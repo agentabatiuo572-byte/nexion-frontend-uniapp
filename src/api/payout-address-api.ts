@@ -16,6 +16,9 @@ export interface PayoutAddressRow {
 export interface PayoutAddressSnapshot {
   addresses: PayoutAddressRow[];
   serverCanonical: true;
+  changeCooldownDays: number;
+  effectiveDelayHours: number;
+  inFlightWithdrawalBlocked: true;
 }
 
 export interface PayoutAddressOtpChallenge {
@@ -65,14 +68,24 @@ function parseRow(value: unknown): PayoutAddressRow {
 
 function parseSnapshot(value: unknown): PayoutAddressSnapshot {
   const row = record(value);
-  if (!row || row.serverCanonical !== true || !Array.isArray(row.addresses)) {
+  if (!row || row.serverCanonical !== true || !Array.isArray(row.addresses)
+      || typeof row.changeCooldownDays !== "number" || !Number.isSafeInteger(row.changeCooldownDays)
+      || row.changeCooldownDays <= 0
+      || typeof row.effectiveDelayHours !== "number" || !Number.isSafeInteger(row.effectiveDelayHours)
+      || row.effectiveDelayHours <= 0 || row.inFlightWithdrawalBlocked !== true) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_RESPONSE_INVALID" });
   }
   const addresses = row.addresses.map(parseRow);
   if (new Set(addresses.map((item) => item.network)).size !== addresses.length) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_RESPONSE_INVALID" });
   }
-  return { addresses, serverCanonical: true };
+  return {
+    addresses,
+    serverCanonical: true,
+    changeCooldownDays: row.changeCooldownDays,
+    effectiveDelayHours: row.effectiveDelayHours,
+    inFlightWithdrawalBlocked: true,
+  };
 }
 
 function parseChallenge(value: unknown): PayoutAddressOtpChallenge {

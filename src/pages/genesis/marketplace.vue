@@ -2,11 +2,11 @@
   Genesis Marketplace — OpenSea-style secondary market for Genesis Node NFTs
   (ported from Nexion-prototype/app/(main)/genesis/marketplace/page.tsx).
 
-  Collection hero (4-stat grid + 7d floor delta + fake OpenSea redirect) →
+  Collection hero (4-stat grid + 7d floor delta + OpenSea redirect) →
   segmented tabs (listings / activity / mine) → sort pills + listing grid /
   activity feed / owned-token grid. Wrapped in <AppChassis active="me">. Buy
   is settled atomically by the canonical Genesis backend transaction.
-  SEED_LISTINGS / SEED_ACTIVITY are faithful English mock arrays.
+  Activity and listings are server-canonical in remote mode.
 -->
 <template>
   <AppChassis active="me">
@@ -142,16 +142,12 @@ import OpenSeaModal from "@/components/genesis/opensea-modal.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { onMounted, onUnmounted } from "vue";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-
-const ONE_DAY = 86400 * 1000;
-const HOUR = 3600_000;
 
 const t = useT();
 const genesis = useGenesis();
@@ -187,29 +183,6 @@ const tab = ref<"listings" | "activity" | "mine">("listings");
 const sortKey = ref<"floor" | "recent" | "lastSale">("floor");
 const openSeaOpen = ref(false);
 
-const now = Date.now();
-const SEED_LISTINGS: Listing[] = [
-  { tokenId: 7, priceUSDT: 16_500, lastSaleUSDT: 7_999, seller: "0x4f8b2c7e1a90", listedAt: now - 1 * HOUR, traits: { tier: "Founder #007", boost: "2.0×", mintYear: 2026 } },
-  { tokenId: 23, priceUSDT: 15_200, lastSaleUSDT: 11_999, seller: "0xa1d9c2e8b720", listedAt: now - 3 * HOUR, traits: { tier: "Founder #023", boost: "1.5×", mintYear: 2026 } },
-  { tokenId: 142, priceUSDT: 14_600, lastSaleUSDT: 11_999, seller: "0x91e3f8074bcd", listedAt: now - 8 * HOUR, traits: { tier: "Founder #142", boost: "1.5×", mintYear: 2026 } },
-  { tokenId: 388, priceUSDT: 14_100, lastSaleUSDT: 9_999, seller: "0x6b4c1afe2d83", listedAt: now - 14 * HOUR, traits: { tier: "Founder #388", boost: "1.5×", mintYear: 2026 } },
-  { tokenId: 501, priceUSDT: 13_800, lastSaleUSDT: 7_999, seller: "0xc7e29a4f8b16", listedAt: now - 1 * ONE_DAY, traits: { tier: "Founder #501", boost: "2.0×", mintYear: 2026 } },
-  { tokenId: 627, priceUSDT: 13_500, lastSaleUSDT: 9_999, seller: "0x29ab78ed4c10", listedAt: now - 2 * ONE_DAY, traits: { tier: "Founder #627", boost: "1.5×", mintYear: 2026 } },
-  { tokenId: 784, priceUSDT: 13_400, lastSaleUSDT: 9_999, seller: "0xf2b04e9d318a", listedAt: now - 2.5 * ONE_DAY, traits: { tier: "Founder #784", boost: "1.5×", mintYear: 2026 } },
-  { tokenId: 829, priceUSDT: 13_400, lastSaleUSDT: 11_999, seller: "0xae73c1b80249", listedAt: now - 3 * ONE_DAY, traits: { tier: "Founder #829", boost: "1.5×", mintYear: 2026 } },
-];
-
-const SEED_ACTIVITY: ActivityEvent[] = [
-  { id: "a-1", kind: "sale", tokenId: 12, priceUSDT: 14_800, from: "0x4f8b2c7e1a90", to: "0x6a1c93f0e2b8", ts: now - 18 * 60_000 },
-  { id: "a-2", kind: "list", tokenId: 7, priceUSDT: 16_500, from: "0x4f8b2c7e1a90", to: "—", ts: now - 1 * HOUR },
-  { id: "a-3", kind: "sale", tokenId: 218, priceUSDT: 13_900, from: "0xa1d9c2e8b720", to: "0x91e3f8074bcd", ts: now - 4 * HOUR },
-  { id: "a-4", kind: "transfer", tokenId: 88, from: "0xc7e29a4f8b16", to: "0x6b4c1afe2d83", ts: now - 6 * HOUR },
-  { id: "a-5", kind: "sale", tokenId: 451, priceUSDT: 14_100, from: "0x29ab78ed4c10", to: "0xae73c1b80249", ts: now - 8 * HOUR },
-  { id: "a-6", kind: "list", tokenId: 142, priceUSDT: 14_600, from: "0x91e3f8074bcd", to: "—", ts: now - 8 * HOUR },
-  { id: "a-7", kind: "mint", tokenId: 847, from: "—", to: "0x4f8b2c7e1a90", ts: now - 12 * HOUR },
-  { id: "a-8", kind: "sale", tokenId: 64, priceUSDT: 13_800, from: "0xf2b04e9d318a", to: "0xae73c1b80249", ts: now - 14 * HOUR },
-];
-
 const ownedCount = computed(() => genesis.myOwned);
 const ownedTokenIds = computed(() => genesis.ownedTokenIds);
 
@@ -218,12 +191,6 @@ const mineTabText = computed(() => fmt(t.value.marketplace.mineTab, { n: ownedCo
 
 // 承接成交后本地移除(mock 演示态,刷新重置;真后台由 server 单源回写挂单状态)。
 const soldTokenIds = ref<Set<number>>(new Set());
-
-// listedAt 约定:opsListing 种子存负偏移(相对 now)→ resolve 为绝对 ts;
-// 运营新建的存绝对 epoch(正值)直接用。
-function resolveListedAt(v: number): number {
-  return v < 0 ? now + v : v;
-}
 
 // Real server listing pool. No local seed or operations registry participates.
 const mergedListings = computed<Listing[]>(() => {
@@ -242,68 +209,26 @@ const sortedListings = computed(() => {
   return arr;
 });
 
-// ── FOMO 成交流(FEAT-GEN10)：虚拟成交（引擎自动 + 运营手动注单）与真实成交混排。
-// 🔴 虚拟成交永不进 bills / 不动 soldSlots / 不动持仓 —— 纯展示流。
-const FOMO_ADDR_POOL = [
-  "0x4f8b2c7e1a90", "0xa1d9c2e8b720", "0x91e3f8074bcd", "0x6b4c1afe2d83",
-  "0xc7e29a4f8b16", "0x29ab78ed4c10", "0xf2b04e9d318a", "0xae73c1b80249",
-  "0x3d70e91ac428", "0x8b52f0173de6",
-];
-const liveFomo = ref<ActivityEvent[]>([]); // 引擎运行时生成(ephemeral,刷新重来)
-let fomoTimer: ReturnType<typeof setTimeout> | null = null;
-let fomoCountToday = 0;
-
-function pickAddr(exclude?: string): string {
-  const i = Math.floor(Math.random() * FOMO_ADDR_POOL.length);
-  const a = FOMO_ADDR_POOL[i];
-  return a === exclude ? FOMO_ADDR_POOL[(i + 1) % FOMO_ADDR_POOL.length] : a;
-}
-
-/** 生成一条虚拟成交（价格=地板 ×(1±band)，随机 token/双方地址）。不碰任何账本。 */
-function genFomoSale(seq: number): ActivityEvent {
-  const band = Math.max(0, Math.min(0.9, cfg.config.fomoPriceBandPct)); // clamp 合法带,防误配(如把 15 当 0.15)产负价/0
-  const floor = stats.value.floor;
-  const price = Math.max(1, Math.round(floor * (1 + (Math.random() * 2 - 1) * band)));
-  const from = pickAddr();
-  return {
-    id: `fomo-${seq}-${genesis.soldSlots}`,
-    kind: "sale",
-    tokenId: 100 + Math.floor(Math.random() * 800),
-    priceUSDT: price,
-    from,
-    to: pickAddr(from),
-    ts: Date.now(),
-  };
-}
-
-function scheduleFomo() {
-  if (!cfg.config.fomoEnabled) return;
-  const { fomoIntervalMinMs: mn, fomoIntervalMaxMs: mx } = cfg.config;
-  const delay = mn + Math.random() * Math.max(0, mx - mn);
-  fomoTimer = setTimeout(() => {
-    // 🔴 阻断态不生成虚拟成交(独立验收 P2-13)。页面一边说「买不了」、一边不停播
-    //   「刚有人成交」,是当面互相拆台;它与创世页的社会证明属同一类紧迫感元素。
-    //   注意保留下面的 scheduleFomo() 递归 —— 只跳过本次生成,恢复开放后自动接上,
-    //   而不是把定时器停掉(停掉就再也不会自己恢复)。
-    if (secondaryBlock.value === null && cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
-      liveFomo.value = [genFomoSale(fomoCountToday), ...liveFomo.value].slice(0, 30);
-      fomoCountToday += 1;
-    }
-    scheduleFomo();
-  }, delay);
-}
-
-// activity 展示流 = 引擎虚拟成交 + 运营手动注单(config.fomoActivity)+ 种子，按 ts 倒序。
 const mergedActivity = computed<ActivityEvent[]>(() => {
-  const manual = cfg.config.fomoActivity.map((e) => ({ ...e, ts: resolveListedAt(e.ts) }));
-  return [...liveFomo.value, ...manual, ...SEED_ACTIVITY].sort((a, b) => b.ts - a.ts);
-});
-
-onMounted(() => {
-  scheduleFomo();
-});
-onUnmounted(() => {
-  if (fomoTimer) clearTimeout(fomoTimer);
+  const listings: ActivityEvent[] = genesis.remoteListings.map((listing) => ({
+    id: `listing:${listing.holdingNo}`,
+    kind: "list",
+    tokenId: listing.tokenId,
+    priceUSDT: listing.priceUSDT,
+    from: listing.seller,
+    to: "—",
+    ts: listing.listedAt,
+  }));
+  const transactions: ActivityEvent[] = genesis.remoteTransactions.map((tx) => ({
+    id: `transaction:${tx.orderNo}`,
+    kind: "sale",
+    priceUSDT: tx.amountUsdt,
+    from: "—",
+    to: "—",
+    ts: tx.completedAt,
+    description: `${tx.orderType} · ${tx.quantity} node${tx.quantity > 1 ? "s" : ""} · ${tx.orderNo}`,
+  }));
+  return [...listings, ...transactions].sort((a, b) => b.ts - a.ts);
 });
 
 async function handleBuy(listing: Listing) {

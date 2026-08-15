@@ -100,6 +100,14 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfigSeed = {
       { key: "poster", intentType: "poster", enabled: true },
       { key: "system", intentType: "system", enabled: true },
     ],
-    appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" },
+    appDownload: {
+      officialUrl: "",
+      iosUrl: "",
+      androidUrl: "",
+      apkUrl: "",
+      version: "",
+      releaseNotes: { zh: "", en: "" },
+      source: "unavailable",
+    },
   },
 };

@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -37,7 +37,10 @@ import { PRODUCTS } from "@/mock/products";
 import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
+import { isProductAvailable } from "@/store/product-availability";
 import { navTo } from "@/lib/route";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { productCatalogState } from "@/store/product-catalog";
 
 const t = useT();
 const app = useApp();
@@ -45,9 +48,46 @@ const w = computed(() => t.value.store.tradeinUpgrade);
 // 上架节奏门(FEAT-DEV02b):横幅报价目标同样只取已上架/抢先购窗口内的 SKU。
 const phase = useProductPhase();
 const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
+type BannerQuote = { name: string; credit: number; target: string; net: number };
+const remoteBest = ref<BannerQuote | null>(null);
+
+async function refreshRemoteBest(): Promise<void> {
+  if (!remoteApiEnabled || productCatalogState.status !== "ready") return;
+  const accountKey = app.accountKey;
+  remoteBest.value = null;
+  try {
+    const candidates: BannerQuote[] = [];
+    for (const product of PRODUCTS.filter((item) => isProductAvailable(item, phase.value))) {
+      const eligibility = await deviceE3Api.eligibility(product.id);
+      if (accountKey !== app.accountKey) return;
+      const source = eligibility.sources.find((item) => item.eligible);
+      if (!eligibility.eligible || !source) continue;
+      const quote = await deviceE3Api.quote(source.sourceDeviceId, product.id);
+      if (accountKey !== app.accountKey) return;
+      candidates.push({
+        name: source.sourceProductName ?? "—",
+        credit: quote.discountUsdt,
+        target: quote.targetProductName,
+        net: quote.payableUsdt,
+      });
+    }
+    if (accountKey === app.accountKey) {
+      remoteBest.value = candidates.reduce<BannerQuote | null>(
+        (best, candidate) => !best || candidate.credit > best.credit ? candidate : best,
+        null,
+      );
+    }
+  } catch {
+    if (accountKey === app.accountKey) remoteBest.value = null;
+  }
+}
+
+watch([() => app.accountKey, () => productCatalogState.revision], () => {
+  void refreshRemoteBest();
+}, { immediate: true });
 
 // 最优可置换设备:抵扣额最高者;目标取其最低升级价 SKU(最易达成的下一档)。
-const best = computed(() => {
+const mockBest = computed<BannerQuote | null>(() => {
   if (!DEFAULT_TRADEIN_CONFIG.enabled) return null;
   let out: { name: string; credit: number; target: string; net: number } | null = null;
   for (const d of app.visibleDevices) {
@@ -56,7 +96,9 @@ const best = computed(() => {
     const targets = PRODUCTS.filter(
       (p) =>
         (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
-        isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
+        (isProductAvailable(p, phase.value)
+          || (p.available === undefined
+            && isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value))),
     );
     if (targets.length === 0) continue;
     const target = targets.reduce((a, b) => (a.price < b.price ? a : b));
@@ -77,6 +119,7 @@ const best = computed(() => {
   }
   return out;
 });
+const best = computed(() => remoteApiEnabled ? remoteBest.value : mockBest.value);
 
 const title = computed(() =>
   best.value

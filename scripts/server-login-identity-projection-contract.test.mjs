@@ -47,6 +47,26 @@ test("App bootstrap reprojects the in-memory server user after account-store reb
   assert.match(app, /app\.projectServerIdentity\(serverSession\.user\)/);
 });
 
+test("post-login bootstrap does not clear the catalog that the accepted login just loaded", () => {
+  const app = read("src/App.vue");
+  assert.match(app, /const completedRemoteLoginAlreadyBound = remoteApiEnabled/);
+  assert.match(app, /app\.accountKey === auth\.accountId/);
+  assert.match(app, /session\.accountKey === auth\.accountId/);
+  assert.match(app, /completedRemoteLoginAlreadyBound[\s\S]*?accountSessionBootstrapped = true;[\s\S]*?return;/);
+  assert.match(app, /if \(completedRemoteLoginAlreadyBound\)[\s\S]*?return;[\s\S]*?app\.bindAccount\(key\);[\s\S]*?rebindAccountScopedStores\(key\);/);
+});
+
+test("remote fleet reads cannot start without a matching in-memory server session", () => {
+  const appShell = read("src/App.vue");
+  const appStore = read("src/store/app.ts");
+  assert.match(appShell, /function canRefreshRemoteAccount\(auth:/);
+  assert.match(appShell, /sessionVault\.read\(\)[\s\S]*?auth\.accountId === `user:\$\{serverSession\.user\.userId\}`/);
+  assert.match(appShell, /if \(canRefreshRemoteAccount\(auth\)\) void useApp\(\)\.refreshRemoteFleet\(\);/);
+  assert.doesNotMatch(appShell, /if \(remoteApiEnabled\) void useApp\(\)\.refreshRemoteFleet\(\);/);
+  assert.match(appStore, /const activeSession = sessionVault\.read\(\);/);
+  assert.match(appStore, /expectedAccountKey !== `user:\$\{activeSession\.user\.userId\}`[\s\S]*?return false;/);
+});
+
 test("remote nickname and avatar mutations use server authority", () => {
   const profile = read("src/store/profile.ts");
   const page = read("src/pages/me/profile.vue");

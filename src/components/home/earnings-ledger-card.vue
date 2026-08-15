@@ -13,7 +13,7 @@
 
     <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
       <view
-        v-for="(r, i) in ROWS"
+        v-for="(r, i) in rows"
         :key="r.id"
         class="grid items-center gap-2.5"
         :style="{ gridTemplateColumns: '1fr auto 36px', padding: '10px 0', borderBottom: i < ROWS.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
@@ -24,14 +24,19 @@
         <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ r.amt }}</text>
         <text class="font-mono-tabular text-right" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
       </view>
+      <text v-if="remoteApiEnabled && rows.length === 0" class="block px-2 py-3" style="font-size: 12px; color: var(--v5-ink-3)">No completed task earnings yet.</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
 
 const t = useT();
+const app = useApp();
 
 const ROWS = [
   { id: 1, who: "Pocket Studios", model: "SDXL Turbo", amt: "+$0.00032", t: "2s" },
@@ -40,6 +45,20 @@ const ROWS = [
   { id: 4, who: "Mosaic Studios", model: "Flux Schnell", amt: "+$0.00048", t: "52s" },
   { id: 5, who: "Vector Foundry", model: "MobileBERT", amt: "+$0.00009", t: "1m" },
 ];
+
+const remoteRows = computed(() => app.visibleDevices
+  .flatMap((device) => device.recentTasks)
+  .filter((task) => Number.isFinite(task.completedAt))
+  .sort((a, b) => b.completedAt - a.completedAt)
+  .slice(0, 5)
+  .map((task) => ({
+    id: task.id,
+    who: task.client,
+    model: task.model,
+    amt: `+$${task.reward.toFixed(5)}`,
+    t: new Date(task.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  })));
+const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 
 function goAll() {
   uni.navigateTo({ url: "/pages/me/wallet-bills", fail: () => {} });

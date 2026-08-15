@@ -28,9 +28,16 @@ export const productCatalogState = reactive<{
 });
 
 let refreshInFlight: Promise<boolean> | null = null;
+let catalogEpoch = 0;
 
 export function prepareProductCatalog(): void {
   if (!remoteApiEnabled) return;
+  // Catalog snapshots and Sandbox run ids are account-scoped. Bump the epoch
+  // before clearing so a response started by the previous account can never
+  // repopulate this account's store. Detach the old promise as well so the new
+  // account can immediately start its own request.
+  catalogEpoch += 1;
+  refreshInFlight = null;
   clearProductCatalog();
   productCatalogState.status = "loading";
   productCatalogState.error = "";
@@ -46,8 +53,10 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
 
   productCatalogState.status = "loading";
   productCatalogState.error = "";
-  refreshInFlight = productCatalogApi.catalog()
+  const requestEpoch = catalogEpoch;
+  const request = productCatalogApi.catalog()
     .then((snapshot) => {
+      if (requestEpoch !== catalogEpoch) return false;
       replaceProductCatalog(snapshot.products);
       productCatalogState.status = "ready";
       productCatalogState.source = snapshot.source;
@@ -56,6 +65,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       return true;
     })
     .catch((error: unknown) => {
+      if (requestEpoch !== catalogEpoch) return false;
       clearProductCatalog();
       productCatalogState.status = "error";
       productCatalogState.error = error instanceof Error ? error.message : "PRODUCT_CATALOG_UNAVAILABLE";
@@ -65,7 +75,8 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       return false;
     })
     .finally(() => {
-      refreshInFlight = null;
+      if (refreshInFlight === request) refreshInFlight = null;
     });
-  return refreshInFlight;
+  refreshInFlight = request;
+  return request;
 }

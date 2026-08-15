@@ -65,6 +65,11 @@ function integer(value: unknown, minimum = 0): number {
   return parsed;
 }
 
+function booleanValue(value: unknown): boolean {
+  if (typeof value !== "boolean") return invalid();
+  return value;
+}
+
 function optionalInteger(value: unknown, minimum = 0): number | undefined {
   if (value === null || value === undefined) return undefined;
   return integer(value, minimum);
@@ -137,6 +142,9 @@ function product(value: unknown): Product {
     features: [...source.features],
     ai: ai(source.ai),
     status: lifecycle as Product["status"],
+    available: booleanValue(source.available),
+    releaseState: optionalString(source.releaseState),
+    releasePhaseId: optionalString(source.releasePhaseId),
     unlocksAtPhase,
     purchaseGate: purchaseGate(source.purchaseGate),
   };

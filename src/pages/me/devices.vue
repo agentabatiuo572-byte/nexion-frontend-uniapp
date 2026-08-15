@@ -82,6 +82,7 @@
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
+              :action-disabled="remoteApiEnabled && !!d.pendingDeactivate"
               v-bind="tradeinStrip(d)"
               @toggle="handleDeactivate(d)"
               @tradein="handleTradein(d)"
@@ -150,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
@@ -174,11 +175,24 @@ import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
+import { isProductAvailable } from "@/store/product-availability";
+import { refreshProductCatalog } from "@/store/product-catalog";
 
 const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
+const deferredCommandInFlight = ref<Set<string>>(new Set());
+
+function deferredCommandSlot(device: Device, accountKey: string, version: number): string {
+  return `${accountKey.trim().toLowerCase()}:deactivate-after-task:${device.id}:${version}`;
+}
+
+function deferredCommandBusy(device: Device): boolean {
+  if (!Number.isSafeInteger(device.rowVersion) || Number(device.rowVersion) < 0) return false;
+  return deferredCommandInFlight.value.has(deferredCommandSlot(device, app.accountKey, Number(device.rowVersion)));
+}
 
 // Typed against TrialStatus so a future enum change fails tsc here instead of
 // silently widening to string[] (FEAT-TRIAL02 audit trap).
@@ -209,12 +223,42 @@ const ladderDevice = ref<Device | null>(null);
 // 上架节奏门(FEAT-DEV02b):未正式上架且不在抢先购窗口的 SKU 不算升级目标。
 const phase = useProductPhase();
 const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
+const remoteEligibleSourceIds = ref<Set<number>>(new Set());
+const remoteEligibilityReady = ref(!remoteApiEnabled);
+
+async function refreshRemoteTradeinEligibility(): Promise<void> {
+  if (!remoteApiEnabled) return;
+  const accountKey = app.accountKey;
+  remoteEligibilityReady.value = false;
+  remoteEligibleSourceIds.value = new Set();
+  try {
+    if (!(await refreshProductCatalog(true)) || accountKey !== app.accountKey) return;
+    const targets = PRODUCTS.filter((product) => isProductAvailable(product, phase.value));
+    const snapshots = await Promise.all(targets.map((product) => deviceE3Api.eligibility(product.id)));
+    if (accountKey !== app.accountKey) return;
+    remoteEligibleSourceIds.value = new Set(snapshots.flatMap((snapshot) => snapshot.sources
+      .filter((source) => source.eligible)
+      .map((source) => source.sourceDeviceId)));
+    remoteEligibilityReady.value = true;
+  } catch {
+    if (accountKey === app.accountKey) remoteEligibleSourceIds.value = new Set();
+  }
+}
+
+watch(() => app.accountKey, () => { void refreshRemoteTradeinEligibility(); }, { immediate: true });
 
 function tradeinStrip(d: Device): {
   tradeinCreditText?: string;
   tradeinCtaLabel?: string;
   tradeinDisabledText?: string;
 } {
+  if (remoteApiEnabled) {
+    if (!remoteEligibilityReady.value || !remoteEligibleSourceIds.value.has(Number(d.id))) return {};
+    return {
+      tradeinCreditText: t.value.tradein.remoteQuoteCreditLabel,
+      tradeinCtaLabel: t.value.tradein.stripCta,
+    };
+  }
   if (!DEFAULT_TRADEIN_CONFIG.enabled) return {};
   const paid = d.paidPriceUsdt ?? 0;
   if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
@@ -264,6 +308,11 @@ async function handleActivate(d: Device) {
 }
 
 async function handleDeactivate(d: Device) {
+  if (remoteApiEnabled && deferredCommandBusy(d)) return;
+  if (remoteApiEnabled && d.pendingDeactivate) {
+    toast.info(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
+    return;
+  }
   // Running task → dedicated sheet offering wait / force / cancel.
   if (d.currentTask) {
     sheetDevice.value = d;
@@ -285,12 +334,81 @@ async function handleDeactivate(d: Device) {
 function onSheetWait() {
   const d = sheetDevice.value;
   if (!d) return;
-  if (remoteApiEnabled) toast.warn(t.value.myDevices.inventoryRemoteWaitUnavailable);
-  else {
-    app.scheduleDeactivation(d.id);
-    toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
+  if (remoteApiEnabled) {
+    void runRemoteDeferredCommand(d);
+    return;
   }
+  app.scheduleDeactivation(d.id);
+  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
+}
+
+async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
+  if (!Number.isSafeInteger(d.rowVersion) || Number(d.rowVersion) < 0) {
+    toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+    return false;
+  }
+  const accountKey = app.accountKey;
+  const scope = captureAccountScope();
+  const version = Number(d.rowVersion);
+  const slot = deferredCommandSlot(d, accountKey, version);
+  if (deferredCommandInFlight.value.has(slot)) return false;
+  deferredCommandInFlight.value.add(slot);
+  sheetDevice.value = null;
+  const key = acquireDeviceCommandKey(accountKey, "deactivate-after-task", d.id, version);
+  const current = () => isCurrentAccountScope(scope) && accountKey === app.accountKey;
+  const confirmed = (status: "PENDING_DEACTIVATE" | "DEACTIVATED") => {
+    if (!current()) return false;
+    const row = app.devices.find((entry) => entry.id === d.id);
+    if (!row) return status === "DEACTIVATED";
+    return status === "DEACTIVATED" ? row.activatedAt === null : row.activatedAt !== null;
+  };
+  const finish = (status: "PENDING_DEACTIVATE" | "DEACTIVATED") => {
+    finishDeviceCommand(accountKey, "deactivate-after-task", d.id, version);
+    toast.success(status === "PENDING_DEACTIVATE"
+      ? fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) })
+      : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
+  };
+  try {
+    toast.info(t.value.deactivateSheet.toastSubmitting);
+    const result = await deviceE3Api.deactivateAfterTask(Number(d.id), version, key);
+    if (result.status === "ACTIVE") throw new Error("DEVICE_DEFERRED_RESPONSE_INVALID");
+    if (!current()) return false;
+    if (!await app.refreshRemoteFleet() || !confirmed(result.status)) {
+      throw new Error("DEVICE_DEFERRED_DEACTIVATION_NOT_CONFIRMED");
+    }
+    finish(result.status);
+    return true;
+  } catch (cause) {
+    // A lost response or 409 is retried with the same durable key first. A
+    // successful replay proves the command was accepted without a duplicate.
+    try {
+      const replay = await deviceE3Api.deactivateAfterTask(Number(d.id), version, key);
+      if (replay.status === "ACTIVE") throw new Error("DEVICE_DEFERRED_RESPONSE_INVALID");
+      if (current() && await app.refreshRemoteFleet() && confirmed(replay.status)) {
+        finish(replay.status);
+        return true;
+      }
+    } catch {
+      // Continue to the authoritative fleet readback below.
+    }
+    try {
+      if (current() && await app.refreshRemoteFleet()) {
+        const row = app.devices.find((entry) => entry.id === d.id);
+        if (current() && row?.activatedAt === null) {
+          finish("DEACTIVATED");
+          return true;
+        }
+      }
+    } catch {
+      // Keep the stable key while command and readback remain uncertain.
+    }
+    if (isSettledRejection(cause)) finishDeviceCommand(accountKey, "deactivate-after-task", d.id, version);
+    if (current()) toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+    return false;
+  } finally {
+    deferredCommandInFlight.value.delete(slot);
+  }
 }
 
 async function onSheetForce() {

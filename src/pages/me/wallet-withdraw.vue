@@ -448,6 +448,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
         dailyLimitCount: sandboxPolicy.dailyLimitCount,
         balanceMaxRatio: sandboxPolicy.balanceMaxRatio,
         smallAmountThresholdUsd: sandboxPolicy.smallAmountThresholdUsd,
+        strongReviewThresholdUsdt: sandboxPolicy.smallAmountThresholdUsd,
         payoutSlaHours: sandboxPolicy.payoutSlaHours,
         networkConfirmFeeUsd: { ...sandboxPolicy.networkConfirmFeeUsd },
         nexFeeOffsetRate: sandboxPolicy.nexFeeOffsetRate,

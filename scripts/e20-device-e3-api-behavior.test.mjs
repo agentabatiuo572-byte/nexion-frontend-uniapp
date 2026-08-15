@@ -67,6 +67,68 @@ const validResult = {
   walletBalanceAfterUsdt: 500,
 };
 
+const validFleet = {
+  dailyUsdt: 12.5,
+  dailyNex: 3.2,
+  realizedTodayUsdt: 1.25,
+  realizedTodayNex: 2.5,
+  walletUsdt: 500,
+  walletNex: 80,
+  userJoinedAt: 1760000000000,
+  serverNow: 1760003600000,
+  timezone: "Asia/Shanghai",
+  slotCap: 3,
+  capacitySchedule: { capacityBand1DeltaPct: "-3" },
+  source: "nx_user_device + nx_compute_receipt + nx_compute_e3_config",
+  devices: [{
+    id: 9,
+    rowVersion: 1,
+    instanceNo: "DEV-9",
+    name: "NexionBox S1",
+    deviceType: "BOX",
+    productCode: "STELLARBOX-S1",
+    status: "ACTIVE",
+    pendingDeactivate: false,
+    activatedAt: 1750000000000,
+    purchasedAt: 1750000000000,
+    dailyUsdt: 12.5,
+    dailyNex: 3.2,
+    todayEarningsUsdt: 1.25,
+    todayEarningsNex: 2.5,
+    gpuModel: "RTX 4090",
+    vramTotalGb: 96,
+    basePowerW: 1200,
+    location: "Singapore",
+    capacityPct: 100,
+    capacityAgeMonths: 1,
+    capacityConfigKey: "capacityApplyToS1",
+    capacitySubsidized: false,
+    capacitySubsidyDays: 0,
+    actualPaidUsdt: 649,
+    cumulativeOutputUsdt: 200,
+  }],
+};
+
+test("E20 fleet preserves server timezone, realized today earnings, and complete specs", async () => {
+  const fleet = await apiReturning(validFleet).fleet();
+  assert.equal(fleet.timezone, "Asia/Shanghai");
+  assert.equal(fleet.realizedTodayUsdt, 1.25);
+  assert.equal(fleet.realizedTodayNex, 2.5);
+  assert.equal(fleet.devices[0].todayEarningsUsdt, 1.25);
+  assert.equal(fleet.devices[0].todayEarningsNex, 2.5);
+  assert.equal(fleet.devices[0].vramTotalGb, 96);
+});
+
+test("E20 fleet rejects a missing device specification instead of coercing it to zero", async () => {
+  await assert.rejects(
+    apiReturning({
+      ...validFleet,
+      devices: [{ ...validFleet.devices[0], gpuModel: null }],
+    }).fleet(),
+    /E3_CANONICAL_RESPONSE_INVALID/,
+  );
+});
+
 function apiReturning(payload) {
   return createDeviceE3Api({ request: async () => structuredClone(payload) });
 }

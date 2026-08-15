@@ -85,6 +85,7 @@
           </view>
         </view>
 
+        <template v-if="market.isMockMode">
         <!-- ───────── EXCHANGE LISTINGS ───────── -->
         <view class="rounded-2xl" :style="cardStyle">
           <text class="block font-mono-tabular" :style="listLabelStyle">{{ t.marketPage.listings.label }}</text>
@@ -129,6 +130,11 @@
         </view>
 
         <text class="block text-center" :style="noteStyle">{{ t.marketPage.note }}</text>
+        </template>
+        <view v-else data-testid="market-comparables-hold" :style="marketHoldStyle">
+          <text class="block" :style="marketHoldTitleStyle">{{ t.marketPage.comparablesHoldTitle }}</text>
+          <text class="block" :style="marketHoldBodyStyle">{{ t.marketPage.comparablesHoldBody }}</text>
+        </view>
       </view>
     </view>
   </AppChassis>
@@ -231,8 +237,7 @@ const statCells = computed(() => [
 ]);
 
 function goExchange() {
-  // Exchange route not yet ported (see PORT report §7) — degrade to no-op.
-  uni.navigateTo({ url: "/pages/me/wallet", fail: () => {} });
+  uni.navigateTo({ url: "/pages/me/wallet-exchange", fail: () => {} });
 }
 
 // ─── styles ───
@@ -376,6 +381,13 @@ const noteStyle: CSSProperties = {
   lineHeight: 1.625,
   paddingTop: "4px",
 };
+const marketHoldStyle: CSSProperties = {
+  padding: "16px",
+  borderRadius: "16px",
+  background: "var(--v5-surface)",
+};
+const marketHoldTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const marketHoldBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", lineHeight: "18px", color: "var(--v5-ink-3)" };
 </script>
 
 <style scoped>

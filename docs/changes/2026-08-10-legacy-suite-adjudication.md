@@ -5,6 +5,13 @@
 - **判决口径**:A=判据过期(不变量在,形态变了→改成构造性判据+双向红测)· B=真回归(修码+门同一提交)· C=判据废弃(主语已不存在→显式删除并写明)。
 - 状态列:☐ 待实施 · ◐ 实施中 · ☑ 已实施 · ✔ 已红测。
 
+## 2026-08-15 路径与真实契约收口
+
+本台账的运行时基线已迁至当前真实工作树：App 为 `D:\workspace\NX1.0-UniApp`，PC 为 `D:\workspace\nexion-ops-console`。历史条目中的 `Nexion-uniapp`、`Nexion-admin-prototype` 和 `lib/mock/admin/compute-config.ts` 仅保留为历史证据，不再作为脚本输入或验收来源。
+
+- SPEC-7 parity 现在执行 PC `scripts/platform-config-contract-parity.mjs`：严格检查 App `src/api/platform-config-api.ts` 的 `/api/config/platform` 解析契约，以及 PC E6 `/api/admin/devices/compute-config`、K1/K2 server API parser 的真实来源；不恢复已删除的 mock，也不以默认值冒充服务端值。
+- 采样证据现在由 PC `scripts/uniapp-port-coverage-audit.mjs` 读取 App `D:\workspace\NX1.0-UniApp\src\pages.json` 与 PC `docs/audit/shards`；缺证据仍判红，不改为跳过。
+
 ## 总判决:A 30 · B 8 · C 7(B 类单列见文末;B7/B8 为首轮修复后全量复跑揪出的第二层真回归)
 
 | # | 门 | 判决 | 依据(回源) | 处置 |
@@ -40,7 +47,7 @@
 | 29 | platform-anchor: 种子取自编译期锚 | A(判据反转) | 819a6da 种子出走+c37e642 compat 默认清零并注释「Deliberately invalid sentinel…Never replace with plausible data」 | 新判据钉**全零哨兵不变量**(compat publicStats 默认必须全零/空表,出现可信假数即红)——这是新的承重不变量 |
 | 30 | platform-anchor: trust.vue 27,150 | C | Q2 字面量整删:QTR_FINANCIALS=[]+模板段 v-if="false"(trust.vue:46/279);披露改远端 trustSectionApi 按地区下发;admin-ops 侧同字段已服务端化(i4-trust.tsx:91),字面量 0 命中 | 显式删门(连同 $47.0M 与 admin data.ts 镜像判据);对照锚在停更仓,概念整体废弃 |
 | 31 | platform-anchor: trust.vue $47.0M | C | 同 #30 | 同 #30 |
-| 32 | sampling evidence(learn 2 页) | B6 | 门正当拦截:c37e642 仅有的两个新增页面 learn/courses+learn/course 无走查证据;证据体系最新体(plan/auditor/corpus)仍在 Nexion-admin-prototype,admin-ops 副本是旧子集(缺 UNI-FR-11/12+空心证据检查) | 给 2 页补采样证据(prototype 仓 corpus+shard 计划登记);体系迁 admin-ops 作为拍板项报主人 |
+| 32 | sampling evidence(learn 2 页) | B6 | 历史基线曾指向旧 prototype；当前门已由真实 PC `D:\workspace\nexion-ops-console\scripts\uniapp-port-coverage-audit.mjs` 解析 `D:\workspace\NX1.0-UniApp` 页面与 shard 证据 | 给 2 页补采样证据并保持缺证据即红，不伪造样本 |
 | 33 | 四边描边容器(3 违例) | B2+B3+产品修 | ①genesis dock 禁用态:allowlist cls 钉了启用态类串,禁用态掉 active:scale 类→miss(元素本身已被豁免)→A 放宽 cls 匹配;②tcs-hero:1px brand 描边违《03》§3,被 voucher 弹层让位暴露→B3 删描边;③stake-alt 卡:渲染条件被 policy-null 回退削弱(0≥0 恒真),空表单即渲染→B2 收条件 amountNum>0 | ①**实际处置=产品修**(genesis dock 禁用态 border:none),非改 allowlist —— V1-P1-1 更正;②③产品修+门不动(zero-border 门本身工作正常) |
 | 34 | dom-qa 新 DOM 违例 | A(共因) | 5 路由 DOM 违例 0(gate=0 info=0);红=coverage 前置的 pageerror(B1 噪声) | B1 修复+mock 前置;dom-qa 门不动。附:team 页 25 节点疑点记走查清单 |
 | 35 | 兑换/创世重入守卫 | A | B④ 资金原语命中 0=创世购买让渡后端原子事务(purchase-sheet.vue:167-204,不再本地扣款);:580 needle 掉 async 前缀致 transform 崩 | 重写:锁点须在 `await genesis.purchase` 前+needle 换 async 形态+双击固定靶用 stub genesisApi 数调用次数(恰 1) |
@@ -62,7 +69,7 @@
 | B3 | #33② | trial-claim-sheet .tcs-hero 有填充+四边描边(违《03》§3),被 voucher 让位暴露 | 删 border 保留 tint;zero-border 门本身即防复发 |
 | B4 | #1 子 11 | commitWithdrawal(首提标记+地址登记)搬家后全站零调用,客户端风控引擎数据面断供:hasWithdrawn 永 false → 首提人工审永远误触发、地址永不登记 → 新地址 hold 永误判、K1 强维输入丢失。已回源核验:seam 注释自证用途+消费面(eligibility-core:442)活着 | ✔ app.ts:1282 建单成功后接回 `commitWithdrawal(accountKey.value, network, address)`;fastlane #11 重锚三合取(调用在/顺序对/seam 体内两原语在),红测 3 组各自隔离打红 |
 | B5 | #26/#41 | c37e642 把创世门跨仓取材面改成本机不存在的仓名,门失效 | 双候选仓名+失效必红(已并入 #41 处置) |
-| B6 | #32 | learn/courses+learn/course 两新页无走查采样证据(门的本职拦截) | ✔ prototype 仓证据生成器补 2 页证据+shard 计划登记(auditor findings 2→0,commit b702df4) |
+| B6 | #32 | learn/courses+learn/course 两新页无走查采样证据(门的本职拦截) | ✔ 历史 prototype 证据仅作旧基线；当前验收由真实 PC audit 读取 `NX1.0-UniApp` 页面和现有 shard，缺项仍红 |
 | B7 | #33②→连锁 | 「故意非法」全零哨兵在 publicStatsHealth 的 members/rank/jitter 合法域里**是合法值**(0∈域)→ mock 首页把「Members 0 +0%/mo」当真数据渲染(tap-feedback 探针连带报违例) | ✔ compat 哨兵三字段(onlineJitter/growthPct/virtualUserCount)0→-1 使六健康位全 false;account-hashrate ⑥a 升级为「无正数 + 六健康位全 false」行为断言(86/0);红测:塞 28432 必红 |
 | B8 | #22/#23 根因二段 | creditRewardBucketInternal 把「客户端释放台账写成功」当 held 两路由的放行条件,而 c37e642 已把台账空壳化恒 false → **mock 模式风控标记账号的赠金/奖励入桶无条件失败**(AUTH02 注册重试恒「服务不可用」实锤;settle 路径同调用但忽略返回值,无此病) | ✔ 与 settle 同形 fire-and-forget(台账义务在服务端);新增 selfcheck-reward-buckets.mjs(3 路由+幂等+非法金额,10/0)接入 [1.6];红测:塞回判死条件→held 两路由精准判红、withdrawable 不误伤;AUTH02 en/zh 复跑 PASS |
 
@@ -70,8 +77,8 @@
 
 - **红测计分板**(除各 selfcheck 内置自证外的文件级注入):resilience✓✓ · preflight✓✓(5173 remote 必红/5183 mock 必绿)· PROD 守卫✓✓ · canonicalStatus✓✓ · available fail-closed✓✓ · no-local-debit✓✓ · compat 全零✓✓ · coverage 集合等式✓✓(此条红测揪出我判据自身的幽灵键 bug 并修正——红测同样防「broken-red」)· trust Q2✓(注入红+还原字节校验)· brand✓✓(裸词红/白名单三形态绿);I1 9 组 · I2 9 组 · I3 13 组(各 agent 报告存证)。
 - **实施 agent 裁量披露**:① I3 将本地 admin-ops checkout `--ff-only` 快进 5 笔到 origin/main(⑧c 键 parity 的红是本地旧线环境红,错题集「本地可能是旧分叉线」同型;纯 ff 干净树,未改判据);② I3 补齐 money-receipt 收口点 EXPORTS(postMoneyBillsOnce),连带抓出并入册漏网的 payout-address.ts。
-- **采样证据**:Nexion-admin-prototype 仓 commit `b702df4`(落在其当前所在分支 `rhythm-configurable`,未推送——门读工作树文件不受分支影响;归置留主人定)。
-- **相邻发现(未在 43 门内,已立案未擅修)**:① learn 双页整页硬编码中文(i18n 违规)→ 任务芯片 task_245aaf60;② SPEC-7 param key/value parity 两条绿门仍锚停更仓 Nexion-admin-prototype 的 compute-config.ts(值得迁 admin-ops,涉对侧文件结构差异,留拍板);③ c37e642 新增的远端契约测试(g/h-remote-authority、hard-block-auth/d5/h9/k6、h9-visible-user-method)**两条链都没接**(孤儿;h-remote 还需 nexion-backend 兄弟仓,本机缺);④ team 页 runtime 仅渲染 25 节点(其它 tab 572-693),疑似 remote 化后空壳,待实景走查确认。
+- **历史采样证据**:旧 prototype 仓 commit `b702df4` 仅作为当时的取证背景，不再由当前门解析。
+- **相邻发现状态更新**:① learn 双页 i18n 问题仍按原任务芯片管理；② SPEC-7 parity 已迁至 `D:\workspace\NX1.0-UniApp\scripts\verify.sh` 调用真实 PC `platform-config-contract-parity.mjs`，不再依赖旧 mock；③ 其它历史孤儿链仍按各自台账处理；④ team 页 runtime 覆盖仍需独立走查，不因路径迁移自动宣称完成。
 
 ## 独立验收三路(2026-08-10 夜,报告存证)
 
@@ -138,10 +145,10 @@
 
 ## HANDOFF 义务清单(随包写入后台仓交接书)
 
-0. **admin 侧数组参数登记**:captchaAlwaysScenes 需登记进 admin compute-config(其 OtpGateParamDef 是 number 单形态,数组参数要加宽类型+K2 渲染+defaultVal),登记后按 verify.sh 注释两步接进值 parity 循环(V1-P1-2 更正:此项原声称已记但清单里没有)。
+0. **旧 admin 侧数组参数登记**:历史 compute-config mock 登记项不再是当前验收输入；captchaAlwaysScenes 由 App platform-config parser/compat 行为门守护，PC 当前 K2 API parser 守护 OTP 数值键集，不能以旧 mock defaultVal 替代服务端响应。
 1. POST /api/withdrawals 服务端事务内:重读落盘余额(幂等键≠并发闸)、拒 NaN/≤0 金额、reject 路由零扣款、费用与 policyVersion 交叉核对。
 2. 收益释放:服务端账本+熔断(clusterRestricted)为唯一权威;客户端已只读。
 3. 创世邀请码:一码一用/一账号一次改服务端强制。
 4. `x-nexion-edge-country` header 名含旧品牌,改名需后端同步(client 测试跟随)。
-5. 采样证据体系(l1-shards/auditor/corpus)仍在停更的 Nexion-admin-prototype,是否迁 admin-ops 待拍板。
+5. 采样证据体系已按当前边界迁移解析：App `D:\workspace\NX1.0-UniApp` + PC `D:\workspace\nexion-ops-console`；缺页、缺 shard 或 blocking action 仍由 PC audit 判红。
 6. `h-remote-authority-contract.test.mjs` 断言读兄弟仓 `../nexion-backend` 的 Java 源,本机无该 checkout —— 已在契约套件登记为 excluded(不假装它在跑),需在有后端仓的环境单跑。

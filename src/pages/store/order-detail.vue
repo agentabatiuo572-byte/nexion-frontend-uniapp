@@ -131,6 +131,7 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
@@ -254,7 +255,10 @@ async function handleCancel() {
     icon: "warn",
   });
   if (ok && order.value) {
-    if (orders.cancelOrder(order.value.id)) {
+    const cancelled = remoteApiEnabled
+      ? await orders.cancelOrderRemote(order.value.id)
+      : orders.cancelOrder(order.value.id);
+    if (cancelled) {
       toast.warn(t.value.orders.cancelDoneToast);
     } else {
       toast.warn("Cancellation is awaiting server confirmation; this order remains pending.");

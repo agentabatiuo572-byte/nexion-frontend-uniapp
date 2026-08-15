@@ -31,6 +31,12 @@
           <text class="block mt-1" :style="titleStyle">{{ product.name }}</text>
           <view v-if="detailsOpen">
             <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
+            <text
+              v-if="serverReleaseReason"
+              data-testid="server-release-reason"
+              class="block mt-1 font-mono-tabular"
+              style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35"
+            >{{ serverReleaseReason }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ product.gpu }}</text>
               <text style="color: var(--v5-ink-4)">·</text>
@@ -91,14 +97,36 @@ const PHASE_TO_QUEUE: Record<string, number> = { P3: 1842, P5: 614 };
 const detailsOpen = ref(false);
 let lastToggleAt = 0;
 const progress = computed(() =>
-  props.product.unlocksAtPhase ? PHASE_TO_PROGRESS[props.product.unlocksAtPhase] ?? null : null,
+  props.product.available === undefined && props.product.unlocksAtPhase
+    ? PHASE_TO_PROGRESS[props.product.unlocksAtPhase] ?? null
+    : null,
 );
 const queue = computed(() =>
-  props.product.unlocksAtPhase ? PHASE_TO_QUEUE[props.product.unlocksAtPhase] ?? null : null,
+  props.product.available === undefined && props.product.unlocksAtPhase
+    ? PHASE_TO_QUEUE[props.product.unlocksAtPhase] ?? null
+    : null,
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
+const serverReleaseReason = computed(() => {
+  const state = props.product.releaseState;
+  if (!state || props.product.available !== false) return "";
+  const phase = props.product.releasePhaseId
+    ? fmt(t.value.store.releasePhaseRef, { phase: props.product.releasePhaseId })
+    : "";
+  if (state === "H1_RHYTHM_UNAVAILABLE") return t.value.store.releaseRhythmUnavailable;
+  if (state === "E1_PHASE_CONFIG_UNAVAILABLE" || state === "E1_UNLOCK_PHASE_INVALID"
+      || state === "E1_GENERATION_PHASE_MISMATCH") return t.value.store.releaseConfigUnavailable;
+  if (state === "E1_GENERATION_ELIGIBILITY_REQUIRED") return t.value.store.releaseEligibilityPending;
+  if (state === "E1_GENERATION_RELEASE_MONTH_NOT_REACHED") return t.value.store.releaseSchedulePending;
+  if (state === "E1_PHASE_NOT_REACHED" || state === "E1_GENERATION_PHASE_NOT_REACHED") {
+    return phase ? fmt(t.value.store.releasePhasePending, { phase }) : t.value.store.releasePending;
+  }
+  return t.value.store.releasePending;
+});
 const stageText = computed(() =>
-  progress.value
+  props.product.available === false && props.product.releasePhaseId
+    ? fmt(t.value.store.releasePhaseRef, { phase: props.product.releasePhaseId })
+    : progress.value
     ? fmt(t.value.store.lockedStageCompact, {
         current: progress.value.current,
         total: progress.value.total,

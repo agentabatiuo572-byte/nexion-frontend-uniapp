@@ -80,7 +80,13 @@ test("remote configuration loads are authoritative and remote writes do not revi
   assert.match(config, /const remote = await platformConfigApi\.platformConfig\(\);[\s\S]*?config\.value = \{[\s\S]*?featureFlags: \{ \.\.\.config\.value\.featureFlags, \.\.\.remote\.featureFlags \}[\s\S]*?publicStats: remote\.publicStats[\s\S]*?onlineBonus: remote\.onlineBonus[\s\S]*?rewards: remote\.rewards[\s\S]*?computeShare: remote\.computeShare/);
   assert.match(config, /catch \{[\s\S]*?syncFailed\.value = true/);
   assert.match(rank, /function setMyRank\(v: VRank\) \{[\s\S]*?if \(remoteApiEnabled\) return;/);
-  assert.match(rank, /function bindAccount\([\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?myRank\.value = 0;[\s\S]*?ladder\.value = \[\];[\s\S]*?void refreshCanonicalVRank\(\)/);
+  {
+    const block = fnBlock(rank, "bindAccount");
+    const iClear = block.indexOf("clearRemoteFacts();");
+    const iRefresh = block.indexOf("void refreshCanonicalVRank(");
+    assert.ok(iClear >= 0, "remote V-rank rebind must clear the previous account facts");
+    assert.ok(iRefresh > iClear, "remote V-rank rebind must refresh only after clearing old facts");
+  }
   assert.match(rank, /function setProgress\(p: VRankProgressPatch\) \{[\s\S]*?if \(remoteApiEnabled\) return;/);
   assert.match(commission, /function withdraw\(id: string\): boolean \{[\s\S]*?if \(remoteApiEnabled\) return false;/);
   assert.match(staking, /async function openRemote\([\s\S]*?if \(!remoteReady\.value\) throw new Error\("G1_REMOTE_AUTHORITY_UNAVAILABLE"\);/);
@@ -113,7 +119,7 @@ test("remote configuration loads are authoritative and remote writes do not revi
   }
 });
 
-test("remote-only policy branches stay inert until a dedicated server contract exists", () => {
+test("remote policy branches use dedicated server contracts or stay fail-closed", () => {
   const config = read("src/store/config.ts");
   const login = read("src/pages/login/login.vue");
   const share = read("src/lib/share.ts");
@@ -125,11 +131,14 @@ test("remote-only policy branches stay inert until a dedicated server contract e
   // WithdrawRulesConfig 删除(每日笔数上限唯一来源 = GET /api/withdrawals/policy),
   // 锚点改用同样「关死」的 smallAmountThresholdUsd: 0(小额免审真停用),强度不变。
   assert.match(config, /const unavailableServerConfig: PlatformConfig = \{[\s\S]*?riskCluster: \{[\s\S]*?releaseMode: "manual_only"[\s\S]*?withdrawRules: \{[\s\S]*?sameAddressRoute: "reject"[\s\S]*?smallAmountThresholdUsd: 0[\s\S]*?riskScore: \{[\s\S]*?weakSignalClusterThreshold: 0[\s\S]*?otpGate: \{[\s\S]*?maxVerifyAttempts: 0[\s\S]*?share: \{[\s\S]*?channels: \[\]/);
-  assert.match(login, /import \{ authApi, remoteApiEnabled \} from "@\/api\/runtime"/);
+  assert.match(login, /import \{[^}]*authApi[^}]*remoteApiEnabled[^}]*\} from "@\/api\/runtime"/);
+  assert.match(login, /async function startOauth\([\s\S]*?authApi\.oauthExchange/);
+  assert.match(login, /apiRuntimeConfig\.mode === "sandbox" && apiRuntimeConfig\.modeExplicit \? "SANDBOX_MOCK" : "PROVIDER"/);
   assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.sendPasswordResetOtp[\s\S]*?authApi\.sendLoginOtp/);
   assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.completeOtpLogin/);
   assert.match(login, /async function finishReset\(\) \{[\s\S]*?authApi\.completePasswordReset/);
   assert.match(share, /export function buildShareLink[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?location\.origin[\s\S]*?return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
-  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?if \(remoteApiEnabled\) return \[\];/);
+  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled\)/);
+  assert.match(share, /const text = remoteApiEnabled[\s\S]*?def\.textTemplate\?\.replace\("\{link\}", link\)/);
 });

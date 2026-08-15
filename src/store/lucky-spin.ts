@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { eventsApi, remoteApiEnabled } from "@/api/runtime";
+import type { EventSpinHistory, EventSpinSegment } from "@/api/events-api";
 import { mockServerNow } from "./server-time";
 import { createAccountRowCommit } from "./account-scoped-storage";
 
@@ -25,7 +27,7 @@ import { createAccountRowCommit } from "./account-scoped-storage";
  * persist key 带版本号;时间戳 ms epoch;action-driven → 接真后台前端零重写.
  */
 
-export type SpinPrizeKind = "nex" | "usdt" | "coupon";
+export type SpinPrizeKind = "nex" | "points" | "usdt" | "coupon";
 
 export interface SpinPrize {
   id: string;
@@ -35,6 +37,7 @@ export interface SpinPrize {
   weight: number; // 概率权重(之和 = 100)
   isReal: boolean; // 真实奖(usdt / coupon)— 受护栏 + 红线降级约束
   tint: string; // 转盘扇区色 token
+  rewardName?: string;
 }
 
 /** 8 档奖池 — 对齐 PRD V3 Ch13 H4 ③ 奖池表(顺序即转盘顺时针扇区序) */
@@ -50,7 +53,6 @@ export const SPIN_PRIZES: SpinPrize[] = [
 ];
 
 export const SEGMENT_COUNT = SPIN_PRIZES.length; // 8
-const SEGMENT_DEG = 360 / SEGMENT_COUNT; // 45°
 
 /** idle → confirming → spinning → won;失败走 ui netError(本 store 退回 idle) */
 export type SpinPhase = "idle" | "confirming" | "spinning" | "won";
@@ -82,11 +84,12 @@ function rollPrize(excludeReal: boolean): SpinPrize {
 }
 
 /** 目标旋转角:多转若干整圈 + 落到中奖扇区中心(指针在 12 点) */
-function targetAngleFor(prizeId: string, prevAngle: number): number {
-  const idx = SPIN_PRIZES.findIndex((p) => p.id === prizeId);
+function targetAngleFor(prizeId: string, prevAngle: number, prizes: SpinPrize[] = SPIN_PRIZES): number {
+  const idx = Math.max(0, prizes.findIndex((p) => p.id === prizeId));
   const turns = 5; // 至少 5 整圈的爽快旋转
   // 扇区 idx 中心相对 0° 的角度;指针固定在顶部,故转盘需反向到该扇区
-  const segCenter = idx * SEGMENT_DEG + SEGMENT_DEG / 2;
+  const segmentDeg = 360 / prizes.length;
+  const segCenter = idx * segmentDeg + segmentDeg / 2;
   const base = Math.ceil(prevAngle / 360) * 360; // 从当前圈数往上累加,保证只正向转
   return base + turns * 360 + (360 - segCenter);
 }
@@ -143,6 +146,15 @@ export const useLuckySpin = defineStore("luckySpin", () => {
   const history = ref<SpinWin[]>([]);
   const realPrizeSoldOut = ref(false);
   const coverageDegraded = ref(false);
+  const remoteSegments = ref<SpinPrize[]>([]);
+  const remoteHistory = ref<EventSpinHistory[]>([]);
+  let remoteGeneration = 0;
+  const remoteState = ref<{
+    freeAvailable: boolean;
+    bonusTickets: number;
+    availableSpins: number;
+    nextResetAtUtc: string;
+  } | null>(null);
 
   // 落盘唯一出口:乐观并发提交器。票是**每日配额 + 稀缺资源**,覆盖式写会让两个标签页
   // 各花掉同一张票各中一次奖(组件抽完直接 creditPrize → 白发奖)。
@@ -167,6 +179,10 @@ export const useLuckySpin = defineStore("luckySpin", () => {
 
   /** 账号切换重绑:装载该账号的转盘持久态(票/记录),并重置本地会话态(转盘动画/弹层)。 */
   function bindAccount(rawAccountKey: string) {
+    remoteGeneration += 1;
+    remoteState.value = null;
+    remoteSegments.value = [];
+    remoteHistory.value = [];
     const next = rows.bind(rawAccountKey) ?? defaults();
     bonusTickets.value = next.bonusTickets;
     lastFreeSpinDate.value = next.lastFreeSpinDate;
@@ -183,14 +199,62 @@ export const useLuckySpin = defineStore("luckySpin", () => {
 
   // ── derived (call as functions, like the source's selectors) ──
   function hasFreeSpinToday(): boolean {
+    if (remoteApiEnabled) return remoteState.value?.freeAvailable ?? false;
     return lastFreeSpinDate.value !== utcDate(mockServerNow());
   }
   function availableSpins(): number {
+    if (remoteApiEnabled) return remoteState.value?.availableSpins ?? 0;
     return (hasFreeSpinToday() ? 1 : 0) + bonusTickets.value;
   }
   /** 真实奖档当前是否参与裁决(售罄 / 降级 → false)*/
   function realPrizeActive(): boolean {
+    if (remoteApiEnabled) return true;
     return !realPrizeSoldOut.value && !coverageDegraded.value;
+  }
+
+  function nextResetAtUtc(): string | null {
+    return remoteState.value?.nextResetAtUtc ?? null;
+  }
+
+  function mapRemoteSegment(segment: EventSpinSegment, index: number): SpinPrize {
+    const type = segment.rewardType.toLowerCase();
+    const kind: SpinPrizeKind = type === "usdt" || type === "coupon" || type === "points"
+      ? type : "nex";
+    return {
+      id: segment.tierId,
+      kind,
+      amount: segment.rewardAmount,
+      labelKey: segment.tierId,
+      weight: 0,
+      isReal: segment.realOutflow,
+      tint: index % 2 === 0 ? "var(--v5-brand)" : "var(--v5-tech-cyan)",
+      rewardName: segment.rewardName,
+    };
+  }
+
+  async function refreshRemoteState(eventCode = "evt-spring-spin"): Promise<boolean> {
+    if (!remoteApiEnabled) return false;
+    const generation = remoteGeneration;
+    try {
+      await eventsApi.state();
+      const next = await eventsApi.spinState(eventCode);
+      if (generation !== remoteGeneration) return false;
+      remoteState.value = {
+        freeAvailable: next.freeAvailable,
+        bonusTickets: next.bonusTickets,
+        availableSpins: next.availableSpins,
+        nextResetAtUtc: next.nextResetAtUtc,
+      };
+      bonusTickets.value = next.bonusTickets;
+      lastFreeSpinDate.value = next.freeAvailable ? "" : next.serverDate;
+      history.value = [];
+      remoteSegments.value = next.segments.map(mapRemoteSegment);
+      remoteHistory.value = next.history;
+      return true;
+    } catch {
+      if (generation === remoteGeneration) remoteState.value = null;
+      return false;
+    }
   }
 
   // ── actions ──
@@ -198,6 +262,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     open.value = true;
     phase.value = "idle";
     lastWonPrizeId.value = null;
+    if (remoteApiEnabled) void refreshRemoteState();
   }
 
   function closeSheet() {
@@ -243,6 +308,29 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     lastWonPrizeId.value = prize.id;
     wheelAngle.value = targetAngleFor(prize.id, wheelAngle.value);
     return { ok: true, prizeId: prize.id };
+  }
+
+  async function spinRemote(
+    eventCode: string,
+    idempotencyKey: string,
+  ): Promise<{ ok: boolean; prizeId: string | null; stale?: boolean }> {
+    if (!remoteApiEnabled) return spin();
+    if (availableSpins() <= 0) return { ok: false, prizeId: null };
+    if (remoteSegments.value.length === 0) return { ok: false, prizeId: null };
+    const generation = remoteGeneration;
+    try {
+      const result = await eventsApi.spin(eventCode, idempotencyKey);
+      if (generation !== remoteGeneration) return { ok: false, prizeId: null, stale: true };
+      const prizeId = result.tierId;
+      const prizes = remoteSegments.value;
+      phase.value = "spinning";
+      lastWonPrizeId.value = prizeId;
+      wheelAngle.value = targetAngleFor(prizeId, wheelAngle.value, prizes);
+      void refreshRemoteState(eventCode);
+      return { ok: true, prizeId };
+    } catch {
+      return { ok: false, prizeId: null };
+    }
   }
 
   /** 动画结束:置 won 态(派奖由组件 compose 各 store 完成,store 不跨 import)*/
@@ -300,8 +388,11 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     history,
     realPrizeSoldOut,
     coverageDegraded,
+    remoteSegments,
+    remoteHistory,
     hasFreeSpinToday,
     availableSpins,
+    nextResetAtUtc,
     realPrizeActive,
     openSheet,
     closeSheet,
@@ -309,6 +400,8 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     startConfirm,
     cancelConfirm,
     spin,
+    spinRemote,
+    refreshRemoteState,
     reveal,
     refundAndReset,
     backToIdle,

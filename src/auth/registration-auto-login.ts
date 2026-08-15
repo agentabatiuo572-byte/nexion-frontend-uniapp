@@ -24,6 +24,7 @@ export async function registerAndLogin(
   request: RegistrationRequest,
   isCurrent: () => boolean,
 ): Promise<RegistrationAutoLoginResult> {
+  let registrationReceipt: AuthenticatedLogin["registrationReceipt"] = null;
   try {
     const registration = await authApi.register(request);
     if (registration.kind !== "authenticated") {
@@ -32,6 +33,7 @@ export async function registerAndLogin(
         error: new ApiError({ kind: "protocol", message: "REGISTRATION_SESSION_INVALID" }),
       };
     }
+    registrationReceipt = registration.registrationReceipt ?? null;
     authApi.discardSessionIfCurrent(registration.vaultRevision);
   } catch (error) {
     if (!isRegistrationOutcomeUnknown(error)) {
@@ -60,7 +62,7 @@ export async function registerAndLogin(
         registrationMayBeCommitted: true,
       };
     }
-    return { ...login, registrationMayBeCommitted: true };
+    return { ...login, registrationReceipt: registrationReceipt ?? login.registrationReceipt ?? null, registrationMayBeCommitted: true };
   } catch (error) {
     return { kind: "login_error", error, registrationMayBeCommitted: true };
   }

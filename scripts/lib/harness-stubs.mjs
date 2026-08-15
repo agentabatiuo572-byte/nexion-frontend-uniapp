@@ -42,6 +42,10 @@ export function runtimeStub(root) {
     // 门测的就不再是 mock 语义(2026-08-12 合并收口实测:withdraw-failpaths 直接崩)。
     fundsServerEnabled: 'export const fundsServerEnabled = false;',
     fundsSandboxEnabled: 'export const fundsSandboxEnabled = false;',
+    // Session storage is a local synchronous dependency, not an API client.
+    // A truthy async Proxy here creates an unhandled rejected Promise when
+    // refresh seams call read() during a remote-mode self-check.
+    sessionVault: 'export const sessionVault = { read: () => null, write: () => {}, clear: () => {} };',
   };
   const body = names.map((n) => special[n] ?? `export const ${n} = unavailable;`).join("\n");
   return `const unavailable = new Proxy({}, { get: () => async () => { throw new Error("runtime API is outside this self-check"); } });\n${body}`;

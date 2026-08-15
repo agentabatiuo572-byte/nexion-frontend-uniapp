@@ -3,6 +3,7 @@ import { reactive } from "vue";
 import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 /**
  * Event-quest store — ported from Nexion-prototype/lib/store/event-quest.ts
@@ -44,6 +45,7 @@ export const useEventQuest = defineStore("eventQuest", () => {
   // Record<id, true> membership maps (P-027: reactive Record, not Set/ref).
   const joinedMap = reactive<Record<string, boolean>>({});
   const claimedMap = reactive<Record<string, boolean>>({});
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   for (const id of init.joined) joinedMap[id] = true;
   for (const id of init.claimed) claimedMap[id] = true;
 
@@ -52,40 +54,43 @@ export const useEventQuest = defineStore("eventQuest", () => {
     for (const key of Object.keys(claimedMap)) delete claimedMap[key];
   }
 
-  async function refreshRemote(): Promise<boolean> {
+  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     clearRemoteFacts();
     try {
       const snapshot = await eventsApi.state();
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
       for (const event of snapshot.events) {
         if (["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus)) joinedMap[event.eventCode] = true;
         if (event.userStatus === "CLAIMED") claimedMap[event.eventCode] = true;
       }
       return true;
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
 
   async function joinRemote(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return join(id);
+    const request = remoteAccountEpoch.snapshot();
     try {
       await eventsApi.join(id, `h4-event-join:${id}`);
-      return refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && refreshRemote(request);
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
 
   async function claimRemote(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return claim(id);
+    const request = remoteAccountEpoch.snapshot();
     try {
       await eventsApi.claim(id, `h4-event-claim:${id}`);
-      return refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && refreshRemote(request);
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
@@ -100,9 +105,10 @@ export const useEventQuest = defineStore("eventQuest", () => {
   /** 账号切换重绑:清空并装载该账号的活动参与/领取态(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    remoteAccountEpoch.bind(boundKey);
     clearRemoteFacts();
     if (remoteApiEnabled) {
-      void refreshRemote();
+      void refreshRemote(remoteAccountEpoch.snapshot());
       return;
     }
     const next = hydrate(boundKey);

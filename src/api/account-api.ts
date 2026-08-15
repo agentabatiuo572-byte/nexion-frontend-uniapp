@@ -10,12 +10,19 @@ export interface AccountApi {
   revokeOtherSessions(): Promise<SecurityMutation>;
   accountDeletionStatus(): Promise<AccountDeletionStatus>;
   requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
+  cancelAccountDeletion(expectedVersion: number, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
 }
 
 export interface AccountDeletionRequest {
   requestNo: string;
   status: "REQUESTED" | "IN_REVIEW" | "BLOCKED" | "COMPLETED" | "CANCELLED";
   requestedAt: string;
+  version: number;
+  reviewedAt: string | null;
+  completedAt: string | null;
+  reason: string | null;
+  blockReason: string | null;
+  cancelledAt: string | null;
 }
 
 export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
@@ -102,7 +109,16 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
   const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
   if (!source || typeof source.requestNo !== "string" || !/^ADR-[a-f0-9]{32}$/i.test(source.requestNo)
       || typeof source.status !== "string" || !allowed.includes(source.status)
-      || !validDate(source.requestedAt)) {
+      || !validDate(source.requestedAt)
+      || typeof source.version !== "number" || !Number.isSafeInteger(source.version) || source.version < 0
+      || (source.reviewedAt !== null && !validDate(source.reviewedAt))
+      || (source.completedAt !== null && !validDate(source.completedAt))
+      || (source.cancelledAt !== null && !validDate(source.cancelledAt))
+      || (source.reason !== null && typeof source.reason !== "string")
+      || (source.blockReason !== null && typeof source.blockReason !== "string")
+      || Object.keys(source).some((key) => ![
+        "requestNo", "status", "version", "requestedAt", "reviewedAt", "completedAt", "reason", "blockReason", "cancelledAt",
+      ].includes(key))) {
     throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
   }
   return source as unknown as AccountDeletionRequest;
@@ -110,7 +126,12 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
 
 function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
   const source = record(value);
-  if (source?.status === "NONE") return { status: "NONE" };
+  if (source?.status === "NONE") {
+    if (Object.keys(source).length !== 1) {
+      throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
+    }
+    return { status: "NONE" };
+  }
   return parseAccountDeletion(value);
 }
 
@@ -150,6 +171,12 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "POST",
       path: "/api/app/security/account-deletion",
       body: { currentPassword, confirmation: "DELETE" },
+      idempotencyKey,
+    })),
+    cancelAccountDeletion: async (expectedVersion, idempotencyKey, reason = "USER_REQUESTED_CANCEL") => parseAccountDeletion(await client.request({
+      method: "POST",
+      path: "/api/app/security/account-deletion/cancel",
+      body: { expectedVersion, reason },
       idempotencyKey,
     })),
   };

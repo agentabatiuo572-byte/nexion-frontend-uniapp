@@ -25,18 +25,26 @@ export interface TrialAuthorityState {
   config: Record<string, TrialConfigValue>;
 }
 
+export interface TrialConvertReceipt {
+  orderNo: string;
+  productNo: string;
+  amountUsdt: number;
+  discountUsdt: number;
+  paymentStatus: "PENDING";
+  orderStatus: "PENDING_PAYMENT";
+  sourceEnvironment: "PRODUCTION";
+}
+
 /**
  * 🔴 转化(用抵扣金购机)故意**不在**本接口层。当前 PRD §9.11a.2 的转化端点是
- * `POST /api/trial/convert`,而 free-trial.ts 的 `convert()` 在 remoteApiEnabled
- * 档直接 return false —— 服务端转化整条链尚未接线(卡:见 docs/changes/
- * 2026-08-13-trial-early-buy-adjudication.md)。接线时按 convert 建方法,别照卡时代
- * 的旧端点名建 —— 那个名字在 2026-08-02 无卡化时已随 §9.11a.2 一起改名,
- * 且它的响应是价格拆解、不是本文件解析的 authority 信封。
+ * `POST /api/trial/convert` returns a server-created pending order receipt;
+ * the store reads `/api/trial/state` again before presenting success.
  */
 export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
   eligibility(): Promise<TrialAuthorityState>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
+  convert(productNo: string, idempotencyKey: string): Promise<TrialConvertReceipt>;
   cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
 }
 
@@ -66,6 +74,19 @@ function timestamp(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = typeof value === "number" ? value : Date.parse(String(value));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : invalid();
+}
+
+function convertReceipt(value: unknown): TrialConvertReceipt {
+  const row = record(value);
+  const orderNo = typeof row?.orderNo === "string" ? row.orderNo.trim() : "";
+  const productNo = typeof row?.productNo === "string" ? row.productNo.trim() : "";
+  const amountUsdt = finiteNumber(row?.amountUsdt);
+  const discountUsdt = finiteNumber(row?.discountUsdt);
+  if (!/^TRC-[A-Z0-9]+$/.test(orderNo) || !productNo || amountUsdt === null || discountUsdt === null
+      || row?.paymentStatus !== "PENDING" || row?.orderStatus !== "PENDING_PAYMENT"
+      || row?.sourceEnvironment !== "PRODUCTION") return invalid();
+  return { orderNo, productNo, amountUsdt, discountUsdt, paymentStatus: "PENDING",
+    orderStatus: "PENDING_PAYMENT", sourceEnvironment: "PRODUCTION" };
 }
 
 function clientStatus(serverState: TrialAuthorityState["serverState"]): TrialStatus {
@@ -157,6 +178,12 @@ export function createTrialApi(client: ApiClient): TrialApi {
       body: { deviceName },
       idempotencyKey,
     }),
+    convert: async (productNo, idempotencyKey) => convertReceipt(await client.request({
+      method: "POST",
+      path: "/api/trial/convert",
+      body: { productNo },
+      idempotencyKey,
+    })),
     cancel: (reason, idempotencyKey) => parse({
       method: "POST",
       path: "/api/trial/cancel",

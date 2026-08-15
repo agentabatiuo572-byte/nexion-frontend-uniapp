@@ -63,6 +63,14 @@ export interface CreatedOrder {
   runId?: string;
 }
 
+export interface CancelledOrder {
+  orderNo: string;
+  orderStatus: "CANCELLED";
+  paymentStatus: "CANCELLED";
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  idempotent: boolean;
+}
+
 export interface CreateOrderRequest {
   productNo: string;
   quantity: number;
@@ -73,6 +81,7 @@ export interface CreateOrderRequest {
 export interface OrderApi {
   list(): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
+  cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
@@ -231,6 +240,16 @@ function createdOrder(value: unknown): CreatedOrder {
   return parsed;
 }
 
+function cancelledOrder(value: unknown): CancelledOrder {
+  const source = record(value);
+  if (typeof source.orderNo !== "string" || !source.orderNo.trim()
+      || source.orderStatus !== "CANCELLED" || source.paymentStatus !== "CANCELLED"
+      || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
+      || typeof source.idempotent !== "boolean") return invalid();
+  return { orderNo: source.orderNo.trim(), orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
+    sourceEnvironment: source.sourceEnvironment, idempotent: source.idempotent };
+}
+
 export function createOrderApi(client: ApiClient): OrderApi {
   return {
     async list(): Promise<CanonicalOrderList> {
@@ -269,6 +288,16 @@ export function createOrderApi(client: ApiClient): OrderApi {
           quantity: request.quantity,
           voucherId: request.voucherId ?? null,
         },
+      }));
+    },
+
+    async cancel(orderNo, idempotencyKey): Promise<CancelledOrder> {
+      const normalized = orderNo.trim();
+      if (!normalized || !idempotencyKey.trim()) return invalid();
+      return cancelledOrder(await client.request<unknown>({
+        method: "POST",
+        path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
+        idempotencyKey,
       }));
     },
   };

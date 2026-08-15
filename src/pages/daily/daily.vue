@@ -103,12 +103,12 @@
             <text :style="leaderBestStyle">{{ yourBestText }}</text>
           </view>
           <view class="px-2" style="padding-bottom: 8px">
-            <view v-for="(s, i) in TOP_STREAKERS" :key="s.name" class="flex items-center" style="gap: 10px; padding: 8px">
+            <view v-for="(s, i) in leaderRows" :key="s.name" class="flex items-center" style="gap: 10px; padding: 8px">
               <text class="tabular-nums text-center" :style="rankStyle">{{ i + 1 }}</text>
               <text class="block grid place-items-center" :style="avatarStyle">{{ s.name.charAt(0) }}</text>
               <view class="flex-1 min-w-0 flex items-center" style="gap: 6px">
                 <text class="truncate" :style="streakerNameStyle">{{ s.name }}</text>
-                <text style="font-size: 12px">{{ s.flag }}</text>
+                <text style="font-size: 12px">{{ s.countryCode }}</text>
               </view>
               <text class="tabular-nums" :style="streakerCountStyle">🔥 {{ s.streak }}</text>
             </view>
@@ -213,18 +213,19 @@ const MILESTONES: Milestone[] = [
   { day: 100, rewardKey: "reward100", labelKey: "day100", reward: { type: "badge", amount: 1 }, tint: "var(--v5-brand)", iconPath: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", iconPath2: "m9 12 2 2 4-4" },
 ];
 
-const TOP_STREAKERS = [
-  { name: "Daniel_K", flag: "🇺🇸", streak: 412 },
-  { name: "Mei_C", flag: "🇸🇬", streak: 387 },
-  { name: "Lukas_F", flag: "🇩🇪", streak: 341 },
-  { name: "Carlos_M", flag: "🇧🇷", streak: 298 },
-  { name: "Priya_S", flag: "🇮🇳", streak: 256 },
+const MOCK_TOP_STREAKERS = [
+  { name: "Daniel_K", countryCode: "US", streak: 412 },
+  { name: "Mei_C", countryCode: "SG", streak: 387 },
+  { name: "Lukas_F", countryCode: "DE", streak: 341 },
+  { name: "Carlos_M", countryCode: "BR", streak: 298 },
+  { name: "Priya_S", countryCode: "IN", streak: 256 },
 ];
 
 const t = useT();
 const faucet = useNexFaucet();
 const app = useApp();
 const luckySpin = useLuckySpin();
+const leaderRows = computed(() => remoteApiEnabled ? faucet.topStreakers : MOCK_TOP_STREAKERS);
 
 // Per-second tick for the countdown.
 const tick = ref(0);

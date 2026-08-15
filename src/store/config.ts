@@ -105,7 +105,15 @@ export const useConfig = defineStore("config", () => {
     share: {
       baseUrl: "",
       channels: [],
-      appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" },
+      appDownload: {
+        officialUrl: "",
+        iosUrl: "",
+        androidUrl: "",
+        apkUrl: "",
+        version: "",
+        releaseNotes: { zh: "", en: "" },
+        source: "unavailable",
+      },
     },
   };
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
@@ -177,6 +185,7 @@ export const useConfig = defineStore("config", () => {
         onlineBonus: remote.onlineBonus,
         rewards: remote.rewards,
         computeShare: remote.computeShare,
+        share: remote.share,
       };
       syncFailed.value = false;
     } catch {

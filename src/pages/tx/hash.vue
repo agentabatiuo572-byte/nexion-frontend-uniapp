@@ -9,6 +9,13 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet-bills" />
 
+      <view v-if="remoteApiEnabled" class="mx-4" data-testid="tx-detail-hold" :style="holdStyle">
+        <text class="block" :style="holdTitleStyle">{{ w.detailUnavailableTitle }}</text>
+        <text class="block" :style="holdBodyStyle">{{ w.detailUnavailableBody }}</text>
+      </view>
+
+      <template v-else>
+
       <!-- Status hero — single-record container (form b: surface fill, no border) -->
       <view class="mx-4" :style="heroStyle">
         <view class="flex items-center" style="gap: 8px; margin-bottom: 8px">
@@ -53,6 +60,7 @@
       </view>
 
       <text class="block mx-4 text-center" :style="footerStyle">{{ w.footer }}</text>
+      </template>
     </view>
   </AppChassis>
 </template>
@@ -67,6 +75,7 @@ import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const w = computed(() => t.value.tx);
@@ -256,4 +265,7 @@ const extBtnStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
 };
 const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
+const holdStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-surface)" };
+const holdTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "13px", lineHeight: "19px", color: "var(--v5-ink-3)" };
 </script>

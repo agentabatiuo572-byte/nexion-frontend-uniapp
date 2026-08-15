@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { remoteApiEnabled, vRankApi } from "@/api/runtime";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
@@ -198,6 +199,16 @@ export const useVRank = defineStore("vRank", () => {
   const teamVolumeUSD = ref(init.teamVolumeUSD);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
+
+  function clearRemoteFacts(): void {
+    myRank.value = 0;
+    selfBuyUSD.value = 0;
+    directRefs.value = 0;
+    teamVolumeUSD.value = 0;
+    vDownlineCounts.value = {};
+    ladder.value = [];
+  }
 
   function persist() {
     if (remoteApiEnabled) return;
@@ -214,13 +225,9 @@ export const useVRank = defineStore("vRank", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
-      myRank.value = 0;
-      selfBuyUSD.value = 0;
-      directRefs.value = 0;
-      teamVolumeUSD.value = 0;
-      vDownlineCounts.value = {};
-      ladder.value = [];
-      void refreshCanonicalVRank();
+      remoteAccountEpoch.bind(boundKey);
+      clearRemoteFacts();
+      void refreshCanonicalVRank(remoteAccountEpoch.snapshot());
       return;
     }
     const next = hydrate(boundKey);
@@ -231,10 +238,11 @@ export const useVRank = defineStore("vRank", () => {
     vDownlineCounts.value = next.vDownlineCounts;
   }
 
-  async function refreshCanonicalVRank() {
+  async function refreshCanonicalVRank(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     if (!remoteApiEnabled) return;
     try {
       const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+      if (!remoteAccountEpoch.isCurrent(request)) return;
       ladder.value = remoteLadder.ranks.map(canonicalRank);
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
       selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
@@ -244,8 +252,7 @@ export const useVRank = defineStore("vRank", () => {
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Partial<Record<VRank, number>>;
     } catch {
-      // 权威不可达是常态输入,不 reject(resilience 门):保留现值(bindAccount 后即空态),
-      // 页面 onShow 重试。
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
     }
   }
 

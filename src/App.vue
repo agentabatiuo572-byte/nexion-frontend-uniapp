@@ -456,6 +456,19 @@ function hasServerAuthenticatedAccountTrace(auth: ReturnType<typeof useAuth>): b
     || hasPersistedServerAuthenticatedAccountTrace();
 }
 
+/**
+ * USER endpoints may be warmed only after the accepted login has installed the
+ * matching in-memory session. In remote H5 the vault is intentionally empty
+ * after a full reload; issuing a fleet read from Login would start an auth
+ * refresh/unauthorized callback that can arrive after the next successful
+ * login and evict that new session.
+ */
+function canRefreshRemoteAccount(auth: ReturnType<typeof useAuth>): boolean {
+  if (!remoteApiEnabled || !auth.isAuthenticated || !auth.onboardingComplete) return false;
+  const serverSession = sessionVault.read();
+  return !!serverSession && auth.accountId === `user:${serverSession.user.userId}`;
+}
+
 function readServerAuthenticatedAccountTrace(): boolean {
   try {
     const record = uni.getStorageSync("nexgrid-auth-v1") as unknown;
@@ -486,18 +499,28 @@ function checkAuthGuard(): boolean {
     if (route.startsWith("pages/login/")) pendingServerSessionRecovery = false;
     return false;
   }
+  const auth = useAuth();
+  const serverSession = remoteApiEnabled ? sessionVault.read() : null;
   // An unauthorized callback can arrive before H5 exposes its first route.
   // Carry only the non-secret recovery decision across that short window, then
-  // consume it exactly once once a route is available.
+  // consume it exactly once once a route is available. A fast successful
+  // re-login can leave Login before the one-second guard observes it; a
+  // matching new vault is stronger evidence than the stale recovery latch and
+  // must consume that latch instead of being evicted by the next tick.
   if (remoteApiEnabled && pendingServerSessionRecovery) {
-    uni.reLaunch({ url: "/pages/login/login?notice=server-session-reload" });
-    return true;
+    if (serverSession
+        && auth.isAuthenticated
+        && auth.accountId === `user:${serverSession.user.userId}`) {
+      pendingServerSessionRecovery = false;
+      serverAuthenticatedAccountTraceAtBoot = false;
+    } else {
+      uni.reLaunch({ url: "/pages/login/login?notice=server-session-reload" });
+      return true;
+    }
   }
-  const auth = useAuth();
   // Server modes cannot accept a historical localStorage sign-in as authority.
   // The runtime vault is deliberately in-memory, so refresh/restart means a
   // clean sign-in instead of a stale local identity issuing sandbox commands.
-  const serverSession = remoteApiEnabled ? sessionVault.read() : null;
   if (remoteApiEnabled && (!serverSession || auth.accountId !== `user:${serverSession.user.userId}`)) {
     const requiresServerSessionRecovery = !serverSession && hasServerAuthenticatedAccountTrace(auth);
     serverAuthenticatedAccountTraceAtBoot = false;
@@ -664,17 +687,32 @@ function bootstrapAccountSession() {
   // 自愈路径对该标签的余生失效(登出态被踢到引导页那一拍正好烧掉它)。
   // 今天没有可达危害(两个认证入口各自 claim),但那是巧合,不是设计。
   if (auth.isAuthenticated) {
-    accountSessionBootstrapped = true;
     const key = auth.email || auth.accountId || "default";
     const app = useApp();
     const session = useSession();
+    const serverSession = remoteApiEnabled ? sessionVault.read() : null;
+    // completeSignIn already binds every account-scoped store and claims this
+    // carrier before it navigates away from Login. The periodic guard can reach
+    // this one-shot bootstrap a moment later. Rebinding again would clear the
+    // catalog/phase stores after Store has loaded them, leaving the page stuck
+    // in "loading" with no later onShow to restart the request.
+    const completedRemoteLoginAlreadyBound = remoteApiEnabled
+      && !!serverSession
+      && auth.accountId === `user:${serverSession.user.userId}`
+      && app.accountKey === auth.accountId
+      && session.accountKey === auth.accountId
+      && session.status === "active";
+    if (completedRemoteLoginAlreadyBound) {
+      accountSessionBootstrapped = true;
+      return;
+    }
+    accountSessionBootstrapped = true;
     app.bindAccount(key);
     rebindAccountScopedStores(key);
     // rebindAccountScopedStores clears profile state in server mode to prevent
     // one browser account leaking into another. On a post-login reLaunch this
     // bootstrap runs after completeSignIn, so restore only the in-memory,
     // authenticated server response — never localStorage or a seed profile.
-    const serverSession = remoteApiEnabled ? sessionVault.read() : null;
     if (serverSession && auth.accountId === `user:${serverSession.user.userId}`) {
       app.projectServerIdentity(serverSession.user);
       useProfile().projectServerIdentity(serverSession.user);
@@ -953,7 +991,7 @@ onLaunch(() => {
     // unauthenticated launch must not turn its expected 401 into a fake catalog
     // failure before the user has even signed in.
     prepareProductCatalog();
-    void useApp().refreshRemoteFleet();
+    if (canRefreshRemoteAccount(auth)) void useApp().refreshRemoteFleet();
   }
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
@@ -983,7 +1021,7 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  if (remoteApiEnabled) void useApp().refreshRemoteFleet();
+  if (canRefreshRemoteAccount(useAuth())) void useApp().refreshRemoteFleet();
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });

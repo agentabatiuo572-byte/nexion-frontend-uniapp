@@ -31,7 +31,11 @@ const SRC = path.join(root, "src");
 // fleetDevices 刻意取 31337(既非哨兵 0,也非编译期锚 28,432)—— store 里出现这个数
 // 只可能是「从这份载荷流过来的」,断言因此是构造性的,不靠「看起来变了」。
 const SERVED_PLATFORM = {
-  featureFlags: { computeShareEnabled: true },
+  featureFlags: {
+    computeShareEnabled: true,
+    homeNewcomerTasksEnabled: true,
+    homeWeeklyPromoEnabled: false,
+  },
   publicStats: {
     version: 7,
     realUserCount: 214_000,
@@ -82,6 +86,15 @@ const SERVED_PLATFORM = {
     sources: ["e6.compute_config"],
   },
   updatedAt: "2026-08-11T00:00:00Z",
+  share: {
+    baseUrl: "https://nexgrid.ai/ref/",
+    channels: [{ key: "zalo", intentType: "scheme", textTemplate: "加入 {link}", enabled: true }],
+    appDownload: {
+      officialUrl: "https://download.nexgrid.ai/app/NexGrid-1.2.3.apk",
+      iosUrl: "", androidUrl: "", apkUrl: "", version: "1.2.3",
+      releaseNotes: { zh: "稳定性修复", en: "Stability fixes" }, source: "official",
+    },
+  },
 };
 
 const SERVED_REFERRAL = {

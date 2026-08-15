@@ -13,6 +13,15 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
+      <view
+        v-if="payoutAddressMockEnabled"
+        data-testid="payout-address-mock-source"
+        class="mx-4"
+        style="margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.08)"
+      >
+        <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-warning)">{{ t.addrRebind.sandboxMockNotice }}</text>
+      </view>
+
       <!-- ── 网络切换(与提现页同语汇)── -->
       <view class="mx-4" style="padding: 0 2px">
         <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
@@ -216,7 +225,7 @@
 import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { asApiError } from "@/api/errors";
-import { remoteApiEnabled } from "@/api/runtime";
+import { payoutAddressMockEnabled, payoutAddressServerEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
@@ -364,7 +373,7 @@ async function sendCode(captchaTicket?: string) {
   if (otpSending.value) return;
   otpSending.value = true;
   try {
-    if (remoteApiEnabled) {
+    if (payoutAddressServerEnabled) {
       try {
         const challenge = await payout.sendRemoteOtp();
         otpRequestId.value = challenge.challengeNo;
@@ -436,7 +445,7 @@ async function confirmOtp() {
   if (!otpReady.value || otpVerifying.value) return;
   otpVerifying.value = true;
   try {
-    if (remoteApiEnabled) {
+    if (payoutAddressServerEnabled) {
       await applyAfterOtp();
       return;
     }
@@ -469,7 +478,7 @@ async function applyAfterOtp() {
     if (!ok) return;
   }
 
-  if (remoteApiEnabled) {
+  if (payoutAddressServerEnabled) {
     try {
       await payout.saveRemoteAddress({
         network: network.value,
@@ -535,7 +544,7 @@ const nowTick = ref(mockServerNow());
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   // refreshRemote 自吞不 reject(resilience 门);失败信号走返回值。
-  if (remoteApiEnabled) void payout.refreshRemote().then((ok) => { if (!ok) toast.error(t.value.addrRebind.startFailed); });
+  if (payoutAddressServerEnabled) void payout.refreshRemote().then((ok) => { if (!ok) toast.error(t.value.addrRebind.startFailed); });
   tickTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
 onUnmounted(() => {
@@ -547,7 +556,7 @@ const frozenNow = computed(() => freezeLeftMs.value > 0);
 const freezeBannerText = computed(() =>
   fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
 );
-const cooldownDays = computed(() => cfg.config.withdrawRules.rebindCooldownDays);
+const cooldownDays = computed(() => payout.changeCooldownDays ?? cfg.config.withdrawRules.rebindCooldownDays);
 function fmtStamp(ts: number): string {
   const d = new Date(ts);
   const p2 = (n: number) => String(n).padStart(2, "0");
@@ -560,11 +569,12 @@ const cooldownUntilText = computed(() => {
 });
 const safetyNoteText = computed(() => fmt(t.value.addrRebind.safetyNote, { days: cooldownDays.value }));
 // 新地址保护期标记:时长取后台配置(newAddressHoldHours),判定输入与风控信号同源
-const holdNoteText = computed(() => fmt(t.value.addrRebind.holdNote, { h: cfg.config.withdrawRules.newAddressHoldHours }));
+const holdHours = computed(() => payout.effectiveDelayHours ?? cfg.config.withdrawRules.newAddressHoldHours);
+const holdNoteText = computed(() => fmt(t.value.addrRebind.holdNote, { h: holdHours.value }));
 const holdActive = computed(() => {
   const c = current.value;
   if (!c || c.source !== "user") return false;
-  return nowTick.value - c.addedAt < cfg.config.withdrawRules.newAddressHoldHours * 3600 * 1000;
+  return nowTick.value - c.addedAt < holdHours.value * 3600 * 1000;
 });
 
 // ── 动作 ──

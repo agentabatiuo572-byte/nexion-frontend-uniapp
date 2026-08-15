@@ -33,6 +33,14 @@ test("OPS-E-19 remote boot hydrates devices and lifecycle config from E3 fleet",
   assert.match(app, /deviceE3Api\.fleet\(\)/);
 });
 
+test("OPS-E-19 remote device cards preserve server-realized earnings", () => {
+  const app = read("src/store/app.ts");
+  assert.match(app, /todayEarnings: device\.todayEarningsUsdt/);
+  assert.match(app, /todayEarningsNEX: device\.todayEarningsNex/);
+  assert.match(app, /today: fleet\.realizedTodayUsdt/);
+  assert.match(app, /todayNEX: fleet\.realizedTodayNex/);
+});
+
 test("OPS-E-20 remote trade-in uses canonical quote, submit, and order readback", () => {
   const sheets = read("src/components/tradein-sheets.vue");
   const checkout = read("src/pages/store/checkout.vue");

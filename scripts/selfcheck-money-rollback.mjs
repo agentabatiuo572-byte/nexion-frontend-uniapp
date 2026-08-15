@@ -326,7 +326,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
 
   const coSrc = strip(read("src", "pages", "store", "checkout.vue"));
   const idxDebit = coSrc.indexOf("app.debitBalance(chargeTotal)");
-  const idxConvert = coSrc.indexOf("freeTrial.convert()");
+  const convertCalls = [...coSrc.matchAll(/freeTrial\.convert\(\s*p\.id\s*\)/g)];
+  const localConvert = convertCalls.find((match) => match.index > idxDebit);
+  const idxConvert = localConvert?.index ?? -1;
   samples.wiring += 1;
   check("⑥ 🔴 结算页:不可逆的 convert() 排在扣款之后,且失败时退款 + 消费返回值",
     idxDebit > 0 && idxConvert > idxDebit

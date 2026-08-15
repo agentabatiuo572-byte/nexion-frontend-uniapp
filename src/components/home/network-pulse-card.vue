@@ -69,6 +69,8 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useRankSnapshot } from "@/store/rank-snapshot";
+import { useNetworkRank } from "@/store/network-rank";
+import { remoteApiEnabled } from "@/api/runtime";
 import { computeRank } from "@/lib/network-rank";
 import { derivedRegisteredUsers, publicStatsHealth, compactNumber as compact } from "@/lib/platform-stats";
 import { toast } from "@/store/ui";
@@ -80,6 +82,7 @@ const t = useT();
 const app = useApp();
 const cfg = useConfig();
 const snap = useRankSnapshot();
+const remoteRank = useNetworkRank();
 
 // 🔴 时间锚的真实机制(2026-08-06 审计纠正,上一版注释说的「下拉刷新带动重渲」不成立):
 //   挂载取一次 + **配置重拉完成沿再取一次**(下拉刷新会触发 cfg.load,见 store/refresh.ts)。
@@ -91,6 +94,11 @@ const nowTs = ref(Date.now());
 //   真隔离 = 展示值在时点定格进普通 ref(它不追踪任何源),提交爱怎么写怎么写。
 const displayDelta = ref<number | null>(null);
 function refreshRankMoment() {
+  if (remoteApiEnabled) {
+    void remoteRank.refresh();
+    displayDelta.value = remoteRank.snapshot?.rankChange24h ?? null;
+    return;
+  }
   nowTs.value = Date.now();
   const r = rank.value;
   if (r.kind === "ranked") {
@@ -101,6 +109,16 @@ function refreshRankMoment() {
   }
 }
 onMounted(refreshRankMoment);
+watch(() => remoteRank.snapshot, (next) => {
+  if (remoteApiEnabled) displayDelta.value = next?.rankChange24h ?? null;
+});
+watch(() => app.accountKey, (accountKey) => {
+  if (!remoteApiEnabled) return;
+  // Defensive rebind for direct session restore/account mutations; the central
+  // account scope also binds this store, and the epoch makes duplicate binds safe.
+  remoteRank.bindAccount(accountKey);
+  refreshRankMoment();
+});
 watch(() => cfg.loading, (l, was) => {
   if (was && !l) refreshRankMoment();
 });
@@ -130,6 +148,12 @@ const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats,
 //   🔴 入参守卫(R2 P2):分母吃服务端真实账号数，营销公布基数不参与资格排名。
 //   是它自己的输入坏了,同判 unavailable;ps 整段缺席(机器门最小桩)同理,不裸解引。
 const rank = computed(() => {
+  if (remoteApiEnabled) {
+    if (remoteRank.status !== "ready" || remoteRank.snapshot === null) return { kind: "unavailable" } as const;
+    return remoteRank.snapshot.currentRank === null
+      ? { kind: "unranked" } as const
+      : { kind: "ranked", rank: remoteRank.snapshot.currentRank } as const;
+  }
   const ps = cfg.config.publicStats;
   const h = health.value;
   if (!ps || !h.membersOk || !h.rankOk) return { kind: "unavailable" } as const;
