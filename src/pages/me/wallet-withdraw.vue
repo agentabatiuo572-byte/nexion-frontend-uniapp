@@ -469,7 +469,9 @@ async function loadWithdrawalPolicy(): Promise<void> {
     }
   } catch (cause) {
     withdrawalPolicy.value = null;
-    withdrawalPolicyError.value = cause instanceof Error ? cause.message : "WITHDRAWAL_POLICY_UNAVAILABLE";
+    // 焦虑文案收口(2026-08-15):原始 message/错误码只进日志,用户面一律人话。
+    console.warn("[withdraw] policy fetch failed:", cause);
+    withdrawalPolicyError.value = t.value.walletV3.submitReasonServiceUnavailable;
   } finally {
     withdrawalPolicyLoading.value = false;
   }
