@@ -47,8 +47,10 @@
 - [x] T7 族8 工程话转人话 + 族10 杂项（绑卡推送对齐 Model A；敬语统一「你」；注销流程 4 处 anxiety-exempt 豁免）
 - [x] T8 族9 代码收口 9 处（原始 message/错误码只进 console；新增 serviceUnavailable 族 4 key；wallet.vue 沙箱面按验收需要保留原始码，见 Impact 附注）
 - [x] T9 族11 死内容清理（faq/tickets/conversations/weekly-quests → .trash/20260815-anxiety-copy；complianceBanner 三语删除）
-- [ ] T10 全量门（verify.sh，worktree 独立端口）+ 实景走查（独立 tester 验收）
-- [ ] T11 nexion-audit + done-review + 三处收尾记录 + 合并回主线
+- [x] T10 全量门 + 实景走查 + 独立验收（verify 445 过/1 红=基线既有 platform-anchor sed 环境差异与本包无关；独立 tester 7/7 AC 全过含孤字检测器红测；主会话三语实景抽验提现/钱包 console 0）
+- [x] T11 对抗审计 + 修复（skeptic 2×P0 + 1×P1 + 7×P2：dustHoldNote 入账承诺改为「结果以账单为准」诚实版；bank pane fallback 补人话修「VIETQR_CREATE_FAILED 必弹」；addSuccessBody 三语「冻结」漏网补齐；孤字探针路由 5→10 补齐改动面；豁免正则加固 ≥6 字理由；checks/ 孤儿重复测试文件入 .trash。P2 遗留 4 条见下）+ 三处收尾记录 + 合并回主线
+
+**审计 P2 遗留台账**（非阻塞，后续按需收）：① `security.opFailed` 跨 10 处复用致反馈精度下降（原「未创建工单」等细分信息合并为通用句）；② wallet-bills 复用「余额不受影响」文案在只读页轻微文不对题；③ topup-card-form `failureReason` ref 只写不读（死状态）；④ 三语语义等价无机器门（本次 dustHoldNote 漂移即此洞，镜像门只验 key 存在性）。
 
 **T8 附注**：`wallet.vue` 的资金沙箱错误面（仅显式 `VITE_NEXGRID_API_MODE=sandbox` 可达，生产默认 remote 不可达）**有意保留原始错误码**——那是验收工程师的诊断面，人话反而降低排障效率。
 **机器门口径**：三语禁词表含 zh（人工审核/复核/核对/处理·待审线·冻结线·风险评分·合规审查·合规中心·风控·审核·审查·核查）/ en（manual|under|pending|for|after review·reviewed·risk control|review|score·compliance review·awaiting approval·do_not_honor）/ vi（duyệt 除 trình duyệt·kiểm soát rủi ro·điểm rủi ro·rà soát tuân thủ·thủ công）。

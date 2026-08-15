@@ -34,7 +34,7 @@ const BANNED = [
   /(?<!trình\s)duyệt|kiểm soát rủi ro|điểm rủi ro|rà soát tuân thủ|thủ công/i,
 ];
 
-const EXEMPT_RE = /anxiety-exempt:\s*\S+/;
+const EXEMPT_RE = /anxiety-exempt:\s*.{6,}/; // 理由至少 6 字符 —— 「x」式空头豁免不放行
 
 /** 逐行抽字符串值:跨行维护块注释状态,行内剥 // 注释(引号感知)。 */
 function extractValues(src) {
