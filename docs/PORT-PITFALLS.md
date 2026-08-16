@@ -1612,8 +1612,16 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **对策**:① 判「代码坏 vs 环境坏」用三件套:交互式浏览器实景渲染 + curl shell 延迟 + 最小 playwright goto 复现(同秒失败/成功对照 = 队列拥塞铁证);② 预热/走查类脚本用「**单 browser 串行耐心 + 失败等 3s 重试**」模式(当晚 176 次 goto 全成);对轮询页(首页 live feed)禁用 networkidle 判据(永不触发),用「等目标文本」;③ 长跑判据:verify 前后各 curl 一次 shell 延迟,>2s 即环境红,先重启 server 再谈门的结论;④ 已焊(2026-08-16,同日):verify.sh `[2.7] dev server health preflight` —— 开跑前对 `$BASE_URL/` 连续 2 次 curl 测 `time_total`,任一次 >2s 即判**环境红**并直接中止(输出 ENV-RED 横幅 + 「重启后再跑」处置;退出码钉 **3** 与门红的 1 区分,`.verify-exit.code` 老读法只跟 0 比不受影响;server 压根连不上时不重复计红,交 [2.5] 判)。收尾处再测 1 次,总结行报「首尾延迟」,首绿尾超阈 = server 在本轮中途退化,后段 runtime 红先疑环境。红测:3.5s 延迟假 server 实测第 1 采样 3.506s → 环境红中止([3] 起零段落跑过、进程与哨兵退出码均 3);恢复真 server 后全量复跑 [2.7] PASS(0.005s/0.005s,收尾 0.011s),无误伤。
 - **判别套件补一件(同日 R4 后)**:`build:h5` 产物 + 10 行 node 静态服务器 + 全新 context 裸启动 = **零转译队列的代码健康终极判别**——dev 模式残差门(entry/onboarding/register 这类整文档冷载「启动图」页)在静态产物上 1-2s 全挂载,即可把「代码 vs dev-server 病理」一刀切开;比无限重跑 verify 省一个数量级时间。
 
-## P-099 门腐烂:实现改了链路形状,门的桩面/判据锚没跟上 —— 门整体空转而**首格照绿**
-<!-- 编号注:2026-08-16 机器上有 4 个并发会话在跑 verify,本条与 P-100 若与他人同号,按 P-097 的先例「主线先落地者保号」顺延。 -->
+## P-099 账号内部 key 经 email 兜底链上屏:profile 身份行直出裸 "default"
+
+- **症状**:中文界面 `/pages/me/profile` 昵称「Hyper Drift 41」正下方渲染一行裸英文 `default`(2026-08-15 date-locale T1 独立验收发现#2,截图 evidence-date-locale/profile-zh.png)。模板 grep 不到字面 —— 值来自 store 直出。
+- **根因**:三层叠加。① `user.email` 的多条兜底链(seed 工厂 / bindAccount 绑定闸)把**账号内部 key 当联系身份**灌入:匿名 boot key 字面就是 `"default"`;② 竞态铸造:App.vue 启动恢复的 `bindAccount("default")` 若抢在 boot 种子首次落盘前执行,`readAccountSnapshot` 读空 → 用 rawAccountKey(="default")重播种**并持久化**——毒行一旦落盘即棘轮式永久污染;③ 静态评审路由(`?nx_device=off` 走查/验收视角)下 `scheduleAccountSessionBootstrap` 直接 return,bind 永不执行,boot 直读毒行原样上屏 —— 修在绑定闸的第一版对该视角完全无效(实测)。
+- **对策**(pkg/zr):归一化整体内置进 `readAccountSnapshot`(全部 9 处存储读、含三路 merge 的 latest 视图的**唯一入口**):`user.email` 非邮箱形(不含 `@`)一律归一成 demo 身份 `alex@nexgrid.ai`;判据取「像邮箱」而非枚举 key 形状(key 形状是开放集合,枚举必漏)。铸造侧两快照工厂加 `asEmailIdentity` 筛(不再铸毒)。**归一化不能只折叠成空串把补值留给个别消费者**——三路 merge 会把空串当 latest 差异反噬回治过的内存值(实测中招后改为整体归一)。
+- **已转哨兵**:`scripts/profile-identity-check.mjs` 运行时门(挂 `test:h5-runtime` 并行组):fresh boot + 注入旧 bug 真实落盘形状的毒快照双场景,断言页面无 standalone `default` 文本节点且身份行邮箱形;红测台账:M-A 撤 read 层归一 → 毒场景红(served 产物核过变异真生效)。诚实边界:seed 工厂筛被 read 层遮蔽(竞态窗不可外部确定性触发),`createServerEmptySnapshot`(remote)无可达渲染面,两处靠 review。
+- **同族提醒**:① 任何「id/key 兜底进展示字段」的链都问一句「这个值像不像它假装的身份」;② 验收/走查视角(静态评审路由)会**停掉会话 bootstrap**——修「启动时自愈」类 bug 必须在该视角下复验,bind 层的修法在这里不存在;③ 红测冷重启前**先杀口再起**:`--strictPort` 撞被占端口会静默退出,探针打到旧 server = 变异「没生效」假象(本轮实测两次)。2026-08-16。
+
+## P-100 门腐烂:实现改了链路形状,门的桩面/判据锚没跟上 —— 门整体空转而**首格照绿**
+<!-- 编号注:2026-08-16 机器上有 4 个并发会话在跑 verify,本条原以 P-099 落笔,合并时主线 pkg/zr 先落地保号,故本条与下条顺延;若仍与他人同号,按 P-097 的先例「主线先落地者保号」顺延。 -->
 
 - **症状**:`BASE_URL=<mock> node scripts/withdraw-bill-runtime.mjs` 20 格里 18 红(基线同红),形态是「账单 0 条 / 落盘 0 条 / 金额 undefined / 退款不动作」—— 看着像提现链整条烂了;而**第一格「提交链路走通」照 PASS**。同批 `scripts/selfcheck-withdraw-nex-refund.mjs` 在 `monthOf` 处直接 ReferenceError 崩掉,自 ⑬ 起十几格一格没跑。
 - **根因**:两条都不是产品回归,是**门的锚过期**,各有一种形态:
@@ -1624,7 +1632,7 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **红测**(全部实跑):拆掉 app.ts `refundWithdrawalDebit` 的「没扣过就没得退」守卫 → 余额 9999 → **10479.25**,两格 ⑦ 当场红(逐分复现 2026-08-11 那条印钞实录);删掉页面 `risk.checkGate` 调用 → 只红 `gateCalls` 那一格(「实测调了 0 次」),其余 18 格照跑;把 `applyWithdrawalDebit(wd)` 接回页面 → 判据自动切到另一支,21/0 全绿(证明门跟着页面走、不写死方向);把同形文本塞进注释 → 剥注释后判据不动(不剥则假阳性)。
 - **同族提醒**:① **「首格绿 + 后面全红」是门腐烂的典型指纹**,不是「实现整条烂了」—— 先问「第一格到底证了什么」,它通常只证到链路的**第一步**;② 任何「20 格里 N 格红」先看**这些格是不是全在空集上判假**(链没跑到),空集上再多断言也是零信息;③ 门与实现对立时(本轮 `selfcheck-fastlane` 三格要求页面必须调 `applyWithdrawalDebit`,`funds-server-sandbox-regression` 要求 `applyWithdrawalDebit` 必须 `if (remoteApiEnabled) return false` —— 两者互斥)**别在自己这道门里替别人裁决**:把判据改成「跟着实现走」,哪边赢都不必回来改门。2026-08-16。
 
-## P-100 `.claude/worktrees/` 里的 dev server 永不跟进源码改动 —— 红测/verify 静默验旧代码
+## P-101 `.claude/worktrees/` 里的 dev server 永不跟进源码改动 —— 红测/verify 静默验旧代码
 
 - **症状**:worktree 内改了 `src/**` 再跑运行时门,行为与代码对不上。实付代价:红测「拆掉退款守卫 → 印钞路径必须变红」跑出**全绿**,差点据此写下「这道门没有牙」的错误结论;杀掉 server 重起后同一红测立刻变红。
 - **根因**(已证):`vite.config.ts` 的 `server.watch.ignored` 含 `**/.claude/**`(P-096 为切断跨仓 junction 成环导致的监视器无限递归 OOM 而加,**那条修复本身是对的**),而 worktree 整棵树就住在 `<repo>/.claude/worktrees/<name>/` 下面。拿仓内 picomatch 实测:worktree 源文件 `…/.claude/worktrees/X/src/store/app.ts` **匹配 → 被拉黑**;主 checkout 的 `…/Nexion-uniapp/src/store/app.ts` **不匹配**。所以「主树能热更、worktree 不能」不是错觉。而 `scripts/verify.sh` **自己不起 server**(只认 `BASE_URL` 上已有的那个)—— 于是「改代码 → 重跑 verify」这个标准循环在 worktree 里默认验的是旧代码,且完全静默。

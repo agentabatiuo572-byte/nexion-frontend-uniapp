@@ -126,7 +126,16 @@ function writeTable(table: AccountCloudTable): boolean {
 export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | null {
   const key = normalizeAccountKey(accountKey);
   const row = readTable()[key];
-  return row && row.schema === 1 ? upgradeLegacyWithdrawals(row) : null;
+  if (!row || row.schema !== 1) return null;
+  const upgraded = upgradeLegacyWithdrawals(row);
+  // 读时升级(同 upgradeLegacyWithdrawals 的「只补形不迁移」纪律):user.email 只承载联系
+  // 身份。旧 bindAccount 曾把账号内部 key("default")当 email 落盘,profile 会把它当邮箱
+  // 渲出来(2026-08-15 T1 验收发现#2);非邮箱形一律归一成 mock demo 身份(与 app.ts boot
+  // 种子同源)。这里是全部存储读(boot / bind / 幂等复读 / merge 的 latest 视图)的唯一
+  // 入口 —— 归一化必须整体住在这:若只折叠成空串、把补值留给个别消费者,三路 merge 会把
+  // 空串当 latest 差异反噬回治过的内存值(实测)。判据取「含 @」而非枚举 key 形状 ——
+  // key 形状是开放集合,枚举必漏。
+  return upgraded.user.email?.includes("@") ? upgraded : { ...upgraded, user: { ...upgraded.user, email: "alex@nexgrid.ai" } };
 }
 
 /**
