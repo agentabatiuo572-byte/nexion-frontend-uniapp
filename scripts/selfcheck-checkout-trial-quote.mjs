@@ -470,7 +470,7 @@ async function bench(opts) {
   check("wiring", "W8 convert 判定在扣款之后(不可逆终态不许排在钱扣住之前)",
     idxConvert > 0 && idxDebit > 0 && idxDebit < idxConvert);
   check("wiring", "W8b convert 失败分支必须退款,且退款返回值被消费(退不回去 → 响亮终态)",
-    /if\s*\(app\.restoreMoney\(beforePay\)/.test(payBare) && /reportStuckFunds\(beforePay/.test(payBare));
+    /(?:if\s*\(|const \w+ = )app\.restoreMoney\(beforePay\)/.test(payBare) && /reportStuckFunds\(beforePay/.test(payBare));
   check("wiring", "W9 建单在扣款之后(任一前置守卫 return 都必然零建单)", idxOrder > idxDebit);
   check("wiring", "W10 族级兜底闸在位:扣款额超过展示总额一律拒单",
     /if\s*\(chargeTotal > quotedTotal\)/.test(payBare));

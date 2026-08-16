@@ -25,16 +25,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FILES = [
   "src/pages/store/checkout.vue",
   "src/pages/store/bundle.vue",
+  "src/components/tradein-sheets.vue",
   "src/store/orders.ts",
   "src/store/voucher.ts",
   "src/store/free-trial.ts",
   "src/store/pending-checkout.ts",
+  "src/store/app.ts", // 落盘权威原语(persistAccountSnapshot / addDevice / activateDevice)住这里 —— 守调用点也守被调用方
 ];
 /** 返回「成没成」的原语:落盘 / CAS / 资金移动 / 收据收口。 */
 const VERDICT_CALLS = new Set([
   "persist", "writeAccountRow", "writeAccountRowCas", "persistAccountSnapshot",
   "markUsed", "release", "consume", "restoreMoney", "debitBalance", "creditBalance", "creditNex",
-  "createOrder", "createOrders", "cancelOrder", "postMoneyBill", "postReceiptOnly", "commit",
+  "createOrder", "createOrders", "cancelOrder", "markActivated", "postMoneyBill", "postReceiptOnly", "postReceiptOnce",
+  "addDevice", "activateDevice", "discardSpawnedDevice", "commit",
 ]);
 const OK_MARK = "persist-verdict-ok";
 
@@ -59,19 +62,44 @@ export function findDiscardedVerdicts(code, fileLabel = "snippet.ts") {
   const sf = ts.createSourceFile(fileLabel, code, ts.ScriptTarget.ES2020, true, ts.ScriptKind.TS);
   const lines = code.split(/\r?\n/);
   const hits = [];
+  // 「丢弃位」:表达式语句里,值最终没人接的那些位置 —— 裸调用 / await 裸调用 / 括号 / 非空断言 /
+  // 逻辑与或空值合并的任一操作数(ok && persist();)/ 逗号表达式 / 三元的两个分支 / 一元 ! /
+  // 数组·对象字面量元素 / 非判决调用的实参(Boolean(persist());)。赋值 / return / if / const 都算消费;
+  // void x() 是显式丢弃,放行(审计 R7 P1:早先只判裸调用,ok && persist(); 被自测认证成合规)。
+  const collectDiscarded = (e, out) => {
+    if (!e) return;
+    if (ts.isVoidExpression(e)) return;
+    if (ts.isAwaitExpression(e) || ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e) || ts.isTypeAssertionExpression(e)) return collectDiscarded(e.expression, out);
+    if (ts.isCallExpression(e)) {
+      const name = calleeName(e.expression);
+      if (name && VERDICT_CALLS.has(name)) { out.push({ node: e, name }); return; }
+      for (const arg of e.arguments) collectDiscarded(arg, out);
+      return;
+    }
+    if (ts.isBinaryExpression(e)) {
+      const k = e.operatorToken.kind;
+      const isLogic = k === ts.SyntaxKind.AmpersandAmpersandToken || k === ts.SyntaxKind.BarBarToken || k === ts.SyntaxKind.QuestionQuestionToken || k === ts.SyntaxKind.CommaToken;
+      if (isLogic) { collectDiscarded(e.left, out); collectDiscarded(e.right, out); return; }
+      if (k === ts.SyntaxKind.EqualsToken || (k >= ts.SyntaxKind.FirstCompoundAssignment && k <= ts.SyntaxKind.LastCompoundAssignment)) return; // assignment consumes
+      collectDiscarded(e.left, out); collectDiscarded(e.right, out); return; // arithmetic / comparison as a statement: value unused
+    }
+    if (ts.isConditionalExpression(e)) { collectDiscarded(e.whenTrue, out); collectDiscarded(e.whenFalse, out); return; }
+    if (ts.isPrefixUnaryExpression(e)) return collectDiscarded(e.operand, out);
+    if (ts.isArrayLiteralExpression(e)) { for (const el of e.elements) collectDiscarded(el, out); return; }
+    if (ts.isObjectLiteralExpression(e)) { for (const pr of e.properties) if (ts.isPropertyAssignment(pr)) collectDiscarded(pr.initializer, out); return; }
+  };
   const visit = (node) => {
     if (ts.isExpressionStatement(node)) {
-      let e = node.expression;
-      if (ts.isAwaitExpression(e)) e = e.expression;
-      if (ts.isCallExpression(e)) {
-        const name = calleeName(e.expression);
-        if (name && VERDICT_CALLS.has(name)) {
-          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line; // 0-based
-          const here = lines[line] ?? "";
-          const prev = lines[line - 1] ?? "";
-          if (!here.includes(OK_MARK) && !prev.includes(OK_MARK)) {
-            hits.push({ line: line + 1, name, text: here.trim().slice(0, 120) });
-          }
+      const found = [];
+      collectDiscarded(node.expression, found);
+      for (const f of found) {
+        const line = sf.getLineAndCharacterOfPosition(f.node.getStart(sf)).line; // 0-based
+        const stmtLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+        const here = lines[line] ?? "";
+        const prev = lines[line - 1] ?? "";
+        const stmtPrev = lines[stmtLine - 1] ?? "";
+        if (!here.includes(OK_MARK) && !prev.includes(OK_MARK) && !stmtPrev.includes(OK_MARK)) {
+          hits.push({ line: line + 1, name: f.name, text: here.trim().slice(0, 120) });
         }
       }
     }
@@ -87,6 +115,16 @@ function selftest() {
     "function f(){ store.markUsed(id); }",               // property access
     "async function f(){ await orders.createOrder(x); }", // awaited bare
     "function f(){ rows.commit((c) => null); }",          // commit bare
+    "function f(){ ok && persist(); }",                   // logical operand, value unused
+    "function f(){ (a, persist()); }",                    // comma
+    "function f(){ cond ? persist() : 0; }",              // ternary branch
+    "function f(){ !persist(); }",                        // unary
+    "function f(){ Boolean(persist()); }",                // wrapped in a non-verdict call
+    "function f(){ persist() || 0; }",
+    "function f(){ (persist()); }",
+    "function f(){ [persist()]; }",
+    "function f(){ store?.persist?.(); }",                // optional call
+    "function f(){ setTimeout(() => { persist(); }, 0); }", // nested statement
   ];
   const good = [
     "function f(){ if (!persist()) return false; }",
@@ -95,7 +133,12 @@ function selftest() {
     "function f(){ void persist(); }",                          // explicit discard
     "function f(){ persist(); // persist-verdict-ok: best-effort prune\n }",
     "function f(){ // persist-verdict-ok: read-only sync\n rows.commit(() => null); }",
-    "function f(){ ok && persist(); }",                          // consumed in expression? (binary → still an ExpressionStatement of BinaryExpression → allowed)
+    "function f(){ x = persist(); }",                           // assigned
+    "function f(){ const c = ok && persist(); return c; }",     // consumed
+    "function f(){ if (a && persist()) {} }",
+    "function f(){ return cond ? persist() : true; }",
+    "function f(){ persist() ? doA() : doB(); }",               // verdict drives the branch = consumed
+    "function f(){ toast.warn(fmt(msg)); }",                    // no verdict primitive at all
   ];
   let fail = 0;
   for (const s of bad) { const h = findDiscardedVerdicts(s); if (h.length !== 1) { console.error("SELFTEST FAIL (should flag):", s, h); fail++; } }
@@ -106,7 +149,7 @@ function selftest() {
   const vh = blocks.flatMap((b) => findDiscardedVerdicts(b.code));
   if (blocks.length !== 1 || vh.length !== 1) { console.error("SELFTEST FAIL (vue extraction):", blocks.length, vh); fail++; }
   if (fail) { console.error(`persist-verdict selftest: ${fail} failed`); process.exit(2); }
-  console.log("persist-verdict selftest: OK (4 flagged · 7 allowed · vue script-only)");
+  console.log(`persist-verdict selftest: OK (${bad.length} flagged · ${good.length} allowed · vue script-only)`);
 }
 
 if (process.argv.includes("--selftest")) { selftest(); process.exit(0); }

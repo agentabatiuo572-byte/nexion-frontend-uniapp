@@ -3381,6 +3381,8 @@ export const en = {
     voucherStuckTitle: "Voucher not restored",
     voucherStuckMsg: "Your balance is unchanged, but the voucher used for this order could not be returned. Contact support with reference {id}.",
     receiptGapMsg: "This purchase went through, but its receipt could not be saved. Keep reference {id} for support.",
+    deviceStuckTitle: "Trade-in device not restored",
+    deviceStuckMsg: "Your balance is back, but the device you traded in could not be returned to your list. Contact support with reference {id}.",
     // 跨标签页并发:这一笔在别处已经处理过了,store 已把最新状态刷回来。共用一对文案,
     // 不给每个 store 各写一套(用户看到的都是同一件事:你眼前这屏刚被别处改过)。
     staleTitle: "Just updated elsewhere",
