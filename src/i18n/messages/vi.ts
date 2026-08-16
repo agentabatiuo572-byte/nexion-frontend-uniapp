@@ -1660,6 +1660,7 @@ export const vi: Messages = {
     specUptime: "SLA thời gian hoạt động",
     specWarranty: "Bảo hành",
     specWarrantyValue: "24 tháng",
+    specValueUnavailable: "Chưa có dữ liệu",
     specUnavailable: "Sản phẩm chưa được chứng nhận đầy đủ thông số nên tạm thời không thể mua.",
     aiRowImageGen: "Tạo ảnh (SDXL)",
     aiRowLlm: "Suy luận LLM",

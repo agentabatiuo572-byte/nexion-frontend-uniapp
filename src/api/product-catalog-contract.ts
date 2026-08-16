@@ -65,8 +65,14 @@ function integer(value: unknown, minimum = 0): number {
   return parsed;
 }
 
+/**
+ * Server sentinel for "this spec has no certified value". A deliberate server
+ * truth, never a client fallback — render it through a locale string, never raw.
+ */
+export const SPEC_UNAVAILABLE = "unavailable";
+
 function displayString(value: unknown): string {
-  // "unavailable" is a deliberate server truth, never a client fallback.
+  // SPEC_UNAVAILABLE is a deliberate server truth, never a client fallback.
   return nonEmptyString(value);
 }
 
