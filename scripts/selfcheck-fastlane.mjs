@@ -776,6 +776,23 @@ function functionBody(src, opener) {
     //   但它只在 mock 模式跑 —— 两道门是分工:静态守 remote-only 的形状,runtime 守 mock 下的行为。
     //   两边都不覆盖的那一格(remote 下的真实行为)本仓目前无门,已登记进
     //   docs/changes/2026-08-11-z5-out-of-scope-findings.md 的 H 项。
+    // 🔴 2026-08-16 重锚 —— 结掉 withdraw-bill-runtime.mjs 头注点名的那笔悬账
+    //    (「selfcheck-fastlane 另有三格…与 4c32a50 直接对立,那笔账在别处结」)。
+    //    4c32a50 把提现的余额权威搬去了服务端:applyWithdrawalDebit 首行成了
+    //    `if (remoteApiEnabled) return false;`,提现页也不再调它,改为建单成功后重拉服务端余额。
+    //    旧判据「两条腿都不受 API 模式影响」守的是**已经不存在的客户端扣款架构** ——
+    //    它红了三格,却一条真问题都没指出,而且每个看到红的人都要重跑一遍同样的调查。
+    //    权威依据(逐条回源 + 运行时实证,remote 模式载真 store、服务端余额可控):
+    //      · app.ts:760 `usdtBalance: fleet.walletUsdt` —— 余额由舰队端点投影,服务端持有;
+    //      · wallet-withdraw.vue 建单成功后 `await app.refreshRemoteFleet()` 重读;
+    //      · 实测服务端 1000 → 本地 1000;服务端扣到 700 → 重拉 → 本地 700;
+    //        此间 applyWithdrawalDebit 不动本地余额并如实回 false。
+    //    所以改成**按页面实际接的那条腿分流**,与 withdraw-bill-runtime.mjs ⑥⑦ 同一范式:
+    //    判据从页面源码读、不写死方向 —— 哪条架构赢,门自动跟着走,不必回来改。
+    // 🔴 剥注释再判:被删掉的调用会在页面的历史说明里被反复提到(本页就有两处),
+    //    读原文会判成「还接着」。
+    const withdrawPageCode = stripComments(readSrc("src/pages/me/wallet-withdraw.vue"));
+    const PAGE_DEBITS_LOCALLY = withdrawPageCode.includes("app.applyWithdrawalDebit(wd)");
     for (const fn of ["applyWithdrawalDebit", "refundWithdrawalDebit"]) {
       const signature = `function ${fn}(wd: Withdrawal): boolean {`;
       const at = appCode.indexOf(signature);
@@ -790,8 +807,26 @@ function functionBody(src, opener) {
       const callerAt = appCode.indexOf("function refundFailedWithdrawals(): string[] {");
       const callerEnd = callerAt < 0 ? -1 : appCode.indexOf("\n  }", callerAt);
       const callerBody = callerAt >= 0 && callerEnd > callerAt ? appCode.slice(callerAt, callerEnd) : "";
-      check(`🔴 ${fn} **不受 API 模式影响**(remote 是唯一建得出提现单的模式,这条腿不能在那里 no-op)`,
-        !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody));
+      if (PAGE_DEBITS_LOCALLY) {
+        // 页面接的是本地扣款腿 → 余额由客户端维持,两条腿都不许在 remote 里 no-op。
+        check(`🔴 ${fn} **不受 API 模式影响**(页面接的是本地扣款腿,它不能在 remote no-op)`,
+          !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody));
+      } else if (fn === "applyWithdrawalDebit") {
+        // 服务端持有余额 → 扣款腿**必须**被模式守卫挡住,否则与服务端同一笔事务双扣。
+        // 🔴 钉**定型串**不用词元正则:判据方向一翻,词元式对「守卫被取反」判绿
+        //    (`if (!remoteApiEnabled) return false;` 照样含 remoteApiEnabled)——
+        //    这正是 2026-08-16 在同一个函数上栽过的那一跤,不重蹈。
+        check(`🔴 ${fn} 必须被模式守卫挡住(服务端已在同一事务扣款,本地再扣 = 双扣)`,
+          !!body && body.includes("if (remoteApiEnabled) return false;"));
+      } else {
+        // 退款腿保持模式无关是**对的**,而且它的安全性不靠模式闸,靠自带的前置:
+        // remote 下扣款腿从没写过幂等键 → 「没扣过就没得退」这一条自然把它挡住。
+        // 两件事一起钉:① 仍然模式无关(别顺手加一道会把 mock 轨退款打死的闸);
+        //              ② 那条前置还在(它才是 remote 下不凭空造钱的真防线)。
+        check(`🔴 ${fn} 保持模式无关,且「没扣过就没得退」的前置还在(它才是 remote 下的真防线)`,
+          !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody)
+            && body.includes("if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;"));
+      }
       // 🔴 落盘失败必须回滚内存并报假。删掉这两行(退回「改了内存就当成功」),
       // money-receipt / withdrawfee / runtime 门**全部照绿** —— 它们的原语名单里没有这两个新函数。
       check(`🔴 ${fn} 落盘失败必须回滚内存并报假(否则刷新即回退,用户眼里钱凭空变化)`,
@@ -803,9 +838,19 @@ function functionBody(src, opener) {
     }
     // 🔴 接线门:判定对 ≠ 接上了。把提现页那一行调用删掉,上面全部静态判据照样绿,
     // 而 runtime 门在 mock 下也测不出 remote 的行为 —— 调用点必须自己被 pin 住。
-    check("🔴 接线:提现建单成功后**真的调**了扣款(删掉调用行,其余判据全绿也拦不住)",
-      stripComments(readSrc("src/pages/me/wallet-withdraw.vue"))
-        .includes("app.applyWithdrawalDebit(wd)"));
+    // 2026-08-16 重锚:同样按实际接线分流(理由见上面那段大注释)。
+    if (PAGE_DEBITS_LOCALLY) {
+      check("🔴 接线:提现建单成功后**真的调**了扣款(删掉调用行,其余判据全绿也拦不住)",
+        withdrawPageCode.includes("app.applyWithdrawalDebit(wd)"));
+    } else {
+      // 🔴🔴 本轮唯一真正的覆盖漏洞:服务端持有余额时,「建单成功后必须重拉服务端余额」
+      //   这条不变量**全仓一道门都没有**(实测:把那一行删掉,tsc / verify 449 格照样全绿,
+      //   而用户提现成功后余额会停在旧数字直到下次重载 —— 还能照着旧数字接着提)。
+      //   withdraw-bill-runtime ⑥ 守的是「不许影子扣款」(别多扣),守不到「必须重拉」(别不减)。
+      //   两条是相反方向的漏,各守各的。
+      check("🔴 接线:服务端持有余额时,建单成功后**必须重拉服务端余额**(不拉 = 余额停在旧数字)",
+        withdrawPageCode.includes("await app.refreshRemoteFleet();"));
+    }
     // 🗑 【2026-08-13 回退】这里曾加过一格「接线门②」,守 App.vue 对账里的扣款补扣格。
     //    实现被 R1 独立审计整格否决(立论前提错 + z5 已明令禁止无条件遍历补扣),
     //    门随实现一起退役 —— 留着就是绿着守一段不存在的代码。
@@ -1031,10 +1076,37 @@ function functionBody(src, opener) {
         // 提交前复检吃的是 snap.daily —— 与 snap.account 同源同刻。取活值会在弹窗期间
         // 切账号时拿新账号的单据判旧账号的额度(R1 三份独立审计各自抓到),
         // 且它声称的跨标签页收益不存在(别的标签页的写入根本不进本标签页内存)。
+        //
+        // 🔴 2026-08-16 重锚:上一版最后一条是一句**无锚的否定式** ——「全文不许出现
+        //    `requestWithdrawalEligibility(…dailyFacts.value,`」。它成立的前提是全页只有
+        //    提交前复检这一处调用;而现在有三处,另外两处是**展示侧**(可提额度显示、
+        //    降额 CTA),吃活值本来就对。于是这条否定式对**正确的实现**判红:
+        //    实测三处调用一处不漏地喂了事实,这格却是唯一红的那格。
+        //    改成按调用点**各自该吃什么**分别断言 —— 严格更强:旧版只会说「有活值就红」,
+        //    新版还会抓「展示侧漏喂」(旧版对漏喂判绿,因为否定式只管别出现)。
+        //    判据构造性:调用实参用括号配对抠,按首参是不是冻结的 snap.* 分两类。
+        const callArgs = [];
+        for (const m of pgCode.matchAll(/requestWithdrawalEligibility\s*\(/g)) {
+          let depth = 0;
+          let i = m.index + m[0].length - 1;
+          const start = i;
+          for (; i < pgCode.length; i++) {
+            if (pgCode[i] === "(") depth++;
+            else if (pgCode[i] === ")" && --depth === 0) break;
+          }
+          callArgs.push(pgCode.slice(start, i + 1));
+        }
+        // 提交前复检 = 拿冻结账号 snap.account 的那一处;其余都是展示侧。
+        const submitRechecks = callArgs.filter((a) => a.includes("snap.account"));
+        const liveReads = callArgs.filter((a) => !a.includes("snap.account"));
         return all >= 2 && all === fed
           && pgCode.includes("daily: dailyFacts.value,")
-          && /requestWithdrawalEligibility\([\s\S]{0,400}?snap\.daily,/.test(pgCode)
-          && !/requestWithdrawalEligibility\([\s\S]{0,400}?dailyFacts\.value,/.test(pgCode);
+          // 提交前复检:必须吃同刻冻结的 snap.daily,且**绝不能**掺活值
+          && submitRechecks.length >= 1
+          && submitRechecks.every((a) => a.includes("snap.daily") && !a.includes("dailyFacts.value"))
+          // 展示侧:一处不落地吃活值(漏喂在这里红 —— 旧的否定式抓不到这一向)
+          && liveReads.length >= 1
+          && liveReads.every((a) => a.includes("dailyFacts.value"));
       })());
     check("🔴 追踪页「再提一笔」与提现页同源(否则一页说能提、一页说不能提)",
       trackCode.includes("dailyLimitStatus({")

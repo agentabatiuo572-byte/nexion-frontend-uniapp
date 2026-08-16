@@ -1394,14 +1394,15 @@ export const useApp = defineStore("app", () => {
   /**
    * 提现落定 → 扣款。与账单主行(`-wd.amount`)是同一笔事实的两个面。
    *
-   * 🔴 为什么是「本地扣减」而不是「回拉服务端余额」(2026-08-11 z5 回源结论):
-   * `usdtBalance` 在本仓**没有服务端源**可拉 —— account-api 没有余额端点,全仓唯一的
-   * 余额类端点 `GET /api/earnings/release-status` 只回**锁定桶**(pending_review / bonus_locked);
-   * 而提现页的可提额度反过来是 `usdtBalance − 这两个桶`(wallet-withdraw.vue maxWithdrawable),
-   * 锚仍是本地这个数。所以「提交成功后回拉服务端余额」在本仓是空转:没有可拉的数,
-   * 拉回来两个显示值一分不动,缺陷原样还在。余额的唯一持有者就是本 store ——
-   * 购买 / 组合 / 质押 / 兑换 / 复投全部在此本地扣款,提现是 2026-08-10 remote 对齐后
-   * **唯一漏掉资金面的那条**:单据搬去了服务端,钱没跟着走。
+   * 🔴 ⚠️ 已过期,勿再据此判断(2026-08-16 回源 + 运行时实证推翻):
+   * 这里原写着「`usdtBalance` 在本仓**没有服务端源**可拉,所以只能本地扣减」。
+   * 那句话把范围限死在 account-api 上了 —— 余额的服务端源不在那儿,在**舰队端点**:
+   * `deviceE3Api.fleet()` 回的 `walletUsdt`,由 refreshRemoteFleet 整体覆写进 usdtBalance
+   * 与 earningBuckets(见本文件 refreshRemoteFleet)。4c32a50 起 remote 轨的余额权威在服务端,
+   * 提现页建单成功后 `await app.refreshRemoteFleet()` 重读,本函数在 remote 下按首行守卫空转。
+   * 运行时实证(remote 载真 store、服务端余额可控):服务端 1000 → 本地 1000;服务端扣到 700
+   * → 重拉 → 本地 700;此间本函数不动本地余额并如实回 false。
+   * 下面「本地扣减」那套仍然是 **mock 轨**的正解(mock 下没有服务端持有余额),故保留。
    * PRD §9.3 同口径:「当日笔数门…即不建单不扣款」(建单⇔扣款)、「提交为原子操作」。
    *
    * 🔴 全有或全无,余额不够整笔不扣并报假,**绝不夹到 0**:夹了的话实扣 < `wd.amount`,
