@@ -464,7 +464,8 @@ const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTT
 // 悬浮(+60),不加内容内缩(内缩会把 sticky 行往下推、滚动时又从浮动条底下穿过)。
 const PENDING_BAR_INSET = 60;
 const hasChassisHeader = computed(() => isTabRoute.value || !!navHeader.value);
-const pendingBarVisible = computed(() => !!pendingCheckout.barSession);
+// 与渲染条件同谓词:静态审查路由 / 首帧 route 未解析时条不渲染,内容也不能白让一带。
+const pendingBarVisible = computed(() => !!pendingCheckout.barSession && showBusinessOverlays.value);
 const pendingBarTop = computed(() => contentTop.value + (hasChassisHeader.value ? 8 : 60));
 const pendingBarInset = computed(() => (pendingBarVisible.value && hasChassisHeader.value ? PENDING_BAR_INSET : 0));
 const topChromeHeight = computed(() => contentTop.value);

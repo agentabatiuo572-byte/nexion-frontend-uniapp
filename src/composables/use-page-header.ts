@@ -13,16 +13,20 @@ type PayloadInput = PageHeaderPayload | (() => PageHeaderPayload);
  * Lifecycle: set reactively + on every onShow (covers tab-switch / back returning to
  * this page, P-044 hash-nav doesn't re-fire onLoad); clear on onHide / onUnmounted so
  * the header never leaks into the next page. Tab pages don't call this → brand row.
+ * Each page instance clears only the header it registered (owner token): the popped
+ * page's late onUnmounted must not wipe the header the surviving page just re-set
+ * (checkout → checkout?resume → back left the survivor without back button / title).
  */
 export function useSetPageHeader(input: PayloadInput) {
   const store = usePageHeader();
   const get = (): PageHeaderPayload => (typeof input === "function" ? input() : input);
+  const owner = Symbol("page-header-owner");
 
   // Reactive: re-set whenever the getter's deps change (async product load etc.).
-  watch(get, (v) => store.set(v), { immediate: true });
+  watch(get, (v) => store.set(v, owner), { immediate: true });
   // Re-assert on show (another page's onHide may have cleared it before we re-enter).
-  onShow(() => store.set(get()));
-  // Clear so the nav header doesn't bleed into the next page.
-  onHide(() => store.clear());
-  onUnmounted(() => store.clear());
+  onShow(() => store.set(get(), owner));
+  // Clear so the nav header doesn't bleed into the next page — but only our own entry.
+  onHide(() => store.clear(owner));
+  onUnmounted(() => store.clear(owner));
 }

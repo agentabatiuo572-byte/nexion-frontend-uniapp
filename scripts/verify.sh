@@ -340,6 +340,16 @@ else
   tail -12 /tmp/uni-withdraw-rail-alias.log | sed 's/^/        /'
 fi
 
+# 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
+# 账号隔离 / 过期剪除 / 一次性离开提示 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
+# (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
+if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts > /tmp/uni-pending-checkout-vitest.log 2>&1; then
+  ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
+else
+  bad "pending-checkout vitest 失败(npx vitest run src/store/pending-checkout*.test.ts 看明细)"
+  sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | tail -15 | sed 's/^/        /'
+fi
+
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
@@ -489,12 +499,15 @@ sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *
 # 模拟「网络看到入金」自动 emit("complete") —— 把「取消」变成 12 秒按钮、把用户推进一笔他没确认的扣款。
 # 付款完成只能来自用户动作(我已完成支付)或服务端权威回读。判据:付款腿组件里 setTimeout/setInterval
 # 的回调体(≤300 字符内)不得出现 emit("complete")。ceiling(如实):回调体超长或经变量间接 emit 抓不到,
-# 运行时判据由 tester「扫码页停 60s 不自行推进」兜。红测:把 12s 定时器加回 chain-payment → 本门红。
+# 运行时判据由 tester「扫码页停 60s 不自行推进」+ scripts/pending-checkout-runtime.mjs(停 15s 不推进)兜。
+# ceiling 补充(2026-08-16 审计):文件名枚举(第三条腿要手动加进来)/ 变量间接 emit 抓不到;checkout.vue 里
+# awaiting→confirmed 的 2.4s 定时器是用户点「我已完成支付」**之后**的 mock 结算腿,不在本门语义内。
+# 红测:把 12s 定时器加回 chain-payment → 本门红。
 pay_auto=$("$NODE_BIN" -e '
 const fs=require("fs");const bad=[];
 for (const f of ["src/components/store/chain-payment.vue","src/components/store/card-payment.vue"]) {
   if(!fs.existsSync(f)) { bad.push(f+": missing (payment leg component renamed? update the sentinel)"); continue; }
-  const s=fs.readFileSync(f,"utf8"); const re=/set(?:Timeout|Interval)\(([\s\S]{0,300}?)emit\(\s*"complete"\s*\)/g; let m;
+  const s=fs.readFileSync(f,"utf8"); const re=/set(?:Timeout|Interval)\(([\s\S]{0,300}?)emit\(\s*["'"'"']complete["'"'"']\s*\)/g; let m;
   while((m=re.exec(s))){ const line=s.slice(0,m.index).split(/\r?\n/).length; bad.push(f+":"+line+" timer-driven emit(\"complete\")"); }
 }
 if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)

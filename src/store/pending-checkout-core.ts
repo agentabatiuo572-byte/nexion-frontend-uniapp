@@ -27,7 +27,7 @@ export interface PendingCheckoutSession {
   id: string;
   /** 预留:购机 | 充值(充值意向单目前仍在 deposits store,未迁)。 */
   kind: "purchase" | "deposit";
-  /** 服务端订单号 —— mock 里直到 confirmed 建单才有,本会话在那一刻即结束,故常为 null。 */
+  /** 服务端订单号 —— 本地支付腿里恒为 null(建单那一刻会话即结束);服务端驱动时 = orderNo。 */
   orderNo: string | null;
   productId: string;
   method: PendingCheckoutMethod;
@@ -82,7 +82,7 @@ export function normalizeSessions(raw: unknown): PendingCheckoutSession[] {
     if (typeof s.amountUsdt !== "number" || !Number.isFinite(s.amountUsdt) || s.amountUsdt < 0) continue;
     if (typeof s.createdAt !== "number" || typeof s.expiresAt !== "number") continue;
     const q = s.quote;
-    if (!q || typeof q !== "object" || typeof q.total !== "number") continue;
+    if (!q || typeof q !== "object" || typeof q.total !== "number" || !Number.isFinite(q.total) || q.total < 0) continue;
     out.push({
       id: s.id,
       kind: s.kind === "deposit" ? "deposit" : "purchase",

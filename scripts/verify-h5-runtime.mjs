@@ -111,6 +111,7 @@ try {
         runGate("sticky-check.mjs", baseUrl),
         runGate("backnav-check.mjs", baseUrl),
         runGate("profile-identity-check.mjs", baseUrl),
+        runGate("pending-checkout-runtime.mjs", baseUrl),
         runGate("page-check.mjs", baseUrl, [
           "/#/pages/index/index",
           "h5-runtime-home",
@@ -121,7 +122,7 @@ try {
   for (const output of outputs) console.log(output.split(/\r?\n/).at(-1));
   console.log(serverSessionReloadRecoveryOnly
     ? `H5 server-session reload recovery: PASS (isolated server ${port}, returning + fresh flows)`
-    : `H5 runtime gates: PASS (isolated server ${port}, 22 scenarios + 5 direct probes)`);
+    : `H5 runtime gates: PASS (isolated server ${port}, 22 scenarios + 6 direct probes)`);
 } finally {
   stopTree(server);
 }

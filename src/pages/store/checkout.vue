@@ -363,6 +363,13 @@ let resumeSessionId: string | null = null;
 // 页面卸载后禁止任何「等弹框回来再动状态」的路径继续执行(弹框是全局层,页面死了它还活着)。
 let pageAlive = true;
 let dialogsOpen = 0;
+// 本页开的确认框都带这个 owner:卸载 / 换号时只收自己的,不碰别人排队中的框。
+const dialogOwner = `checkout:${mintDialogOwner()}`;
+function mintDialogOwner(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 const productId = ref("stellarbox-s1");
 onLoad(async (options) => {
@@ -626,6 +633,8 @@ watch(() => app.accountKey, () => {
   remoteTradeinRecoveryRequired.value = false;
   remoteOrderCommandKey.clear();
   activeSession.value = null;
+  // 正开着的确认框渲染的是上一个账号的商品名与金额 —— 一并收掉。
+  if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
   step.value = "select-payment";
 });
 function fireTradeinIntercept() {
@@ -1012,8 +1021,11 @@ async function openChainSession(): Promise<boolean> {
   const p = product.value;
   if (!p) return false;
   const method = payment.value as PendingCheckoutMethod;
+  // 任何一张在窗内的发票都要先问 —— 包括本页自己曾经开出的那张(支付时刻守卫回弹会把页面
+  // 送回这里;发票在回弹那一刻已由 watch(step) 作废,能走到这一步说明还有一张活票就得问)。
   const existing = pending.current;
-  if (existing && existing.id !== activeSession.value?.id) {
+  let replaceId: string | null = null;
+  if (existing) {
     dialogsOpen += 1;
     const dropOld = await confirm({
       title: t.value.store.pendingCollisionTitle,
@@ -1026,6 +1038,7 @@ async function openChainSession(): Promise<boolean> {
       cancelLabel: t.value.store.pendingCollisionKeep,
       danger: true,
       icon: "warn",
+      owner: dialogOwner,
     });
     dialogsOpen -= 1;
     // 弹框期间页面已卸载 / 离开 confirm 步(换号 / 返回)→ 什么都不做:页面死了不许再动全局态。
@@ -1033,7 +1046,7 @@ async function openChainSession(): Promise<boolean> {
     // 「保留它」(含点遮罩)= 什么都不动:旧发票原样在,浮动条就在本页顶上,想回去点它即可;
     // 不在这里替用户跳页 —— 一个「关掉」手势不该把人带到另一商品的付款页。
     if (!dropOld) return false;
-    pending.remove(existing.id);
+    replaceId = existing.id; // 与开新票同一次提交(store 内销旧开新,没有半执行窗口)
   }
   const ti = appliedTradeinView.value;
   const s = pending.begin({
@@ -1047,8 +1060,11 @@ async function openChainSession(): Promise<boolean> {
       trial: { ...trialQuote },
       tradeIn: ti ? { deviceId: ti.device.id } : null,
     },
+    replaceId,
   });
   if (!s) {
+    // 远端模式 / 入参非法 / 磁盘最新行里还有别的活票(另一个标签页开的):store 已把最新行同步
+    // 进内存,浮动条会露出那张票;这里只提示重试,不再铸第二张。
     toast.warn(t.value.tradein.errPleaseRetry);
     return false;
   }
@@ -1069,6 +1085,7 @@ async function onChainCancel() {
     cancelLabel: t.value.store.pendingCancelKeep,
     danger: true,
     icon: "warn",
+    owner: dialogOwner,
   });
   dialogsOpen -= 1;
   if (!pageAlive || !ok || activeSession.value !== s) return;
@@ -1390,6 +1407,8 @@ function restartRemoteOrderPolling() {
 
 onShow(() => {
   remoteOrderPageVisible = true;
+  // 页面重新可见 → 它展示的那张发票不需要浮动条重复提醒。
+  if (activeSession.value) pending.setViewing(activeSession.value.id);
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
   restoreReceiptRecovery();
@@ -1397,6 +1416,8 @@ onShow(() => {
 });
 onHide(() => {
   remoteOrderPageVisible = false;
+  // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。
+  if (activeSession.value && pending.viewingId === activeSession.value.id) pending.setViewing(null);
   stopRemoteOrderPolling();
 });
 
@@ -1408,6 +1429,11 @@ function clearAdvance() {
 
 watch(step, async (s) => {
   clearAdvance();
+  // 🔴 回到报价前的步骤 = 这张发票作废(支付时刻任一守卫回弹 / 换支付方式 / 撞单放弃):
+  // 发票绑的是那份报价,报价既然要重来,票就不能活着 —— 否则下一次 Pay now 会再开一张,
+  // 两个地址同时催付、落单后旧票成孤儿继续拉人二次付款(独立审计 P0 族)。单一咽喉,
+  // 不在十来处回弹点各写一遍。
+  if ((s === "select-payment" || s === "confirm") && activeSession.value) dropActiveSession();
   // Remote checkout is a server-state machine. Never turn elapsed time into a
   // payment, provisioning, or activation result; only authoritative readback
   // may advance it. Local mock retains the guided timer demonstration.
@@ -1424,6 +1450,12 @@ watch(step, async (s) => {
     if (!p) return;
     // Persist order + spend bill — only ONCE per checkout (orderId guard).
     if (!orderId.value) {
+      // 到点即死的发票在真正花钱的这一刻也要有判据(扫码页的守卫与这里隔着 2.4s)。
+      if (activeSession.value && !pending.isLive(activeSession.value)) {
+        toast.warn(t.value.store.pendingExpiredTitle);
+        step.value = "select-payment";
+        return;
+      }
       // ── Voucher pay-time revalidation(与 trade-in/trial 失效守卫同构)──
       // 券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
       // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用
@@ -1675,12 +1707,16 @@ function cleanup() {
   remoteOrderPageVisible = false;
   stopRemoteOrderPolling();
   tradein.clearApplied();
+  // 本页拉起的置换 / 槽位 sheet 是 chassis 级全局层,不随页面卸载自动收 —— 不收会跟到落地页,
+  // 整屏 backdrop 把浮动条与页面一起挡死(T3 黑盒 P1-2)。
+  tradein.hide();
   if (trialTicker) { clearInterval(trialTicker); trialTicker = undefined; }
   releaseSessionOnLeave();
   pageAlive = false;
   // 本页开着的确认框(撞单 / 取消支付)随页面一起收掉 —— 确认框是全局层,不收会跟着用户去下一页,
   // 而它的按钮回调指向的是一个已卸载的页面(实测:弹框全站阻断 + 「继续那一笔」点了没反应)。
-  if (dialogsOpen > 0) useUI().clearAllConfirms();
+  // 只收本页 owner 的,别人排队中的框不动。
+  if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
