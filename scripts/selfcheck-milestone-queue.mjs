@@ -53,6 +53,28 @@ const mod = await import(
 );
 const { useMilestones, isMoneyFlowRoute, MONEY_FLOW_ROUTE_PREFIXES, CELEBRATION_GAP_MS } = mod;
 
+// 第二个 bundle:真 popup-arbiter(同一套 pinia/vue stub)。⑦ 用它做**组合行为**测试 —
+// 两个 store 各自绿不代表接起来对,现象①正是「零件都在、链没接上」。
+const arbBundle = await build({
+  entryPoints: [path.join(root, "src", "store", "popup-arbiter.ts")],
+  bundle: true,
+  write: false,
+  format: "esm",
+  plugins: [
+    {
+      name: "selfcheck-stubs-arb",
+      setup(b) {
+        b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
+        b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
+        b.onLoad({ filter: /.*/, namespace: "stub" }, (args) => ({ contents: STUBS[args.path], loader: "js" }));
+      },
+    },
+  ],
+});
+const arbMod = await import(
+  "data:text/javascript;base64," + Buffer.from(arbBundle.outputFiles[0].text, "utf8").toString("base64")
+);
+
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail) {
@@ -201,6 +223,125 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
     zOverlay !== null && zToast !== null && zMask !== null);
   check("③ 🔴 .ms-overlay < .nx-mask(庆祝不得盖确认弹窗)", zOverlay !== null && zMask !== null && zOverlay < zMask);
   check("③ .ms-overlay < .nx-toast-host(庆祝不得盖 toast/宽限提示)", zOverlay !== null && zToast !== null && zOverlay < zToast);
+
+  // ③ 🔴 2026-08-16 补业务半屏这一面 —— 本门此前只比了庆祝对 toast / 对 .nx-mask,
+  //    而实测缺陷恰恰发生在**领取弹层**上(庆祝 8900 盖住代金券弹层 790/800 并模糊背景)。
+  //    「契约原文写着必须在业务 UI 之下」与「门是绿的」曾长期同时成立,就是因为缺这一面。
+  const SHEETS = [
+    ["src/components/voucher-claim-sheet.vue", ".vcs-root", ".vcs-panel"],
+    ["src/components/trial-claim-sheet.vue", ".tcs-root", ".tcs-panel"],
+  ];
+  const sheetZ = [];
+  for (const [rel, mask, panel] of SHEETS) {
+    const src = readFileSync(path.join(root, rel), "utf8");
+    for (const sel of [mask, panel]) {
+      const z = zOf(src, sel);
+      check(`③ 业务半屏层级可解析:${rel.split("/").pop()} ${sel}=${z}(解析不到=红,不许静默跳过)`, z !== null);
+      if (z !== null) sheetZ.push({ rel, sel, z });
+    }
+  }
+  check(`③ 扫描面非空(样本 ${sheetZ.length}/${SHEETS.length * 2} 个业务半屏层级)—— 期望是空集的断言天然假绿`,
+    sheetZ.length === SHEETS.length * 2);
+  const lowestSheet = sheetZ.length ? sheetZ.reduce((a, b) => (a.z <= b.z ? a : b)) : null;
+  check(`③ 🔴 .ms-overlay(${zOverlay}) < 全部业务半屏(最低 ${lowestSheet?.sel}=${lowestSheet?.z})—— 庆祝不得盖领取弹层`,
+    zOverlay !== null && lowestSheet !== null && zOverlay < lowestSheet.z,
+    `overlay=${zOverlay} lowestSheet=${JSON.stringify(lowestSheet)}`);
+}
+
+// ── ⑤ 有人占屏时庆祝挂起(2026-08-16 主人拍板 C1;编排层见 src/store/popup-arbiter.ts)──
+//    实测缺陷:庆祝浮层此前**只按路由挂起**,对「屏上有没有别的自动弹层」完全无感,
+//    于是它在首页叠在代金券领取弹层正上方并模糊背景数十秒。
+{
+  const s = freshStore();
+  s.show(M100);
+  const promoted = s.advance("pages/index/index", true);
+  check("⑤ 🔴 有别的弹层占屏时不上屏(promoted=false,队列原样保留)",
+    promoted === false && s.active.value === null && s.pendingCelebrations.value.length === 1,
+    `promoted=${promoted} active=${JSON.stringify(s.active.value)} pending=${s.pendingCelebrations.value.length}`);
+
+  // 占屏解除后照常补发 —— 挂起是「等一下」,不是「丢掉」。
+  check("⑤ 占屏解除后立刻补发(挂起不吞事件)",
+    s.advance("pages/index/index", false) === true && s.active.value?.id === "earn-100",
+    String(s.active.value?.id));
+
+  // 🔴 C1 永不顶替:已经在放的庆祝,不因为「别人想占屏」被收回 ——
+  //    收回是钱链路 park 的语义(会排回队首重放),不是本轴的语义。
+  s.show(M500);
+  const stillActive = s.advance("pages/index/index", true);
+  check("⑤ 🔴 已上屏的不被顶掉(C1 先到先得:screenBusy 只拦新上屏,不收回在放的)",
+    stillActive === false && s.active.value?.id === "earn-100" && s.pendingCelebrations.value.length === 1,
+    `active=${JSON.stringify(s.active.value)} pending=${s.pendingCelebrations.value.length}`);
+
+  // 默认参数回归:不传第二参 = 不挂起(老调用点行为不变,否则全站庆祝会静默失灵)
+  const s2 = freshStore();
+  s2.show(M100);
+  check("⑤ 默认参数不挂起(不传 screenBusy 的老调用点行为不变)",
+    s2.advance("pages/index/index") === true && s2.active.value?.id === "earn-100");
+}
+
+// ── ⑦ 组合行为:两个 store **一起**跑(单测各自绿 ≠ 合起来对)────────────────
+//    ⑤ 只证明「传 true 就挂起」,没证明「弹层占屏时传进去的真的是 true」。
+//    这里把真 popup-arbiter 与真 milestones 接成宿主那条链,测的是链不是零件。
+{
+  const arb = arbMod.usePopupArbiter();
+  const s = freshStore();
+  const busy = () => arb.busyForOthers("milestone");
+
+  check("⑦ 空屏时 busyForOthers=false(基线:没人占屏则庆祝照常上屏)", busy() === false);
+
+  // 领取弹层占屏 → 庆祝必须挂起(现象①的完整复现路径)
+  check("⑦ 代金券拿到令牌", arb.acquire("voucher-claim") === true);
+  s.show(M100);
+  const blocked = s.advance("pages/index/index", busy());
+  check("⑦ 🔴 代金券占屏时庆祝不上屏(链路级复现:此前它 z 8900 直接盖上去)",
+    blocked === false && s.active.value === null && s.pendingCelebrations.value.length === 1,
+    `promoted=${blocked} active=${JSON.stringify(s.active.value)}`);
+
+  // 关闭领取弹层 → 归还令牌 → 庆祝补发(挂起是等一下,不是丢掉)
+  arb.release("voucher-claim");
+  check("⑦ 代金券关闭后令牌归还(current=null)", arb.current.value === null);
+  const promoted = s.advance("pages/index/index", busy());
+  check("⑦ 归还后庆祝立刻补发(0 丢失)", promoted === true && s.active.value?.id === "earn-100");
+
+  // C1 反向:庆祝占屏时,领取弹层申请令牌必须失败(不许顶掉在放的庆祝)
+  check("⑦ 庆祝上屏后取得令牌", arb.acquire("milestone") === true);
+  check("⑦ 🔴 庆祝占屏时代金券申请令牌失败(C1 永不顶替 · 反向)",
+    arb.acquire("voucher-claim") === false && arb.current.value === "milestone",
+    String(arb.current.value));
+  check("⑦ 非持有者归还无效(代金券还不掉庆祝的令牌)",
+    (arb.release("voucher-claim"), arb.current.value === "milestone"));
+  check("⑦ 持有者归还有效", (arb.release("milestone"), arb.current.value === null));
+}
+
+// ── ⑥ 编排层本身:优先级是数据 + 底盘接线(结构断言,headless 跑不了组件)────
+{
+  const arbSrc = readFileSync(path.join(root, "src", "store", "popup-arbiter.ts"), "utf8");
+  // 优先级必须是一张有序表,而不是散落在各处的延迟数字之差(旧写法 1300 vs 1500)。
+  const m = arbSrc.match(/POPUP_PRIORITY\s*=\s*\[([^\]]+)\]/s);
+  check("⑥ 优先级表存在且是有序数组(不再靠延迟数字之差隐式表达顺序)", m !== null);
+  if (m) {
+    const ids = m[1].match(/"([a-z-]+)"/g)?.map((x) => x.replace(/"/g, "")) ?? [];
+    check(`⑥ 🔴 顺序 = 主人 2026-08-16 拍板 A1「代金券 → 试用 → 庆祝」(实际 ${JSON.stringify(ids)})`,
+      ids[0] === "voucher-claim" && ids[1] === "trial-claim" && ids[2] === "milestone",
+      JSON.stringify(ids));
+  }
+  // C1:acquire 里必须有「已被别人占着就失败」这条,否则就是可顶替语义。
+  check("⑥ 🔴 acquire 对已被他人持有的令牌返回 false(C1 永不顶替;删掉这条即变成抢屏)",
+    /current\.value\s*!==\s*null\s*&&\s*current\.value\s*!==\s*id\)\s*return false/.test(arbSrc));
+  // release 必须校验持有者,否则 A 关闭会把 B 刚拿到的令牌抹掉。
+  check("⑥ release 只允许持有者归还(防 A 关闭时抹掉 B 的令牌)",
+    /function release\(id: PopupId\)\s*\{\s*if \(current\.value === id\) current\.value = null;/.test(arbSrc));
+
+  // 底盘:资格必须在触发时复算。旧写法把资格锁死在挂载那一刻,remote 档下代金券
+  // 目录还没到货 → 定时器根本没排上,试用无人竞争地弹出(静默优先级反转)。
+  const chassisSrc = readFileSync(path.join(root, "src", "components", "app-chassis.vue"), "utf8");
+  check("⑥ 🔴 底盘不再有「代金券/试用」各自独立的挂载期定时器(两两互斥不封闭,加面必漏)",
+    chassisSrc.indexOf("voucherPushTimer") === -1 && chassisSrc.indexOf("autoPushTimer") === -1,
+    `voucherPushTimer=${chassisSrc.indexOf("voucherPushTimer")} autoPushTimer=${chassisSrc.indexOf("autoPushTimer")}`);
+  check("⑥ 🔴 底盘按优先级表逐个评,且评之前先申请令牌(同屏互斥的唯一裁决点)",
+    /for \(const id of POPUP_PRIORITY\)/.test(chassisSrc) && /popupArbiter\.acquire\(candidate\.id\)/.test(chassisSrc));
+  check("⑥ 资格在触发时复算而非挂载时锁死(eligible 是函数,被 runAutoPushRound 调用)",
+    /eligible:\s*\(\)\s*=>/.test(chassisSrc) && /candidate\.eligible\(\)/.test(chassisSrc));
 }
 
 // ── ④ 非钱链路即时弹 + 白名单不过宽 ──

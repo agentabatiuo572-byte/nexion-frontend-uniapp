@@ -281,10 +281,10 @@ onUnmounted(() => {
      0–50   页内装饰 / 页面 chrome(aurora · refresher 5 · tabbar 30 · stickyCTA 35 · sub-page header 50)
     90–100  底盘 chrome(.nx-top-chrome 90 · .nx-header/.nx-navheader 100)
    110–200  底盘之上的常驻件(状态栏 110 · 消息抽屉 110/120 · opensea 120 · PC 设备卡 200)
+       780  里程碑庆祝 —— 必须在业务 UI 之下(2026-08-03 定,2026-08-16 兑现,见 milestone-celebration.vue)
    790/800  业务半屏(trial-claim · slot-action · lucky-spin · voucher-claim · tradein · trial)
        900  说明型半屏(capacity-explainer · tradein-ladder)
  8000/8001  分享半屏(share-channel · share-poster)
-      8900  里程碑庆祝 —— 必须在业务 UI 之下(2026-08-03 定,见 milestone-celebration.vue)
  9000/9001  瞬时层 / 选择器(toast host · 国家区号半屏)
       9100  阻断式弹窗(confirm / netError 的 .nx-mask)
  >>> 9500   本层:滑块人机验证 <<<

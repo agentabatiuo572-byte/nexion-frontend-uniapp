@@ -160,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, type CSSProperties } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, type CSSProperties } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
@@ -184,6 +184,7 @@ import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
+import { usePopupArbiter, POPUP_PRIORITY, type PopupId } from "@/store/popup-arbiter";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
@@ -203,8 +204,106 @@ const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
 const voucher = useVoucher();
 const voucherClaimSheet = useVoucherClaimSheet();
-let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
-let voucherPushTimer: ReturnType<typeof setTimeout> | null = null;
+const popupArbiter = usePopupArbiter();
+
+// ── 首页自动弹层编排(主人 2026-08-16 拍板 A1 / B1 / C1)──────────────────────
+// 旧写法是两条各自独立的定时器 + 两两手写 `!对方.open`,优先级只体现为 1300ms 与
+// 1500ms 的延迟之差 —— 那是一段 200ms 的赛跑,不是一条规则。实测出的三条缺陷:
+//   ① 庆祝浮层对谁都不让,画在领取弹层之上并模糊背景(两两互斥不封闭,加第三个面必漏);
+//   ② 资格在挂载那一刻就锁死,而 remote 档下代金券目录是异步拉回来的,那时还是空的
+//      → 代金券的定时器根本没排上,试用无人竞争地弹出,漏斗顺序被静默反转;
+//   ③ 谁先弹取决于两个延迟数字,改延迟 = 不知情地改掉漏斗顺序。
+// 现在:一条安顿定时器 + 一张优先级表(store/popup-arbiter)。到点后按优先级顺序
+// 逐个问「你现在够条件吗」,第一个够的拿走令牌。
+// 🔴 B1「一次进首页只弹一个」由「只评出一个赢家、评出即停表」自然成立 —— 不另设闩:
+//    赢家关掉之后不会再有第二个候选被评,因为表已经停了。
+const SETTLE_RETRY_MS = 300;
+// 资格复算窗口:只在安顿点评一次会重演缺陷 ②(异步目录还没到货)。
+// ponytail: 有界重试,20 × 300ms = 6s;超时就这一趟不弹 —— 比让低优先级顶上去好。
+const SETTLE_MAX_TICKS = 20;
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
+let settleRetry: ReturnType<typeof setInterval> | null = null;
+let settleTicks = 0;
+
+interface AutoPushCandidate {
+  id: PopupId;
+  /** 资格 —— **在触发时复算**,不在挂载时锁死(修缺陷 ②)。 */
+  eligible: () => boolean;
+  /** 尝试弹出;各自的 cooldownHours / maxPerSession 仍由各自 store 判定,本层不碰。 */
+  push: () => boolean;
+}
+
+// 顺序**不在这里定**(按 POPUP_PRIORITY 排),这里只声明每个 id 的资格与推送方式。
+const autoPushCandidates: AutoPushCandidate[] = [
+  {
+    id: "voucher-claim",
+    eligible: () => voucher.claimableVouchers.some((v) => v.popupEnabled),
+    push: () =>
+      voucherClaimSheet.tryAutoPush({
+        cooldownHours: VOUCHER_POPUP.cooldownHours,
+        maxPerSession: VOUCHER_POPUP.maxPerSession,
+      }),
+  },
+  {
+    id: "trial-claim",
+    eligible: () => trialConfig.config.autoPushEnabled && freeTrial.canStart(),
+    push: () =>
+      trialClaimSheet.tryAutoPush({
+        cooldownHours: trialConfig.config.autoPushCooldownHours,
+        maxPerSession: trialConfig.config.autoPushMaxPerSession,
+      }),
+  },
+];
+
+// 延迟回归本职「让首屏先安顿」,不再兼任优先级。取各候选配置延迟的较大值,
+// 保证每个候选都过了它自己那份 autoPushDelayMs 才被评。
+function settleDelayMs(): number {
+  return Math.max(trialConfig.config.autoPushDelayMs, VOUCHER_POPUP.autoPushDelayMs);
+}
+
+/** 按优先级评一轮。返回 true = 该停表(有人弹出来了,或已离开首页)。 */
+function runAutoPushRound(): boolean {
+  if (readRoute() !== "pages/index/index") return true;
+  for (const id of POPUP_PRIORITY) {
+    const candidate = autoPushCandidates.find((c) => c.id === id);
+    // 庆祝浮层在优先级表里,但不由底盘推送(它有自己的队列宿主)——
+    // 它在这里的意义是:它占着屏时,下面这道 acquire 会失败,领取弹层就得等。
+    if (!candidate || !candidate.eligible()) continue;
+    // C1 先到先得:已有人占屏 → 这一轮谁都不弹,留给下一次重试,绝不顶替。
+    if (!popupArbiter.acquire(candidate.id)) return false;
+    if (candidate.push()) return true;
+    // 冷却没过 / 会话次数用完 → 还回令牌,让位给下一个候选。
+    popupArbiter.release(candidate.id);
+  }
+  return false;
+}
+
+function stopAutoPush() {
+  if (settleTimer) {
+    clearTimeout(settleTimer);
+    settleTimer = null;
+  }
+  if (settleRetry) {
+    clearInterval(settleRetry);
+    settleRetry = null;
+  }
+}
+
+// 令牌跟着弹层的真实开合走 —— 从 banner 手动打开的也算占屏,庆祝浮层同样要让路。
+// 写成 watch 而不是散在各个关闭路径上:关闭出口有好几个(hide / closeTransient /
+// 直接置 open),漏接任何一个都会把令牌永久扣住,之后谁都再弹不出来。
+function syncSheetToken(id: PopupId, open: boolean) {
+  if (open) popupArbiter.acquire(id);
+  else popupArbiter.release(id);
+}
+watch(
+  [() => voucherClaimSheet.open, () => trialClaimSheet.open],
+  ([voucherOpen, trialOpen]) => {
+    syncSheetToken("voucher-claim", voucherOpen);
+    syncSheetToken("trial-claim", trialOpen);
+  },
+  { immediate: true },
+);
 
 // ── Pull-to-refresh — touch gesture ported from the prototype's PullToRefresh
 // (lib/store/refresh + ui/pull-to-refresh.tsx). The plain overflow:auto view
@@ -350,40 +449,19 @@ onMounted(() => {
   else trialClaimSheet.open = false;
   voucherClaimSheet.closeTransient();
 
-  // Home auto-push trial sheet — ported from the prototype mission-control.tsx
-  // mount effect (the missing trigger: store + config were ported, the auto-push
-  // was not). On Home mount, after autoPushDelayMs, fire tryAutoPush (cooldown +
-  // session-cap gated in the store). Lives at the chassis with an isHome guard so
-  // the protected index.vue page is never edited (ALIGNMENT red-line). Re-checks the
-  // route at fire time so it never pops over a page navigated-to during the delay.
-  if (isHome.value && trialConfig.config.autoPushEnabled && freeTrial.canStart()) {
-    autoPushTimer = setTimeout(() => {
-      // Defer to the voucher sheet (fires 1300ms < this 1500ms) — only one
-      // auto-popup per Home visit; the trial fills in when no voucher opened.
-      if (readRoute() === "pages/index/index" && !voucherClaimSheet.open) {
-        trialClaimSheet.tryAutoPush({
-          cooldownHours: trialConfig.config.autoPushCooldownHours,
-          maxPerSession: trialConfig.config.autoPushMaxPerSession,
-        });
-      }
-    }, trialConfig.config.autoPushDelayMs);
-  }
-
-  // Home auto-push voucher sheet — fires FIRST (VOUCHER_POPUP.autoPushDelayMs
-  // 1300ms < trial 1500ms) so the voucher takes PRIORITY; the trial sheet defers
-  // via its own !voucherClaimSheet.open guard (and fills in when no voucher is
-  // claimable). The !trialClaimSheet.open check here is belt-and-suspenders
-  // (trial can't be open yet at 1300ms unless manually shown). Cooldown +
-  // session-cap gated in the store; re-checks route at fire time.
-  if (isHome.value && voucher.claimableVouchers.some((v) => v.popupEnabled)) {
-    voucherPushTimer = setTimeout(() => {
-      if (readRoute() === "pages/index/index" && !trialClaimSheet.open) {
-        voucherClaimSheet.tryAutoPush({
-          cooldownHours: VOUCHER_POPUP.cooldownHours,
-          maxPerSession: VOUCHER_POPUP.maxPerSession,
-        });
-      }
-    }, VOUCHER_POPUP.autoPushDelayMs);
+  // 首页自动弹层编排入口(编排规则见文件上半部 autoPushCandidates / runAutoPushRound)。
+  // 挂载即排一条安顿定时器;到点评一轮,评不出赢家就有界重试(等异步目录到货),
+  // 直到有人弹出 / 离开首页 / 超时。isHome 守卫让受保护的 index.vue 不必被编辑
+  // (ALIGNMENT 红线);路由在**触发时**复检,绝不弹到延迟期间跳过去的别的页上。
+  if (isHome.value) {
+    settleTicks = 0;
+    settleTimer = setTimeout(() => {
+      if (runAutoPushRound()) return;
+      settleRetry = setInterval(() => {
+        settleTicks += 1;
+        if (runAutoPushRound() || settleTicks >= SETTLE_MAX_TICKS) stopAutoPush();
+      }, SETTLE_RETRY_MS);
+    }, settleDelayMs());
   }
 });
 onUnmounted(() => {
@@ -391,14 +469,7 @@ onUnmounted(() => {
   if (scrollDom && typeof scrollDom.removeEventListener === "function") {
     scrollDom.removeEventListener("scroll", onChassisScroll);
   }
-  if (autoPushTimer) {
-    clearTimeout(autoPushTimer);
-    autoPushTimer = null;
-  }
-  if (voucherPushTimer) {
-    clearTimeout(voucherPushTimer);
-    voucherPushTimer = null;
-  }
+  stopAutoPush();
 });
 
 const routeTab = computed(() => TAB_ROUTE_KEY[route.value]);
