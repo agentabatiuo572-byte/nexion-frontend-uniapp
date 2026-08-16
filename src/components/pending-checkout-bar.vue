@@ -44,7 +44,8 @@ const pending = usePendingCheckout();
 const session = computed(() => pending.barSession);
 const amountText = computed(() => (session.value ? session.value.amountUsdt.toLocaleString() : ""));
 const countdown = computed(() => (session.value ? formatCountdown(pending.secondsLeft(session.value)) : "00:00"));
-const ariaLabel = computed(() => `${t.value.store.pendingBarLabel} $${amountText.value} · ${countdown.value} · ${t.value.store.pendingBarResume}`);
+// 屏读标签不带每秒变化的倒计时(否则聚焦时连续重播报)。
+const ariaLabel = computed(() => `${t.value.store.pendingBarLabel} $${amountText.value} · ${t.value.store.pendingBarResume}`);
 
 function resume() {
   const s = session.value;
@@ -60,7 +61,7 @@ function resume() {
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 95; /* under the fixed headers (100), over sticky sub-page headers (50) + content */
+  z-index: 60; /* over sticky sub-page headers (50) + content; UNDER sheet / modal backdrops (79+) and headers (100) */
   display: flex;
   justify-content: center;
   padding: 0 16px;
@@ -104,6 +105,9 @@ function resume() {
   font-size: 12px;
   color: var(--v5-ink-2);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis; /* narrow viewports: the label gives way, amount / countdown / CTA stay whole */
 }
 .pcb-amount {
   font-family: var(--font-v5);

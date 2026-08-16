@@ -28,6 +28,8 @@ export interface ConfirmOptions {
   danger?: boolean;
   hideCancel?: boolean;
   icon?: "danger" | "warn" | "info" | "success" | null;
+  /** 谁开的框(如页面实例的 owner 标记)—— 页面卸载时只收自己开的,不碰别人排队中的框。 */
+  owner?: string;
 }
 
 interface ConfirmInternal extends ConfirmOptions {
@@ -98,6 +100,14 @@ export const useUI = defineStore("ui", () => {
     for (const item of pending) item.resolve(false);
   }
 
+  /** 只收掉某个 owner 开的确认框(按「取消」结掉);别人的原样排队。 */
+  function clearConfirmsBy(owner: string) {
+    const mine = confirmQueue.value.filter((c) => c.owner === owner);
+    if (mine.length === 0) return;
+    confirmQueue.value = confirmQueue.value.filter((c) => c.owner !== owner);
+    for (const item of mine) item.resolve(false);
+  }
+
   function showNetError(s: Omit<NetErrorState, "visible">) {
     netError.value = { visible: true, ...s };
   }
@@ -123,6 +133,7 @@ export const useUI = defineStore("ui", () => {
     confirm,
     resolveConfirm,
     clearAllConfirms,
+    clearConfirmsBy,
     showNetError,
     hideNetError,
     openMessageDrawer,
