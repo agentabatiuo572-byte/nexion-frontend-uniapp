@@ -793,6 +793,23 @@ function functionBody(src, opener) {
     //    读原文会判成「还接着」。
     const withdrawPageCode = stripComments(readSrc("src/pages/me/wallet-withdraw.vue"));
     const PAGE_DEBITS_LOCALLY = withdrawPageCode.includes("app.applyWithdrawalDebit(wd)");
+    // 🔴 远端档标志的**等价类**,从 runtime.ts 解析出来 —— 不手写名字。
+    //    手写的那一刻它就只是个字符串,而实现随时能换个同义词绕过去,且绕过去的方式恰好是**报绿**。
+    //    今为 remoteApiEnabled / fundsServerEnabled(两者同为 `mode !== "mock"`,app.ts 亦注明「≡」)。
+    //    解析面为空 = 判据失效,由下面的 `REMOTE_RAIL.length > 0` fail-closed 判红。
+    const REMOTE_RAIL = [...readSrc("src/api/runtime.ts")
+      .matchAll(/export const (\w+) = apiRuntimeConfig\.mode !== "mock";/g)].map((m) => m[1]);
+    // 「这条腿被远端档闸挡住了吗」——钉**正向定型串** `if (<flag>) return`,不用词元正则:
+    // 词元式对「守卫被取反」和「只剩装饰性提及」双双判绿(P-104),而这里两种都要抓。
+    const railGated = (code) => REMOTE_RAIL.some((flag) => code.includes(`if (${flag}) return`));
+    // 扣款腿的函数体单独切一份:退款腿那格要拿它做**同档**比较,而循环里的 `body` 是当轮那条腿的。
+    // 切法与循环内逐字同形(含 fail-closed:切不出来即空串,下游判据据此判红)。
+    const debitLegBody = (() => {
+      const sig = "function applyWithdrawalDebit(wd: Withdrawal): boolean {";
+      const at = appCode.indexOf(sig);
+      const end = at < 0 ? -1 : appCode.indexOf("\n  }", at);
+      return at >= 0 && end > at ? appCode.slice(at, end) : "";
+    })();
     for (const fn of ["applyWithdrawalDebit", "refundWithdrawalDebit"]) {
       const signature = `function ${fn}(wd: Withdrawal): boolean {`;
       const at = appCode.indexOf(signature);
@@ -819,13 +836,27 @@ function functionBody(src, opener) {
         check(`🔴 ${fn} 必须被模式守卫挡住(服务端已在同一事务扣款,本地再扣 = 双扣)`,
           !!body && body.includes("if (remoteApiEnabled) return false;"));
       } else {
-        // 退款腿保持模式无关是**对的**,而且它的安全性不靠模式闸,靠自带的前置:
-        // remote 下扣款腿从没写过幂等键 → 「没扣过就没得退」这一条自然把它挡住。
-        // 两件事一起钉:① 仍然模式无关(别顺手加一道会把 mock 轨退款打死的闸);
-        //              ② 那条前置还在(它才是 remote 下不凭空造钱的真防线)。
-        check(`🔴 ${fn} 保持模式无关,且「没扣过就没得退」的前置还在(它才是 remote 下的真防线)`,
-          !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody)
-            && body.includes("if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;"));
+        // 🔴🔴【2026-08-16 别名假绿修正】上一版这格写的是「退款腿**保持模式无关**」,
+        //    并警告「别顺手加一道会把 mock 轨退款打死的闸」—— 可那道闸**早就在了**:
+        //    refundFailedWithdrawals 首行就是 `if (fundsServerEnabled) return [];`,
+        //    而 runtime.ts 里 fundsServerEnabled 与 remoteApiEnabled **同为** `mode !== "mock"`。
+        //    判据只认 `remoteApiEnabled` 这一个字面量,认不出同义别名,于是在
+        //    「退款腿实际已被服务端档整条关掉」的情况下**一路报绿** ——
+        //    正是本文件上面那句「能力上界①:换成别名函数就扫不到」一字不差地兑现。
+        //
+        //    修法**不是**把闸拆掉:服务端持有余额时扣与退都归服务端(app.ts 头注同口径),
+        //    两条腿同档关闭是对的。要修的是判据 —— 让它如实描述架构,并把原注释担心的
+        //    那件事**真正钉住**(原判据只是嘴上说,守不到):
+        //      ① 与扣款腿**同档** —— 一开一关 = 扣了不退(丢钱)/ 没扣却退(印钞),两向同一格接住;
+        //      ② 闸必须是远端档标志的**正向定型串** —— `if (true) return []` 或取反形
+        //         `if (!fundsServerEnabled)` 都会把 **mock 轨**的退款打死(= 原注释的担心),
+        //         定型串一并挡住,而词元正则对这两种都瞎;
+        //      ③ 「没扣过就没得退」的前置还在 —— 它才是 remote 下不凭空造钱的真防线(上一版的贡献,保留)。
+        check(`🔴 ${fn} 与扣款腿**同档**(标志按等价类解析,别名也认),且「没扣过就没得退」前置还在`,
+          !!body && !!callerBody && REMOTE_RAIL.length > 0
+            && railGated(body + callerBody) === railGated(debitLegBody)
+            && body.includes("if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;"),
+          `远端档标志=${JSON.stringify(REMOTE_RAIL)} 退款腿被闸=${railGated(body + callerBody)} 扣款腿被闸=${railGated(debitLegBody)}`);
       }
       // 🔴 落盘失败必须回滚内存并报假。删掉这两行(退回「改了内存就当成功」),
       // money-receipt / withdrawfee / runtime 门**全部照绿** —— 它们的原语名单里没有这两个新函数。
