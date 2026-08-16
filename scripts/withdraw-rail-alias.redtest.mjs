@@ -1,8 +1,18 @@
 #!/usr/bin/env node
 /**
- * 提现「扣退同档」那格的**红测** —— 哨兵失效即门失效。
+ * 提现资金门**整族**的红测 —— 哨兵失效即门失效。
+ * (文件名沿用首次落地时的由头「rail-alias」;现已扩到钉 fastlane 里提现资金那一族门。)
  *
- * 为什么要有这支:这一格 2026-08-16 因**同义别名**假绿被修过一轮。上一版判据写的是
+ * 覆盖四格,每格都要求变异后红的**正是那一格**(不是隔壁格):
+ *   · 扣退**同档**(标志按等价类解析 + 正向定型串)
+ *   · 扣款腿**必须被模式守卫挡住**(定型串)
+ *   · 建单成功后**必须重拉服务端余额**
+ *   · 提现页**三个评估点**(提交前复检必须吃冻结快照)
+ * 后三格是 P-105 重锚时新立的,落地时**一道红测都没有** —— 而其中「必须重拉服务端余额」
+ * 那格,重锚它的人自己在注释里写着「本轮唯一真正的覆盖漏洞…全仓一道门都没有」:
+ * 门补上了,门的牙齿却没人证过。新门同样适用「哨兵失效即门失效」,这里把那笔补齐。
+ *
+ * 为什么先有这支:「同档」那格 2026-08-16 因**同义别名**假绿被修过一轮。上一版判据写的是
  * 「退款腿保持模式无关」,并警告「别顺手加一道会把 mock 轨退款打死的闸」——
  * 可那道闸早就在了(`refundFailedWithdrawals` 首行 `if (fundsServerEnabled) return [];`,
  * 而 runtime.ts 里它与 `remoteApiEnabled` 同为 `mode !== "mock"`)。判据只认后者的字面量,
@@ -30,14 +40,28 @@ import path from "node:path";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const APP = path.join(root, "src/store/app.ts");
 const RUNTIME = path.join(root, "src/api/runtime.ts");
+const PAGE = path.join(root, "src/pages/me/wallet-withdraw.vue");
 
 const REFUND_CALLER = "function refundFailedWithdrawals(): string[] {";
 const REFUND_LEG = "function refundWithdrawalDebit(wd: Withdrawal): boolean {";
 const DEBIT_LEG = "function applyWithdrawalDebit(wd: Withdrawal): boolean {";
-const GATE = "扣款腿**同档**";
+/** 各格的可辨识片段。红测不只要求「有格红了」,还要求红的是**这一格** ——
+ *  否则某天判据串味、红的是隔壁那格,这里照样绿(元验证实测过这种情形)。 */
+const G_SAME_RAIL = "扣款腿**同档**";
+const G_DEBIT_GUARD = "必须被模式守卫挡住";
+const G_REFETCH = "必须重拉服务端余额";
+const G_THREE_POINTS = "三个评估点";
 
-/** 在指定函数体切片内做单行替换,再拼回全文。hits !== 1 即靶没打准。 */
+/**
+ * 在指定函数体切片内做单行替换,再拼回全文。hits !== 1 即靶没打准。
+ * sig 传 null = 该靶在**全文**唯一(已逐个核过),直接全文替换,不必切片。
+ * 切片存在的唯一理由是「靶串在全文有重名」(如 `if (fundsServerEnabled) return [];` 有两处)。
+ */
 function editInFn(text, sig, from, to) {
+  if (sig === null) {
+    const hits = text.split(from).length - 1;
+    return hits === 1 ? { text: text.replace(from, to), hits } : { text, hits };
+  }
   const at = text.indexOf(sig);
   const end = at < 0 ? -1 : text.indexOf("\n  }", at);
   if (at < 0 || end <= at) return { text, hits: -1 };
@@ -53,6 +77,7 @@ const TARGETS = [
     // 缺陷实体:服务端持有余额时退款腿也放开 → 服务端冲正之外 client 再退一笔 = 印钞。
     // 🔴 这一条正是**旧判据报绿**的那个形状,本红测的正身。
     name: "退款腿档闸被拆掉(印钞;旧判据对它报绿)",
+    gate: G_SAME_RAIL,
     file: APP,
     ops: [[REFUND_CALLER, "if (fundsServerEnabled) return [];", "if (false) return [];"]],
   },
@@ -60,23 +85,27 @@ const TARGETS = [
     // 取反 = 把 **mock 轨**的退款打死(失败提现永不退款)—— 正是上一版注释担心、
     // 却没能守住的那件事。词元式判据对取反天生瞎(P-104)。
     name: "退款腿档闸被取反(打死 mock 轨退款)",
+    gate: G_SAME_RAIL,
     file: APP,
     ops: [[REFUND_CALLER, "if (fundsServerEnabled) return [];", "if (!fundsServerEnabled) return [];"]],
   },
   {
     name: "退款腿档闸只剩装饰性提及(闸没了,名字还在)",
+    gate: G_SAME_RAIL,
     file: APP,
     ops: [[REFUND_CALLER, "if (fundsServerEnabled) return [];", "const _unusedRail = fundsServerEnabled;"]],
   },
   {
     // 缺陷实体:生产轨上 client 在服务端原子扣款之外再扣一遍 = 双扣。
     name: "扣款腿档闸被拆掉(生产轨双扣)",
+    gate: G_SAME_RAIL,
     file: APP,
     ops: [[DEBIT_LEG, "if (remoteApiEnabled) return false;", "if (false) return false;"]],
   },
   {
     // 「没扣过就没得退」才是 remote 下不凭空造钱的真防线,这条判据是上一版的贡献,不许弄丢。
     name: "「没扣过就没得退」前置被删(真防线)",
+    gate: G_SAME_RAIL,
     file: APP,
     ops: [[REFUND_LEG,
       "if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;",
@@ -85,6 +114,7 @@ const TARGETS = [
   {
     // 标志等价类从 runtime.ts 解析。解析面为空 = 判据失效,必须红,不许「扫不到就当没违规」。
     name: "标志等价类解析面为空(fail-closed)",
+    gate: G_SAME_RAIL,
     file: RUNTIME,
     plain: [
       ['export const remoteApiEnabled = apiRuntimeConfig.mode !== "mock";',
@@ -92,6 +122,43 @@ const TARGETS = [
       ['export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";',
         "export const fundsServerEnabled = !isMockMode(apiRuntimeConfig);"],
     ],
+  },
+  // ══ 以下四靶钉的是 P-105 重锚时新立的三格 —— 它们落地时**没有任何红测**,
+  //    而其中「必须重拉服务端余额」那格,重锚它的人自己在注释里写着
+  //    「本轮唯一真正的覆盖漏洞…全仓一道门都没有」。门补上了,门的牙齿没人证过。
+  //    「哨兵失效即门失效」对新门同样成立,这四靶把那笔补上。
+  {
+    // 缺陷实体(重锚者原话实测):删掉这一行,tsc / verify 449 格照样全绿,
+    // 而用户提现成功后余额停在旧数字,还能照着旧数字接着提。
+    name: "建单成功后不重拉服务端余额(余额停在旧数字,还能照旧数字接着提)",
+    gate: G_REFETCH,
+    file: PAGE,
+    ops: [[null,
+      "if (app.accountKey === snap.account) await app.refreshRemoteFleet();",
+      "if (app.accountKey === snap.account) { /* REDTEST MUTANT */ }"]],
+  },
+  {
+    // 「必须被模式守卫挡住」那格钉的是定型串;取反后守卫形状不匹配 → 必须红。
+    // 缺陷实体:生产轨上 client 在服务端原子扣款之外再扣一遍 = 双扣。
+    name: "扣款腿守卫被取反(生产轨双扣;定型串格)",
+    gate: G_DEBIT_GUARD,
+    file: APP,
+    ops: [[DEBIT_LEG, "if (remoteApiEnabled) return false;", "if (!remoteApiEnabled) return false;"]],
+  },
+  {
+    // 缺陷实体:弹窗期间切账号 → 拿新账号的单据判旧账号的额度(独立审计三次抓到)。
+    name: "提交前复检改吃活值(不吃冻结快照)",
+    gate: G_THREE_POINTS,
+    file: PAGE,
+    ops: [[null, "        snap.daily,", "        dailyFacts.value,"]],
+  },
+  {
+    // 复检整段消失时判据的扫描面为空 —— 同样必须红(禁「扫不到就当没违规」)。
+    name: "提交前复检整段消失(扫描面为空)",
+    gate: G_THREE_POINTS,
+    file: PAGE,
+    ops: [[null, "      fresh = await requestWithdrawalEligibility(",
+      "      fresh = await requestWithdrawalEligibilityREMOVED("]],
   },
 ];
 
@@ -161,10 +228,10 @@ for (const t of TARGETS) {
     console.error(`  🔴 还原后字节不一致:${t.file} —— 红测把树改脏了,立即停`);
     process.exit(2);
   }
-  const hit = fails.some((f) => f.includes(GATE));
+  const hit = fails.some((f) => f.includes(t.gate));
   results.push(hit
     ? `✓ ${t.name}(锚点命中 ${hits} 次)`
-    : `✗ ${t.name} —— 变异后「${GATE}」没红(实际红的:${fails.length ? fails.join(" | ") : "一格都没红"})`);
+    : `✗ ${t.name} —— 变异后「${t.gate}」没红(实际红的:${fails.length ? fails.join(" | ") : "一格都没红"})`);
 }
 
 for (const r of results) console.log(`  ${r}`);
