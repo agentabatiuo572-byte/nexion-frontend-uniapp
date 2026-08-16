@@ -46,7 +46,13 @@ verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另�
 
 ## 架构 big-picture
 
-Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 真后台结构（backend-replaceable），随时可接真后台零重写**。
+🔴 **本工程是生产级代码，要真落地**（主人 2026-08-16 交底：本地与远端仓皆然，**不再是纯演示样本**）。现在仍有 mock 数据，那是主人做 UI/UX 优化期间的**临时脚手架**——优化完成后要清除临时 mock 内容与数据，恢复干净的生产代码。每个 store/model 必须 100% 真后台结构（backend-replaceable），随时可接真后台零重写。
+
+由此三条判断口径（**推翻此前「mock 驱动高保真原型，无真后端」的旧框架**）：
+
+- **判缺陷以「接上真后端对不对」为准**，不以「mock 档下用户看到什么」为准。收尾汇报也别再用「三个档位用户可见行为一致」这类**拿 mock 当产品面**的措辞。
+- **新代码要让 mock 跑通某条链，首选把服务端行为桩在测试 harness 里，而不是在页面 / store 里新开一条模式分支。** 实例：提现页的风险披露闸在 mock 下会 fail-closed 抛错，主人 2026-08-16 拍板**不给页面加分流**，改由 `scripts/withdraw-bill-runtime.mjs` 桩掉 `risk.checkGate` 模拟「服务端答应了」——页面保持模式无关。
+- **存量的 mock 专用腿是待清的债，不是可扩展的模式**：别在上面加功能。⚠️ 但也**别顺手删** ——`scripts/store-unreachable-code-gate.mjs` 那道门要求「服务端权威化时必须留 `if (remoteApiEnabled)` 守卫」，正是为了防止本地实现变成谁也没执行的死代码；清理要整条链一起清，且由主人点头，不是单点删除。
 
 - **状态**：Pinia setup store（`src/store/`，~46 文件）。全局 `app.ts`/`ui.ts`，业务域各自 store；`locale.ts` 用 uniStorage 持久。
 - **i18n**：`src/i18n/messages/{en,zh}.ts` 镜像 key 树（94 namespace）；`use-t.ts` 的 `useT()` + `format.ts` 的 `fmt()`。**加 key 必两文件同序**；硬编码英文 = regression。
