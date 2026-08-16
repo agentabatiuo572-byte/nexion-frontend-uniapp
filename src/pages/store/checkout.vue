@@ -139,7 +139,7 @@
             <!-- Explicit exit before any commitment — ghost weight (conversion Cancel must
                  stay visibly weaker than the primary CTA); goes back to the product. -->
             <view class="w-full grid place-items-center active:opacity-70" :style="ghostCancelStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="cancelCheckout">
-              <text @click.stop="cancelCheckout">{{ t.store.coCancel }}</text>
+              <text>{{ t.store.coCancel }}</text>
             </view>
           </view>
         </view>

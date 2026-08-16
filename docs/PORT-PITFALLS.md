@@ -1703,3 +1703,15 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **修法不是拆闸**:服务端持有余额时扣与退都归服务端,两条腿同档关闭**是对的**;错的是判据的措辞。别被「门红了就改实现」带着走 —— 先问「门声称的那件事,今天还成立吗」。
 - **已转哨兵**:`scripts/withdraw-rail-alias.redtest.mjs`(挂 verify.sh [1.6] fastlane 之后)—— 6 靶全部**变异前绿、变异后红**且还原逐字节一致,其中 **4 靶是「旧判据报绿、新判据报红」**(退款腿闸被拆=印钞 / 被取反=打死 mock 轨退款 / 只剩装饰性提及 / 扣款腿闸被拆=生产轨双扣),另 2 靶守「没扣过就没得退」前置(P-105 的贡献,证明重写时没弄丢)与解析面为空 fail-closed。元验证:把同档判据削成恒真 → 红测精确报 4 靶 ✗ 并 exit 1;第 4 靶此时红的是**隔壁格**,红测按格名比对判 ✗ —— 证明它不会被邻格的红蒙混过关。
 - **同族提醒**:① 凡判据里出现**手写的标识符**(标志名 / 端点名 / 键名),都要问「这个名字有没有同义写法」——有就必须解析等价类,否则失效方式恰好是**报绿**(与 P-102 提醒② 同源:靠人记得同步的清单都会静默失效);② 红测判「红的是不是**这一格**」要按**格名**比对,只看 `fail > 0` 会被隔壁格的红蒙混过关(本轮元验证第 4 靶实证);③ 靶在 `app.ts` 这类大文件里定位,用**函数体切片内的单行串**——`if (fundsServerEnabled) return [];` 全文有两处,全文级替换会打错地方,而跨行靶受混用行尾影响(P-105 提醒①)。2026-08-16。
+
+## P-107 worktree 下的 dev server **没有 HMR** —— vite 把 `**/.claude/**` 整个拉黑,而 worktree 根就在它底下
+
+- **症状**:在 `.claude/worktrees/<x>` 起的 dev server 改文件不热更、也不整页 reload;浏览器里跑的是**旧模块图**,与磁盘不一致却毫无提示。实测形态:改了 checkout.vue 的 cleanup 逻辑,页面「返回后会话保留态没写盘」,像是逻辑坏了 —— 其实浏览器根本没拿到新代码;更阴险的是**混合图**(有的模块新有的旧),行为看似随机。
+- **根因**:`vite.config.ts` 2026-08-15/16 为断 junction 递归环(主 5173 连崩)加了 `server.watch.ignored: ["**/.claude/**", …]`。该 glob 按**绝对路径**匹配,worktree 根 `…/Nexion-uniapp/.claude/worktrees/<x>/src/**` 全命中 → 自己的源码一个都不监视。
+- **对策**:① worktree 里每次改完源码**冷重启** dev server(kill → 起),再验;② 判「代码坏 vs 环境坏」先 `curl <dev>/src/<file>` 与磁盘 grep 比对(同 [[feedback_dev_server_stale_module_graph]]);③ 根治候选(未落地,待主人点头):把 ignore 改成只拉黑**本树根**下的 `.claude`(`path.resolve(__dirname, ".claude") + "/**"`),主检出仍断环、worktree 恢复监视 —— 改的是共享构建配置,归包外决策。2026-08-16。
+
+## P-108 同路由 `uni.redirectTo` 会把 chassis 导航头**清掉**(useSetPageHeader 是单槽全局态)
+
+- **症状**:从 `/pages/store/checkout?product=B` `redirectTo` 到 `/pages/store/checkout?product=A&resume=…`,新页正常渲染但**没有返回键与标题**(`.nx-navheader` 缺席);redirectTo 到**别的**路由(orders)则正常。
+- **根因**:`usePageHeader` 是一个全局单槽 store;`useSetPageHeader` 在新页 onShow 时 set,而**同路由**重定向时旧页实例的 onHide/onUnmounted 排在其后执行 → `store.clear()` 抹掉新页刚登记的头。跨路由时卸载次序不同,恰好没踩到。
+- **对策**:① 同一路由之间**不要 redirectTo**:能原地切状态就原地切(结算撞单「继续那一笔」= 改 `productId` ref 原地恢复,报价 / 门 / 页头 backHref 全部重派生);必须导航则 `navTo` push(旧页 onHide 先于新页 onShow,头不丢);② 若日后必须支持同路由 replace,页头 store 应改成按页实例 id 记账、清理只清自己那条(单槽 → 按 owner 的表,同 [[feedback_single_slot_model_must_be_a_list]] 一族)。2026-08-16。

@@ -485,6 +485,20 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 # with Ref unwrapping (state typed as a plain value ≠ the returned Ref<T>) →
 # TS2740. Setup stores must let Pinia infer the return (cf. market/profile).
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
+# 付款腿禁止定时器自动推进(2026-08-16 pkg/ad checkout-cancel):chain-payment.vue 曾用 12s setTimeout
+# 模拟「网络看到入金」自动 emit("complete") —— 把「取消」变成 12 秒按钮、把用户推进一笔他没确认的扣款。
+# 付款完成只能来自用户动作(我已完成支付)或服务端权威回读。判据:付款腿组件里 setTimeout/setInterval
+# 的回调体(≤300 字符内)不得出现 emit("complete")。ceiling(如实):回调体超长或经变量间接 emit 抓不到,
+# 运行时判据由 tester「扫码页停 60s 不自行推进」兜。红测:把 12s 定时器加回 chain-payment → 本门红。
+pay_auto=$("$NODE_BIN" -e '
+const fs=require("fs");const bad=[];
+for (const f of ["src/components/store/chain-payment.vue","src/components/store/card-payment.vue"]) {
+  if(!fs.existsSync(f)) { bad.push(f+": missing (payment leg component renamed? update the sentinel)"); continue; }
+  const s=fs.readFileSync(f,"utf8"); const re=/set(?:Timeout|Interval)\(([\s\S]{0,300}?)emit\(\s*"complete"\s*\)/g; let m;
+  while((m=re.exec(s))){ const line=s.slice(0,m.index).split(/\r?\n/).length; bad.push(f+":"+line+" timer-driven emit(\"complete\")"); }
+}
+if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
+if [ -z "$pay_auto" ]; then ok "payment leg never auto-completes (no timer-driven emit(\"complete\"))"; else bad "payment leg has a timer-driven complete (mock auto-arrival)"; echo "$pay_auto" | sed 's/^/        /'; fi
 # 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-096;合并重编号,勿与 P-097=server 退化混淆):toLocale* 不传 locale
 # (无参 / undefined / [])= 跟浏览器走,应用 en + 浏览器 zh 时渲染 "Member since 2026年7月",
 # 同字符串还会画进 proof 分享海报 canvas。Date 格式化一律传 src/i18n/format.ts 的 dateLocale()。
