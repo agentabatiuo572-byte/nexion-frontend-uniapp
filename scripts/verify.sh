@@ -218,6 +218,18 @@ api_idempotency_key_gate() {
   fi
 }
 api_idempotency_key_gate
+# vite 监视器锚定门(P-100):拉黑 .claude 的 ignore 必须锚在本树绝对路径。写成通配
+# `**/.claude/**` 会把 worktree(住在 <主 checkout>/.claude/worktrees/<name>/)的全部源码
+# 一起拉黑 —— dev server 静默不跟进改动,改完 curl 回来还是旧转译产物,红测因此假绿。
+vite_watch_anchor_gate() {
+  if "$NODE_BIN" scripts/vite-watch-anchor-gate.mjs > /tmp/uniapp-vite-watch-anchor.log 2>&1; then
+    ok "vite 监视器锚定门 — $(grep -E '^PASS' /tmp/uniapp-vite-watch-anchor.log | tail -1)"
+  else
+    bad "vite 监视器 ignore 没锚在本树 — node scripts/vite-watch-anchor-gate.mjs 看明细"
+    grep -E "^FAIL" /tmp/uniapp-vite-watch-anchor.log | head -5 | sed "s/^/        /"
+  fi
+}
+vite_watch_anchor_gate
 
 echo -e "${C}[1] vue-tsc type-check${N}"
 if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then

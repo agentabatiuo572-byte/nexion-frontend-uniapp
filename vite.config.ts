@@ -8,6 +8,13 @@ import UnoCSS from "unocss/vite";
 // so uni() works regardless of interop mode.
 const uni = (uniPlugin as unknown as { default?: typeof uniPlugin }).default ?? uniPlugin;
 
+// 本配置文件所在树的根(主 checkout 或某个 worktree),正斜杠形式 —— chokidar 的
+// ignore 走 normalize-path,两侧都归一成正斜杠,与 vite 自己拉黑 cacheDir 同款写法。
+// __dirname 由 vite 打包 config 时注入(__vite_injected_original_dirname),ESM 下也有。
+// ponytail: 没给路径做 glob 转义 —— 仓库路径一旦含 `( ) [ ] !` 等元字符这条会静默失配
+// (P-096 的 OOM 会回来)。真要搬到那种路径,照 vite 拉黑 cacheDir 的做法先 escapePath。
+const selfDir = __dirname.replace(/\\/g, "/");
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   // The dev server, rather than the browser bundle, owns the loopback target.
@@ -47,8 +54,16 @@ export default defineConfig(({ mode }) => {
       //   (FATAL: heap out of memory,exit 134;2026-08-15/16 主 5173 连崩,GC 日志实锤)。
       //   dist/ 是构建产物:verify 链的 build:h5 每次落盘都触发整页 reload,打断正在浏览的人。
       //   .trash/ 是删除暂存,监视它只有噪声。三者都不是源码,监视器一律拉黑。
+      // 🔴 .claude 必须锚在**本配置文件所在树**的绝对路径,不能写 `**/.claude/**`:
+      //   worktree 整棵树就住在 <主 checkout>/.claude/worktrees/<name>/ 里,通配版会把
+      //   worktree 的**全部源码**一起拉黑 → dev server 永不跟进改动,且完全静默
+      //   (改完 curl 回来还是旧转译产物,杀了重起才更新)。实付:一次「拆掉退款守卫、
+      //   印钞路径必须变红」的红测跑出全绿,换新 server 立刻变红。详见 P-100。
+      //   门:scripts/vite-watch-anchor-gate.mjs(verify [0] 静态门,改回通配即红)。
+      //   锚定后:主 checkout 照旧拉黑自己的 .claude(junction 环仍进不去),
+      //   worktree 只拉黑自己的 .claude,源码恢复可见。
       watch: {
-        ignored: ["**/.claude/**", "**/dist/**", "**/.trash/**"],
+        ignored: [`${selfDir}/.claude/**`, "**/dist/**", "**/.trash/**"],
       },
       proxy: {
         // The real H5 UI calls /auth/users/* from its same-origin base URL.
