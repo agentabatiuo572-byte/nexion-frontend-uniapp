@@ -201,7 +201,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import ProofSparkline from "@/components/me/proof-sparkline.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
@@ -263,7 +263,7 @@ const joined = computed(() => {
   const raw = remoteApiEnabled ? remoteSnapshot.value?.joinedAt : app.user.joinedAt;
   if (!raw) return "—";
   const ts = typeof raw === "string" ? Date.parse(raw) : raw;
-  return Number.isFinite(ts) ? new Date(ts).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—";
+  return Number.isFinite(ts) ? new Date(ts).toLocaleDateString(dateLocale(), { month: "short", year: "numeric" }) : "—";
 });
 const activeDays = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.activeDays ?? null
   : Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));

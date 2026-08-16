@@ -147,6 +147,7 @@ import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
@@ -300,7 +301,7 @@ function eventText(stage: OrderStatus): string {
 }
 
 function dt(ts: number): string {
-  return new Date(ts).toLocaleString();
+  return new Date(ts).toLocaleString(dateLocale());
 }
 
 async function handleCancel() {

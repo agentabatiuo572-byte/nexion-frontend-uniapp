@@ -65,6 +65,7 @@ import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { useOrders, type OrderStatus } from "@/store/orders";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
@@ -131,7 +132,7 @@ function badge(status: OrderStatus): Badge {
 }
 
 function dateText(ts: number): string {
-  return new Date(ts).toLocaleDateString();
+  return new Date(ts).toLocaleDateString(dateLocale());
 }
 
 function goStore() {

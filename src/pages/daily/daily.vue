@@ -191,7 +191,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -369,7 +369,7 @@ function daysLeftText(day: number): string {
   return fmt(t.value.daily.milestones.daysLeft, { n: day - streak.value });
 }
 function formatTs(ts: number): string {
-  return new Date(ts).toLocaleString();
+  return new Date(ts).toLocaleString(dateLocale());
 }
 
 /** 签到分录的稳定幂等键 = 当天日期(签到一天一次)。带时间戳的话判重永不命中 = 假幂等。 */
