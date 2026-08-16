@@ -387,7 +387,11 @@ onLoad(async (options) => {
   // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
   // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
   const pp = getProduct(productId.value);
+  // 三道跳转门任一命中且带 ?resume=:那张票在这个 SKU 上再也付不了 —— 顺手作废,别让浮动条把人
+  // 反复带回来又弹走(审计 R3:门序把 resume 排在门后形成无出口循环)。
+  const dropResumeInvoice = () => { if (resumeSessionId) { pending.remove(resumeSessionId); resumeSessionId = null; } };
   if (pp?.purchaseBlocked) {
+    dropResumeInvoice();
     uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
     navTo("/store");
     return;
@@ -397,6 +401,7 @@ onLoad(async (options) => {
     const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
       && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
     if (!mockEarlyWindow) {
+      dropResumeInvoice();
       uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
       navTo("/store");
       return;
@@ -406,6 +411,7 @@ onLoad(async (options) => {
   // SKUs — deep-link defense (store cards & detail already redirect blocked users
   // to /team/quota). Server re-checks on POST /api/orders (server-canonical).
   if (purchaseGate.value.blocked) {
+    dropResumeInvoice();
     uni.showToast({
       title: purchaseGate.value.soldOut
         ? t.value.store.gateSoldOutToast
@@ -723,7 +729,7 @@ const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
 const CHECKOUT_RECEIPT_RECOVERY_KEY = "nexgrid-checkout-receipt-recovery-v1";
-type CheckoutReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderId: string };
+type CheckoutReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderId: string; productId?: string };
 const receiptWriteFailure = ref<CheckoutReceiptRecovery | null>(null);
 const receiptRetrying = ref(false);
 // Re-entry guard for the confirm→pay tap (mirrors source confirmingRef) —
@@ -744,7 +750,9 @@ const firstOrderCelebrating = ref(false);
 function restoreReceiptRecovery() {
   const accountKey = orders.currentAccountKey();
   const row = readAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, accountKey);
+  // 恢复行只属于它那笔结算的商品页(老行没有 productId → 兼容放行);别的商品的结算页不被它劫持。
   receiptWriteFailure.value = row?.accountKey === accountKey && row.orderId === row.draft?.ref
+      && (!row.productId || row.productId === productId.value)
     ? row
     : null;
 }
@@ -770,6 +778,8 @@ function retryReceiptWrite() {
     if (!postReceiptOnly(failure.draft)) return;
     receiptWriteFailure.value = null;
     clearReceiptRecovery(failure.accountKey);
+    // 补写成功接续的是那笔已成交的订单;本页若还持有一张新开的发票,不能让它绕过咽喉活成孤儿票。
+    dropActiveSession();
     orderId.value = failure.orderId;
     step.value = "activating";
   } finally {
@@ -864,7 +874,8 @@ async function goAwaiting() {
   if (step.value !== "pay-instructions") return;
   // A dead invoice can never be "completed" (component hides the button; this is the second gate).
   if (activeSession.value && !pending.isLive(activeSession.value)) return;
-  // 别处(另一个页面实例 / 标签页)已结算或取消了这张票 → 本页不能再推进它。
+  // 别处(另一个页面实例 / 标签页)已结算或取消了这张票 → 本页不能再推进它(先回灌再判)。
+  if (activeSession.value) pending.refreshFromDisk();
   if (activeSession.value && !pending.get(activeSession.value.id)) {
     toast.warn(t.value.store.pendingSettledElsewhere);
     dropActiveSession();
@@ -909,6 +920,10 @@ let quotedTotal = 0;
 // to LIVE-read voucherMatch — a voucher expiring/being redeemed mid-checkout
 // silently charged the un-discounted price the confirm step never showed.
 let voucherQuote: { id: string | null; discount: number } = { id: null, discount: 0 };
+// Trade-in context the confirm step actually showed (or the invoice recorded). A device that only
+// becomes eligible after the quote must NOT be retired at pay time — the user never saw that row
+// (审计 R3 P1:确认页无抵扣行、发票按全价开,支付瞬间设备任务结束 → 抵扣现算生效 → 静默下架一台)。
+let quotedTradeIn: { deviceId: string } | null = null;
 
 async function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
@@ -916,6 +931,7 @@ async function onConfirmPay() {
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
+  quotedTradeIn = appliedTradeinView.value ? { deviceId: appliedTradeinView.value.device.id } : null;
   if (remoteApiEnabled) {
     // Trial conversion is already a backend transaction (trial lock + wallet
     // debit + order creation). It must run before the ordinary order path;
@@ -995,14 +1011,20 @@ async function onConfirmPay() {
 /** 恢复一张仍在窗内的发票:报价快照原样复位(扣款只认它),回到扫码步。 */
 function adoptSession(s: PendingCheckoutSession) {
   payment.value = s.method;
-  trialQuote = { ...s.quote.trial };
+  // 🔴 信任边界:发票行来自 localStorage,任何人开 devtools 就能改。持久化的报价分项
+  // (券折扣 / 试用促销与抵扣)只是给后端镜像与展示的信息,**不参与扣款算术** —— 券与试用一律
+  // 按此刻的券定义 / 试用状态机现算(与 onConfirmPay 同一取数),发票只提供「不得高于」的
+  // 应付总额天花板(改大只会放宽天花板、扣的仍是现算价;改小则拒单)。
+  // (审计 R3 P0:此前原样复位持久化的 voucher.discount,篡改成 648 可用 $1 买 $649 设备。)
   quotedTotal = s.quote.total;
-  voucherQuote = { ...s.quote.voucher };
+  quotedTradeIn = s.quote.tradeIn;
   // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
   // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。发票没有抵扣时必须
   // 清掉本页可能残留的抵扣上下文。
   if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
   else tradein.clearApplied();
+  trialQuote = trialView.value;
+  voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
   interceptFired = true;
   activeSession.value = s;
   pending.setViewing(s.id);
@@ -1013,7 +1035,8 @@ function resumePendingSession(id: string): boolean {
   pending.refreshFromDisk(); // 别的标签页可能已结算 / 取消了它 —— 先回灌再判
   const s = pending.get(id);
   if (!s || !pending.isLive(s) || s.productId !== productId.value) {
-    toast.warn(t.value.store.pendingResumeGone);
+    // 票不在册 = 已在别处结算或取消;票在但过期 / 商品对不上 = 付款时间已过(重新下单)。
+    toast.warn(!s ? t.value.store.pendingSettledElsewhere : t.value.store.pendingResumeGone);
     return false;
   }
   adoptSession(s);
@@ -1418,7 +1441,7 @@ onShow(() => {
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
     pending.refreshFromDisk();
-    if (!pending.get(activeSession.value.id)) {
+    if (!pending.get(activeSession.value.id) && pending.isLive(activeSession.value)) {
       toast.warn(t.value.store.pendingSettledElsewhere);
       dropActiveSession();
       if (step.value === "pay-instructions" || step.value === "awaiting") step.value = "confirm";
@@ -1487,7 +1510,11 @@ watch(step, async (s) => {
       // FEAT-DEV02:先快照抵扣上下文(clearApplied 会把 computed 归零),再走
       // 扣款→下架的同步原子块。抵扣只减应付;新机由订单履约管线 addDevice
       // 未激活入库,本块不生成设备。
-      const ti = appliedTradeinView.value;
+      // 只承认确认页(或发票)当时就有的那台抵扣设备:报价后才变得可抵扣的设备不参与,否则会按
+      // 用户没见过的净额少扣、并静默下架一台确认页从未提及的设备。
+      const ti = quotedTradeIn && appliedTradeinView.value?.device.id === quotedTradeIn.deviceId
+        ? appliedTradeinView.value
+        : null;
       // 抵扣在支付瞬间失效(设备消失/任务开始/开关关闭)→ 拒单重报价,
       // 绝不按确认页没展示过的全价静默扣款。
       if (tradein.appliedTradein?.targetKind === p.id && !ti) {
@@ -1585,6 +1612,12 @@ watch(step, async (s) => {
       // 🔴 先原子消费发票再花钱:CAS 在磁盘最新行上要求这张票仍在册且在窗内,删成功才算本实例抢到
       // 结算权。别的页面实例 / 标签页已结算或取消了它 → false → 拒单回报价步。花钱动作只许排在它之后
       // (审计 R2 P0 族:此前只验「过期」不验「还在不在」,同一张票被两处各结算一次、取消后仍能扣)。
+      // 余额预检排在消费发票之前:钱不够就别先把付款指令销掉(consume 不可逆)。
+      if (app.user.usdtBalance < chargeTotal) {
+        toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+        step.value = "select-payment";
+        return;
+      }
       const invoice = activeSession.value;
       if (invoice) {
         if (!pending.consume(invoice.id)) {

@@ -111,7 +111,7 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
   }
   // H5 同源多标签页:别的标签页写了这张表,本页立刻回灌(App webview 单上下文,事件不触发也无妨)。
   if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-    window.addEventListener("storage", (e) => { if (e.key === ACCOUNTS_KEY) refreshFromDisk(); });
+    window.addEventListener("storage", (e) => { if (e.key === ACCOUNTS_KEY) { clock.value = mockServerNow(); refreshFromDisk(); } });
   }
 
   /** 账号切换重绑:装载该账号的会话行(过期行读入即剪);正在展示的会话属于旧账号,一并放手。 */
