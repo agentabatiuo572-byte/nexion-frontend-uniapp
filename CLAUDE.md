@@ -59,7 +59,7 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 
 ## 工作约定
 
-- 设计/UI/文案/新组件前强制加载 `nexion-design` skill（V5 dark + Ponzi 仿真 + 反向教育样本：产品内 0 meta）。
+- 设计/UI/文案/新组件前强制加载 `nexion-design` skill（V5 dark + 生产级真平台标准 + 产品内 0 meta）。
 - 完成自检走 `done-review`；功能性任务后走 `nexion-audit`（3-agent 并行修到 P0=0）。
 - 删除文件先 Move 到 `<root>\.trash\<时间戳>`，禁 `Remove-Item -Force`（用户级 PreToolUse 守卫 hook 兜底，缓存目录放行）。
 
