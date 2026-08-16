@@ -41,6 +41,9 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const APP = path.join(root, "src/store/app.ts");
 const RUNTIME = path.join(root, "src/api/runtime.ts");
 const PAGE = path.join(root, "src/pages/me/wallet-withdraw.vue");
+const APPVUE = path.join(root, "src/App.vue");
+/** 门脚本自己 —— 只有「扫描面塌成空」那一靶变异它(证明判据自带的扫描面自证真会红)。 */
+const GATEFILE = path.join(root, "scripts/selfcheck-fastlane.mjs");
 
 const REFUND_CALLER = "function refundFailedWithdrawals(): string[] {";
 const REFUND_LEG = "function refundWithdrawalDebit(wd: Withdrawal): boolean {";
@@ -51,6 +54,7 @@ const G_SAME_RAIL = "扣款腿**同档**";
 const G_DEBIT_GUARD = "必须被模式守卫挡住";
 const G_REFETCH = "必须重拉服务端余额";
 const G_THREE_POINTS = "三个评估点";
+const G_CALLSITES = "调用点**集合等式**";
 
 /**
  * 在指定函数体切片内做单行替换,再拼回全文。hits !== 1 即靶没打准。
@@ -159,6 +163,26 @@ const TARGETS = [
     file: PAGE,
     ops: [[null, "      fresh = await requestWithdrawalEligibility(",
       "      fresh = await requestWithdrawalEligibilityREMOVED("]],
+  },
+  {
+    // 🔴 2026-08-16 实测:补这格之前,同一个变异让 fastlane 117 格 + tsc + verify **全绿** ——
+    //    「谁减记余额」已经失控而一道门都不响。而这不是假想:2026-08-13 真有人在 App.vue
+    //    对账里加过「扣款补扣格」,被 R1 独立审计整格否决;实现退役了,禁令却没留下任何门。
+    //    第二个调用点会写扣款幂等键,而退款腿的「没扣过就没得退」正是按这个键判 ——
+    //    键被凭空置位 = 退一笔本客户端从没扣过的钱。
+    name: "第二个减记者藏在别的文件(App.vue 对账里偷偷再扣一次)",
+    gate: G_CALLSITES,
+    file: APPVUE,
+    ops: [[null, "      postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);",
+      "      app.applyWithdrawalDebit(wd);\r\n      postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);"]],
+  },
+  {
+    // 该格的失败方向特殊:页面没接本地腿时**期望就是空集**,于是「扫不到」与「没违规」
+    // 产出同一个绿。故判据自带扫描面证据,这一靶证明那道自证真的会红。
+    name: "调用点扫描面塌成空(扫不到 ≠ 没违规)",
+    gate: G_CALLSITES,
+    file: GATEFILE,
+    ops: [[null, "    const scannedFiles = walkSrc();", "    const scannedFiles = [];"]],
   },
 ];
 
