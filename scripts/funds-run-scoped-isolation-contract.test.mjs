@@ -2,19 +2,23 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { resolveSiblingRepo } from "./lib/sibling-repo.mjs";
 
 const appRoot = path.resolve(import.meta.dirname, "..");
-const workspaceRoot = path.resolve(appRoot, "..");
-const backendRoot = process.env.NEXGRID_BACKEND_ROOT?.trim()
-  ? path.resolve(process.env.NEXGRID_BACKEND_ROOT.trim())
-  : path.join(workspaceRoot, "nexion-backend");
+// 缺后端仓只 skip 跨仓两条;App parser 那两条(RunID 不匹配必须报错)是纯本仓断言,单列照跑。
+const { root: backendRoot, missing: backendMissing } = resolveSiblingRepo("nexion-backend", "NEXGRID_BACKEND_ROOT");
 const readBackend = (relative) => readFileSync(path.join(backendRoot, relative), "utf8");
 const readApp = (relative) => readFileSync(path.join(appRoot, relative), "utf8");
 
-test("all funds sandbox facts are RunID scoped from mapper through App parser", () => {
+test("App parser refuses a funds sandbox payload whose RunID does not match", () => {
+  const api = readApp("src/api/funds-sandbox-api.ts");
+  assert.match(api, /FUNDS_SANDBOX_RUN_ID_MISMATCH/);
+  assert.match(api, /runId: string/);
+});
+
+test("all funds sandbox facts are RunID scoped from mapper through service", { skip: backendMissing }, () => {
   const mapper = readBackend("src/main/java/ffdd/opsconsole/finance/mapper/FundsSandboxMapper.java");
   const service = readBackend("src/main/java/ffdd/opsconsole/finance/application/FundsSandboxService.java");
-  const api = readApp("src/api/funds-sandbox-api.ts");
   for (const table of ["wallet", "order", "ledger", "callback_inbox"]) {
     assert.match(mapper, new RegExp(`nx_funds_sandbox_${table}[\\s\\S]{0,400}run_id`));
   }
@@ -30,11 +34,9 @@ test("all funds sandbox facts are RunID scoped from mapper through App parser", 
   assert.match(service, /winner\.requestHash\(\)\.equals\(requestHash\)/);
   assert.match(service, /catch \(DuplicateKeyException duplicate\)/,
     "a MySQL duplicate-key exception must enter the authoritative callback replay path");
-  assert.match(api, /FUNDS_SANDBOX_RUN_ID_MISMATCH/);
-  assert.match(api, /runId: string/);
 });
 
-test("baseline, forward migration and guarded runner preserve RunID uniqueness", () => {
+test("baseline, forward migration and guarded runner preserve RunID uniqueness", { skip: backendMissing }, () => {
   const baseline = readBackend("scripts/migrations/20260811_funds_persistent_sandbox.sql");
   const forward = readBackend("scripts/migrations/20260812_funds_sandbox_run_scope.sql");
   const runner = readBackend("scripts/apply_startup_schema_migrations.ps1");
