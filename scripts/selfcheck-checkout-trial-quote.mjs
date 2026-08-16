@@ -157,7 +157,7 @@ export function build(deps) {
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
           voucherDiscount, tradeinCredit, nowTick, reportStuckFunds,
-          remoteApiEnabled, tradein, activeSession, pending, voucher } = deps;
+          remoteApiEnabled, tradein, activeSession, pending, voucher, appliedTradeinView } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
@@ -280,6 +280,8 @@ async function bench(opts) {
     // 报价链,不持发票 —— 桩成「无发票」让该段跳过(发票一次性语义由 pending-checkout.test.ts 与
     // 运行时门 pending-checkout-runtime 场景 E 看守)。少这两个桩 = ReferenceError 整门崩掉。
     activeSession: { value: invoiceAmount == null ? null : { id: "inv-1", amountUsdt: invoiceAmount } },
+    // R6:netPrice 的服务端权威抵扣报价改从 appliedTradeinView 读(不再直读全局槽);本 harness 钉本地链 → null
+    appliedTradeinView: { value: null },
     pending: { consume: () => true },
     // 券 store:核销 = CAS 判决(先占后花);release = 之后失败面放回。真语义在 store/voucher.ts。
     voucher: {
@@ -468,7 +470,7 @@ async function bench(opts) {
   check("wiring", "W8 convert 判定在扣款之后(不可逆终态不许排在钱扣住之前)",
     idxConvert > 0 && idxDebit > 0 && idxDebit < idxConvert);
   check("wiring", "W8b convert 失败分支必须退款,且退款返回值被消费(退不回去 → 响亮终态)",
-    /if\s*\(app\.restoreMoney\(beforePay\)\)/.test(payBare) && /reportStuckFunds\(beforePay\)/.test(payBare));
+    /if\s*\(app\.restoreMoney\(beforePay\)/.test(payBare) && /reportStuckFunds\(beforePay/.test(payBare));
   check("wiring", "W9 建单在扣款之后(任一前置守卫 return 都必然零建单)", idxOrder > idxDebit);
   check("wiring", "W10 族级兜底闸在位:扣款额超过展示总额一律拒单",
     /if\s*\(chargeTotal > quotedTotal\)/.test(payBare));

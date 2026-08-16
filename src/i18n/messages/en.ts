@@ -3377,6 +3377,10 @@ export const en = {
     // 回滚自己也失败了(R5):钱是真的扣着,不许再说"余额没有变化"。必须给交易号 + 找人。
     fundsStuckTitle: "Amount still held",
     fundsStuckMsg: "We couldn't put this amount back. Contact support with reference {id} and they will release it for you.",
+    // 补偿链的另两种卡法(R6):券放不回 / 收据连同它的补写入口都存不下 —— 钱是对的,凭据缺,同样给交易号 + 找人。
+    voucherStuckTitle: "Voucher not restored",
+    voucherStuckMsg: "Your balance is unchanged, but the voucher used for this order could not be returned. Contact support with reference {id}.",
+    receiptGapMsg: "This purchase went through, but its receipt could not be saved. Keep reference {id} for support.",
     // 跨标签页并发:这一笔在别处已经处理过了,store 已把最新状态刷回来。共用一对文案,
     // 不给每个 store 各写一套(用户看到的都是同一件事:你眼前这屏刚被别处改过)。
     staleTitle: "Just updated elsewhere",

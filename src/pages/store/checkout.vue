@@ -280,7 +280,7 @@ import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { postMoneyBill, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
@@ -553,8 +553,19 @@ const appliedTradeinView = computed(() => {
       Math.max(0, device.cumulativeEarningsUsdt ?? 0),
       p.price,
     );
-  return credit > 0 ? { device, credit } : null;
+  // canonicalQuote 只随通过了上面四道校验的视图外露:净额 / 卡费 / 容量闸都读这里,不再直读全局槽
+  // (审计 R6 P1:抵扣行因设备失效消失后,总额却仍按槽里的折后价展示、卡费仍归 0)。
+  return credit > 0 ? { device, credit, canonicalQuote: quote ?? null } : null;
 });
+/** 支付时刻用:按**本页报价快照**里的那台设备解析抵扣,不看全局槽(兄弟实例 / 报价后的变化都不影响这一单)。 */
+function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit: number } | null {
+  const p = product.value;
+  if (!quotedTradeIn || !p) return null;
+  const device = app.devices.find((d) => d.id === quotedTradeIn!.deviceId);
+  if (!device || isDeviceTaskBlocked(device)) return null;
+  const credit = computeTradeInCredit(device.paidPriceUsdt ?? 0, Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
+  return credit > 0 ? { device, credit } : null;
+}
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
 const hasTradein = computed(() => tradeinCredit.value > 0);
 // toFixed(2) 与其余六个抵扣展示面统一(strip/弹层/横幅均两位小数)。
@@ -589,7 +600,7 @@ function reAddTradein() {
 }
 
 const netPrice = computed(() => {
-  const canonical = remoteApiEnabled ? tradein.appliedTradein?.canonicalQuote : null;
+  const canonical = remoteApiEnabled ? appliedTradeinView.value?.canonicalQuote ?? null : null;
   if (canonical) return canonical.payableUsdt;
   return Math.max(
     0,
@@ -759,18 +770,26 @@ function restoreReceiptRecovery() {
   const accountKey = orders.currentAccountKey();
   const row = readAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, accountKey);
   // 恢复行只属于它那笔结算的商品页(老行没有 productId → 兼容放行);别的商品的结算页不被它劫持。
-  receiptWriteFailure.value = row?.accountKey === accountKey && row.orderId === row.draft?.ref
+  const diskRow = row?.accountKey === accountKey && row.orderId === row.draft?.ref
       && (!row.productId || row.productId === productId.value)
     ? row
     : null;
+  // 磁盘没有行时,内存里同账号的卡**保留**:恢复行自己也可能写不进去(它与收据走同一层 storage),
+  // 那张卡是用户手上唯一的补写入口,不能被一次 onShow 抹掉(审计 R6 P0)。换号 → 别人的卡才清。
+  const memRow = receiptWriteFailure.value?.accountKey === accountKey ? receiptWriteFailure.value : null;
+  receiptWriteFailure.value = diskRow ?? memRow;
 }
 
 function persistReceiptRecovery(failure: CheckoutReceiptRecovery) {
   receiptWriteFailure.value = failure;
-  writeAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, failure.accountKey, failure);
+  // 恢复行也写不进去 = 连补写入口都留不住:登记待对账 + 给交易号(钱与单都对,只缺凭据)。
+  if (!writeAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, failure.accountKey, failure)) {
+    reportStuckFunds(app.captureMoney(), failure.orderId, "receipt");
+  }
 }
 
 function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
+  // persist-verdict-ok: 清不掉最多让卡多露一次;补写走 postReceiptOnce 按 ref 幂等,不会写出第二条收据
   writeAccountRow<CheckoutReceiptRecovery | null>(CHECKOUT_RECEIPT_RECOVERY_KEY, accountKey, null);
 }
 
@@ -783,7 +802,7 @@ function retryReceiptWrite() {
   }
   receiptRetrying.value = true;
   try {
-    if (!postReceiptOnly(failure.draft)) return;
+    if (!postReceiptOnce(failure.draft)) return; // 按 ref 幂等:恢复行清不掉再点一次也不会写出第二条
     receiptWriteFailure.value = null;
     clearReceiptRecovery(failure.accountKey);
     // 补写成功接续的是那笔已成交的订单;本页若还持有一张新开的发票,不能让它绕过咽喉活成孤儿票。
@@ -812,7 +831,7 @@ const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
 const netPriceText = computed(() => netPrice.value.toLocaleString());
 // 算法也单源:整数域(cent × bps)与入金同一套。浮点直乘再 toFixed 会在半分边界
 // 被 IEEE754 压低一分(实测 14 个金额少收 1 分),同一笔费率两种算法两个答案。
-const cardFee = computed(() => (remoteApiEnabled && tradein.appliedTradein?.canonicalQuote
+const cardFee = computed(() => (remoteApiEnabled && appliedTradeinView.value?.canonicalQuote
   ? 0 : isCard.value ? cardFeeUsd(netPrice.value) : 0));
 const cardFeeText = computed(() => cardFee.value.toLocaleString());
 const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
@@ -862,7 +881,7 @@ function goConfirm() {
     return;
   }
   if (step.value !== "select-payment") return;
-  const hasCanonicalTradein = Boolean(tradein.appliedTradein?.canonicalQuote);
+  const hasCanonicalTradein = Boolean(appliedTradeinView.value?.canonicalQuote);
   if (remoteApiEnabled && !remoteCapacityGate.canConfirm(hasCanonicalTradein)) {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
@@ -1191,6 +1210,7 @@ function remoteOrderKey(): string {
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return `h7-order:${suffix}`;
   });
+  // persist-verdict-ok: 远端命令键的耐久性归远端幂等设计(页内内存键仍在;跨刷新丢键须服务端按 intent 幂等,见 HANDOFF U-21)
   writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, {
     commands: { ...(persisted?.commands ?? {}), [intent]: key },
   });
@@ -1206,6 +1226,7 @@ function retireRemoteOrderKey(): void {
   if (persisted?.commands?.[intent]) {
     const commands = { ...persisted.commands };
     delete commands[intent];
+    // persist-verdict-ok: 退役旧键失败只会让下一次同 intent 复用旧键(服务端幂等回同一单),不铸新单
     writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, { commands });
   }
   remoteOrderCommandKey.clear();
@@ -1555,13 +1576,13 @@ watch(step, async (s) => {
       // 未激活入库,本块不生成设备。
       // 只承认确认页(或发票)当时就有的那台抵扣设备:报价后才变得可抵扣的设备不参与,否则会按
       // 用户没见过的净额少扣、并静默下架一台确认页从未提及的设备。
-      const ti = quotedTradeIn && appliedTradeinView.value?.device.id === quotedTradeIn.deviceId
-        ? appliedTradeinView.value
-        : null;
+      // 由本页快照解析,不读全局槽:兄弟结算页实例改了槽、或本实例在隐藏态被定时器推进,都不影响这一单
+      // (审计 R6 P1:此前用槽的 targetKind 当前件,全价单被误拒并销票,还顺手清掉兄弟实例的抵扣)。
+      const ti = resolveQuotedTradeIn();
       // 抵扣在支付瞬间失效(设备消失/任务开始/开关关闭)→ 拒单重报价,
       // 绝不按确认页没展示过的全价静默扣款。
-      if (tradein.appliedTradein?.targetKind === p.id && !ti) {
-        tradein.clearApplied();
+      if (quotedTradeIn && !ti) {
+        tradein.clearApplied(tradeinOwner);
         toast.warn(t.value.tradein.errPleaseRetry);
         step.value = "select-payment";
         return;
@@ -1678,11 +1699,12 @@ watch(step, async (s) => {
         step.value = "select-payment";
         return;
       }
-      const releaseVoucher = () => { if (voucherClaimed && usedVoucherId) voucher.release(usedVoucherId); };
+      /** 券放回:true = 已放回或本就没占;false = 放不回(storage 又坏了)→ 调用方按响亮终态处理。 */
+      const releaseVoucher = (): boolean => (voucherClaimed && usedVoucherId ? voucher.release(usedVoucherId) : true);
       const invoice = activeSession.value;
       if (invoice) {
         if (!pending.consume(invoice.id)) {
-          releaseVoucher();
+          if (!releaseVoucher()) reportStuckFunds(app.captureMoney(), invoice.id, "voucher");
           toast.warn(t.value.store.pendingSettledElsewhere);
           activeSession.value = null;
           step.value = "select-payment";
@@ -1695,7 +1717,7 @@ watch(step, async (s) => {
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402),
         // with an explicit toast (was a silent bounce, PR-D debt #3).
-        releaseVoucher();
+        if (!releaseVoucher()) reportStuckFunds(beforePay, "", "voucher");
         toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
         step.value = "select-payment";
         return;
@@ -1704,9 +1726,9 @@ watch(step, async (s) => {
         // 扣款与 convert 之间跨过宽限终点的极窄窗口:把刚扣的钱按增量精确退回
         // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
         // 绝不再弹一句"报价已变"了事。
-        releaseVoucher();
-        if (app.restoreMoney(beforePay)) toast.warn(t.value.store.coTrialQuoteChanged);
-        else reportStuckFunds(beforePay);
+        const voucherBack = releaseVoucher();
+        if (app.restoreMoney(beforePay) && voucherBack) toast.warn(t.value.store.coTrialQuoteChanged);
+        else reportStuckFunds(beforePay, "", voucherBack ? "funds" : "voucher");
         step.value = "select-payment";
         return;
       }
@@ -1718,14 +1740,14 @@ watch(step, async (s) => {
           // 下架没落盘(store 已把内存拨回磁盘那份,设备仍在):抵扣的前提不成立,这一单不能按抵扣价
           // 成交。钱按快照精确冲正;冲不回去 = 响亮终态。(审计 R4 P0:此前丢弃返回值 —— 设备复活、
           // 扣款照旧、订单还写着 tradeInDeviceId。)
-          tradein.clearApplied();
-          releaseVoucher();
-          if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-          else reportStuckFunds(beforePay);
+          tradein.clearApplied(tradeinOwner);
+          const voucherBack = releaseVoucher();
+          if (app.restoreMoney(beforePay) && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+          else reportStuckFunds(beforePay, "", voucherBack ? "funds" : "voucher");
           step.value = "select-payment";
           return;
         }
-        tradein.clearApplied();
+        tradein.clearApplied(tradeinOwner);
       }
       const ord = orders.createOrder({
         productId: p.id as Order["productId"],
@@ -1744,9 +1766,9 @@ watch(step, async (s) => {
         const deviceBack = !ti || app.devices.some((d) => d.id === ti.device.id)
           || ((app.devices = [...app.devices, ti.device]), app.persistAccountSnapshot());
         const moneyBack = app.restoreMoney(beforePay);
-        releaseVoucher();
-        if (deviceBack && moneyBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-        else reportStuckFunds(beforePay);
+        const voucherBack = releaseVoucher();
+        if (deviceBack && moneyBack && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        else reportStuckFunds(beforePay, "", !moneyBack || !deviceBack ? "funds" : "voucher");
         step.value = "select-payment";
         return;
       }

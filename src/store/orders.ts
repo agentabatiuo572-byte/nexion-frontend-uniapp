@@ -118,6 +118,7 @@ function hydrate(accountKey: string): Order[] {
 type DeviceSpawnApp = {
   addDevice?: (kind: DeviceKind, options?: { paidPriceUsdt?: number }) => string;
   activateDevice?: (id: string, reservedSlots?: number) => boolean;
+  discardSpawnedDevice?: (id: string) => boolean;
   devices: { id: string; activatedAt?: number | null }[];
 };
 
@@ -296,6 +297,7 @@ export const useOrders = defineStore("orders", () => {
       ? "Waiting for an empty device slot"
       : statusNote(next, cur.dataCenter);
 
+    const before = orders.value;
     orders.value = orders.value.map((o) =>
       o.id !== id
         ? o
@@ -310,11 +312,20 @@ export const useOrders = defineStore("orders", () => {
             ],
           },
     );
-    persist();
+    if (!persist()) {
+      // 这一跳没落盘 = 没发生:内存退回;刚为它生的那台设备一并撤回 —— 否则下一 tick 看到订单还没 deviceId,
+      // 会再发一台(白得设备)。撤回自己的落盘不再追(R5 结构反思:撤销的撤销是无穷回归),下一 tick 重试整跳。
+      orders.value = before;
+      if (spawnedDeviceId && !cur.deviceId) {
+        const app = useApp() as unknown as DeviceSpawnApp;
+        void app.discardSpawnedDevice?.(spawnedDeviceId);
+      }
+    }
   }
 
-  function markActivated(id: string, deviceId: string) {
-    if (remoteApiEnabled) return;
+  function markActivated(id: string, deviceId: string): boolean {
+    if (remoteApiEnabled) return false;
+    const before = orders.value;
     orders.value = orders.value.map((o) =>
       o.id === id
         ? {
@@ -333,7 +344,11 @@ export const useOrders = defineStore("orders", () => {
           }
         : o,
     );
-    persist();
+    if (!persist()) {
+      orders.value = before;
+      return false;
+    }
+    return true;
   }
 
   // Cancel is allowed ONLY pre-payment ("placed"). Once paid, DC provisioning

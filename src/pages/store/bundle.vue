@@ -200,7 +200,7 @@ import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
+import { postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -272,7 +272,7 @@ function retryReceiptWrite() {
   }
   receiptRetrying.value = true;
   try {
-    if (!postReceiptOnly(failure.draft)) return;
+    if (!postReceiptOnce(failure.draft)) return; // 按 ref 幂等
     receiptWriteFailure.value = null;
     clearReceiptRecovery(failure.accountKey);
     cart.clear();
@@ -305,15 +305,20 @@ const receiptRetrying = ref(false);
 function restoreReceiptRecovery() {
   const accountKey = orders.currentAccountKey();
   const row = readAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey);
-  receiptWriteFailure.value = row?.accountKey === accountKey ? row : null;
+  // 磁盘没有行时保留内存里同账号的卡(恢复行自己也可能写不进去,那张卡是唯一补写入口);换号才清。
+  const memRow = receiptWriteFailure.value?.accountKey === accountKey ? receiptWriteFailure.value : null;
+  receiptWriteFailure.value = (row?.accountKey === accountKey ? row : null) ?? memRow;
 }
 
 function persistReceiptRecovery(failure: BundleReceiptRecovery) {
   receiptWriteFailure.value = failure;
-  writeAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, failure.accountKey, failure);
+  if (!writeAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, failure.accountKey, failure)) {
+    reportStuckFunds(app.captureMoney(), failure.orderIds.join(","), "receipt");
+  }
 }
 
 function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
+  // persist-verdict-ok: 清不掉最多让卡多露一次;补写走 postReceiptOnce 按 ref 幂等
   writeAccountRow<BundleReceiptRecovery | null>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey, null);
 }
 
@@ -349,6 +354,7 @@ function acquireBundleKey(list: Product[], accountKey: string): string {
   const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const key = `bundle:${suffix}`;
+  // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, {
     commands: { ...(row?.commands ?? {}), [fingerprint]: key },
   });
@@ -358,6 +364,7 @@ function retireBundleKey(list: Product[], accountKey: string): void {
   const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
   const commands = { ...(row?.commands ?? {}) };
   delete commands[bundleFingerprint(list)];
+  // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, { commands });
 }
 

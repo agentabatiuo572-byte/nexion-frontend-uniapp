@@ -1204,6 +1204,13 @@ export const useApp = defineStore("app", () => {
   // Returns the new device id so callers that chain activate/debit/bill use
   // the returned id, NOT `.filter(kind).pop()` (Batch C Round 1 P0 #4: pop()
   // picked the wrong same-kind device when inventory already held one).
+  /** 撤回一台刚生出来、还没被任何单据引用的设备(履约推进落盘失败的补偿)。返回落盘结果。 */
+  function discardSpawnedDevice(deviceId: string): boolean {
+    devices.value = devices.value.filter((d) => d.id !== deviceId);
+    deviceTimers.delete(deviceId);
+    return persistAccountSnapshot();
+  }
+
   function addDevice(kind: DeviceKind, options: CreateDeviceOptions = {}): string {
     const id = `${kind}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
     const newDevice = createDevice(kind, id, options);
@@ -2358,6 +2365,6 @@ export const useApp = defineStore("app", () => {
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
-    addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
+    addDevice, discardSpawnedDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });

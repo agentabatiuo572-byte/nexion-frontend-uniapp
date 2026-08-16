@@ -341,6 +341,13 @@ else
 fi
 
 # 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
+# 钱路「落盘 / CAS 判决必须被消费」—— AST 门(审计 R4→R6 同族五次:返回值当语句丢掉)。先自测门本身会红,再扫钱路文件。
+if node scripts/selfcheck-persist-verdict.mjs --selftest > /tmp/uni-persist-verdict-selftest.log 2>&1 && node scripts/selfcheck-persist-verdict.mjs > /tmp/uni-persist-verdict.log 2>&1; then
+  ok "persist-verdict — $(tail -1 /tmp/uni-persist-verdict.log)"
+else
+  bad "persist-verdict:钱路上有落盘 / CAS / 资金原语的返回值被丢弃(node scripts/selfcheck-persist-verdict.mjs 看明细)"
+  cat /tmp/uni-persist-verdict-selftest.log /tmp/uni-persist-verdict.log | tail -20 | sed 's/^/        /'
+fi
 # 账号隔离 / 过期剪除 / 一次性离开提示 + 建单落盘契约(createOrder / createOrders 落盘失败返 null,不留内存孤儿单;一批一次落盘)+ 单次券核销 CAS(先占后花,双实例只成一次;release 放回)+ 恢复发票逐项 min 对账 + 存储行取值域 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
 # (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
 if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts > /tmp/uni-pending-checkout-vitest.log 2>&1; then
