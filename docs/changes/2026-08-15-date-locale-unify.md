@@ -58,6 +58,8 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
   **终极判别(03:50)**:`build:h5`(0 err)产物起零转译静态服务器(:5599),全新上下文裸启动实测——
   bare-boot / entry-surfaces/h5 / onboarding/intro / register / proof 全部 **1-2s 挂载 OK**(正是残差门的目标页);
   且 proof 以「新存储 + zh-CN 浏览器」直出 `Member since Jul 2026` = 在**生产构建**上复现原始缺陷环境并证明已修。
+  (注:该案深链直达 proof 时应用语言停留默认 en 而非跟随系统检测——与 locale 写手调查[2026-08-16 跨会话同步]一致:
+  `ensureSystemDetected` 只挂首页 index.vue,深链不经过它;locale 全站仅两写手、无隐藏写手,dateLocale() 地基获运行时证据背书。)
   结论:代码全健康;残差 = dev server 转译管线在整文档冷载「启动图」请求形态下的病理(P-097),
   与 SPA 增量导航(我/tester 走的路径,全部通过)分野一致。
   🔴 **未清账**:环境恢复正常后(其它会话 dev server 停掉/白天常规状态)复跑 `bash scripts/verify.sh` 全绿才许合并主线——runbook:
