@@ -130,9 +130,10 @@ export const useOrders = defineStore("orders", () => {
   let boundEpoch = 0;
   const orders = ref<Order[]>(remoteApiEnabled ? [] : hydrate(boundKey));
 
-  function persist() {
-    if (remoteApiEnabled) return;
-    writeAccountRow<{ orders: Order[] }>(ACCOUNTS_KEY, boundKey, { orders: orders.value });
+  /** 远端档不落本地盘(状态归服务端)= 预期结果;mock 档如实返回 storage 写入结果。 */
+  function persist(): boolean {
+    if (remoteApiEnabled) return true;
+    return writeAccountRow<{ orders: Order[] }>(ACCOUNTS_KEY, boundKey, { orders: orders.value });
   }
 
   /** 账号切换重绑:装载该账号的订单行(变更处处即时 persist,旧账号无需先落盘)。 */
@@ -200,7 +201,11 @@ export const useOrders = defineStore("orders", () => {
     }
   }
 
-  function createOrder(input: CreateOrderInput): Order {
+  /**
+   * 建单并落盘。落盘失败 → 内存那条一并撤掉,返回 null:一张只活在内存里的「已付」订单会在刷新时
+   * 消失,而调用方此前已经扣款 / 下架旧机 —— 必须让调用方知道并按原路退回,不能静默吞掉。
+   */
+  function createOrder(input: CreateOrderInput): Order | null {
     if (remoteApiEnabled) throw new Error("REMOTE_ORDER_CREATE_REQUIRES_SERVER_API");
     const {
       productId, productName, unitPrice, paymentMethod,
@@ -234,7 +239,10 @@ export const useOrders = defineStore("orders", () => {
       ],
     };
     orders.value = [order, ...orders.value];
-    persist();
+    if (!persist()) {
+      orders.value = orders.value.filter((o) => o.id !== id);
+      return null;
+    }
     return order;
   }
 

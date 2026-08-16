@@ -389,7 +389,12 @@ onLoad(async (options) => {
   const pp = getProduct(productId.value);
   // 三道跳转门任一命中且带 ?resume=:那张票在这个 SKU 上再也付不了 —— 顺手作废,别让浮动条把人
   // 反复带回来又弹走(审计 R3:门序把 resume 排在门后形成无出口循环)。
-  const dropResumeInvoice = () => { if (resumeSessionId) { pending.remove(resumeSessionId); resumeSessionId = null; } };
+  const dropResumeInvoice = () => {
+    if (!resumeSessionId) return;
+    // 只作废属于本商品页的那张;?resume= 指向别的商品的票(拼错 / 拼接的 URL)不归这里处置。
+    if (pending.get(resumeSessionId)?.productId === productId.value) pending.remove(resumeSessionId);
+    resumeSessionId = null;
+  };
   if (pp?.purchaseBlocked) {
     dropResumeInvoice();
     uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
@@ -1008,14 +1013,18 @@ async function onConfirmPay() {
   if (opened) step.value = "pay-instructions";
 }
 
-/** 恢复一张仍在窗内的发票:报价快照原样复位(扣款只认它),回到扫码步。 */
+/** 恢复一张仍在窗内的发票:按发票复位报价上下文,回到扫码步。 */
 function adoptSession(s: PendingCheckoutSession) {
   payment.value = s.method;
   // 🔴 信任边界:发票行来自 localStorage,任何人开 devtools 就能改。持久化的报价分项
-  // (券折扣 / 试用促销与抵扣)只是给后端镜像与展示的信息,**不参与扣款算术** —— 券与试用一律
-  // 按此刻的券定义 / 试用状态机现算(与 onConfirmPay 同一取数),发票只提供「不得高于」的
-  // 应付总额天花板(改大只会放宽天花板、扣的仍是现算价;改小则拒单)。
-  // (审计 R3 P0:此前原样复位持久化的 voucher.discount,篡改成 648 可用 $1 买 $649 设备。)
+  // (券折扣 / 试用促销与抵扣)**不能原样当扣款算术**(审计 R3 P0:篡改 voucher.discount 成 648
+  // 可用 $1 买 $649 设备)。规则 = **逐项取 min(此刻现算值, 发票记录值)**:
+  //   · 现算值封顶 → 发票改大没用(扣的不超过现算);
+  //   · 发票值封顶 → 窗内新到的券 / 多累计的试用收益不参与这一单 —— 二维码告诉用户转 X,
+  //     本单就恰好按 X 成交(支付时刻另有「实扣 = 票面」闸;审计 R4 P1:此前现算值可低于票面,
+  //     QR 说转 649 却按 600 入账,差额无账目落点)。
+  //   · 现算比发票少(券失效 / 试用结束 / 试用未再挂上)→ 实扣高于票面 → 支付时刻拒单重报价。
+  // 发票的应付总额同时仍是「不得高于」的天花板(quotedTotal)。
   quotedTotal = s.quote.total;
   quotedTradeIn = s.quote.tradeIn;
   // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
@@ -1023,8 +1032,23 @@ function adoptSession(s: PendingCheckoutSession) {
   // 清掉本页可能残留的抵扣上下文。
   if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
   else tradein.clearApplied();
-  trialQuote = trialView.value;
-  voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
+  const liveTrial = trialView.value;
+  const invTrial = s.quote.trial;
+  trialQuote = liveTrial.applied && invTrial.applied
+    ? {
+        applied: true,
+        promo: Math.min(liveTrial.promo, invTrial.promo),
+        offsetUSD: Math.min(liveTrial.offsetUSD, invTrial.offsetUSD),
+        remainderUSD: Math.min(liveTrial.remainderUSD, invTrial.remainderUSD),
+        shadowNEX: Math.min(liveTrial.shadowNEX, invTrial.shadowNEX),
+      }
+    : NO_TRIAL;
+  const liveVoucherId = voucherMatch.value?.def.id ?? null;
+  // 券:只有「此刻匹配到的正是发票那张」才带折扣(取 min);发票那张没了 / 换成别张 → 不带折扣,
+  // 支付时刻的券一致性闸(live id ≠ 快照 id)或票面闸会拒单重报价。
+  voucherQuote = liveVoucherId && liveVoucherId === s.quote.voucher.id
+    ? { id: liveVoucherId, discount: Math.min(voucherDiscount.value, s.quote.voucher.discount) }
+    : { id: null, discount: 0 };
   interceptFired = true;
   activeSession.value = s;
   pending.setViewing(s.id);
@@ -1079,7 +1103,6 @@ async function openChainSession(): Promise<boolean> {
     if (!dropOld) return false;
     replaceId = existing.id; // 与开新票同一次提交(store 内销旧开新,没有半执行窗口)
   }
-  const ti = appliedTradeinView.value;
   const s = pending.begin({
     productId: p.id,
     method,
@@ -1089,7 +1112,8 @@ async function openChainSession(): Promise<boolean> {
       total: quotedTotal,
       voucher: { ...voucherQuote },
       trial: { ...trialQuote },
-      tradeIn: ti ? { deviceId: ti.device.id } : null,
+      // 与其余分项同一份确认页快照(quotedTradeIn),不是撞单确认框 await 之后的实时读数。
+      tradeIn: quotedTradeIn ? { ...quotedTradeIn } : null,
     },
     replaceId,
   });
@@ -1576,6 +1600,14 @@ watch(step, async (s) => {
         step.value = "select-payment";
         return;
       }
+      // 链上发票按票面成交:二维码让用户转 X,本地只承认恰好 X 的结算 —— 差一分都拒单重报价
+      // (审计 R4 P1:恢复发票后现算值与票面分家,QR 说 649 却按 600 入账,差额无账目落点)。
+      // adoptSession 的逐项 min 规则保证正常恢复时二者恰好相等;不等 = 报价环境真变了。
+      if (activeSession.value && Math.abs(chargeTotal - activeSession.value.amountUsdt) > 0.000001) {
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
       // 🔴 非数值金额必须在**任何终态副作用之前**拦掉(R3 P1)。NaN 参与比较恒为假 ——
       // 上面的族级兜底闸(`chargeTotal > quotedTotal`)与下面的余额预检(`余额 < chargeTotal`)
       // **两道都会静默放行**,于是 convert() 把试用打成 converted(不可逆终态),而随后的
@@ -1650,7 +1682,16 @@ watch(step, async (s) => {
       // 不存在半执行窗口;失败路径(上面 return)未动任何状态。
       if (ti) {
         app.devices = app.devices.filter((d) => d.id !== ti.device.id);
-        app.persistAccountSnapshot();
+        if (!app.persistAccountSnapshot()) {
+          // 下架没落盘(store 已把内存拨回磁盘那份,设备仍在):抵扣的前提不成立,这一单不能按抵扣价
+          // 成交。钱按快照精确冲正;冲不回去 = 响亮终态。(审计 R4 P0:此前丢弃返回值 —— 设备复活、
+          // 扣款照旧、订单还写着 tradeInDeviceId。)
+          tradein.clearApplied();
+          if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+          else reportStuckFunds(beforePay);
+          step.value = "select-payment";
+          return;
+        }
         tradein.clearApplied();
       }
       const ord = orders.createOrder({
@@ -1662,6 +1703,17 @@ watch(step, async (s) => {
         ...(ti && { tradeInCredit, tradeInDeviceId: ti.device.id }),
         ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD }),
       });
+      if (!ord) {
+        // 单子没落盘(store 已把内存那条撤掉):把上面已做掉的两件事按原路退回 —— 旧机重新上架、
+        // 资金精确冲正;任一退不回去 = 响亮终态(交易号 + 待对账),绝不静默让「钱扣了 / 设备没了 /
+        // 单子查无」并存(审计 R4 P1)。试用 convert 已落终态,与上面 convert 之后各失败面同一残余。
+        const deviceBack = !ti || app.devices.some((d) => d.id === ti.device.id)
+          || ((app.devices = [...app.devices, ti.device]), app.persistAccountSnapshot());
+        if (deviceBack && app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        else reportStuckFunds(beforePay);
+        step.value = "select-payment";
+        return;
+      }
       orderId.value = ord.id;
       // 发票已在扣款前被 consume(见上),这里不再有会话要收。
       // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
@@ -1729,6 +1781,7 @@ watch(step, async (s) => {
           accountKey: orders.currentAccountKey(),
           draft: receiptDraft,
           orderId: ord.id,
+          productId: p.id, // 读侧按商品作用域过滤(restoreReceiptRecovery);不写 = 那道过滤永远放行
         });
         return;
       }
