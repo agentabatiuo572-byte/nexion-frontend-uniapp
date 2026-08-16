@@ -152,6 +152,9 @@
       <LuckySpinSheet />
       <StickyCtaBar />
       <MessageDrawer />
+      <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
+           自隐藏:无在途会话 / 已过期 / 结算页正在展示它。位置钉在任何 header 变体之下(status bar + 64)。 -->
+      <PendingCheckoutBar :top="statusBarHeight + 64" :route="route" />
     </template>
 
     <!-- Global overlay host (toast / confirm / netError) -->
@@ -166,6 +169,7 @@ import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
+import PendingCheckoutBar from "@/components/pending-checkout-bar.vue";
 import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
 import MessageDrawer from "@/components/message-drawer.vue";
