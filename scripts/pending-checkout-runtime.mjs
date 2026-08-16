@@ -241,10 +241,10 @@ try {
     await page.bringToFront();
     await page.waitForTimeout(800);
     const stale = await readState(page);
-    if (stale.onPayStep) {
-      await tapButton(page, "I've completed the payment →");
-      await page.waitForTimeout(4500);
-    }
+    // The stale settle attempt IS the probe — if tab 1 is not on the pay step the scenario proved nothing.
+    if (!stale.onPayStep) fail(`E: tab 1 left the pay step before the stale settle attempt (hash=${stale.hash})`);
+    await tapButton(page, "I've completed the payment →");
+    await page.waitForTimeout(4500);
     const after = await readState(page);
     if (after.orderCount !== t0.orderCount + 1) fail(`E: the same invoice was settled twice (orders ${t0.orderCount} → ${after.orderCount})`);
     if (after.sessions.length !== 0) fail(`E: a second invoice appeared after the stale settle attempt (${after.sessions.length})`);
