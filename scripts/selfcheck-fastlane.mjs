@@ -24,6 +24,11 @@ import path from "node:path";
 import { transformSync } from "esbuild";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+/** 全 src 的 .ts/.vue 扫描面。两处消费:扣款调用点集合等式、日限消费点集合等式。 */
+const walkSrc = (dir = path.join(root, "src")) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  const p = path.join(dir, e.name);
+  return e.isDirectory() ? walkSrc(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
+});
 const src = readFileSync(path.join(root, "src", "store", "withdrawal-eligibility-core.ts"), "utf8");
 const { code } = transformSync(src, { loader: "ts", format: "esm" });
 const core = await import("data:text/javascript;base64," + Buffer.from(code, "utf8").toString("base64"));
@@ -882,6 +887,30 @@ function functionBody(src, opener) {
       check("🔴 接线:服务端持有余额时,建单成功后**必须重拉服务端余额**(不拉 = 余额停在旧数字)",
         withdrawPageCode.includes("await app.refreshRemoteFleet();"));
     }
+    // 🔴🔴 扣款的**调用点集合等式** —— 上面两支都只看提现页,看不见**别的文件**里的第二个减记者。
+    //    实测(2026-08-16,主线 b3b53d1):往 App.vue 对账里塞一句 `app.applyWithdrawalDebit(wd);`,
+    //    fastlane 117 格、tsc、verify 全绿 —— 而「谁减记余额」这件事已经失控。
+    //    这不是假想:同一段代码正下方那条 🗑 记着,2026-08-13 真的有人在 App.vue 对账里加过
+    //    「扣款补扣格」,被 R1 独立审计**整格否决**(立论前提错 + z5 明令禁止无条件遍历补扣)。
+    //    实现退役了,**禁令却没留下任何门** —— 下一个人照着同样的直觉再写一遍,没有一道门会拦。
+    //  为什么第二个调用点是资金缺陷(不只是「不干净」):
+    //    · 它写扣款幂等键,而退款腿的「没扣过就没得退」正是按这个键判 —— 键被凭空置位,
+    //      失败终态时就会退一笔本客户端从没扣过的钱;
+    //    · 它可以挂在对账循环上(5s 一拍)、重试里、别的页面里,时机完全不可控,
+    //      而提现页那一处是有冻结账号 snap 保护的,别处没有。
+    //  判据是**集合等式**不是「不许出现」:页面接了本地扣款腿时它就该有一处(且只在提现页),
+    //  没接时一处都不许有 —— 与上面两支同一个分流,哪条架构赢都不必回来改。
+    //  🔴 扫描面必须自证非空:没接本地腿时**期望就是空集**,于是「扫不到」与「没违规」
+    //     产出同一个绿 —— 这一格若不自带扫描面证据,walkSrc 一坏它就变成永久的假绿。
+    //     (日限那格也守 walkSrc,但守的是它自己那次调用;这里被改成扫别的目录时它不会红。)
+    const scannedFiles = walkSrc();
+    const debitCallSites = scannedFiles
+      .filter((p) => stripComments(readFileSync(p, "utf8")).includes(".applyWithdrawalDebit("))
+      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
+    const expectedSites = PAGE_DEBITS_LOCALLY ? ["src/pages/me/wallet-withdraw.vue"] : [];
+    check("🔴 扣款调用点**集合等式**(第二个减记者藏在别的文件里,上面两格都看不见)",
+      scannedFiles.length >= 100 && debitCallSites.join(",") === expectedSites.join(","),
+      `扫了 ${scannedFiles.length} 个源文件 实扫=${JSON.stringify(debitCallSites)} 应为=${JSON.stringify(expectedSites)}`);
     // 🗑 【2026-08-13 回退】这里曾加过一格「接线门②」,守 App.vue 对账里的扣款补扣格。
     //    实现被 R1 独立审计整格否决(立论前提错 + z5 已明令禁止无条件遍历补扣),
     //    门随实现一起退役 —— 留着就是绿着守一段不存在的代码。
@@ -1028,11 +1057,7 @@ function functionBody(src, opener) {
   {
     const pgSrc2 = readSrc("src/pages/me/wallet-withdraw.vue");
     const trackSrc2 = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
-    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-      const p = path.join(dir, e.name);
-      return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
-    });
-    const files = walk(path.join(root, "src"));
+    const files = walkSrc();
     // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
     check(`🔴 日限扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
 
