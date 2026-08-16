@@ -9,11 +9,22 @@
 //   同一份审计还实测到:提现那三条 token 里的 `NEX+`(App.vue 的抵扣费冲正行)在 remote
 //   模式下运行期确实永不执行 —— 「有生产者」≠「跑得到」,这正是本门补的那一刀。
 //
-// 🔴 桩到哪一层:只覆盖 `withdrawalApi.policy` / `submit` 两个方法(与
-//   scripts/selfcheck-withdraw-failpaths.mjs 同法)。`toCanonicalWithdrawal`、app store、
-//   bills store、收口点、**以及提现页那个 handler 本身**全是真代码 —— 被测的正是它们。
+// 🔴 桩到哪一层:只覆盖**服务端往返**那几处 —— `withdrawalApi.policy` / `submit`
+//   两个方法(与 scripts/selfcheck-withdraw-failpaths.mjs 同法),外加下面那次风险披露闸。
+//   `toCanonicalWithdrawal`、app store、bills store、收口点、**以及提现页那个 handler 本身**
+//   全是真代码 —— 被测的正是它们。
 //   不桩就跑不了:提现建单只认真后端,mock 模式下 apiClient 一律 reject,
 //   本地 dev 没有 /api,两种情况下这条链一步都走不到(那也正是它曾被删掉半年没人发现的原因)。
+//
+// 🔴 第三处桩 `risk.checkGate` 及其由来(2026-08-16,4c32a50「sandbox 商城闭环」批次):
+//   那一批在**确认之后、建单之前**给提现页插了一次新的服务端往返(风险披露闸)。它在 mock 下
+//   由 **store 层**第一行 `if (!remoteApiEnabled) throw RISK_DISCLOSURE_REMOTE_REQUIRED` 拒掉 ——
+//   桩 `riskDisclosureApi` 够不到它,`remoteApiEnabled` 又是模块级 const 改不了,
+//   唯一的注入点就是 store 上那个方法。本门要模拟的是「服务端答应了」,和另两个桩同一条纪律。
+//   实测代价:漏了这一桩,整条链停在确认之后,20 格里 17 格集体空转,而**首格照 PASS**
+//   (确认框确实弹了、确实被点了)—— 「链路走通」那一格证的是弹窗,不是提交。
+//   桩生效与否本身也钉了一格(见文末 `gateCalls`):桩不上时给一条能直接读懂的红,
+//   而不是让人从 17 条红里往回猜。
 //
 // 守的断言:
 //   ① 提交成功后账单里出现**两条**同单号的 withdraw 分录(USDT 主行负额 + NEX 抵扣费负额)
@@ -26,21 +37,40 @@
 //
 // 🔴 ⑥⑦ 的能力上界(与上面同一条纪律:先说清楚门守不到哪)——
 //   本门只在 **mock 模式**跑(verify.sh [2.5] 的 API-mode preflight 强制如此),
-//   所以 ⑦ 证的是「扣了必退、退了不重复」,**证不到**「退款在 remote 模式下也有效」。
-//   而提现单恰恰只在 remote 下才建得出来 —— 那一条靠 `refundWithdrawalDebit` 里
-//   压根没有 `remoteApiEnabled` 分支来保证(它的兄弟 creditRewardBucketOnce 有,
-//   USDT 腿此前正是走的那条,于是「唯一会产生提现的模式」里退款恒 no-op)。
-//   下一个把这条腿改回 creditRewardBucketOnce 的人:本门在 mock 下**照绿**,
-//   红的是 remote 下真实用户的钱。改之前先读 app.ts refundWithdrawalDebit 头注。
+//   所以它证的一律是「本地这一侧的账对不对」,**证不到** remote 下真实用户那笔钱。
 //
 // 🔴 红测实录(2026-08-11 z5,基线 worktree 同脚本对跑):无扣款的原状态下 ⑦ 实测
 //   余额 9999 →(失败终态退款)**10479.25** —— 退了一笔从没扣过的钱,凭空 +$480.25。
 //   即「只有退款腿、没有扣款腿」本身就是一条印钞路径,不是单纯的少扣。
+//
+// 🔴 ⑥⑦ 按页面**实际接的那条腿**分流(2026-08-16 重锚,判据从页面源码读、不写死方向):
+//   同一批 4c32a50 把提现的余额权威搬去了服务端 —— 提现页不再调 `app.applyWithdrawalDebit(wd)`,
+//   改成建单成功后 `await app.refreshRemoteFleet()` 重读服务端 `fleet.walletUsdt`
+//   (app.ts 里它**整体覆写** usdtBalance 与 earningBuckets)。而 refreshRemoteFleet 第一行是
+//   `if (!remoteApiEnabled) return true` —— 本门只跑 mock,于是「余额少了 480.25」在当前实现下
+//   **结构上不可能成立**。那不是回归,是这一格的锚过期了:不变量没变,变的是由谁维持它。
+//   · 页面接了本地扣款腿 → 走原来那五格(扣了 / 落盘 / 重放不重复扣 / 失败退回 / 退款幂等)。
+//   · 页面没接(= 服务端持有余额)→ 改钉另外三条红线:不许影子扣款(本地再扣一次 = 与服务端
+//     事务双扣)、失败终态不许凭空加钱(上面那条红测实录的正身)、对账反复打拍不许漂移。
+//   两条分支**共有**一格:提交 → 失败终态 一个往返必须**净零** —— 它同时挡住「扣了不退」(丢钱)
+//   与「没扣却退」(印钞),与页面接哪条腿无关。
+//   ⚠️ 分流不是为了「两边都能绿」:接了本地腿却不退钱、或没接本地腿却凭空加钱,各自当场红。
+//   ⚠️ selfcheck-fastlane 另有三格要求「页面必须调 applyWithdrawalDebit」,与 4c32a50 的
+//     `if (remoteApiEnabled) return false` 直接对立,那笔账在别处结。**本门不参与裁决**:
+//     哪边赢,页面源码就是什么样,本门的判据自动跟着走,不必回来改。
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { strip } from "./lib/strip-code.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
+/**
+ * 提现页到底接没接**本地**扣款腿 —— ⑥⑦ 分流的判据(理由见文件头注)。
+ * 🔴 剥注释再判:被删掉的调用会在历史说明里被反复提到(本页就有两处),读原文会判成「接着」。
+ */
+const PAGE_DEBITS_LOCALLY = strip(
+  readFileSync(new URL("../src/pages/me/wallet-withdraw.vue", import.meta.url), "utf8"),
+).includes("app.applyWithdrawalDebit(wd)");
 const WD_NO = "WD-RUNTIME-0001";
 /** 服务端回执里的金额**故意**与页面输入不同 —— 用来证明落盘的是回执而不是本地报价。 */
 const SERVER_AMOUNT = 480.25;
@@ -90,7 +120,7 @@ if (!I18N_CONFIRM_CTA || !I18N_RESEND_CTA) {
   throw new Error("抠不到确认按钮文案(withdrawConfirmCta / withdrawResendCta)—— 判据失效,判红");
 }
 
-const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA }) => {
+const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA, PAGE_DEBITS_LOCALLY }) => {
     const [rt, rel, payoutMod, riskMod, appMod, billsMod] = await Promise.all([
       import("/src/api/runtime.ts"), import("/src/store/earning-release.ts"),
       import("/src/store/payout-address.ts"), import("/src/store/risk-disclosure.ts"),
@@ -165,7 +195,12 @@ const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I
       "usdt-trc20": { ...st, current: { ...st.current, addedAt: past },
         freezeUntil: past + 864e5, nextChangeAt: past + 7 * 864e5 },
     };
-    riskMod.useRiskDisclosure().accepted = true;
+    // 🔴 风险披露闸:确认之后、建单之前的那次服务端往返(桩在 store 方法上的理由见文件头注)。
+    // `accepted` 只喂页面的展示判据,拦住提交的是 checkGate 自己 —— 两个都要给。
+    const risk = riskMod.useRiskDisclosure();
+    risk.accepted = true;
+    let gateCalls = 0;
+    risk.checkGate = async () => { gateCalls += 1; };
 
     // 重挂页面,让 onMounted 用桩过的 policy 重新取一次
     uni.redirectTo({ url: "/pages/me/wallet" });
@@ -252,7 +287,10 @@ const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I
     // ⑥ 重放不重复扣款:自愈补写 / 用户回退再进都会再走一次,第二次必须不动钱且如实回真。
     // 🔴 探针不许因为「被测的东西不存在」而抛:整段 evaluate 一抛,输出就是一条堆栈,
     // 20 条断言一条都不显示 —— 红测反而看不出是哪一条在守。缺函数 = 记 null 让断言去红。
-    const replayReturned = wdRow && typeof app.applyWithdrawalDebit === "function"
+    // 🔴 页面没接本地扣款腿时**探针自己也不许调**:mock 下这个函数照样真扣钱,探针一调就
+    // 凭空造出一笔页面从没做过的扣款,随后退款腿把它对称退回 —— 「印钞守卫」那一格于是
+    // 变成自问自答(测的是探针自己那笔),而真正要证的「没扣过就不许退」一个字都没验到。
+    const replayReturned = PAGE_DEBITS_LOCALLY && wdRow && typeof app.applyWithdrawalDebit === "function"
       ? app.applyWithdrawalDebit(wdRow)
       : null;
     const balanceAfterReplay = balanceOf();
@@ -291,14 +329,19 @@ const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I
       clickable: clickable.length,
       route: location.hash,
       parserAlive,
+      gateCalls,
       labels,
     };
-  }, { WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA });
+  }, { WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA, PAGE_DEBITS_LOCALLY });
 
   console.log("withdraw-bill-runtime — 提现账单行真的会被写出来(不是「代码里有」)");
 
   check("提交链路走通(确认弹窗出现并被确认)", result.first === "ok" && result.second === "ok",
     `${result.first} / ${result.second} · 按钮=${JSON.stringify(result.labels)}`);
+  // 🔴 单列一格:上一格证的只是「弹窗弹了、被点了」,链路能不能**走过确认之后**是另一回事。
+  // 风险披露闸的桩没生效时,链停在那里而上一格照 PASS,下面 17 格集体空转(2026-08-16 实录)。
+  check("🔴 确认之后真的走进了风险披露闸(两次提交各问一次;桩不上 = 下面全部空转)",
+    result.gateCalls === 2, `实测调了 ${result.gateCalls} 次(期望 2)`);
   check("④ 歧义失败那一次**不写任何账单行**(单据在服务端,客户端还不知道单号)",
     // 🔴 必须合取上「后来真的写出了两条」:光判 `=== 0` 在整条链一步没走时恒真 ——
     // z5 实测正是如此(链卡在第一步、17 条红,这一条照 PASS)。空集全过的同族。
@@ -336,33 +379,51 @@ const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I
   const B = result;
   const debited = +(B.balanceBefore - B.balanceAfterSuccess).toFixed(2);
   const debitHappened = debited === SERVER_AMOUNT;
-  check("⑥ 歧义失败那一次**不扣款**(结局未定时乐观扣款 = 服务端没建单就凭空少钱)",
-    B.balanceAfterAmbiguous === B.balanceBefore && debitHappened,
-    `歧义后 ${B.balanceBefore} → ${B.balanceAfterAmbiguous};成功那次实扣 ${debited}`);
-  check(`⑥ 提交成功后余额**真的**少了服务端回执那个数(实扣 ${SERVER_AMOUNT},不是页面输入的 ${PAGE_AMOUNT})`,
-    debitHappened,
-    `实扣 ${debited}(${B.balanceBefore} → ${B.balanceAfterSuccess}),期望 ${SERVER_AMOUNT}`);
-  check("⑥ 扣款**真落盘**(只在内存 = 刷新后钱又回来了)",
-    debitHappened && B.diskBalance === B.balanceAfterSuccess,
-    `盘上 ${B.diskBalance} / 内存 ${B.balanceAfterSuccess}(实扣 ${debited})`);
-  check("⑥ 同一单重放**不重复扣款**,且如实回真(已扣到位 ≠ 本次写了)",
-    debitHappened && B.replayReturned === true && B.balanceAfterReplay === B.balanceAfterSuccess,
-    `返回 ${B.replayReturned}、重放后 ${B.balanceAfterReplay}(实扣 ${debited})`);
-  check("⑦ 🔴 失败终态**退回**这笔扣款(扣款与退款必须同模式对称,否则拒单 = 烧钱)",
-    // 🔴 `Array.isArray` 先判:refundedIds 为 null(退款函数不存在)时直接 `.includes` 会抛,
-    // 而这里是 node 侧、外层无 catch —— 一抛就吞掉全部 20 条断言,正是上一版注释声称要防的那件事。
-    debitHappened && Array.isArray(B.refundedIds) && B.refundedIds.includes(WD_NO)
-      && B.balanceAfterRefund === B.balanceBefore,
-    `退回单号 ${JSON.stringify(B.refundedIds)}、退后 ${B.balanceAfterRefund}(期望 ${B.balanceBefore},实扣 ${debited})`);
-  check("⑦ 退款幂等(对账 5s 一拍反复调,每拍退一次就是印钞)",
-    debitHappened && B.balanceAfterRefund === B.balanceBefore
-      && B.balanceAfterRefundReplay === B.balanceAfterRefund,
-    `二次调用 ${B.balanceAfterRefund} → ${B.balanceAfterRefundReplay}`);
+  if (PAGE_DEBITS_LOCALLY) {
+    check("⑥ 歧义失败那一次**不扣款**(结局未定时乐观扣款 = 服务端没建单就凭空少钱)",
+      B.balanceAfterAmbiguous === B.balanceBefore && debitHappened,
+      `歧义后 ${B.balanceBefore} → ${B.balanceAfterAmbiguous};成功那次实扣 ${debited}`);
+    check(`⑥ 提交成功后余额**真的**少了服务端回执那个数(实扣 ${SERVER_AMOUNT},不是页面输入的 ${PAGE_AMOUNT})`,
+      debitHappened,
+      `实扣 ${debited}(${B.balanceBefore} → ${B.balanceAfterSuccess}),期望 ${SERVER_AMOUNT}`);
+    check("⑥ 扣款**真落盘**(只在内存 = 刷新后钱又回来了)",
+      debitHappened && B.diskBalance === B.balanceAfterSuccess,
+      `盘上 ${B.diskBalance} / 内存 ${B.balanceAfterSuccess}(实扣 ${debited})`);
+    check("⑥ 同一单重放**不重复扣款**,且如实回真(已扣到位 ≠ 本次写了)",
+      debitHappened && B.replayReturned === true && B.balanceAfterReplay === B.balanceAfterSuccess,
+      `返回 ${B.replayReturned}、重放后 ${B.balanceAfterReplay}(实扣 ${debited})`);
+    check("⑦ 🔴 失败终态**退回**这笔扣款(扣款与退款必须同模式对称,否则拒单 = 烧钱)",
+      // 🔴 `Array.isArray` 先判:refundedIds 为 null(退款函数不存在)时直接 `.includes` 会抛,
+      // 而这里是 node 侧、外层无 catch —— 一抛就吞掉全部 20 条断言,正是上一版注释声称要防的那件事。
+      debitHappened && Array.isArray(B.refundedIds) && B.refundedIds.includes(WD_NO)
+        && B.balanceAfterRefund === B.balanceBefore,
+      `退回单号 ${JSON.stringify(B.refundedIds)}、退后 ${B.balanceAfterRefund}(期望 ${B.balanceBefore},实扣 ${debited})`);
+  } else {
+    // 余额权威在服务端(页面建单成功后重读 fleet 快照,不再本地扣)。本门跑 mock,读不到那份
+    // 快照 —— 于是这一侧要钉的不是「少了多少」,而是**本地一分都不许自己动**。
+    check("⑥ 服务端持有余额时页面**不许**再来一次影子扣款(本地再扣 = 与服务端同一笔事务双扣)",
+      debited === 0 && B.balanceAfterAmbiguous === B.balanceBefore,
+      `${B.balanceBefore} → 歧义后 ${B.balanceAfterAmbiguous} → 成功后 ${B.balanceAfterSuccess}`);
+    check("⑥ 盘上同样不许被本地改写(内存不动而盘上动了 = 刷新后钱凭空变化)",
+      B.diskBalance === undefined || B.diskBalance === B.balanceBefore,
+      `盘上 ${B.diskBalance} / 期望 ${B.balanceBefore}`);
+    check("⑦ 🔴 失败终态**不许凭空加钱** —— 没扣过就没得退(2026-08-11 实录:9999 → 10479.25,凭空 +$480.25)",
+      Array.isArray(B.refundedIds) && B.refundedIds.length === 0
+        && B.balanceAfterRefund === B.balanceBefore,
+      `退回单号 ${JSON.stringify(B.refundedIds)}、退后 ${B.balanceAfterRefund}(期望 ${B.balanceBefore})`);
+  }
+  // 🔴 两条分支共有的那一格:提交 → 失败终态,一个往返必须**净零**。
+  // 它同时挡住「扣了不退」(丢钱)与「没扣却退」(印钞),与页面接哪条腿无关 ——
+  // 分流的是机制,这一条是不变量本身,任何一版实现都得过。
+  check("⑦ 🔴 提交 → 失败终态 一个往返**净零**(对账 5s 一拍反复调也不许漂移)",
+    B.balanceAfterRefund === B.balanceBefore && B.balanceAfterRefundReplay === B.balanceBefore,
+    `起 ${B.balanceBefore} → 退后 ${B.balanceAfterRefund} → 再打一拍 ${B.balanceAfterRefundReplay}`);
 
   check("零 console error", errors.length === 0, errors.slice(0, 3).join(" | "));
 } finally {
   await browser.close();
 }
 
-console.log(`\n${pass} pass / ${fail} fail(真页面 handler + 真 store + 真收口点;仅桩 withdrawalApi 两个方法)`);
+console.log(`\n${pass} pass / ${fail} fail(真页面 handler + 真 store + 真收口点;仅桩服务端往返三处)`
+  + `\n资金面判据走「${PAGE_DEBITS_LOCALLY ? "页面接本地扣款腿" : "余额权威在服务端"}」那一支(判据取自提现页源码)`);
 process.exit(fail ? 1 : 0);
