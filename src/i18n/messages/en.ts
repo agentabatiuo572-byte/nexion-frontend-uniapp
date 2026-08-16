@@ -2039,7 +2039,6 @@ export const en = {
     invitePromoChip: "Limited time · {multiplier}× bonus this week",
     earnedTodayCount: "247 earned today",
     alreadyEarned: "Already earned",
-    beTheFirst: "Be the first one to earn from your network",
     shareAndEarn: "Share & Earn {n}",
     sandboxBanner: "Acceptance Sandbox · source=mock · SANDBOX",
     serverRewardPerSettlement: "Server-set reward per settled invitation",

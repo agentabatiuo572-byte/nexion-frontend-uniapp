@@ -1957,7 +1957,6 @@ export const vi: Messages = {
     invitePromoChip: "Có hạn · thưởng {multiplier}× trong tuần này",
     earnedTodayCount: "247 người đã có lợi nhuận hôm nay",
     alreadyEarned: "Đã có lợi nhuận",
-    beTheFirst: "Hãy là người đầu tiên sinh lời từ mạng lưới của bạn",
     shareAndEarn: "Chia sẻ & Nhận {n}",
     sandboxBanner: "Sandbox nghiệm thu · nguồn=mock · SANDBOX",
     serverRewardPerSettlement: "Thưởng do máy chủ quyết định cho mỗi lượt mời đã quyết toán",
