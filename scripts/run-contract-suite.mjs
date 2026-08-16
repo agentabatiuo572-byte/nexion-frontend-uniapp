@@ -169,11 +169,23 @@ for (const f of excluded) console.log(`  SKIP(登记在案)${f} — ${REGISTRY[f
 const res = spawnSync(process.execPath, ["--test", ...chain.map((f) => path.join("scripts", f))], {
   cwd: root, encoding: "utf8", stdio: "pipe",
 });
-process.stdout.write((res.stdout || "").split("\n").filter((l) => /^. (pass|fail)|^not ok|^# Subtest|Error/.test(l)).join("\n") + "\n");
+const out = res.stdout || "";
+// 🔴 skip 必须打出来。原过滤器只放行 pass/fail 汇总,`ℹ skipped N` 与逐条 skip 理由被吞掉 ——
+// 于是「某条跨仓断言这台机器根本没验」在结果里看不见,读起来跟全验过一模一样(no silent caps)。
+// 认 skip 行不靠 reporter 的记号字形(易随 node 版本漂),认「(耗时) # 理由」这个形状:pass 行没有 `# `。
+const skipLines = out.split("\n").filter((l) => /\(\d[\d.]*ms\) # /.test(l));
+const skippedN = Number((out.match(/^.{0,4}skipped (\d+)\s*$/m) || [])[1] || 0);
+process.stdout.write(out.split("\n").filter((l) => /^. (pass|fail|skipped)|^not ok|^# Subtest|Error/.test(l)).join("\n") + "\n");
 if (res.status !== 0) {
-  process.stderr.write(res.stdout || "");
+  process.stderr.write(out);
   process.stderr.write(res.stderr || "");
   console.error(`FAIL 契约测试套件失败(chain ${chain.length} 个)`);
   process.exit(1);
 }
-console.log(`contract-suite PASS — chain ${chain.length} 跑过 · elsewhere ${elsewhereN} 由别的入口跑 · excluded ${excluded.length} 登记在案 · 登记覆盖 ${found.length}/${found.length}`);
+// 判据自查:数得出 N 条却打不出 N 行(或反之)= 解析漂了,报告在替它自己说谎 —— 按本文件既有风格判红。
+if (skipLines.length !== skippedN) {
+  console.log(`FAIL  skip 统计与明细对不上(汇总 ${skippedN} 条 / 明细 ${skipLines.length} 行)—— 判据失效,判红`);
+  process.exit(1);
+}
+console.log(`contract-suite PASS — chain ${chain.length} 跑过 · elsewhere ${elsewhereN} 由别的入口跑 · excluded ${excluded.length} 登记在案 · 登记覆盖 ${found.length}/${found.length}${skippedN ? ` · ⚠ skip ${skippedN} 条(未验证)` : ""}`);
+for (const l of skipLines) console.log(`  ⚠ SKIP ${l.trim()}`);
