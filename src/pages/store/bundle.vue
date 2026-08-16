@@ -200,7 +200,7 @@ import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
+import { postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -419,6 +419,7 @@ async function onCheckout() {
   }
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;
+  const beforePay = app.captureMoney();
   if (!app.debitBalance(charge)) {
     toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
     return;
@@ -426,15 +427,24 @@ async function onCheckout() {
   const pct = discountPct.value;
   // 逐商品建单;组合折扣按单价比例分摊到各单(展示净额)。
   // ponytail: 账本单源 = debitBalance(total)+bills;各单 net 之和的四舍五入分差不入账。
-  const created = list.map((p) =>
-    orders.createOrder({
+  const created: Order[] = [];
+  for (const p of list) {
+    const o = orders.createOrder({
       productId: p.id as Order["productId"],
       productName: p.name,
       unitPrice: p.price,
       paymentMethod: "balance",
       discount: +(p.price * pct).toFixed(2),
-    }),
-  );
+    });
+    if (!o) {
+      // 单子没落盘(store 已把内存那条撤掉):钱按快照精确冲正,冲不回去走响亮终态。
+      // ponytail: 落盘失败是 storage 整体不可用,几乎必发生在第一单;已落盘的前几单不再撤(mock 残余)。
+      if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+      else reportStuckFunds(beforePay);
+      return;
+    }
+    created.push(o);
+  }
   // 🔴 走 postReceiptOnly 而不是 postMoneyBill(与 checkout.vue 主账单同口径):扣款必须
   // 发生在建单之前,而单子已经建好并进入履约 —— 收据写失败时回滚资金只还钱、还不回那几台设备。
   // 既定处置是让用户明确看见收据没记上,而不是像原来那样丢弃返回值静默吞掉。
