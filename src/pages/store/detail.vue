@@ -91,7 +91,7 @@
                 <text class="block truncate" :style="nameStyle">{{ product.name }}</text>
                 <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
               </view>
-              <text v-if="!isShare" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
+              <text v-if="!isShare && speedup > 0" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
             </view>
 
             <!-- trust chips -->
@@ -243,6 +243,7 @@ import { productCopy } from "@/lib/product-copy";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
+import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 
@@ -324,9 +325,16 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
+// Spec values are server-owned strings; SPEC_UNAVAILABLE is the server's own
+// "no certified value" sentinel and a mock SKU may not carry the field at all.
+// Both degrade through one locale string — the raw token is never rendered.
+function specText(value: string | undefined): string {
+  return !value || value === SPEC_UNAVAILABLE ? t.value.store.specValueUnavailable : value;
+}
+
 const phoneDailyEarnValue = computed(() => {
   const raw = product.value?.phoneDailyEarn;
-  if (!raw || raw === "unavailable") return 0;
+  if (!raw || raw === SPEC_UNAVAILABLE) return 0;
   const match = raw.match(/[0-9]+(?:\.[0-9]+)?/);
   return match ? Number(match[0]) : 0;
 });
@@ -353,19 +361,20 @@ const paybackLabel = computed(() => {
     : fmt(t.value.store.detPaybackDays, { n: d });
 });
 
-// Hardware spec rows — per-SKU fields (gpu / vram / power) stay as authored in
-// products.ts; the managed-service rows are copy and resolve per locale.
+// Hardware spec rows — every value is server-owned (the contract requires all of
+// them non-empty), so labels localise but values render as authored upstream.
+// Only the missing/uncertified case degrades through specText().
 const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
   const p = product.value;
   if (!p) return [];
   const s = t.value.store;
   return [
-    { k: s.specGpu, v: p.gpu },
-    { k: s.specVram, v: p.vram },
-    { k: s.specPower, v: p.power ?? "unavailable" },
-    { k: s.specDatacenter, v: p.datacenter ?? "unavailable" },
-    { k: s.specUptime, v: p.uptime ?? "unavailable" },
-    { k: s.specWarranty, v: p.warranty ?? "unavailable" },
+    { k: s.specGpu, v: specText(p.gpu) },
+    { k: s.specVram, v: specText(p.vram) },
+    { k: s.specPower, v: specText(p.power) },
+    { k: s.specDatacenter, v: specText(p.datacenter) },
+    { k: s.specUptime, v: specText(p.uptime) },
+    { k: s.specWarranty, v: specText(p.warranty) },
   ];
 });
 
@@ -398,7 +407,7 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
-const phoneDailyEarnText = computed(() => product.value?.phoneDailyEarn ?? "unavailable");
+const phoneDailyEarnText = computed(() => specText(product.value?.phoneDailyEarn));
 const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
 const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
 const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));

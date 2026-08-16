@@ -1728,6 +1728,7 @@ export const en = {
     specUptime: "Uptime SLA",
     specWarranty: "Warranty",
     specWarrantyValue: "24 months",
+    specValueUnavailable: "Not available",
     specUnavailable: "This product cannot be purchased until its hardware and service specifications are certified.",
     // AI performance sheet — row labels carry the benchmark model in parens,
     // so they stay distinct from the bare workload names in t.market.workloads.
