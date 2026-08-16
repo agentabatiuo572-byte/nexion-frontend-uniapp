@@ -123,7 +123,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="activityLabelStyle">{{ a.label }}</text>
-              <text class="block" :style="activityTimeStyle">{{ new Date(a.ts).toLocaleString() }}</text>
+              <text class="block" :style="activityTimeStyle">{{ new Date(a.ts).toLocaleString(dateLocale()) }}</text>
             </view>
             <view class="text-right">
               <text class="block tabular-nums" :style="activityNexStyle">{{ a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} NEX</text>
@@ -147,6 +147,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useMarket } from "@/store/market";
 import { useCommission } from "@/store/commission";

@@ -180,7 +180,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block tabular-nums" :style="historyMainStyle">{{ swapLine(h) }}</text>
-              <text class="block" :style="historySubStyle">@ {{ h.rate.toFixed(5) }} · {{ new Date(h.ts).toLocaleString() }}</text>
+              <text class="block" :style="historySubStyle">@ {{ h.rate.toFixed(5) }} · {{ new Date(h.ts).toLocaleString(dateLocale()) }}</text>
             </view>
           </view>
         </view>
@@ -195,7 +195,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";

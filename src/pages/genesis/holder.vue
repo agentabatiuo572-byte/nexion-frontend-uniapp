@@ -232,7 +232,7 @@ import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_EMISSION } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -325,7 +325,7 @@ const emissionFeed = computed(() => {
   if (remoteApiEnabled) {
     return genesis.remoteEmissions.map((entry) => ({
       label: entry.paidAt
-        ? `${entry.batchNo} · ${new Date(entry.paidAt).toLocaleDateString()}`
+        ? `${entry.batchNo} · ${new Date(entry.paidAt).toLocaleDateString(dateLocale())}`
         : `${entry.batchNo} · ${entry.status}`,
       amt: `+${entry.amountUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`,
     }));
@@ -363,7 +363,7 @@ const holdingAmountLabel = computed(() => remoteApiEnabled
   : t.value.genesisHolder.holdingCard.allocation);
 
 function mintedText(ms: number): string {
-  return fmt(t.value.genesisHolder.holdingCard.mintedOn, { date: new Date(ms).toLocaleDateString() });
+  return fmt(t.value.genesisHolder.holdingCard.mintedOn, { date: new Date(ms).toLocaleDateString(dateLocale()) });
 }
 
 function goGenesis() {

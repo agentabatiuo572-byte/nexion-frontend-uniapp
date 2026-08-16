@@ -1594,3 +1594,20 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:跨仓门取材面在两个仓各挂了一条 junction —— uniapp 侧 `.claude/worktrees/nexion-ops-console → admin-ops`,admin 侧 `.claude/worktrees/Nexion-uniapp → Nexion-uniapp`,构成**双向环**;vite 的文件监视器(chokidar)跟随 junction 在环里无限递归,监视条目路径每圈翻倍直至堆爆。触发即崩的不是流量而是**时间**,与页面操作无关。只有主检出中招(worktree 检出里没有那些 junction),所以 5399 从不崩、5173 必崩,极易误判成「偶发内存不足」。
 - **对策**(已焊):`vite.config.ts` → `server.watch.ignored: ["**/.claude/**", "**/dist/**", "**/.trash/**"]`——`.claude`(worktrees/junction 基础设施)、`dist`(构建产物;verify 链每跑 build:h5 都会触发整页 reload 打断浏览者)、`.trash`(删除暂存)都不是源码,监视器一律拉黑。加内存(`start-services.ps1` 5173 行已带 4GB)只是缓冲,不是修复。
 - **同族提醒**:① 新挂任何跨仓 junction 前,想一句「对面仓会不会也挂回来」——环一旦成立,**两边所有跟随符号链接的递归工具**(watcher / find / 备份 / 打包)都会中招;② dev server「定时炸弹式」崩溃(固定 uptime 后崩、与负载无关)优先查监视面无限增长,GC 日志和崩前 watch 路径是第一现场;③ 与 env_windows_shell「junction 递归删除穿透」同族:junction 的风险面 = 一切递归遍历,不止删除。2026-08-16。
+## P-097 toLocale* 不传 locale = 跟浏览器语言,应用语言≠设备语言时全站混语日期
+<!-- 编号注:本条与上一条在两个并行会话各自以 P-096 落笔,合并时按主线先落地者保号,本条顺延 P-097(下一条顺延 P-098)。 -->
+
+- **症状**:独立 tester 验收 proof 页发现:应用 en + 浏览器 zh 时 "Member since 2026年7月"、vi 页 "Thành viên từ 2026年7月";同字符串还画进分享海报 canvas。全站同型 22 处(无参 / `undefined` / `[]` 三种形态),散在 17 个文件。
+- **根因**:`Date#toLocaleDateString/toLocaleTimeString/toLocaleString` 的 locale 参数缺省 = 宿主环境语言(浏览器/OS),与应用自选语言(locale store)是两个独立轴。wallet-bills 曾单点修过(本地 `localeTag` computed + 注释写明理由),但没有全站扫同型、没有焊门 → 其余 21 处照旧(修一处 ≠ 修全部)。
+- **对策**(pkg/zp):① `src/i18n/format.ts` 单源 `dateLocale()`——应用语言→BCP-47(en-US/vi-VN/zh-CN),词典未落地的语言随 UI 文案一起回退 en-US(避免反向混语);读 locale store,computed 内调用随切换语言重算。② 全站 22 处全部改传 `dateLocale()`,wallet-bills 本地实现收编进单源。③ verify.sh 焊 `date toLocale* pins app locale` 哨兵(修前基线 22 命中 = 哨兵四个分支的天然红证)。**ceiling**:变量持有的 Date 调裸 `.toLocaleString()` 与数字千分位同形,grep 兜不住,靠 review;数字 `Number#toLocaleString()` 千分位分组是另一族(约 150 处,部分定点 en-US),有意不动。
+- **同族提醒**:任何「宿主环境缺省」参数(locale / timezone / 首日周起点)都要问一句「这该跟设备还是跟应用?」——跟应用的必须显式传值并锁单源。2026-08-15。
+- **对抗轮加固**(同日 skeptic 证伪三条 P1,全部采纳):① 12/24 小时制随语言联动——en-US 默认 12h("02:05 PM" 8 字符),修后跟应用语言反而把命中面从「设备恰好 en-US」扩到「选英文 UI 的所有人」,且落在 feed 两处无溢出防护的固定 px 栅格列;两处 `toLocaleTimeString` 钉 `hour12: false`(设计栅格按 "14:05" 定宽)。② `DATE_LOCALE_TAGS` 与 `DICTS` 是两张独立手抄表、无门无类型锁——正是 wallet-bills 本地 localeTag 分叉旧账的复刻;根治:tag 表补全 11 语并 `Record<LocaleCode, string>` 锁类型(加语言码不补 tag 编译即红),启用与否由 `code in DICTS` 派生(词典上线日期自动跟上,无第二张开关表)。③ 哨兵可被 `navigator.language` / 字符串字面量 tag / `Intl.DateTimeFormat` / `[ ]`(带空格)四类写法绕过——正则四分支扩容 + ceiling 注释改如实;红测用 eval 提取 verify.sh 原行重建有效正则(防手抄转义偏差),合成探针 11/11 全红、真实 src 0 误伤。
+
+## P-098 dev server 喂满一轮 verify 流量会队列拥塞式退化;探针假红与「一门一浏览器」模式共振
+
+> 根因后注(合并时补):当晚进程膨胀 4.8GB 的根源即上文 **P-096 junction 环**(邻会话已焊 `server.watch.ignored` 修复)——两案互证:环让监视面无限增长,监视面撑爆的进程把转译队列拖成分钟级。
+
+- **症状**:全量 verify 的运行时探针族(auth/entry/dom-qa/tap/orphan/empty-state/theme)跨三轮稳定集体 FAIL,形态清一色 page.goto 超时 / 「app DOM coverage 为空」,零断言失败;同期同一页面在交互式浏览器里秒级渲染。
+- **根因**:① uni/vite dev server 处理完一轮探针流量后进程膨胀(实测 4.8GB 工作集),空载 shell 响应 4~31s;② 更关键的是**服务器侧请求队列拥塞**——超时被杀的探针客户端不取消服务器侧转译,积压排队,后来的请求随机排到几十秒(最小复现:同一秒内裸 `/` goto 超时 30s、紧接的 hash 路由 528ms 成功);③ 探针「一门起一个 browser、20-30s 预算」的模式与该病理共振,重试也落进同一拥塞窗口;当晚机器同时跑 3 个 uni dev server 加剧。auth 门脚本内早有注释记过「并发跑多个 headless chromium 时这条稳定误报」——是同族先兆。
+- **对策**:① 判「代码坏 vs 环境坏」用三件套:交互式浏览器实景渲染 + curl shell 延迟 + 最小 playwright goto 复现(同秒失败/成功对照 = 队列拥塞铁证);② 预热/走查类脚本用「**单 browser 串行耐心 + 失败等 3s 重试**」模式(当晚 176 次 goto 全成);对轮询页(首页 live feed)禁用 networkidle 判据(永不触发),用「等目标文本」;③ 长跑判据:verify 前后各 curl 一次 shell 延迟,>2s 即环境红,先重启 server 再谈门的结论;④ 待办(芯片):verify.sh 加 server-health preflight(shell 延迟超阈直接 abort 判环境红),防拿病服务器烧 45 分钟出一堆假红。2026-08-16。
+- **判别套件补一件(同日 R4 后)**:`build:h5` 产物 + 10 行 node 静态服务器 + 全新 context 裸启动 = **零转译队列的代码健康终极判别**——dev 模式残差门(entry/onboarding/register 这类整文档冷载「启动图」页)在静态产物上 1-2s 全挂载,即可把「代码 vs dev-server 病理」一刀切开;比无限重跑 verify 省一个数量级时间。

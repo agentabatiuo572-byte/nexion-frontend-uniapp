@@ -434,6 +434,16 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 # with Ref unwrapping (state typed as a plain value ≠ the returned Ref<T>) →
 # TS2740. Setup stores must let Pinia infer the return (cf. market/profile).
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
+# 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-097):toLocale* 不传 locale
+# (无参 / undefined / [])= 跟浏览器走,应用 en + 浏览器 zh 时渲染 "Member since 2026年7月",
+# 同字符串还会画进 proof 分享海报 canvas。Date 格式化一律传 src/i18n/format.ts 的 dateLocale()。
+# 2026-08-15 skeptic 证伪后扩容:除「没传」三形态外,再禁 navigator.* 显式传设备语言、
+# 禁字符串字面量 tag(Date 展示必须走 dateLocale() 单源;Number#toLocaleString("en-US") 不受影响,
+# 该分支要求 Date 语境)、禁 Intl.DateTimeFormat 的 无参/undefined/[]/navigator 形态。
+# ceiling(如实):① 折成多行的调用(grep 按行);② 变量持有的 Date 调裸 .toLocaleString()
+# (与数字千分位同形,只兜内联 `new Date(…)` 惯用形);③ Number#toLocaleString()(千分位)有意不管;
+# ④ Intl.DateTimeFormat 带字面 tag(钉死某语言、不跟应用语言)不拦,归 review 判断。
+sentinel_absent "date toLocale* pins app locale (dateLocale())" 'toLocale(Date|Time)String\(\s*(\)|undefined|\[\s*\]|navigator\.|["'"'"'])|new Date\([^)]*\)\.toLocaleString\(\s*(\)|undefined|\[\s*\]|navigator\.|["'"'"'])|Intl\.DateTimeFormat\(\s*(\)|undefined|\[\s*\]|navigator\.)'
 # reverse-ed / meta language must never leak into the product
 sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|跑路|ponzi|scam|反向教育|揭穿|conversion quest|funnel'
 # Funnel-meta vocabulary must not leak into user-facing i18n copy. The sentinel

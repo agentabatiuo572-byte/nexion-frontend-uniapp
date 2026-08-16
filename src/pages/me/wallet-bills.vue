@@ -95,14 +95,13 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
-import { useLocaleStore } from "@/store/locale";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
@@ -110,7 +109,6 @@ import { navTo } from "@/lib/route";
 import { fundsServerEnabled } from "@/api/runtime";
 
 const t = useT();
-const locale = useLocaleStore();
 const billsStore = useBills();
 const deposits = useDeposits();
 const refreshError = ref("");
@@ -179,7 +177,7 @@ const grouped = computed<Array<{ month: string; rows: Bill[] }>>(() => {
   for (const b of filtered.value) {
     const d = new Date(b.ts);
     // 🔴 跟**应用**语言,不跟浏览器语言 —— undefined 会让越南语用户看到中文月份表头。
-    const key = d.toLocaleDateString(localeTag.value, { year: "numeric", month: "long" });
+    const key = d.toLocaleDateString(dateLocale(), { year: "numeric", month: "long" });
     const arr = map.get(key) ?? [];
     arr.push(b);
     map.set(key, arr);
@@ -215,10 +213,8 @@ function fmtAmount(b: Bill): string {
   const abs = Math.abs(b.amount);
   return b.symbol === "USDT" ? abs.toFixed(4) : abs.toLocaleString();
 }
-/** 应用当前语言对应的 BCP-47 tag(用于日期 / 数字格式化)。 */
-const localeTag = computed(() => ({ zh: "zh-CN", en: "en-US", vi: "vi-VN" } as Record<string, string>)[locale.code] ?? "en-US");
 function fmtTime(ts: number): string {
-  return new Date(ts).toLocaleString(localeTag.value, {
+  return new Date(ts).toLocaleString(dateLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
