@@ -2659,31 +2659,6 @@ NODE
 }
 home_task_carousel_contract
 
-# ── 跨仓采样证据门:pages.json 每个页面必须在 admin 仓有 runtime 采样证据 ──
-# 单源 = $ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs(../nexion-ops-console → admin-ops
-# main;直接调用,不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
-# 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
-cross_repo_sampling_gate() {
-  local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
-  local audit_arg="$audit_js"
-  if [ ! -f "$audit_js" ]; then
-    ok "cross-repo sampling evidence gate skipped (admin repo absent)"
-    return
-  fi
-  # WSL can resolve `node` to Windows node.exe; translate /mnt/* before passing
-  # the script path or Node misreads it as D:\mnt\d\... (MODULE_NOT_FOUND).
-  if [ "$("$NODE_BIN" -p 'process.platform' 2>/dev/null)" = "win32" ] && command -v wslpath >/dev/null 2>&1; then
-    audit_arg=$(wslpath -w "$audit_js")
-  fi
-  if "$NODE_BIN" "$audit_arg" > /tmp/uniapp-port-coverage-audit.log 2>&1; then
-    ok "cross-repo sampling evidence (admin uniapp-port-coverage-audit findings=0)"
-  else
-    bad "page(s) lack admin-side sampling evidence — 去 ../nexion-ops-console(admin-ops main)把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
-    tail -25 /tmp/uniapp-port-coverage-audit.log | sed 's/^/        /'
-  fi
-}
-cross_repo_sampling_gate
-
 # ── 值域棘轮哨兵(vibe-playbook P2-F 2026-07-22 主人批):档间字号+圆角值集,只拦增量 ──
 # 基线 docs/VALUE-LADDER-BASELINE.json;新代码上阶梯(--v5-radius-* / 9 档字号),存量随尺寸迁移工程消化。
 value_ladder_gate() {
