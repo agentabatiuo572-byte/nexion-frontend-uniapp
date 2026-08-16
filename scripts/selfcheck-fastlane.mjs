@@ -903,14 +903,37 @@ function functionBody(src, opener) {
     //  🔴 扫描面必须自证非空:没接本地腿时**期望就是空集**,于是「扫不到」与「没违规」
     //     产出同一个绿 —— 这一格若不自带扫描面证据,walkSrc 一坏它就变成永久的假绿。
     //     (日限那格也守 walkSrc,但守的是它自己那次调用;这里被改成扫别的目录时它不会红。)
+    //  🔴🔴 扫的是**裸标识符**,不是 `.applyWithdrawalDebit(` 这种「调用写法」。按轴自查时实测出两个假绿面:
+    //     ① **间接引用**:`const debitFn = app.applyWithdrawalDebit; debitFn(wd);` —— 缺陷实体与直接调用
+    //        **完全相同**(第二个减记者、照写扣款幂等键),而带左括号的判据一个字都扫不到,全绿;
+    //     ② **改名**:函数一改名,带括号的串恒不命中 → 实扫空集,而没接本地腿时期望**也是**空集 → 判绿
+    //        (那次靠同块邻格连带报红兜住了,但本格自己是瞎的,不能指望邻格)。
+    //     换成「提到这个名字的文件集合 + 每个文件提几行」之后,三条轴一并抓住:
+    //     多一个文件 → 集合不等;改名 → 集合塌成空、与含定义处的期望不等;
+    //     同一文件里多提一次(第二个减记者藏在 store 自己内部)→ 行数不等。
+    //  🔴 期望里**含定义处**(app.ts 的函数声明 + 返回对象导出、types.ts 的接口声明),
+    //     正是这一点让「改名/删除」也判红 —— 期望非空,空集就不可能等于它,「扫不到」再也换不到绿。
+    //  能力上界(写下来免得下一个人高估):行数判据认的是「提了几次」,不是「提的是不是调用」——
+    //     app.ts 内把导出行挪个位置、或写成等价的另一种导出语法,行数不变故不报;
+    //     那属于同文件内重构,由同块另外三格(签名切片、定型串守卫、幂等读盘)接住。
+    //  🔴 用**词边界**匹配,不用 includes:`applyWithdrawalDebitV2` 这种改名**包含**原名子串,
+    //     includes 版对它照样计数、行数不变 → 改名轴仍旧判绿(实测过,这是第二次修同一格)。
     const scannedFiles = walkSrc();
-    const debitCallSites = scannedFiles
-      .filter((p) => stripComments(readFileSync(p, "utf8")).includes(".applyWithdrawalDebit("))
-      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
-    const expectedSites = PAGE_DEBITS_LOCALLY ? ["src/pages/me/wallet-withdraw.vue"] : [];
+    const debitMentions = {};
+    for (const p of scannedFiles) {
+      const lines = stripComments(readFileSync(p, "utf8"))
+        .split(/\r?\n/).filter((l) => /\bapplyWithdrawalDebit\b/.test(l)).length;
+      if (lines > 0) debitMentions[path.relative(root, p).replace(/\\/g, "/")] = lines;
+    }
+    const expectedMentions = {
+      "src/store/app.ts": 2,                                    // 函数声明 + 返回对象里的导出
+      "src/store/types.ts": 1,                                  // store 对外接口声明
+      ...(PAGE_DEBITS_LOCALLY ? { "src/pages/me/wallet-withdraw.vue": 1 } : {}),
+    };
+    const norm = (o) => Object.keys(o).sort().map((k) => `${k}:${o[k]}`).join(",");
     check("🔴 扣款调用点**集合等式**(第二个减记者藏在别的文件里,上面两格都看不见)",
-      scannedFiles.length >= 100 && debitCallSites.join(",") === expectedSites.join(","),
-      `扫了 ${scannedFiles.length} 个源文件 实扫=${JSON.stringify(debitCallSites)} 应为=${JSON.stringify(expectedSites)}`);
+      scannedFiles.length >= 100 && norm(debitMentions) === norm(expectedMentions),
+      `扫了 ${scannedFiles.length} 个源文件 实扫=${norm(debitMentions)} 应为=${norm(expectedMentions)}`);
     // 🗑 【2026-08-13 回退】这里曾加过一格「接线门②」,守 App.vue 对账里的扣款补扣格。
     //    实现被 R1 独立审计整格否决(立论前提错 + z5 已明令禁止无条件遍历补扣),
     //    门随实现一起退役 —— 留着就是绿着守一段不存在的代码。
