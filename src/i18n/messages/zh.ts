@@ -3260,6 +3260,8 @@ export const zh: Messages = {
     voucherStuckTitle: "代金券未能放回",
     voucherStuckMsg: "你的余额没有变化,但这笔订单用掉的代金券没能放回。请把交易号 {id} 提供给客服。",
     receiptGapMsg: "这笔购买已生效,但收据没能保存。请保留交易号 {id} 以便客服查询。",
+    deviceStuckTitle: "抵扣的旧机未能放回",
+    deviceStuckMsg: "你的余额已退回,但用于抵扣的旧设备没能放回你的设备列表。请把交易号 {id} 提供给客服。",
     staleTitle: "刚在别处更新过",
     staleMsg: "这一笔已经在另一个页面处理过了。已为你刷新到最新,请先看一眼再重试。",
   },

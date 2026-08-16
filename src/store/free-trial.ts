@@ -388,8 +388,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const cfg = useTrialConfig().config;
     const now = mockServerNow();
     const exp = now + cfg.trialDays * ONE_DAY_MS;
-    status.value = "active";
+    // 🔴 快照取在**任何**字段改动之前(审计 R7 P0:曾取在 status 置 active 之后,落盘失败回滚成
+    // 「active + 全空边界」的坏行,解析器 fail-closed 判 ended 并被 poll 落盘 —— 一次性试用资格被永久烧掉)。
     const beforeStart = snapshot();
+    status.value = "active";
     startedAt.value = now;
     expiresAt.value = exp;
     graceEndsAt.value = exp + cfg.graceDays * ONE_DAY_MS;

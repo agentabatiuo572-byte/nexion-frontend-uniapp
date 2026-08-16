@@ -650,9 +650,10 @@ function onReplace() {
   }
   app.deactivateDevice(lowest.id); // move old → inventory (frees slot)
   const newId = app.addDevice(s.newKind);
-  const activated = app.activateDevice(newId, reservedSlots.value);
+  const activated = !!newId && app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
-    app.devices = app.devices.filter((d) => d.id !== newId);
+    if (newId) app.devices = app.devices.filter((d) => d.id !== newId);
+    // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
@@ -673,6 +674,7 @@ function onReplace() {
     // 钱没扣成(余额不足)或没记上账(收口点已还原资金 + 弹错)——设备侧的改动必须一起退回,
     // 否则用户白得一台新机、老机还停着。
     app.devices = app.devices.filter((d) => d.id !== newId);
+    // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;
@@ -722,6 +724,12 @@ function onKeepBuy() {
   // Order: addDevice (default inactive) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。
   // 注释曾写「debit → bill / rollback」两步 —— 那是迁到收口点之前的形态,已过期。No demotion.
   const newId = app.addDevice(s.newKind);
+  if (!newId) {
+    // 新机没落盘 → 不扣钱(否则钱扣了机器没了)
+    toast.warn(t.value.tradein.errPleaseRetry);
+    confirming.value = false;
+    return;
+  }
   const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
@@ -790,6 +798,11 @@ function onForce() {
   //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
   const newId = app.addDevice(s.newKind);
+  if (!newId) {
+    toast.warn(t.value.tradein.errPleaseRetry); // 新机没落盘 → 旧机与任务原封不动
+    confirming.value = false;
+    return;
+  }
   app.deactivateDevice(lowest.id); // frees slot + wipes currentTask
   const activated = app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
@@ -797,6 +810,7 @@ function onForce() {
     app.devices = app.devices
       .filter((d) => d.id !== newId)
       .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
@@ -819,6 +833,7 @@ function onForce() {
     app.devices = app.devices
       .filter((d) => d.id !== newId)
       .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;

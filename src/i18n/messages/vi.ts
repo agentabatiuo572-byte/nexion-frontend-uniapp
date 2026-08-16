@@ -3248,6 +3248,8 @@ export const vi: Messages = {
     voucherStuckTitle: "Chưa hoàn lại được phiếu giảm giá",
     voucherStuckMsg: "Số dư của bạn không thay đổi, nhưng phiếu giảm giá đã dùng cho đơn này chưa được hoàn lại. Vui lòng cung cấp mã giao dịch {id} cho bộ phận hỗ trợ.",
     receiptGapMsg: "Giao dịch mua này đã thành công nhưng chưa lưu được biên nhận. Vui lòng giữ mã giao dịch {id} để bộ phận hỗ trợ tra cứu.",
+    deviceStuckTitle: "Chưa hoàn lại được thiết bị đổi cũ",
+    deviceStuckMsg: "Số dư đã được hoàn lại, nhưng thiết bị bạn dùng để đổi cũ chưa được trả về danh sách thiết bị. Vui lòng cung cấp mã giao dịch {id} cho bộ phận hỗ trợ.",
     staleTitle: "Vừa được cập nhật ở nơi khác",
     staleMsg: "Mục này đã được xử lý ở màn hình khác. Chúng tôi đã làm mới giúp bạn — hãy xem lại trước khi thử lại.",
   },

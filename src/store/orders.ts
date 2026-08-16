@@ -116,7 +116,7 @@ function hydrate(accountKey: string): Order[] {
 // then this typed view lets advanceOrder() compile and degrade gracefully: the
 // order still advances to "activated", just without spawning a Device.
 type DeviceSpawnApp = {
-  addDevice?: (kind: DeviceKind, options?: { paidPriceUsdt?: number }) => string;
+  addDevice?: (kind: DeviceKind, options?: { paidPriceUsdt?: number }) => string | null;
   activateDevice?: (id: string, reservedSlots?: number) => boolean;
   discardSpawnedDevice?: (id: string) => boolean;
   devices: { id: string; activatedAt?: number | null }[];
@@ -284,8 +284,9 @@ export const useOrders = defineStore("orders", () => {
       if (!spawnedDeviceId && typeof app.addDevice === "function") {
         // FEAT-DEV02:阶梯抵扣基数 = 实付净额(order.total 已扣券与置换抵扣),
         // 不是目录价——否则券/抵扣买入的设备下一跳置换基数被系统性高估。
-        spawnedDeviceId = app.addDevice(cur.productId, { paidPriceUsdt: cur.total });
-        spawnedDeviceId = spawnedDeviceId ?? app.devices.slice(-1)[0]?.id;
+        spawnedDeviceId = app.addDevice(cur.productId, { paidPriceUsdt: cur.total }) ?? undefined;
+        // 生不出设备(落盘失败)= 这一跳不发生:不把幽灵 id 写进订单,下一 tick 整跳重试。
+        if (!spawnedDeviceId) return;
       }
       if (spawnedDeviceId && typeof app.activateDevice === "function") {
         const alreadyActive = app.devices.some((d) => d.id === spawnedDeviceId && d.activatedAt !== null);

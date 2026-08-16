@@ -540,6 +540,9 @@ const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString(
 // 服务端同事务复算+下架)。
 const appliedTradeinView = computed(() => {
   if (!remoteApiEnabled && !DEFAULT_TRADEIN_CONFIG.enabled) return null;
+  // 试用转化单不叠加旧机抵扣(规格未定义四重叠加,intercept 早就不弹);展示 / 结算两条解析路径同一条闸,
+  // 别处挂进来的抵扣上下文在转化单上一律不生效(审计 R7 P1:护栏只焊在 intercept)。
+  if (trialConversionMode.value) return null;
   const a = tradein.appliedTradein;
   const p = product.value;
   if (!a || !p || a.targetKind !== p.id) return null;
@@ -560,7 +563,7 @@ const appliedTradeinView = computed(() => {
 /** 支付时刻用:按**本页报价快照**里的那台设备解析抵扣,不看全局槽(兄弟实例 / 报价后的变化都不影响这一单)。 */
 function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit: number } | null {
   const p = product.value;
-  if (!quotedTradeIn || !p) return null;
+  if (!quotedTradeIn || !p || trialConversionMode.value) return null;
   const device = app.devices.find((d) => d.id === quotedTradeIn!.deviceId);
   if (!device || isDeviceTaskBlocked(device)) return null;
   const credit = computeTradeInCredit(device.paidPriceUsdt ?? 0, Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
@@ -1480,7 +1483,7 @@ function restartRemoteOrderPolling() {
 // ── 抵扣上下文的页级镜像(审计 R5 P0)──
 // tradein.appliedTradein 是全局单槽,而浮动条 / 绑卡返回会让两个结算页实例同时在栈上:上层实例的
 // adoptSession / cleanup 会改写它。本页只在**可见**时把槽的变化收进自己的镜像(用户在本页做的选择),
-// 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-108 同款)。
+// 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-112 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
 let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
@@ -1727,8 +1730,10 @@ watch(step, async (s) => {
         // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
         // 绝不再弹一句"报价已变"了事。
         const voucherBack = releaseVoucher();
-        if (app.restoreMoney(beforePay) && voucherBack) toast.warn(t.value.store.coTrialQuoteChanged);
-        else reportStuckFunds(beforePay, "", voucherBack ? "funds" : "voucher");
+        const moneyBack = app.restoreMoney(beforePay);
+        // 钱没退回永远是第一优先级(券的文案宣称「余额没有变化」,钱真扣着时不许说这句)。
+        if (moneyBack && voucherBack) toast.warn(t.value.store.coTrialQuoteChanged);
+        else reportStuckFunds(beforePay, "", moneyBack ? "voucher" : "funds");
         step.value = "select-payment";
         return;
       }
@@ -1742,8 +1747,9 @@ watch(step, async (s) => {
           // 扣款照旧、订单还写着 tradeInDeviceId。)
           tradein.clearApplied(tradeinOwner);
           const voucherBack = releaseVoucher();
-          if (app.restoreMoney(beforePay) && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-          else reportStuckFunds(beforePay, "", voucherBack ? "funds" : "voucher");
+          const moneyBack = app.restoreMoney(beforePay);
+          if (moneyBack && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+          else reportStuckFunds(beforePay, "", moneyBack ? "voucher" : "funds");
           step.value = "select-payment";
           return;
         }
@@ -1768,7 +1774,10 @@ watch(step, async (s) => {
         const moneyBack = app.restoreMoney(beforePay);
         const voucherBack = releaseVoucher();
         if (deviceBack && moneyBack && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-        else reportStuckFunds(beforePay, "", !moneyBack || !deviceBack ? "funds" : "voucher");
+        // 优先级 钱 > 设备 > 券;设备卡住时 ref 带上设备 id,对账端才知道该还哪一台。
+        else if (!moneyBack) reportStuckFunds(beforePay, "", "funds");
+        else if (!deviceBack) reportStuckFunds(beforePay, ti ? ti.device.id : "", "device");
+        else reportStuckFunds(beforePay, "", "voucher");
         step.value = "select-payment";
         return;
       }
