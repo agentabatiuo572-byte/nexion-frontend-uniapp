@@ -329,6 +329,17 @@ for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate 
   fi
 done
 
+# fastlane 的「扣退同档」那格 2026-08-16 因**同义别名**假绿修过一轮(判据只认 remoteApiEnabled
+# 字面量,认不出等价的 fundsServerEnabled,退款腿实际已被整条关掉却一路报绿)。
+# 修后判据按等价类解析 + 钉正向定型串,而关系型/解析型判据更容易在重构里悄悄失去牙齿 ——
+# 6 靶红测钉住它真会红,其中 4 靶是「旧判据漏、新判据抓」的资金缺陷形状。
+if "$NODE_BIN" scripts/withdraw-rail-alias.redtest.mjs > /tmp/uni-withdraw-rail-alias.log 2>&1; then
+  ok "withdraw-rail-alias redtest — $(tail -1 /tmp/uni-withdraw-rail-alias.log)"
+else
+  bad "withdraw-rail-alias redtest 失败(哨兵失效即门失效;node scripts/withdraw-rail-alias.redtest.mjs 看明细)"
+  tail -12 /tmp/uni-withdraw-rail-alias.log | sed 's/^/        /'
+fi
+
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
