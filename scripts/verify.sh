@@ -417,6 +417,46 @@ else
   tail -8 /tmp/uni-remote-resilience.log | sed 's/^/        /'
 fi
 
+# ── [2.7] dev server 健康 preflight(P-097 对策③④,环境门)──────────────────
+# why:dev server 被喂满一轮 verify 流量后会队列拥塞式退化(实测空载 shell 响应 4~31s、
+# 进程 4.8GB 工作集),runtime 探针族「一门一浏览器、20-30s 预算」与该病理共振 → 集体
+# 假红,拿病服务器烧 45 分钟出一堆假红,还会被读成「代码坏了」。开跑前对 $BASE_URL/
+# 量 2 次裸 shell 延迟,任一次超阈即判「环境红」并直接中止:这不是门红,不代表代码有
+# 问题,重启 server 再跑才有结论。收尾处再量 1 次,总结行报首尾延迟(见脚本尾部),
+# 首绿尾超阈 = server 在本轮中途退化,后段 runtime 红先疑环境再疑代码。
+# 🔴 环境红退出码钉 3(≠1 的门红):.verify-exit.code 老读法只跟 0 比,不受影响;
+# 要区分「门红 vs 环境红」的消费者读退出码 3 或 grep 输出里的 ENV-RED 横幅。
+HEALTH_MAX_S=2   # P-097 对策③的阈:健康 vite dev 空载 shell 响应在毫秒级,>2s 已是拥塞先兆
+_shell_latency() {  # 量一次 $BASE_URL/ 的 time_total(秒);连不上输出空串
+  local t rc
+  t=$("$CURL_BIN" -s -o /dev/null --max-time 15 -w '%{time_total}' "$BASE_URL/" 2>/dev/null); rc=$?
+  case "$rc" in
+    0) printf '%s' "$t" ;;
+    28) printf '15.000000' ;;   # 响应超 15s 被掐断:按 15s 计必超阈 —— 挂死的 server 不许把探针也拖死
+    *) printf '' ;;
+  esac
+}
+_over_health_max() { [ -n "$1" ] && awk -v t="$1" -v m="$HEALTH_MAX_S" 'BEGIN{exit !(t+0 > m+0)}'; }
+echo -e "${C}[2.7] dev server health preflight(P-097 环境门)${N}"
+HEALTH_T1=""; HEALTH_T2=""
+for _hi in 1 2; do
+  _ht=$(_shell_latency)
+  if [ "$_hi" = 1 ]; then HEALTH_T1="$_ht"; else HEALTH_T2="$_ht"; fi
+  if [ -z "$_ht" ]; then
+    skipped "server health preflight 第${_hi}次:$BASE_URL 连不上,量不了(server 没起的红由 [2.5] 负责,此处不重复计红)"
+    break
+  fi
+  if _over_health_max "$_ht"; then
+    bad "「环境红」server health preflight 第${_hi}次:shell 延迟 ${_ht}s > ${HEALTH_MAX_S}s —— dev server 队列拥塞/进程退化,重启后再跑(P-097)"
+    echo -e "${R}━━ ENV-RED(P-097)环境红,非门红:dev server 已退化,继续跑只会产出连片假红,中止本轮 verify ━━${N}"
+    echo -e "${R}   处置:重启 dev server(或 npm run test:legacy-suite 自启壳)后整轮重跑;本轮已出的 PASS/FAIL 一律作废${N}"
+    exit 3
+  fi
+done
+if [ -n "$HEALTH_T2" ]; then
+  ok "server health preflight:2 次 shell 延迟 ${HEALTH_T1}s / ${HEALTH_T2}s(均 ≤ ${HEALTH_MAX_S}s)"
+fi
+
 echo -e "${C}[3] grep sentinels over src/${N}"
 # React residue (should never survive a .tsx → .vue port)
 sentinel_absent "no className= (use class=)"      'className='
@@ -434,7 +474,7 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 # with Ref unwrapping (state typed as a plain value ≠ the returned Ref<T>) →
 # TS2740. Setup stores must let Pinia infer the return (cf. market/profile).
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
-# 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-097):toLocale* 不传 locale
+# 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-096;合并重编号,勿与 P-097=server 退化混淆):toLocale* 不传 locale
 # (无参 / undefined / [])= 跟浏览器走,应用 en + 浏览器 zh 时渲染 "Member since 2026年7月",
 # 同字符串还会画进 proof 分享海报 canvas。Date 格式化一律传 src/i18n/format.ts 的 dateLocale()。
 # 2026-08-15 skeptic 证伪后扩容:除「没传」三形态外,再禁 navigator.* 显式传设备语言、
@@ -3527,6 +3567,19 @@ fi
 if [ -s "$PROBE_RETRY_LOG" ]; then
   echo -e "${Y}⚠ probe retries this run:${N}"
   sed 's/^/    /' "$PROBE_RETRY_LOG"
+fi
+# ── [2.7] 收尾半程(P-097 对策③):门全部跑完后再量一次 shell 延迟,与 preflight 成对报出。
+# 首绿尾超阈 = server 在本轮 verify 中途被探针流量喂退化 —— 后段 runtime 探针的红先疑
+# 环境再疑代码。只报不计数不改判:门都跑完了,此处再 abort 无意义,判断权交给读摘要的人。
+if [ -n "${HEALTH_T1:-}" ] && [ -n "${HEALTH_T2:-}" ]; then
+  HEALTH_T_END=$(_shell_latency)
+  if [ -z "$HEALTH_T_END" ]; then
+    echo -e "${Y}⚠ server health 首尾延迟:${HEALTH_T1}s/${HEALTH_T2}s → 收尾连不上 $BASE_URL(server 中途死了?)—— 后段 runtime 红先疑环境(P-097)${N}"
+  elif _over_health_max "$HEALTH_T_END"; then
+    echo -e "${Y}⚠ server health 首尾延迟:${HEALTH_T1}s/${HEALTH_T2}s → ${HEALTH_T_END}s(收尾已超 ${HEALTH_MAX_S}s)—— 跑到后段 server 已退化,本轮后段 runtime 红先重启 server 复跑再定论(P-097)${N}"
+  else
+    echo "server health 首尾延迟:preflight ${HEALTH_T1}s/${HEALTH_T2}s → 收尾 ${HEALTH_T_END}s(均 ≤ ${HEALTH_MAX_S}s)"
+  fi
 fi
 echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
 [ $fail -eq 0 ] && [ $skip -eq 0 ]
