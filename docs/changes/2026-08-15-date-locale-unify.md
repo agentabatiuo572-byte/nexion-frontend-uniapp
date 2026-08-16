@@ -1,6 +1,6 @@
 # 2026-08-15 · date-locale-unify（pkg/zp-date-locale）
 
-**Status**: Aligned（方向 = 主人转发的独立 tester 判据 + 指定修法,视为已对齐;S/M 级机械同型清扫)
+**Status**: Shipped（主人 2026-08-16 拍板合并;方向 = 主人转发的独立 tester 判据 + 指定修法;S/M 级机械同型清扫)
 
 ## Why
 
@@ -62,8 +62,9 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
   `ensureSystemDetected` 只挂首页 index.vue,深链不经过它;locale 全站仅两写手、无隐藏写手,dateLocale() 地基获运行时证据背书。)
   结论:代码全健康;残差 = dev server 转译管线在整文档冷载「启动图」请求形态下的病理(P-097),
   与 SPA 增量导航(我/tester 走的路径,全部通过)分野一致。
-  🔴 **未清账**:环境恢复正常后(其它会话 dev server 停掉/白天常规状态)复跑 `bash scripts/verify.sh` 全绿才许合并主线——runbook:
-  `VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5223` 起新服务器 → `node <scratch>/warm-all-routes.cjs` 预热 → 全量 verify。
+  **主人 2026-08-16 拍板:凭上述证据链直接合并**;复跑改为合并后立即执行——邻会话 c86137d 已修
+  「vite 监视器走跨仓 junction 环 + dist/.trash 致 OOM」,正是当晚 dev server 膨胀病理(P-097)的根因,
+  合并拿到该修复后环境应恢复,runbook:起新 server → 预热 → 全量 verify。
 - [x] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图(main DOM 断言 + tester 截图双份,`evidence-date-locale/`)
 - [x] 独立 tester 黑盒验收 **AC 5/5 pass**(报告 `2026-08-15-date-locale-unify-t1-test.md`;5 条 AC 外发现已裁决:#2 裸值 default 与 #1/#3/#4 均为既有问题,#2 已挂修复芯片)
 - [ ] 🔴 静机复跑 `bash scripts/verify.sh` 全绿(P-097 环境红清账)→ 才合并回 UniApp 主线(主线只收合并)
