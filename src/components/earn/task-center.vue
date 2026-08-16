@@ -76,7 +76,7 @@
         <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">+${{ task.reward.toFixed(3) }}</text>
         <text class="text-right shrink-0" style="font-size: 12px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
         <view v-if="remoteApiEnabled && task.receiptNo" class="shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-brand)" :title="task.receiptNo">
-          <text style="font-size: 9px; font-weight: 700">R</text>
+          <text style="font-size: 12px; font-weight: 600">R</text>
         </view>
         <view v-else-if="!remoteApiEnabled && receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>

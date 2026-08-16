@@ -48,7 +48,7 @@
            the detail readable, but never expose a purchase CTA for it. -->
       <template v-else-if="purchaseUnavailable">
         <view class="mx-4 rounded-2xl border" style="padding: 24px; border-color: var(--v5-border); background: var(--v5-surface)">
-          <text class="block" style="font-size: 16px; font-weight: 600; color: var(--v5-ink)">{{ product.name }}</text>
+          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ product.name }}</text>
           <text class="block" style="margin-top: 8px; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3)">{{ t.store.specUnavailable }}</text>
         </view>
         <view aria-hidden style="height: 32px" />
