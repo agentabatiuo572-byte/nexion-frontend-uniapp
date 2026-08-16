@@ -316,8 +316,9 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   margin-top: 2px;
 }
 .vcs-cta {
-  margin-top: 10px;
-  align-self: flex-start;
+  /* 主人 2026-08-16:CTA 落卡片右下角,与上方文字块拉开,不挤在一起 */
+  margin-top: 14px;
+  align-self: flex-end;
   /* 《07》tap≥44 + 转化场景主 CTA 权重必须压过 dismiss(原 34px 比满宽 40px
      的 dismiss 还矮,视觉权重倒挂) */
   min-height: 44px;
