@@ -864,6 +864,13 @@ async function goAwaiting() {
   if (step.value !== "pay-instructions") return;
   // A dead invoice can never be "completed" (component hides the button; this is the second gate).
   if (activeSession.value && !pending.isLive(activeSession.value)) return;
+  // 别处(另一个页面实例 / 标签页)已结算或取消了这张票 → 本页不能再推进它。
+  if (activeSession.value && !pending.get(activeSession.value.id)) {
+    toast.warn(t.value.store.pendingSettledElsewhere);
+    dropActiveSession();
+    goConfirm();
+    return;
+  }
   // Explicit local-sandbox payment is a server command: only the backend may
   // debit the run-scoped sandbox wallet and issue the durable payment number.
   // Remote/production deliberately remains provider-backed and never falls
@@ -1003,6 +1010,7 @@ function adoptSession(s: PendingCheckoutSession) {
 }
 
 function resumePendingSession(id: string): boolean {
+  pending.refreshFromDisk(); // 别的标签页可能已结算 / 取消了它 —— 先回灌再判
   const s = pending.get(id);
   if (!s || !pending.isLive(s) || s.productId !== productId.value) {
     toast.warn(t.value.store.pendingResumeGone);
@@ -1407,8 +1415,17 @@ function restartRemoteOrderPolling() {
 
 onShow(() => {
   remoteOrderPageVisible = true;
-  // 页面重新可见 → 它展示的那张发票不需要浮动条重复提醒。
-  if (activeSession.value) pending.setViewing(activeSession.value.id);
+  // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
+  if (activeSession.value) {
+    pending.refreshFromDisk();
+    if (!pending.get(activeSession.value.id)) {
+      toast.warn(t.value.store.pendingSettledElsewhere);
+      dropActiveSession();
+      if (step.value === "pay-instructions" || step.value === "awaiting") step.value = "confirm";
+    } else {
+      pending.setViewing(activeSession.value.id); // 它展示的那张发票不需要浮动条重复提醒
+    }
+  }
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
   restoreReceiptRecovery();
@@ -1494,6 +1511,7 @@ watch(step, async (s) => {
       // 购买门支付时复验(同构纵深):onLoad 拦截后若经返回键回到留栈实例,
       // 支付时刻仍按门拒单(对抗审查 F4b)。
       if (purchaseGate.value.blocked) {
+        toast.warn(purchaseGate.value.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
         step.value = "select-payment";
         return;
       }
@@ -1564,6 +1582,19 @@ watch(step, async (s) => {
       // 反过来排之后:扣款失败 → 试用一根汗毛没动(余额不足与落盘失败共用同一条退出);
       // convert() 仍是状态机的最终裁决(自取 server now 再解析一次),只是挪到钱确实扣住
       // 之后再问。PRODUCTION:两步本就是 POST /api/orders 的同一个事务,不存在先后。
+      // 🔴 先原子消费发票再花钱:CAS 在磁盘最新行上要求这张票仍在册且在窗内,删成功才算本实例抢到
+      // 结算权。别的页面实例 / 标签页已结算或取消了它 → false → 拒单回报价步。花钱动作只许排在它之后
+      // (审计 R2 P0 族:此前只验「过期」不验「还在不在」,同一张票被两处各结算一次、取消后仍能扣)。
+      const invoice = activeSession.value;
+      if (invoice) {
+        if (!pending.consume(invoice.id)) {
+          toast.warn(t.value.store.pendingSettledElsewhere);
+          activeSession.value = null;
+          step.value = "select-payment";
+          return;
+        }
+        activeSession.value = null; // 票已消费;下面任何失败都回报价步重开新票,不再回到它
+      }
       const beforePay = app.captureMoney();
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
@@ -1599,11 +1630,7 @@ watch(step, async (s) => {
         ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD }),
       });
       orderId.value = ord.id;
-      // 发票已付清并落单 —— 待支付会话结束(浮动条随之消失)。
-      if (activeSession.value) {
-        pending.remove(activeSession.value.id);
-        activeSession.value = null;
-      }
+      // 发票已在扣款前被 consume(见上),这里不再有会话要收。
       // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
       // convert() 已在扣款前裁决并落 converted(见上);这里只做返还入账。设备由
       // 既有订单履约管线生成(tickOrders → advanceOrder → addDevice,吃 order.total
@@ -1684,10 +1711,7 @@ watch(step, async (s) => {
     return;
   }
   if (s === "live" && product.value && orderId.value) {
-    toast.success(
-      t.value.store.coOrderPlaced,
-      `Your ${product.value.name} is being provisioned in our data center.`,
-    );
+    toast.success(t.value.store.coOrderPlaced, orderPlacedBody.value);
   }
 });
 

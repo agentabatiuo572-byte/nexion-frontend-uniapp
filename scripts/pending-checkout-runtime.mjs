@@ -62,17 +62,23 @@ async function dismissSheets(page) {
   }
 }
 
+// Real pointer clicks (Playwright actionability: visible, stable, receives events) — a synthetic
+// el.click() would still "work" through a backdrop, off-screen or under another layer.
 async function tapButton(page, label) {
-  const ok = await page.evaluate((l) => {
-    const pages = [...document.querySelectorAll('uni-page[data-page="pages/store/checkout"]')];
-    const scope = pages[pages.length - 1] ?? document;
-    const btn = [...scope.querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label") === l);
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }, label);
-  if (!ok) fail(`button "${label}" not found on the checkout page`);
+  const btn = page.locator(`uni-page[data-page="pages/store/checkout"] [role="button"][aria-label="${label}"]`).last();
+  if ((await btn.count()) === 0) fail(`button "${label}" not found on the checkout page`);
+  await btn.click({ timeout: 5000 });
   await page.waitForTimeout(600);
+}
+
+async function tapBar(page) {
+  const bar = page.locator(".pcb-pill");
+  if ((await bar.count()) === 0) fail("floating bar not present");
+  // Mock celebrations (milestone overlay) and toasts may legitimately sit on top for a moment;
+  // dismiss the celebration, then require a REAL click to land within 15s (a backdrop that stays = red).
+  await page.evaluate(() => { const o = document.querySelector(".ms-overlay"); if (o) o.click(); });
+  await page.waitForTimeout(300);
+  await bar.click({ timeout: 15000 });
 }
 
 async function readState(page) {
@@ -113,7 +119,7 @@ async function goToPayStep(page) {
 }
 
 async function goBack(page) {
-  await page.evaluate(() => document.querySelector(".nx-navheader .nx-nav-side")?.click());
+  await page.locator(".nx-navheader .nx-nav-side").first().click({ timeout: 5000 });
   await page.waitForTimeout(1200);
 }
 
@@ -134,7 +140,7 @@ try {
     if (!left.pill || !left.pill.includes(String(t0.sessions[0].amountUsdt).replace(/\B(?=(\d{3})+(?!\d))/g, ","))) fail(`B: floating bar missing/wrong after leaving: ${left.pill}`);
     if (left.sessions.length !== 1 || left.sessions[0].leftNoticeShown !== true) fail(`B: invoice not kept / notice not marked: ${JSON.stringify(left.sessions)}`);
     const pillCountdown = left.pill.match(/\b\d\d:\d\d\b/)?.[0] ?? null;
-    await page.evaluate(() => document.querySelector(".pcb-pill")?.click());
+    await tapBar(page);
     await page.waitForTimeout(2000);
     const back = await readState(page);
     if (!back.hash.includes("resume=")) fail(`B: bar tap did not open the resume route (${back.hash})`);
@@ -195,14 +201,14 @@ try {
     await goBack(page);
     await page.evaluate((PENDING_KEY) => {
       const wrapped = JSON.parse(localStorage.getItem(PENDING_KEY));
-      for (const row of Object.values(wrapped.data)) for (const s of row.sessions ?? []) s.expiresAt = Date.now() + 3000;
+      for (const row of Object.values(wrapped.data)) for (const s of row.sessions ?? []) s.expiresAt = Date.now() + 8000; // 8s: reload + settle must fit; the bar must still be there when we look
       localStorage.setItem(PENDING_KEY, JSON.stringify(wrapped));
     }, PENDING_KEY);
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(1200);
     const before = await readState(page);
     if (!before.pill) fail("D: bar missing right after reload with a still-live invoice");
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(9000);
     const after = await readState(page);
     if (after.pill !== null) fail(`D: bar still shows an expired invoice: ${after.pill}`);
     if (after.sessions.length !== 0) fail(`D: expired invoice not pruned from storage (${after.sessions.length})`);
@@ -211,8 +217,44 @@ try {
     await ctx.close();
   }
 
+  // ── E: one invoice, two tabs — settled once, never twice ──
+  {
+    const { ctx, page, errors } = await openPage(null);
+    const t0 = await goToPayStep(page); // tab 1 holds invoice X on the pay step
+    const page2 = await ctx.newPage(); // tab 2: same profile → same localStorage
+    page2.on("console", collectAppConsoleErrors(errors, BASE));
+    page2.on("pageerror", (e) => errors.push(String(e)));
+    await page2.goto(directAppUrl(BASE, "/#/pages/store/store"), { waitUntil: "networkidle", timeout: 30000 });
+    await page2.waitForTimeout(1500);
+    const seen = await readState(page2);
+    if (!seen.pill) fail(`E: tab 2 does not see tab 1's invoice on the bar: ${JSON.stringify(seen)}`);
+    await tapBar(page2);
+    await page2.waitForTimeout(2000);
+    const resumed = await readState(page2);
+    if (resumed.address !== t0.address) fail(`E: tab 2 resumed a different invoice (${t0.address} → ${resumed.address})`);
+    await tapButton(page2, "I've completed the payment →");
+    await page2.waitForTimeout(4500); // awaiting → confirmed → order
+    const settled = await readState(page2);
+    if (settled.orderCount !== t0.orderCount + 1) fail(`E: tab 2 did not settle the invoice (orders ${t0.orderCount} → ${settled.orderCount})`);
+    if (settled.sessions.length !== 0) fail(`E: invoice still on the books after settlement (${settled.sessions.length})`);
+    // tab 1 still shows the pay step with its stale copy — pressing complete must NOT pay again
+    await page.bringToFront();
+    await page.waitForTimeout(800);
+    const stale = await readState(page);
+    if (stale.onPayStep) {
+      await tapButton(page, "I've completed the payment →");
+      await page.waitForTimeout(4500);
+    }
+    const after = await readState(page);
+    if (after.orderCount !== t0.orderCount + 1) fail(`E: the same invoice was settled twice (orders ${t0.orderCount} → ${after.orderCount})`);
+    if (after.sessions.length !== 0) fail(`E: a second invoice appeared after the stale settle attempt (${after.sessions.length})`);
+    report.E = { address: t0.address, ordersBefore: t0.orderCount, ordersAfter: after.orderCount, tab1BounceHash: after.hash, errors };
+    assertNoRuntimeErrors(errors, "pending-checkout E");
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(report, null, 2));
-  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune)");
+  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune · E two tabs settle once)");
 } finally {
   await browser.close();
 }

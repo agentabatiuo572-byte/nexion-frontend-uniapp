@@ -42,8 +42,8 @@ export function computeCreditedUsdt(grossAmountUsdt: number, feeUsdt: number): n
 }
 
 // ── 每用户 × 每网络专属充值地址(确定性派生)────────────────────────
-// mockExternalAddress(chain-payment 内联版)是「随机一次性」形态;充值地址必须
-// 「同账号同网络恒定」(server 派发恒定不轮换),故同形态 + 确定性种子:
+// 充值地址必须「同账号同网络恒定」(server 派发恒定不轮换),故同形态 + 确定性种子;
+// 结算待支付发票(store/pending-checkout)复用同一派生函数,种子换成会话 id → 每单专属地址:
 // seed = hash(accountKey|network) → 种子化 PRNG → 逐字符生成。
 // PROD: GET /api/deposits/address?network= 返回 server 派发地址,本段整体删除。
 
@@ -69,7 +69,7 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-/** 同账号同网络恒定;TRC20 = "T" + 33 位(34 位总长),EVM = "0x" + 40 hex。 */
+/** 种子(账号键 = 同账号同网络恒定;会话 id = 每单专属)+ 网络 → 确定性地址;TRC20 = "T" + 33 位(34 位总长),EVM = "0x" + 40 hex。MOCK-ONLY:无人持有私钥,远端档由 store 闸拒发。 */
 export function deriveDepositAddress(accountKey: string, network: ChainDepositChannel): string {
   const rnd = mulberry32(fnv1a(`${accountKey}|${network}`));
   const hex = (n: number): string => {
@@ -79,7 +79,7 @@ export function deriveDepositAddress(accountKey: string, network: ChainDepositCh
     return s;
   };
   if (network === "usdt-trc20") {
-    // TRON 形态:T + 33 字符(与 mockExternalAddress 同款近似 base58 大写)
+    // TRON 形态:T + 33 字符(近似 base58 大写)
     return "T" + hex(33).toUpperCase();
   }
   // ERC20 / BEP20 共用 EVM 0x 形态(按网络各派各的地址,规格「每网络专属」)

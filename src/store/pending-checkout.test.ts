@@ -130,6 +130,62 @@ describe("usePendingCheckout (mock leg)", () => {
     expect(store.sessions).toHaveLength(1);
   });
 
+  it("consume() settles an invoice exactly once: the second claimant (stale instance / other tab) gets false", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const s = store.begin(INPUT)!;
+    expect(store.consume(s.id)).toBe(true);
+    expect(store.consume(s.id)).toBe(false); // already settled — must not pay twice
+    expect(store.sessions).toHaveLength(0);
+    expect(diskSessions("acct-a")).toHaveLength(0);
+  });
+
+  it("consume() refuses a cancelled invoice and an expired one", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const cancelled = store.begin(INPUT)!;
+    store.remove(cancelled.id);
+    expect(store.consume(cancelled.id)).toBe(false);
+    const dying = store.begin(INPUT)!;
+    const table = memory.get(TABLE) as Record<string, { sessions: typeof dying[] }>;
+    table["acct-a"].sessions[0].expiresAt = Date.now() - 1;
+    memory.set(TABLE, table);
+    expect(store.consume(dying.id)).toBe(false);
+  });
+
+  it("consume() is disk-authoritative: a second store instance (other tab) cannot settle a ticket the first one already consumed", () => {
+    const tabA = usePendingCheckout();
+    tabA.bindAccount("acct-a");
+    const s = tabA.begin(INPUT)!;
+    setActivePinia(createPinia());
+    const tabB = usePendingCheckout();
+    tabB.bindAccount("acct-a");
+    expect(tabB.current?.id).toBe(s.id); // tab B sees it on disk
+    expect(tabB.consume(s.id)).toBe(true); // tab B settles first
+    expect(tabA.consume(s.id)).toBe(false); // tab A's stale memory copy must lose
+    expect(tabA.sessions).toHaveLength(0); // and its memory is now refreshed from disk
+  });
+
+  it("refreshFromDisk() pulls another tab's writes without writing", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const other = { ...INPUT, id: "pc-other", kind: "purchase", orderNo: null, address: "TOTHER", createdAt: Date.now(), expiresAt: Date.now() + 60_000, leftNoticeShown: false };
+    memory.set(TABLE, { "acct-a": { sessions: [other], rev: 3 } });
+    store.refreshFromDisk();
+    expect(store.current?.id).toBe("pc-other");
+    expect((memory.get(TABLE) as Record<string, { rev: number }>)["acct-a"].rev).toBe(3); // no write
+  });
+
+  it("bindAccount heals a corrupted multi-live row down to one invoice", () => {
+    const now = Date.now();
+    const mk = (id: string) => ({ ...INPUT, id, kind: "purchase", orderNo: null, address: "T" + id, createdAt: now, expiresAt: now + 60_000, leftNoticeShown: false });
+    memory.set(TABLE, { "acct-a": { sessions: [mk("pc-1"), mk("pc-2")], rev: 1 } });
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    expect(store.sessions.map((s) => s.id)).toEqual(["pc-1"]);
+    expect(diskSessions("acct-a").map((s) => s.id)).toEqual(["pc-1"]);
+    expect(store.begin({ ...INPUT, replaceId: "pc-1" })).not.toBeNull(); // no longer locked out
+  });
   it("sees an invoice another tab opened (disk-latest base) and refuses to double it", () => {
     const store = usePendingCheckout();
     store.bindAccount("acct-a");

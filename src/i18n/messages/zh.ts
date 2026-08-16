@@ -1759,6 +1759,7 @@ export const zh: Messages = {
     pendingCancelConfirm: "取消支付",
     pendingCancelKeep: "继续支付",
     pendingResumeGone: "这笔订单的付款时间已过,请从商品页重新下单。",
+    pendingSettledElsewhere: "这笔付款已在别处完成或取消,请回到订单确认页重新付款。",
     coSendExact: "请一笔转入准确金额 · 仅通过 {network} 转账",
     coCardSelect: "选择银行卡",
     coCardSecurity: "256 位 TLS · PCI DSS 令牌",
