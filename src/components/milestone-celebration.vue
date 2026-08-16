@@ -63,6 +63,8 @@
 import { computed, watch, onMounted, onUnmounted } from "vue";
 import { useMilestones } from "@/store/milestones";
 import { usePopupArbiter } from "@/store/popup-arbiter";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -73,6 +75,8 @@ const ADVANCE_TICK_MS = 300;
 
 const m = useMilestones();
 const arbiter = usePopupArbiter();
+const voucherClaimSheet = useVoucherClaimSheet();
+const trialClaimSheet = useTrialClaimSheet();
 const t = useT();
 
 // ── Queue pump — same route source as global-ui.vue readRoute / App.vue
@@ -100,7 +104,16 @@ function readRoute(): string {
 // 出口漏接一个就会把令牌永久扣住,之后谁都再弹不出来;而对齐写法天然幂等,
 // 页面栈里 N 份宿主副本同时跑也收敛到同一结果(uni 不卸载被压住的页面)。
 function pumpCelebrationQueue() {
-  m.advance(readRoute(), arbiter.busyForOthers("milestone"));
+  const route = readRoute();
+  // 🔴 「屏上有没有别人」不能只问令牌:领取弹层可以被用户从 banner 手动打开,那条路径
+  // 不经仲裁(申请失败也照开),令牌因此会与屏幕真实状态背离。独立审计实测的后果是
+  // 庆祝在弹层背后播完 5.2s 被 dismiss 消耗掉,而 markFired 早已落盘 —— 用户永远
+  // 看不到这一级奖励通知。所以直接问弹层开没开。
+  const sheetOpen = voucherClaimSheet.open || trialClaimSheet.open;
+  // B1「一次进首页只弹一个」:名额用掉后,本次进首页不再放新的庆祝上屏。
+  // 只拦首页、且只拦**新上屏**;已在放的那条不受影响(C1 永不顶替)。
+  const homeSlotUsed = route === "pages/index/index" && arbiter.visitClaimed;
+  m.advance(route, arbiter.busyForOthers("milestone") || sheetOpen || homeSlotUsed);
   if (m.active) arbiter.acquire("milestone");
   else arbiter.release("milestone");
 }
@@ -200,6 +213,11 @@ watch(
       timer = setTimeout(() => m.dismiss(), OVERLAY_DURATION_MS);
     }
   },
+  // 🔴 immediate 必须留着:切底部 tab 走的是 reLaunch,会**真卸载**整个页面栈
+  // (不是 deactivate),新页面挂载出一份新宿主。而 active 是 Pinia 态、跨卸载存活 ——
+  // 不加 immediate,新宿主对这条**继承来的**庆祝不会安排关闭定时器,于是它永远不关,
+  // 泵每拍都重新 acquire 令牌,代金券/试用弹层此后整个会话再也拿不到令牌(死锁)。
+  { immediate: true },
 );
 
 onUnmounted(() => {

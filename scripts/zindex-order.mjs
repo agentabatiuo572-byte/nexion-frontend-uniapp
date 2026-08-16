@@ -63,9 +63,62 @@ export const LADDER = [
 /* ── 契约 ③:庆祝浮层必须低于全部业务浮层 ──────────────────────────────────
    秩序表(captcha-slider.vue 单源)原文:「里程碑庆祝 —— 必须在业务 UI 之下」。
    业务浮层带 = 秩序表里 790/800 业务半屏 → 900 说明半屏 → 8000/8001 分享半屏 这一段;
-   下沿取 700(底盘 chrome 最高 200,留足缓冲),上沿取 8999(9000 起是瞬时层/阻断层,
-   庆祝低于它们已由阶梯①覆盖,不重复断言)。 */
-export const BUSINESS_BAND_FLOOR = 700;
+   上沿取 8999(9000 起是瞬时层/阻断层,庆祝低于它们已由阶梯①覆盖,不重复断言)。
+
+   🔴 下沿定在 201 而不是 700(2026-08-16 独立审计实测后收紧):原值 700 把三张
+   **付款半屏**漏在窗外 —— stake-sheet / genesis purchase-sheet / eligibility-sheet
+   当时是 79/80(比秩序表记的 790/800 少一位数),庆祝 780 压在它们之上并**吃掉
+   「锁仓」按钮的点击**(elementFromPoint 实测命中 .ms-backdrop)。那三张已归位到
+   790/800,下沿同时降到 201 = 底盘 chrome 最高值(PC 设备卡长按菜单 200)+1,
+   此后 201 以上任何新浮层都在判据的扫描面内。
+   ⚠️ 已知残留(不在带内,门管不到):消息抽屉 110/120、opensea 弹窗 120。
+   它们仍在庆祝之下会被盖住;要收进来需连带重排 chrome 与状态栏,属独立任务。 */
+export const BUSINESS_BAND_FLOOR = 201; // 仅供文档/红测引用;判据已改为结构式,不再按数值取带
+
+/**
+ * 结构判据的**显式欠账清单** —— 这三处也是全屏模态遮罩,数值确实低于庆祝浮层(780),
+ * 庆祝会画在它们之上。没有随本次一起修,是因为它们不属本次缺陷族(与首页自动弹层无关),
+ * 且各自带滑入动画/长按手势,重排层级要连带回归,属独立任务。
+ * 🔴 这是**记账不是豁免**:清单在这里就是为了让下一个人看见它、而不是让门装作没看见。
+ * 清掉一条就从这里删一条;新增任何一条都必须在这里写明理由,否则门直接判红。
+ */
+export const SCRIM_EXEMPT = [
+  { file: "src/components/message-drawer.vue", z: "110/120", reason: "消息抽屉,滑入动画 + 独立焦点管理,重排需回归通知链路" },
+  { file: "src/components/genesis/opensea-modal.vue", z: "120", reason: "创世外链弹窗,自带 2.4s 状态自迁移,与本族无关" },
+  { file: "src/components/earn/device-card-pc.vue", z: "200", reason: "PC 设备卡长按菜单,内联 style 且依赖长按手势坐标" },
+];
+
+/**
+ * 扫「全屏遮罩」——position:fixed 且四边贴边、且带 z-index 的规则块。
+ * 这个形态就是模态层(遮罩铺满视口、吃掉底下的点击),与它的 z 数值无关;
+ * 底盘 chrome(header 只贴 top/left/right、tabbar 只贴 bottom)不满足四边贴边,天然排除。
+ */
+export function scanFullScreenScrims(files) {
+  const out = [];
+  for (const f of files) {
+    const text = f.text.replace(/\/\*[\s\S]*?\*\//g, "");
+    const styleOnly = text.replace(/<template[\s\S]*?<\/template>/g, "");
+    const ruleRe = /([.#][\w-]+(?:\[[^\]]*\])?)\s*\{([^}]*)\}/g;
+    let m;
+    while ((m = ruleRe.exec(styleOnly)) !== null) {
+      const [, sel, body] = m;
+      if (!/position:\s*fixed/.test(body)) continue;
+      const zm = body.match(/z-index:\s*(\d+)/);
+      if (!zm) continue;
+      const fullBleed =
+        /inset:\s*0(\s|;|$)/.test(body) ||
+        (/top:\s*0/.test(body) && /right:\s*0/.test(body) && /bottom:\s*0/.test(body) && /left:\s*0/.test(body));
+      if (!fullBleed) continue;
+      out.push({
+        file: f.rel,
+        line: styleOnly.slice(0, m.index).split("\n").length,
+        sel,
+        z: parseInt(zm[1], 10),
+      });
+    }
+  }
+  return out;
+}
 export const BUSINESS_BAND_CEIL = 8999;
 export const MILESTONE_FILE = "src/components/milestone-celebration.vue";
 
@@ -106,8 +159,14 @@ export function evaluate(files = readVueFiles()) {
   //    都不在表里 —— 于是「契约被违反」和「门是绿的」同时成立了很久)。
   //    判据用**扫描出的整条业务浮层带**而不是手写清单:手写清单认不出新加进来的面。
   const msZ = rungs.find((r) => r.sel === ".ms-overlay")?.z ?? null;
-  const businessBand = scanAll(files).filter(
-    (h) => h.z >= BUSINESS_BAND_FLOOR && h.z <= BUSINESS_BAND_CEIL && h.file !== MILESTONE_FILE,
+  // 🔴 判据是**结构**不是数值窗口(2026-08-16 第二轮收紧):原先按 z ∈ [700,8999] 取带,
+  // 对落在窗外的违例天生失明 —— 实测把付款半屏退回 79/80,门 0 违例照报绿,而那正是
+  // 「庆祝盖住锁仓按钮」的现场。现在改成认「全屏遮罩」这个形态:position:fixed 且四边
+  // 贴边(inset:0 或 top/right/bottom/left 全 0)+ 带 z-index = 模态层,与它的数值无关。
+  const businessBand = scanFullScreenScrims(files).filter(
+    (h) => h.z <= BUSINESS_BAND_CEIL && h.file !== MILESTONE_FILE
+      && !CEILING_EXEMPT.some((e) => e.file === h.file)
+      && !SCRIM_EXEMPT.some((e) => e.file === h.file),
   );
   if (msZ === null) {
     problems.push("庆祝层级解析不到:无法判定它是否压在业务 UI 之下");
@@ -177,9 +236,18 @@ function selftest() {
   {
     // 轴 2「新成员」:新加一个业务半屏,其 z 低于庆祝 —— 手写清单式判据对这条是瞎的。
     const files = clone();
-    files.push({ rel: "src/components/fake-new-sheet.vue", text: "<style scoped>\n.fake-sheet { position: fixed; z-index: 750; }\n</style>" });
-    p("红测③-新成员 新增 750 业务半屏必红(庆祝 780 反而压在它上面)",
+    files.push({ rel: "src/components/fake-new-sheet.vue", text: "<style scoped>\n.fake-sheet { position: fixed; inset: 0; z-index: 750; }\n</style>" });
+    p("红测③-新成员 新增 750 全屏模态必红(庆祝 780 反而压在它上面)",
       evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")));
+  }
+  {
+    // 🔴 数值窗口式判据对**窗外**违例天生失明 —— 这一靶就是它当初漏掉的现场:
+    //    付款半屏退回 79/80(比业务带下沿低一个数量级),结构判据必须照样抓到。
+    const files = patch("src/components/staking/stake-sheet.vue",
+      (t) => t.replace(/(\n\s*)z-index: 790;/, "$1z-index: 79;").replace(/(\n\s*)z-index: 800;/, "$1z-index: 80;"));
+    p("红测③-窗外 付款半屏退回 79/80 必红(数值窗口式判据对此曾经全绿)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
   }
   {
     // 轴 3「扫描面塌空」:业务带一个成员都扫不到时不许判绿 —— 期望是空集的断言天然假绿。

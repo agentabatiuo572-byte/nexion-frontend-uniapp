@@ -32,9 +32,78 @@ export const POPUP_PRIORITY = ["voucher-claim", "trial-claim", "milestone"] as c
 
 export type PopupId = (typeof POPUP_PRIORITY)[number];
 
+export interface AutoPushCandidate {
+  id: PopupId;
+  /** 资格 —— 在**触发时**复算,不在挂载时锁死。 */
+  eligible: () => boolean;
+  /**
+   * 判据依赖的数据是否已到货。🔴 与 eligible 是两件事:`eligible=false` 有两种含义 ——
+   * 「数据还没回来,暂时判不出」与「判出来了,确实不够条件」。只看 eligible 会让
+   * **低优先级的面抢跑**(remote 档下代金券目录异步到货,安顿点它 eligible=false,
+   * 试用立刻上位 —— 正是「换语言重进首页试用抢在代金券前」的成因)。
+   */
+  ready: () => boolean;
+  /** 尝试弹出;各自的 cooldownHours / maxPerSession 由各自 store 判定,本层不碰。 */
+  push: () => boolean;
+}
+
+/**
+ * 按 POPUP_PRIORITY 评一轮。返回 true = 该停表(有人弹出来了 / 已无需再评)。
+ *
+ * 🔴 放在 store 层而不是 .vue 里,是为了让机器门能测**正主**:埋在组件里时门只能
+ * 用正则猜写法,而正则对改名 / 挪位 / 装饰性保留一概判绿(P-104/P-106 同族)。
+ * 依赖以**存取函数**注入(而不是直接收一个 store 对象),这样测试里的 stub 与真
+ * pinia 的 ref 解包差异不会渗进判据。
+ */
+export function runPriorityRound(args: {
+  currentHolder: () => PopupId | null;
+  acquire: (id: PopupId) => boolean;
+  release: (id: PopupId) => void;
+  candidates: ReadonlyArray<AutoPushCandidate>;
+  /** 仍在安顿等待窗口内 —— 高优先级的面未就绪时是否要整轮让位给它。 */
+  waitForReady: boolean;
+}): boolean {
+  // 🔴 C1 先到先得,且这道判断必须**先于一切**、放在循环外:
+  // acquire 对同一个 id 幂等,若屏上那个(例如用户从 banner 手动打开的代金券)恰好
+  // 就是本轮候选,循环里的 acquire 会"成功",而 push 因冷却失败后那句 release 会把
+  // **别人正持有的**令牌抹掉,下一个候选随即叠上去 —— B1「同屏只一个」当场破。
+  if (args.currentHolder() !== null) return false;
+  for (const id of POPUP_PRIORITY) {
+    const candidate = args.candidates.find((c) => c.id === id);
+    // 庆祝浮层在优先级表里但不由底盘推送(它有自己的队列宿主);它占屏的情况
+    // 已被上面那道早退挡住。
+    if (!candidate) continue;
+    if (!candidate.eligible()) {
+      // 数据没到货 ≠ 不够条件:高优先级的面未就绪时**整轮让位给它**,不许低优先级
+      // 抢跑;等待有上限,窗口到点它仍不就绪才轮到下一个。
+      if (!candidate.ready() && args.waitForReady) return false;
+      continue;
+    }
+    if (!args.acquire(candidate.id)) return false;
+    if (candidate.push()) return true;
+    // 冷却没过 / 会话次数用完 → 还回**本轮刚拿到的**令牌,让位给下一个候选。
+    args.release(candidate.id);
+  }
+  return false;
+}
+
 export const usePopupArbiter = defineStore("popupArbiter", () => {
-  /** 此刻占屏的面;null = 空屏,谁都可以申请。会话态,不持久化。 */
+  /** 此刻占屏的面;null = 空屏,谁都可以申请。会话态,不持久化(持久化会跨 reload 死锁)。 */
   const current = ref<PopupId | null>(null);
+
+  /**
+   * 本次进首页的「自动弹层名额」是否已用掉。主人 2026-08-16 拍板 B1「一次进首页只弹一个」。
+   * 🔴 单靠底盘那条「评出赢家即停表」**不足以**兑现 B1 —— 停表只停得住底盘推送的两条腿,
+   * 而庆祝浮层有自己独立的泵、从不经过那张表:赢家一关闭,下一拍(≤300ms)庆祝就接着上屏,
+   * 独立审计实测「1 张领取弹层 + 3 张全屏庆祝、合计约 18 秒遮挡」。所以名额要显式记。
+   * 由底盘在每次进首页时 beginHomeVisit() 复位。
+   */
+  const visitClaimed = ref(false);
+
+  /** 进首页 = 新的一轮名额。 */
+  function beginHomeVisit() {
+    visitClaimed.value = false;
+  }
 
   /**
    * 申请占屏。主人 2026-08-16 拍板 C1「永不顶替,先到先得」——
@@ -45,6 +114,7 @@ export const usePopupArbiter = defineStore("popupArbiter", () => {
   function acquire(id: PopupId): boolean {
     if (current.value !== null && current.value !== id) return false;
     current.value = id;
+    visitClaimed.value = true;
     return true;
   }
 
@@ -58,5 +128,5 @@ export const usePopupArbiter = defineStore("popupArbiter", () => {
     return current.value !== null && current.value !== self;
   }
 
-  return { current, acquire, release, busyForOthers };
+  return { current, visitClaimed, beginHomeVisit, acquire, release, busyForOthers };
 });
