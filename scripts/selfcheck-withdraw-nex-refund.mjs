@@ -539,17 +539,41 @@ const AUGUST = Date.parse("2026-08-05T11:30:00.000Z");
 /**
  * 账单页的分月键 —— **从页面源码抠那一行出来跑**,不在门里重写一份口径。
  * (时区、locale、粒度任一处漂移,门与页面就会各说各话 —— 本门 ⑧ 正是栽在「重写一份」上。)
+ *
+ * 🔴 语言钉死成英文,与页面**当前**取语言的方式解耦。抠出来的表达式里那个「取语言」的调用
+ * (2026-08-16 P-096 起是 `dateLocale()`,此前是 `localeTag.value`)由本门注入 ——
+ * 本门断言的是**分月粒度**,与显示成哪种语言无关,钉死才可重复。
+ * 两个形参都给:页面写哪一种都跑得起来,改名不必跟着改门。
+ *
+ * 🔴 抠不到 / 跑不起来时**不抛**,回 null 让下面的哨兵值去判红。
+ * module 级一抛会把它**后面**十几格断言整片带走 —— 门的输出就只剩一条堆栈,
+ * 红测反而看不出是哪一条在守(实测:P-096 改名后本门自 ⑬ 起全部没跑,形同虚设)。
  */
+let monthKeyErr = "";
+const PINNED_DATE_LOCALE = "en-US";
 const monthKeyFn = (() => {
   // 🔴 **先剥注释再判**(本仓硬规则,与本门 ⑪ 同款剥法):注释里出现同形文本会把判据引到
   // 一段不是真在跑的代码上,而抠出来的东西照样能跑、照样全绿。
   const page = readFileSync(path.join(SRC, "pages", "me", "wallet-bills.vue"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
   const m = page.match(/const key = d\.toLocaleDateString\(([\s\S]*?)\);/);
-  if (!m) throw new Error("harness: 抠不出 wallet-bills 的分月键 —— 判据失效必红,禁静默放行");
-  return new Function("ts", "localeTag", `const d = new Date(ts); return d.toLocaleDateString(${m[1]});`);
+  if (!m) { monthKeyErr = "抠不出 wallet-bills 的分月键"; return null; }
+  try {
+    const fn = new Function("ts", "dateLocale", "localeTag",
+      `const d = new Date(ts); return d.toLocaleDateString(${m[1]});`);
+    // 构造成功 ≠ 跑得起来:表达式里引用了本门没注入的名字时,`new Function` 不报错,
+    // 第一次调用才 ReferenceError。当场试跑一次,把「判据已失效」提前到这里认出来。
+    fn(0, () => PINNED_DATE_LOCALE, { value: PINNED_DATE_LOCALE });
+    return fn;
+  } catch (e) {
+    monthKeyErr = `抠出来的分月键跑不起来:${e?.message ?? e}`;
+    return null;
+  }
 })();
-const monthOf = (ts) => monthKeyFn(ts, { value: "en-US" });
+/** 失效时回**常量**哨兵:同月同键恒成立、跨月异键恒不成立 ⇒ 依赖它的两格都判红(而不是一格假绿)。 */
+const monthOf = (ts) => (monthKeyFn
+  ? monthKeyFn(ts, () => PINNED_DATE_LOCALE, { value: PINNED_DATE_LOCALE })
+  : `harness-broken(${monthKeyErr})`);
 // 🔴 判据自证:分月键必须**恰好是月粒度**。抠错了表达式(比如抓到页面里那个精确到分的
 // `fmtTime`)的话,任意两个不同时刻都会得到不同的键 —— 下面那条「落在不同月分组」就变成
 // 一条恒真的自证,而冲正行哪怕只差一秒也算「换了月」。两头都钉:同月同键 + 跨月异键。
