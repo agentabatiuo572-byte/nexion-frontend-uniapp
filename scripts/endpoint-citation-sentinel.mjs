@@ -53,7 +53,7 @@ const LEDGER = {
   "GET /api/config/leadership-pool": "PRD §9.11c.1",
   "GET /api/config/milestones": "PRD §9.11c.1",
   "GET /api/config/phone-tiers": "PRD §9.11c.1",
-  "/api/config/phone-tiers": "PRD §9.11c.1",
+  "/api/config/phone-tiers": "PRD §9.11c.1 + §6.10(手机算力显示规则与校准;PRD 原文**点名**了 `GET /api/config/phone-tiers`,不是未定义)",
   "GET /api/config/staking/pools": "PRD §9.11c.1",
   "GET /api/config/task-capacity": "PRD §6.8 / §9.11c.1(PRD 原文标 TBD)",
   "GET /api/config/tradein": "PRD §7.5.1 / §9.11c.1",
@@ -119,8 +119,9 @@ const LEDGER = {
   "PATCH /api/me/rewards/seen": "PRD §11.5a",
   "GET /api/earnings/release-status": "TBD-NAME: PRD 未定名 —— 收益放行桶(可提现 / 待审 / 赠金锁定)的读取端点,概念见 PRD §9.3「提现只认可提现桶」;实现在 src/api/earnings-release-api.ts。🔴 它**只回锁定桶,不回总余额**:全仓没有任何余额端点,所以「提现后回拉服务端余额」这条路不成立(见 app.ts applyWithdrawalDebit 头注)。PRD 同步时定名",
   "GET /api/me/earnings": "PRD §9.11c.1",
-  "/api/devices/earnings": "TBD: 设备收益推送候选资源;当前仅为迁移说明,以实际 earnings authority 为准",
-  "/api/app/wallet/sandbox": "TBD: 受控验收 Funds sandbox 投影族;仅用于永久 Sandbox 标签说明",
+  // (这里原有 `/api/devices/earnings` 与 `/api/app/wallet/sandbox` 两条 `TBD:`,与下方
+  //  146 / 148 行**同键重复**、且被后者静默覆盖 —— 已删重复项,保留下方带分类前缀的那两条
+  //  (生效值不变)。防复发的判据见下方「台账键自检」。)
   "/api/me/earnings/stream": "PRD §9.11c.1(SSE)",
 
   // ── vouchers ──────────────────────────────────────────────────────────
@@ -159,7 +160,9 @@ const LEDGER = {
   "/api/public/referrals/:param/preview": "BACKEND: PublicSponsorPreviewController 已实现;公开推荐预览,前端 PRD 待同步",
   "/api/storefront/activity": "BACKEND: AppStorefrontActivityController 已实现;商城活动流,前端 PRD 待同步",
   "/api/storefront/products/:param/social-proof": "BACKEND: AppStorefrontActivityController 已实现;商品社会证明快照,前端 PRD 待同步",
-  "/api/config/phone-tiers": "TBD-NAME: 机型档位配置,PRD 未单列章节",
+  // (这里原有第二条 `/api/config/phone-tiers`: "TBD-NAME: …PRD 未单列章节" —— 它既是重复键,
+  //  又**与事实相反**:PRD §6.10 与 §13.3 参数表都点名了这个 endpoint。因为排在后面,它
+  //  **静默覆盖**了上方那条正确的 PRD 引用,于是台账对外报的是错的出处。已删。)
   "POST /api/faucet/sign-in": "PRD §11.12",
   "POST /api/nex/sign-in": "TBD-NAME: PRD 用 POST /api/faucet/sign-in;本处为旧候选名,接后台时以 faucet 为准",
   "POST /api/me/milestones/:id/claim": "PRD §11.3a",
@@ -529,6 +532,35 @@ if (fail.length) {
 //     TBD-NAME = 功能 PRD 写了,只是没点名这个端点(台账的活,不是 PRD 的活)
 //     NOT-PRD  = 基建 / 非本工程 / 沙箱 / 后台域 / 已退役(不该进前端产品 PRD)
 //   混成一个数会得出「PRD 欠 86 条」这种错误结论,而真缺口只有个位数。
+// 🔴 台账键自检:对象字面量的重复键**静默后者覆盖前者** —— tsc 不报、eslint 默认也不一定报,
+// 于是同一个地址可以并存两条**自相矛盾**的出处,而对外生效的是排在后面的那条。
+// 实测(2026-08-16)3 组重复,其中 `/api/config/phone-tiers` 生效的恰恰是错的那条
+// (它写「PRD 未单列章节」,而 PRD §6.10 与 §13.3 参数表都点名了这个 endpoint)——
+// 台账的**全部价值**就是「出处可信」,这种静默覆盖直接把它废掉,而且任何门都看不见。
+// 判据:自读源码数**字面量**键,与运行时对象比对。
+{
+  const selfSrc = readFileSync(fileURLToPath(import.meta.url), "utf8");
+  const at = selfSrc.indexOf("const LEDGER = {");
+  const end = at < 0 ? -1 : selfSrc.indexOf("\n};", at);
+  // fail-closed:抠不出台账块 = 判据失效,判红(空集让全称判据恒真是本仓惯犯)
+  const block = at >= 0 && end > at ? selfSrc.slice(at, end) : "";
+  const literalKeys = [...block.matchAll(/^ {2}"([^"]+)":/gm)].map((m) => m[1]);
+  const dupes = [...new Set(literalKeys.filter((k, i) => literalKeys.indexOf(k) !== i))];
+  const runtimeCount = Object.keys(LEDGER).length;
+  if (!block || dupes.length || literalKeys.length < runtimeCount) {
+    console.error("✗ endpoint-citation-sentinel FAIL — 台账键自检");
+    if (!block) console.error("  抠不出 LEDGER 块 —— 判据失效,不静默放行");
+    if (dupes.length) {
+      console.error(`  重复键 ${dupes.length} 个(后者静默覆盖前者,可并存自相矛盾的出处):`);
+      for (const k of dupes) console.error(`    ${k}`);
+    }
+    if (block && literalKeys.length < runtimeCount) {
+      console.error(`  字面量键 ${literalKeys.length} < 运行时 ${runtimeCount} —— 抓键正则漏了,判据失真`);
+    }
+    process.exit(1);
+  }
+}
+
 const kinds = { "TBD-GAP": 0, "TBD-NAME": 0, "NOT-PRD": 0 };
 for (const v of Object.values(LEDGER)) {
   for (const k of Object.keys(kinds)) if (v.startsWith(`${k}:`)) kinds[k]++;
