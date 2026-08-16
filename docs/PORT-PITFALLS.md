@@ -1620,6 +1620,15 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **已转哨兵**:`scripts/profile-identity-check.mjs` 运行时门(挂 `test:h5-runtime` 并行组):fresh boot + 注入旧 bug 真实落盘形状的毒快照双场景,断言页面无 standalone `default` 文本节点且身份行邮箱形;红测台账:M-A 撤 read 层归一 → 毒场景红(served 产物核过变异真生效)。诚实边界:seed 工厂筛被 read 层遮蔽(竞态窗不可外部确定性触发),`createServerEmptySnapshot`(remote)无可达渲染面,两处靠 review。
 - **同族提醒**:① 任何「id/key 兜底进展示字段」的链都问一句「这个值像不像它假装的身份」;② 验收/走查视角(静态评审路由)会**停掉会话 bootstrap**——修「启动时自愈」类 bug 必须在该视角下复验,bind 层的修法在这里不存在;③ 红测冷重启前**先杀口再起**:`--strictPort` 撞被占端口会静默退出,探针打到旧 server = 变异「没生效」假象(本轮实测两次)。2026-08-16。
 
+## P-100 P-096 的后遗症:`**/.claude/**` 把整棵 worktree 的源码一起拉黑,dev server 静默不跟进
+
+- **症状**:`.claude/worktrees/*` 里起的 dev server **永不跟进源码改动**,且完全静默(不报错、不 warn):改完 `curl $BASE_URL/src/<file>` 返回的仍是改动前的转译产物,vite 日志也不出 `page reload` 行,杀了 server 重起才更新。实付代价:一次「拆掉退款守卫、印钞路径必须变红」的红测跑出**全绿**,换新 server 重跑立刻变红(9999 → 10479.25)。
+- **根因**:P-096 为切断跨仓 junction 环加的 `server.watch.ignored: ["**/.claude/**", …]` 本身是对的,但 **worktree 整棵树就住在 `<主 checkout>/.claude/worktrees/<name>/` 下面** —— 通配版把 worktree 的全部源文件一并拉黑。真 chokidar 实测(复刻 vite `resolveChokidarOptions` 的 ignore 清单):worktree 根下 `watchedDirs=0`(整树拉黑),锚定后 97。主检出的源码不在 `.claude/` 下,所以这坑**只在 worktree 里现形**;而项目不变量要求功能包都在 `pkg/*` worktree 上做,`scripts/verify.sh` 自己又不起 server(只认 `BASE_URL` 上已有的那个)→「改代码 → 重跑 verify / 重跑运行时门 / 做红测」这个标准循环默认验的是旧代码。
+- **对策**(pkg/zv):把 `.claude` 那条锚在**配置文件所在树**的绝对路径 —— `` ignored: [`${selfDir}/.claude/**`, …] ``,`selfDir = __dirname.replace(/\\/g, "/")`(`__dirname` 由 vite 打包 config 时注入 `__vite_injected_original_dirname`,ESM 配置下同样可用)。chokidar 的 ignore 两侧都过 `normalize-path` 归一成正斜杠(与 vite 自己拉黑 `cacheDir` 同款写法),绝对路径 glob 在 Windows 下照样匹配。`dist` / `.trash` 保持通配:它们在任何树里都是构建产物 / 删除暂存,通配语义本来就对(`src` 下无同名目录,实测 0 误伤)。
+- **已转哨兵**:`scripts/vite-watch-anchor-gate.mjs`(挂 verify `[0]` 静态门)——走 vite 自己的 `loadConfigFromFile` 读**求值后**的 ignore 清单(顺带证明 `__dirname` 注入确实可用,不是对源码做文本猜测),断言拉黑 `.claude` 的条目恰好 1 条且等于 `<本树>/.claude/**`。红测台账:改回 `**/.claude/**` → 门 FAIL(实跑,exit 1)。
+- **双向活体实证**(2026-08-16):① 绿——worktree 起 mock server(5391),给 `src/lib/carrier.ts` 追一行**代码**(注释不行,esbuild 会把注释剥掉,拿注释当标识会恒查不到),curl 立刻见到新导出、日志出 `page reload src/lib/carrier.ts`,不重起 server;② 红——同一探针在通配版配置下,磁盘确实有改动而 curl 恒返回旧产物、日志无 reload 行;③ P-096 未复发——锚定后主检出真 chokidar 实测 `watchedDirs=104`、`.claude` 泄漏 0,junction 环仍然进不去。
+- **同族提醒**:① 任何 `**/` 开头的忽略 / 排除模式,先问一句「本工程会不会有一天住在那个目录名底下」——worktree / CI cache / 容器挂载都会让「基础设施目录」与「源码树」重叠,通配一律改锚定;② 监视器静默失效 = 一切「改完重跑」的结论作废,判红绿前先证明 server 跑的是当前源码;③ 与 P-096 是同一行代码的两面:环要拉黑、源码不能拉黑,判据是**锚定**而非通配。2026-08-16。
+
 ## P-101 门腐烂:实现改了链路形状,门的桩面/判据锚没跟上 —— 门整体空转而**首格照绿**
 <!-- 编号注:本条原以 P-099 落笔,合并时主线 pkg/zr 先落地保号;P-100 让给 pkg/zv(`**/.claude/**` 把整棵 worktree 拉黑),本条顺延 P-101。 -->
 
@@ -1692,7 +1701,7 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
   | N8 只让展示侧资格预检漏喂(隔离新牙) | 3(没察觉) | 1 ✓ |
 
 - **第三格的独立教训 —— 无锚的否定式**:它原本是「全文不许出现 `requestWithdrawalEligibility(…dailyFacts.value,`」,成立前提是全页只有提交前复检一处调用;后来加了两处**展示侧**调用(吃活值本来就对),这条否定式于是**对正确实现判红**。改成按调用点各自该吃什么分别断言(实参用括号配对抠,按首参是不是冻结的 `snap.*` 分类),严格更强:旧版只会说「有活值就红」,新版还抓「展示侧漏喂」——N8 证明旧版对这一向判绿。**否定式判据必须锚到具体调用点,`全文不许出现 X` 会随调用点增多而失真。**
-- **同族提醒**:① 变异测试的靶串要用**全文唯一的单行串**——`wallet-withdraw.vue` 行尾混用(实测 1496 CRLF + 106 LF),跨行靶按 `\r\n` 拼会静默不命中,而不命中的变异**看起来就是「门抓到了」**(本轮 N8 第一次就是这么假成功的,靠打印锚点命中情况才发现);② 判行尾别用 `grep -c $'\r'` 拼命令替换,实测在 `$( )` 里会给出与 `wc -l` 相同的假数(把混用文件报成纯 CRLF),用 node 数 `/\r\n/g` 与 `/(?<!\r)\n/g`;③ 改 CRLF 源文件的注释要**字节级替换**,改完用 `git diff --stat` 与 `git diff --ignore-cr-at-eol --numstat` 对比,两者一致才证明没洗行尾。2026-08-16。
+- **同族提醒**:① 变异测试的靶串要用**全文唯一的单行串**——`wallet-withdraw.vue` 行尾混用(实测 1496 CRLF + 106 LF),跨行靶按 `\r\n` 拼会静默不命中,而不命中的变异**看起来就是「门抓到了」**(本轮 N8 第一次就是这么假成功的,靠打印锚点命中情况才发现);② 判行尾别用 `grep -c \r'` 拼命令替换,实测在 `$( )` 里会给出与 `wc -l` 相同的假数(把混用文件报成纯 CRLF),用 node 数 `/\r\n/g` 与 `/(?<!\r)\n/g`;③ 改 CRLF 源文件的注释要**字节级替换**,改完用 `git diff --stat` 与 `git diff --ignore-cr-at-eol --numstat` 对比,两者一致才证明没洗行尾。2026-08-16。
 
 ## P-106 判据里**手写的标志名**认不出同义别名 —— 门声称在守 A,实际 A 早已不成立
 
@@ -1784,6 +1793,7 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **症状**:在 `.claude/worktrees/<x>` 起的 dev server 改文件不热更、也不整页 reload;浏览器里跑的是**旧模块图**,与磁盘不一致却毫无提示。实测形态:改了 checkout.vue 的 cleanup 逻辑,页面「返回后会话保留态没写盘」,像是逻辑坏了 —— 其实浏览器根本没拿到新代码;更阴险的是**混合图**(有的模块新有的旧),行为看似随机。
 - **根因**:`vite.config.ts` 2026-08-15/16 为断 junction 递归环(主 5173 连崩)加了 `server.watch.ignored: ["**/.claude/**", …]`。该 glob 按**绝对路径**匹配,worktree 根 `…/Nexion-uniapp/.claude/worktrees/<x>/src/**` 全命中 → 自己的源码一个都不监视。
 - **对策**:① worktree 里每次改完源码**冷重启** dev server(kill → 起),再验;② 判「代码坏 vs 环境坏」先 `curl <dev>/src/<file>` 与磁盘 grep 比对(同 [[feedback_dev_server_stale_module_graph]]);③ 根治候选(未落地,待主人点头):把 ignore 改成只拉黑**本树根**下的 `.claude`(`path.resolve(__dirname, ".claude") + "/**"`),主检出仍断环、worktree 恢复监视 —— 改的是共享构建配置,归包外决策。2026-08-16。
+- **已修(2026-08-17 接手合并 pkg/zv)**:根治在 P-100 —— `vite.config.ts` 把 ignore 锚到本配置文件所在树(`${selfDir}/.claude/**`),worktree 源码恢复可见,`scripts/vite-watch-anchor-gate.mjs` 守住不退回通配写法。本条保留作诊断口径(判「代码坏 vs 环境坏」的 curl 比对法仍适用);「冷重启」不再是必需动作。
 
 ## P-116 同路由推栈 / 重定向后 chassis 导航头被**上一页的卸载清掉**(useSetPageHeader 曾是无主单槽)
 
