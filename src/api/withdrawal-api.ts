@@ -98,6 +98,7 @@ export interface WithdrawalApi {
     policyVersion?: string;
   }): Promise<WithdrawalEligibilitySnapshot>;
   get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;
+  abandonAttempt(input: WithdrawalAttemptAbandonInput): Promise<WithdrawalAttemptAbandonResult>;
   submit(
     amount: number,
     chain: SupportedWithdrawalNetwork,
@@ -107,6 +108,19 @@ export interface WithdrawalApi {
     idempotencyKey: string,
   ): Promise<WithdrawalSubmission>;
 }
+
+export interface WithdrawalAttemptAbandonInput {
+  idempotencyKey: string;
+  amount: number;
+  chain: SupportedWithdrawalNetwork;
+  address: string;
+  policyVersion: string;
+  useNexFeeOffset: boolean;
+}
+
+export type WithdrawalAttemptAbandonResult =
+  | { state: "ABANDONED"; withdrawal: null }
+  | { state: "COMMITTED"; withdrawal: WithdrawalSubmission };
 
 export interface WithdrawalEligibilitySnapshot {
   canSubmit: boolean;
@@ -124,6 +138,18 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function parseAttemptAbandon(value: unknown): WithdrawalAttemptAbandonResult {
+  const row = record(value);
+  if (!row || (row.state !== "ABANDONED" && row.state !== "COMMITTED")) {
+    throw new Error("WITHDRAWAL_ATTEMPT_RESPONSE_INVALID");
+  }
+  if (row.state === "ABANDONED") {
+    if (row.withdrawal !== null && row.withdrawal !== undefined) throw new Error("WITHDRAWAL_ATTEMPT_RESPONSE_INVALID");
+    return { state: "ABANDONED", withdrawal: null };
+  }
+  return { state: "COMMITTED", withdrawal: parseSubmission(row.withdrawal) };
 }
 
 function text(value: unknown): string | null {
@@ -597,6 +623,22 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
       method: "GET",
       path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,
     }), withdrawalNo),
+    abandonAttempt: async (input) => {
+      const key = input.idempotencyKey.trim();
+      if (!key) throw new Error("WITHDRAWAL_ATTEMPT_KEY_REQUIRED");
+      return parseAttemptAbandon(await client.request({
+        method: "POST",
+        path: `/api/withdrawals/attempts/${encodeURIComponent(key)}/abandon`,
+        body: {
+          amount: input.amount,
+          chain: input.chain,
+          address: input.address,
+          policyVersion: input.policyVersion,
+          useNexFeeOffset: input.useNexFeeOffset,
+        },
+        timeoutMs: 30_000,
+      }));
+    },
     submit: async (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey) =>
       parseSubmission(await client.request({
         method: "POST",

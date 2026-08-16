@@ -91,10 +91,12 @@ const LEDGER = {
   // ── orders / store ────────────────────────────────────────────────────
   "POST /api/orders": "PRD §7.5 / §9.10 / §9.11e",
   "POST /api/orders/bundle": "TBD: 2026-08-13 服务端权威组合定价与原子建单契约;PRD §7.5 / §9.10 待同步 bundle 资源",
+  "/api/orders/:param/pay": "BACKEND: AppOrderCommandController 已实现;订单支付/捕获命令,前端 PRD 待同步",
   "GET /api/orders": "TBD-NAME: PRD §7.4 只定义了按 id 读单;列表读回路已由 order-api.ts 的 list() 实现(store/order-canonical.ts 在用),PRD 同步时补条目",
   "GET /api/orders/:id": "PRD §7.4(SSE)",
   "POST /api/orders/:param/pay": "TBD-NAME: 订单支付确认(commerce-payment-api.confirm,幂等键随请求);PRD §7.5 / §9.10 是下单与支付域但没定义该路径 —— 与已登记的同族命令 /api/orders/:param/cancel 同口径,接线以后端为准",
   "GET /api/store/catalog": "PRD §7.1",
+  "/api/store/purchase-eligibility": "当前文档: PC 管理端开发落地规格 §3 API E1/E3; PRD v2 §E1/E3（Gen-2 E1 purchaseGate COMPLETE）",
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────
   "GET /api/withdrawals": "PRD §9.4",
@@ -214,8 +216,8 @@ const LEDGER = {
   // ── /api/app/* 契约族 ────────────────────────────────────────────────
   // 后端对接批次引入的 app 作用域前缀,前端 PRD 成文早于它,整族都没有条目。
   // 这一族**不要**逐条去 PRD 找 —— 找不到不是漏搜,是 PRD 还没写。
-  "/api/app/home/overview": "TBD-NAME: /api/app/* 族,首页权威投影(app-home-api.fetch;app store refreshRemoteFleet 每次刷完舰队取一次,喂首页收益区间与 on-grid 面);前端 PRD 待同步",
-  "/api/app/proof": "TBD-NAME: /api/app/* 族,战绩快照(proof-api.snapshot:活跃天数 / 在线设备 / 百分位 / 累计收益 / 邀请与团队计数);前端 PRD 待同步",
+  "/api/app/home/overview": "TBD-NAME: BACKEND AppHomeOverviewController 已实现;/api/app/* 族首页权威投影(app-home-api.fetch;app store refreshRemoteFleet 每次刷完舰队取一次,喂首页收益区间与 on-grid 面);前端 PRD 待同步",
+  "/api/app/proof": "TBD-NAME: BACKEND AppProofController 已实现;/api/app/* 族战绩/收益证明权威投影(proof-api.snapshot:活跃天数 / 在线设备 / 百分位 / 累计收益 / 邀请与团队计数);前端 PRD 待同步",
   "/api/app/security": "TBD-NAME: /api/app/* 后端契约族(账号安全读),前端 PRD 未定义",
   "/api/app/security/password": "TBD-NAME: 同上(改密)",
   "/api/app/security/two-factor": "TBD-NAME: 同上(两步验证开关)",
@@ -230,7 +232,7 @@ const LEDGER = {
   "/api/app/team/ambassador-applications": "TBD-NAME: /api/app/* 族,推广大使申请的用户自助资源;前端 PRD 待同步",
   "/api/app/team/insights": "TBD-NAME: /api/app/* 族,当前账号团队榜单/佣金/领导池权威投影;前端 PRD 待同步",
   "/api/app/team/network": "TBD-NAME: /api/app/* 族,当前账号团队网络权威投影;前端 PRD 待同步",
-  "/api/app/team/quota": "TBD-NAME: /api/app/* 族,硬件配额解锁的服务端快照(team-quota-api.snapshot:达标事实 + 逐档 productId);概念见 PRD §8.9(那里定义的是页面路由 /team/quota),该 API 路径 PRD 未定义",
+  "/api/app/team/quota": "TBD-NAME: BACKEND AppTeamQuotaController 已实现;/api/app/* 族硬件配额解锁的服务端快照(team-quota-api.snapshot:达标事实 + 逐档 productId);概念见 PRD §8.9(那里定义的是页面路由 /team/quota),该 API 路径待同步",
   "/api/app/network/regions": "TBD-NAME: /api/app/* 族,当前账号网络地域权威投影;前端 PRD 待同步",
   "/api/app/compute-share/enrollments": "TBD-NAME: /api/app/* 族,算力共享接入申请与列表资源;前端 PRD 待同步",
   "/api/app/compute-share/enrollments/:param": "TBD-NAME: 同上(单条接入申请读回)",
@@ -306,8 +308,8 @@ const LEDGER = {
   "/api/notifications/:param/actions": "TBD-NAME: 通知内联动作;PRD 未定义",
   "/api/payment-methods": "TBD-NAME: 支付方式列表;PRD §9.10 是绑卡域,该路径未定义",
   "/api/payment-methods/bind": "TBD-NAME: 同上(绑定)",
-  "/api/payment-methods/:param/unbind": "TBD-NAME: 同上(解绑;带幂等键 + expectedVersion 乐观并发,回执 CARD_UNBOUND)",
-  "/api/payment-methods/:param/default": "TBD-NAME: 同上(设为默认;同款幂等键 + expectedVersion,回执 CARD_DEFAULT_SET)",
+  "/api/payment-methods/:param/unbind": "TBD-NAME: BACKEND AppPaymentMethodController 已实现;支付方式解绑命令带幂等键 + expectedVersion 乐观并发,回执 CARD_UNBOUND;PRD §9.10 为绑卡域但未定义该路径,待同步",
+  "/api/payment-methods/:param/default": "TBD-NAME: BACKEND AppPaymentMethodController 已实现;默认支付方式命令带幂等键 + expectedVersion 乐观并发,回执 CARD_DEFAULT_SET;PRD §9.10 为绑卡域但未定义该路径,待同步",
   "/api/payout-addresses/otp/send": "TBD-NAME: 换绑收款地址的验证码;与已登记的 /api/payout-addresses 同族",
   "/api/points/state": "TBD-NAME: 积分状态读;APP规格只列了 sign-in",
   "/api/points/milestones/:param/claim": "TBD-NAME: 积分里程碑领奖;PRD §11.3a 是 /api/me/milestones/:id/claim,两个候选名并存",
@@ -318,7 +320,8 @@ const LEDGER = {
   "/api/repurchase/orders/:param/claim": "TBD-NAME: 同上(领取)",
   "/api/repurchase/orders/:param/early-withdraw": "TBD-NAME: 同上(提前赎回)",
   "/api/legal/risk-disclosure/acknowledgment": "TBD-NAME: 风险披露确认回写;PRD §9.11d.1 只定义了读端点",
-  "/api/legal/risk-disclosure/gates/:param/check": "TBD-NAME: 高敏动作前的披露闸校验(risk-disclosure-api.checkGate;提现与质押在用户确认之后、建单之前各调一次,幂等键复用为 operationId);PRD §9.11d.1 定义了读端点、§11.4a 定义了披露页与「确认态以服务端为权威」,该闸路径未定义",
+  "/api/legal/risk-disclosure/gates/:param/check": "TBD-NAME: BACKEND AppRiskDisclosureController 已实现;高敏动作前的披露闸校验(risk-disclosure-api.checkGate;提现与质押在用户确认之后、建单之前各调一次,幂等键复用为 operationId);PRD §9.11d.1 定义了读端点、§11.4a 定义了披露页与服务端权威确认态,该闸路径待同步",
+  "/api/withdrawals/attempts/:param/abandon": "当前文档: PC 管理端开发落地规格 §3 API D2; PRD v2 当前状态合同（提现未知结果核验与放弃 COMPLETE）",
   // 🔴 /api/stakes/* 与已登记的 /api/staking/* 是**同一批业务的两个路径名**,谁是真的没定论。
   //    交接书 U-2 已就此问后端。在他们回话之前,两边都按代码真实引用登记 —— 台账反映实情,
   //    不反映我们希望的样子。

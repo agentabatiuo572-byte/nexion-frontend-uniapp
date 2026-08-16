@@ -747,16 +747,10 @@ function functionBody(src, opener) {
       appVueCode.includes("function reconcileBills()")
         && appVueCode.includes("reconcileBills();")
         && !appVueCode.includes("pendingBillSettle"));
-    // 🔴 提现在提交那一刻就扣了款,所以任何「最终没打出去」的终态都必须把钱退回去。
-    // 账单也要同步置 failed —— 两个缺口分开看都像「反正走不到」,合起来就是
-    // 「钱扣了、单子废了、没人还」。退款与置账单失败必须在**同一处**完成,
-    // 否则接后端时必然只做一半(审计明确点名)。
-    // 🔴 z5 更新:USDT 腿改走 refundWithdrawalDebit(扣款 ⇄ 退款成对的那一半)。
-    // 原判据钉的是 creditRewardBucketOnce —— 那条路**内部第一行就是 `if (remoteApiEnabled) return false`**,
-    // 而提现单只在 remote 模式下建得出来,于是退款在「唯一会产生提现的模式」里恒为 no-op。
-    // 🔴 判据一律走**剥注释**的源(appCode,非 appSrc)。z5 独立审计实测:用原文时把
-    // `if (refundWithdrawalDebit(wd)) done.push(wd.id);` 整行注释掉(退款腿实际死掉),
-    // 三条判据仍全绿 —— 与本文件 700-706 行给 App.vue 焊过的同一种绕法,app.ts 侧当时没跟上。
+    // 远端提现的服务端事务同时负责余额预留、费用/NEX、订单和账本。
+    // 旧门曾要求页面在成功后调用 applyWithdrawalDebit，并在 runtime 里验证本地账单；
+    // 那套断言与 D5 真实边界相反：它会鼓励客户端二次扣款/伪造账单。这里钉真正的
+    // 负向契约，并把服务端账单读回留给 withdraw-bill-runtime 的行为门。
     const appCode = stripComments(appSrc);
     check("🔴 提现失败终态:退款与置账单失败成对完成,且幂等",
       appCode.includes("function refundFailedWithdrawals(): string[] {")
@@ -882,6 +876,17 @@ function functionBody(src, opener) {
       check("🔴 接线:服务端持有余额时,建单成功后**必须重拉服务端余额**(不拉 = 余额停在旧数字)",
         withdrawPageCode.includes("await app.refreshRemoteFleet();"));
     }
+    // 服务端持有远端余额、订单与账本权威；同时保留更直接的负向接线门，
+    // 防止页面或 store 在新分支重新引入本地扣款/账单伪造。
+    const submitBody = functionBody(appSrc, "async function submitWithdrawal(");
+    const pageSubmitBody = functionBody(readSrc("src/pages/me/wallet-withdraw.vue"), "async function handleSubmit(");
+    check("🔴 远端提现提交不在客户端扣 USDT/NEX", !!submitBody && !!pageSubmitBody
+      && !/(?:applyWithdrawalDebit|debitBalance|debitNex)\s*\(/.test(submitBody)
+      && !/(?:applyWithdrawalDebit|debitBalance|debitNex)\s*\(/.test(pageSubmitBody));
+    const billsCode = stripComments(readSrc("src/store/bills.ts"));
+    check("🔴 远端账单只消费服务端投影，不由提现页面直接 add/伪造", !!pageSubmitBody
+      && !/(?:bills\.)?(?:add|addMany|addManyForAccountOnce|postMoneyBill)\s*\(/.test(pageSubmitBody)
+      && billsCode.includes("if (fundsServerEnabled) return null"));
     // 🗑 【2026-08-13 回退】这里曾加过一格「接线门②」,守 App.vue 对账里的扣款补扣格。
     //    实现被 R1 独立审计整格否决(立论前提错 + z5 已明令禁止无条件遍历补扣),
     //    门随实现一起退役 —— 留着就是绿着守一段不存在的代码。
@@ -1006,14 +1011,6 @@ function functionBody(src, opener) {
       const call = body.indexOf("commitWithdrawal(");
       const submit = body.indexOf("await withdrawalApi.submit");
       if (call < 0 || submit < 0 || submit > call) return false;
-      // 🔴 (e) 页面侧对称门(z4 R2 P1-3):账单**真正落地的地方**在提现页,而它把账号钉在
-      //     提交快照 `snap.account` 上。store 侧钉死了、页面侧没门守着,下一次改动把它写回
-      //     `app.accountKey` 时四道门全绿 —— 那正是本包 R1 的原始缺陷(只钉了一半)。
-      const pageBody = functionBody(readFileSync(path.join(root, "src/pages/me/wallet-withdraw.vue"), "utf8"),
-        "async function handleSubmit(");
-      if (!pageBody) return false;
-      const receipt = /postReceiptForAccount\(\s*([A-Za-z_$][\w$.]*)\s*,/.exec(stripComments(pageBody));
-      if (!receipt || receipt[1] !== "snap.account") return false;
       const elgBody = functionBody(elgSrc, "function commitWithdrawal(");
       return !!elgBody
         && elgBody.includes("recordWithdrawAddressUse(accountKey, network, address);")
@@ -1098,10 +1095,10 @@ function functionBody(src, opener) {
         // 🔴 说不说这句 ⟺ 闸拦不拦。limitCount ≤0 时判定按「不限制」走,这句必须消失 ——
         // 否则后端不可达时页面会写「每日限额:0 笔/日」(实景实测过的原话)。
         && pgCode.includes('<text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>'));
-    check("🔴 提现页:三个评估点(显示 / 降额 CTA / 提交前复检)**全部**吃这份事实,一处不落",
+    check("🔴 提现页:显示 / 降额 CTA / 提交前复检均走服务端事实或冻结快照",
       (() => {
-        // 数的是「全部 evaluateWithdrawal 调用」与「带 dailyFacts 的调用」两个集合是否相等,
-        // 不再写死 === 2(新增第四个合法评估点时旧写法会假红,漏喂时又不红)。
+        // mock 轨的纯函数评估必须吃 dailyFacts；remote 轨的显示与降额 CTA 使用
+        // 服务端 remoteSmallLineEligibility，不应被旧门强行要求本地再算一遍。
         const all = (pgCode.match(/evaluateWithdrawal\s*\(/g) || []).length;
         const fed = (pgCode.match(/evaluateWithdrawal\([^)]*dailyFacts\.value/g) || []).length;
         // 提交前复检吃的是 snap.daily —— 与 snap.account 同源同刻。取活值会在弹窗期间
@@ -1131,13 +1128,15 @@ function functionBody(src, opener) {
         const submitRechecks = callArgs.filter((a) => a.includes("snap.account"));
         const liveReads = callArgs.filter((a) => !a.includes("snap.account"));
         return all >= 2 && all === fed
+          && pgCode.includes("remoteSmallLineEligibility.value")
           && pgCode.includes("daily: dailyFacts.value,")
           // 提交前复检:必须吃同刻冻结的 snap.daily,且**绝不能**掺活值
           && submitRechecks.length >= 1
           && submitRechecks.every((a) => a.includes("snap.daily") && !a.includes("dailyFacts.value"))
           // 展示侧:一处不落地吃活值(漏喂在这里红 —— 旧的否定式抓不到这一向)
           && liveReads.length >= 1
-          && liveReads.every((a) => a.includes("dailyFacts.value"));
+          && liveReads.every((a) => a.includes("dailyFacts.value"))
+          && /fresh\s*=\s*await\s+requestWithdrawalEligibility\s*\([\s\S]{0,500}?snap\.daily,/.test(pgCode);
       })());
     check("🔴 追踪页「再提一笔」与提现页同源(否则一页说能提、一页说不能提)",
       trackCode.includes("dailyLimitStatus({")
@@ -1382,9 +1381,8 @@ function functionBody(src, opener) {
 // 判据是**下限不是等式**:新增断言天天有,不该每次都来改这里;而删断言是罕见动作,
 // 必须撞线。下限按「当前条数 - 5」留一点重构余量,加断言时不必动它,
 // 真删掉一整节(几十条)必然击穿。
-// 2026-08-13:131 → 117(判决 14 格老红门:13 格 C 类显式删除 + 1 格 A 类重锚顺带吸收
-// 一格空转的绿灯)。按本行自己的规矩,删门时下限跟着走:117 − 5 = 112。
-const ASSERT_FLOOR = 112;
+// 2026-08-16:112(提现本地扣款/账单旧门 11 格由服务端权威负向门替代,保留 5 格余量)。
+const ASSERT_FLOOR = 107;
 if (pass + fail < ASSERT_FLOOR) {
   console.log(`  FAIL  🔴🔴 断言总数 ${pass + fail} 跌破下限 ${ASSERT_FLOOR} —— 有断言被整段删除?`
     + ` 删门是重大动作:确要删,连同本行下限一起改,并在 commit 里写明删了哪一节、为什么。`);

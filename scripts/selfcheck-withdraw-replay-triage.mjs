@@ -105,7 +105,7 @@ const catchSeg = (() => {
 assert.ok(catchSeg.length > 800, `catch 段只抠到 ${catchSeg.length} 字符 —— 判据失效,判红`);
 // 🔴 这些格**不是**构造性恒真:锚是 `triageWithdrawFailure(`,而下面钉的是别的东西。
 check("退役动作只有一处,且由判决门控", (catchSeg.match(/forgetWithdrawAttempt\(/g) || []).length === 1
-  && /if \(verdict\.fate === "retire"\) forgetWithdrawAttempt/.test(catchSeg));
+  && /if \(verdict\.fate === "retire"\)\s*\{[\s\S]*?forgetWithdrawAttempt/.test(catchSeg));
 check("刷费率只有一处,且由判决门控", (catchSeg.match(/loadWithdrawalPolicy\(/g) || []).length === 1
   && /if \(verdict\.refreshPolicy\) await loadWithdrawalPolicy/.test(catchSeg));
 check("catch 段里不再自己判定局(没有裸的 isSettledRejection / isIdempotencyConflict)",

@@ -75,6 +75,7 @@ async function runCatch(scenario) {
     isDailyLimitRejection: () => scenario.isDailyLimit === true,
     triageWithdrawFailure: (e, ctx) => { seen.ctx = ctx; return realTriage(e, ctx); },
     forgetWithdrawAttempt: () => { seen.forgot++; },
+    refreshPendingAttempt: () => {},
     loadWithdrawalPolicy: async () => { seen.refreshed++; },
     toast: { error: (a, b) => seen.toasts.push([a, b]) },
     dailyLimitReachedText: { value: "T:dailyLimitReached" },

@@ -452,6 +452,8 @@ const sandboxEnabled = import.meta.env.DEV && import.meta.env.VITE_JANUS_EXECUTO
 const sandboxExecutor = sandboxEnabled ? createJanusExecutor({
   mode: "sandbox",
   production: import.meta.env.PROD,
+  profile: String(import.meta.env.VITE_JANUS_SANDBOX_PROFILE || ""),
+  authorization: String(import.meta.env.VITE_JANUS_SANDBOX_AUTHORIZATION || ""),
   allowedSubjects: String(import.meta.env.VITE_JANUS_SANDBOX_SUBJECTS || "").split(","),
   allowedTargetKeys: String(import.meta.env.VITE_JANUS_SANDBOX_TARGETS || "").split(","),
   sandboxToken: String(import.meta.env.VITE_JANUS_SANDBOX_TOKEN || ""),

@@ -40,6 +40,7 @@ import { useRepurchase } from "@/store/repurchase";
 import { useNetwork } from "@/store/network";
 import { prepareProductCatalog } from "@/store/product-catalog";
 import { prepareServerProductPhase } from "@/store/server-product-phase";
+import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useContentCopy } from "@/store/content-copy";
 import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -77,6 +78,9 @@ export function rebindAccountScopedStores(accountKey: string): void {
   // the successful sign-in flow refreshes this cleared slot immediately.
   prepareProductCatalog();
   prepareServerProductPhase();
+  // Eligibility snapshots are server decisions scoped to the active account;
+  // clear them before any next-account commerce request can start.
+  purchaseEligibilityStore.clear();
   useTradeinSheet().clearApplied();
   useTradeinSheet().hide();
   useContentCopy().clear();

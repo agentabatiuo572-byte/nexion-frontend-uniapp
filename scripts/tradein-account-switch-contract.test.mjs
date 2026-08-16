@@ -12,6 +12,7 @@ test("account scope exposes the shared request fence and advances it on rebind",
   const epoch = read("src/lib/remote-account-epoch.ts");
   assert.match(epoch, /createRemoteAccountEpoch/);
   assert.match(epoch, /epoch \+= 1/);
+  assert.match(scope, /remoteAccountScope/);
   assert.match(scope, /captureAccountScope/);
   assert.match(scope, /isCurrentAccountScope/);
   assert.match(scope, /remoteAccountScope\.bind\(accountKey\)/);

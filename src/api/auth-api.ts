@@ -44,7 +44,7 @@ export interface RegistrationRequest extends RegistrationOtpRequest {
   sponsorCode: string | null;
 }
 
-export type OAuthProvider = "GOOGLE" | "APPLE";
+export type OAuthProvider = "GOOGLE" | "APPLE" | "PASSKEY" | "TELEGRAM";
 export type OAuthExchangeMode = "SANDBOX_MOCK" | "PROVIDER";
 export interface OAuthExchangeRequest {
   provider: OAuthProvider;

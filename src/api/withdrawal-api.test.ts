@@ -25,3 +25,20 @@ test("hydrates the durable withdrawal list and sends the server eligibility snap
   expect(requests[0].path).toBe("/api/withdrawals");
   expect(requests[1].path).toBe("/api/withdrawals/eligibility");
 });
+
+test("abandons an ambiguous attempt through the server fence instead of deleting local proof first", async () => {
+  let request: any;
+  const api = createWithdrawalApi({ request: async (value: any) => {
+    request = value;
+    return { state: "ABANDONED", withdrawal: null };
+  }} as never);
+
+  await expect(api.abandonAttempt({
+    idempotencyKey: "withdrawal:ambiguous-1", amount: 25, chain: "USDT-BEP20",
+    address: row.targetAddress, policyVersion: "p1", useNexFeeOffset: false,
+  })).resolves.toEqual({ state: "ABANDONED", withdrawal: null });
+  expect(request).toMatchObject({
+    method: "POST", path: "/api/withdrawals/attempts/withdrawal%3Aambiguous-1/abandon",
+    body: { amount: 25, chain: "USDT-BEP20", address: row.targetAddress, policyVersion: "p1", useNexFeeOffset: false },
+  });
+});

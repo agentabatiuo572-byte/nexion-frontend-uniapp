@@ -56,6 +56,20 @@
 
       <!-- Full detail -->
       <template v-else>
+        <!-- Remote purchase qualification is server-owned. Keep the detail
+             readable, but never imply that a loading/error response is a buy
+             decision. Error state has an explicit retry and remains blocked. -->
+        <view v-if="remoteApiEnabled && eligibility.status !== 'ready'" data-testid="detail-purchase-eligibility" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
+          <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibility.status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
+          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityFailClosed }}</text>
+          <view v-if="eligibility.status === 'error'" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" @click.stop="retryEligibility">
+            <text>{{ t.store.purchaseEligibilityRetry }}</text>
+          </view>
+        </view>
+        <view v-else-if="remoteApiEnabled && !eligibility.eligible" data-testid="detail-purchase-ineligible" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
+          <text class="block" :style="purchaseEligibilityTitleStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
+          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityFailClosed }}</text>
+        </view>
         <!-- === Section 1: Hero === -->
         <view class="mx-4 rounded-2xl border overflow-hidden relative" :style="heroCardStyle">
           <view aria-hidden :style="auroraStyle" />
@@ -225,11 +239,12 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
+import { usePurchaseGate } from "@/composables/use-purchase-gate";
+import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 
 const t = useT();
 const phase = useProductPhase();
@@ -279,8 +294,22 @@ const isLocked = computed(() => {
   return !isProductAvailable(p, phase.value);
 });
 
-// Per-user purchase gate (等级门 + 锁额) — drives the sticky Buy CTA below.
-const { gate: purchaseGate } = usePurchaseGate(product);
+// Per-user purchase gate — local V-rank/team snapshots are mock-only. Remote
+// mode consumes only the account-scoped server eligibility response.
+const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(product);
+const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => product.value?.id ?? "");
+const purchaseGate = computed(() => remoteApiEnabled
+  ? {
+      gated: true,
+      eligible: eligibility.value.status === "ready" && eligibility.value.eligible,
+      soldOut: false,
+      blocked: eligibility.value.status !== "ready" || !eligibility.value.eligible,
+      remaining: null,
+      conditions: [],
+      unmet: [],
+      progressPct: eligibility.value.status === "ready" && eligibility.value.eligible ? 1 : 0,
+    }
+  : localPurchaseGate!.gate.value);
 
 // Sticky chassis nav header (back + centered title/tier) — replaces the old
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
@@ -399,8 +428,19 @@ const sticky = useStickyCTA();
 watch(
   [product, isShare, isLocked, purchaseUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate],
   () => {
-    if (!product.value || isLocked.value || purchaseUnavailable.value) {
+    if (!product.value || isLocked.value || purchaseUnavailable.value
+      || (remoteApiEnabled && eligibility.value.status !== "ready")) {
       sticky.hide();
+      return;
+    }
+    if (remoteApiEnabled && !eligibility.value.eligible) {
+      sticky.show({
+        href: "/pages/team/quota",
+        amount: `$${priceText.value}`,
+        amountSubtext: t.value.store.purchaseEligibilityIneligible,
+        buttonLabel: t.value.store.purchaseEligibilityIneligible,
+        showTabBar: false,
+      });
       return;
     }
     // Purchase gate blocks → CTA routes to /team/quota with locked label, not checkout.
@@ -442,6 +482,16 @@ const catalogRetryStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontSize: "13px",
   fontWeight: 600,
+};
+const purchaseEligibilityCardStyle: CSSProperties = {
+  padding: "14px 16px",
+  background: "var(--v5-surface)",
+  border: "1px solid var(--v5-border)",
+};
+const purchaseEligibilityTitleStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
 };
 const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",

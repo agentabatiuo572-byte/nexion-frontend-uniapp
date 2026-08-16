@@ -229,7 +229,9 @@
 
   /* Typography ladder — 《02》§2 14 档(B0 2026-07-22)。成对引用:
      font-size: var(--v5-type-X); line-height: var(--v5-type-X-lh);
-     字重/判定线与 9→14 迁移映射见 docs/TYPO-MIGRATION-MAP.md(棘轮哨兵同源)。 */
+     字重/判定线与 9→14 迁移映射见 docs/TYPO-MIGRATION-MAP.md(棘轮哨兵同源)。
+     以下三个命名 token 是经本轮真实业务 UI 复核保留的微型标记 / 模式徽章 /
+     详情卡标题，不把裸字号散落在组件里。 */
   --v5-type-hero: 56px;       --v5-type-hero-lh: 64px;       /* display.hero · 600 */
   --v5-type-display-xl: 44px; --v5-type-display-xl-lh: 52px; /* display.xl · 600 */
   --v5-type-display-l: 36px;  --v5-type-display-l-lh: 44px;  /* display.l · 600 */
@@ -243,6 +245,9 @@
   --v5-type-mono: 15px;       --v5-type-mono-lh: 22px;       /* number.mono · 500 · JetBrains */
   --v5-type-button: 15px;     --v5-type-button-lh: 20px;     /* button.m · 600 */
   --v5-type-input: 15px;      --v5-type-input-lh: 22px;      /* input.m · 400 */
+  --v5-type-micro: 9px;       --v5-type-micro-lh: 12px;       /* receipt marker · 700 */
+  --v5-type-meta: 11px;       --v5-type-meta-lh: 14px;       /* runtime mode badge · 700 */
+  --v5-type-card-title: 16px; --v5-type-card-title-lh: 22px; /* unavailable product title · 600 */
 }
 
 /* ─────────────────────────────────────────────────────────────────────

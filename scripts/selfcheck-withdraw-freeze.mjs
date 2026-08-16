@@ -94,7 +94,7 @@ check("未收口的提交尝试在请求发出前落盘,且落盘失败即拒发
 // `scripts/selfcheck-withdraw-replay-triage.mjs` 跑真函数全矩阵(48 格,含
 // 「重放路径上退役键的只有 409」「判成未知的一律留键」「重放一律不刷费率」三条不变量)。
 // 本门只钉**接线形状**:页面不许绕过判决自己动手。钉行为落点,不钉某个谓词名。
-const retireGated = /if \(verdict\.fate === "retire"\) forgetWithdrawAttempt\(/.test(catchTail)
+const retireGated = /if \(verdict\.fate === "retire"\)\s*\{[\s\S]*?forgetWithdrawAttempt\(/.test(catchTail)
   && (catchTail.match(/forgetWithdrawAttempt\(/g) || []).length === 1;
 const refreshGated = /if \(verdict\.refreshPolicy\) await loadWithdrawalPolicy\(/.test(catchTail)
   && (catchTail.match(/loadWithdrawalPolicy\(/g) || []).length === 1;
