@@ -36,7 +36,7 @@
     "build:quickapp-webview-huawei": "uni build -p quickapp-webview-huawei",
     "build:quickapp-webview-union": "uni build -p quickapp-webview-union",
     "type-check": "vue-tsc --noEmit",
-    "test:contract-registry": "node scripts/run-contract-suite.mjs",
+    "test:contract-registry": "node scripts/ts-ext-resolve.redtest.mjs && node scripts/run-contract-suite.mjs",
     "test:final-commerce-closure": "node --test scripts/final-commerce-closure-contract.test.mjs",
     "test:phase-isolation": "node --test scripts/phase-isolation-contract.test.mjs",
     "test:kyc-removal": "node --test scripts/kyc-removal-contract.test.mjs",

@@ -6,7 +6,12 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 test("account scope exposes the shared request fence and advances it on rebind", () => {
   const scope = read("src/lib/account-scope.ts");
-  assert.match(scope, /createRemoteAccountEpoch/);
+  // 共享栅栏的**构造点**已挪进叶子模块 remote-account-epoch.ts(注释写明:放叶子里各 store 才能共用
+  // 同一道栅栏而不 import account-scope,否则成环 —— 即本仓 store 互不 import 的硬规则)。
+  // 所以构造断言跟着搬,顺带钉住「bind 必推进代次」这条真正的行为事实(只匹配文件名挡不住它被改空)。
+  const epoch = read("src/lib/remote-account-epoch.ts");
+  assert.match(epoch, /createRemoteAccountEpoch/);
+  assert.match(epoch, /epoch \+= 1/);
   assert.match(scope, /captureAccountScope/);
   assert.match(scope, /isCurrentAccountScope/);
   assert.match(scope, /remoteAccountScope\.bind\(accountKey\)/);
