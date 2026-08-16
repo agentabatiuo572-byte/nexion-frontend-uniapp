@@ -271,8 +271,11 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
 //    解构 `const { K } = import.meta.env` 读键,拿到的是 undefined(静默错模式)。当前全仓 0 处
 //    解构读法;新增时必须改用点式或在此补 define。
 // 2026-08-15 现场重扫为 28 条；新增的 VietQR provider 刷新缝已纳入下方实扫清单。
+// 2026-08-16 重扫为 29 条：4c32a50 的服务端权威改造新增 app.ts#refreshRemoteWithdrawalList
+// (withdrawalApi.list() 拉权威提现列表,带 epoch + accountKey 双重作用域校验),属正当刷新缝,
+// 与 28 那版的差集仅此一条(逐条比对 26adbff 的函数面得出,不是照着实扫数回填)。
 // 该精确值继续作为删除向棘轮使用。
-const EXPECTED_SEAMS = 28;
+const EXPECTED_SEAMS = 29;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来
