@@ -1620,8 +1620,8 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **已转哨兵**:`scripts/profile-identity-check.mjs` 运行时门(挂 `test:h5-runtime` 并行组):fresh boot + 注入旧 bug 真实落盘形状的毒快照双场景,断言页面无 standalone `default` 文本节点且身份行邮箱形;红测台账:M-A 撤 read 层归一 → 毒场景红(served 产物核过变异真生效)。诚实边界:seed 工厂筛被 read 层遮蔽(竞态窗不可外部确定性触发),`createServerEmptySnapshot`(remote)无可达渲染面,两处靠 review。
 - **同族提醒**:① 任何「id/key 兜底进展示字段」的链都问一句「这个值像不像它假装的身份」;② 验收/走查视角(静态评审路由)会**停掉会话 bootstrap**——修「启动时自愈」类 bug 必须在该视角下复验,bind 层的修法在这里不存在;③ 红测冷重启前**先杀口再起**:`--strictPort` 撞被占端口会静默退出,探针打到旧 server = 变异「没生效」假象(本轮实测两次)。2026-08-16。
 
-## P-100 门腐烂:实现改了链路形状,门的桩面/判据锚没跟上 —— 门整体空转而**首格照绿**
-<!-- 编号注:2026-08-16 机器上有 4 个并发会话在跑 verify,本条原以 P-099 落笔,合并时主线 pkg/zr 先落地保号,故本条与下条顺延;若仍与他人同号,按 P-097 的先例「主线先落地者保号」顺延。 -->
+## P-101 门腐烂:实现改了链路形状,门的桩面/判据锚没跟上 —— 门整体空转而**首格照绿**
+<!-- 编号注:本条原以 P-099 落笔,合并时主线 pkg/zr 先落地保号;P-100 让给 pkg/zv(`**/.claude/**` 把整棵 worktree 拉黑),本条顺延 P-101。 -->
 
 - **症状**:`BASE_URL=<mock> node scripts/withdraw-bill-runtime.mjs` 20 格里 18 红(基线同红),形态是「账单 0 条 / 落盘 0 条 / 金额 undefined / 退款不动作」—— 看着像提现链整条烂了;而**第一格「提交链路走通」照 PASS**。同批 `scripts/selfcheck-withdraw-nex-refund.mjs` 在 `monthOf` 处直接 ReferenceError 崩掉,自 ⑬ 起十几格一格没跑。
 - **根因**:两条都不是产品回归,是**门的锚过期**,各有一种形态:
@@ -1630,12 +1630,4 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
   ③ **抠源码型判据的第二种腐烂**——P-097 把账单页分月键从 `localeTag.value` 改成 `dateLocale()`,门里 `new Function("ts","localeTag",…)` 注入的名字对不上,**首次调用**才 ReferenceError;而它写在 module 级、外层无 catch,一抛把后面全部断言带走。
 - **对策**(已焊进两个门):① 桩面按「**服务端往返**」枚举而不是按方法名,新增往返即补桩;② **桩生效与否自己钉一格**(`gateCalls === 2`),桩不上给一条读得懂的红,而不是让人从 17 条红里往回猜;③ 资金面判据**按页面实际接的那条腿分流**,判据从页面源码剥注释后读(`strip()`),两支各有各的红线,共有一格钉不变量本身「提交→失败终态一个往返净零」(同时挡住扣了不退=丢钱、没扣却退=印钞);④ 抠源码构造的判据**构造后当场试跑一次**,失败不抛、回常量哨兵让依赖它的那两格自己红,其余断言照跑。
 - **红测**(全部实跑):拆掉 app.ts `refundWithdrawalDebit` 的「没扣过就没得退」守卫 → 余额 9999 → **10479.25**,两格 ⑦ 当场红(逐分复现 2026-08-11 那条印钞实录);删掉页面 `risk.checkGate` 调用 → 只红 `gateCalls` 那一格(「实测调了 0 次」),其余 18 格照跑;把 `applyWithdrawalDebit(wd)` 接回页面 → 判据自动切到另一支,21/0 全绿(证明门跟着页面走、不写死方向);把同形文本塞进注释 → 剥注释后判据不动(不剥则假阳性)。
-- **同族提醒**:① **「首格绿 + 后面全红」是门腐烂的典型指纹**,不是「实现整条烂了」—— 先问「第一格到底证了什么」,它通常只证到链路的**第一步**;② 任何「20 格里 N 格红」先看**这些格是不是全在空集上判假**(链没跑到),空集上再多断言也是零信息;③ 门与实现对立时(本轮 `selfcheck-fastlane` 三格要求页面必须调 `applyWithdrawalDebit`,`funds-server-sandbox-regression` 要求 `applyWithdrawalDebit` 必须 `if (remoteApiEnabled) return false` —— 两者互斥)**别在自己这道门里替别人裁决**:把判据改成「跟着实现走」,哪边赢都不必回来改门。2026-08-16。
-
-## P-101 `.claude/worktrees/` 里的 dev server 永不跟进源码改动 —— 红测/verify 静默验旧代码
-
-- **症状**:worktree 内改了 `src/**` 再跑运行时门,行为与代码对不上。实付代价:红测「拆掉退款守卫 → 印钞路径必须变红」跑出**全绿**,差点据此写下「这道门没有牙」的错误结论;杀掉 server 重起后同一红测立刻变红。
-- **根因**(已证):`vite.config.ts` 的 `server.watch.ignored` 含 `**/.claude/**`(P-096 为切断跨仓 junction 成环导致的监视器无限递归 OOM 而加,**那条修复本身是对的**),而 worktree 整棵树就住在 `<repo>/.claude/worktrees/<name>/` 下面。拿仓内 picomatch 实测:worktree 源文件 `…/.claude/worktrees/X/src/store/app.ts` **匹配 → 被拉黑**;主 checkout 的 `…/Nexion-uniapp/src/store/app.ts` **不匹配**。所以「主树能热更、worktree 不能」不是错觉。而 `scripts/verify.sh` **自己不起 server**(只认 `BASE_URL` 上已有的那个)—— 于是「改代码 → 重跑 verify」这个标准循环在 worktree 里默认验的是旧代码,且完全静默。
-- **对策**(未修,已开卡):正解是把那条 ignore 从 `**/.claude/**` 改成锚在配置所在目录的 `<root>/.claude/**`,主 checkout 的 junction 环照旧拉黑、worktree 源码不再误伤(`dist` / `.trash` 同理)。**在此之前的硬规则**:worktree 内改完 `src/**` 要跑任何运行时门 / 实景检查,**先按端口杀掉 dev server 再重起**,不重起的红绿一律作废。
-- **判别法**:`curl $BASE_URL/src/<file> | grep <新符号>` 对照磁盘。⚠️ **别拿注释当标识** —— esbuild 转译会剥掉注释,注释标识恒查不到,会反过来误判成「还是旧的」;要 grep **代码**。
-- **同族提醒**:① 任何形如 `**/<基础设施目录>/**` 的全局忽略,都要问一句「有没有工作副本住在那个目录里」;② 与 P-096 是同一条修复的一体两面 —— 修 A 处的递归,别顺手把 B 处的源码一起拉黑;③ 并发跑 verify 时 `/tmp/uniapp-*.log` 是**写死的共享路径**,几个检出互相覆盖:自己那轮的结论只认自己那条命令的 stdout,别读共享 /tmp(实测读到别的检出跑的旧版脚本日志,时间戳却是「刚刚」)。2026-08-16。
+- **同族提醒**:① **「首格绿 + 后面全红」是门腐烂的典型指纹**,不是「实现整条烂了」—— 先问「第一格到底证了什么」,它通常只证到链路的**第一步**;② 任何「20 格里 N 格红」先看**这些格是不是全在空集上判假**(链没跑到),空集上再多断言也是零信息;③ 门与实现对立时(本轮 `selfcheck-fastlane` 三格要求页面必须调 `applyWithdrawalDebit`,`funds-server-sandbox-regression` 要求 `applyWithdrawalDebit` 必须 `if (remoteApiEnabled) return false` —— 两者互斥)**别在自己这道门里替别人裁决**:把判据改成「跟着实现走」,哪边赢都不必回来改门;④ 并发跑 verify 时 `/tmp/uniapp-*.log` 是**写死的共享路径**,几个检出互相覆盖 —— 自己那轮的结论只认自己那条命令的 stdout,别读共享 /tmp(实测读到别的检出跑的旧版脚本日志,时间戳却是「刚刚」,差点据此判定自己的改动没生效);⑤ 「跑的是不是当前源码」这一层由 P-100 单独管,判红绿前先过那一关。2026-08-16。
