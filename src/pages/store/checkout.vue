@@ -136,6 +136,11 @@
             <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" role="button" tabindex="0" :aria-label="t.store.coContinue" @click.stop="goConfirm">
               <text @click.stop="goConfirm">{{ t.store.coContinue }}</text>
             </view>
+            <!-- Explicit exit before any commitment — ghost weight (conversion Cancel must
+                 stay visibly weaker than the primary CTA); goes back to the product. -->
+            <view class="w-full grid place-items-center active:opacity-70" :style="ghostCancelStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="cancelCheckout">
+              <text @click.stop="cancelCheckout">{{ t.store.coCancel }}</text>
+            </view>
           </view>
         </view>
 
@@ -172,7 +177,7 @@
         <!-- === pay-instructions === -->
         <view v-else-if="step === 'pay-instructions'" class="mx-4 nx-step-in">
           <CardPayment v-if="isCard" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
-          <ChainPayment v-else :method="(payment as 'usdt-trc20' | 'usdt-bep20' | 'usdt-erc20')" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
+          <ChainPayment v-else-if="activeSession" :session="activeSession" @complete="goAwaiting" @cancel="onChainCancel" @restart="onChainRestart" />
         </view>
 
         <!-- === awaiting === -->
@@ -185,7 +190,7 @@
           <view v-if="remoteApiEnabled && remoteOrderPollError && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="restartRemoteOrderPolling">
             <text>{{ t.store.coRetryStatus }}</text>
           </view>
-          <view v-if="remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="goTrack">
+          <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
         </view>
@@ -224,6 +229,9 @@
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ activatingSubText }}</text>
           <view class="mx-auto rounded-full overflow-hidden" style="margin-top: 16px; max-width: 200px; height: 6px; background: var(--v5-surface-2)">
             <view class="h-full nx-progress-fill" style="background: var(--v5-brand)" />
+          </view>
+          <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 16px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
+            <text>{{ t.store.coTrackOrder }}</text>
           </view>
         </view>
 
@@ -279,9 +287,9 @@ import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
-import { toast } from "@/store/ui";
+import { confirm, toast } from "@/store/ui";
 import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
@@ -290,6 +298,8 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
+import { usePendingCheckout } from "@/store/pending-checkout";
+import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 const MAX_DEVICES = 6;
@@ -344,12 +354,20 @@ const tradein = useTradeinSheet();
 // 上架节奏门判定与商城正门同源(含 demo pin)。
 const phase = useProductPhase();
 
+// ─── 待支付会话(链上付款的「发票」)───────────────────────────────────────
+// 进扫码步开票(金额 / 地址 / 截止冻结),用户离开再回来仍是同一笔;到点作废。
+// 本页只持有「正在展示的那张」;持久与账号隔离在 store。
+const pending = usePendingCheckout();
+const activeSession = ref<PendingCheckoutSession | null>(null);
+let resumeSessionId: string | null = null;
+
 const productId = ref("stellarbox-s1");
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   // accept ?product= (canonical) or ?id= (per task spec)
   if (o.product) productId.value = o.product;
   else if (o.id) productId.value = o.id;
+  resumeSessionId = o.resume || null;
   const [catalogReady] = await Promise.all([
     refreshProductCatalog(true),
     refreshServerProductPhase(true),
@@ -387,6 +405,9 @@ onLoad(async (options) => {
     navTo("/pages/team/quota");
     return;
   }
+  // Resuming a pending session (floating bar / collision "continue that one")
+  // is not a new checkout: no trade-in intercept, straight back to the pay step.
+  if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
   // Trade-in intercept must run AFTER productId resolves (so the eligibility
   // composable gets the real device kind). onLoad fires before onMounted in
   // uni pages, so this is the single earliest point the kind is known.
@@ -601,6 +622,7 @@ watch(() => app.accountKey, () => {
   remoteOrderPollError.value = false;
   remoteTradeinRecoveryRequired.value = false;
   remoteOrderCommandKey.clear();
+  activeSession.value = null;
   step.value = "select-payment";
 });
 function fireTradeinIntercept() {
@@ -828,6 +850,8 @@ function goSelectPayment() {
 
 async function goAwaiting() {
   if (step.value !== "pay-instructions") return;
+  // A dead invoice can never be "completed" (component hides the button; this is the second gate).
+  if (activeSession.value && !pending.isLive(activeSession.value)) return;
   // Explicit local-sandbox payment is a server command: only the backend may
   // debit the run-scoped sandbox wallet and issue the durable payment number.
   // Remote/production deliberately remains provider-backed and never falls
@@ -937,8 +961,147 @@ async function onConfirmPay() {
   // money/order side effects hang on the step==='confirmed' watch below, so
   // skipping pay-instructions + awaiting is pure navigation; non-zero totals
   // keep the exact pre-existing path. 判据取快照总额,与下面扣款同一个数。
-  step.value = quotedTotal === 0 ? "confirmed" : "pay-instructions";
-  setTimeout(() => { confirming = false; }, 0);
+  if (quotedTotal === 0 || isCard.value) {
+    step.value = quotedTotal === 0 ? "confirmed" : "pay-instructions";
+    setTimeout(() => { confirming = false; }, 0);
+    return;
+  }
+  // Chain payment = open an invoice (pending session). An older live invoice is
+  // never silently replaced — the user chooses (openChainSession asks).
+  const opened = await openChainSession();
+  confirming = false;
+  if (opened) step.value = "pay-instructions";
+}
+
+/** 恢复一张仍在窗内的发票:报价快照原样复位(扣款只认它),回到扫码步。 */
+function adoptSession(s: PendingCheckoutSession) {
+  payment.value = s.method;
+  trialQuote = { ...s.quote.trial };
+  quotedTotal = s.quote.total;
+  voucherQuote = { ...s.quote.voucher };
+  // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
+  // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。
+  if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
+  interceptFired = true;
+  activeSession.value = s;
+  pending.setViewing(s.id);
+  step.value = "pay-instructions";
+}
+
+function resumePendingSession(id: string): boolean {
+  const s = pending.get(id);
+  if (!s || !pending.isLive(s) || s.productId !== productId.value) {
+    toast.warn(t.value.store.pendingResumeGone);
+    return false;
+  }
+  adoptSession(s);
+  return true;
+}
+
+/**
+ * 开票。已有一张在途发票 → 确认框二选一:confirm(true)=「放弃它,开始新的」(danger),
+ * cancel / 点遮罩(false)=「继续那一笔」—— 安全默认落在保留旧单那边(用户可能已转账)。
+ * 返回 true 表示本页新开了一张发票;原地恢复旧票时 step 已由 adoptSession 切好,返回 false。
+ */
+async function openChainSession(): Promise<boolean> {
+  const p = product.value;
+  if (!p) return false;
+  const method = payment.value as PendingCheckoutMethod;
+  const existing = pending.current;
+  if (existing && existing.id !== activeSession.value?.id) {
+    const dropOld = await confirm({
+      title: t.value.store.pendingCollisionTitle,
+      message: fmt(t.value.store.pendingCollisionBody, {
+        name: getProduct(existing.productId)?.name ?? existing.productId,
+        amount: existing.amountUsdt.toLocaleString(),
+        left: formatCountdown(pending.secondsLeft(existing)),
+      }),
+      confirmLabel: t.value.store.pendingCollisionDrop,
+      cancelLabel: t.value.store.pendingCollisionKeep,
+      danger: true,
+      icon: "warn",
+    });
+    // 弹框期间页面已离开 confirm 步(换号 / 离开)→ 什么都不做。
+    if (step.value !== "confirm") return false;
+    if (!dropOld) {
+      if (existing.productId === productId.value && pending.isLive(existing)) {
+        adoptSession(existing);
+        return false; // step already switched by adoptSession
+      }
+      const url = `/pages/store/checkout?product=${encodeURIComponent(existing.productId)}&resume=${encodeURIComponent(existing.id)}`;
+      uni.redirectTo({ url, fail: () => navTo(url) });
+      return false;
+    }
+    pending.remove(existing.id);
+  }
+  const ti = appliedTradeinView.value;
+  const s = pending.begin({
+    productId: p.id,
+    method,
+    // 链上付款无卡费:要求转账的金额 = 确认页展示过的应付总额(同一份快照)。
+    amountUsdt: quotedTotal,
+    quote: {
+      total: quotedTotal,
+      voucher: { ...voucherQuote },
+      trial: { ...trialQuote },
+      tradeIn: ti ? { deviceId: ti.device.id } : null,
+    },
+  });
+  if (!s) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return false;
+  }
+  activeSession.value = s;
+  pending.setViewing(s.id);
+  return true;
+}
+
+/** 扫码步「取消」= 作废这张发票。确认框防误触:若已转账,销毁 = 孤儿化他的钱。 */
+async function onChainCancel() {
+  const s = activeSession.value;
+  if (!s) { goConfirm(); return; }
+  const ok = await confirm({
+    title: t.value.store.pendingCancelTitle,
+    message: t.value.store.pendingCancelBody,
+    confirmLabel: t.value.store.pendingCancelConfirm,
+    cancelLabel: t.value.store.pendingCancelKeep,
+    danger: true,
+    icon: "warn",
+  });
+  if (!ok || activeSession.value !== s) return;
+  dropActiveSession();
+  goConfirm();
+}
+
+/** 超时态唯一出口:回 confirm 步重新报价,下一次「Pay now」开新票(新地址、新 30 分钟)。 */
+function onChainRestart() {
+  dropActiveSession();
+  goConfirm();
+}
+
+function dropActiveSession() {
+  const s = activeSession.value;
+  if (!s) return;
+  pending.remove(s.id);
+  activeSession.value = null;
+}
+
+/**
+ * 离开结算页(返回 / 刷新前卸载):发票静默保留 —— 不弹确认框(用户可能已经转账,
+ * 销毁 = 孤儿化他的钱);首次离开给一次性提示,浮动条接手提醒。
+ */
+function releaseSessionOnLeave() {
+  const s = activeSession.value;
+  if (!s) return;
+  activeSession.value = null;
+  if (pending.viewingId === s.id) pending.setViewing(null);
+  if (pending.isLive(s) && pending.markLeftNotice(s.id)) {
+    toast.info(fmt(t.value.store.pendingKeptToast, { min: String(PENDING_CHECKOUT_WINDOW_MIN) }));
+  }
+}
+
+function cancelCheckout() {
+  navBack(product.value ? `/pages/store/detail?id=${product.value.id}` : "/store");
 }
 
 // IDEMPOTENCY-FRESH-OK: 下面 738-740 行先读**持久化**的 durable 键(readAccountRow),命中就直接返回 ——
@@ -1401,6 +1564,11 @@ watch(step, async (s) => {
         ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD }),
       });
       orderId.value = ord.id;
+      // 发票已付清并落单 —— 待支付会话结束(浮动条随之消失)。
+      if (activeSession.value) {
+        pending.remove(activeSession.value.id);
+        activeSession.value = null;
+      }
       // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
       // convert() 已在扣款前裁决并落 converted(见上);这里只做返还入账。设备由
       // 既有订单履约管线生成(tickOrders → advanceOrder → addDevice,吃 order.total
@@ -1505,6 +1673,7 @@ function cleanup() {
   stopRemoteOrderPolling();
   tradein.clearApplied();
   if (trialTicker) { clearInterval(trialTicker); trialTicker = undefined; }
+  releaseSessionOnLeave();
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
@@ -1571,6 +1740,13 @@ const primaryBtnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",
   fontWeight: 600,
+};
+// Ghost cancel under the primary CTA — no fill, ink-3, 44px tap target.
+const ghostCancelStyle: CSSProperties = {
+  marginTop: "4px",
+  height: "44px",
+  color: "var(--v5-ink-3)",
+  fontSize: "13px",
 };
 const confirmCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
