@@ -157,7 +157,7 @@ export function build(deps) {
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
           voucherDiscount, tradeinCredit, nowTick, reportStuckFunds,
-          remoteApiEnabled, tradein } = deps;
+          remoteApiEnabled, tradein, activeSession, pending } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
@@ -268,6 +268,11 @@ async function bench(opts) {
     tradein: { appliedTradein: null },
     remoteApiEnabled: false,
     nowTick: { value: clockAt },
+    // 2026-08-16 pkg/ad:结算块在扣款前先原子消费待支付发票(pending.consume);本 harness 验的是
+    // 报价链,不持发票 —— 桩成「无发票」让该段跳过(发票一次性语义由 pending-checkout.test.ts 与
+    // 运行时门 pending-checkout-runtime 场景 E 看守)。少这两个桩 = ReferenceError 整门崩掉。
+    activeSession: { value: null },
+    pending: { consume: () => true },
   };
   const api = mod.build(deps);
   // ── 展示侧:确认页此刻渲染的净额 / 总额(卡费按净额算,与页面同式)──

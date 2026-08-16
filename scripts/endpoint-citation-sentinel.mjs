@@ -94,6 +94,7 @@ const LEDGER = {
   "GET /api/orders": "TBD-NAME: PRD §7.4 只定义了按 id 读单;列表读回路已由 order-api.ts 的 list() 实现(store/order-canonical.ts 在用),PRD 同步时补条目",
   "GET /api/orders/:id": "PRD §7.4(SSE)",
   "POST /api/orders/:param/pay": "TBD-NAME: 订单支付确认(commerce-payment-api.confirm,幂等键随请求);PRD §7.5 / §9.10 是下单与支付域但没定义该路径 —— 与已登记的同族命令 /api/orders/:param/cancel 同口径,接线以后端为准",
+  "POST /api/orders/{orderNo}/pay": "TBD-NAME: 与上一条同一端点、花括号参数写法(后端 commerce sandbox 验收记录 2026-08-16 用 {orderNo});store/pending-checkout.ts 文件头引用为发票的服务端完成腿",
   "GET /api/store/catalog": "PRD §7.1",
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────

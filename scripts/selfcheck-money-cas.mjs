@@ -647,6 +647,7 @@ group();
     "daily-powerup.ts": ["claimed", "claimedAt"],
     "nex-faucet.ts": ["history", "lastSignedInAt", "signInStreak", "longestStreak", "streakSavers", "claimedMilestones"],
     "lucky-spin.ts": ["bonusTickets", "lastFreeSpinDate", "history", "realPrizeSoldOut", "coverageDegraded"],
+    "pending-checkout.ts": ["sessions"], // 2026-08-16 pkg/ad:待支付发票(begin/consume/remove/markLeftNotice 全部走 CAS)
   };
   // 🔴 清单是手抄的 → 加一道覆盖门(z1 R2 对抗审计 P1-17c:c37e662 那批新接远端缝的
   //    store 不在册,清单静默漏检)。判据从磁盘来:凡是走了 CAS 提交器
