@@ -40,13 +40,22 @@ test("genesis surfaces do not synthesize remote social proof", () => {
   const store = read("src/store/genesis.ts");
   assert.match(store, /createRemoteAccountEpoch/);
   assert.match(store, /isCurrent\(/);
-  assert.match(store, /remoteApiEnabled \? globalDefaults\(\)/);
+  // remote 档不许从本地存量 hydrate 出「已售 N 席」的稀缺感。原断言钉的是 globalDefaults(),
+  // 但那份默认值里带着写死的 847 已售 —— 正是本测试标题要消灭的伪社交证明。现在 remote 档走
+  // remoteDefaults()(从 0 起,权威由服务端给),比原断言更贴它自己保护的语义;两条一起钉,
+  // 免得日后有人把 remoteDefaults 的 soldSlots 改回 847 而门照绿。
+  assert.match(store, /remoteApiEnabled \? remoteDefaults\(\)/);
+  assert.match(store, /function remoteDefaults\(\)[\s\S]{0,240}soldSlots: 0/);
 });
 
-test("remote market board is limited to the NEX market quote", () => {
+// 旧断言的前提是「remote 档只有 NEX 币价有服务端权威」,该前提已被 /api/app/home/overview 消除:
+// 行情行现在整块来自服务端投影(取不到就显示 Unavailable,不编数)。断言不能删 —— 全仓只有这一条门
+// 守这张卡;改成守「remote 只渲染服务端投影 + mock 那几行必须留在 mock 分支里 + 无权威时显式不可用」。
+test("remote market board renders only the server-owned home truth rows", () => {
   const board = read("src/components/home/market-board-card.vue");
-  assert.match(board, /remoteApiEnabled/);
-  assert.match(board, /market\.nexPriceUSDT/);
+  assert.match(board, /homeTruth\?\.marketBoard\.workloads/);
+  assert.match(board, /v-if="!remoteApiEnabled"/);
+  assert.match(board, /Unavailable/);
 });
 
 test("purchase social proof consumes the authenticated storefront activity API", () => {
