@@ -70,7 +70,7 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
 
   const rows = createAccountRowCommit<PendingRow>({
     tableKey: ACCOUNTS_KEY,
-    parse: (raw) => ({ sessions: normalizeSessions((raw as { sessions?: unknown } | null)?.sessions) }),
+    parse: (raw) => ({ sessions: normalizeSessions((raw as { sessions?: unknown } | null)?.sessions, mockServerNow()) }),
     snapshot: () => ({ sessions: sessions.value }),
     sync: (row) => { sessions.value = row.sessions; },
   });

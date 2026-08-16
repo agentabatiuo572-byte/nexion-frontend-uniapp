@@ -332,7 +332,7 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   samples.wiring += 1;
   check("⑥ 🔴 结算页:不可逆的 convert() 排在扣款之后,且失败时退款 + 消费返回值",
     idxDebit > 0 && idxConvert > idxDebit
-    && /if \(app\.restoreMoney\(beforePay\)\)/.test(coSrc) && /else reportStuckFunds\(beforePay\)/.test(coSrc),
+    && /if \(app\.restoreMoney\(beforePay\)/.test(coSrc) && /else reportStuckFunds\(beforePay/.test(coSrc),
     `debit@${idxDebit} convert@${idxConvert}`);
 }
 

@@ -203,7 +203,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const resolved = resolveTrialAt(row, now, useTrialConfig().config);
     if (resolved !== row) {
       load(resolved);
-      persist();
+      persist(); // persist-verdict-ok: 边界推进 = 行 + now 纯推导,没落盘下次从旧行重算得到同一结果
     }
     return resolved;
   }
@@ -389,6 +389,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const now = mockServerNow();
     const exp = now + cfg.trialDays * ONE_DAY_MS;
     status.value = "active";
+    const beforeStart = snapshot();
     startedAt.value = now;
     expiresAt.value = exp;
     graceEndsAt.value = exp + cfg.graceDays * ONE_DAY_MS;
@@ -396,7 +397,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     shadowFrozenAtUSD.value = 0;
     shadowFrozenAtNEX.value = 0;
     legacyCardMigrated.value = false;
-    persist();
+    if (!persist()) {
+      load(beforeStart); // 没落盘 = 没开始:别让页面宣布「试用已开始」而刷新后什么都没有
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 
@@ -499,9 +503,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
     }
     if (status.value !== "active") return { ok: false, reason: eligibility().reason ?? "unknown" };
+    const beforeEnd = snapshot();
     status.value = "ended";
     finishedAt.value = mockServerNow();
-    persist();
+    if (!persist()) {
+      load(beforeEnd);
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 

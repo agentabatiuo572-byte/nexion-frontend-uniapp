@@ -87,8 +87,12 @@ function nonNegative(v: unknown): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-/** 存储行归一化:坏行 / 缺字段一律丢弃(宁可少一条也不复活一张残缺发票)。 */
-export function normalizeSessions(raw: unknown): PendingCheckoutSession[] {
+/**
+ * 存储行归一化:坏行 / 缺字段 / 出界一律丢弃(宁可少一条也不复活一张残缺发票)。
+ * `now` = 读入时刻:窗口除了宽度还要卡**位置** —— expiresAt 不得晚于 now + 30 分钟,否则把两个时间戳一起
+ * 前移 10 年就是一张永生发票(审计 R6 P1:只卡宽度的取值域被同步前移绕过)。
+ */
+export function normalizeSessions(raw: unknown, now: number = Date.now()): PendingCheckoutSession[] {
   if (!Array.isArray(raw)) return [];
   const out: PendingCheckoutSession[] = [];
   for (const r of raw) {
@@ -104,6 +108,7 @@ export function normalizeSessions(raw: unknown): PendingCheckoutSession[] {
     if (!Number.isFinite(s.createdAt) || !Number.isFinite(s.expiresAt)) continue;
     const windowMs = s.expiresAt - s.createdAt;
     if (!(windowMs > 0 && windowMs <= PENDING_CHECKOUT_WINDOW_MIN * 60_000)) continue;
+    if (s.expiresAt > now + PENDING_CHECKOUT_WINDOW_MIN * 60_000) continue; // 位置:最晚也只能是「刚开出的一张」
     const q = s.quote;
     if (!q || typeof q !== "object" || typeof q.total !== "number" || !Number.isFinite(q.total) || q.total < 0) continue;
     // 票面自洽:链上发票要求转账的金额就是确认页应付总额,两者不等的行不是本 store 开出来的。

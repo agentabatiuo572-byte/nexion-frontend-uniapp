@@ -80,12 +80,13 @@ describe("pending-checkout-core", () => {
     const base = session();
     const rows = [
       { ...base, id: "eternal", expiresAt: T0 + 10 * 365 * 24 * 3600_000 },              // window > 30 min → an immortal invoice
+      { ...base, id: "shifted", createdAt: T0 + 10 * 365 * 24 * 3600_000, expiresAt: T0 + 10 * 365 * 24 * 3600_000 + 30 * 60_000 }, // width OK, but 10 years in the future
       { ...base, id: "inverted", createdAt: T0 + 60_000, expiresAt: T0 },                    // createdAt after expiresAt
       { ...base, id: "zero-window", expiresAt: T0 },                                          // window 0
       { ...base, id: "face-mismatch", amountUsdt: 1299, quote: { ...base.quote, total: 600 } }, // QR amount ≠ quoted total
       { ...base, id: "neg-discount", quote: { ...base.quote, voucher: { id: "v1", discount: -50 } } }, // negative discount → clamped to 0
     ];
-    const out = normalizeSessions(rows);
+    const out = normalizeSessions(rows, T0);
     expect(out.map((s) => s.id)).toEqual(["neg-discount"]);
     expect(out[0]!.quote.voucher.discount).toBe(0);
   });
