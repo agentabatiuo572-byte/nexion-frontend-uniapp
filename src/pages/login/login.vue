@@ -787,7 +787,7 @@ onUnmounted(() => cleanup());
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
 .lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
-.lg-mode-badge__t { font-size: 11px; font-weight: 700; color: var(--v5-warning); }
+.lg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
 .lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
 .lg-recovery-notice__t { display: block; font-size: 13px; line-height: 1.5; color: var(--v5-ink-2); }
 .lg-sub { display: block; margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); }
