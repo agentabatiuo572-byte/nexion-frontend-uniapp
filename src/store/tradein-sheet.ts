@@ -78,11 +78,25 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
    *  持久块原子执行(移除旧机+净额扣款+新机未激活入库);「移除」清空恢复原价。
    *  仅内存态(不持久):刷新丢弃=放弃抵扣,旧设备原状,无半执行风险。 */
   const appliedTradein = ref<{ oldDeviceId: string; targetKind: DeviceKind; canonicalQuote?: CanonicalTradeinQuote } | null>(null);
-  function applyTradein(oldDeviceId: string, targetKind: DeviceKind, canonicalQuote?: CanonicalTradeinQuote) {
+  /**
+   * 🔴 全局单槽 + owner(page-header 同款,P-108):浮动条 / 绑卡返回会让**两个结算页实例同时在栈上**,
+   * 上层实例的卸载(含晚一拍的 onUnmounted)若无条件清槽,会抹掉在世实例正在用的抵扣上下文 ——
+   * 它的活票随即按全价复算、被「金额已变」拒单并销票(审计 R5 P0,运行时红测复现)。
+   * 带 owner 的 clear 只清自己写的那份;不带 owner 的 apply / clear 是可见页面上的用户动作,照旧无条件。
+   */
+  let appliedOwner: symbol | null = null;
+  function applyTradein(oldDeviceId: string, targetKind: DeviceKind, canonicalQuote?: CanonicalTradeinQuote, owner: symbol | null = null) {
     appliedTradein.value = { oldDeviceId, targetKind, canonicalQuote };
+    appliedOwner = owner;
   }
-  function clearApplied() {
+  function clearApplied(owner?: symbol) {
+    if (owner !== undefined && appliedOwner !== null && appliedOwner !== owner) return;
     appliedTradein.value = null;
+    appliedOwner = null;
+  }
+  /** 当前槽是否由该 owner 写入(页面据此决定要不要把自己的镜像重新挂回去)。 */
+  function appliedBy(owner: symbol): boolean {
+    return appliedTradein.value !== null && appliedOwner === owner;
   }
 
   function showChoice(
@@ -152,5 +166,5 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     state.value = { kind: "none" };
   }
 
-  return { state, appliedTradein, applyTradein, clearApplied, showChoice, showRetire, showTradein, showReplace, showCanonicalReplace, showBlock, showRetireBlock, hide };
+  return { state, appliedTradein, applyTradein, clearApplied, appliedBy, showChoice, showRetire, showTradein, showReplace, showCanonicalReplace, showBlock, showRetireBlock, hide };
 });

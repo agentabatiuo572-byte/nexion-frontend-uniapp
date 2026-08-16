@@ -163,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
@@ -188,6 +188,7 @@ import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { usePendingCheckout } from "@/store/pending-checkout";
+import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
@@ -458,16 +459,17 @@ const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTTOM));
 // ── 待支付浮动条的落位 ──
-// 有 chassis 级 header 的页(5 个 tab + useSetPageHeader 子页):浮动条占自己的一条带(header 下 8px),
-// 内容整体下让 PENDING_BAR_INSET,谁也不被盖住(否则它正好压在券横幅 / 首屏卡片上)。
-// 用 sub-page-header(内容内 sticky 行)的子页:chassis 不知道那一行的高度,浮动条按标准 44 行之下
-// 悬浮(+60),不加内容内缩(内缩会把 sticky 行往下推、滚动时又从浮动条底下穿过)。
+// 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
+// 任何页都不被盖住:tab 页 / useSetPageHeader 子页的 chassis 头在带之上;用 sub-page-header(内容内
+// sticky 行)的子页,那一行随内容一起下让,并经 provide 拿到同一个内缩值当自己的 sticky top —— 滚动时
+// 钉在带的下沿,不再从浮动条底下穿过。(此前只给有 chassis 头的页内缩,~55 个 sub-page-header 子页的
+// 首屏被压 36px:独立审查按像素常量推算 + Playwright 实测 daily / wallet-nex 页 overlap=36。)
 const PENDING_BAR_INSET = 60;
-const hasChassisHeader = computed(() => isTabRoute.value || !!navHeader.value);
 // 与渲染条件同谓词:静态审查路由 / 首帧 route 未解析时条不渲染,内容也不能白让一带。
 const pendingBarVisible = computed(() => !!pendingCheckout.barSession && showBusinessOverlays.value);
-const pendingBarTop = computed(() => contentTop.value + (hasChassisHeader.value ? 8 : 60));
-const pendingBarInset = computed(() => (pendingBarVisible.value && hasChassisHeader.value ? PENDING_BAR_INSET : 0));
+const pendingBarTop = computed(() => contentTop.value + 8);
+const pendingBarInset = computed(() => (pendingBarVisible.value ? PENDING_BAR_INSET : 0));
+provide(PENDING_BAR_INSET_KEY, pendingBarInset);
 const topChromeHeight = computed(() => contentTop.value);
 
 // lucide-style outline paths (Home / Zap / ShoppingBag / Users / User)

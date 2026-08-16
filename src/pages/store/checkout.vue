@@ -62,8 +62,11 @@
 
         <!-- A receipt-only write is a recoverable post-order failure. Keep the
              checkout on this explicit state; the timer chain must not announce
-             activation while the bill is still missing. -->
-        <view v-if="receiptWriteFailure" class="mx-4 rounded-2xl text-center nx-step-in" :style="receiptFailureCardStyle">
+             activation while the bill is still missing.
+             不许盖住本页正在展示的活票(地址 / 金额 / 倒计时 / 取消都在被它压掉的那一支里):
+             恢复行是持久行,resume 进来的票会被它整页遮蔽而全站失联(审计 R5 P0)—— 有活票先付票,
+             票结清 / 作废后这张卡再露出来。 -->
+        <view v-if="receiptWriteFailure && !activeSession" class="mx-4 rounded-2xl text-center nx-step-in" :style="receiptFailureCardStyle">
           <text class="block" :style="centerTitleStyle">{{ t.errors.billMissingTitle }}</text>
           <text class="block" style="margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.errors.billMissingMsg }}</text>
           <view class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 16px" :aria-disabled="receiptRetrying" @click.stop="retryReceiptWrite">
@@ -299,7 +302,7 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
-import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
+import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 const MAX_DEVICES = 6;
@@ -1008,6 +1011,9 @@ async function onConfirmPay() {
   }
   // Chain payment = open an invoice (pending session). An older live invoice is
   // never silently replaced — the user chooses (openChainSession asks).
+  // 远端档在上面的分支里已经 return;这里再钉一次:本地发票腿(伪地址 / 本地 30 分钟窗)只属于 mock 档,
+  // 远端分支哪天落到公共尾巴上也不许开票 —— 否则支付步是一块空白 + 「请重试」死循环。
+  if (remoteApiEnabled) { confirming = false; return; }
   const opened = await openChainSession();
   confirming = false;
   if (opened) step.value = "pay-instructions";
@@ -1030,25 +1036,15 @@ function adoptSession(s: PendingCheckoutSession) {
   // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
   // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。发票没有抵扣时必须
   // 清掉本页可能残留的抵扣上下文。
-  if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
+  if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind, undefined, tradeinOwner);
   else tradein.clearApplied();
-  const liveTrial = trialView.value;
-  const invTrial = s.quote.trial;
-  trialQuote = liveTrial.applied && invTrial.applied
-    ? {
-        applied: true,
-        promo: Math.min(liveTrial.promo, invTrial.promo),
-        offsetUSD: Math.min(liveTrial.offsetUSD, invTrial.offsetUSD),
-        remainderUSD: Math.min(liveTrial.remainderUSD, invTrial.remainderUSD),
-        shadowNEX: Math.min(liveTrial.shadowNEX, invTrial.shadowNEX),
-      }
-    : NO_TRIAL;
-  const liveVoucherId = voucherMatch.value?.def.id ?? null;
-  // 券:只有「此刻匹配到的正是发票那张」才带折扣(取 min);发票那张没了 / 换成别张 → 不带折扣,
-  // 支付时刻的券一致性闸(live id ≠ 快照 id)或票面闸会拒单重报价。
-  voucherQuote = liveVoucherId && liveVoucherId === s.quote.voucher.id
-    ? { id: liveVoucherId, discount: Math.min(voucherDiscount.value, s.quote.voucher.discount) }
-    : { id: null, discount: 0 };
+  // 逐项对账(纯函数,vitest 钉住):现算与记录值取 min;券只认「就是发票那张」。
+  const reconciled = reconcileInvoiceQuote(
+    { trial: trialView.value, voucher: { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value } },
+    s.quote,
+  );
+  trialQuote = reconciled.trial;
+  voucherQuote = reconciled.voucher;
   interceptFired = true;
   activeSession.value = s;
   pending.setViewing(s.id);
@@ -1460,8 +1456,28 @@ function restartRemoteOrderPolling() {
   scheduleRemoteOrderPoll(requestEpoch, 0);
 }
 
+// ── 抵扣上下文的页级镜像(审计 R5 P0)──
+// tradein.appliedTradein 是全局单槽,而浮动条 / 绑卡返回会让两个结算页实例同时在栈上:上层实例的
+// adoptSession / cleanup 会改写它。本页只在**可见**时把槽的变化收进自己的镜像(用户在本页做的选择),
+// 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-108 同款)。
+const tradeinOwner = Symbol("checkout-tradein");
+let pageVisible = true;
+let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
+watch(() => tradein.appliedTradein, (v) => {
+  if (!pageVisible) return;
+  tradeinMirror = v ? { ...v } : null;
+  // 置换 sheet 写进来的是无主的:本页认领,别的实例的 owner 清法就动不了它。
+  if (v && !tradein.appliedBy(tradeinOwner)) tradein.applyTradein(v.oldDeviceId, v.targetKind, v.canonicalQuote, tradeinOwner);
+}, { immediate: true });
+function reassertTradeinContext() {
+  if (tradeinMirror) tradein.applyTradein(tradeinMirror.oldDeviceId, tradeinMirror.targetKind, tradeinMirror.canonicalQuote, tradeinOwner);
+  else tradein.clearApplied(tradeinOwner);
+}
+
 onShow(() => {
   remoteOrderPageVisible = true;
+  pageVisible = true;
+  reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
     pending.refreshFromDisk();
@@ -1480,6 +1496,7 @@ onShow(() => {
 });
 onHide(() => {
   remoteOrderPageVisible = false;
+  pageVisible = false;
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。
   if (activeSession.value && pending.viewingId === activeSession.value.id) pending.setViewing(null);
   stopRemoteOrderPolling();
@@ -1521,10 +1538,12 @@ watch(step, async (s) => {
         return;
       }
       // ── Voucher pay-time revalidation(与 trade-in/trial 失效守卫同构)──
-      // 券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
-      // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用
-      // 冻结值继续。冻结值也天然满足旧注释的「markUsed 之前取值」要求。
-      if ((voucherMatch.value?.def.id ?? null) !== voucherQuote.id) {
+      // 快照里带券时,券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
+      // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用冻结值继续。
+      // 快照里**没有券**(确认页 / 发票按全价报,或恢复发票时对账清空)→ 这一单不依赖任何券:窗内新到
+      // 的券不参与、也不该把单拒掉 —— 实扣仍是用户看到的那个数(审计 R5 P1:此前 null ≠ 新券 id 就拒单,
+      // 一张合法发票因为用户去领了张券而永久付不掉、还被销票)。
+      if (voucherQuote.id !== null && (voucherMatch.value?.def.id ?? null) !== voucherQuote.id) {
         toast.warn(t.value.voucher.quoteChanged);
         step.value = "select-payment";
         return;
@@ -1650,9 +1669,20 @@ watch(step, async (s) => {
         step.value = "select-payment";
         return;
       }
+      // 🔴 单次券与发票同款「先占后花」:核销走 CAS(磁盘最新账本要求「已领且未用」),抢不到 = 别的标签页 /
+      // 页面实例已经用掉这张券 → 拒单重报价。排在一切不可逆动作之前;之后任何失败面都把券放回(releaseVoucher)。
+      // (审计 R5 P0:此前核销排在建单之后且返回 void,两处各结算一次同一张券,后到者的 CAS 失败被吞,双花不留痕。)
+      const voucherClaimed = discount > 0 && !!usedVoucherId && voucher.markUsed(usedVoucherId);
+      if (discount > 0 && usedVoucherId && !voucherClaimed) {
+        toast.warn(t.value.voucher.quoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      const releaseVoucher = () => { if (voucherClaimed && usedVoucherId) voucher.release(usedVoucherId); };
       const invoice = activeSession.value;
       if (invoice) {
         if (!pending.consume(invoice.id)) {
+          releaseVoucher();
           toast.warn(t.value.store.pendingSettledElsewhere);
           activeSession.value = null;
           step.value = "select-payment";
@@ -1665,6 +1695,7 @@ watch(step, async (s) => {
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402),
         // with an explicit toast (was a silent bounce, PR-D debt #3).
+        releaseVoucher();
         toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
         step.value = "select-payment";
         return;
@@ -1673,6 +1704,7 @@ watch(step, async (s) => {
         // 扣款与 convert 之间跨过宽限终点的极窄窗口:把刚扣的钱按增量精确退回
         // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
         // 绝不再弹一句"报价已变"了事。
+        releaseVoucher();
         if (app.restoreMoney(beforePay)) toast.warn(t.value.store.coTrialQuoteChanged);
         else reportStuckFunds(beforePay);
         step.value = "select-payment";
@@ -1687,6 +1719,7 @@ watch(step, async (s) => {
           // 成交。钱按快照精确冲正;冲不回去 = 响亮终态。(审计 R4 P0:此前丢弃返回值 —— 设备复活、
           // 扣款照旧、订单还写着 tradeInDeviceId。)
           tradein.clearApplied();
+          releaseVoucher();
           if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
           else reportStuckFunds(beforePay);
           step.value = "select-payment";
@@ -1707,9 +1740,12 @@ watch(step, async (s) => {
         // 单子没落盘(store 已把内存那条撤掉):把上面已做掉的两件事按原路退回 —— 旧机重新上架、
         // 资金精确冲正;任一退不回去 = 响亮终态(交易号 + 待对账),绝不静默让「钱扣了 / 设备没了 /
         // 单子查无」并存(审计 R4 P1)。试用 convert 已落终态,与上面 convert 之后各失败面同一残余。
+        // 三件都做(不短路):设备回架、资金冲正、券放回;任一没成 → 响亮终态。
         const deviceBack = !ti || app.devices.some((d) => d.id === ti.device.id)
           || ((app.devices = [...app.devices, ti.device]), app.persistAccountSnapshot());
-        if (deviceBack && app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        const moneyBack = app.restoreMoney(beforePay);
+        releaseVoucher();
+        if (deviceBack && moneyBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
         else reportStuckFunds(beforePay);
         step.value = "select-payment";
         return;
@@ -1751,8 +1787,7 @@ watch(step, async (s) => {
         if (nexCredited) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
         if (earnParts.length) toast.success(fmt(t.value.store.coTrialEarnToast, { parts: earnParts.join(" · ") }));
       }
-      // Consume the voucher (single-use) once the order is persisted.
-      if (discount > 0 && usedVoucherId) voucher.markUsed(usedVoucherId);
+      // 券已在扣款前核销(先占后花,见上);到这里订单已落盘,核销就是终态。
       // 账单 memo 走 i18n(用户账单页直接渲染,禁硬编码英文)。
       const memoParts: string[] = [];
       if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
@@ -1812,11 +1847,15 @@ function goTrack() {
 }
 
 // 离开结算页即放弃未使用的抵扣上下文(内存态,无半执行风险)。
+// 只跑一次:onUnload 与晚一拍的 onUnmounted 都挂着它,第二次已经在别的页面实例 onShow 之后 —— 那时再清
+// 任何全局层都是在动别人的东西。
 function cleanup() {
+  if (!pageAlive) return;
   clearAdvance();
   remoteOrderPageVisible = false;
+  pageVisible = false;
   stopRemoteOrderPolling();
-  tradein.clearApplied();
+  tradein.clearApplied(tradeinOwner); // 只清本页 owner 的那份;在世实例的上下文不动
   // 本页拉起的置换 / 槽位 sheet 是 chassis 级全局层,不随页面卸载自动收 —— 不收会跟到落地页,
   // 整屏 backdrop 把浮动条与页面一起挡死(T3 黑盒 P1-2)。
   tradein.hide();

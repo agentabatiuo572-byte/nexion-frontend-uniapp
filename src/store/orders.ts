@@ -206,7 +206,26 @@ export const useOrders = defineStore("orders", () => {
    * 消失,而调用方此前已经扣款 / 下架旧机 —— 必须让调用方知道并按原路退回,不能静默吞掉。
    */
   function createOrder(input: CreateOrderInput): Order | null {
+    return createOrders([input])?.[0] ?? null;
+  }
+
+  /**
+   * 一批建单 = **一次**落盘:全部进内存后只写一次盘,失败整批撤掉返 null —— 组合购买不存在「前几单落了、
+   * 后几单没落」的半执行态(审计 R5 P1:逐单写盘中途失败,整笔退款而已落盘的单子照发设备)。
+   */
+  function createOrders(inputs: CreateOrderInput[]): Order[] | null {
     if (remoteApiEnabled) throw new Error("REMOTE_ORDER_CREATE_REQUIRES_SERVER_API");
+    const batch = inputs.map(buildOrder);
+    const before = orders.value;
+    orders.value = [...batch.slice().reverse(), ...orders.value];
+    if (!persist()) {
+      orders.value = before;
+      return null;
+    }
+    return batch;
+  }
+
+  function buildOrder(input: CreateOrderInput): Order {
     const {
       productId, productName, unitPrice, paymentMethod,
       discount = 0, tradeInCredit = 0, tradeInDeviceId,
@@ -238,11 +257,6 @@ export const useOrders = defineStore("orders", () => {
         { status: "paid", ts: now + 1000, note: `Settled via ${paymentMethod}` },
       ],
     };
-    orders.value = [order, ...orders.value];
-    if (!persist()) {
-      orders.value = orders.value.filter((o) => o.id !== id);
-      return null;
-    }
     return order;
   }
 
@@ -331,6 +345,7 @@ export const useOrders = defineStore("orders", () => {
     if (remoteApiEnabled) return false;
     const cancellable = orders.value.some((o) => o.id === id && o.status === "placed");
     if (!cancellable) return false;
+    const before = orders.value;
     orders.value = orders.value.map((o) =>
       o.id === id && o.status === "placed"
         ? {
@@ -347,7 +362,11 @@ export const useOrders = defineStore("orders", () => {
           }
         : o,
     );
-    persist();
+    // 取消没落盘 = 没取消(刷新后仍是 placed):内存退回、如实返 false,别让页面宣布「已取消 · 退款排队中」。
+    if (!persist()) {
+      orders.value = before;
+      return false;
+    }
     return true;
   }
 
@@ -359,7 +378,7 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
+  return { orders, createOrder, createOrders, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

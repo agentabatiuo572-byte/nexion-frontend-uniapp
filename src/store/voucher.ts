@@ -181,22 +181,38 @@ export const useVoucher = defineStore("voucher", () => {
     return r.ok ? { ok: true } : { ok: false, conflict: r.conflict };
   }
 
-  /** Mark a claimed voucher as redeemed (called once after an order consumes it).
-   *  天然幂等:别处已核销过 → apply 返回 null,终态本就是「已用」,无需回报失败。 */
-  function markUsed(id: string): void {
+  /**
+   * 核销一张已领的单次券 —— **先占后花**:结算块在扣款之前调用,CAS 在磁盘最新账本上要求「已领且未用」,
+   * 抢到才返 true。别的标签页 / 页面实例已经用掉它、或 storage 写不进去 → false,调用方拒单重报价。
+   * (审计 R5 P0:此前返回 void、排在建单之后,两处各结算一次同一张券,后到者的 CAS 失败被吞,双花不留痕。)
+   * 远端档由服务端在建单事务里核销,这里恒 true。
+   */
+  function markUsed(id: string): boolean {
     if (remoteApiEnabled) {
       // Order creation owns voucher redemption atomically on the server.
       void refreshRemote();
-      return;
+      return true;
     }
     const now = mockServerNow();
-    rows.commit((cur) => {
+    return rows.commit((cur) => {
       if (!cur.claimed.some((c) => c.id === id && c.usedAt == null)) return null;
       return {
         next: { claimed: cur.claimed.map((c) => (c.id === id && c.usedAt == null ? { ...c, usedAt: now } : c)) },
         result: true as const,
       };
-    });
+    }).ok;
+  }
+
+  /** 结算在核销之后失败(扣款 / 建单 / 下架落盘)→ 把这张券放回「已领未用」。远端档无此动作(服务端事务整体回滚)。 */
+  function release(id: string): boolean {
+    if (remoteApiEnabled) return true;
+    return rows.commit((cur) => {
+      if (!cur.claimed.some((c) => c.id === id && c.usedAt != null)) return null;
+      return {
+        next: { claimed: cur.claimed.map((c) => (c.id === id ? { ...c, usedAt: null } : c)) },
+        result: true as const,
+      };
+    }).ok;
   }
 
   const catalog = computed<VoucherDef[]>(() => remoteApiEnabled ? remoteCatalog.value : listVouchers());
@@ -265,7 +281,7 @@ export const useVoucher = defineStore("voucher", () => {
     isUsed,
     claim,
     claimRemote,
-    markUsed,
+    markUsed, release,
     refreshRemote,
     claimableVouchers,
     catalog,

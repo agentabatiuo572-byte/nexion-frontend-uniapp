@@ -100,10 +100,18 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     if (n > 0 && !ticker) ticker = setInterval(tick, 1000);
     else if (n === 0 && ticker) { clearInterval(ticker); ticker = undefined; }
   }, { immediate: true });
-  /** 只读回灌:把磁盘最新行同步进内存(不写盘)。别的标签页开票 / 结算 / 取消后,本页据此刷新。 */
+  /**
+   * 回灌:把磁盘最新行同步进内存。别的标签页开票 / 结算 / 取消后,本页据此刷新。
+   * 读入面同时守不变量(与 bindAccount 同一条):过期行剪掉、多张活票只留最早那张 —— 行已经正常时是
+   * 只读同步(apply 返 null,不写盘);不正常才写一次把它治好,否则 begin() 会对着两张陈旧活票永久拒开。
+   */
   function refreshFromDisk() {
     if (fundsServerEnabled) return;
-    rows.commit(() => null); // apply 返 null = 前置不成立 → 提交器把磁盘最新行 sync 进内存
+    const now = mockServerNow();
+    commitSessions((cur) => {
+      const live = pruneExpiredSessions(cur, now);
+      return live.length === cur.length && live.length <= 1 ? null : { next: live.slice(0, 1), result: true };
+    });
   }
   // 后台标签页的定时器会被浏览器节流;回到前台先把时钟拨准 + 回灌磁盘,别让浮动条展示一张其实已死的票。
   if (typeof document !== "undefined" && typeof document.addEventListener === "function") {

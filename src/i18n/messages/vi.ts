@@ -1757,7 +1757,7 @@ export const vi: Messages = {
     pendingCancelConfirm: "Hủy thanh toán",
     pendingCancelKeep: "Tiếp tục thanh toán",
     pendingResumeGone: "Đơn này đã hết thời gian thanh toán — hãy bắt đầu lại từ trang sản phẩm.",
-    pendingSettledElsewhere: "Khoản thanh toán này đã được hoàn tất hoặc hủy ở nơi khác — hãy xem lại đơn để thanh toán lại.",
+    pendingSettledElsewhere: "Khoản thanh toán này đã được hoàn tất hoặc hủy ở nơi khác — hãy chọn lại phương thức thanh toán để thanh toán lại.",
     coSendExact: "Gửi đúng số tiền trong một giao dịch · Chỉ gửi qua {network}",
     coCardSelect: "Chọn thẻ",
     coCardSecurity: "256-bit TLS · token PCI DSS",
