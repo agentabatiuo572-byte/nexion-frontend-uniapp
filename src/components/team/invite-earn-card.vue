@@ -51,11 +51,10 @@
         </view>
         <text class="font-display tabular-nums" :style="nexLineStyle">{{ t.team.serverRewardPerSettlement }}</text>
         <text :style="cooldownStyle">{{ t.team.perFriendCooldown }}</text>
-        <!-- Cumulative earned pill -->
-        <view class="inline-flex items-center" :style="earnedPillStyle">
+        <!-- Cumulative earned pill — 仅在有已结算战绩时渲染,零收益无空态文案 -->
+        <view v-if="lifetimeEarned > 0" class="inline-flex items-center" :style="earnedPillStyle">
           <text>💎</text>
-          <text v-if="lifetimeEarned > 0" class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan-ink)', fontWeight: 600 }">+{{ lifetimeEarned.toLocaleString() }} NEX</text>
-          <text v-else :style="{ color: 'var(--v5-tech-cyan-ink)' }">{{ t.team.beTheFirst }}</text>
+          <text class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan-ink)', fontWeight: 600 }">+{{ lifetimeEarned.toLocaleString() }} NEX</text>
         </view>
       </view>
 
