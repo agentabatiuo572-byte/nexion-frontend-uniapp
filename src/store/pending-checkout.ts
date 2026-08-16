@@ -87,6 +87,8 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
   }
 
   const current = computed(() => firstLiveSession(sessions.value, clock.value));
+  /** 浮动条要展示的那一笔:有在途会话,且结算页此刻没有在展示它(不重复提醒)。 */
+  const barSession = computed(() => (current.value && current.value.id !== viewingId.value ? current.value : null));
 
   function get(id: string): PendingCheckoutSession | null {
     return sessions.value.find((s) => s.id === id) ?? null;
@@ -142,5 +144,5 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     viewingId.value = id;
   }
 
-  return { sessions, current, viewingId, clock, bindAccount, get, isLive, secondsLeft, begin, remove, markLeftNotice, setViewing };
+  return { sessions, current, barSession, viewingId, clock, bindAccount, get, isLive, secondsLeft, begin, remove, markLeftNotice, setViewing };
 });

@@ -980,8 +980,14 @@ function adoptSession(s: PendingCheckoutSession) {
   quotedTotal = s.quote.total;
   voucherQuote = { ...s.quote.voucher };
   // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
-  // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。
+  // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。发票没有抵扣时必须
+  // 清掉本页可能残留的抵扣上下文(撞单切换到另一商品的发票时尤其如此)。
   if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
+  else tradein.clearApplied();
+  // 撞单「继续那一笔」可能是另一商品的发票:原地切换商品(productId 是 ref,报价 / 门 /
+  // 页头 backHref 全部重新派生),不做同路由 redirectTo —— uni H5 同路由重定向会让旧页的
+  // 卸载清掉新页刚登记的导航头。
+  productId.value = s.productId;
   interceptFired = true;
   activeSession.value = s;
   pending.setViewing(s.id);
@@ -1024,15 +1030,14 @@ async function openChainSession(): Promise<boolean> {
     // 弹框期间页面已离开 confirm 步(换号 / 离开)→ 什么都不做。
     if (step.value !== "confirm") return false;
     if (!dropOld) {
-      if (existing.productId === productId.value && pending.isLive(existing)) {
+      // 继续那一笔(同商品或另一商品都原地恢复;过期了就当没有,继续开新票)
+      if (pending.isLive(existing)) {
         adoptSession(existing);
         return false; // step already switched by adoptSession
       }
-      const url = `/pages/store/checkout?product=${encodeURIComponent(existing.productId)}&resume=${encodeURIComponent(existing.id)}`;
-      uni.redirectTo({ url, fail: () => navTo(url) });
-      return false;
+    } else {
+      pending.remove(existing.id);
     }
-    pending.remove(existing.id);
   }
   const ti = appliedTradeinView.value;
   const s = pending.begin({

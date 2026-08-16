@@ -1822,7 +1822,7 @@ export const en = {
     pendingStartAgain: "Start again",
     pendingCollisionTitle: "You have an unpaid order",
     pendingCollisionBody: "{name} · ${amount} is still waiting for payment ({left} left). Continue that one, or drop it and start this one? If you already sent funds to its address, keep it.",
-    pendingCollisionKeep: "Continue that order",
+    pendingCollisionKeep: "Resume it",
     pendingCollisionDrop: "Drop it, start new",
     pendingCancelTitle: "Cancel this payment?",
     pendingCancelBody: "If you already sent funds to this address, don't cancel — tap “I've completed the payment” instead.",

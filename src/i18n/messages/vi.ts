@@ -1751,7 +1751,7 @@ export const vi: Messages = {
     pendingCollisionTitle: "Bạn có một đơn chưa thanh toán",
     pendingCollisionBody: "{name} · ${amount} vẫn đang chờ thanh toán (còn {left}). Tiếp tục đơn đó, hay bỏ nó và bắt đầu đơn này? Nếu bạn đã chuyển tiền tới địa chỉ của nó, hãy giữ lại.",
     pendingCollisionKeep: "Tiếp tục đơn đó",
-    pendingCollisionDrop: "Bỏ đơn đó, tạo mới",
+    pendingCollisionDrop: "Bỏ, tạo đơn mới",
     pendingCancelTitle: "Hủy thanh toán này?",
     pendingCancelBody: "Nếu bạn đã chuyển tiền tới địa chỉ này, đừng hủy — hãy bấm “Tôi đã thanh toán xong”.",
     pendingCancelConfirm: "Hủy thanh toán",
