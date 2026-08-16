@@ -65,6 +65,8 @@ async function waitForServer(url, child, tailOutput, timeoutMs = 180_000) {
 
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
+const remotePort = await freePort();
+const remoteBaseUrl = `http://127.0.0.1:${remotePort}`;
 const npmCli = [
   process.env.npm_execpath,
   path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
@@ -74,19 +76,28 @@ const server = spawn(
   [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
   { cwd: root, env: { ...process.env, VITE_NEXGRID_API_MODE: "mock" }, shell: false, stdio: ["ignore", "pipe", "pipe"] },
 );
+const remoteServer = spawn(
+  npmCli ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm"),
+  [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(remotePort), "--strictPort"],
+  { cwd: root, env: { ...process.env, VITE_NEXGRID_API_MODE: "remote" }, shell: false, stdio: ["ignore", "pipe", "pipe"] },
+);
 let out = "";
 server.stdout.on("data", (c) => { out = (out + c).slice(-12_000); });
 server.stderr.on("data", (c) => { out = (out + c).slice(-12_000); });
+let remoteOut = "";
+remoteServer.stdout.on("data", (c) => { remoteOut = (remoteOut + c).slice(-12_000); });
+remoteServer.stderr.on("data", (c) => { remoteOut = (remoteOut + c).slice(-12_000); });
 
 let code = 1;
 try {
   await waitForServer(`${baseUrl}/?nx_device=off`, server, () => out);
-  console.log(`legacy-suite:已在 ${baseUrl} 起隔离 mock server(本工作树),开始跑 scripts/verify.sh`);
+  await waitForServer(`${remoteBaseUrl}/?nx_device=off`, remoteServer, () => remoteOut);
+  console.log(`legacy-suite:已在 ${baseUrl} 起隔离 mock server，并在 ${remoteBaseUrl} 起 remote 资金边界 server，开始跑 scripts/verify.sh`);
   const bash = findBash();
   if (!bash) throw new Error("BASH_RUNTIME_NOT_FOUND:请安装 Git Bash 或设置 BASH_EXE");
   const res = spawnSync(bash, ["scripts/verify.sh"], {
     cwd: root,
-    env: { ...process.env, BASE_URL: baseUrl, VITE_NEXGRID_API_MODE: "mock" },
+    env: { ...process.env, BASE_URL: baseUrl, REMOTE_BASE_URL: remoteBaseUrl, VITE_NEXGRID_API_MODE: "mock" },
     stdio: "inherit",
     shell: false,
   });
@@ -129,5 +140,6 @@ try {
   }
 } finally {
   stopTree(server);
+  stopTree(remoteServer);
 }
 process.exit(code);

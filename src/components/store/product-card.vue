@@ -77,21 +77,22 @@
           <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: copy.unlocks }) }}</text>
         </view>
 
-        <!-- Purchase gate — locked state (等级门/锁额) -->
+        <!-- Purchase gate — remote mode is server-authoritative and fail-closed. -->
         <view v-if="gateLockedView" class="mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
           <view class="flex items-center justify-between">
             <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
+              <text>{{ gateLabel }}</text>
             </view>
             <view v-if="!gate.soldOut" class="grid place-items-center" :style="gateToggleStyle">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </view>
           </view>
-          <view v-if="!gate.soldOut && gateDetailsOpen" class="mt-1.5 flex flex-wrap" style="gap: 6px">
+          <view v-if="!remoteApiEnabled && !gate.soldOut && gateDetailsOpen" class="mt-1.5 flex flex-wrap" style="gap: 6px">
             <text v-for="(c, i) in gateCondTexts" :key="i" :style="gateCondStyle">{{ c }}</text>
           </view>
-          <text v-if="!gate.soldOut && gateDetailsOpen" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
+          <text v-if="!remoteApiEnabled && !gate.soldOut && gateDetailsOpen" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
+          <text v-if="remoteApiEnabled && eligibility.status === 'error'" class="block" :style="gateMetaStyle">{{ t.store.purchaseEligibilityError }}</text>
         </view>
 
         <!-- Trade-in callout (legacy) -->
@@ -133,6 +134,7 @@ import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>(), {
   featured: false,
@@ -164,11 +166,34 @@ const bestTradeinCredit = computed(() => {
 });
 const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value > 0);
 
-// ── Purchase gate (等级门 + 锁额) — locked state + Buy redirect ──
-const { gate } = usePurchaseGate(() => props.product);
+// ── Purchase gate ──────────────────────────────────────────────────────────
+// Remote mode never evaluates the local V-rank/team snapshot. The server
+// eligibility response is the only source that can unlock this card.
+const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(() => props.product);
+const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id);
+const gate = computed(() => remoteApiEnabled
+  ? {
+      gated: true,
+      eligible: eligibility.value.status === "ready" && eligibility.value.eligible,
+      soldOut: eligibility.value.status === "ready"
+        && !eligibility.value.eligible
+        && /SOLD_OUT|OUT_OF_STOCK|STOCK/.test(eligibility.value.snapshot?.decisionCode ?? ""),
+      blocked: eligibility.value.status !== "ready" || !eligibility.value.eligible,
+      remaining: null,
+      conditions: [],
+      unmet: [],
+      progressPct: eligibility.value.status === "ready" && eligibility.value.eligible ? 1 : 0,
+    }
+  : localPurchaseGate!.gate.value);
 const gateDetailsOpen = ref(false);
 let lastGateToggleAt = 0;
 const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
+const gateLabel = computed(() => {
+  if (!remoteApiEnabled) return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.gateLockedEyebrow;
+  if (eligibility.value.status === "loading" || eligibility.value.status === "idle") return t.value.store.purchaseEligibilityLoading;
+  if (eligibility.value.status === "error") return t.value.store.purchaseEligibilityRetry;
+  return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.purchaseEligibilityIneligible;
+});
 const gateCondTexts = computed(() =>
   gate.value.conditions.map((c) => {
     if (c.kind === "rank") return fmt(t.value.store.gateCondRank, { n: c.need });
@@ -187,13 +212,22 @@ const gateProgressText = computed(() =>
   fmt(t.value.store.gateProgress, { pct: Math.round(gate.value.progressPct * 100) }),
 );
 const buyLabel = computed(() =>
-  gate.value.soldOut
+  remoteApiEnabled && (eligibility.value.status === "loading" || eligibility.value.status === "idle")
+    ? t.value.store.purchaseEligibilityLoading
+    : remoteApiEnabled && eligibility.value.status === "error"
+      ? t.value.store.purchaseEligibilityRetry
+      : gate.value.soldOut
     ? t.value.store.gateSoldOut
     : gate.value.blocked
       ? t.value.store.gateLockedEyebrow
       : t.value.store.cardBuyNow,
 );
 function onBuy() {
+  if (remoteApiEnabled) {
+    if (eligibility.value.status === "error") void retryEligibility();
+    else if (eligibility.value.status === "ready" && eligibility.value.eligible) goCheckout();
+    return;
+  }
   if (gate.value.blocked) {
     navTo("/pages/team/quota");
     return;
@@ -204,6 +238,10 @@ function toggleGateDetails() {
   const now = Date.now();
   if (now - lastGateToggleAt < 120) return;
   lastGateToggleAt = now;
+  if (remoteApiEnabled && eligibility.value.status === "error") {
+    void retryEligibility();
+    return;
+  }
   if (!gate.value.soldOut) gateDetailsOpen.value = !gateDetailsOpen.value;
 }
 

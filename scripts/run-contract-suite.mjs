@@ -33,6 +33,12 @@ const REGISTRY = {
   "remote-authority-simulation.test.mjs": { how: "chain" },
   "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
   "withdraw-idempotency-contract.test.mjs": { how: "chain" },
+  "gen2-withdraw-closure-contract.test.mjs": { how: "chain" },
+  "purchase-eligibility-ui-contract.test.mjs": { how: "chain" },
+  "purchase-eligibility-checkout-contract.test.mjs": { how: "chain" },
+  "final-commerce-closure-contract.test.mjs": { how: "chain" },
+  "remote-journey-closure-contract.test.mjs": { how: "chain" },
+  "remote-truth-boundary-contract.test.mjs": { how: "chain" },
   "remote-config-merge-contract.test.mjs": { how: "chain" },
   "remaining-feature-authority-contract.test.mjs": { how: "chain" },
   "nova-local-ai-contract.test.mjs": { how: "chain" },
@@ -66,10 +72,6 @@ const REGISTRY = {
   // ── 2026-08-12 同事第二批新增(收口据实登记:4 进链 · 2 缺兄弟仓 · 1 与拍板相反)──
   "commerce-acceptance-h5-launch-contract.test.mjs": { how: "chain" },
   "remote-registration-unknown-result-contract.test.mjs": { how: "chain" },
-  // ── 2026-08-16 摘门会话据实补登(昨夜 4c32a50/6d93739 新建未登记致门红;实跑 14 断言全绿)──
-  "final-commerce-closure-contract.test.mjs": { how: "chain" },
-  "remote-journey-closure-contract.test.mjs": { how: "chain" },
-  "remote-truth-boundary-contract.test.mjs": { how: "chain" },
   // 🔴 这批「跨仓」文件不是「缺仓就整份不跑」:兄弟仓缺席时只有跨仓那几条 test 带理由 skip,
   //    同文件里纯本仓的断言照跑(不连坐)。skip 不掩护真失败由 scripts/cross-repo-skip.redtest.mjs
   //    钉死(仓在场 → 那批 skip 必须逐条真跑真红),它挂在 test:cross-repo 末尾。

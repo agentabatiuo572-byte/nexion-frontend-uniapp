@@ -135,7 +135,7 @@
         <view class="rg-social">
           <view v-for="o in oauth" :key="o.label" class="rg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="startOauth(o.label)" @keydown.enter.prevent="startOauth(o.label)" @keydown.space.prevent="startOauth(o.label)">
             <view class="rg-social__ic" v-html="o.svg" />
-            <text class="rg-social__lbl">{{ o.label }}</text>
+            <text class="rg-social__lbl">{{ oauthDisplayLabel(o.label) }}</text>
           </view>
         </view>
       </view>
@@ -326,7 +326,15 @@ function showOauthUnavailable(provider: string) {
 }
 
 function oauthProvider(label: string): OAuthProvider | null {
-  return label === "Google" ? "GOOGLE" : label === "Apple" ? "APPLE" : null;
+  return label === "Google" ? "GOOGLE"
+    : label === "Apple" ? "APPLE"
+    : label === "Passkey" ? "PASSKEY"
+    : label === "Telegram" ? "TELEGRAM"
+    : null;
+}
+
+function oauthDisplayLabel(label: string): string {
+  return apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? `${label} · Mock` : label;
 }
 
 function oauthSubject(provider: OAuthProvider): string {

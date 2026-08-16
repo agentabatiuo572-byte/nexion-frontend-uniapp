@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-
-import { createTrialApi } from "../src/api/trial-api.ts";
+import ts from "typescript";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(path.join(root, file), "utf8");
+const trialSource = read("src/api/trial-api.ts")
+  .replace(/^import .*;\r?\n/gm, "");
+const compiledTrial = ts.transpileModule(
+  `const isCurrentCommerceSandboxRun = () => false;\n${trialSource}`,
+  { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
+).outputText;
+const { createTrialApi } = await import(`data:text/javascript;base64,${Buffer.from(compiledTrial).toString("base64")}`);
 
 function clientReturning(data) {
   const requests = [];

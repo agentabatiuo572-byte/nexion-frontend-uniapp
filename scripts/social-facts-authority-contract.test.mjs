@@ -46,6 +46,8 @@ test("genesis surfaces do not synthesize remote social proof", () => {
   // 免得日后有人把 remoteDefaults 的 soldSlots 改回 847 而门照绿。
   assert.match(store, /remoteApiEnabled \? remoteDefaults\(\)/);
   assert.match(store, /function remoteDefaults\(\)[\s\S]{0,240}soldSlots: 0/);
+  assert.match(store, /remoteApiEnabled \? remoteDefaults\(\) : hydrateGlobal\(\)/);
+  assert.match(store, /Remote mode starts unknown, never with the mock's seeded 847 slots/);
 });
 
 // 旧断言的前提是「remote 档只有 NEX 币价有服务端权威」,该前提已被 /api/app/home/overview 消除:
@@ -54,7 +56,9 @@ test("genesis surfaces do not synthesize remote social proof", () => {
 test("remote market board renders only the server-owned home truth rows", () => {
   const board = read("src/components/home/market-board-card.vue");
   assert.match(board, /homeTruth\?\.marketBoard\.workloads/);
+  assert.match(board, /app\.homeTruth\?\.marketBoard\.workloads \?\? \[\]/);
   assert.match(board, /v-if="!remoteApiEnabled"/);
+  assert.match(board, /v-if="homeMarketRows\.length"/);
   assert.match(board, /Unavailable/);
 });
 

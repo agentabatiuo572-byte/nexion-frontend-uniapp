@@ -272,6 +272,7 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 import { postMoneyBill, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
+import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "@/store/trial-config";
 import { resolveTrialAt, accruedShadow } from "@/store/trial-boundary";
@@ -282,9 +283,10 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
-import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
+import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
@@ -345,6 +347,42 @@ const tradein = useTradeinSheet();
 const phase = useProductPhase();
 
 const productId = ref("stellarbox-s1");
+const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
+const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+
+async function refreshPurchaseEligibility(): Promise<boolean> {
+  if (!remoteApiEnabled) return !purchaseGate.value.blocked;
+  remotePurchaseEligibilityStatus.value = "loading";
+  try {
+    const snapshot = await purchaseEligibilityApi.get(productId.value);
+    remotePurchaseEligibility.value = snapshot;
+    remotePurchaseEligibilityStatus.value = "ready";
+    return snapshot.eligible;
+  } catch {
+    remotePurchaseEligibility.value = null;
+    remotePurchaseEligibilityStatus.value = "error";
+    return false;
+  }
+}
+
+function remotePurchaseEligibilityFailureCopy(): string {
+  switch (resolvePurchaseEligibilityMessage(
+    remotePurchaseEligibilityStatus.value,
+    remotePurchaseEligibility.value,
+  )) {
+    case "quotaDepleted": return t.value.store.gateSoldOutToast;
+    case "ineligible": return t.value.store.gateBlockedToast;
+    default: return t.value.store.purchaseEligibilityError;
+  }
+}
+
+function purchaseEligibilityFailureCopy(): string {
+  if (remoteApiEnabled) return remotePurchaseEligibilityFailureCopy();
+  return purchaseGate.value.soldOut
+    ? t.value.store.gateSoldOutToast
+    : t.value.store.gateBlockedToast;
+}
+
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   // accept ?product= (canonical) or ?id= (per task spec)
@@ -377,11 +415,9 @@ onLoad(async (options) => {
   // Hard purchase gate (等级门/锁额): refuse checkout for ineligible / sold-out
   // SKUs — deep-link defense (store cards & detail already redirect blocked users
   // to /team/quota). Server re-checks on POST /api/orders (server-canonical).
-  if (purchaseGate.value.blocked) {
+  if (!(await refreshPurchaseEligibility())) {
     uni.showToast({
-      title: purchaseGate.value.soldOut
-        ? t.value.store.gateSoldOutToast
-        : t.value.store.gateBlockedToast,
+      title: purchaseEligibilityFailureCopy(),
       icon: "none",
     });
     navTo("/pages/team/quota");
@@ -986,6 +1022,12 @@ async function submitRemoteOrder(): Promise<void> {
     confirming = false;
     return;
   }
+  if (!(await refreshPurchaseEligibility())) {
+    confirming = false;
+    toast.warn(purchaseEligibilityFailureCopy());
+    step.value = "select-payment";
+    return;
+  }
   try {
     const tradeinContext = appliedTradeinView.value;
     if (tradein.appliedTradein && !tradeinContext) {
@@ -1295,7 +1337,13 @@ watch(step, async (s) => {
       }
       // 购买门支付时复验(同构纵深):onLoad 拦截后若经返回键回到留栈实例,
       // 支付时刻仍按门拒单(对抗审查 F4b)。
-      if (purchaseGate.value.blocked) {
+      // Remote mode already refreshed the server decision at the start of this
+      // submit. Do not let a stale client rank/team snapshot overrule that
+      // authority; the order endpoint performs the final transactional check.
+      const purchaseBlockedNow = remoteApiEnabled
+        ? remotePurchaseEligibility.value?.eligible !== true
+        : purchaseGate.value.blocked;
+      if (purchaseBlockedNow) {
         step.value = "select-payment";
         return;
       }

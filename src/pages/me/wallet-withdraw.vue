@@ -27,6 +27,16 @@
       <SubPageHeader back="/pages/me/wallet" title="USDT" :subtitle="t.wallet.withdraw" />
       <FundsSandboxBadge />
 
+      <view v-if="pendingAttempt" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
+        <view class="flex-1 min-w-0">
+          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">{{ t.walletV3.withdrawAmbiguousExitTitle }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px; line-height: 1.4">{{ t.walletV3.withdrawAmbiguousExitBody }}</text>
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px" @click="abandonPendingAttempt">
+            <text style="font-size: 12px; color: var(--v5-danger); text-decoration: underline">{{ abandoningAttempt ? `${t.walletV3.withdrawAbandonAttemptCta}…` : t.walletV3.withdrawAbandonAttemptCta }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- dev-only tester reset(?dev=1):清空当前账号提现地址簿,复现空态引导 -->
       <view v-if="devMode" class="mx-4 mb-3 flex items-center justify-end">
         <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetAddresses">
@@ -405,6 +415,56 @@ const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
 const withdrawalPolicyError = ref("");
+const pendingAttempt = ref(readWithdrawAttempt(app.accountKey));
+const abandoningAttempt = ref(false);
+
+function refreshPendingAttempt() {
+  pendingAttempt.value = readWithdrawAttempt(app.accountKey);
+}
+
+async function abandonPendingAttempt() {
+  const pending = readWithdrawAttempt(app.accountKey);
+  if (!pending || abandoningAttempt.value || submitting.value || confirmingSubmit.value) return;
+  const confirmed = await uiConfirm({
+    title: t.value.walletV3.withdrawAbandonAttemptTitle,
+    message: t.value.walletV3.withdrawAbandonAttemptBody,
+    danger: true,
+    icon: "warn",
+    confirmLabel: t.value.walletV3.withdrawAbandonAttemptCta,
+  });
+  if (!confirmed) return;
+  abandoningAttempt.value = true;
+  try {
+    if (remoteApiEnabled && !fundsSandboxEnabled) {
+      const result = await withdrawalApi.abandonAttempt({
+        idempotencyKey: pending.key,
+        amount: pending.amount,
+        chain: pending.network,
+        address: pending.address,
+        policyVersion: pending.policyVersion,
+        useNexFeeOffset: pending.offset,
+      });
+      forgetWithdrawAttempt(app.accountKey);
+      refreshPendingAttempt();
+      if (result.state === "COMMITTED") {
+        toast.info(t.value.walletV3.withdrawAbandonAlreadyCommitted);
+        await app.refreshRemoteFleet();
+        uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`, fail: () => {} });
+      } else {
+        toast.info(t.value.walletV3.withdrawAbandonSuccess);
+      }
+    } else {
+      // Explicit local funds sandbox has no production money side effect.
+      forgetWithdrawAttempt(app.accountKey);
+      refreshPendingAttempt();
+      toast.info(t.value.walletV3.withdrawAbandonSuccess);
+    }
+  } catch {
+    toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
+  } finally {
+    abandoningAttempt.value = false;
+  }
+}
 // The production withdrawal policy is deliberately irrelevant in an explicit
 // funds sandbox. Only the strict, authenticated wallet overview may project
 // this rail; a missing or contradictory policy leaves the page closed.
@@ -547,8 +607,8 @@ const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n
  *      · 新轨:改地址 → 重放仍发**冻结的旧地址**。风险是钱打到用户已经放弃的地址。
  *    取新轨:重复出账不可逆,而旧地址在换绑之前本来就是用户自己确认过的收款地址,
  *    且重发弹窗会把那个冻结地址(掩码)原样展示出来再确认一次。
- *    ⚠️ 残余缺口:用户若真想放弃这笔,**目前没有出口**(2026-08-12 独立审计 P1)。
- *    已记进本轮收口文档的待办,需主人拍板取哪种出口,不在本次修法内。
+ *    2026-08-16 已补齐出口：页面调用服务端 abandon/readback；只有服务端确认
+ *    ABANDONED 才清理本地尝试，若已 COMMITTED 则跳转真实订单，网络不确定继续保留。
  */
 
 /**
@@ -646,6 +706,7 @@ onMounted(() => {
 // 真正靠日限与最低额拦人的是**这一页**,而 App 端页面进栈后不销毁,不补拉就可能拿着
 // 好几天前的限额判人(R2 跨端镜头点名)。loader 自带在途守卫,重复触发是安全的。
 onShow(() => {
+  refreshPendingAttempt();
   void loadWithdrawalPolicy();
 });
 onUnmounted(() => {
@@ -1287,6 +1348,7 @@ async function handleSubmit() {
       fresh?.waivedGates ?? [],
     );
     forgetWithdrawAttempt(snap.account);
+    refreshPendingAttempt();
     clearSubmitFreeze();
     // (这里原本有一条 `if (!wd)` 的余额不足分支。submitWithdrawal 自 2026-08-10 起
     //  没有任何 return null 路径 —— 拒单全在服务端、一律抛 ApiError 走下面的 catch 分诊。
@@ -1343,7 +1405,12 @@ async function handleSubmit() {
       isDailyLimit: isDailyLimitRejection(err),
       isGeo: geo !== null,
     });
-    if (verdict.fate === "retire") forgetWithdrawAttempt(snap.account);
+    if (verdict.fate === "retire") {
+      forgetWithdrawAttempt(snap.account);
+      refreshPendingAttempt();
+    } else {
+      refreshPendingAttempt();
+    }
     // 🔴 刷费率只跟着判决走:重放时刷了 policyVersion 就变,而重放的 body 冻着旧版本,
     // 刷完再重放 = 同 key 异 body → 409 + 安全事件。
     if (verdict.refreshPolicy) await loadWithdrawalPolicy();

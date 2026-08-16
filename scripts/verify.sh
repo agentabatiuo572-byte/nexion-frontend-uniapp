@@ -3098,10 +3098,11 @@ bill_producer_gate
 # (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
 # 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
 withdraw_bill_runtime_gate() {
-  if probe_retry /tmp/uniapp-withdraw-bill-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
+  local withdraw_base_url="${REMOTE_BASE_URL:-$BASE_URL}"
+  if probe_retry /tmp/uniapp-withdraw-bill-runtime.log env BASE_URL="$withdraw_base_url" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
     ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
   else
-    bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
+    bad "提现账单行 runtime 门失败 — BASE_URL=$withdraw_base_url node scripts/withdraw-bill-runtime.mjs 看明细"
     grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
   fi
 }

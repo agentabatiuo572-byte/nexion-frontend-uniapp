@@ -8,7 +8,7 @@ describe("managed content copy API", () => {
       .mockResolvedValueOnce({
         copyKey: "home.conversion-banner.v1",
         version: "2026-08-15",
-        zh: "Chinese",
+        zh: "Simplified Chinese",
         en: "English",
         vi: "Tiếng Việt",
         experimentId: "home-banner",

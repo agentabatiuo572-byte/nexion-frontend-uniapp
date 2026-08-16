@@ -23,6 +23,17 @@ test("OAuth exchange posts an explicit sandbox subject and consumes server prove
   });
 });
 
+test.each(["PASSKEY", "TELEGRAM"] as const)("%s uses the same explicit isolated sandbox exchange", async (provider) => {
+  let request: any;
+  const api = createAuthApi({ request: async (value: unknown) => { request = value; return response(); } } as never,
+    createSessionVault());
+
+  await expect(api.oauthExchange({
+    provider, mode: "SANDBOX_MOCK", externalSubject: `app-${provider.toLowerCase()}-sandbox`,
+  })).resolves.toMatchObject({ source: "mock", sandbox: true });
+  expect(request.body.provider).toBe(provider);
+});
+
 test("OAuth exchange rejects a response that attempts to masquerade as a provider session", async () => {
   const api = createAuthApi({ request: async () => response({ source: "provider", sandbox: false }) } as never, createSessionVault());
   await expect(api.oauthExchange({

@@ -15,9 +15,10 @@ import type { Withdrawal } from "@/store/types";
  * H5 的 uni storage 就是 localStorage,同源多标签页共享,顺带把「两个标签页各铸一个键」
  * 也一起关掉。资金类幂等记录服务端永久保留(同上规格),故不设 TTL。
  *
- * ⚠️ 诚实边界:本仓没有 `GET /api/withdrawals` —— client 无法自己查「那张单到底建了没」。
- * 未确认的尝试只能靠重放拿到定局(成功 / 服务端明确拒绝 / 409)来收口。接了查询接口后,
- * 这里应改成先查权威再判,不再让用户重放。
+ * ⚠️ 收口边界:结果未知时既可原样重放,也可调用服务端 attempt abandon 接口。
+ * abandon 会与提交争用同一用户事务锁:若单已落库则回读 canonical withdrawal;
+ * 若尚未落库则写 ABANDONED tombstone,以后同 key 的提交会被服务端拒绝。客户端
+ * 只有收到这两个确定回执之一后才能退役本地冻结件,绝不能只删 localStorage。
  */
 export interface WithdrawAttempt {
   /** 随请求上送的 Idempotency-Key。 */
