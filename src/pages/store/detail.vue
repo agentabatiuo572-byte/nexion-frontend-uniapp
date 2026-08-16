@@ -239,7 +239,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { productCopy } from "@/lib/product-copy";
+import { productCopy, specText } from "@/lib/product-copy";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -325,15 +325,8 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
-// Spec values are server-owned strings; SPEC_UNAVAILABLE is the server's own
-// "no certified value" sentinel and a mock SKU may not carry the field at all.
-// Both degrade through one locale string — the raw token is never rendered.
-function specText(value: string | undefined): string {
-  return !value || value === SPEC_UNAVAILABLE ? t.value.store.specValueUnavailable : value;
-}
-
 const phoneDailyEarnValue = computed(() => {
-  const raw = product.value?.phoneDailyEarn;
+  const raw = product.value?.phoneDailyEarn; // spec-sentinel-ok: parsed for arithmetic, never rendered
   if (!raw || raw === SPEC_UNAVAILABLE) return 0;
   const match = raw.match(/[0-9]+(?:\.[0-9]+)?/);
   return match ? Number(match[0]) : 0;
@@ -369,12 +362,12 @@ const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
   if (!p) return [];
   const s = t.value.store;
   return [
-    { k: s.specGpu, v: specText(p.gpu) },
-    { k: s.specVram, v: specText(p.vram) },
-    { k: s.specPower, v: specText(p.power) },
-    { k: s.specDatacenter, v: specText(p.datacenter) },
-    { k: s.specUptime, v: specText(p.uptime) },
-    { k: s.specWarranty, v: specText(p.warranty) },
+    { k: s.specGpu, v: specText(t.value, p.gpu) },
+    { k: s.specVram, v: specText(t.value, p.vram) },
+    { k: s.specPower, v: specText(t.value, p.power) },
+    { k: s.specDatacenter, v: specText(t.value, p.datacenter) },
+    { k: s.specUptime, v: specText(t.value, p.uptime) },
+    { k: s.specWarranty, v: specText(t.value, p.warranty) },
   ];
 });
 
@@ -407,7 +400,7 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
-const phoneDailyEarnText = computed(() => specText(product.value?.phoneDailyEarn));
+const phoneDailyEarnText = computed(() => specText(t.value, product.value?.phoneDailyEarn));
 const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
 const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
 const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));

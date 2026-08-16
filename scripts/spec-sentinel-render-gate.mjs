@@ -28,18 +28,30 @@ const I18N_KEY = "specValueUnavailable";
 // 渲染面:商品域的页面与组件。这些文件里哨兵值只该以「import 进来的常量」出现,
 // 裸字面量一律是 bug。别的域(network-rank / fx / genesis)拿 "unavailable" 当状态枚举
 // 成员用是合法的,所以 Rule B 不扩到全仓。
-const RENDER_FACE = ["src/pages/store", "src/components/store"];
+// Rule B/C 的判定面 = 全部页面与组件。原先只圈 `*/store`,而独立审计实测:同类漏洞完全
+// 可能落在圈外(以及圈内但换个写法),把面收窄等于给自己留盲区。别的域(network-rank / fx /
+// genesis)拿 "unavailable" 当**状态枚举成员**是合法的 —— 那由 Rule B 只认整串字面量、
+// Rule C 只认 `.<字段名>` 属性读取来区分,不靠缩小扫描面来回避。
+const RENDER_FACE = ["src/pages", "src/components"];
+// Rule B(裸字面量)只圈商品域:别的域(network-rank / fx / genesis / geo)拿 "unavailable"
+// 当**状态枚举成员**是合法写法,在全域判它会淹没在误报里。Rule C 靠字段名精确定位,不受此限。
+const LITERAL_FACE = ["src/pages/store", "src/components/store"];
 // 降级映射的函数名。Rule C 认它;改名会让 Rule C 全体判红,改名的人必须同步这里 —— 比
 // 「悄悄失效」好:门宁可吵,不可瞎。
 const MAPPER = "specText";
+// 非展示用途(取数值去算术等)的显式豁免标记,写在该行。默认收紧、例外留痕。
+const EXEMPT_MARK = "spec-sentinel-ok";
 const SCAN_EXT = /\.(vue|ts)$/;
 const SKIP = /\.(test|spec)\.ts$/;
 
+// 抹掉注释内容但**保留行结构** —— 换行留着,其余字符换成空格。行号必须和原文严格对齐,
+// 否则报出来的位置是错的(实测:压缩式剥离让报告指向隔壁无关行,读的人会以为门在乱叫)。
+const blank = (s) => s.replace(/[^\n]/g, " ");
 function stripComments(src) {
   return src
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:\\])\/\/[^\n]*/g, "$1");
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/(^|[^:\\])(\/\/[^\n]*)/g, (_m, pre, cmt) => pre + blank(cmt));
 }
 
 function walk(dir, out = []) {
@@ -74,31 +86,55 @@ function readSentinelFields(contractSrc) {
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** 求 `MAPPER(` 每次调用的实参区间(括号配对),用于判「这次字段读取是不是裹在映射里」。 */
+function mapperSpans(text) {
+  const spans = [];
+  const call = new RegExp(`\\b${escape(MAPPER)}\\s*\\(`, "g");
+  for (const m of text.matchAll(call)) {
+    let depth = 0;
+    for (let i = m.index + m[0].length - 1; i < text.length; i += 1) {
+      if (text[i] === "(") depth += 1;
+      else if (text[i] === ")") { depth -= 1; if (depth === 0) { spans.push([m.index, i]); break; } }
+    }
+  }
+  return spans;
+}
+
 function scanSource(file, src, sentinel, fields = []) {
   const hits = [];
   const clean = stripComments(src);
   const lines = clean.split(/\r?\n/);
+  const rawLines = src.split(/\r?\n/);
   // Rule A:?? / || 兜底到哨兵 —— 字面量与常量名两种写法都判(防「改成引用常量」逃逸)。
   const fallback = new RegExp(`(\\?\\?|\\|\\|)\\s*(["']${escape(sentinel.value)}["']|${escape(sentinel.name)})`);
   // Rule B:渲染面里的裸字面量。整串相等才算,`purchaseUnavailable` 这类标识符不误伤。
   const literal = new RegExp(`["']${escape(sentinel.value)}["']`);
-  // Rule C:🔴 A/B 都只看得见**写出来的字面量**。`{ k: s.specGpu, v: p.gpu }` 一个字面量都没有,
-  // 服务端把 gpu 下发成哨兵值时照样原样渲染 —— 实测漏网(2026-08-16 自查抓到,契约测试第 21 行
-  // 明写服务端可对 gpu/vram 下发哨兵)。所以再判一条:渲染面的展示行取值(`v:` / `value:`)只要
-  // 引用了 displayString 字段,就必须裹在降级映射里。
-  const rowValue = /\b(?:v|value):\s*([^,}]+)/g;
   const onRenderFace = RENDER_FACE.some((d) => file.startsWith(`${d}/`));
+  const onLiteralFace = LITERAL_FACE.some((d) => file.startsWith(`${d}/`));
   lines.forEach((line, i) => {
     if (fallback.test(line)) { hits.push({ file, line: i + 1, rule: "A", text: line.trim() }); return; }
-    if (onRenderFace && literal.test(line)) { hits.push({ file, line: i + 1, rule: "B", text: line.trim() }); return; }
-    if (!onRenderFace || fields.length === 0) return;
-    for (const [, expr] of line.matchAll(rowValue)) {
-      const touches = fields.find((f) => new RegExp(`\\.\\s*${escape(f)}\\b`).test(expr));
-      if (touches && !new RegExp(`${escape(MAPPER)}\\s*\\(`).test(expr)) {
-        hits.push({ file, line: i + 1, rule: "C", text: line.trim(), field: touches });
-      }
-    }
+    if (onLiteralFace && literal.test(line)) hits.push({ file, line: i + 1, rule: "B", text: line.trim() });
   });
+  if (!onRenderFace || fields.length === 0) return hits;
+
+  // Rule C:🔴 A/B 都只看得见**写出来的字面量**,而绝大多数漏网形态一个字面量都没有 ——
+  // `{ k: s.specGpu, v: p.gpu }`、`{{ product.gpu }}`、`const g = p.gpu` 转手一道再渲染,
+  // 三种都逃得掉(前两种实测各漏过一次:自查抓到 detail.vue 的 gpu/vram,独立审计抓到
+  // locked-product-card.vue 的模板插值)。所以判据不再猜「哪里是展示位」——**渲染面上任何
+  // 一次读取都必须裹在降级映射里**,读了不裹就是违规;确有非展示用途(取数值去算术)在该行
+  // 写 `spec-sentinel-ok` 显式豁免。默认收紧、例外留痕,比枚举展示位形态稳。
+  const spans = mapperSpans(clean);
+  const inMapper = (idx) => spans.some(([a, b]) => idx > a && idx < b);
+  const lineOf = (idx) => clean.slice(0, idx).split(/\r?\n/).length;
+  for (const f of fields) {
+    for (const m of clean.matchAll(new RegExp(`\\.\\s*${escape(f)}\\b`, "g"))) {
+      if (inMapper(m.index)) continue;
+      const ln = lineOf(m.index);
+      // 标记写在本行或紧邻上一行都认(模板里同行塞注释很难看,沿用 eslint-disable-next-line 的习惯)。
+      if (`${rawLines[ln - 2] ?? ""}\n${rawLines[ln - 1] ?? ""}`.includes(EXEMPT_MARK)) continue;
+      hits.push({ file, line: ln, rule: "C", text: (rawLines[ln - 1] ?? "").trim(), field: f });
+    }
+  }
   return hits;
 }
 
@@ -164,9 +200,11 @@ function selftest() {
   const O = "src/store/genesis.ts";          // 非渲染面
   const cases = [
     // ── 阳性:必须抓到 ──
-    ["🔴 原样回归:?? 兜底到字面量", P, 'const v = computed(() => p.value?.warranty ?? "unavailable");', 1],
-    ["🔴 || 兜底同样算(换个运算符不逃逸)", P, 'const v = p.warranty || "unavailable";', 1],
-    ["🔴 间接引用:兜底到常量名而非字面量", P, "const v = p.warranty ?? SPEC_UNAVAILABLE;", 1],
+    // 下面三格在渲染面各中 2 条(A 兜底 + C 裸读):同一行确实同时犯了两个错,只修兜底
+    // 而不裹降级映射仍然会把服务端下发的哨兵值渲染出去,所以两条都报是对的。
+    ["🔴 原样回归:?? 兜底到字面量(A+C)", P, 'const v = computed(() => p.value?.warranty ?? "unavailable");', 2],
+    ["🔴 || 兜底同样算(换个运算符不逃逸)(A+C)", P, 'const v = p.warranty || "unavailable";', 2],
+    ["🔴 间接引用:兜底到常量名而非字面量(A+C)", P, "const v = p.warranty ?? SPEC_UNAVAILABLE;", 2],
     ["🔴 非渲染面的 ?? 兜底也判(Rule A 全仓生效)", O, 'const v = x ?? "unavailable";', 1],
     ["🔴 渲染面裸字面量(不经 ?? 也算,防挪位)", P, 'rows.push({ k: s.specWarranty, v: "unavailable" });', 1],
     ["🔴 渲染面裸字面量在模板里", P, "<template><text>{{ ok ? v : 'unavailable' }}</text></template>", 1],
@@ -179,16 +217,25 @@ function selftest() {
     ["子串包含:更长的句子里含该词不误伤", P, 'const msg = "service unavailable now";', 0],
     ["注释里写了不算违规", P, '// 兜底禁止写成 ?? "unavailable"', 0],
     ["块注释里写了不算违规", P, '/* 曾经是 p.warranty ?? "unavailable" */', 0],
-    // ── Rule C:一个字面量都没有的裸渲染(A/B 对这形态全瞎,2026-08-16 实测漏网 gpu/vram)──
-    ["🔴 展示取值裸引用 displayString 字段(无任何字面量)", P, "rows.push({ k: s.specGpu, v: p.gpu });", 1],
-    ["🔴 同上,可选链写法", P, "{ k: s.specWarranty, v: product.value?.warranty },", 1],
-    ["🔴 同上,value: 键名", P, "{ label: s.specUptime, value: p.uptime },", 1],
-    ["🔴 一行里两个裸取值各算一条", P, "[{ v: p.gpu }, { v: p.vram }]", 2],
-    ["合法:裹了降级映射", P, "{ k: s.specGpu, v: specText(p.gpu) },", 0],
-    ["合法:非展示位读原值做数值解析(不是 v:/value:)", P, "const raw = product.value?.phoneDailyEarn;", 0],
+    // ── Rule C:一个字面量都没有的裸读取。判据是「渲染面读了就必须裹」,不猜哪里是展示位 ──
+    // 前两格是实际漏网过的形态:对象字面量取值(自查抓到 detail.vue 的 gpu/vram)、
+    // 模板插值(独立审计抓到 locked-product-card.vue)。旧判据只认 `v:`/`value:`,对后者全瞎。
+    ["🔴 对象字面量取值裸读", P, "rows.push({ k: s.specGpu, v: p.gpu });", 1],
+    ["🔴 模板插值裸读(旧判据对这形态全瞎)", P, "<template><text>{{ product.gpu }}</text></template>", 1],
+    ["🔴 可选链裸读", P, "{ k: s.specWarranty, v: product.value?.warranty },", 1],
+    ["🔴 间接引用:先赋给局部变量再渲染", P, "const g = p.gpu;", 1],
+    ["🔴 跨行:取值换到下一行", P, "{\n  v:\n    p.uptime,\n}", 1],
+    ["🔴 字符串模板拼接裸读", P, "const s = `${p.gpu} · ${p.vram}`;", 2],
+    ["🔴 一行里两个裸读各算一条", P, "[{ v: p.gpu }, { v: p.vram }]", 2],
+    ["合法:裹了降级映射", P, "{ k: s.specGpu, v: specText(t.value, p.gpu) },", 0],
+    ["合法:嵌套在映射实参里的第二个字段也算裹住", P, "`${specText(t, p.gpu)} · ${specText(t, p.vram)}`", 0],
+    ["合法:本行显式豁免标记", P, "const raw = product.value?.phoneDailyEarn; // spec-sentinel-ok: 取数值算术", 0],
+    ["合法:上一行显式豁免标记(模板里同行塞注释难看)", P, "<!-- spec-sentinel-ok: 不是目录字段 -->\n<text>{{ it.vram }}</text>", 0],
+    ["🔴 豁免标记在更早的行不生效(防一条标记罩一整段)", P, "// spec-sentinel-ok\nconst a = 1;\nconst g = p.gpu;", 1],
     ["合法:非渲染面的同名字段读取不判", O, "{ v: p.warranty },", 0],
     ["子串包含:字段名作为更长标识符的一部分不误伤", P, "{ v: p.warrantyBadgeUrl },", 0],
-    ["合法:展示取值引用的是非哨兵字段", P, "{ k: s.specSold, v: p.sold },", 0],
+    ["合法:读的是非哨兵字段", P, "{ k: s.specSold, v: p.sold },", 0],
+    ["合法:注释里提到字段不算读取", P, "// 这里以前是 p.gpu", 0],
   ];
   let failed = 0;
   for (const [name, file, src, want] of cases) {
