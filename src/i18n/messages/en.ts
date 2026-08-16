@@ -1829,7 +1829,7 @@ export const en = {
     pendingCancelConfirm: "Cancel payment",
     pendingCancelKeep: "Keep paying",
     pendingResumeGone: "That order's payment window has closed — start again from the product.",
-    pendingSettledElsewhere: "This payment was already completed or cancelled elsewhere — review your order to pay again.",
+    pendingSettledElsewhere: "This payment was already completed or cancelled elsewhere — choose a payment method to pay again.",
     coSendExact: "Send the exact amount in one transaction · Send only on {network}",
     coCardSelect: "Select card",
     coCardSecurity: "256-bit TLS · PCI DSS token",

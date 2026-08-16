@@ -196,4 +196,27 @@ describe("usePendingCheckout (mock leg)", () => {
     // memory now mirrors disk → the bar can surface the other tab's invoice
     expect(store.sessions.map((s) => s.id)).toEqual(["pc-other"]);
   });
+
+  it("refreshFromDisk() heals the read side: expired rows pruned, extra live rows collapsed to the earliest one (memory AND disk)", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const live = store.begin(INPUT)!;
+    // another (older) client appended a second live row + an expired one straight to disk
+    const table = memory.get(TABLE) as Record<string, { sessions: unknown[]; rev?: number }>;
+    const row = table["acct-a"]!;
+    const now = Date.now();
+    row.sessions = [
+      { ...live, id: "pc-expired", createdAt: now - 40 * 60_000, expiresAt: now - 10 * 60_000 },
+      live,
+      { ...live, id: "pc-second", createdAt: now + 1, expiresAt: now + 25 * 60_000 },
+    ];
+    memory.set(TABLE, table);
+    store.refreshFromDisk();
+    expect(store.sessions.map((s) => s.id)).toEqual([live.id]);
+    expect(diskSessions("acct-a").map((s) => s.id)).toEqual([live.id]);
+    // a normal row is a read-only sync (no rewrite): rev unchanged across a second refresh
+    const revBefore = (memory.get(TABLE) as Record<string, { rev?: number }>)["acct-a"]!.rev;
+    store.refreshFromDisk();
+    expect((memory.get(TABLE) as Record<string, { rev?: number }>)["acct-a"]!.rev).toBe(revBefore);
+  });
 });

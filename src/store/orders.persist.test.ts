@@ -41,6 +41,22 @@ describe("useOrders.createOrder persistence contract", () => {
     expect(again.orders.map((o) => o.id)).toEqual([ord!.id]);
   });
 
+  it("createOrders is one write: a batch is all-or-nothing (no partial batch on disk)", () => {
+    const store = useOrders();
+    store.bindAccount("acct-a");
+    const inputs = [INPUT, { ...INPUT, productId: "stellarbox-pro" as const, productName: "Pro", unitPrice: 1199 }, INPUT];
+    storageBroken = true;
+    expect(store.createOrders(inputs)).toBeNull();
+    expect(store.orders).toHaveLength(0);
+    storageBroken = false;
+    const batch = store.createOrders(inputs);
+    expect(batch).toHaveLength(3);
+    expect(store.orders).toHaveLength(3);
+    setActivePinia(createPinia());
+    const again = useOrders();
+    again.bindAccount("acct-a");
+    expect(again.orders.map((o) => o.id).sort()).toEqual(batch!.map((o) => o.id).sort());
+  });
   it("returns null and leaves NO memory-only order when the write fails", () => {
     const store = useOrders();
     store.bindAccount("acct-a");

@@ -11,6 +11,9 @@
  *     (storage 0 张)→ 再 Pay now → 只有 1 张、且是新地址;绝不并存两张(两张 = 两个地址同时催付、
  *     落单后旧票成孤儿拉人二次付款)。
  *   D 到点即死:把 expiresAt 注入成 3s 后 → 重载 → 浮动条先在、到点后消失、storage 剪成 0。
+ *   E 一票只结算一次:两个标签页共用同一张票,第二个结算后第一个再点「已完成」不再扣款 / 建单。
+ *   F 抵扣上下文不被同栈的第二个结算页实例抹掉(审计 R5 P0):A 带旧机抵扣开票(票面 634.08)→ push 第二个
+ *     结算页实例 → 返回 A → 付款 → 恰按票面成交、旧机下架、订单记 tradeInCredit;不出现「金额已变」拒单 + 销票。
  *
  * 判据全部是构造性的(读页面文本 / storage / 订单数),不扫源码形状。
  * Usage: BASE_URL=http://127.0.0.1:<port> node scripts/pending-checkout-runtime.mjs
@@ -93,7 +96,9 @@ async function readState(page) {
     const text = (scope?.innerText || "").replace(/\s+/g, " ");
     return {
       hash: location.hash,
-      sessions: sessions.map((s) => ({ id: s.id, address: s.address, amountUsdt: s.amountUsdt, expiresAt: s.expiresAt, leftNoticeShown: s.leftNoticeShown })),
+      sessions: sessions.map((s) => ({ id: s.id, address: s.address, amountUsdt: s.amountUsdt, expiresAt: s.expiresAt, leftNoticeShown: s.leftNoticeShown, tradeIn: s.quote?.tradeIn ?? null })),
+      lastOrder: (() => { const o = Object.values(orders).flatMap((row) => row?.orders ?? [])[0]; return o ? { total: o.total, tradeInCredit: o.tradeInCredit ?? 0, tradeInDeviceId: o.tradeInDeviceId ?? null } : null; })(),
+      pageStack: typeof getCurrentPages === "function" ? getCurrentPages().length : null,
       orderCount,
       onPayStep: /completed the payment/.test(text),
       address: text.match(/T[0-9A-F]{33}|0x[0-9a-f]{40}/)?.[0] ?? null,
@@ -115,6 +120,24 @@ async function goToPayStep(page) {
   await page.waitForTimeout(400);
   const st = await readState(page);
   if (!st.onPayStep || !st.address || st.sessions.length !== 1) fail(`could not reach the pay step: ${JSON.stringify(st)}`);
+  return st;
+}
+
+/** Same as goToPayStep, but accept the trade-in the entry sheet offers (mock seed: Cloud Share → S1). */
+async function goToPayStepWithTradeIn(page) {
+  await page.goto(directAppUrl(BASE, CHECKOUT), { waitUntil: "networkidle", timeout: 30000 });
+  await page.waitForTimeout(1500);
+  const sheet = page.locator(".tis-root .tis-opt");
+  if ((await sheet.count()) === 0) fail("F: trade-in choice sheet did not appear on checkout entry (mock seed changed?)");
+  await sheet.first().click({ timeout: 5000 });
+  await page.waitForTimeout(800);
+  await page.locator(".tis-root .tis-cta").first().click({ timeout: 5000 });
+  await page.waitForTimeout(800);
+  await tapButton(page, "Continue");
+  await tapButton(page, "Pay now");
+  await page.waitForTimeout(400);
+  const st = await readState(page);
+  if (!st.onPayStep || !st.address || st.sessions.length !== 1) fail(`F: could not reach the pay step with a trade-in: ${JSON.stringify(st)}`);
   return st;
 }
 
@@ -253,8 +276,34 @@ try {
     await ctx.close();
   }
 
+  // ── F: a second checkout instance on the stack must not wipe the first one's trade-in context ──
+  {
+    const { ctx, page, errors } = await openPage(null);
+    const t0 = await goToPayStepWithTradeIn(page);
+    if (!t0.sessions[0].tradeIn) fail(`F: invoice did not record the trade-in: ${JSON.stringify(t0.sessions)}`);
+    // push a second checkout instance (same route — exactly what the floating bar / add-card return do), then come back
+    await page.evaluate(() => uni.navigateTo({ url: "/pages/store/checkout?product=stellarbox-s1" }));
+    await page.waitForTimeout(1500);
+    await dismissSheets(page);
+    const stacked = await readState(page);
+    if (stacked.pageStack !== 2) fail(`F: second checkout instance was not pushed (stack=${stacked.pageStack})`);
+    await goBack(page);
+    const back = await readState(page);
+    if (!back.onPayStep || back.sessions.length !== 1 || back.address !== t0.address) fail(`F: first instance lost its invoice after the second one unloaded: ${JSON.stringify(back)}`);
+    await tapButton(page, "I've completed the payment →");
+    await page.waitForTimeout(4500);
+    const paid = await readState(page);
+    if (paid.orderCount !== t0.orderCount + 1) fail(`F: trade-in invoice did not settle after a sibling instance unloaded (orders ${t0.orderCount} → ${paid.orderCount}; toast=${paid.toast})`);
+    if (paid.sessions.length !== 0) fail(`F: invoice still on the books after settlement (${paid.sessions.length})`);
+    if (!paid.lastOrder || Math.abs(paid.lastOrder.total - t0.sessions[0].amountUsdt) > 0.000001) fail(`F: settled amount ≠ invoice face (${JSON.stringify(paid.lastOrder)} vs ${t0.sessions[0].amountUsdt})`);
+    if (paid.lastOrder.tradeInDeviceId !== t0.sessions[0].tradeIn.deviceId) fail(`F: order lost the trade-in device (${JSON.stringify(paid.lastOrder)})`);
+    report.F = { address: t0.address, face: t0.sessions[0].amountUsdt, order: paid.lastOrder, errors };
+    assertNoRuntimeErrors(errors, "pending-checkout F");
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(report, null, 2));
-  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune · E two tabs settle once)");
+  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune · E two tabs settle once · F sibling instance keeps trade-in)");
 } finally {
   await browser.close();
 }

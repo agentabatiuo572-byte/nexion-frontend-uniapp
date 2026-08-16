@@ -190,9 +190,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     };
   }
 
-  function persist() {
-    if (remoteApiEnabled) return;
-    writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
+  /** 远端档不落本地盘 = 预期结果;mock 档如实返回写入结果(convert 据此决定终态算不算落定)。 */
+  function persist(): boolean {
+    if (remoteApiEnabled) return true;
+    return writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
   }
 
   /** 边界推进唯一入口:resolve 后有变化才落盘(poll/convert 共用;渲染路径禁调)。 */
@@ -454,9 +455,17 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const now = mockServerNow();
     const resolved = advanceTo(now);
     if (resolved.status !== "active" && resolved.status !== "grace") return { ok: false, reason: "used" };
+    const prevStatus = status.value;
+    const prevFinishedAt = finishedAt.value;
     status.value = "converted";
     finishedAt.value = now;
-    persist();
+    // 终态必须落盘才算裁决成立:写不进去就退回内存,报 ok:false —— 否则调用方按「已转化」发放试用减免与
+    // 入账,刷新后试用行仍是 active,同一份福利可再吃一次(审计 R5 P1)。
+    if (!persist()) {
+      status.value = prevStatus;
+      finishedAt.value = prevFinishedAt;
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 
