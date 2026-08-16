@@ -60,6 +60,15 @@ export const LADDER = [
   { file: "src/components/device/standalone-page-shell.vue", sel: ".nx-standalone-home", role: "模拟设备 chrome(硬件层,pointer-events:none)" },
 ];
 
+/* ── 契约 ③:庆祝浮层必须低于全部业务浮层 ──────────────────────────────────
+   秩序表(captcha-slider.vue 单源)原文:「里程碑庆祝 —— 必须在业务 UI 之下」。
+   业务浮层带 = 秩序表里 790/800 业务半屏 → 900 说明半屏 → 8000/8001 分享半屏 这一段;
+   下沿取 700(底盘 chrome 最高 200,留足缓冲),上沿取 8999(9000 起是瞬时层/阻断层,
+   庆祝低于它们已由阶梯①覆盖,不重复断言)。 */
+export const BUSINESS_BAND_FLOOR = 700;
+export const BUSINESS_BAND_CEIL = 8999;
+export const MILESTONE_FILE = "src/components/milestone-celebration.vue";
+
 /* ── 契约 ②:允许高于滑块的白名单(只有模拟硬件 chrome)────────────────────── */
 export const CEILING_EXEMPT = [
   { file: "src/components/device/standalone-page-shell.vue", reason: "模拟设备状态栏 / Home Indicator = 硬件层,与居中卡片零几何重叠,indicator 还是 pointer-events:none" },
@@ -90,6 +99,30 @@ export function evaluate(files = readVueFiles()) {
     const a = rungs[i - 1], b = rungs[i];
     if (a.z !== null && b.z !== null && !(a.z < b.z))
       problems.push(`序反了:${a.sel}(${a.z}) 必须 < ${b.sel}(${b.z}) —— ${b.role}`);
+  }
+
+  // ③ 庆祝浮层必须低于**全部业务浮层**(2026-08-16 补:秩序表原文一直写着这句,
+  //    数值却压在业务半屏之上,而阶梯①只排了登录/注册页共挂的 6 层,业务半屏一条
+  //    都不在表里 —— 于是「契约被违反」和「门是绿的」同时成立了很久)。
+  //    判据用**扫描出的整条业务浮层带**而不是手写清单:手写清单认不出新加进来的面。
+  const msZ = rungs.find((r) => r.sel === ".ms-overlay")?.z ?? null;
+  const businessBand = scanAll(files).filter(
+    (h) => h.z >= BUSINESS_BAND_FLOOR && h.z <= BUSINESS_BAND_CEIL && h.file !== MILESTONE_FILE,
+  );
+  if (msZ === null) {
+    problems.push("庆祝层级解析不到:无法判定它是否压在业务 UI 之下");
+  } else if (businessBand.length === 0) {
+    // 扫描面塌空 = 假绿的经典形态:期望本就是空集时,「不许出现 X」永远成立。
+    problems.push(
+      `业务浮层带扫不到任何成员(${BUSINESS_BAND_FLOOR}–${BUSINESS_BAND_CEIL})—— 判据失去扫描面,按红处理`,
+    );
+  } else {
+    const lowest = businessBand.reduce((a, b) => (a.z <= b.z ? a : b));
+    if (msZ >= lowest.z)
+      problems.push(
+        `庆祝压在业务 UI 之上:.ms-overlay(${msZ}) 必须 < ${lowest.file}:${lowest.line}(${lowest.z})` +
+          ` —— 秩序表原文「里程碑庆祝必须在业务 UI 之下」`,
+      );
   }
 
   // ② 天花板
@@ -131,6 +164,31 @@ function selftest() {
   for (const r of [LADDER[4], LADDER[3]]) {
     const files = patch(r.file, (t) => t.replace(new RegExp(`(${r.sel.replace(/\./g, "\\.")}\\s*\\{[^}]*?)z-index:\\s*\\d+;\\s*`, "s"), "$1"));
     p(`红测①-删除 ${r.sel} 的 z-index 行必红(降数/删成员方向)`, evaluate(files).problems.some((x) => x.startsWith("层级值解析不到")));
+  }
+
+  // ③ 庆祝 vs 业务浮层:三条轴各自单独踩坏
+  {
+    // 轴 1「回退」:把庆祝改回事故值 8900(压在 790/800 业务半屏之上)。
+    const files = patch(MILESTONE_FILE, (t) => t.replace(/(\.ms-overlay\s*\{[^}]*?z-index:\s*)\d+/s, "$18900"));
+    p("红测③-事故现场 .ms-overlay 改回 8900 必红(压在业务半屏之上)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 轴 2「新成员」:新加一个业务半屏,其 z 低于庆祝 —— 手写清单式判据对这条是瞎的。
+    const files = clone();
+    files.push({ rel: "src/components/fake-new-sheet.vue", text: "<style scoped>\n.fake-sheet { position: fixed; z-index: 750; }\n</style>" });
+    p("红测③-新成员 新增 750 业务半屏必红(庆祝 780 反而压在它上面)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")));
+  }
+  {
+    // 轴 3「扫描面塌空」:业务带一个成员都扫不到时不许判绿 —— 期望是空集的断言天然假绿。
+    const files = base.filter((f) => {
+      const hits = scanAll([f]);
+      return !hits.some((h) => h.z >= BUSINESS_BAND_FLOOR && h.z <= BUSINESS_BAND_CEIL && h.file !== MILESTONE_FILE);
+    });
+    p("红测③-塌空 业务带扫不到成员时必红(不许因『没找到违例』而假绿)",
+      evaluate(files).problems.some((x) => x.startsWith("业务浮层带扫不到任何成员")));
   }
 
   // ② 天花板:新加一个高于滑块的业务浮层
