@@ -33,21 +33,15 @@ import { navTo } from "@/lib/route";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown } from "@/store/pending-checkout-core";
 
-const props = defineProps<{
+defineProps<{
   /** px from the chassis top — chassis passes status bar + header clearance. */
   top: number;
-  /** current uni route (chassis-resolved), e.g. "pages/store/checkout". */
-  route: string;
 }>();
 
 const t = useT();
 const pending = usePendingCheckout();
 
-const session = computed(() => {
-  const s = pending.current;
-  if (!s || s.id === pending.viewingId) return null;
-  return s;
-});
+const session = computed(() => pending.barSession);
 const amountText = computed(() => (session.value ? session.value.amountUsdt.toLocaleString() : ""));
 const countdown = computed(() => (session.value ? formatCountdown(pending.secondsLeft(session.value)) : "00:00"));
 const ariaLabel = computed(() => `${t.value.store.pendingBarLabel} $${amountText.value} · ${countdown.value} · ${t.value.store.pendingBarResume}`);
@@ -55,14 +49,9 @@ const ariaLabel = computed(() => `${t.value.store.pendingBarLabel} $${amountText
 function resume() {
   const s = session.value;
   if (!s) return;
-  const url = `/pages/store/checkout?product=${encodeURIComponent(s.productId)}&resume=${encodeURIComponent(s.id)}`;
-  // Already on a checkout page (for another product / a fresh attempt): replace it
-  // instead of stacking a second checkout underneath.
-  if (props.route === "pages/store/checkout") {
-    uni.redirectTo({ url, fail: () => navTo(url) });
-    return;
-  }
-  navTo(url);
+  // Always push (also from another checkout page): a same-route redirectTo lets the
+  // old page's teardown clear the nav header the new page just registered (uni H5).
+  navTo(`/pages/store/checkout?product=${encodeURIComponent(s.productId)}&resume=${encodeURIComponent(s.id)}`);
 }
 </script>
 

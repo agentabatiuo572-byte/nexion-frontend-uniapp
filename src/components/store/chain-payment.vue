@@ -19,7 +19,7 @@
       </view>
       <view class="flex-1 min-w-0">
         <text class="block" :style="headerTitleStyle">{{ sendLabel }}</text>
-        <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ expired ? t.store.pendingExpiredTitle : t.store.coNetworkConfirms }}</text>
+        <text v-if="!expired" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.store.coNetworkConfirms }}</text>
       </view>
       <view class="flex items-center tabular-nums" style="gap: 4px; font-size: 12px; color: var(--v5-warning)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
@@ -90,6 +90,7 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { mockServerNow } from "@/store/server-time";
 import { formatCountdown, sessionSecondsLeft, type PendingCheckoutSession } from "@/store/pending-checkout-core";
+import { fnv1a, mulberry32 } from "@/store/deposits-core";
 
 const props = defineProps<{ session: PendingCheckoutSession }>();
 const emit = defineEmits<{ complete: []; cancel: []; restart: [] }>();
@@ -150,15 +151,12 @@ function emitRestart() {
 const QR_SIZE = 21;
 const cell = 120 / QR_SIZE;
 const qrCells = computed<{ i: number; x: number; y: number }[]>(() => {
-  const seed = props.session.address;
+  // Seeded PRNG shared with the deposit pane (deposits-core). The old inline LCG
+  // multiplied past 2^53 and lost its low bits → every address drew an all-white
+  // grid with only the finder squares (looked broken).
+  const rnd = mulberry32(fnv1a(props.session.address));
   const arr: boolean[] = [];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0xffffffff;
-  let s = Math.abs(hash);
-  for (let i = 0; i < QR_SIZE * QR_SIZE; i++) {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    arr.push((s & 1) === 1);
-  }
+  for (let i = 0; i < QR_SIZE * QR_SIZE; i++) arr.push(rnd() > 0.52);
   // Force the 3 finder squares (TL / TR / BL) — classic QR look
   const setSquare = (cx: number, cy: number) => {
     for (let y = 0; y < 7; y++)

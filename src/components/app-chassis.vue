@@ -98,7 +98,7 @@
              clipped everything above the header so there was nothing behind the
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
-        <view class="nx-page-enter" :style="{ paddingTop: contentTop + 'px', paddingBottom: contentBottom + 'px' }">
+        <view class="nx-page-enter" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom + 'px' }">
           <slot name="pageTop" />
           <!-- Voucher fallback banner — chassis-injected at content top so the
                5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
@@ -153,8 +153,8 @@
       <StickyCtaBar />
       <MessageDrawer />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
-           自隐藏:无在途会话 / 已过期 / 结算页正在展示它。位置钉在任何 header 变体之下(status bar + 64)。 -->
-      <PendingCheckoutBar :top="statusBarHeight + 64" :route="route" />
+           自隐藏:无在途会话 / 已过期 / 结算页正在展示它。位置见 pendingBarTop / pendingBarInset。 -->
+      <PendingCheckoutBar :top="pendingBarTop" />
     </template>
 
     <!-- Global overlay host (toast / confirm / netError) -->
@@ -187,6 +187,7 @@ import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { usePendingCheckout } from "@/store/pending-checkout";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
@@ -207,6 +208,7 @@ const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
 const voucher = useVoucher();
 const voucherClaimSheet = useVoucherClaimSheet();
+const pendingCheckout = usePendingCheckout();
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
 let voucherPushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -455,6 +457,16 @@ const TABBAR_INSET = 104; // floating pill (64) + home indicator (22) + 18 breat
 const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTTOM));
+// ── 待支付浮动条的落位 ──
+// 有 chassis 级 header 的页(5 个 tab + useSetPageHeader 子页):浮动条占自己的一条带(header 下 8px),
+// 内容整体下让 PENDING_BAR_INSET,谁也不被盖住(否则它正好压在券横幅 / 首屏卡片上)。
+// 用 sub-page-header(内容内 sticky 行)的子页:chassis 不知道那一行的高度,浮动条按标准 44 行之下
+// 悬浮(+60),不加内容内缩(内缩会把 sticky 行往下推、滚动时又从浮动条底下穿过)。
+const PENDING_BAR_INSET = 60;
+const hasChassisHeader = computed(() => isTabRoute.value || !!navHeader.value);
+const pendingBarVisible = computed(() => !!pendingCheckout.barSession);
+const pendingBarTop = computed(() => contentTop.value + (hasChassisHeader.value ? 8 : 60));
+const pendingBarInset = computed(() => (pendingBarVisible.value && hasChassisHeader.value ? PENDING_BAR_INSET : 0));
 const topChromeHeight = computed(() => contentTop.value);
 
 // lucide-style outline paths (Home / Zap / ShoppingBag / Users / User)
