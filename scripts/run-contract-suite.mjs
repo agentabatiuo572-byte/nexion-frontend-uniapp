@@ -66,6 +66,10 @@ const REGISTRY = {
   // ── 2026-08-12 同事第二批新增(收口据实登记:4 进链 · 2 缺兄弟仓 · 1 与拍板相反)──
   "commerce-acceptance-h5-launch-contract.test.mjs": { how: "chain" },
   "remote-registration-unknown-result-contract.test.mjs": { how: "chain" },
+  // ── 2026-08-16 摘门会话据实补登(昨夜 4c32a50/6d93739 新建未登记致门红;实跑 14 断言全绿)──
+  "final-commerce-closure-contract.test.mjs": { how: "chain" },
+  "remote-journey-closure-contract.test.mjs": { how: "chain" },
+  "remote-truth-boundary-contract.test.mjs": { how: "chain" },
   "funds-run-scoped-isolation-contract.test.mjs": {
     how: "elsewhere",
     by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend)",
