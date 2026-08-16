@@ -1710,8 +1710,10 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:`vite.config.ts` 2026-08-15/16 为断 junction 递归环(主 5173 连崩)加了 `server.watch.ignored: ["**/.claude/**", …]`。该 glob 按**绝对路径**匹配,worktree 根 `…/Nexion-uniapp/.claude/worktrees/<x>/src/**` 全命中 → 自己的源码一个都不监视。
 - **对策**:① worktree 里每次改完源码**冷重启** dev server(kill → 起),再验;② 判「代码坏 vs 环境坏」先 `curl <dev>/src/<file>` 与磁盘 grep 比对(同 [[feedback_dev_server_stale_module_graph]]);③ 根治候选(未落地,待主人点头):把 ignore 改成只拉黑**本树根**下的 `.claude`(`path.resolve(__dirname, ".claude") + "/**"`),主检出仍断环、worktree 恢复监视 —— 改的是共享构建配置,归包外决策。2026-08-16。
 
-## P-108 同路由 `uni.redirectTo` 会把 chassis 导航头**清掉**(useSetPageHeader 是单槽全局态)
+## P-108 同路由推栈 / 重定向后 chassis 导航头被**上一页的卸载清掉**(useSetPageHeader 曾是无主单槽)
 
-- **症状**:从 `/pages/store/checkout?product=B` `redirectTo` 到 `/pages/store/checkout?product=A&resume=…`,新页正常渲染但**没有返回键与标题**(`.nx-navheader` 缺席);redirectTo 到**别的**路由(orders)则正常。
-- **根因**:`usePageHeader` 是一个全局单槽 store;`useSetPageHeader` 在新页 onShow 时 set,而**同路由**重定向时旧页实例的 onHide/onUnmounted 排在其后执行 → `store.clear()` 抹掉新页刚登记的头。跨路由时卸载次序不同,恰好没踩到。
-- **对策**:① 同一路由之间**不要 redirectTo**:能原地切状态就原地切(结算撞单「继续那一笔」= 改 `productId` ref 原地恢复,报价 / 门 / 页头 backHref 全部重派生);必须导航则 `navTo` push(旧页 onHide 先于新页 onShow,头不丢);② 若日后必须支持同路由 replace,页头 store 应改成按页实例 id 记账、清理只清自己那条(单槽 → 按 owner 的表,同 [[feedback_single_slot_model_must_be_a_list]] 一族)。2026-08-16。
+- **症状**:① `checkout(B)` → 浮动条 push `checkout(A)?resume=…` → 返回 B:B 的返回键与「Checkout」标题**没了**,浮动条压住 Review order 标题(T3 黑盒 P1-1,主路径确定性复现);② 同路由 `uni.redirectTo` 也一样;跨路由 redirectTo 反而正常。
+- **根因**:`usePageHeader` 是全局单槽 store;页面 A 的 onHide/onUnmounted 与页面 B 的 onShow **没有先后保证**——A 卸载晚一拍执行 `clear()`,把 B 刚重新 set 的头抹掉。
+- **落地修法(1722cd9)**:单槽保留,但**记 owner**:`set(payload, ownerSymbol)` / `clear(ownerSymbol)`,`useSetPageHeader` 每个页面实例一个 symbol,clear 只清自己登记的那条 —— A 的晚清对 B 是 no-op。为什么不改成「按实例的表」([[feedback_single_slot_model_must_be_a_list]] 一族):渲染面永远只要「当前页那一个头」,表只多存了永远不渲染的历史;owner 标记已经把「谁的清谁的」这条不变量钉住,再加表是给不存在的消费者建模。它依赖 onShow 重新 set(P-044 的补丁)——两者互为前提,写在 use-page-header.ts 头注释里。
+- **顺带的对策**:结算撞单「保留它」= 什么都不动(不再原地切商品,原地切换方案已被 T2 推翻);浮动条从任何页(含另一结算页)一律 `navTo` push。
+- **同族提醒**:全局单槽 store(page-header / sticky-cta / 各类 sheet 的 open 位)凡是「谁 set 谁 clear」而 set/clear 分属两个页面实例的,都要问一句「清的是不是自己那条」。2026-08-16。

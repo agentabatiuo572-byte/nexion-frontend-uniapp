@@ -2,8 +2,12 @@
  * 待支付会话 store —— 结算扫码步开出的「发票」(金额 / 地址 / 截止)按账号持久,
  * 用户离开再回来仍是同一笔;到点作废。浮动条(pending-checkout-bar)与结算页共同消费。
  *
- * 🔴 不变量(store 自守,不靠调用点):**同账号同一时刻至多一张在窗内的发票**。
- * `begin()` 在磁盘最新行上复核:除调用方明示要替换的那张(`replaceId`,撞单确认框已问过用户)
+ * 🔴 不变量(store 自守,不靠调用点):**同账号同一时刻至多一张在窗内的发票**,且**一张发票至多被结算一次**。
+ * 花钱前必须先 `consume(id)`:CAS 在磁盘最新行上要求这张票仍在册且在窗内,删成功才返 true ——
+ * 谁抢到谁结算;别的页面实例 / 标签页 / 已取消的票拿到 false,一律拒单回报价步(审计 R2 P0 族:
+ * 支付时刻只验「过期」不验「还在不在」,同一张票被两处各结算一次、取消后仍能扣)。
+ * `begin()` / `consume()` 经 CAS 提交器在磁盘最新行上复核(storage 读不出时退回内存态,见 account-scoped-storage
+ * 的诚实边界):除调用方明示要替换的那张(`replaceId`,撞单确认框已问过用户)
  * 外若还有别的活票 → 拒开(返 null,并把最新行同步进内存让浮动条露出那张票)。
  * 曾经的形状:调用点判「不是本页手里那张才问」+ store 纯追加 → 支付时刻守卫回弹后再点 Pay now
  * 直接铸出第二张活票、两个地址同时催付、落单后旧票成孤儿继续拉人二次付款(独立审计 P0 族)。
@@ -96,9 +100,18 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     if (n > 0 && !ticker) ticker = setInterval(tick, 1000);
     else if (n === 0 && ticker) { clearInterval(ticker); ticker = undefined; }
   }, { immediate: true });
-  // 后台标签页的定时器会被浏览器节流;回到前台先把时钟拨准,别让浮动条展示一张其实已死的票。
+  /** 只读回灌:把磁盘最新行同步进内存(不写盘)。别的标签页开票 / 结算 / 取消后,本页据此刷新。 */
+  function refreshFromDisk() {
+    if (fundsServerEnabled) return;
+    rows.commit(() => null); // apply 返 null = 前置不成立 → 提交器把磁盘最新行 sync 进内存
+  }
+  // 后台标签页的定时器会被浏览器节流;回到前台先把时钟拨准 + 回灌磁盘,别让浮动条展示一张其实已死的票。
   if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick(); refreshFromDisk(); } });
+  }
+  // H5 同源多标签页:别的标签页写了这张表,本页立刻回灌(App webview 单上下文,事件不触发也无妨)。
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("storage", (e) => { if (e.key === ACCOUNTS_KEY) refreshFromDisk(); });
   }
 
   /** 账号切换重绑:装载该账号的会话行(过期行读入即剪);正在展示的会话属于旧账号,一并放手。 */
@@ -107,7 +120,11 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     clock.value = mockServerNow();
     if (fundsServerEnabled) { sessions.value = []; return; }
     const row = rows.bind(rawAccountKey);
-    sessions.value = pruneExpiredSessions(row?.sessions ?? [], clock.value);
+    const live = pruneExpiredSessions(row?.sessions ?? [], clock.value);
+    // 读入面也守不变量:磁盘上若有多张活票(老版本纯追加写下的行 / 手改 storage),只留最早那张 ——
+    // 否则 begin() 永远拒开、浮动条只露一张、用户 30 分钟内下不了任何链上单。
+    sessions.value = live.slice(0, 1);
+    if (live.length > 1) commitSessions((cur) => ({ next: pruneExpiredSessions(cur, clock.value).slice(0, 1), result: true }));
   }
 
   const current = computed(() => firstLiveSession(sessions.value, clock.value));
@@ -159,10 +176,22 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     });
   }
 
-  /** 完成付款(已建单)/ 用户放弃 / 支付时刻守卫回弹作废 —— 这张发票不再有任何可恢复动作。 */
+  /**
+   * 结算前的原子消费:磁盘最新行里这张票仍在册且在窗内 → 删掉并返 true(本调用方抢到了结算权);
+   * 已被别处结算 / 取消 / 过期 → false,调用方必须拒单。花钱动作只许排在它之后。
+   */
+  function consume(id: string): boolean {
+    if (viewingId.value === id) viewingId.value = null;
+    const now = mockServerNow();
+    return commitSessions((cur) => (cur.some((s) => s.id === id && isSessionLive(s, now))
+      ? { next: cur.filter((s) => s.id !== id), result: true }
+      : null)) === true;
+  }
+
+  /** 用户放弃 / 支付时刻守卫回弹作废 —— 这张发票不再有任何可恢复动作(结算走 consume,不走这里)。 */
   function remove(id: string) {
     if (viewingId.value === id) viewingId.value = null;
-    if (!sessions.value.some((s) => s.id === id)) return;
+    // 不按内存早退:内存可能陈旧,磁盘上那张才是要删的(删不到也顺带把最新行回灌进来)。
     commitSessions((cur) => (cur.some((s) => s.id === id)
       ? { next: cur.filter((s) => s.id !== id), result: true }
       : null));
@@ -181,5 +210,5 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     viewingId.value = id;
   }
 
-  return { sessions, current, barSession, viewingId, clock, bindAccount, get, isLive, secondsLeft, begin, remove, markLeftNotice, setViewing };
+  return { sessions, current, barSession, viewingId, clock, bindAccount, refreshFromDisk, get, isLive, secondsLeft, begin, consume, remove, markLeftNotice, setViewing };
 });
