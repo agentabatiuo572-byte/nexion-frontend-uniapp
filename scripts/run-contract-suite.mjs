@@ -70,13 +70,16 @@ const REGISTRY = {
   "final-commerce-closure-contract.test.mjs": { how: "chain" },
   "remote-journey-closure-contract.test.mjs": { how: "chain" },
   "remote-truth-boundary-contract.test.mjs": { how: "chain" },
+  // 🔴 这批「跨仓」文件不是「缺仓就整份不跑」:兄弟仓缺席时只有跨仓那几条 test 带理由 skip,
+  //    同文件里纯本仓的断言照跑(不连坐)。skip 不掩护真失败由 scripts/cross-repo-skip.redtest.mjs
+  //    钉死(仓在场 → 那批 skip 必须逐条真跑真红),它挂在 test:cross-repo 末尾。
   "funds-run-scoped-isolation-contract.test.mjs": {
     how: "elsewhere",
-    by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend)",
+    by: "npm run test:cross-repo(NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend;缺仓 → 跨仓断言可见 skip,本仓断言照跑)",
   },
   "h8-run-scoped-referral-projection-contract.test.mjs": {
     how: "elsewhere",
-    by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT/NEXGRID_PC_ROOT 或标准兄弟仓)",
+    by: "npm run test:cross-repo(NEXGRID_BACKEND_ROOT/NEXGRID_PC_ROOT 或标准兄弟仓;两仓各自独立判缺席,缺谁 skip 谁)",
   },
   "funds-production-withdrawal-hold-contract.test.mjs": {
     how: "excluded",
@@ -86,7 +89,7 @@ const REGISTRY = {
   "acceptance-h5-sandbox-config.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "behavior-analytics-active-route-catalog-contract.test.mjs": {
     how: "elsewhere",
-    by: "npm run test:cross-repo",
+    by: "npm run test:cross-repo(NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend;缺仓 → 目录 parity 那条可见 skip,路由归一那条照跑)",
   },
   "behavior-analytics-auth-lifecycle-contract.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
   "e20-device-e3-api-behavior.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },

@@ -52,7 +52,7 @@
     "verify": "npm run type-check && npm run test:contract-registry && npm run test:cross-repo && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness && npm run test:a11y-activate && npm run test:learning-contracts && npm run test:real-backend-integration && npm run build:h5 && npm run test:h5-runtime && npm run test:withdraw-status-mirror && npm run test:legacy-suite",
     "test:learning-contracts": "node --experimental-strip-types --test scripts/learning-submission.test.mjs",
     "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs",
-    "test:cross-repo": "node --test scripts/funds-run-scoped-isolation-contract.test.mjs scripts/funds-server-sandbox-contract.test.mjs scripts/h8-run-scoped-referral-projection-contract.test.mjs scripts/behavior-analytics-active-route-catalog-contract.test.mjs",
+    "test:cross-repo": "node --test scripts/funds-run-scoped-isolation-contract.test.mjs scripts/funds-server-sandbox-contract.test.mjs scripts/h8-run-scoped-referral-projection-contract.test.mjs scripts/behavior-analytics-active-route-catalog-contract.test.mjs && node scripts/cross-repo-skip.redtest.mjs",
     "test:quest-tripwire": "node scripts/quest-genesis-tripwire-runtime.mjs",
     "test:withdraw-status-mirror": "node scripts/withdraw-status-mirror-runtime.mjs",
     "test:legacy-suite": "node scripts/run-legacy-suite.mjs"
