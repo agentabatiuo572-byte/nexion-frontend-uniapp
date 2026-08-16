@@ -231,13 +231,21 @@ function hydrateSnapshotEconomics(s: AccountCloudSnapshot | null): AccountCloudS
   return s ? { ...s, devices: (s.devices ?? []).map(backfillDeviceEconomics) } : null;
 }
 
+// user.email 只收联系身份,不收账号内部 key:兜底链的入参既有邮箱也有账号 key
+// ("default" / "user:<id>" 等),匿名 boot key 一旦流进去,profile 页会把裸 "default"
+// 当邮箱渲出来(页面文案禁枚举值/字段名不变量;2026-08-15 date-locale T1 验收发现#2)。
+// 判据取「像邮箱」而不是枚举 key 形状 —— key 形状是开放集合,枚举必漏。
+// 分层:这里只守**铸造侧**(两个快照工厂);存量毒行在读侧治 —— readAccountSnapshot
+// (全部存储读的唯一入口)把非邮箱形归一成 demo 身份,merge 三视图因此天然一致。
+const asEmailIdentity = (identity: string) => (identity.includes("@") ? identity : "");
+
 function createSeedSnapshot(accountKey: string, email: string, entrySurface: EntrySurface): AccountCloudSnapshot {
   return {
     schema: 1,
     accountKey: normalizeAccountKey(accountKey),
     entrySurface,
     updatedAt: Date.now(),
-    user: createInitialUser(email || accountKey || "alex@nexgrid.ai"),
+    user: createInitialUser(asEmailIdentity(email) || asEmailIdentity(accountKey) || "alex@nexgrid.ai"),
     devices: makeInitialDevices(),
     earnings: createInitialEarnings(),
     withdrawals: [],
@@ -251,7 +259,7 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
  * the authoritative refresh is still in flight (or unavailable).
  */
 function createServerEmptySnapshot(accountKey: string, email: string, entrySurface: EntrySurface): AccountCloudSnapshot {
-  const emptyUser = createInitialUser(email || accountKey);
+  const emptyUser = createInitialUser(asEmailIdentity(email) || asEmailIdentity(accountKey));
   return {
     schema: 1,
     accountKey: normalizeAccountKey(accountKey),
