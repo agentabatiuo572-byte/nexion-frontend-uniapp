@@ -316,6 +316,23 @@ else
   bad "product catalog i18n parity"; head -5 /tmp/uni-catalog-parity.log | sed 's/^/        /'
 fi
 
+# 上面三道 i18n 门整条轴是反的:都在查「中文有没有跑出词典」,没有一道查「英文有没有跑进
+# 界面」。实付(P-109):4c32a50 把规格兜底改成 `?? "unavailable"` 五处,中文态渲染出
+# 「你的手机 unavailable」等 4 处混排,三道门全绿。本门补这条轴 —— 服务端哨兵值不得当
+# client fallback、不得在商品渲染面裸用。selftest 先跑:哨兵失效即门失效。
+if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs --selftest > /tmp/uni-spec-sentinel-selftest.log 2>&1; then
+  ok "$(tail -1 /tmp/uni-spec-sentinel-selftest.log)"
+else
+  bad "spec-sentinel selftest 失败(哨兵失效即门失效;node scripts/spec-sentinel-render-gate.mjs --selftest 看明细)"
+  tail -8 /tmp/uni-spec-sentinel-selftest.log | sed 's/^/        /'
+fi
+if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs > /tmp/uni-spec-sentinel.log 2>&1; then
+  ok "$(tail -1 /tmp/uni-spec-sentinel.log)"
+else
+  bad "服务端规格哨兵被当兜底/裸渲染 — 走 t.store.specValueUnavailable 降级文案"
+  tail -10 /tmp/uni-spec-sentinel.log | sed 's/^/        /'
+fi
+
 # 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
 # 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
 # withdraw-freeze(2026-08-04 R2 三条 P1):提交链快照单源化 —— 弹窗展示 = 扣款 = 建单

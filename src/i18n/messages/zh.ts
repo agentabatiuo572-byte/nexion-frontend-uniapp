@@ -1660,6 +1660,7 @@ export const zh: Messages = {
     specUptime: "在线率 SLA",
     specWarranty: "质保",
     specWarrantyValue: "24 个月",
+    specValueUnavailable: "暂无数据",
     specUnavailable: "商品硬件与服务规格尚未完成认证，暂不可购买。",
     aiRowImageGen: "图像生成(SDXL)",
     aiRowLlm: "LLM 推理",

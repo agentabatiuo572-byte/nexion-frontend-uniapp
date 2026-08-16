@@ -76,6 +76,7 @@ import { fmt } from "@/i18n/format";
 import { remoteApiEnabled, teamQuotaApi } from "@/api/runtime";
 import type { TeamQuotaSnapshot } from "@/api/team-quota-api";
 import { getProduct as getMockProduct, annualRoiPct as mockAnnualRoiPct } from "@/mock/products";
+import { specText } from "@/lib/product-copy";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 import { useConfig } from "@/store/config";
@@ -137,7 +138,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
     conditions,
     perks: [
       fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
-      `${p.gpu} · ${p.vram}`,
+      `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
       fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
     ],
     tint,
