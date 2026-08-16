@@ -23,7 +23,7 @@
 6. **后退语义**:扫码页/等待页离开 → 会话静默保留 + 一次性 toast「订单已为你保留 30 分钟」;不弹确认框。
 7. **浮动条** `components/pending-checkout-bar.vue` 挂 app-chassis overlays:「待支付 $X · mm:ss · 继续支付」;点击 → 同一笔(同地址 + 连续倒计时);正在展示该会话的结算页上不显示;完成/取消/超时消失;账号隔离;刷新存活。
 8. **超时态**:倒计时归零 → 扫码页进「支付已超时」态(地址不再展示、无法推进),唯一出口「重新下单」→ 回 confirm 步(重新报价再建新会话);浮动条同时消失。
-9. **撞旧会话**:已有 live 会话又点「Pay now」→ 确认框:「放弃它,开始新的」(danger,confirm)/「继续那一笔」(ghost,cancel;点遮罩=继续旧的,安全默认);继续旧的 = 同商品原地恢复,异商品 `redirectTo` 旧商品结算页 `?resume=<id>`。
+9. **撞旧会话**:已有 live 会话又点「Pay now」→ 确认框:「放弃它,开始新的」(danger,confirm)/「保留它」(ghost,cancel;点遮罩同,安全默认)= 什么都不动 —— 旧发票在、浮动条就在本页顶上,想回去点它;不替用户跳页(T2 实测:遮罩当「继续」会把人带到另一商品付款页,且 URL 与内容不一致)。确认框随页面卸载一起收掉、回调按 pageAlive 守卫(T2 P1-1 修法)。
 10. **显式「取消」**(扫码页原按钮):加确认框「取消这笔支付?若已转账请勿取消」— 判断项,主人未议,可否决。
 - **Out of scope**:卡支付腿不建会话(即时表单,无在途资金);远端模式浮动条(服务端无付款截止字段,待后端补 `paymentDeadline` 后由服务端订单驱动,见 HANDOFF);多笔并存 UI;confirm 步第三按钮;30 分钟窗改后台可配。
 
@@ -55,3 +55,10 @@
 ## 诚实边界
 - 远端模式:ChainPayment 不可达(remote 走 submitRemoteOrder→awaiting 轮询),故会话 store 在远端**不建行也不读行**;浮动条在远端不出现——因为服务端订单契约没有付款截止字段,客户端不得自造 30 分钟并宣称过期。后端补 `paymentDeadline` + 支付指令后,由订单列表驱动同一组件(已在 HANDOFF 登记)。
 - 30 分钟窗口 = `PENDING_CHECKOUT_WINDOW_MIN` 单一常量(mock 侧「服务端」);PROD 由服务端下发。
+
+## 实施记录(2026-08-16,pkg/ad-checkout-cancel)
+- 提交:229415e(主体)· 06054fe(撞单原地切换 / 浮动条内缩 / 伪 QR 种子修复 / 超时态副标题 / 弹框短标签)· 7e71b25(a11y 基线 / verify 哨兵 / 日志 / P-107·P-108)。
+- 判断项(主人可否决):① 扫码页显式「取消」加确认框(拍板只议了「返回」不弹;显式取消 = 作废发票,已转账者误触即孤儿化资金,故加一道,遮罩 = 继续支付);② 顺手修 chain-payment 伪 QR 全白(旧 LCG 越 2^53 精度丢失,所有地址只剩三个定位块;改用 deposits-core 的 fnv1a+mulberry32,与充值面同源);③ 浮动条在有 chassis 页头的页(5 tab + useSetPageHeader 子页)让内容整体下让 60px 占独立一带(实测覆盖商城券横幅),sub-page-header 子页仅悬浮不内缩(内缩会把 sticky 行推下去又从条底穿过)。
+- 设计取舍:撞单「继续那一笔」**不做**同路由 `uni.redirectTo`(会丢导航头,P-108),改 `productId` ref 原地切换;浮动条从任何页(含另一结算页)一律 push。
+- 门:vue-tsc 0 · vitest pending-checkout-core 4/4 · i18n mirror 4848 键 · a11y-activate 门绿(基线内)· 新 verify 哨兵「付款腿禁定时器 emit complete」红测旧文件红;全量 verify.sh(5401 worktree,mock)见收尾汇报。
+- 环境教训:worktree dev server 无 HMR(vite ignore `**/.claude/**`,P-107)——改完必冷重启;交接书点名的 zk-anxiety-copy 实为他会话活动树,已自建 ad-checkout-cancel 树并把误入的他方改动复原。

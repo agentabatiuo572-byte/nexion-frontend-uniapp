@@ -289,7 +289,7 @@ import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
-import { confirm, toast } from "@/store/ui";
+import { confirm, toast, useUI } from "@/store/ui";
 import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
@@ -360,6 +360,9 @@ const phase = useProductPhase();
 const pending = usePendingCheckout();
 const activeSession = ref<PendingCheckoutSession | null>(null);
 let resumeSessionId: string | null = null;
+// 页面卸载后禁止任何「等弹框回来再动状态」的路径继续执行(弹框是全局层,页面死了它还活着)。
+let pageAlive = true;
+let dialogsOpen = 0;
 
 const productId = ref("stellarbox-s1");
 onLoad(async (options) => {
@@ -981,13 +984,9 @@ function adoptSession(s: PendingCheckoutSession) {
   voucherQuote = { ...s.quote.voucher };
   // 旧机抵扣上下文是内存态(离开结算页即清),凭发票记录重新挂上;抵扣额在支付瞬间
   // 由 confirmed 步按现值复算并受「不得高于确认页总额」族级闸保护。发票没有抵扣时必须
-  // 清掉本页可能残留的抵扣上下文(撞单切换到另一商品的发票时尤其如此)。
+  // 清掉本页可能残留的抵扣上下文。
   if (s.quote.tradeIn) tradein.applyTradein(s.quote.tradeIn.deviceId, s.productId as DeviceKind);
   else tradein.clearApplied();
-  // 撞单「继续那一笔」可能是另一商品的发票:原地切换商品(productId 是 ref,报价 / 门 /
-  // 页头 backHref 全部重新派生),不做同路由 redirectTo —— uni H5 同路由重定向会让旧页的
-  // 卸载清掉新页刚登记的导航头。
-  productId.value = s.productId;
   interceptFired = true;
   activeSession.value = s;
   pending.setViewing(s.id);
@@ -1015,6 +1014,7 @@ async function openChainSession(): Promise<boolean> {
   const method = payment.value as PendingCheckoutMethod;
   const existing = pending.current;
   if (existing && existing.id !== activeSession.value?.id) {
+    dialogsOpen += 1;
     const dropOld = await confirm({
       title: t.value.store.pendingCollisionTitle,
       message: fmt(t.value.store.pendingCollisionBody, {
@@ -1027,17 +1027,13 @@ async function openChainSession(): Promise<boolean> {
       danger: true,
       icon: "warn",
     });
-    // 弹框期间页面已离开 confirm 步(换号 / 离开)→ 什么都不做。
-    if (step.value !== "confirm") return false;
-    if (!dropOld) {
-      // 继续那一笔(同商品或另一商品都原地恢复;过期了就当没有,继续开新票)
-      if (pending.isLive(existing)) {
-        adoptSession(existing);
-        return false; // step already switched by adoptSession
-      }
-    } else {
-      pending.remove(existing.id);
-    }
+    dialogsOpen -= 1;
+    // 弹框期间页面已卸载 / 离开 confirm 步(换号 / 返回)→ 什么都不做:页面死了不许再动全局态。
+    if (!pageAlive || step.value !== "confirm") return false;
+    // 「保留它」(含点遮罩)= 什么都不动:旧发票原样在,浮动条就在本页顶上,想回去点它即可;
+    // 不在这里替用户跳页 —— 一个「关掉」手势不该把人带到另一商品的付款页。
+    if (!dropOld) return false;
+    pending.remove(existing.id);
   }
   const ti = appliedTradeinView.value;
   const s = pending.begin({
@@ -1065,6 +1061,7 @@ async function openChainSession(): Promise<boolean> {
 async function onChainCancel() {
   const s = activeSession.value;
   if (!s) { goConfirm(); return; }
+  dialogsOpen += 1;
   const ok = await confirm({
     title: t.value.store.pendingCancelTitle,
     message: t.value.store.pendingCancelBody,
@@ -1073,7 +1070,8 @@ async function onChainCancel() {
     danger: true,
     icon: "warn",
   });
-  if (!ok || activeSession.value !== s) return;
+  dialogsOpen -= 1;
+  if (!pageAlive || !ok || activeSession.value !== s) return;
   dropActiveSession();
   goConfirm();
 }
@@ -1679,6 +1677,10 @@ function cleanup() {
   tradein.clearApplied();
   if (trialTicker) { clearInterval(trialTicker); trialTicker = undefined; }
   releaseSessionOnLeave();
+  pageAlive = false;
+  // 本页开着的确认框(撞单 / 取消支付)随页面一起收掉 —— 确认框是全局层,不收会跟着用户去下一页,
+  // 而它的按钮回调指向的是一个已卸载的页面(实测:弹框全站阻断 + 「继续那一笔」点了没反应)。
+  if (dialogsOpen > 0) useUI().clearAllConfirms();
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());

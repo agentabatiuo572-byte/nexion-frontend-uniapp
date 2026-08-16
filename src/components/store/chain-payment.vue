@@ -18,7 +18,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
       </view>
       <view class="flex-1 min-w-0">
-        <text class="block" :style="headerTitleStyle">{{ sendLabel }}</text>
+        <text class="block" :style="headerTitleStyle">{{ expired ? network : sendLabel }}</text>
         <text v-if="!expired" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.store.coNetworkConfirms }}</text>
       </view>
       <view class="flex items-center tabular-nums" style="gap: 4px; font-size: 12px; color: var(--v5-warning)">
