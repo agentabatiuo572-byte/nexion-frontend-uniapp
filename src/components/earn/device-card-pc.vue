@@ -260,6 +260,7 @@
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
             <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <!-- spec-sentinel-ok: workload VRAM requirement from lockedTeasers, not a catalog Product field -->
             <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 40px">{{ it.vram }}</text>
           </view>
         </view>
