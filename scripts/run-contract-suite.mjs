@@ -15,7 +15,7 @@
 //     excluded — 明确不跑,必须写清原因(如依赖本机不存在的兄弟仓)
 import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -80,7 +80,7 @@ const REGISTRY = {
   },
   "funds-production-withdrawal-hold-contract.test.mjs": {
     how: "excluded",
-    why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。若日后改回 HOLD,把本条移回 chain。",
+    why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。2026-08-16 复核补记:拍板的实现(16bddf0)已把 FUNDS_PRODUCTION_WITHDRAWAL_HOLD 从 src 删干净(全仓 0 命中),本门现在是**被测对象已不存在**的死门,单跑必红 —— 不是「能跑但结论相反」。若日后改回 HOLD,连同该常量一起恢复再移回 chain;否则按删除纪律 Move 到 .trash 更干净(留着待主人裁决)。",
   },
   // ── elsewhere:已有入口在跑 ──
   "acceptance-h5-sandbox-config.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
@@ -166,14 +166,30 @@ const elsewhereN = found.filter((f) => REGISTRY[f].how === "elsewhere").length;
 const excluded = found.filter((f) => REGISTRY[f].how === "excluded");
 for (const f of excluded) console.log(`  SKIP(登记在案)${f} — ${REGISTRY[f].why}`);
 
-const res = spawnSync(process.execPath, ["--test", ...chain.map((f) => path.join("scripts", f))], {
+// --import:给 chain 里那些 import 仓内 .ts 跑真实现的测试补「无扩展名相对导入」的兜底解析
+// (Node 原生 ESM 不补全,Vite/vitest 补;详见 scripts/lib/ts-ext-resolve.mjs)。只在解析失败后兜底,
+// 真缺模块照抛。Windows 上 --import 必须给 file:// URL,裸路径会 ERR_UNSUPPORTED_ESM_URL_SCHEME。
+const tsExtResolve = pathToFileURL(path.join(SCRIPTS, "lib", "ts-ext-resolve.mjs")).href;
+const res = spawnSync(process.execPath, ["--import", tsExtResolve, "--test", ...chain.map((f) => path.join("scripts", f))], {
   cwd: root, encoding: "utf8", stdio: "pipe",
 });
-process.stdout.write((res.stdout || "").split("\n").filter((l) => /^. (pass|fail)|^not ok|^# Subtest|Error/.test(l)).join("\n") + "\n");
+const out = res.stdout || "";
+// 🔴 skip 必须打出来。原过滤器只放行 pass/fail 汇总,`ℹ skipped N` 与逐条 skip 理由被吞掉 ——
+// 于是「某条跨仓断言这台机器根本没验」在结果里看不见,读起来跟全验过一模一样(no silent caps)。
+// 认 skip 行不靠 reporter 的记号字形(易随 node 版本漂),认「(耗时) # 理由」这个形状:pass 行没有 `# `。
+const skipLines = out.split("\n").filter((l) => /\(\d[\d.]*ms\) # /.test(l));
+const skippedN = Number((out.match(/^.{0,4}skipped (\d+)\s*$/m) || [])[1] || 0);
+process.stdout.write(out.split("\n").filter((l) => /^. (pass|fail|skipped)|^not ok|^# Subtest|Error/.test(l)).join("\n") + "\n");
 if (res.status !== 0) {
-  process.stderr.write(res.stdout || "");
+  process.stderr.write(out);
   process.stderr.write(res.stderr || "");
   console.error(`FAIL 契约测试套件失败(chain ${chain.length} 个)`);
   process.exit(1);
 }
-console.log(`contract-suite PASS — chain ${chain.length} 跑过 · elsewhere ${elsewhereN} 由别的入口跑 · excluded ${excluded.length} 登记在案 · 登记覆盖 ${found.length}/${found.length}`);
+// 判据自查:数得出 N 条却打不出 N 行(或反之)= 解析漂了,报告在替它自己说谎 —— 按本文件既有风格判红。
+if (skipLines.length !== skippedN) {
+  console.log(`FAIL  skip 统计与明细对不上(汇总 ${skippedN} 条 / 明细 ${skipLines.length} 行)—— 判据失效,判红`);
+  process.exit(1);
+}
+console.log(`contract-suite PASS — chain ${chain.length} 跑过 · elsewhere ${elsewhereN} 由别的入口跑 · excluded ${excluded.length} 登记在案 · 登记覆盖 ${found.length}/${found.length}${skippedN ? ` · ⚠ skip ${skippedN} 条(未验证)` : ""}`);
+for (const l of skipLines) console.log(`  ⚠ SKIP ${l.trim()}`);
