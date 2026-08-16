@@ -313,6 +313,105 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
   check("⑦ 持有者归还有效", (arb.release("milestone"), arb.current.value === null));
 }
 
+// ── ⑧ 评选逻辑本体(runPriorityRound)——三条都是 2026-08-16 独立审计实测出的真缺陷 ──
+//    此前这段逻辑埋在 app-chassis.vue 里,门只能用正则猜写法,对改名/挪位/装饰性保留
+//    一概判绿(审计实测:两条旧定时器改个变量名搬回来,门 57/57 全绿)。现在测正主。
+{
+  const { runPriorityRound } = arbMod;
+  const mk = (over = {}) => {
+    const arb = arbMod.usePopupArbiter();
+    const opened = [];
+    const cand = (id, { eligible = true, ready = true, push = true } = {}) => ({
+      id, eligible: () => eligible, ready: () => ready,
+      push: () => { if (push) opened.push(id); return push; },
+    });
+    return { arb, opened, cand, ...over };
+  };
+
+  // 轴 A:手动打开的弹层已持有令牌 → 整轮不评,绝不把它的令牌抹掉。
+  //   旧写法把「有人占屏」判在循环里,而 acquire 对同 id 幂等 → 手动开的那个会被
+  //   "acquire 成功"、push 因冷却失败后被 release 抹掉,下一个候选随即叠上去。
+  {
+    const { arb, opened, cand } = mk();
+    arb.acquire("voucher-claim"); // 模拟用户从 banner 手动打开
+    const stop = runPriorityRound({
+      currentHolder: () => arb.current.value,
+      acquire: (id) => arb.acquire(id), release: (id) => arb.release(id),
+      candidates: [cand("voucher-claim", { push: false }), cand("trial-claim")],
+      waitForReady: false,
+    });
+    check("⑧ 🔴 已有人占屏时整轮不评,令牌不被抹掉(手动开的代金券不会被试用顶掉)",
+      stop === false && arb.current.value === "voucher-claim" && opened.length === 0,
+      `stop=${stop} holder=${arb.current.value} opened=${JSON.stringify(opened)}`);
+  }
+
+  // 轴 B:高优先级「数据没到货」时整轮让位,不许低优先级抢跑(缺陷④ 的真修法)。
+  {
+    const { arb, opened, cand } = mk();
+    const stop = runPriorityRound({
+      currentHolder: () => arb.current.value,
+      acquire: (id) => arb.acquire(id), release: (id) => arb.release(id),
+      candidates: [cand("voucher-claim", { eligible: false, ready: false }), cand("trial-claim")],
+      waitForReady: true,
+    });
+    check("⑧ 🔴 代金券目录未到货时试用不许抢跑(等待窗口内整轮让位)",
+      stop === false && opened.length === 0 && arb.current.value === null,
+      `stop=${stop} opened=${JSON.stringify(opened)} holder=${arb.current.value}`);
+  }
+
+  // 轴 B':等待窗口到点后,低优先级才轮到 —— 让位必须有上限,不能无限期卡住。
+  {
+    const { arb, opened, cand } = mk();
+    runPriorityRound({
+      currentHolder: () => arb.current.value,
+      acquire: (id) => arb.acquire(id), release: (id) => arb.release(id),
+      candidates: [cand("voucher-claim", { eligible: false, ready: false }), cand("trial-claim")],
+      waitForReady: false, // 窗口已到点
+    });
+    check("⑧ 等待窗口到点后试用才轮到(让位有上限,不无限期卡住)",
+      opened.length === 1 && opened[0] === "trial-claim", JSON.stringify(opened));
+  }
+
+  // 轴 C:「确定没有可领券」(已就绪但不够格)应立刻让位,不该白等满窗口。
+  {
+    const { arb, opened, cand } = mk();
+    runPriorityRound({
+      currentHolder: () => arb.current.value,
+      acquire: (id) => arb.acquire(id), release: (id) => arb.release(id),
+      candidates: [cand("voucher-claim", { eligible: false, ready: true }), cand("trial-claim")],
+      waitForReady: true,
+    });
+    check("⑧ 已就绪但确实没有可领券 → 立刻让位给试用(ready 与 eligible 是两件事)",
+      opened.length === 1 && opened[0] === "trial-claim", JSON.stringify(opened));
+  }
+
+  // 轴 D:冷却没过 → 还回本轮刚拿的令牌,让下一个候选上(不是整轮作废)。
+  {
+    const { arb, opened, cand } = mk();
+    runPriorityRound({
+      currentHolder: () => arb.current.value,
+      acquire: (id) => arb.acquire(id), release: (id) => arb.release(id),
+      candidates: [cand("voucher-claim", { push: false }), cand("trial-claim")],
+      waitForReady: false,
+    });
+    check("⑧ 代金券冷却没过 → 让位给试用,且令牌归属正确",
+      opened.length === 1 && opened[0] === "trial-claim" && arb.current.value === "trial-claim",
+      `opened=${JSON.stringify(opened)} holder=${arb.current.value}`);
+  }
+
+  // 轴 E:B1 名额 —— acquire 成功即占掉本次进首页的名额;beginHomeVisit 复位。
+  {
+    const arb = arbMod.usePopupArbiter();
+    check("⑧ 🔴 B1 名额:acquire 成功即标记本次进首页已用掉(庆祝据此不再接着连播)",
+      arb.visitClaimed.value === false && arb.acquire("voucher-claim") === true && arb.visitClaimed.value === true);
+    arb.release("voucher-claim");
+    check("⑧ B1 名额:归还令牌不复位名额(关掉≠没弹过,否则庆祝立刻接上就是连播)",
+      arb.visitClaimed.value === true);
+    arb.beginHomeVisit();
+    check("⑧ B1 名额:重新进首页才复位", arb.visitClaimed.value === false);
+  }
+}
+
 // ── ⑥ 编排层本身:优先级是数据 + 底盘接线(结构断言,headless 跑不了组件)────
 {
   const arbSrc = readFileSync(path.join(root, "src", "store", "popup-arbiter.ts"), "utf8");
@@ -338,10 +437,23 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
   check("⑥ 🔴 底盘不再有「代金券/试用」各自独立的挂载期定时器(两两互斥不封闭,加面必漏)",
     chassisSrc.indexOf("voucherPushTimer") === -1 && chassisSrc.indexOf("autoPushTimer") === -1,
     `voucherPushTimer=${chassisSrc.indexOf("voucherPushTimer")} autoPushTimer=${chassisSrc.indexOf("autoPushTimer")}`);
-  check("⑥ 🔴 底盘按优先级表逐个评,且评之前先申请令牌(同屏互斥的唯一裁决点)",
-    /for \(const id of POPUP_PRIORITY\)/.test(chassisSrc) && /popupArbiter\.acquire\(candidate\.id\)/.test(chassisSrc));
-  check("⑥ 资格在触发时复算而非挂载时锁死(eligible 是函数,被 runAutoPushRound 调用)",
-    /eligible:\s*\(\)\s*=>/.test(chassisSrc) && /candidate\.eligible\(\)/.test(chassisSrc));
+  // 🔴 判代码不判散文:整段行注释先剥掉。独立审计实测过 —— 不剥的话,把编排整段删掉、
+  //    只把这几个字面量留在注释里,门照样 57/57 全绿。
+  const stripLineComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  const chassisCode = stripLineComments(chassisSrc);
+  check("⑥ 🔴 底盘把评选委托给 store 层的 runPriorityRound(逻辑不许回到组件里,否则门只能用正则猜)",
+    /runPriorityRound\(\{/.test(chassisCode) && /from "@\/store\/popup-arbiter"/.test(chassisCode),
+    `has=${/runPriorityRound\(\{/.test(chassisCode)}`);
+  check("⑥ 🔴 进首页复位 B1 名额(少了它,第二次进首页永远弹不出东西)",
+    /popupArbiter\.beginHomeVisit\(\)/.test(chassisCode));
+  check("⑥ 资格与就绪分别声明,且在触发时复算(两者都是函数,不是挂载期算好的布尔)",
+    /eligible:\s*\(\)\s*=>/.test(chassisCode) && /ready:\s*\(\)\s*=>/.test(chassisCode));
+  check("⑥ 🔴 庆祝宿主把「弹层是否真的开着」并入挂起判据(只问令牌会与屏幕脱节)",
+    (() => {
+      const celCode = stripLineComments(readFileSync(path.join(root, "src", "components", "milestone-celebration.vue"), "utf8"));
+      return /voucherClaimSheet\.open\s*\|\|\s*trialClaimSheet\.open/.test(celCode)
+        && /\{\s*immediate:\s*true\s*\}/.test(celCode);
+    })());
 }
 
 // ── ④ 非钱链路即时弹 + 白名单不过宽 ──

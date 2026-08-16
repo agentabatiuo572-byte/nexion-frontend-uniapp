@@ -184,7 +184,7 @@ import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
-import { usePopupArbiter, POPUP_PRIORITY, type PopupId } from "@/store/popup-arbiter";
+import { usePopupArbiter, runPriorityRound, type AutoPushCandidate, type PopupId } from "@/store/popup-arbiter";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
@@ -225,19 +225,12 @@ let settleTimer: ReturnType<typeof setTimeout> | null = null;
 let settleRetry: ReturnType<typeof setInterval> | null = null;
 let settleTicks = 0;
 
-interface AutoPushCandidate {
-  id: PopupId;
-  /** 资格 —— **在触发时复算**,不在挂载时锁死(修缺陷 ②)。 */
-  eligible: () => boolean;
-  /** 尝试弹出;各自的 cooldownHours / maxPerSession 仍由各自 store 判定,本层不碰。 */
-  push: () => boolean;
-}
-
 // 顺序**不在这里定**(按 POPUP_PRIORITY 排),这里只声明每个 id 的资格与推送方式。
 const autoPushCandidates: AutoPushCandidate[] = [
   {
     id: "voucher-claim",
     eligible: () => voucher.claimableVouchers.some((v) => v.popupEnabled),
+    ready: () => voucher.catalogReady,
     push: () =>
       voucherClaimSheet.tryAutoPush({
         cooldownHours: VOUCHER_POPUP.cooldownHours,
@@ -246,7 +239,9 @@ const autoPushCandidates: AutoPushCandidate[] = [
   },
   {
     id: "trial-claim",
+    // 试用的判据全部来自本地 config 与试用状态,无异步依赖,恒就绪。
     eligible: () => trialConfig.config.autoPushEnabled && freeTrial.canStart(),
+    ready: () => true,
     push: () =>
       trialClaimSheet.tryAutoPush({
         cooldownHours: trialConfig.config.autoPushCooldownHours,
@@ -262,20 +257,18 @@ function settleDelayMs(): number {
 }
 
 /** 按优先级评一轮。返回 true = 该停表(有人弹出来了,或已离开首页)。 */
+// 评选逻辑本体在 store/popup-arbiter.ts 的 runPriorityRound —— 放在 store 层是为了让
+// 机器门能测**正主**;埋在组件里时门只能用正则猜写法,而正则对改名 / 挪位 / 装饰性
+// 保留一概判绿(独立审计实测:两条旧定时器改个变量名搬回来,门 57/57 全绿)。
 function runAutoPushRound(): boolean {
   if (readRoute() !== "pages/index/index") return true;
-  for (const id of POPUP_PRIORITY) {
-    const candidate = autoPushCandidates.find((c) => c.id === id);
-    // 庆祝浮层在优先级表里,但不由底盘推送(它有自己的队列宿主)——
-    // 它在这里的意义是:它占着屏时,下面这道 acquire 会失败,领取弹层就得等。
-    if (!candidate || !candidate.eligible()) continue;
-    // C1 先到先得:已有人占屏 → 这一轮谁都不弹,留给下一次重试,绝不顶替。
-    if (!popupArbiter.acquire(candidate.id)) return false;
-    if (candidate.push()) return true;
-    // 冷却没过 / 会话次数用完 → 还回令牌,让位给下一个候选。
-    popupArbiter.release(candidate.id);
-  }
-  return false;
+  return runPriorityRound({
+    currentHolder: () => popupArbiter.current,
+    acquire: (id) => popupArbiter.acquire(id),
+    release: (id) => popupArbiter.release(id),
+    candidates: autoPushCandidates,
+    waitForReady: settleTicks < SETTLE_MAX_TICKS,
+  });
 }
 
 function stopAutoPush() {
@@ -454,6 +447,7 @@ onMounted(() => {
   // 直到有人弹出 / 离开首页 / 超时。isHome 守卫让受保护的 index.vue 不必被编辑
   // (ALIGNMENT 红线);路由在**触发时**复检,绝不弹到延迟期间跳过去的别的页上。
   if (isHome.value) {
+    popupArbiter.beginHomeVisit();
     settleTicks = 0;
     settleTimer = setTimeout(() => {
       if (runAutoPushRound()) return;
