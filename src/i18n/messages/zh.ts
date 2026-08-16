@@ -1966,7 +1966,6 @@ export const zh: Messages = {
     invitePromoChip: "限时 · 本周邀请奖励 {multiplier}× ",
     earnedTodayCount: "今日 247 人已领取",
     alreadyEarned: "你已赚到",
-    beTheFirst: "成为你的网络里第一个赚到的人",
     shareAndEarn: "立即分享赚 {n}",
     sandboxBanner: "验收沙箱 · 来源=模拟 · SANDBOX",
     serverRewardPerSettlement: "每位成功邀请的服务端结算奖励",
