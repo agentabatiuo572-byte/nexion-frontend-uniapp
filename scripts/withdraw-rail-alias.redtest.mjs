@@ -184,6 +184,32 @@ const TARGETS = [
     file: GATEFILE,
     ops: [[null, "    const scannedFiles = walkSrc();", "    const scannedFiles = [];"]],
   },
+  {
+    // 🔴 **间接引用轴**(2026-08-16 按轴自查实测出来的假绿面):先把函数取出来再调,
+    //    缺陷实体与直接调用**完全相同**(第二个减记者、照写扣款幂等键),
+    //    而扫「调用写法」`.applyWithdrawalDebit(` 的判据一个字都扫不到 —— 补此轴前主线全绿。
+    name: "间接引用规避(先取函数再调,缺陷实体不变)",
+    gate: G_CALLSITES,
+    file: APPVUE,
+    ops: [[null, "      postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);",
+      "      const debitFn = app.applyWithdrawalDebit;\r\n      debitFn(wd);\r\n"
+      + "      postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);"]],
+  },
+  {
+    // 🔴 **改名轴**:函数一改名,扫「调用写法」的判据恒不命中 → 实扫空集,
+    //    而没接本地腿时期望**也是**空集 → 判绿。改成「含定义处的集合等式」后期望非空,
+    //    空集再也换不到绿。⚠️ 且必须用**词边界**匹配:`applyWithdrawalDebitV2` 包含原名子串,
+    //    `includes` 版对它照样计数、行数不变 → 改名轴仍旧判绿(实测过,这一格修了两次)。
+    name: "函数被改名(词边界;includes 版对它是瞎的)",
+    gate: G_CALLSITES,
+    file: APP,
+    ops: [
+      [null, "  function applyWithdrawalDebit(wd: Withdrawal): boolean {",
+        "  function applyWithdrawalDebitV2(wd: Withdrawal): boolean {"],
+      [null, "    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival,",
+        "    submitWithdrawal, applyWithdrawalDebit: applyWithdrawalDebitV2, advanceWithdrawalArrival,"],
+    ],
+  },
 ];
 
 const runGate = () => {
