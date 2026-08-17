@@ -216,6 +216,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
+import { usePendingCheckout } from "@/store/pending-checkout";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
@@ -244,6 +245,7 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTradeinSheet();
 const app = useApp();
+const pending = usePendingCheckout();
 const orders = useOrders();
 const t = useT();
 // 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
@@ -648,12 +650,23 @@ function onReplace() {
     confirming.value = false;
     return;
   }
-  app.deactivateDevice(lowest.id); // move old → inventory (frees slot)
+  // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(审计 R9 P1:事后失败再回滚,回滚里的再激活撞的是
+  // 同一个槽位谓词,必然连环失败,把一台已付费旧机甩进库存)。
+  if (app.activeSlotCount - 1 + reservedSlots.value >= MAX_DEVICES) {
+    toast.warn(t.value.tradein.errReplaceSlotConflict);
+    confirming.value = false;
+    return;
+  }
+  if (!app.deactivateDevice(lowest.id)) { // move old → inventory (frees slot);没落盘 = 没停,别继续
+    toast.warn(t.value.tradein.errPleaseRetry);
+    confirming.value = false;
+    return;
+  }
   const newId = app.addDevice(s.newKind);
   const activated = !!newId && app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
     if (newId && !app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
-    // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
+    // persist-verdict-ok: 上面已按同一谓词预检过,这里的再激活只在落盘抖动时会失败;失败 = 旧机留在库存,设备页可手动激活
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
@@ -682,6 +695,9 @@ function onReplace() {
     confirming.value = false;
     return;
   }
+  // 成交即兑现意图:同账号该商品仍在窗内的链上发票一并作废(否则浮动条继续催第二笔;审计 R9 P1)。
+  // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出可取消的旧票,不会二次扣款
+  pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),
@@ -747,6 +763,9 @@ function onKeepBuy() {
     confirming.value = false;
     return;
   }
+  // 成交即兑现意图:同账号该商品仍在窗内的链上发票一并作废(否则浮动条继续催第二笔;审计 R9 P1)。
+  // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出可取消的旧票,不会二次扣款
+  pending.settleProduct(s.newKind);
   toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
   confirming.value = false;
   hide();
@@ -801,19 +820,31 @@ function onForce() {
   // Order: snapshot task → addDevice(new) → deactivate(old, clears task) →
   //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
+  // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(与 onReplace 同一条;审计 R9 P1)。
+  if (app.activeSlotCount - 1 + reservedSlots.value >= MAX_DEVICES) {
+    toast.warn(t.value.tradein.errReplaceSlotConflict);
+    confirming.value = false;
+    return;
+  }
   const newId = app.addDevice(s.newKind);
   if (!newId) {
     toast.warn(t.value.tradein.errPleaseRetry); // 新机没落盘 → 旧机与任务原封不动
     confirming.value = false;
     return;
   }
-  app.deactivateDevice(lowest.id); // frees slot + wipes currentTask
+  if (!app.deactivateDevice(lowest.id)) { // frees slot + wipes currentTask;没落盘 = 没停,撤掉新机别继续
+    if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
+    toast.warn(t.value.tradein.errPleaseRetry);
+    confirming.value = false;
+    return;
+  }
   const activated = app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
     // Rollback: remove new, restore the snapshotted task, re-activate old.
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
 
-    app.devices = app.devices.map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    // persist-verdict-ok: 任务快照恢复不成 = 旧机任务已丢(deactivate 抹的),与其余回滚同一残余,已在 toast 里告知重试
+    app.patchDevice(lowest.id, { currentTask: taskSnapshot });
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
@@ -836,13 +867,17 @@ function onForce() {
   if (paid !== "ok") {
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
 
-    app.devices = app.devices.map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    // persist-verdict-ok: 任务快照恢复不成 = 旧机任务已丢(deactivate 抹的),与其余回滚同一残余,已在 toast 里告知重试
+    app.patchDevice(lowest.id, { currentTask: taskSnapshot });
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;
     return;
   }
+  // 成交即兑现意图:同账号该商品仍在窗内的链上发票一并作废(否则浮动条继续催第二笔;审计 R9 P1)。
+  // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出可取消的旧票,不会二次扣款
+  pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),

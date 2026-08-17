@@ -282,7 +282,7 @@ async function bench(opts) {
     activeSession: { value: invoiceAmount == null ? null : { id: "inv-1", amountUsdt: invoiceAmount } },
     // R6:netPrice 的服务端权威抵扣报价改从 appliedTradeinView 读(不再直读全局槽);本 harness 钉本地链 → null
     appliedTradeinView: { value: null },
-    pending: { consume: () => true },
+    pending: { consume: () => "consumed" },
     // 券 store:核销 = CAS 判决(先占后花);release = 之后失败面放回。真语义在 store/voucher.ts。
     voucher: {
       markUsed: (id) => { voucherClaims.push(id); return voucherClaimOk; },

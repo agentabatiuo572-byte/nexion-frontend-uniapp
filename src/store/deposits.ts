@@ -394,8 +394,8 @@ export const useDeposits = defineStore("deposits", () => {
     }
     // 记账走收口点的幂等变体(以 txHash 为 ref 判重),不再裸调 bills.addOnce ——
     // 「钱动了、账没记上」那一族的收口纪律,入金轨同样适用。
-    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
-    postReceiptOnce({
+    // 入金已落定(recordDeposit 不回滚),收据没写上 = 「钱动了账没记」:同 R6 结算页处置 —— 登记待对账 + 交易号(收口点已弹提示)。
+    if (!postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: rec.creditedUsdt,
@@ -404,7 +404,7 @@ export const useDeposits = defineStore("deposits", () => {
       ref: rec.txHash ?? rec.depositId,
       // 链上通道落网络码位(法币轨为 undefined 不落);账单详情跳转不再依赖 memo 文案正则
       network: CHAIN_NET_SHORT[rec.channel],
-    });
+    })) reportStuckFunds(useApp().captureMoney(), String(rec.txHash ?? rec.depositId), "receipt");
     return true;
   }
 
@@ -706,15 +706,15 @@ export const useDeposits = defineStore("deposits", () => {
       return false;
     }
     // 与链上轨同口径:记账走收口点的幂等变体(ref=intentId 判重),不裸调账单写入。
-    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
-    postReceiptOnce({
+    // 入金已落定(recordDeposit 不回滚),收据没写上 = 「钱动了账没记」:同 R6 结算页处置 —— 登记待对账 + 交易号(收口点已弹提示)。
+    if (!postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: credited,
       status: "posted",
       memo: `Top-up · ${CHANNEL_MEMO["bank-vietqr"]}`,
       ref: intentId,
-    });
+    })) reportStuckFunds(useApp().captureMoney(), String(intentId), "receipt");
     return true;
   }
 
@@ -855,15 +855,15 @@ export const useDeposits = defineStore("deposits", () => {
       if (!undone.ok) reportStuckFunds(useApp().captureMoney(), rec.depositId);
       return null;
     }
-    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
-    postReceiptOnce({
+    // 入金已落定(recordDeposit 不回滚),收据没写上 = 「钱动了账没记」:同 R6 结算页处置 —— 登记待对账 + 交易号(收口点已弹提示)。
+    if (!postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: credited,
       status: "posted",
       memo: `Top-up · ${CHANNEL_MEMO["card-intl"]}`,
       ref: authCode,
-    });
+    })) reportStuckFunds(useApp().captureMoney(), String(authCode), "receipt");
     return rec;
   }
 

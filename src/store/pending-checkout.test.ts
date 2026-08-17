@@ -10,9 +10,10 @@ import { createPinia, setActivePinia } from "pinia";
 vi.mock("@/api/runtime", () => ({ fundsServerEnabled: false, remoteApiEnabled: false, fundsSandboxEnabled: false }));
 
 const memory = new Map<string, unknown>();
+let storageBroken = false;
 (globalThis as unknown as { uni: unknown }).uni = {
   getStorageSync: (k: string) => (memory.has(k) ? JSON.parse(JSON.stringify(memory.get(k))) : ""),
-  setStorageSync: (k: string, v: unknown) => { memory.set(k, JSON.parse(JSON.stringify(v))); },
+  setStorageSync: (k: string, v: unknown) => { if (storageBroken) throw new Error("QuotaExceededError"); memory.set(k, JSON.parse(JSON.stringify(v))); },
   removeStorageSync: (k: string) => { memory.delete(k); },
   getStorageInfoSync: () => ({ keys: [...memory.keys()] }),
 };
@@ -32,6 +33,7 @@ function diskSessions(account: string) {
 describe("usePendingCheckout (mock leg)", () => {
   beforeEach(() => {
     memory.clear();
+    storageBroken = false;
     setActivePinia(createPinia());
   });
 
@@ -134,8 +136,8 @@ describe("usePendingCheckout (mock leg)", () => {
     const store = usePendingCheckout();
     store.bindAccount("acct-a");
     const s = store.begin(INPUT)!;
-    expect(store.consume(s.id)).toBe(true);
-    expect(store.consume(s.id)).toBe(false); // already settled — must not pay twice
+    expect(store.consume(s.id)).toBe("consumed");
+    expect(store.consume(s.id)).toBe("absent"); // already settled — must not pay twice
     expect(store.sessions).toHaveLength(0);
     expect(diskSessions("acct-a")).toHaveLength(0);
   });
@@ -145,12 +147,12 @@ describe("usePendingCheckout (mock leg)", () => {
     store.bindAccount("acct-a");
     const cancelled = store.begin(INPUT)!;
     store.remove(cancelled.id);
-    expect(store.consume(cancelled.id)).toBe(false);
+    expect(store.consume(cancelled.id)).toBe("absent");
     const dying = store.begin(INPUT)!;
     const table = memory.get(TABLE) as Record<string, { sessions: typeof dying[] }>;
     table["acct-a"].sessions[0].expiresAt = Date.now() - 1;
     memory.set(TABLE, table);
-    expect(store.consume(dying.id)).toBe(false);
+    expect(store.consume(dying.id)).toBe("absent");
   });
 
   it("consume() is disk-authoritative: a second store instance (other tab) cannot settle a ticket the first one already consumed", () => {
@@ -161,8 +163,8 @@ describe("usePendingCheckout (mock leg)", () => {
     const tabB = usePendingCheckout();
     tabB.bindAccount("acct-a");
     expect(tabB.current?.id).toBe(s.id); // tab B sees it on disk
-    expect(tabB.consume(s.id)).toBe(true); // tab B settles first
-    expect(tabA.consume(s.id)).toBe(false); // tab A's stale memory copy must lose
+    expect(tabB.consume(s.id)).toBe("consumed"); // tab B settles first
+    expect(tabA.consume(s.id)).toBe("absent"); // tab A's stale memory copy must lose
     expect(tabA.sessions).toHaveLength(0); // and its memory is now refreshed from disk
   });
 
@@ -234,5 +236,17 @@ describe("usePendingCheckout (mock leg)", () => {
     expect(store.remove(again.id)).toBe(true);
     expect(store.remove("pc-nope")).toBe(true);
     expect(diskSessions("acct-a")).toHaveLength(0);
+  });
+
+  it("consume() is tri-state: a storage write failure is 'failed' (invoice stays on disk), not 'absent'", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const s = store.begin(INPUT)!;
+    storageBroken = true;
+    expect(store.consume(s.id)).toBe("failed");
+    storageBroken = false;
+    expect(diskSessions("acct-a").map((x) => x.id)).toEqual([s.id]); // still there — the user may have paid, keep the instruction
+    expect(store.consume(s.id)).toBe("consumed");
+    expect(store.consume(s.id)).toBe("absent");
   });
 });
