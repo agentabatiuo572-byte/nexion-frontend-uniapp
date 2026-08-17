@@ -40,7 +40,8 @@
         </view>
       </view>
 
-      <view v-if="expanded" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px dashed var(--v5-border)">
+      <!-- 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 12+12 -->
+      <view v-if="expanded" style="margin-top: 24px; display: flex; flex-direction: column; gap: 4px">
         <view
           v-for="task in tasks"
           :key="task.id"

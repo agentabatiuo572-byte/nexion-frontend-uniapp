@@ -13,7 +13,8 @@
         <view class="mt-1 tabular-nums whitespace-nowrap" :style="phoneNumStyle">
           <text>$0.06</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
-        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsNexPerDay }}</text>
+        <!-- 「/天」后缀恒用弱化色(与本卡美元侧同档 ink-4),不跟数字的强调色走 -->
+        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsNexPerDay }}<text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></text>
       </view>
       <!-- Arrow + 117× chip -->
       <view class="flex flex-col items-center gap-1 px-1">
@@ -26,7 +27,7 @@
         <view class="mt-1 tabular-nums whitespace-nowrap" :style="s1NumStyle">
           <text>$7.00</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
-        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsS1NexPerDay }}</text>
+        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsS1NexPerDay }}<text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></text>
       </view>
     </view>
   </view>
