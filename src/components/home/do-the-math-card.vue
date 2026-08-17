@@ -42,7 +42,8 @@
           </view>
         </view>
 
-        <view class="mt-4 pt-3 grid grid-cols-3" style="border-top: 1px dashed var(--v5-border-strong)">
+        <!-- 去线(主人 2026-08-17 全站令):mt-7 = 原 mt-4 + pt-3 的总间距 -->
+        <view class="mt-7 grid grid-cols-3">
           <view v-for="s in stats" :key="s.k">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ s.k }}</text>
             <text class="block tabular-nums" :style="{ marginTop: '3px', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: s.tone, letterSpacing: '-0.014em' }">{{ s.v }}</text>

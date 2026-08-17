@@ -445,9 +445,8 @@ const deltaStyle: CSSProperties = {
   color: "var(--v5-success)",
 };
 const belowGridStyle: CSSProperties = {
-  marginTop: "10px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 10+14。
+  marginTop: "24px",
   gap: "14px",
 };
 const statKStyle: CSSProperties = {
