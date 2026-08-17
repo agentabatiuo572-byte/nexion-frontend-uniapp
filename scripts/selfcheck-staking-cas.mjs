@@ -338,7 +338,7 @@ function diskRev() {
   // 两条不变量都靠磁盘最新行复核,纯覆盖写在多标签页下必双开/双付。
   const CAS_CONSUMERS = [
     "daily-powerup.ts", "deposits.ts", "lucky-spin.ts", "nex-faucet.ts",
-    "pending-checkout.ts", "staking.ts", "voucher.ts",
+    "orders.ts", "pending-checkout.ts", "staking.ts", "voucher.ts", // orders 2026-08-17 R10:整行覆盖写丢已付款单 → CAS
   ];
   const storeFiles = readdirSync(STORE_DIR).filter((f) => f.endsWith(".ts"));
   samples.storeFiles = storeFiles.length;

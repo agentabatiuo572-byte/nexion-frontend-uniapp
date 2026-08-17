@@ -46,7 +46,7 @@ export interface StuckFundsCase {
   /** 卡住的是什么:钱退不回 / 券放不回 / 收据与它的恢复行都写不进去(钱与单都对,只缺凭据)。 */
   kind: StuckKind;
 }
-export type StuckKind = "funds" | "voucher" | "receipt" | "device" | "trial";
+export type StuckKind = "funds" | "voucher" | "receipt" | "device" | "trial" | "payout";
 
 /** 尽力持久化(storage 正是刚刚出故障的那一层,写不进去也只能认)。 */
 const STUCK_KEY = "nexgrid-funds-stuck-v1";
@@ -86,6 +86,7 @@ export function reportStuckFunds(restoreTo: MoneySnapshot, ref = "", kind: Stuck
     : kind === "receipt" ? [T.billMissingTitle, T.receiptGapMsg]
     : kind === "device" ? [T.deviceStuckTitle, T.deviceStuckMsg]
     : kind === "trial" ? [T.trialStuckTitle, T.trialStuckMsg]
+    : kind === "payout" ? [T.payoutStuckTitle, T.payoutStuckMsg]
     : [T.fundsStuckTitle, T.fundsStuckMsg];
   toast.error(title, fmt(msg, { id: record.id }));
   return "stuck";

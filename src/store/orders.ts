@@ -18,7 +18,7 @@ import { ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
 
@@ -105,10 +105,10 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
   }
 }
 
-function hydrate(accountKey: string): Order[] {
-  const row = readAccountRow<{ orders?: Order[] }>(ACCOUNTS_KEY, accountKey);
-  if (row && Array.isArray(row.orders)) return row.orders;
-  return [];
+type OrdersRow = { orders: Order[] };
+function parseOrdersRow(raw: unknown): OrdersRow {
+  const row = raw as { orders?: unknown } | null;
+  return { orders: row && Array.isArray(row.orders) ? (row.orders as Order[]) : [] };
 }
 
 // app store optional device-CRUD surface — these actions land on useApp when the
@@ -129,20 +129,37 @@ export const useOrders = defineStore("orders", () => {
   // Any in-flight server response is scoped to this binding generation. A logout
   // or account switch must not project the prior account into the new session.
   let boundEpoch = 0;
-  const orders = ref<Order[]>(remoteApiEnabled ? [] : hydrate(boundKey));
+  const orders = ref<Order[]>([]);
 
-  /** 远端档不落本地盘(状态归服务端)= 预期结果;mock 档如实返回 storage 写入结果。 */
-  function persist(): boolean {
-    if (remoteApiEnabled) return true;
-    return writeAccountRow<{ orders: Order[] }>(ACCOUNTS_KEY, boundKey, { orders: orders.value });
+  /**
+   * 🔴 落盘走 CAS 提交器(与 pending-checkout / deposits 同款),不再整行覆盖写(审计 R10 P0):
+   * H5 多标签页各持一份内存副本、永久不同步,覆盖写 = 后写者用陈旧数组抹掉别的标签页刚落盘的已付款订单
+   * (钱按增量合并保住了,单却没了 → 履约永不发生)。每次变更在**磁盘最新行**上 apply,提交结果 sync 回内存。
+   * 远端档不落本地盘(状态归服务端):提交器不建、不读。
+   */
+  const rows = createAccountRowCommit<OrdersRow>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseOrdersRow,
+    snapshot: () => ({ orders: orders.value }),
+    sync: (row) => { orders.value = row.orders; },
+  });
+
+  /** 在磁盘最新行上改订单列表;返回提交是否成功(前置不成立 / 写失败都是 false,内存已按提交器语义处理)。 */
+  function commitOrders(apply: (cur: Order[]) => Order[] | null): boolean {
+    if (remoteApiEnabled) return false;
+    return rows.commit((cur) => {
+      const next = apply(cur.orders);
+      return next ? { next: { orders: next }, result: true as const } : null;
+    }).ok;
   }
 
-  /** 账号切换重绑:装载该账号的订单行(变更处处即时 persist,旧账号无需先落盘)。 */
+  /** 账号切换重绑:装载该账号的订单行。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     boundEpoch += 1;
-    orders.value = remoteApiEnabled ? [] : hydrate(boundKey);
+    orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
   }
+  bindAccount(boundKey); // boot 期先挂 "default";账号确定后由 rebindAccountScopedStores 重绑
 
   function fromCanonical(row: CanonicalOrder): Order {
     const status: OrderStatus = row.canonicalStatus;
@@ -217,13 +234,8 @@ export const useOrders = defineStore("orders", () => {
   function createOrders(inputs: CreateOrderInput[]): Order[] | null {
     if (remoteApiEnabled) throw new Error("REMOTE_ORDER_CREATE_REQUIRES_SERVER_API");
     const batch = inputs.map(buildOrder);
-    const before = orders.value;
-    orders.value = [...batch.slice().reverse(), ...orders.value];
-    if (!persist()) {
-      orders.value = before;
-      return null;
-    }
-    return batch;
+    // 追加在**磁盘最新**列表之上(不是本标签页的内存副本):别的标签页刚建的单不会被本次落盘抹掉。
+    return commitOrders((cur) => [...batch.slice().reverse(), ...cur]) ? batch : null;
   }
 
   function buildOrder(input: CreateOrderInput): Order {
@@ -298,58 +310,55 @@ export const useOrders = defineStore("orders", () => {
       ? "Waiting for an empty device slot"
       : statusNote(next, cur.dataCenter);
 
-    const before = orders.value;
-    orders.value = orders.value.map((o) =>
-      o.id !== id
-        ? o
-        : {
-            ...o,
-            status: targetStatus,
-            deviceId: spawnedDeviceId ?? o.deviceId,
-            activatedAt: targetStatus === "activated" ? Date.now() : o.activatedAt,
-            timeline: [
-              ...o.timeline,
-              { status: targetStatus, ts: Date.now(), note: targetNote },
-            ],
-          },
-    );
-    if (!persist()) {
-      // 这一跳没落盘 = 没发生:内存退回;刚为它生的那台设备一并撤回 —— 否则下一 tick 看到订单还没 deviceId,
-      // 会再发一台(白得设备)。撤回自己的落盘不再追(R5 结构反思:撤销的撤销是无穷回归),下一 tick 重试整跳。
-      orders.value = before;
-      if (spawnedDeviceId && !cur.deviceId) {
-        const app = useApp() as unknown as DeviceSpawnApp;
-        void app.discardSpawnedDevice?.(spawnedDeviceId);
-      }
+    // CAS 前置:磁盘上这张单仍是我看到的那一跳(status 相同、还没被别的标签页配上设备)。别的标签页已经推进
+    // 过 → 前置不成立 → 本次不写,刚为它生的那台设备撤回(否则两个标签页各发一台);写失败同样撤回、下一 tick 重试。
+    const committed = commitOrders((list) => {
+      const disk = list.find((o) => o.id === id);
+      if (!disk || disk.status !== cur.status || (spawnedDeviceId && !cur.deviceId && disk.deviceId)) return null;
+      return list.map((o) =>
+        o.id !== id
+          ? o
+          : {
+              ...o,
+              status: targetStatus,
+              deviceId: spawnedDeviceId ?? o.deviceId,
+              activatedAt: targetStatus === "activated" ? Date.now() : o.activatedAt,
+              timeline: [
+                ...o.timeline,
+                { status: targetStatus, ts: Date.now(), note: targetNote },
+              ],
+            },
+      );
+    });
+    if (!committed && spawnedDeviceId && !cur.deviceId) {
+      // 撤回自己的落盘不再追(R5 结构反思:撤销的撤销是无穷回归)。
+      const app = useApp() as unknown as DeviceSpawnApp;
+      void app.discardSpawnedDevice?.(spawnedDeviceId);
     }
   }
 
   function markActivated(id: string, deviceId: string): boolean {
     if (remoteApiEnabled) return false;
-    const before = orders.value;
-    orders.value = orders.value.map((o) =>
-      o.id === id
-        ? {
-            ...o,
-            status: "activated",
-            activatedAt: Date.now(),
-            deviceId,
-            timeline: [
-              ...o.timeline.filter((e) => e.status !== "activated"),
-              {
+    return commitOrders((list) => (list.some((o) => o.id === id)
+      ? list.map((o) =>
+          o.id === id
+            ? {
+                ...o,
                 status: "activated",
-                ts: Date.now(),
-                note: "Device live · joined NexGrid network",
-              },
-            ],
-          }
-        : o,
-    );
-    if (!persist()) {
-      orders.value = before;
-      return false;
-    }
-    return true;
+                activatedAt: Date.now(),
+                deviceId,
+                timeline: [
+                  ...o.timeline.filter((e) => e.status !== "activated"),
+                  {
+                    status: "activated",
+                    ts: Date.now(),
+                    note: "Device live · joined NexGrid network",
+                  },
+                ],
+              }
+            : o,
+        )
+      : null));
   }
 
   // Cancel is allowed ONLY pre-payment ("placed"). Once paid, DC provisioning
@@ -359,31 +368,25 @@ export const useOrders = defineStore("orders", () => {
     // There is no user-facing canonical cancellation command. Remote mode must
     // remain HOLD/pending rather than pretending a local mutation succeeded.
     if (remoteApiEnabled) return false;
-    const cancellable = orders.value.some((o) => o.id === id && o.status === "placed");
-    if (!cancellable) return false;
-    const before = orders.value;
-    orders.value = orders.value.map((o) =>
-      o.id === id && o.status === "placed"
-        ? {
-            ...o,
-            status: "cancelled",
-            timeline: [
-              ...o.timeline,
-              {
+    // 前置在磁盘最新行上复核(placed 才可取消);没落盘 = 没取消(刷新后仍是 placed),如实返 false。
+    return commitOrders((list) => (list.some((o) => o.id === id && o.status === "placed")
+      ? list.map((o) =>
+          o.id === id && o.status === "placed"
+            ? {
+                ...o,
                 status: "cancelled",
-                ts: Date.now(),
-                note: "Order cancelled · refund queued",
-              },
-            ],
-          }
-        : o,
-    );
-    // 取消没落盘 = 没取消(刷新后仍是 placed):内存退回、如实返 false,别让页面宣布「已取消 · 退款排队中」。
-    if (!persist()) {
-      orders.value = before;
-      return false;
-    }
-    return true;
+                timeline: [
+                  ...o.timeline,
+                  {
+                    status: "cancelled",
+                    ts: Date.now(),
+                    note: "Order cancelled · refund queued",
+                  },
+                ],
+              }
+            : o,
+        )
+      : null));
   }
 
   function currentAccountKey(): string {

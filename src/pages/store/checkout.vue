@@ -954,6 +954,8 @@ let voucherQuote: { id: string | null; discount: number } = { id: null, discount
 // becomes eligible after the quote must NOT be retired at pay time — the user never saw that row
 // (审计 R3 P1:确认页无抵扣行、发票按全价开,支付瞬间设备任务结束 → 抵扣现算生效 → 静默下架一台)。
 let quotedTradeIn: { deviceId: string } | null = null;
+/** 上一次结算尝试里核销了却没放回的券 id(storage 抖动);下一次尝试开头先补放回。 */
+let pendingVoucherRelease: string | null = null;
 
 async function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
@@ -1168,6 +1170,7 @@ async function onChainCancel() {
     return;
   }
   activeSession.value = null;
+  toast.info(t.value.store.pendingCancelledToast);
   goConfirm();
 }
 
@@ -1568,6 +1571,9 @@ watch(step, async (s) => {
         step.value = "select-payment";
         return;
       }
+      // 上一次结算里券放回失败(storage 抖动)→ 这次先把它放回,否则下面的券一致性闸会把这一单拒回报价步、
+      // 顺手销掉那张用户可能已转账的发票(审计 R10 P1:「请重试」的重试反而销票)。
+      if (pendingVoucherRelease && voucher.release(pendingVoucherRelease)) pendingVoucherRelease = null;
       // ── Voucher pay-time revalidation(与 trade-in/trial 失效守卫同构)──
       // 快照里带券时,券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
       // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用冻结值继续。
@@ -1715,7 +1721,10 @@ watch(step, async (s) => {
       if (invoice) {
         const taken = pending.consume(invoice.id);
         if (taken !== "consumed") {
-          if (!releaseVoucher()) reportStuckFunds(app.captureMoney(), invoice.id, "voucher");
+          if (!releaseVoucher()) {
+            reportStuckFunds(app.captureMoney(), invoice.id, "voucher");
+            if (usedVoucherId) pendingVoucherRelease = usedVoucherId; // 下一次结算尝试先补放回
+          }
           if (taken === "failed") {
             // storage 故障:票还活着、地址还在,用户可能已转账 —— 留在扫码步,让他重试,别谎称「已在别处结算」。
             toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
@@ -1813,6 +1822,8 @@ watch(step, async (s) => {
         // 🔴 入账 ⊗ 收据走同一个收口点(2026-08-04 R4)。原实现是「creditBalance / creditNex →
         // 裸 bills.add」,收据写失败时返回 null 没人接:钱加了、账单没有,而下面的 toast 还
         // 照旧宣布「你到手了 $X」。收口后收据落不了盘 = 入账原样退回、这一项不进 toast。
+        // silentFailure:通用文案「余额没有变化,也没有产生任何记录,请重试」在这条路径上是假的(订单 / 扣款 / 转化都已记,
+        // 且这一单不可能再跑一次);返还没到账 = 平台欠用户的钱,登记待对账 + 交易号(审计 R10 P1)。
         const usdtCredited =
           trialRemainderUSD > 0 &&
           postMoneyBill({
@@ -1822,7 +1833,7 @@ watch(step, async (s) => {
             status: "posted",
             memo: fmt(t.value.store.coBillTrialRemainderMemo, { name: p.name }),
             ref: `${convRef}-EARN-USDT`,
-          }) === "ok";
+          }, { silentFailure: true }) === "ok";
         const nexCredited =
           shadowNEXNow > 0 &&
           postMoneyBill({
@@ -1832,7 +1843,10 @@ watch(step, async (s) => {
             status: "posted",
             memo: fmt(t.value.store.coBillTrialNexMemo, { name: p.name }),
             ref: `${convRef}-EARN-NEX`,
-          }) === "ok";
+          }, { silentFailure: true }) === "ok";
+        if ((trialRemainderUSD > 0 && !usdtCredited) || (shadowNEXNow > 0 && !nexCredited)) {
+          reportStuckFunds(app.captureMoney(), convRef, "payout");
+        }
         // 只报**真的到账**的那几项 —— 报了没到账的钱等于二次欺骗。
         const earnParts: string[] = [];
         if (usdtCredited) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
