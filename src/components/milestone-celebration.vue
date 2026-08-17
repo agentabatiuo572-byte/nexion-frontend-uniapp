@@ -115,7 +115,7 @@ function pumpCelebrationQueue() {
   const homeSlotUsed = route === "pages/index/index" && arbiter.visitClaimed;
   m.advance(route, arbiter.busyForOthers("milestone") || sheetOpen || homeSlotUsed);
   if (m.active) arbiter.acquire("milestone");
-  else arbiter.release("milestone");
+  else arbiter.release("milestone"); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语
 }
 
 let advTimer: ReturnType<typeof setInterval> | null = null;
@@ -228,7 +228,7 @@ onUnmounted(() => {
   }
   // 宿主被摘掉时(如切到静态走查路由)必须还令牌,否则占屏状态会一直扣着,
   // 领取弹层此后永远拿不到令牌 —— 死锁比多弹一次严重得多。
-  arbiter.release("milestone");
+  arbiter.release("milestone"); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语
 });
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
