@@ -1811,8 +1811,14 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **升层**:`scripts/selfcheck-persist-verdict.mjs` —— TypeScript AST(vue 只取 `<script>` 块),钱路 6 个文件里 17 个落盘 / CAS / 资金原语(`persist / writeAccountRow / persistAccountSnapshot / markUsed / release / consume / restoreMoney / debitBalance / creditBalance / createOrder(s) / cancelOrder / postMoneyBill / postReceiptOnly / commit …`)**不许作为裸表达式语句出现**;`void x()` 是显式丢弃放行,确需忽略写 `persist-verdict-ok: <理由>`。`--selftest` 4 红 7 绿,真文件塞一行 `persist();` 即红;已挂 verify.sh。首跑抓 14 处(含审计的 2 处 + 12 处同形),逐个消费或标注理由(远端命令键 4 处 → HANDOFF U-21)。
 - **同族提醒**:① 「返回布尔的动作」在钱路上必须被 if / const / return 接住,接不住就写下为什么;② 一族修到第二次就该问「能不能机器测」——这条本可以在 R4 就焊,晚了两轮;③ 门的判据用 AST 不用正则:换行 / 链式 / 泛型实参 / 模板字符串都不影响,正则版一定漏。2026-08-17。
 
+## P-118 「已接入名单」型的门,对压根没接的页面天然隐形 —— 空态门 20/20 连绿,而空白页就在名单外
 
-## P-118 长期红的门,红绿方向可能是**反的** —— 判据锚在「实现形态」上,一次加固就够让它开始奖励回退
+- **症状**:创世市场 `#/pages/genesis/marketplace`「在售(0)」时,页签下方约 400px 纯空白(探针确认该区间零元素)。同页「我的」页签有空态,订单 / 商城 / 收据页也都有空态,唯独这里没有。而空态哨兵 `scripts/empty-state-probe.mjs` 一路 **20/20 报绿**,建门至今没红过。最后是靠人肉全站走查抓到的。
+- **根因**:那道门的 `ROUTES` 是**手工登记表**,注释写明语义是「接了 EmptyState 的页面」。门本身很硬(逐页强制清空 store 数组让空态显形 + 断言 `.nx-empty` 出现 / 插画 `naturalWidth>0` / 标题非空 / 不横向溢出 / 零 console error),但**判据的定义域由名单决定**:压根没接空态的页面不在名单里 ⇒ 它对这类页面**天然失明**。门守的是「已入册的变差」,守不住「没入册」。同族根因见 [[count-ledger-blind-to-unscanned]](总数恒等式两边同源)。
+- **落地修法**:① 两个空分支(listings / activity)改接全站共享的 `components/empty-state.vue`(《06 缺省页规范》唯一实现,与订单 / 商城 / 收据同款),**不新造样式**;② 把 `pages/genesis/marketplace` 登记进 `ROUTES`,门从 20/20 变 21/21。
+- 🔴 **未收口的那条轴(补名单 ≠ 补门)**:「哪些页**该有**空态却没有」仍在这张表的视野之外——今天补的只是本页纳管,下一个漏接空态的页面依旧隐形。真要守住得**反过来判**:凡渲染列表 / feed 的模板分支,要么有空态兄弟分支,要么带显式豁免标记;候选必须落进一个有账的桶,不许静默跳过(构造性判据,别再用名单)。**这条尚未实现,是已知欠账。**
+- **同族提醒**:看到白名单 / 登记表 / `EXPECTED_N` / 「已接入 X 的清单」这种形状,一律先问一句——**没入册的东西谁来发现?** 答不上来,这道门就只是在给已知项做回归,不是在做覆盖。另:被这类门保护的样式别顺手删,`emptyCardStyle` 那种**空态整框虚线是合法保留项**(与「卡内横向虚线清零」不是一回事)。2026-08-17。
+## P-119 长期红的门,红绿方向可能是**反的** —— 判据锚在「实现形态」上,一次加固就够让它开始奖励回退
 
 - **症状**:`scripts/h2-trial-remote-api.test.mjs:157` 断言 `src/store/free-trial.ts` 里必须出现 `if (remoteApiEnabled) return;`,长期红,挡在 `npm run verify` 第 2 步(`test:contract-registry`)—— 47 个契约测试里唯一的红,全链一次跑不通;其余 46 条 + 后 15 步 + legacy-suite 458 格全绿。这两个文件自 `5030cd1` 起一个字未变,不是新回归。
 - **根因**:判据写于 `5d3c92e`,那时 `persist()` 是 void。`da445ec`(审计 R5)为了让 convert 能判「终态到底落没落盘」,把 `persist()` 改成返回落盘判决(`if (remoteApiEnabled) return true;`),判据从此永不命中。**架构没退化,是被加固了** —— 判据钉的是实现形态而不是不变量,加固一样让它过期。
