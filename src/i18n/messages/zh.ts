@@ -475,6 +475,9 @@ export const zh: Messages = {
     feedWhoPeer: "同伴",
     feedWhoLock: "锁定",
     feedValLocked: "锁定",
+    ledgerEmpty: "暂无已完成任务的收益。",
+    liveFeedTitle: "任务派发",
+    liveFeedEmpty: "暂无任务动态。",
   },
   earn: {
     title: "赚取",
@@ -626,6 +629,8 @@ export const zh: Messages = {
     rangeAll: "全部",
     computeEarned: "算力收益",
     jobsCount: "{n} 个任务",
+    taskLockTitle: "任务锁定",
+    taskLockRemaining: "{n} 分钟",
   },
   market: {
     title: "行情看板",
@@ -655,6 +660,7 @@ export const zh: Messages = {
       cloudShare: "门槛最低",
       phone: "手机 NPU 档",
     },
+    oursTag: "自有",
   },
 
   genesisHolder: {
@@ -2467,7 +2473,7 @@ export const zh: Messages = {
       teamPlacedOne: "网络伙伴 V5 {sponsor} 给你的 Track B 自动安置了 1 位新成员。",
       teamPlacedMany: "网络伙伴 V5 {sponsor} 给你的 Track B 自动安置了 {n} 位新成员。",
       teamPlacedCta: "看双轨匹配",
-      teamRankGap: "再差 ${remain} 就到 V3 队长 —— Apple Watch SE 等着你。",
+      teamRankGap: "再差 ${remain} 就到 V3 舰长 —— Apple Watch SE 等着你。",
       teamRankGapCta: "冲一把",
       teamPeerBonus: "同级伙伴 {buyer} 本周赚了 ${peer} → 你的 5% 同级奖 +${amt}。",
       teamPeerBonusCta: "去看看",
@@ -2530,7 +2536,7 @@ export const zh: Messages = {
   },
   receipt: {
     title: "收据",
-    proofOfCompute: "Proof of Compute",
+    proofOfCompute: "算力证明",
     back: "返回",
     viewReceipt: "查看收据",
     copied: "已复制到剪贴板",
@@ -2551,12 +2557,16 @@ export const zh: Messages = {
     typeWalletPairing: "钱包验证(历史)",
     sigCopied: "签名已复制",
     clearedToast: "已删除 {n} 条收据",
+    stampVerified: "已核验",
+    statusRecorded: "已记录",
+    statusSettled: "已结算",
   },
   language: {
     pageTitle: "语言",
     intro: "选择你偏好的语言。翻译按优先级分批上线 —— 每种语言都可预览布局与 RTL 效果。",
     autoDetect: "自动识别即将推出",
     backToAccount: "返回个人中心",
+    countLine: "{n} 种语言",
   },
   ui: {
     confirm: "确认",
@@ -3186,6 +3196,7 @@ export const zh: Messages = {
     regionLatencyUnavailable: "平均延迟 {n}",
     metricUnavailable: "--",
     projectionUpdatedAt: "服务器更新于 {at}",
+    uptimeLine: "在线率 {v}",
   },
   proof: {
     title: "收益证明",
@@ -3367,6 +3378,7 @@ export const zh: Messages = {
     chips: {
       devices: "{n} 台设备",
       teamSize: "{n} 人团队",
+      directs: "{n} 直推",
     },
     cta: {
       share: "分享我的邀请链接",
@@ -3402,12 +3414,14 @@ export const zh: Messages = {
       topYield: "收益最高",
     },
     penaltySuffix: "提前赎回罚款",
+    vaultMin: "起投 {amount}",
     calc: {
       label: "复利计算器",
       principal: "锁仓金额",
       singlePayout: "单次结算",
       compoundPayout: "{n}× 复投(1 年)",
       disclaimer: "复投按到期立即重新锁定 + 当前 APY 测算。实际 APY 周期间可能波动。",
+      compoundSuffix: "来自复投 · 到期后再质押 {n} 次",
     },
     sheet: {
       title: "质押 {n} 天",
@@ -3437,6 +3451,8 @@ export const zh: Messages = {
       startedOn: "开始于",
       autoClaimToast: "到期自动领取",
       autoClaimSubtitle: "{n} 天后解锁",
+      statusLabel: "状态",
+      remainingLabel: "剩余",
     },
     toast: {
       stakeSuccess: "质押成功",
@@ -3461,6 +3477,10 @@ export const zh: Messages = {
       openFailedStorageSubtitle: "这台设备没能保存这笔持仓,所以停下没锁。金额已全额退回余额,腾点空间或关掉无痕模式后再试。",
     },
     howItWorksEntry: "规则介绍",
+    earningChip: "生息中",
+    todayAccrued: "今日 {amount}",
+    activeCount: "{n} 笔进行中",
+    maturedCount: "{n} 笔已到期",
   },
 
   stakingHowItWorks: {
@@ -3803,7 +3823,13 @@ export const zh: Messages = {
     current: "当前",
     next: "下一阶:",
     progressLabel: "进度",
-    chips: { direct: "直推", peer: "平级", pool: "领导池", votes: "票" },
+    chips: {
+      direct: "直推",
+      peer: "平级",
+      pool: "领导池",
+      votes: "票",
+      unlimitedExtended: "无限扩展",
+    },
     cond: {
       selfBuy: "自买 ≥ ${n}",
       directRefs: "直推 ≥ {n}",
@@ -3871,7 +3897,7 @@ export const zh: Messages = {
     s5Intro: "下面是一位用户真实的晋升过程,带具体数字和时间。",
     s5StartLabel: "起点",
     s5StartBody:
-      "Alice 当前是 V3 Captain,团队累计业绩 $22,000。她的两个 V1 直推帮助她在 6 个月前满足 V3 升级条件。",
+      "Alice 当前是 V3 舰长,团队累计业绩 $22,000。她的两个 V1 直推帮助她在 6 个月前满足 V3 升级条件。",
     s5Phase1Title: "阶段 1 — 已有直推成长",
     s5Phase1Body:
       "Alice 的两个 V1 直推(Bob 和 Carol)各自建设自己的团队。两人的团队业绩各自跨过 $5,000 → 各自自动升 V2。Alice 每次都收到 +2,000 NEX 培育奖。",
@@ -3882,7 +3908,7 @@ export const zh: Messages = {
     s5Phase3Body: "David 又下一笔 NexGridBox 订单。系统重新评估 Alice 的等级进度。",
     s5TriggerLabel: "晋升瞬时触发",
     s5TriggerBody:
-      "团队业绩 $52,300 ≥ $50,000 ✓ 且 V2+ 直推数 = 3 ≥ 3 ✓。两个条件在同一个事件中满足——Alice 在那一帧被自动晋升为 V4 Commander。",
+      "团队业绩 $52,300 ≥ $50,000 ✓ 且 V2+ 直推数 = 3 ≥ 3 ✓。两个条件在同一个事件中满足——Alice 在那一帧被自动晋升为 V4 指挥官。",
     s5UnlockLabel: "Alice 在 V4 拿到的东西",
     s5Unlock1: "扩展网络版税覆盖范围进一步加宽——更多下游订单现在按 V4 费率流入她的月度版税",
     s5Unlock2: "领导池票数从 1 票升到 2 票(下次周结自动生效)",
@@ -4138,7 +4164,7 @@ export const zh: Messages = {
     hoursShort: "小时",
     unlocked: "已解锁",
     locked: "未解锁",
-    requiresV3: "领导池需 V3 Captain 解锁",
+    requiresV3: "领导池需 V3 舰长解锁",
     currentlyV: "你当前 V{n} {title} · 升至 V3 解锁 1 票权重",
     seePathV3: "查看升至 V3 路径",
     projectedDividend: "你的预估分红",
@@ -4411,6 +4437,7 @@ export const zh: Messages = {
     projectionErrorTitle: "团队网络读取失败",
     projectionErrorDesc: "未能取得服务器权威团队数据；当前不会把失败显示成零成员或零金额。",
     retry: "重试",
+    diagramYou: "你",
   },
 
   tree: {
@@ -4463,10 +4490,10 @@ export const zh: Messages = {
     fieldBudget: "申请预算",
     cityPlaceholder: "例如:东京 · 六本木 Hills",
     heroHeadline: "成为你所在区域的网络领袖",
-    heroBody: "授权大使可主办认证线下大会、运行付费 KOL 推广、获得专属铜牌。V5 Wing Leader 及以上可用。",
+    heroBody: "授权大使可主办认证线下大会、运行付费 KOL 推广、获得专属铜牌。V5 翼领 及以上可用。",
     eligible: "符合资格",
     annualBudget: "年度预算额度:$40,000 USDT",
-    lockedReq: "未解锁 · 需 V5 Wing Leader",
+    lockedReq: "未解锁 · 需 V5 翼领",
     lockedSub: "你当前 V{n} {title}。升至 V5 可申请。",
     pathCta: "路径",
     buckets: {
@@ -4484,11 +4511,11 @@ export const zh: Messages = {
     budgetRequested: "申请预算",
     submitForReview: "提交申请",
     lockedV5: "未解锁 · 需 V5",
-    previewOnly: "表单仅预览 · V5 Wing Leader 起开放申请",
+    previewOnly: "表单仅预览 · V5 翼领 起开放申请",
     recentlyApproved: "近期通过",
     hostedBy: "{name} 主办 · {attendees} 参会",
     toastV5Required: "需 V5",
-    toastV5RequiredSub: "升至 V5 Wing Leader 才能提交",
+    toastV5RequiredSub: "升至 V5 翼领 才能提交",
     toastMissingFields: "字段缺失",
     toastMissingFieldsSub: "请填写活动日期和城市",
     toastBucketRequired: "请选择一项预算用途",
@@ -4788,6 +4815,7 @@ export const zh: Messages = {
     alreadyBar: "你已注册 NexGrid。邀请链接对新用户有效,新人礼每账号仅一次。",
     enterApp: "进入 NexGrid",
     previewUnavailable: "当前无法确认这份邀请礼包,请稍后重试。",
+    certikAudited: "CertiK 已审计",
   },
 
   upsell: {
@@ -5288,6 +5316,13 @@ export const zh: Messages = {
     decreaseQty: "减少数量",
     increaseQty: "增加数量",
     copyHashFor: "复制哈希到 {target}",
+    removeItem: "移除 {name}",
+    addItem: "添加 {name}",
+    unavailable: "暂无数据",
+    volumeShort: "{amount} 业绩",
+    joinedDaysAgo: "{n} 天前",
+    perMonth: "{amount}/月",
+    earnsPerDay: "日赚 {amount}",
   },
   fx: {
     rateLabel: "牌价",

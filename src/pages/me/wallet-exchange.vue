@@ -18,7 +18,7 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
       <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.exchange.remoteUnavailableClosed }}</text>
-      <!-- 同 staking:开发诊断,DEV 构建才渲染,裸英文字面量不进三语词典。 -->
+      <!-- 同 staking:开发诊断,DEV 构建才渲染,裸英文字面量不进三语词典。 i18n-en-ok: 工程话诊断横幅,仅 DEV 构建渲染 -->
       <text v-else-if="isDevBuild && !remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
 
       <!-- How-it-works entry + refresh — pill compacted to match the other pages;

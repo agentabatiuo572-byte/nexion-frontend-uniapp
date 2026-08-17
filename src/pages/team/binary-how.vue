@@ -70,11 +70,11 @@
           <view class="grid grid-cols-2" style="margin-top: 12px; gap: 8px">
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand)')">
               <text class="block" :style="{ color: 'var(--v5-brand)', fontWeight: 500, fontSize: '12px' }">{{ w.diagLeftLabel }}</text>
-              <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$3,000/mo</text>
+              <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">{{ fmt(t.uiChrome.perMonth, { amount: "$3,000" }) }}</text>
             </view>
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand-2)')">
               <text class="block" :style="{ color: 'var(--v5-brand-2)', fontWeight: 500, fontSize: '12px' }">{{ w.diagRightLabel }}</text>
-              <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$2,000/mo</text>
+              <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">{{ fmt(t.uiChrome.perMonth, { amount: "$2,000" }) }}</text>
             </view>
           </view>
         </view>

@@ -84,76 +84,13 @@ const VALUE_EXEMPTIONS = [
 const LEGACY_CONFIG_TOKENS = ["开", "开放", "关", "关闭"];
 
 // ── 注释剥离 ────────────────────────────────────────────────────────────────
-// 按区域用不同的注释语法,不能一把梭:模板里的 `//` 是普通文本(URL / 分数 / 中文里的斜杠),
-// 当成行注释会把后面的中文一起吃掉 = 假绿。所以先切出 <script> / <style> 区域再分别处理。
-function regions(src, isVue) {
-  if (!isVue) return { script: [[0, src.length]], style: [] };
-  const collect = (tag) => {
-    const out = [];
-    const re = new RegExp(`<${tag}[^>]*>`, "gi");
-    let open;
-    while ((open = re.exec(src))) {
-      const from = open.index + open[0].length;
-      const close = src.toLowerCase().indexOf(`</${tag}>`, from);
-      out.push([from, close < 0 ? src.length : close]);
-    }
-    return out;
-  };
-  return { script: collect("script"), style: collect("style") };
-}
-
-const inside = (ranges, i) => ranges.some(([a, b]) => i >= a && i < b);
-
-// 把注释替换成等长空白(行号与列都不漂移),字符串字面量原样保留 —— 本门要判的就是字符串。
-export function stripComments(src, isVue) {
-  const { script, style } = regions(src, isVue);
-  let out = "";
-  let i = 0;
-  const n = src.length;
-  const blank = (s) => s.replace(/[^\n]/g, " ");
-  while (i < n) {
-    const c = src[i];
-    const c2 = src[i + 1];
-    const inScript = inside(script, i);
-    const inStyle = inside(style, i);
-    if (inScript && (c === '"' || c === "'" || c === "`")) {
-      const quote = c;
-      let j = i + 1;
-      while (j < n) {
-        if (src[j] === "\\") { j += 2; continue; }
-        if (src[j] === quote) { j += 1; break; }
-        j += 1;
-      }
-      out += src.slice(i, j);
-      i = j;
-      continue;
-    }
-    if (inScript && c === "/" && c2 === "/") {
-      let j = i;
-      while (j < n && src[j] !== "\n") j += 1;
-      out += blank(src.slice(i, j));
-      i = j;
-      continue;
-    }
-    if ((inScript || inStyle) && c === "/" && c2 === "*") {
-      const end = src.indexOf("*/", i + 2);
-      const j = end < 0 ? n : end + 2;
-      out += blank(src.slice(i, j));
-      i = j;
-      continue;
-    }
-    if (!inScript && !inStyle && c === "<" && src.startsWith("<!--", i)) {
-      const end = src.indexOf("-->", i + 4);
-      const j = end < 0 ? n : end + 3;
-      out += blank(src.slice(i, j));
-      i = j;
-      continue;
-    }
-    out += c;
-    i += 1;
-  }
-  return out;
-}
+// 🔴 2026-08-17 起搬到 `scripts/lib/sfc-strip-comments.mjs`,与英文面哨兵
+// (i18n-hardcoded-en-copy-sentinel.mjs)共用一份 —— 留在这里让那边复制,
+// 就是「修了一道门、漏了另一道」的标准形态。本文件下面那批注释红测(HTML 注释 /
+// script 行注释 / 块注释 / style 注释 / 含 `//` 的字符串 / 模板里的 `//`)
+// **同时是共享模块的回归靶**:改坏共享逻辑,这里立刻红。
+export { stripComments } from "./lib/sfc-strip-comments.mjs";
+import { stripComments } from "./lib/sfc-strip-comments.mjs";
 
 export function scanSource(file, src) {
   const stripped = decodeEscapes(stripComments(src, file.endsWith(".vue")));

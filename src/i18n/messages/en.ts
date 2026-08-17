@@ -534,6 +534,9 @@ export const en = {
     feedWhoPeer: "Peer",
     feedWhoLock: "Lock",
     feedValLocked: "locked",
+    ledgerEmpty: "No completed task earnings yet.",
+    liveFeedTitle: "Task assignments",
+    liveFeedEmpty: "No task activity available.",
   },
   earn: {
     title: "Earn",
@@ -686,6 +689,8 @@ export const en = {
     rangeAll: "All",
     computeEarned: "Compute earned",
     jobsCount: "{n} jobs",
+    taskLockTitle: "Task lock",
+    taskLockRemaining: "{n} min",
   },
   market: {
     title: "Market Overview",
@@ -717,6 +722,7 @@ export const en = {
       cloudShare: "Low barrier entry",
       phone: "Mobile NPU tier",
     },
+    oursTag: "OURS",
   },
 
   genesisHolder: {
@@ -2643,6 +2649,9 @@ export const en = {
     typeWalletPairing: "Wallet verification (legacy)",
     sigCopied: "Signature copied",
     clearedToast: "{n} receipts removed",
+    stampVerified: "VERIFIED",
+    statusRecorded: "Recorded",
+    statusSettled: "Settled",
   },
   language: {
     pageTitle: "Language",
@@ -2650,6 +2659,7 @@ export const en = {
       "Choose your preferred language. Translation coverage rolls out per priority tier — layout & RTL preview available for every option.",
     autoDetect: "auto-detect coming soon",
     backToAccount: "Back to Account",
+    countLine: "{n} languages",
   },
   ui: {
     confirm: "Confirm",
@@ -3297,6 +3307,7 @@ export const en = {
     regionLatencyUnavailable: "Avg latency {n}",
     metricUnavailable: "--",
     projectionUpdatedAt: "Server updated {at}",
+    uptimeLine: "uptime {v}",
   },
   proof: {
     title: "Earnings Proof",
@@ -3490,6 +3501,7 @@ export const en = {
     chips: {
       devices: "{n} devices",
       teamSize: "{n} team",
+      directs: "{n} directs",
     },
     cta: {
       share: "Share my invite link",
@@ -3526,12 +3538,14 @@ export const en = {
       topYield: "Highest yield",
     },
     penaltySuffix: "early-withdraw penalty",
+    vaultMin: "Min {amount}",
     calc: {
       label: "Compound calculator",
       principal: "Stake amount",
       singlePayout: "1 cycle payout",
       compoundPayout: "{n}× re-stake (1 year)",
       disclaimer: "Compound assumes re-stake on each maturity at current APY. Real APY may vary cycle-to-cycle.",
+      compoundSuffix: "from compounding · re-stake {n}× at maturity",
     },
     sheet: {
       title: "Stake {n}-day",
@@ -3562,6 +3576,8 @@ export const en = {
       startedOn: "Started",
       autoClaimToast: "Auto-claim on unlock",
       autoClaimSubtitle: "Unlocks in {n}d",
+      statusLabel: "Status",
+      remainingLabel: "Remaining",
     },
     toast: {
       stakeSuccess: "Staked successfully",
@@ -3586,6 +3602,10 @@ export const en = {
       openFailedStorageSubtitle: "This device couldn't save the position, so we stopped before locking it. The full amount is back in your balance — free up some space or switch off private browsing, then try again.",
     },
     howItWorksEntry: "Rules",
+    earningChip: "earning",
+    todayAccrued: "{amount} today",
+    activeCount: "{n} active",
+    maturedCount: "{n} matured",
   },
 
   stakingHowItWorks: {
@@ -3938,6 +3958,7 @@ export const en = {
       peer: "Peer",
       pool: "Pool",
       votes: "votes",
+      unlimitedExtended: "Unlimited extended",
     },
     cond: {
       selfBuy: "Self-buy ≥ ${n}",
@@ -4566,6 +4587,7 @@ export const en = {
     projectionErrorTitle: "Team network unavailable",
     projectionErrorDesc: "The authoritative server projection could not be loaded. A failed request is never shown as zero members or zero volume.",
     retry: "Retry",
+    diagramYou: "YOU",
   },
 
   tree: {
@@ -4949,6 +4971,7 @@ export const en = {
     alreadyBar: "You're already on NexGrid. Invite links are for new users — the welcome gift is once per account.",
     enterApp: "Enter NexGrid",
     previewUnavailable: "This referral offer is unavailable right now. Please try again later.",
+    certikAudited: "CertiK audited",
   },
 
   upsell: {
@@ -5456,6 +5479,13 @@ export const en = {
     decreaseQty: "Decrease quantity",
     increaseQty: "Increase quantity",
     copyHashFor: "Copy hash for {target}",
+    removeItem: "Remove {name}",
+    addItem: "Add {name}",
+    unavailable: "Unavailable",
+    volumeShort: "{amount} vol",
+    joinedDaysAgo: "{n}d ago",
+    perMonth: "{amount}/mo",
+    earnsPerDay: "Earns {amount}/d",
   },
   fx: {
     rateLabel: "Rate",
