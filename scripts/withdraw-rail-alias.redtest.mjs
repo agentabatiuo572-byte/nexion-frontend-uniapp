@@ -53,7 +53,7 @@ const DEBIT_LEG = "function applyWithdrawalDebit(wd: Withdrawal): boolean {";
 const G_SAME_RAIL = "扣款腿**同档**";
 const G_DEBIT_GUARD = "必须被模式守卫挡住";
 const G_REFETCH = "必须重拉服务端余额";
-const G_THREE_POINTS = "三个评估点";
+const G_THREE_POINTS = "提交前复检均走"; // 格名 2026-08-16 主线改成「提现页:显示 / 降额 CTA / 提交前复检均走服务端事实或冻结快照」,钉稳定片段
 const G_CALLSITES = "调用点**集合等式**";
 
 /**
