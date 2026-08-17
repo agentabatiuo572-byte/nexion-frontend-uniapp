@@ -423,7 +423,9 @@ export function scanVue(file, src) {
       if (mode.skip) { attrExemptHits.push(mode.exemptId); continue; }
       if (!hasLatin(attr.value)) continue;
       if (mode.kind === "text") {
-        record("A", attr.at, attr.value, `${attr.name}="${attr.value}"`);
+        // 行号取**值**的位置,不取属性名的位置 —— 属性名与值跨行时(`title=\n  "…"`),
+        // 用名字的位置会让上一行的豁免标记罩住它。与下面绑定分支、以及插值那边归一。
+        record("A", attr.valueAt, attr.value, `${attr.name}="${attr.value}"`);
       } else {
         for (const lit of literals(attr.value)) {
           if (!hasLatin(lit.text)) continue;
@@ -655,6 +657,9 @@ function selftest() {
     // 同族第二处:绑定**属性**里的跨行表达式。自查发现 A 规则原来用属性起点算行号,
     // 一条标记能罩住整段;判据与插值那边归一后,下面几行照判。
     ["🔴 跨行绑定属性:标记只豁免与它相邻那行的字面量", P, "<template>\n<!-- i18n-en-ok: 工程话 -->\n<view :aria-label=\"a ? 'Dev build'\n: 'Cooling down'\" />\n</template>", 1],
+    // 同族第三处(done-review 维度④ 扫出来的):**静态**属性的名与值跨行时,
+    // 行号原来取属性名的位置,于是上一行的标记会罩住实际落在下一行的值。
+    ["🔴 静态属性名与值跨行:行号按值算,上一行的标记不该罩住它", P, "<template>\n<!-- i18n-en-ok: 工程话 -->\n<view title=\n\"Cooling down\" />\n</template>", 1],
   ];
 
   let failed = 0;
