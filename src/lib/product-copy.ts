@@ -46,6 +46,24 @@ export function specText(t: Messages, value: string | undefined): string {
   return !value || value === SPEC_UNAVAILABLE ? t.store.specValueUnavailable : value;
 }
 
+export interface SpecRow { k: string; v: string }
+
+/**
+ * A spec-table row, or null when there is nothing to say. An empty row carries no
+ * information, and printing a placeholder into a spec sheet reads as "we haven't
+ * told you yet" — worse than simply not listing the line. Callers filter out nulls.
+ *
+ * Absence is judged on the SOURCE value, never on the rendered string: comparing
+ * against the localized placeholder would silently break the moment that copy or
+ * the active language changes.
+ *
+ * Single-value displays (a card's "GPU · VRAM" line) can't drop a row and keep
+ * using specText's placeholder instead.
+ */
+export function specRow(label: string, raw: string | undefined): SpecRow | null {
+  return !raw || raw === SPEC_UNAVAILABLE ? null : { k: label, v: raw };
+}
+
 /**
  * Warranty term. The server owns a month count; the unit word is ours, so the row
  * is three-language by construction instead of arriving as untranslatable prose
