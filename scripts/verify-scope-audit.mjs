@@ -7,6 +7,7 @@
 //   ① full 里 FAIL 的门 / 步骤,若在 scoped 里被 SCOPED-SKIP → 映射表漏配(该门的输入声明不完整,或它本来就该 always);
 //   ② scoped 里 FAIL 而 full 里 PASS 的门 → 抖动或环境差(不是映射问题,但要点名);
 //   ③ scoped 与 full 的 verify.sh 总格数(ran + scoped_skip)必须相等 —— 少了就是有门在 scoped 路径上根本没被点名。
+//      (包 ax:多格门跳过时 scoped_skip 按 manifest `cells` 计;首跑抓出 7 格差 = theme/dom-qa/tap/orphan 各 2 格、spec7 3 格、spec4 2 格,已声明。)
 // 何时跑:改 gates.manifest.json / 给 verify.sh 加减 scope_hit 之后必跑一次;平时按需(两遍很贵)。
 // 结果落 .verify-cache/scope-audit.json;退出码 0/1。
 import { spawnSync } from "node:child_process";

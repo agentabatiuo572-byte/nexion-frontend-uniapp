@@ -24,6 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { scopeRoutes, mapRoutes } from "./lib/probe-routes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -37,6 +38,10 @@ const ROUTES = [
   "/pages/team/team",
   "/pages/me/me",
 ];
+// 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。scoped 下「消失」只对扫过的路由比,--update-baseline 拒绝。
+const SCOPE = scopeRoutes(ROUTES, "双主题恒定着色");
+const SCAN = SCOPE.routes;
+const SCANNED = new Set(SCAN);
 
 /* ── 颜色工具 ── */
 export function parseColor(s) {
@@ -134,10 +139,11 @@ async function sweep() {
   const { chromium } = require("playwright");
   const constVals = themeConstantTokenValues(fs.readFileSync(TOKENS_CSS, "utf8"));
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US" });
-  const page = await ctx.newPage();
   const found = new Map(); // fingerprint -> {route, prop, value, count, sample}
-  for (const route of ROUTES) {
+  // 包 ax:本门只走路由级范围化,**不并行**(concurrency 1 = 与原来逐路由串行完全同构):本门靠「同一元素两主题快照按稳定键配对」判定,
+  //   对页面加载时序敏感(首页 tech-money-card 的 aurora 用了遗留 token --accent-purple、双主题恒定且带 transform 动画,配对成功与否看动画相位,
+  //   串行下就间歇命中 1/4;并行改变时序后命中率升到 2/3 → 门变红)。这条是**既有**问题,已上报待裁决;5 条路由并行只省 ~5s,不值得赌。
+  const snaps = await mapRoutes(browser, SCAN, async (page, route) => {
     await page.goto(`${BASE}/?nx_device=off#${route}`, { waitUntil: "networkidle" });
     await page.waitForTimeout(700);
     const snap = {};
@@ -149,6 +155,11 @@ async function sweep() {
       await page.waitForTimeout(320);
       snap[theme] = await page.evaluate(PROBE);
     }
+    return { route, snap };
+  }, { concurrency: 1, context: { viewport: { width: 390, height: 844 }, locale: "en-US" } });
+  for (const r of snaps) {
+    if (!r || r.error) throw new Error(`theme-constant: 路由扫描失败 ${r?.route ?? "?"}:${r?.error ?? "unknown"}`);
+    const { route, snap } = r;
     // 按稳定身份键配对,且只取两侧都唯一的键(轮播/动画导致的 DOM 漂移一律跳过)
     const count = (arr) => arr.reduce((m, x) => m.set(x.key, (m.get(x.key) || 0) + 1), new Map());
     const cd = count(snap.dark), cl = count(snap.light);
@@ -222,6 +233,7 @@ if (process.argv.includes("--selftest")) selftest();
 const hits = await sweep();
 const key = (h) => `${h.route}|${h.prop}|${h.value}`;
 if (process.argv.includes("--update-baseline")) {
+  if (SCOPE.scoped) { console.error("双主题恒定着色:PROBE_ROUTES 范围模式下不许 --update-baseline(只扫了一部分路由)。不设 PROBE_ROUTES 全量跑再重建。"); process.exit(2); }
   fs.writeFileSync(
     BASELINE,
     JSON.stringify(
@@ -241,7 +253,7 @@ if (process.argv.includes("--update-baseline")) {
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")).entries ?? [] : [];
 const known = new Set(baseline.map(key));
 const added = hits.filter((h) => !known.has(key(h)));
-const gone = baseline.filter((b) => !hits.some((h) => key(h) === key(b)));
+const gone = baseline.filter((b) => SCANNED.has(b.route) && !hits.some((h) => key(h) === key(b))); // scoped:只对扫过的路由比「消失」
 
 // 🔴 二次确认再 fail(2026-07-23 C3 加):首页任务卡/事件卡有轮播,亮暗两次渲染
 //    偶尔配对到不同的卡 → 报一条查无实据的「新增」。已两次踩到:上一轮连跑 3 次
@@ -264,4 +276,4 @@ if (confirmed.length) {
   console.error(`确属设计上就该恒定 → node scripts/theme-constant-gate.mjs --update-baseline 收编并写 note 理由。`);
   process.exit(1);
 }
-console.log(`双主题恒定着色:无新增(基线 ${baseline.length} 条,本次消失 ${gone.length} 条)`);
+console.log(`双主题恒定着色:无新增(基线 ${baseline.length} 条,本次消失 ${gone.length} 条${SCOPE.scoped ? ` · scoped ${SCAN.length}/${ROUTES.length} 路由` : ""})`);
