@@ -189,8 +189,8 @@ sentinel_present() {
 # 跳过的格走 scoped_skip 计数(与 skip 分开:skip=该跑没跑成=红;scoped_skip=按范围有意不跑=不红,但结果行必点名)。
 VERIFY_MODE="${VERIFY_MODE:-full}"
 case "$VERIFY_MODE" in full|scoped|static) ;; *) echo "VERIFY_MODE 只认 full|scoped|static(给的是 $VERIFY_MODE)"; exit 2 ;; esac
-declare -A SCOPE_RUN SCOPE_WHY
-SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
+declare -A SCOPE_RUN SCOPE_WHY SCOPE_ROUTES_FOR
+SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""; SCOPE_ROUTES="*"; SCOPE_ROUTES_NOTE=""; SCOPE_H5_PROBE_ROUTES_JSON=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
 scoped_skip=0
 VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
 if [ "$VERIFY_MODE" != "full" ]; then
@@ -200,6 +200,15 @@ if [ "$VERIFY_MODE" != "full" ]; then
     SCOPE_MODE=full; SCOPE_UPGRADED="范围计划算不出($(head -1 /tmp/uni-scope-plan.err 2>/dev/null))→ full(保守方向)"
   fi
 fi
+# 路由级范围(包 ax,主人拍板 B):scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)只扫
+#   「受影响路由 ∩ 探针射程」;探针读 env PROBE_ROUTES(scripts/lib/probe-routes.mjs)。门因自身输入(脚本/基线/台账)
+#   变化而跑 → SCOPE_ROUTES_FOR[id]='*' 全扫。full 一律清空 —— 外层残留不许把 full 变半量。用法:if scope_hit X; then route_scope X; …
+unset PROBE_ROUTES
+if [ "$SCOPE_MODE" = "scoped" ] && [ -n "$SCOPE_H5_PROBE_ROUTES_JSON" ]; then export H5_PROBE_ROUTES="$SCOPE_H5_PROBE_ROUTES_JSON"; else unset H5_PROBE_ROUTES; fi
+route_scope() {
+  local r="${SCOPE_ROUTES_FOR[$1]:-*}"
+  if [ "$SCOPE_MODE" = "scoped" ] && [ "$r" != "*" ]; then export PROBE_ROUTES="$r"; else unset PROBE_ROUTES; fi
+}
 # 用法:if scope_hit <id>; then …真跑… ; fi —— 返回 1 时已自行计数并点名 SCOPED-SKIP;未声明的 id 照跑
 scope_hit() {
   local id="$1"
@@ -212,7 +221,7 @@ scope_hit() {
 }
 
 echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE · mode=$SCOPE_MODE${SCOPE_UPGRADED:+(请求 $SCOPE_REQUESTED → $SCOPE_UPGRADED)}${VERIFY_TREE_START:+ · tree ${VERIFY_TREE_START:0:10}} ━━${N}"
-if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; fi
+if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; echo "  路由范围:${SCOPE_ROUTES_NOTE:-全部};route 类探针只扫「受影响 ∩ 射程」,门自身输入变了仍全扫"; fi
 # 门的门:manifest ↔ verify.sh 接线一致 + glob 都命中(改了清单没接线 / 接了线没声明 / 路径漂移,任一即红;三档都跑)
 if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > /tmp/uni-scope-lint.log 2>&1; then
   ok "gates.manifest 接线门 — $(tail -1 /tmp/uni-scope-lint.log)"
@@ -1604,7 +1613,7 @@ spec6_entry_surface_homes_present() {
   fi
 }
 spec6_entry_surface_homes_present
-if scope_hit spec6-entry-runtime; then
+if scope_hit spec6-entry-runtime; then route_scope spec6-entry-runtime
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-spec6-entry-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
     ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
@@ -2946,7 +2955,7 @@ theme_constant_gate() {
     tail -10 /tmp/uniapp-theme-const.log | sed 's/^/        /'
   fi
 }
-if scope_hit theme-constant-runtime; then theme_constant_gate; fi
+if scope_hit theme-constant-runtime; then route_scope theme-constant-runtime; theme_constant_gate; fi
 
 # ── 零-border 铁律 · 运行时门(C2 批次 2026-07-23) ──
 # 《03》§3:带 bg 填充的卡片/板块一律零 border,border 只属透明容器(分组 hairline /
@@ -2967,7 +2976,7 @@ zero_border_gate() {
     tail -10 /tmp/uniapp-zero-border.log | sed 's/^/        /'
   fi
 }
-if scope_hit zero-border-runtime; then zero_border_gate; fi
+if scope_hit zero-border-runtime; then route_scope zero-border-runtime; zero_border_gate; fi
 
 # ── DOM-QA 体检哨兵(vibe-playbook P1-A 2026-07-22 主人批):5 探针事实层 ──
 # ① 横向溢出 ② 文字<10px(10-12 普查不 gate) ③ tap<44pt ④ img broken ⑤ 按钮无可达名。
@@ -2988,7 +2997,7 @@ dom_qa_gate() {
     tail -12 /tmp/uniapp-dom-qa.log | sed 's/^/        /'
   fi
 }
-if scope_hit dom-qa-runtime; then dom_qa_gate; fi
+if scope_hit dom-qa-runtime; then route_scope dom-qa-runtime; dom_qa_gate; fi
 
 # ── tap 目标哨兵(C3 2026-07-23):热区 ≥44pt + 按下有可感知反馈 ──
 # 与 dom-qa 的 tap 探针**互补不重复**:dom-qa 靠「交互标签/role + cursor:pointer」找候选,
@@ -2997,7 +3006,7 @@ if scope_hit dom-qa-runtime; then dom_qa_gate; fi
 # 反馈判定走 CDP CSS.forcePseudoState 实测(不是 grep class,声明了但被 inline style 压掉的会被抓出来)。
 # 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
 tap_feedback_gate() {
-  if scope_hit tap-feedback-runtime; then
+  if scope_hit tap-feedback-runtime; then route_scope tap-feedback-runtime
   if probe_retry /tmp/uniapp-tap-selftest.log "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
     ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
   else
@@ -3014,7 +3023,7 @@ tap_feedback_gate() {
   fi
   # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
   # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
-  if scope_hit orphan-line-runtime; then
+  if scope_hit orphan-line-runtime; then route_scope orphan-line-runtime
   if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
     ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
   else
@@ -3083,7 +3092,7 @@ empty_state_gate() {
     grep -E "^FAIL" /tmp/uniapp-empty-state.log | head -8 | sed 's/^/        /'
   fi
 }
-if scope_hit empty-state-runtime; then empty_state_gate; fi
+if scope_hit empty-state-runtime; then route_scope empty-state-runtime; empty_state_gate; fi
 
 # ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
 # 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;

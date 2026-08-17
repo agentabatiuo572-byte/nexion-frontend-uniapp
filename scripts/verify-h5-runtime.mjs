@@ -22,12 +22,23 @@ const reuseUrl = { mock: process.env.H5_RUNTIME_REUSE_MOCK_URL, sandbox: process
 const onlyList = (process.env.H5_RUNTIME_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
 const only = (script) => !onlyList.length || onlyList.includes(script);
 const skippedProbes = [];
+// 路由级范围(包 ax):H5_PROBE_ROUTES = {"<script>.mjs": "a,b" | "*"}(runner / verify.sh 按 gates.manifest pages 闭包算);
+//   有条目且不是 "*" 才给该子进程设 PROBE_ROUTES,否则删掉(父环境残留不许下渗)。
+let h5ProbeRoutes = {};
+try { h5ProbeRoutes = process.env.H5_PROBE_ROUTES ? JSON.parse(process.env.H5_PROBE_ROUTES) : {}; } catch { h5ProbeRoutes = {}; }
+function probeEnv(script, baseUrl) {
+  const env = { ...process.env, BASE_URL: baseUrl };
+  delete env.PROBE_ROUTES;
+  const r = h5ProbeRoutes[script];
+  if (r && r !== "*") env.PROBE_ROUTES = r;
+  return env;
+}
 
 function runGate(script, baseUrl, args = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(root, "scripts", script), ...args], {
       cwd: root,
-      env: { ...process.env, BASE_URL: baseUrl },
+      env: probeEnv(script, baseUrl),
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";

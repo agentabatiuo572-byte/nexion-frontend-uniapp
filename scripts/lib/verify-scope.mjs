@@ -18,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { buildGraph, closure, pageRoutes, affectedRoutes } from "./import-graph.mjs";
 
 export const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export const MANIFEST_PATH = path.join(ROOT, "scripts", "gates.manifest.json");
@@ -145,6 +146,29 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
       }
     }
   }
+  // pages 声明(包 ax):门/探针驱动的页面 → 页面文件的静态 import 闭包 = 真实输入集(改共享组件/store 自然命中引用它的页面);
+  //   "*" = pages.json 全部页面。图 0.5s 建一次;闭包按需算并缓存。scoped 时另算「受影响路由」交给 route 类探针做路由级缩范围。
+  let graph = null; const closureCache = new Map();
+  const allPages = pageRoutes(ROOT);
+  const pagesOf = (entry) => expandPages(entry, allPages);
+  // 已删除的 src 文件不在图里(闭包算不到它) → 保守:所有 pages 类门都视为命中,路由全开;tsc/build 另守断链。
+  const deletedSrc = changedInfo ? changedInfo.files.filter((f) => f.startsWith("src/") && !fs.existsSync(path.join(ROOT, f))) : [];
+  const closureHit = (entry) => {
+    const pages = pagesOf(entry); if (!pages.length || !changedInfo) return null;
+    if (deletedSrc.length) return deletedSrc;
+    graph = graph || buildGraph(ROOT);
+    const roots = [...pages, ...probeScriptRoots(entry)];
+    const key = roots.join("|");
+    if (!closureCache.has(key)) closureCache.set(key, closure(graph, roots));
+    const cl = closureCache.get(key);
+    const hits = changedInfo.files.filter((f) => cl.has(f));
+    return hits;
+  };
+  let routes = null; // scoped 时:{all, affected, reason}
+  if ((mode === "scoped" || mode === "static") && changedInfo) {
+    if (deletedSrc.length) routes = { all: allPages.map((p) => p.route), affected: allPages.map((p) => p.route), reason: `改动集含已删除的 src 文件(${deletedSrc[0]}${deletedSrc.length > 1 ? ` +${deletedSrc.length - 1}` : ""})→ 全部路由` };
+    else { graph = graph || buildGraph(ROOT); routes = affectedRoutes(ROOT, changedInfo.files, graph); }
+  }
   const decide = (entry, id) => {
     if (mode === "full") return { run: true, reason: "full" };
     if (entry.fullOnly) return { run: false, reason: "full-only(只在全量档跑)" };
@@ -153,27 +177,85 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
     if (mode === "static" && entry.kind === "test") return { run: false, reason: "static:测试套件留给 scoped/full" };
     if (entry.always) return { run: true, reason: "always" };
     if (mode === "static" && staticAll) return { run: true, reason: "static:全跑" };
-    // scoped / static:按输入交集
-    if (!entry.inputs || !entry.inputs.length) return { run: true, reason: "no-inputs-declared(照跑)" };
-    const hits = changedInfo.files.filter((f) => matchAny(f, entry.inputs));
-    return hits.length ? { run: true, reason: `hit:${hits[0]}${hits.length > 1 ? ` +${hits.length - 1}` : ""}` } : { run: false, reason: `${mode}:输入未变` };
+    // scoped / static:按输入交集(inputs glob)∪ 页面闭包交集(pages)
+    const hasInputs = entry.inputs && entry.inputs.length; const hasPages = pagesOf(entry).length;
+    if (!hasInputs && !hasPages) return { run: true, reason: "no-inputs-declared(照跑)" };
+    const hits = hasInputs ? changedInfo.files.filter((f) => matchAny(f, entry.inputs)) : [];
+    const pageHits = hasPages ? (closureHit(entry) || []) : [];
+    if (hits.length) return { run: true, reason: `hit:${hits[0]}${hits.length > 1 ? ` +${hits.length - 1}` : ""}`, routes: "*" }; // 探针/基线/台账自己变了 → 全扫
+    if (pageHits.length) {
+      if (deletedSrc.length) return { run: true, reason: `deleted-src(保守全开):${pageHits[0]}${pageHits.length > 1 ? ` +${pageHits.length - 1}` : ""}`, routes: "*" };
+      const mine = new Set(pagesOf(entry)); const affected = routes && Array.isArray(routes.affected) ? routes.affected : null;
+      const scopedRoutes = affected ? allPages.filter((p) => mine.has(p.file) && affected.includes(p.route)).map((p) => p.route) : "*";
+      return { run: true, reason: `page-closure-hit:${pageHits[0]}${pageHits.length > 1 ? ` +${pageHits.length - 1}` : ""}`, routes: scopedRoutes };
+    }
+    return { run: false, reason: `${mode}:输入与页面闭包均未变` };
   };
   const table = (obj) => Object.fromEntries(Object.entries(obj || {}).map(([id, e]) => [id, decide(e, id)]));
+  const h5Table = table(manifest.h5Probes);
+  const anyH5 = Object.values(h5Table).some((d) => d.run);
+  const withUmbrella = (obj) => Object.fromEntries(Object.entries(obj || {}).map(([id, e]) => {
+    const d = decide(e, id);
+    if (e.runIfAny === "h5Probes" && mode !== "full" && !e.always) {
+      if (d.run && d.reason.startsWith("hit:")) return [id, d]; // 伞门自己的输入(脚本)变了照跑
+      return [id, anyH5 ? { run: true, reason: "runIfAny:h5Probes 有子探针要跑" } : { run: false, reason: `${mode}:h5Probes 全部跳过,伞门不起服` }];
+    }
+    return [id, d];
+  }));
   return {
     requested, mode, upgraded,
     changed: changedInfo ? { base: changedInfo.base, baseReason: changedInfo.baseReason, files: changedInfo.files } : null,
-    gates: table(manifest.gates), steps: table(manifest.steps), h5Probes: table(manifest.h5Probes),
+    routes: mode === "full" ? { all: allPages.map((p) => p.route), affected: "*", reason: "full:全部路由" } : (routes || { all: allPages.map((p) => p.route), affected: "*", reason: "改动集不可用:全部路由" }),
+    gates: withUmbrella(manifest.gates), steps: withUmbrella(manifest.steps), h5Probes: h5Table,
   };
 }
 
-/** verify.sh 用的 shell 片段:SCOPE_MODE / SCOPE_UPGRADED / SCOPE_RUN[id]=1|0 SCOPE_WHY[id]。 */
+/** pages 声明展开:"*" → 全部页面文件;含 * 的条目按 glob 匹配 pages.json 页面文件;其余按字面。 */
+export function expandPages(entry, allPages = pageRoutes(ROOT)) {
+  if (entry.pages === "*") return allPages.map((p) => p.file);
+  if (!Array.isArray(entry.pages)) return [];
+  const out = new Set();
+  for (const pg of entry.pages) {
+    if (pg.includes("*")) for (const p of allPages) { if (path.matchesGlob(p.file, pg)) out.add(p.file); }
+    else out.add(pg.replace(/\\/g, "/"));
+  }
+  return [...out];
+}
+
+/** 探针脚本(inputs 里的 scripts/*.mjs)在页面上下文里 import("/src/…") 的模块 —— 不在页面闭包里,自动并入闭包根。 */
+export function probeScriptRoots(entry) {
+  const roots = new Set();
+  for (const inp of entry.inputs || []) {
+    if (!/^scripts\/[^*?]+\.mjs$/.test(inp)) continue;
+    let src = ""; try { src = fs.readFileSync(path.join(ROOT, inp), "utf8"); } catch { continue; }
+    for (const m of src.matchAll(/["'`]\/src\/([^"'`]+)["'`]/g)) roots.add("src/" + m[1]);
+  }
+  return [...roots];
+}
+
+/** 门级路由范围 → env 串:"*" 全扫;[] → "__none__"(探针扫 0 条);否则逗号串。 */
+export function routesOfDecision(d) {
+  if (!d || d.routes === undefined || d.routes === "*") return "*";
+  return Array.isArray(d.routes) && d.routes.length ? d.routes.join(",") : "__none__";
+}
+/** h5 子探针路由映射(verify-h5-runtime.mjs 给每个子探针单独设 PROBE_ROUTES):{ "spec6-entry-surface-runtime.mjs": "a,b" | "*" }。 */
+export function h5ProbeRoutesMap(p) {
+  const out = {};
+  for (const [id, d] of Object.entries(p.h5Probes || {})) if (d.run) out[`${id}.mjs`] = routesOfDecision(d);
+  return out;
+}
+/** verify.sh 用的 shell 片段:SCOPE_MODE / SCOPE_UPGRADED / SCOPE_RUN[id]=1|0 SCOPE_WHY[id] SCOPE_ROUTES_FOR[id]。 */
 export function planToShell(p) {
   const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+  const routesEnv = !p.routes || p.routes.affected === "*" ? "*" : p.routes.affected.join(",");
   const lines = [`SCOPE_MODE=${q(p.mode)}`, `SCOPE_REQUESTED=${q(p.requested)}`, `SCOPE_UPGRADED=${q(p.upgraded || "")}`,
-    `SCOPE_CHANGED_COUNT=${p.changed ? p.changed.files.length : -1}`, `SCOPE_BASE_USED=${q(p.changed ? p.changed.base : "")}`];
+    `SCOPE_CHANGED_COUNT=${p.changed ? p.changed.files.length : -1}`, `SCOPE_BASE_USED=${q(p.changed ? p.changed.base : "")}`,
+    `SCOPE_ROUTES=${q(routesEnv)}`, `SCOPE_ROUTES_NOTE=${q(p.routes ? p.routes.reason : "")}`,
+    `SCOPE_H5_PROBE_ROUTES_JSON=${q(JSON.stringify(h5ProbeRoutesMap(p)))}`];
   for (const [id, d] of Object.entries(p.gates)) {
     lines.push(`SCOPE_RUN[${q(id)}]=${d.run ? 1 : 0}`);
     lines.push(`SCOPE_WHY[${q(id)}]=${q(d.reason)}`);
+    lines.push(`SCOPE_ROUTES_FOR[${q(id)}]=${q(routesOfDecision(d))}`);
   }
   return lines.join("\n") + "\n";
 }
@@ -194,11 +276,30 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
     }
   };
   checkGlobs("globals", manifest.globals);
+  const allPagesL = pageRoutes(ROOT); const pageFilesL = new Set(allPagesL.map((p) => p.file));
   for (const [k, e] of Object.entries(manifest.gates || {})) checkGlobs(`gates.${k}`, e.inputs);
   for (const [k, e] of Object.entries(manifest.steps || {})) checkGlobs(`steps.${k}`, e.inputs);
   for (const [k, e] of Object.entries(manifest.h5Probes || {})) checkGlobs(`h5Probes.${k}`, e.inputs);
   for (const [k, e] of Object.entries({ ...(manifest.gates || {}), ...(manifest.steps || {}), ...(manifest.h5Probes || {}) })) {
-    if (!e.always && (!e.inputs || !e.inputs.length)) problems.push(`${k} 既没 inputs 也没 always —— 要么声明输入,要么显式 always:true`);
+    const hasPages = e.pages === "*" || (Array.isArray(e.pages) && e.pages.length);
+    if (Array.isArray(e.pages)) {
+      for (const pg of e.pages) {
+        if (pg.includes("*")) { if (!expandPages({ pages: [pg] }, allPagesL).length) problems.push(`${k}.pages 的 glob 没匹配到任何 pages.json 页面:${pg}`); }
+        else if (!fs.existsSync(path.join(ROOT, pg))) problems.push(`${k}.pages 里的页面文件不存在:${pg}`);
+        else if (!pageFilesL.has(pg)) problems.push(`${k}.pages 里的文件不是 pages.json 登记的页面:${pg}`);
+      }
+      // 探针脚本里出现的路由字面(pages/x/y)必须被 pages 覆盖 —— 探针加了路由忘改清单会漂
+      const declared = new Set(expandPages(e, allPagesL));
+      for (const inp of e.inputs || []) {
+        if (!/^scripts\/[^*?]+\.mjs$/.test(inp)) continue;
+        let src = ""; try { src = fs.readFileSync(path.join(ROOT, inp), "utf8"); } catch { continue; }
+        for (const m of src.matchAll(/["'`#/]pages\/([a-z0-9_-]+\/[a-z0-9_-]+)\b/g)) {
+          const file = `src/pages/${m[1]}.vue`;
+          if (pageFilesL.has(file) && !declared.has(file)) problems.push(`${k}: 探针 ${inp} 里出现路由 pages/${m[1]},但 pages 声明未覆盖 → 加进 pages`);
+        }
+      }
+    }
+    if (!e.always && !hasPages && (!e.inputs || !e.inputs.length)) problems.push(`${k} 既没 inputs / pages 也没 always —— 要么声明输入,要么显式 always:true`);
     if (e.kind && !["static", "runtime", "server", "test", "build", "meta"].includes(e.kind)) problems.push(`${k}.kind=${e.kind} 不认识`);
   }
   return problems;
