@@ -1729,7 +1729,7 @@ sentinel_present "P2-8 account-scope helper rebinds orders" src/lib/account-scop
 sentinel_present "P2-8 account-scope helper rebinds bills" src/lib/account-scope.ts 'useBills\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds staking" src/lib/account-scope.ts 'useStaking\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds commission" src/lib/account-scope.ts 'useCommission\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 orders store is account-scoped" src/store/orders.ts 'writeAccountRow'
+sentinel_present "P2-8 orders store is account-scoped" src/store/orders.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 bills store is account-scoped" src/store/bills.ts 'writeAccountRow'
 sentinel_present "P2-8 staking store is account-scoped" src/store/staking.ts 'writeAccountRow'
 sentinel_present "P2-8 commission store is account-scoped" src/store/commission.ts 'writeAccountRow'
