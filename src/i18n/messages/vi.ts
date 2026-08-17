@@ -2353,6 +2353,7 @@ export const vi: Messages = {
     quickActions: "Thao tác nhanh",
     walletSlotUnlock: "Mở khóa",
     walletSlotMore: "nữa",
+    walletSlotsLine: "{online} đang chạy · {open} chỗ trống",
     withdrawalLocked: "Chưa đạt mức rút tối thiểu",
     withdrawalLockedBody: "Bạn cần tối thiểu ${min} (còn thiếu ${short}). Với mức điện thoại $0.06/ngày, sẽ mất ~325 ngày. Một NexGridBox S1 chạm mốc $20 trong chưa đầy 3 ngày.",
     withdrawalLockedBrowse: "Xem phần cứng",

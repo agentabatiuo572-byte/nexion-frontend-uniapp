@@ -2371,6 +2371,7 @@ export const zh: Messages = {
     quickActions: "快捷操作",
     walletSlotUnlock: "解锁",
     walletSlotMore: "更多",
+    walletSlotsLine: "{online} 台在线 · {open} 个空位",
     withdrawalLocked: "未达最低提现额",
     withdrawalLockedBody: "至少需要 ${min} 才能提现(还差 ${short})。手机算力 $0.06/天 → 约 325 天才够。一台 NexGridBox S1 不到 3 天即可达 $20。",
     withdrawalLockedBrowse: "浏览设备",
