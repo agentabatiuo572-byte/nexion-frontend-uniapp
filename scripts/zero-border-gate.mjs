@@ -207,6 +207,10 @@ async function sweep() {
   const failed = [];
   // 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一条路由(PROBE_CONCURRENCY,默认 3);每条路由仍是 goto → 700ms →
   //   两主题各 300+300ms 的原节奏,判定逻辑不动;结果按路由原顺序合并,found 的插入顺序与串行一致。
+  // 🔴 导航语义变了(tester-F F-06 要求写明):query 带 &zb=<序号> → 每条路由**整页重载**,不再是同文档换 hash。
+  //   原来 checkout 页弹开的支付面板(.tis-panel)会留在 DOM 里被记到后面 74 条路由名下(基线 159 条里 73 条是它);
+  //   现在只归属它真正所在的路由,hit 少 46% 全是这一类假归属,没丢覆盖(full 3 条逐字一致,并行 3 与串行 1 逐字节一致)。
+  //   基线里那 73 条从此稳定「消失」(partial 只报不拦),用不带 PROBE_ROUTES 的 --update-baseline 收缩。
   const perRoute = await mapRoutes(browser, SCAN, async (page, route, i) => {
     try {
       await page.goto(`${BASE}/?nx_device=off&zb=${i}#${route}`, { waitUntil: "networkidle", timeout: 20000 });

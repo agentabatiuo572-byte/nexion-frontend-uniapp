@@ -216,6 +216,7 @@ route_scope() {
 # 用法:if scope_hit <id>; then …真跑… ; fi —— 返回 1 时已自行计数并点名 SCOPED-SKIP;未声明的 id 照跑
 scope_hit() {
   local id="$1"
+  unset PROBE_ROUTES   # 每道门从干净的路由范围起步(tester-F F-07:route_scope 只 set 不 clear 会前向泄漏);route 类门在 scope_hit 之后再 route_scope 自取
   [ "$SCOPE_MODE" = "full" ] && return 0
   local r="${SCOPE_RUN[$id]:-}"
   if [ -z "$r" ] || [ "$r" = "1" ]; then return 0; fi

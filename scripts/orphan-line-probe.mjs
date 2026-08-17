@@ -132,7 +132,7 @@ for (const locale of LOCALES) {
       localStorage.setItem("nexgrid-locale-v1", JSON.stringify({ type: "object", data: { code, userSet: true } }));
     }, locale);
     await p.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
-    await settleNetwork(p); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待
+    await settleNetwork(p); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;PROBE_CONCURRENCY=1 时空转(F-04)
     await p.waitForTimeout(900);
     return await p.evaluate(scanOrphans);
   }, { context: { viewport: { width: WIDTH, height: HEIGHT } } });

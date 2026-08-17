@@ -19,6 +19,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { buildGraph, closure, pageRoutes, affectedRoutes } from "./import-graph.mjs";
+/** app 壳根:它们的静态 import 闭包作用于每一页(自身在 manifest.globals;下游靠这里兜)。 */
+export const APP_SHELL_ROOTS = ["src/App.vue", "src/main.ts", "src/components/app-chassis.vue", "src/components/global-ui.vue"];
 
 export const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export const MANIFEST_PATH = path.join(ROOT, "scripts", "gates.manifest.json");
@@ -153,9 +155,19 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
   const pagesOf = (entry) => expandPages(entry, allPages);
   // 已删除的 src 文件不在图里(闭包算不到它) → 保守:所有 pages 类门都视为命中,路由全开;tsc/build 另守断链。
   const deletedSrc = changedInfo ? changedInfo.files.filter((f) => f.startsWith("src/") && !fs.existsSync(path.join(ROOT, f))) : [];
+  // app 壳闭包(tester-F F-01/F-02):App.vue / main.ts / app-chassis / global-ui 本身在 globals 里,但**只被它们引用**的下游
+  //   (retired-route-migrations / a11y-activate / spec7-dev-bridge、App 层编排的 auth / session / theme 等 store)不在任何页面闭包里,
+  //   却作用于每一页(P-031:store 不互 import,跨 store 编排放 App 层)。命中壳闭包 = 全部路由受影响、所有 pages 类门都跑。
+  const shellHits = (() => {
+    if (!changedInfo || deletedSrc.length) return [];
+    graph = graph || buildGraph(ROOT);
+    const shell = closure(graph, APP_SHELL_ROOTS.filter((r) => graph.has(r)));
+    return changedInfo.files.filter((f) => shell.has(f));
+  })();
   const closureHit = (entry) => {
     const pages = pagesOf(entry); if (!pages.length || !changedInfo) return null;
     if (deletedSrc.length) return deletedSrc;
+    if (shellHits.length) return shellHits;
     graph = graph || buildGraph(ROOT);
     const roots = [...pages, ...probeScriptRoots(entry)];
     const key = roots.join("|");
@@ -167,6 +179,7 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
   let routes = null; // scoped 时:{all, affected, reason}
   if ((mode === "scoped" || mode === "static") && changedInfo) {
     if (deletedSrc.length) routes = { all: allPages.map((p) => p.route), affected: allPages.map((p) => p.route), reason: `改动集含已删除的 src 文件(${deletedSrc[0]}${deletedSrc.length > 1 ? ` +${deletedSrc.length - 1}` : ""})→ 全部路由` };
+    else if (shellHits.length) routes = { all: allPages.map((p) => p.route), affected: allPages.map((p) => p.route), reason: `改动命中 app 壳闭包(${shellHits[0]}${shellHits.length > 1 ? ` +${shellHits.length - 1}` : ""};App/main/chassis/global-ui 的下游作用于每一页)→ 全部路由` };
     else { graph = graph || buildGraph(ROOT); routes = affectedRoutes(ROOT, changedInfo.files, graph); }
   }
   const decide = (entry, id) => {
@@ -184,10 +197,15 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
     const pageHits = hasPages ? (closureHit(entry) || []) : [];
     if (hits.length) return { run: true, reason: `hit:${hits[0]}${hits.length > 1 ? ` +${hits.length - 1}` : ""}`, routes: "*" }; // 探针/基线/台账自己变了 → 全扫
     if (pageHits.length) {
-      if (deletedSrc.length) return { run: true, reason: `deleted-src(保守全开):${pageHits[0]}${pageHits.length > 1 ? ` +${pageHits.length - 1}` : ""}`, routes: "*" };
+      const more = pageHits.length > 1 ? ` +${pageHits.length - 1}` : "";
+      if (deletedSrc.length) return { run: true, reason: `deleted-src(保守全开):${pageHits[0]}${more}`, routes: "*" };
+      if (shellHits.length) return { run: true, reason: `app-shell-closure-hit(全部路由):${pageHits[0]}${more}`, routes: "*" };
+      // 路由级缩范围只给 routeScoped 的门(读 PROBE_ROUTES 的 7 个 route 类探针);其它门 routes 恒 "*"(tester-F F-09:别产出没人消费的假缩范围信息)。
+      // 交集为空(命中只来自探针脚本 import 的模块、页面本身没变)→ "*" 全扫,绝不下发 0 条(tester-F F-03:该保守的地方不许给 0)。
+      if (!entry.routeScoped) return { run: true, reason: `page-closure-hit:${pageHits[0]}${more}`, routes: "*" };
       const mine = new Set(pagesOf(entry)); const affected = routes && Array.isArray(routes.affected) ? routes.affected : null;
-      const scopedRoutes = affected ? allPages.filter((p) => mine.has(p.file) && affected.includes(p.route)).map((p) => p.route) : "*";
-      return { run: true, reason: `page-closure-hit:${pageHits[0]}${pageHits.length > 1 ? ` +${pageHits.length - 1}` : ""}`, routes: scopedRoutes };
+      const scopedRoutes = affected ? allPages.filter((p) => mine.has(p.file) && affected.includes(p.route)).map((p) => p.route) : [];
+      return { run: true, reason: `page-closure-hit:${pageHits[0]}${more}${scopedRoutes.length ? "" : "(路由交集空 → 全扫)"}`, routes: scopedRoutes.length ? scopedRoutes : "*" };
     }
     return { run: false, reason: `${mode}:输入与页面闭包均未变` };
   };
@@ -238,7 +256,7 @@ export function routesOfDecision(d) {
   if (!d || d.routes === undefined || d.routes === "*") return "*";
   // 🔴 去掉前导 "/":Git Bash(MSYS)会把以 / 开头的 env 值当 POSIX 路径改写成 C:/Program Files/Git/pages/…(实测 PROBE_ROUTES 整串被改,探针 0 命中);
   //   probe-routes.normRoute 两边都忽略前导斜杠,不影响匹配。
-  return Array.isArray(d.routes) && d.routes.length ? d.routes.map((r) => String(r).replace(/^\/+/, "")).join(",") : "__none__";
+  return Array.isArray(d.routes) && d.routes.length ? d.routes.map((r) => String(r).replace(/^\/+/, "")).join(",") : "*"; // 空 = 全扫,不产出 __none__(F-03)
 }
 /** h5 子探针路由映射(verify-h5-runtime.mjs 给每个子探针单独设 PROBE_ROUTES):{ "spec6-entry-surface-runtime.mjs": "a,b" | "*" }。 */
 export function h5ProbeRoutesMap(p) {
@@ -278,12 +296,20 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
     }
   };
   checkGlobs("globals", manifest.globals);
+  // routeScoped 门 ↔ verify.sh 里的 route_scope <id> 必须双向配对(tester-F F-07:route_scope 漏调 = 探针跑在别的门的路由集里)
+  const routeScopeCalls = new Set([...verifySh.matchAll(/(?:^|[;&|(\s])route_scope\s+([A-Za-z0-9_.:-]+)/gm)].map((m) => m[1]).filter((id) => id !== "<门id>"));
+  for (const [k, e] of Object.entries(manifest.gates || {})) {
+    if (e.routeScoped && !routeScopeCalls.has(k)) problems.push(`gates.${k} 标了 routeScoped,verify.sh 里却没有 route_scope ${k}(探针会继承别的门的 PROBE_ROUTES / 或全扫)`);
+  }
+  for (const id of routeScopeCalls) if (!(manifest.gates || {})[id]?.routeScoped) problems.push(`verify.sh 调了 route_scope ${id},但 manifest.gates.${id} 没标 routeScoped:true`);
   const allPagesL = pageRoutes(ROOT); const pageFilesL = new Set(allPagesL.map((p) => p.file));
   for (const [k, e] of Object.entries(manifest.gates || {})) checkGlobs(`gates.${k}`, e.inputs);
   for (const [k, e] of Object.entries(manifest.steps || {})) checkGlobs(`steps.${k}`, e.inputs);
   for (const [k, e] of Object.entries(manifest.h5Probes || {})) checkGlobs(`h5Probes.${k}`, e.inputs);
   for (const [k, e] of Object.entries({ ...(manifest.gates || {}), ...(manifest.steps || {}), ...(manifest.h5Probes || {}) })) {
     const hasPages = e.pages === "*" || (Array.isArray(e.pages) && e.pages.length);
+    if (e.pages !== undefined && !hasPages) problems.push(`${k}.pages 必须是 "*" 或非空数组(现在是 ${JSON.stringify(e.pages)} —— 会被静默当成没声明)`);
+    if (e.routeScoped && !hasPages) problems.push(`${k} 标了 routeScoped 却没有 pages —— 路由范围无从算起`);
     if (Array.isArray(e.pages)) {
       for (const pg of e.pages) {
         if (pg.includes("*")) { if (!expandPages({ pages: [pg] }, allPagesL).length) problems.push(`${k}.pages 的 glob 没匹配到任何 pages.json 页面:${pg}`); }

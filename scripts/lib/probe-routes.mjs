@@ -52,6 +52,9 @@ export async function mapRoutes(browser, routes, worker, { concurrency = concurr
 // 有界 networkidle(包 ax):并行 N 页时共用一台 Vite dev server(单线程 transform),别的页在拉模块会把本页的图片 / 懒加载
 //   请求排到 1-2s 后 —— 实测 3 页并行时空态插画 <img> 要 1.1-1.8s 才出现(串行 0.1s),固定 600ms 就判成「插画没加载出来」假红。
 //   在固定等待之前先等本页网络空闲(封顶 timeoutMs,超时不抛 —— 有轮询的页面不该因此红),只补齐「服务器忙」那部分,判定不动。
-export async function settleNetwork(page, timeoutMs = 5000) {
+//   🔴 只在真的并行(有效 lane 数 > 1)时等;PROBE_CONCURRENCY=1 = 串行 = 没有拥塞,直接返回 —— 否则「拥塞时降到 1」的逃生阀反而更慢
+//   (tester-F F-04:orphan 33s→74s、empty-state 55s→89s)。lanes 由调用方传(探针知道自己实际开了几条 lane),不传按 env 算。
+export async function settleNetwork(page, timeoutMs = 5000, lanes = concurrencyFromEnv()) {
+  if (lanes <= 1) return;
   await page.waitForLoadState("networkidle", { timeout: timeoutMs }).catch(() => {});
 }
