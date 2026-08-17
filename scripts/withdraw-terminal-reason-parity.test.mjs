@@ -182,9 +182,9 @@ test("接线 runtime 门必须还挂在 verify 链上(防它变成孤儿)", () =
     "test:withdraw-status-mirror 脚本不见了或不再指向那道门",
   );
   assert.match(
-    pkg.scripts.verify ?? "",
+    pkg.scripts["verify:steps"] ?? "",
     /npm run test:withdraw-status-mirror\b/,
-    "verify 链里没有 test:withdraw-status-mirror —— 门还在文件系统上,但没人会跑它(孤儿门)",
+    "verify:steps 链里没有 test:withdraw-status-mirror —— 门还在文件系统上,但没人会跑它(孤儿门;npm run verify 由 verify-chain.mjs 按 verify:steps 执行)",
   );
 });
 

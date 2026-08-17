@@ -58,3 +58,7 @@ scripts/.baseline/baseline-*/
 # 探针每跑一次就重生成的临时对照图(chk.png / w.png 是有意跟踪的参考图,不在此列)
 scripts/.baseline/_check/h5-runtime-home.png
 scripts/.baseline/_check/sticky-frost.png
+
+# verify 三档制(包 ar):runner 产物 —— 缓存 / 日志 / 上次运行记录 / 链退出码哨兵,外部判定读文件不读管道
+.verify-cache/
+.verify-chain.code

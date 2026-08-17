@@ -10,89 +10,32 @@
 //   这层壳照 verify-h5-runtime.mjs 的家法:自己挑空闲端口、以 mock 模式起**本工作树**的
 //   server、把 BASE_URL 交给 sh、跑完连进程树一起收掉。套件从此对外部环境零依赖,
 //   接进官方门链才不会互相踩(多个 worktree 会话并发时尤其重要 —— 各起各的端口)。
-import { spawn, spawnSync } from "node:child_process";
-import { createServer } from "node:net";
+//
+// 包 ar(2026-08-17):起服走 lib/dev-server-pool.mjs;runner 已起的一对 server 可经
+//   LEGACY_SUITE_REUSE_MOCK_URL / LEGACY_SUITE_REUSE_REMOTE_URL 传进来 —— **先核身份(本树 + 模式)再复用**,
+//   核不过照旧自己起。VERIFY_MODE(full|scoped|static)原样透传给 verify.sh;static 档不该走本壳
+//   (不需要 server,runner 直接裸跑 verify.sh)。
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureServer } from "./lib/dev-server-pool.mjs";
+import { findBash } from "./lib/find-bash.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.unref();
-    srv.on("error", reject);
-    srv.listen(0, "127.0.0.1", () => {
-      const { port } = srv.address();
-      srv.close(() => resolve(port));
-    });
-  });
-}
 
-function stopTree(child) {
-  if (!child.pid || child.exitCode !== null) return;
-  if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-  else child.kill("SIGTERM");
-}
-
-function findBash() {
-  if (process.platform !== "win32") return "bash";
-  const candidates = [process.env.BASH_EXE];
-  const locatedGit = spawnSync("where.exe", ["git"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  for (const gitExe of String(locatedGit.stdout || "").split(/\r?\n/).filter(Boolean)) {
-    candidates.push(path.resolve(path.dirname(gitExe), "..", "bin", "bash.exe"));
-  }
-  candidates.push(
-    path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "bin", "bash.exe"),
-    path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
-  );
-  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
-}
-
-async function waitForServer(url, child, tailOutput, timeoutMs = 180_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`dev server 提前退出(code ${child.exitCode}):\n${tailOutput()}`);
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch { /* 还没起来 */ }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error(`dev server 在 ${timeoutMs / 1000}s 内没起来:\n${tailOutput()}`);
-}
-
-const port = await freePort();
-const baseUrl = `http://127.0.0.1:${port}`;
-const remotePort = await freePort();
-const remoteBaseUrl = `http://127.0.0.1:${remotePort}`;
-const npmCli = [
-  process.env.npm_execpath,
-  path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
-].find((c) => c && fs.existsSync(c));
-const server = spawn(
-  npmCli ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm"),
-  [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
-  { cwd: root, env: { ...process.env, VITE_NEXGRID_API_MODE: "mock" }, shell: false, stdio: ["ignore", "pipe", "pipe"] },
-);
-const remoteServer = spawn(
-  npmCli ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm"),
-  [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(remotePort), "--strictPort"],
-  { cwd: root, env: { ...process.env, VITE_NEXGRID_API_MODE: "remote" }, shell: false, stdio: ["ignore", "pipe", "pipe"] },
-);
-let out = "";
-server.stdout.on("data", (c) => { out = (out + c).slice(-12_000); });
-server.stderr.on("data", (c) => { out = (out + c).slice(-12_000); });
-let remoteOut = "";
-remoteServer.stdout.on("data", (c) => { remoteOut = (remoteOut + c).slice(-12_000); });
-remoteServer.stderr.on("data", (c) => { remoteOut = (remoteOut + c).slice(-12_000); });
+const log = (m) => console.log(`legacy-suite:${m}`);
+const [server, remoteServer] = await Promise.all([
+  ensureServer({ root, mode: "mock", reuseUrl: process.env.LEGACY_SUITE_REUSE_MOCK_URL || null, log }),
+  ensureServer({ root, mode: "remote", reuseUrl: process.env.LEGACY_SUITE_REUSE_REMOTE_URL || null, log }),
+]);
+const baseUrl = server.baseUrl;
+const remoteBaseUrl = remoteServer.baseUrl;
 
 let code = 1;
 try {
-  await waitForServer(`${baseUrl}/?nx_device=off`, server, () => out);
-  await waitForServer(`${remoteBaseUrl}/?nx_device=off`, remoteServer, () => remoteOut);
-  console.log(`legacy-suite:已在 ${baseUrl} 起隔离 mock server，并在 ${remoteBaseUrl} 起 remote 资金边界 server，开始跑 scripts/verify.sh`);
+  log(`mock server ${baseUrl}(${server.reused ? "复用" : "隔离自起"})· remote 资金边界 server ${remoteBaseUrl}(${remoteServer.reused ? "复用" : "隔离自起"}),开始跑 scripts/verify.sh(VERIFY_MODE=${process.env.VERIFY_MODE || "full"})`);
   const bash = findBash();
   if (!bash) throw new Error("BASH_RUNTIME_NOT_FOUND:请安装 Git Bash 或设置 BASH_EXE");
   const res = spawnSync(bash, ["scripts/verify.sh"], {
@@ -117,29 +60,33 @@ try {
   // 回源 diff 才发现同期 verify.sh 其实**净增 4 道门、一道没少**。
   // 要判「门有没有掉」,查的是 `git diff <旧> HEAD -- scripts/verify.sh` 里消失的 ok/bad 调用,
   // 以及各门自报的样本量有没有塌(那才是构造性判据);这里这个总数只负责区分「跑完 vs 中止」。
+  //
+  // 包 ar:scoped 档下 ran = pass+fail 会因 SCOPED-SKIP 而正常低于 400 —— 下限对 scoped/static 档
+  // 换成「ran + scoped_skip ≥ 400」(跳过的格也是「到过」的格,只是没跑;半路暴毙时它们不会被点名)。
   const FLOOR = 400;
   let tally = null;
   try {
     const line = fs.readFileSync(path.join(root, ".verify-exit.code"), "utf8").split(/\r?\n/)[1] ?? "";
     const m = line.match(/pass=(\d+) fail=(\d+) skip=(\d+)/);
-    if (m) tally = { pass: +m[1], fail: +m[2], skip: +m[3] };
+    const ss = line.match(/scoped_skip=(\d+)/);
+    if (m) tally = { pass: +m[1], fail: +m[2], skip: +m[3], scopedSkip: ss ? +ss[1] : 0, mode: (line.match(/mode=(\w+)/) || [])[1] || "full" };
   } catch { /* 哨兵读不到,按下面的 null 分支处理 */ }
   if (!tally) {
     console.error("legacy-suite:FAIL —— 读不到退出码哨兵的基数行,无法区分「跑完判红」与「半路中止」");
     code = code || 1;
   } else {
     const ran = tally.pass + tally.fail;
-    console.log(`legacy-suite:本次实跑 ${ran} 格(pass ${tally.pass} / fail ${tally.fail} / skip ${tally.skip})`);
-    if (ran < FLOOR) {
+    log(`本次实跑 ${ran} 格(pass ${tally.pass} / fail ${tally.fail} / skip ${tally.skip}${tally.scopedSkip ? ` / scoped-skip ${tally.scopedSkip}` : ""} · mode=${tally.mode})`);
+    if (ran + tally.scopedSkip < FLOOR) {
       console.error(
-        `legacy-suite:FAIL —— 只跑了 ${ran} 格,低于下限 ${FLOOR} ⇒ **套件中途中止,不是判红**。` +
+        `legacy-suite:FAIL —— 只到过 ${ran + tally.scopedSkip} 格,低于下限 ${FLOOR} ⇒ **套件中途中止,不是判红**。` +
         "红门数变少在这种情况下是假象;先看日志最后一行的报错(unbound variable / 语法错 / 某步崩溃),别拿本次红门数做对比。",
       );
       code = code || 1;
     }
   }
 } finally {
-  stopTree(server);
-  stopTree(remoteServer);
+  server.stop();
+  remoteServer.stop();
 }
 process.exit(code);
