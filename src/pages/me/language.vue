@@ -44,7 +44,7 @@
           </template>
         </view>
 
-        <text class="block text-center" :style="footStyle">{{ localeCount }} languages · {{ t.language.autoDetect }}</text>
+        <text class="block text-center" :style="footStyle">{{ fmt(t.language.countLine, { n: localeCount }) }} · {{ t.language.autoDetect }}</text>
 
         <view class="flex items-center justify-center active:opacity-70 transition-opacity" :style="backLinkStyle" @click="goAccount">
           <text>{{ t.language.backToAccount }}</text>
@@ -59,6 +59,7 @@ import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
 import { LOCALES, PRIORITY_LABELS, localesByPriority, type LocaleCode } from "@/i18n";
 

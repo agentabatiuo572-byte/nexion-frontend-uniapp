@@ -16,7 +16,8 @@
       <!-- 开发诊断,不是产品文案:所以① 只在 DEV 构建渲染 ② 文案是裸英文字面量,不进三语词典 ——
            进了词典它就成了「工程名词写死在用户文案契约里」,而且词典对象摇不掉、会原样进生产包。
            ③ 与下面的 remoteError 分支解耦成独立 v-if:挂在同一条 v-else-if 链上时,这道闸一旦为假
-           就会把 remoteError 分支放出来,是个只等某天 mock 下写了 remoteError 就会炸的暗雷。 -->
+           就会把 remoteError 分支放出来,是个只等某天 mock 下写了 remoteError 就会炸的暗雷。
+           i18n-en-ok: 工程话诊断横幅,仅 DEV + mock 档渲染 -->
       <text v-if="isDevBuild && staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
       <text v-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
 
@@ -31,7 +32,7 @@
             <view class="flex items-center justify-between" style="margin-bottom: 8px">
               <text :style="metaLabelStyle">{{ t.stakingV3.totalLocked }}</text>
               <view class="flex items-center" style="gap: 8px">
-                <text v-if="activePositions.length > 0" :style="earningChipStyle">earning</text>
+                <text v-if="activePositions.length > 0" :style="earningChipStyle">{{ t.stakingV3.earningChip }}</text>
                 <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
                   <text style="margin: 0 6px">{{ t.stakingV3.howItWorksEntry }}</text>
@@ -48,10 +49,10 @@
 
             <!-- delta -->
             <view class="tabular-nums" :style="deltaStyle">
-              <text>+${{ todayAccruedText }} today</text>
-              <text style="color: var(--v5-ink-4)"> · {{ activePositions.length }} active</text>
+              <text>{{ fmt(t.stakingV3.todayAccrued, { amount: `+$${todayAccruedText}` }) }}</text>
+              <text style="color: var(--v5-ink-4)"> · {{ fmt(t.stakingV3.activeCount, { n: activePositions.length }) }}</text>
               <text v-if="maturedCount > 0" style="color: var(--v5-ink-4)"> · </text>
-              <text v-if="maturedCount > 0" style="color: var(--v5-brand-2); font-weight: 500">{{ maturedCount }} matured</text>
+              <text v-if="maturedCount > 0" style="color: var(--v5-brand-2); font-weight: 500">{{ fmt(t.stakingV3.maturedCount, { n: maturedCount }) }}</text>
             </view>
 
             <!-- 2-col -->

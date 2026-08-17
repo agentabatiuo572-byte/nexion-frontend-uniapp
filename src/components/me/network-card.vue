@@ -65,10 +65,10 @@ import { useLocaleStore } from "@/store/locale";
 import {
   useVRank,
   nextRankGap,
-  V_RANKS,
   type PrimaryGap,
   type PerkUnlock,
 } from "@/store/v-rank";
+import { rankTitle } from "@/lib/v-rank-copy";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
@@ -80,7 +80,9 @@ const isZh = computed(() => locale.code === "zh");
 const myRank = computed(() => vrank.myRank);
 const gap = computed(() => nextRankGap(vrank));
 
-const titleOf = (v: number): string => (isZh.value ? V_RANKS[v].cnTitle : V_RANKS[v].title);
+// 头衔的中英取舍收在 lib/v-rank-copy(主人 2026-08-17 拍板 V3 = 舰长;此前三处各写一份判断,
+// 中文界面出现「舰长 / 队长 / Captain」三种写法)
+const titleOf = (v: number): string => rankTitle(v, isZh.value);
 
 // ── Max-rank end state ──(实物奖已删 → 用通用「已达成」图标作 dignity 锚点)
 const maxPrizeIcon = "✓";
