@@ -239,7 +239,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { productCopy, specText, warrantyText } from "@/lib/product-copy";
+import { productCopy, specRow, warrantyText, type SpecRow } from "@/lib/product-copy";
 import { typicalPhoneDailyUsdt } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -353,22 +353,24 @@ const paybackLabel = computed(() => {
     : fmt(t.value.store.detPaybackDays, { n: d });
 });
 
-// Hardware spec rows — every value is server-owned (the contract requires all of
-// them non-empty), so labels localise but values render as authored upstream.
-// Only the missing/uncertified case degrades through specText().
-const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
+// Hardware spec rows — per-SKU values are server-owned and optional, so labels
+// localise while values render as authored upstream, and a row with nothing to
+// say is dropped rather than filled with a placeholder. Uptime is a platform-wide
+// promise and warranty is a month count we format ourselves.
+const hardwareSpecs = computed<SpecRow[]>(() => {
   const p = product.value;
   if (!p) return [];
   const s = t.value.store;
   return [
-    { k: s.specGpu, v: specText(t.value, p.gpu) },
-    { k: s.specVram, v: specText(t.value, p.vram) },
-    { k: s.specPower, v: specText(t.value, p.power) },
-    { k: s.specDatacenter, v: specText(t.value, p.datacenter) },
+    specRow(s.specGpu, p.gpu),
+    specRow(s.specVram, p.vram),
+    specRow(s.specPower, p.power),
+    specRow(s.specDatacenter, p.datacenter),
     // 在线率是**平台**统一的托管承诺,对每件商品都一样,故走文案不走商品字段。
     { k: s.specUptime, v: s.specUptimeValue },
-    { k: s.specWarranty, v: warrantyText(t.value, p.warrantyMonths) },
-  ];
+    // 无质保的条目(如 Cloud Share —— 用户不拥有硬件)整行不出现,而不是显示「暂无数据」。
+    p.warrantyMonths ? { k: s.specWarranty, v: warrantyText(t.value, p.warrantyMonths) } : null,
+  ].filter((r): r is SpecRow => r !== null);
 });
 
 // AI perf rows from product.ai. `unlocks` is per-SKU marketing copy → resolved
