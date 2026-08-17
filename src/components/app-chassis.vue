@@ -294,7 +294,7 @@ function stopAutoPush() {
 // 直接置 open),漏接任何一个都会把令牌永久扣住,之后谁都再弹不出来。
 function syncSheetToken(id: PopupId, open: boolean) {
   if (open) popupArbiter.acquire(id);
-  else popupArbiter.release(id);
+  else popupArbiter.release(id); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语
 }
 watch(
   [() => voucherClaimSheet.open, () => trialClaimSheet.open],
