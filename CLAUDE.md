@@ -19,26 +19,23 @@ This file provides guidance to Claude Code when working in this repository.
 VITE_NEXGRID_API_MODE=mock npm run dev:h5     # H5 dev（verify 的合法靶必须是 mock 模式）
 npm run dev:mp-weixin     # 微信小程序 dev
 npm run build:h5          # H5 生产构建 → dist/
-npm run type-check        # vue-tsc --noEmit（宣布完成前必须 0 错）
-bash scripts/verify.sh    # 全量自测：类型 + i18n 镜像 + HTTP200 + 源码哨兵
+npm run type-check        # vue-tsc --noEmit（裸跑）；npm run type-check:cached = 指纹缓存壳（同树重复 1s；变了裸跑 ~35s;--incremental 因假绿禁用，门链都走这个）
+npm run verify            # 🔴 全量档（full）：18 步链 runner（tsc → 契约测试 → 生产构建 → 运行时探针 → verify.sh 458 格），各步自起本树隔离 server，实测 ~24 min（基线 29）
+npm run verify:scoped     # 范围档：只跑「git 改动集 ∩ 门声明输入」命中的重门（scripts/gates.manifest.json），子任务交 tester 前用；耗时与改动面成正比（只碰页面/组件类文件明显省；碰 src/store/** 因多数运行时门都依赖 store,接近全量 ~18 min；改门基建/全局清单文件自动升 full）
+npm run verify:static     # 静态档：不起 server，vue-tsc（缓存）+ 静态哨兵，实测 3-4 min（Stop hook 每回合末自动跑；树未变 / 只改文档秒退）
 node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 ```
 
-🔴 **verify 前先确认「靶子是本树 + mock 模式」**，两条都不满足就别看结论：
+🔴 **verify 三档只有 full 算数**（主人 2026-08-17 拍板）：scoped / static 只买内循环速度，结果行与 `.verify-exit.code` 第 2 行都带 `mode=`；宣布 done / 合并主线前必须在最后一次提交之后跑一次 `npm run verify`（工作树干净），合并守卫 `PLAN/.claude/hooks/verify-fresh-before-merge.mjs` 会核 `.verify-cache/last-run.json` 的 full 绿树对象 == 被合分支树。范围由机器算（`node scripts/lib/verify-scope.mjs plan --mode scoped`），改动命中全局不变量清单自动升 full；未声明的门照跑；改 `gates.manifest.json` 后跑 `npm run verify:scope-audit:deep`（scoped vs full 双跑比对）。
 
-```bash
-VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5399
-BASE_URL=http://localhost:5399 bash scripts/verify.sh
-```
+runner 各步自起「本树」隔离 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399（`--pool` 可选共享一对，默认关）。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 mock server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 mock 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
 
-主 checkout 可以直接用默认 5173；**worktree 必须换端口并显式传 `BASE_URL`**——`BASE_URL` 默认 5173，而 5173 上多半是主 checkout 的 server，13 道运行时门会安静地验**另一棵树**还一路报 PASS。实测代价：同一提交对着错靶子跑出 10 红、对着本树 mock 跑是 418 pass / 0 fail——「一堆既有红门」整个是环境假象。`[2.6] 树身份 preflight` 现在会把这种情况判红（判据 `VITE_ROOT_DIR`，探不到也红）。
-
-verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有一份哨兵文件 `.verify-exit.code`（`| tail` 会吞掉真实退出码，**外部判定读文件不读管道**）。
+verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有哨兵文件：`.verify-exit.code`（verify.sh）与 `.verify-chain.code` / `.verify-cache/last-run.json`（runner）—— `| tail` 会吞掉真实退出码，**外部判定读文件不读管道**。
 
 ## 完成门（宣布 module done 前必走）
 
-1. `npm run type-check` → 0 错。**setup store 别写 `(): ReturnType =>` 返回类型注解**，让 Pinia 自动推导（否则 TS2740）。
-2. `bash scripts/verify.sh` → 全绿。含 15+ 源码哨兵：React 残留（`className=`/`useState`/JSX 自闭）、反向词（庞氏/杀猪盘/ponzi）、hex 硬码（禁用色号）、SFC 闭合、native `<button>` 禁用、chassis 完整性、CSS 基础、路由有效性。
+1. `npm run verify` → 全绿（full 档；含 vue-tsc 0 错。**setup store 别写 `(): ReturnType =>` 返回类型注解**，让 Pinia 自动推导（否则 TS2740））。
+2. verify.sh 458 格里含 15+ 源码哨兵：React 残留（`className=`/`useState`/JSX 自闭）、反向词（庞氏/杀猪盘/ponzi）、hex 硬码（禁用色号）、SFC 闭合、native `<button>` 禁用、chassis 完整性、CSS 基础、路由有效性；子任务内循环用 `verify:scoped`，回合末 Stop hook 跑 `verify:static`。
 3. Browser self-check（Playwright）：每个改动路由 navigate + console error=0 + 截图。**verify 绿 ≠ 渲染 OK**（只有浏览器抓 hydration / 遮挡 / 字色回归）。
 4. 清理 `.playwright-mcp/` 和临时 `*.png`。
 5. PRD sync：按 `nexion-prd-sync` Step 2 判据**自行判定**并执行（主人 2026-08-15 拍板：不再询问），收尾汇报写明「已同步 §X / 未同步+理由」（标准 PRD 风格，不加 changelog）。
