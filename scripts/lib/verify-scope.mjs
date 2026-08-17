@@ -236,7 +236,9 @@ export function probeScriptRoots(entry) {
 /** 门级路由范围 → env 串:"*" 全扫;[] → "__none__"(探针扫 0 条);否则逗号串。 */
 export function routesOfDecision(d) {
   if (!d || d.routes === undefined || d.routes === "*") return "*";
-  return Array.isArray(d.routes) && d.routes.length ? d.routes.join(",") : "__none__";
+  // 🔴 去掉前导 "/":Git Bash(MSYS)会把以 / 开头的 env 值当 POSIX 路径改写成 C:/Program Files/Git/pages/…(实测 PROBE_ROUTES 整串被改,探针 0 命中);
+  //   probe-routes.normRoute 两边都忽略前导斜杠,不影响匹配。
+  return Array.isArray(d.routes) && d.routes.length ? d.routes.map((r) => String(r).replace(/^\/+/, "")).join(",") : "__none__";
 }
 /** h5 子探针路由映射(verify-h5-runtime.mjs 给每个子探针单独设 PROBE_ROUTES):{ "spec6-entry-surface-runtime.mjs": "a,b" | "*" }。 */
 export function h5ProbeRoutesMap(p) {
@@ -247,7 +249,7 @@ export function h5ProbeRoutesMap(p) {
 /** verify.sh 用的 shell 片段:SCOPE_MODE / SCOPE_UPGRADED / SCOPE_RUN[id]=1|0 SCOPE_WHY[id] SCOPE_ROUTES_FOR[id]。 */
 export function planToShell(p) {
   const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
-  const routesEnv = !p.routes || p.routes.affected === "*" ? "*" : p.routes.affected.join(",");
+  const routesEnv = !p.routes || p.routes.affected === "*" ? "*" : p.routes.affected.map((r) => String(r).replace(/^\/+/, "")).join(","); // 无前导 /(MSYS 路径改写,见 routesOfDecision)
   const lines = [`SCOPE_MODE=${q(p.mode)}`, `SCOPE_REQUESTED=${q(p.requested)}`, `SCOPE_UPGRADED=${q(p.upgraded || "")}`,
     `SCOPE_CHANGED_COUNT=${p.changed ? p.changed.files.length : -1}`, `SCOPE_BASE_USED=${q(p.changed ? p.changed.base : "")}`,
     `SCOPE_ROUTES=${q(routesEnv)}`, `SCOPE_ROUTES_NOTE=${q(p.routes ? p.routes.reason : "")}`,
