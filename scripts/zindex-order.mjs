@@ -167,6 +167,26 @@ export function scanFullScreenScrims(files) {
       if (z === null) continue;
       out.push({ file: f.rel, line: text.slice(0, m.index).split("\n").length, sel: "JS 样式对象", z });
     }
+    // 🔴 第四种写法:定位来自 **UnoCSS 原子类**(`class="fixed inset-0"`),z-index 来自
+    // 同一个标签的内联 style 或 `z-<n>` 原子类。前三种判据都要求「position 与 z-index 出现在
+    // 同一段声明体里」,而这一种**天生分居两处**:class 里只有定位、style 里只有层级,
+    // 任何一边单看都不成立 —— 于是 capacity-explainer / tradein-ladder 两张说明半屏
+    // 一直在判据之外(它们眼下是 900 没违例,但改成 90 也不会红)。按**标签**取属性再判。
+    const tagRe = /<[a-zA-Z][\w-]*\s([^>]*?)\/?>/g;
+    while ((m = tagRe.exec(text)) !== null) {
+      const attrs = m[1];
+      const cls = (attrs.match(/class="([^"]*)"/) || ["", ""])[1];
+      if (!/(^|\s)fixed(\s|$)/.test(cls)) continue;
+      const fullBleed =
+        /(^|\s)inset-0(\s|$)/.test(cls) ||
+        (/(^|\s)top-0(\s|$)/.test(cls) && /(^|\s)right-0(\s|$)/.test(cls) &&
+         /(^|\s)bottom-0(\s|$)/.test(cls) && /(^|\s)left-0(\s|$)/.test(cls));
+      if (!fullBleed) continue;
+      const styleAttr = (attrs.match(/style="([^"]*)"/) || ["", ""])[1];
+      const zm = styleAttr.match(/z-index:\s*(\d+)/) || cls.match(/(?:^|\s)z-\[?(\d+)\]?(?:\s|$)/);
+      if (!zm) continue;
+      out.push({ file: f.rel, line: text.slice(0, m.index).split("\n").length, sel: "原子类定位", z: parseInt(zm[1], 10) });
+    }
   }
   return out;
 }
@@ -333,6 +353,26 @@ function selftest() {
       text: `<script setup lang="ts">\nconst scrimStyle = { position: "fixed", inset: 0, zIndex: 750 };\n</script>`,
     });
     p("红测③-JS对象 JS 样式对象写的 750 全屏模态必红(CSS 正则对引号+camelCase 全瞎)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 🔴 轴「定位与层级分居两处」:定位由 UnoCSS 原子类给,z-index 在内联 style 里,
+    //    任何「要求两者出现在同一段声明体」的判据都对它天生失明。
+    const files = clone();
+    files.push({
+      rel: "src/components/fake-uno-sheet.vue",
+      text: `<template>\n  <view class="fixed inset-0" style="z-index: 750" />\n</template>`,
+    });
+    p("红测③-原子类 class 给定位 + style 给层级的 750 全屏模态必红(前三种判据都看不见)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 事故现场:说明型半屏(原子类定位)退回 90 —— 补这条轴之前它退回去也不会红。
+    const files = patch("src/components/earn/capacity-explainer-sheet.vue",
+      (t) => t.replace(/(class="fixed inset-0" style="z-index: )900/, "$190"));
+    p("红测③-原子类事故现场 说明半屏退回 90 必红(补轴前它是判据外的)",
       evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
       evaluate(files).problems.join(" / "));
   }
