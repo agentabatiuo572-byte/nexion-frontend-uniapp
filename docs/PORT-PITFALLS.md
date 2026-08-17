@@ -1811,7 +1811,15 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **升层**:`scripts/selfcheck-persist-verdict.mjs` —— TypeScript AST(vue 只取 `<script>` 块),钱路 6 个文件里 17 个落盘 / CAS / 资金原语(`persist / writeAccountRow / persistAccountSnapshot / markUsed / release / consume / restoreMoney / debitBalance / creditBalance / createOrder(s) / cancelOrder / postMoneyBill / postReceiptOnly / commit …`)**不许作为裸表达式语句出现**;`void x()` 是显式丢弃放行,确需忽略写 `persist-verdict-ok: <理由>`。`--selftest` 4 红 7 绿,真文件塞一行 `persist();` 即红;已挂 verify.sh。首跑抓 14 处(含审计的 2 处 + 12 处同形),逐个消费或标注理由(远端命令键 4 处 → HANDOFF U-21)。
 - **同族提醒**:① 「返回布尔的动作」在钱路上必须被 if / const / return 接住,接不住就写下为什么;② 一族修到第二次就该问「能不能机器测」——这条本可以在 R4 就焊,晚了两轮;③ 门的判据用 AST 不用正则:换行 / 链式 / 泛型实参 / 模板字符串都不影响,正则版一定漏。2026-08-17。
 
-## P-118 全套 i18n 机器门只守**中文**这一面 —— 英文文案跑进界面,456 格门一条不响
+## P-118 「已接入名单」型的门,对压根没接的页面天然隐形 —— 空态门 20/20 连绿,而空白页就在名单外
+
+- **症状**:创世市场 `#/pages/genesis/marketplace`「在售(0)」时,页签下方约 400px 纯空白(探针确认该区间零元素)。同页「我的」页签有空态,订单 / 商城 / 收据页也都有空态,唯独这里没有。而空态哨兵 `scripts/empty-state-probe.mjs` 一路 **20/20 报绿**,建门至今没红过。最后是靠人肉全站走查抓到的。
+- **根因**:那道门的 `ROUTES` 是**手工登记表**,注释写明语义是「接了 EmptyState 的页面」。门本身很硬(逐页强制清空 store 数组让空态显形 + 断言 `.nx-empty` 出现 / 插画 `naturalWidth>0` / 标题非空 / 不横向溢出 / 零 console error),但**判据的定义域由名单决定**:压根没接空态的页面不在名单里 ⇒ 它对这类页面**天然失明**。门守的是「已入册的变差」,守不住「没入册」。同族根因见 [[count-ledger-blind-to-unscanned]](总数恒等式两边同源)。
+- **落地修法**:① 两个空分支(listings / activity)改接全站共享的 `components/empty-state.vue`(《06 缺省页规范》唯一实现,与订单 / 商城 / 收据同款),**不新造样式**;② 把 `pages/genesis/marketplace` 登记进 `ROUTES`,门从 20/20 变 21/21。
+- 🔴 **未收口的那条轴(补名单 ≠ 补门)**:「哪些页**该有**空态却没有」仍在这张表的视野之外——今天补的只是本页纳管,下一个漏接空态的页面依旧隐形。真要守住得**反过来判**:凡渲染列表 / feed 的模板分支,要么有空态兄弟分支,要么带显式豁免标记;候选必须落进一个有账的桶,不许静默跳过(构造性判据,别再用名单)。**这条尚未实现,是已知欠账。**
+- **同族提醒**:看到白名单 / 登记表 / `EXPECTED_N` / 「已接入 X 的清单」这种形状,一律先问一句——**没入册的东西谁来发现?** 答不上来,这道门就只是在给已知项做回归,不是在做覆盖。另:被这类门保护的样式别顺手删,`emptyCardStyle` 那种**空态整框虚线是合法保留项**(与「卡内横向虚线清零」不是一回事)。2026-08-17。
+
+## P-120 全套 i18n 机器门只守**中文**这一面 —— 英文文案跑进界面,456 格门一条不响
 
 - **症状**:`src/components/me/wallet-card.vue` 的槽位行长期写成 `{{ onlineCount }} live · {{ emptySlots }} slots open`,中文 / 越南语界面**直出英文**。发现它靠的是独立验收 agent 在越南语截图里**肉眼**看到,不是任何一道门。
 - **根因是整条轴单面**,不是某一道门写坏了:`i18n-hardcoded-cjk-sentinel` 判「不许出现中文」(它最后一条红测 `["纯英文页面 0 命中", …, "<view>Loading…</view>", 0]` **明确把英文放行**);`i18n-key-mirror` 只保证已进词典的 key 三语齐,压根没进词典的字符串无感;`spec-sentinel-render-gate` 只守 product-catalog 那一个哨兵值。三道门都在看「中文有没有跑出词典」,没有一道看「英文有没有跑进界面」。
@@ -1828,7 +1836,7 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - 🔴 **门的「0 命中即失效」判据当场证明自己有用**:`CertiK audited` 收进词典后 `CertiK` 在判定面再无命中,门立刻判红要求删掉这条授权。死授权不是「白留一条」,它是给未来英文文案开的静默后门。
 - **同族提醒**:① **一道门的红测里那条「阴性放行」样本,往回读就是它的盲区声明** —— 中文门写着「纯英文页面 0 命中」,那句话本身就是这个缺口的自白,半年没人往回读;② 不变量是「双语 / 三语」时,问一句**每一面都有门吗**,别只数门的条数(456 格门,英文那面 0 格);③ 判据形状定型前先量规模,量出来的分布会推翻直觉(本轮直觉判据会漏掉 60% 的真违规)。2026-08-17。
 
-### P-118 追记(同日,独立审计 3 P1 + 20 P2 之后):门 v1 的判定面是「表层形态白名单」,整族同义别名逃逸
+### P-120 追记(同日,独立审计 3 P1 + 20 P2 之后):门 v1 的判定面是「表层形态白名单」,整族同义别名逃逸
 
 第一版判定面按「属性名白名单 + 双引号 + 非绑定写法」圈,独立审计当场证伪:
 
@@ -1854,7 +1862,14 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - 🔴 **模板里打一个空格不等于渲染出空格。** 把分隔空格从词典值的前导空格挪进模板后,Vue 的空白折叠把标签边上的空白删掉,实景渲染成 `+$550来自复投`(粘字)。要显式拼进表达式(`{{ " " + fmt(...) }}`)。**「把不可见契约显式化」这个改法本身也会引入不可见契约。**
 - 🔴 **注入语言必须在 app 启动之前。** locale store 只在 app init 时 hydrate 一次,之后写存储 + hash 导航不会重新 hydrate —— 于是「三语走查」三轮全在验同一种语言,而输出看起来完全正常(页面确实是本地化的,只是同一种)。正确做法:`context.addInitScript` 写 `uni` 的存储壳格式(`{"type":"object","data":{…}}`,直接写裸 JSON 读不出来)+ 每种语言用**独立 context**。验完要能给出「en 下 30 个英文原串全部仍在(渲染等价)/ zh·vi 下只剩 N 个」这种双向数字,单向只看「变中文了」证明不了没改坏英文。
 
-### P-119 `<svg>` 里的 `<text>` 在 uni H5 下编成 `<uni-text>`,**0×0 不渲染**
+### P-120 追记 2:套件**运行期间**改 `scripts/verify.sh`,会崩成「语法错」的样子
+
+- **症状**:`npm run test:legacy-suite` 跑到一半突然 `scripts/verify.sh: line 1927: e: command not found` + `line 1929: syntax error near unexpected token 'fi'`,只跑了 356 格(下限 400),套件自带的下限守卫判 FAIL 并提示「中途中止,不是判红」。
+- **根因**:bash **按字节偏移增量读**脚本,不是一次性载入。我在它执行到一半时改了同一个文件(给两条日志名加 PID),文件长度变了,bash 从错位的偏移继续读,读出半条命令。
+- **判据**:比 `scripts/verify.sh` 的 mtime 与日志最后一行的时间 —— 本例 19:06:58 改、19:07:07 崩,9 秒。**先看这个,再怀疑代码**。
+- **教训**:① 套件在跑时,`scripts/verify.sh` 与它 `source` 的任何 shell 文件一律不许动(`.mjs` / `.ts` 无此问题,node 每次是新进程、整文件读);② 这种崩法**长得像自己刚写的代码有语法错**,最容易把人引去改无关的东西 —— 套件自带的「跑格数低于下限即判中止」那条守卫在这里救了一次,它比红门数可信。
+- **同族**:[[suite-run-mutates-source-in-place]] 说的是反向(套件会就地改 `src/` 再还原);这条是「我改了套件正在执行的脚本」。两条合起来的口径:**套件在跑 = 树处于不可变期,双向都别动。** 2026-08-17。
+## P-121 `<svg>` 里的 `<text>` 在 uni H5 下编成 `<uni-text>`,**0×0 不渲染**
 
 - **症状**:内联 SVG 里的文字标签用户完全看不见。实测 `src/pages/team/network.vue` 的关系网示意图中心节点上没有「你 / YOU」、两条轨道环上没有「直推 / 扩展」;`src/components/store/product-render.vue` 的产品渲染图上没有丝印与 GPU/CPU/RAM/SSD 字样。
 - **判据**:`document.querySelectorAll("svg text").length === 0`,而 `svg uni-text` 有 6 个、`getBoundingClientRect()` 全是 `0×0`。原生 SVG 需要 `<text>` 元素,uni 把模板里的 `<text>` 一律编译成自定义元素 `<uni-text>`,它不是合法的 SVG 子元素,浏览器不排版。
@@ -1862,10 +1877,3 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **与本轮的关系**:这 13 个节点里有几个是硬编码英文(`YOU` / `DIRECT` / `EXTENDED` / `CLOUD SHARE` / `DISTRIBUTED · NO HARDWARE`),英文文案门照判(判据是「渲染位上有没有英文」,而它们在源码上确实是渲染位)。把它们接进词典**不改变可见结果**,因为压根不可见 —— 这属于**另一个缺陷**:该有的文字不在。
 - **留给主人拍板**(不擅自改):要让 SVG 里的文字显示,得改画法(改用原生 SVG `text` 需要绕过 uni 的组件编译,或者把文字挪到 SVG 外用绝对定位叠上去),这是全仓示意图的画法决定,不是单点修补。**判据教训**:`<text>` 在本仓有两种语义(uni 组件 / SVG 元素),写在 SVG 里的那种是**静默失效**——不报错、不留痕,只是没有字。2026-08-17。
 
-### P-118 追记 2:套件**运行期间**改 `scripts/verify.sh`,会崩成「语法错」的样子
-
-- **症状**:`npm run test:legacy-suite` 跑到一半突然 `scripts/verify.sh: line 1927: e: command not found` + `line 1929: syntax error near unexpected token 'fi'`,只跑了 356 格(下限 400),套件自带的下限守卫判 FAIL 并提示「中途中止,不是判红」。
-- **根因**:bash **按字节偏移增量读**脚本,不是一次性载入。我在它执行到一半时改了同一个文件(给两条日志名加 PID),文件长度变了,bash 从错位的偏移继续读,读出半条命令。
-- **判据**:比 `scripts/verify.sh` 的 mtime 与日志最后一行的时间 —— 本例 19:06:58 改、19:07:07 崩,9 秒。**先看这个,再怀疑代码**。
-- **教训**:① 套件在跑时,`scripts/verify.sh` 与它 `source` 的任何 shell 文件一律不许动(`.mjs` / `.ts` 无此问题,node 每次是新进程、整文件读);② 这种崩法**长得像自己刚写的代码有语法错**,最容易把人引去改无关的东西 —— 套件自带的「跑格数低于下限即判中止」那条守卫在这里救了一次,它比红门数可信。
-- **同族**:[[suite-run-mutates-source-in-place]] 说的是反向(套件会就地改 `src/` 再还原);这条是「我改了套件正在执行的脚本」。两条合起来的口径:**套件在跑 = 树处于不可变期,双向都别动。** 2026-08-17。

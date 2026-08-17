@@ -44,7 +44,9 @@
 
         <!-- 去线(主人 2026-08-17 全站令):mt-7 = 原 mt-4 + pt-3 的总间距 -->
         <view class="mt-7 grid grid-cols-3">
-          <view v-for="s in stats" :key="s.k">
+          <!-- 每列拉满行高 + 标签贴顶数值贴底:第三列标签("对比 <机型>")会折成两行,
+               不这么做的话它的数值被推低 15px,三列数字读起来是歪的(去掉分隔虚线后更明显) -->
+          <view v-for="s in stats" :key="s.k" style="display: flex; flex-direction: column; justify-content: space-between">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ s.k }}</text>
             <text class="block tabular-nums" :style="{ marginTop: '3px', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: s.tone, letterSpacing: '-0.014em' }">{{ s.v }}</text>
           </view>
