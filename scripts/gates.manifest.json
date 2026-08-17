@@ -1,5 +1,5 @@
 {
-  "$comment": "verify 范围化清单(包 ar,2026-08-17)。每道重门/每个链步骤声明自己的输入文件集(glob,path.matchesGlob 语义);scoped 模式下改动集∩inputs=∅ 才跳过。未在此声明的门一律照跑;globals 命中即整轮升 full;kind=runtime|server 的在 static 模式一律跳过。改本文件 = 改门定义,自动属于 globals。接线一致性由 `node scripts/lib/verify-scope.mjs lint` 守(verify.sh 也跑它)。 包 ax(2026-08-17 主人拍板 A+B):门可声明 `pages`(页面文件路径 / glob / \"*\"=pages.json 全部)—— scoped 时输入集 = inputs ∪ 这些页面的静态 import 闭包(scripts/lib/import-graph.mjs),改共享组件 / store 自然命中引用它的页面;探针脚本(inputs 里 scripts/*.mjs)里 import(\"/src/…\") 的模块自动并入闭包根。route 类探针另收 PROBE_ROUTES(=受影响路由 ∩ 探针射程)做路由级缩范围;`runIfAny:\"h5Probes\"` = 只在任一 h5 子探针要跑时才跑。 routeScoped:true = 该门的探针读 PROBE_ROUTES(路由级缩范围只给这些门算,verify.sh 必须紧跟 route_scope <id>,lint 双向配对);其它门 routes 恒 \"*\"。app 壳(App.vue/main.ts/app-chassis/global-ui)闭包内任何文件变了 = 全部路由受影响。",
+  "$comment": "verify 范围化清单(包 ar,2026-08-17)。每道重门/每个链步骤声明自己的输入文件集(glob,path.matchesGlob 语义);scoped 模式下改动集∩inputs=∅ 才跳过。未在此声明的门一律照跑;globals 命中即整轮升 full;kind=runtime|server 的在 static 模式一律跳过。改本文件 = 改门定义,自动属于 globals。接线一致性由 `node scripts/lib/verify-scope.mjs lint` 守(verify.sh 也跑它)。 包 ax(2026-08-17 主人拍板 A+B):门可声明 `pages`(页面文件路径 / glob / \"*\"=pages.json 全部)—— scoped 时输入集 = inputs ∪ 这些页面的静态 import 闭包(scripts/lib/import-graph.mjs),改共享组件 / store 自然命中引用它的页面;探针脚本(inputs 里 scripts/*.mjs)里 import(\"/src/…\") 的模块自动并入闭包根。route 类探针另收 PROBE_ROUTES(=受影响路由 ∩ 探针射程)做路由级缩范围;`runIfAny:\"h5Probes\"` = 只在任一 h5 子探针要跑时才跑。 routeScoped:true = 该门的探针读 PROBE_ROUTES(路由级缩范围只给这些门算,verify.sh 必须紧跟 route_scope <id>,lint 双向配对);其它门 routes 恒 \"*\"。app 壳(App.vue/main.ts/app-chassis/global-ui)闭包内任何文件变了 = 全部路由受影响。 cells:N = 该门在 verify.sh 里出几格(selftest+探针 = 2,SPEC-7 = 风控 + AUTH02 en/zh = 3;缺省 1);scope_hit 跳过时按 cells 计 scoped_skip,verify:scope-audit:deep 的判据 ③(scoped ran+scoped_skip == full ran)靠它守恒。",
   "globals": [
     "scripts/verify.sh",
     "scripts/gates.manifest.json",
@@ -115,6 +115,7 @@
     },
     "spec7-k1-auth02-runtime": {
       "kind": "runtime",
+      "cells": 3,
       "pages": [
         "src/pages/index/index.vue",
         "src/pages/login/login.vue",
@@ -129,6 +130,7 @@
     },
     "spec4-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "pages": [
         "src/pages/index/index.vue",
         "src/pages/me/security.vue",
@@ -141,6 +143,7 @@
     },
     "theme-constant-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "routeScoped": true,
       "pages": [
         "src/pages/index/index.vue",
@@ -158,6 +161,7 @@
     },
     "zero-border-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "routeScoped": true,
       "pages": "*",
       "inputs": [
@@ -170,6 +174,7 @@
     },
     "dom-qa-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "routeScoped": true,
       "pages": [
         "src/pages/index/index.vue",
@@ -185,6 +190,7 @@
     },
     "tap-feedback-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "routeScoped": true,
       "pages": [
         "src/pages/index/index.vue",
@@ -200,6 +206,7 @@
     },
     "orphan-line-runtime": {
       "kind": "runtime",
+      "cells": 2,
       "routeScoped": true,
       "pages": [
         "src/pages/me/wallet-withdraw.vue",

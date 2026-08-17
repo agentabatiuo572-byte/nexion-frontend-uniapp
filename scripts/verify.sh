@@ -193,7 +193,7 @@ sentinel_present() {
 # 跳过的格走 scoped_skip 计数(与 skip 分开:skip=该跑没跑成=红;scoped_skip=按范围有意不跑=不红,但结果行必点名)。
 VERIFY_MODE="${VERIFY_MODE:-full}"
 case "$VERIFY_MODE" in full|scoped|static) ;; *) echo "VERIFY_MODE 只认 full|scoped|static(给的是 $VERIFY_MODE)"; exit 2 ;; esac
-declare -A SCOPE_RUN SCOPE_WHY SCOPE_ROUTES_FOR
+declare -A SCOPE_RUN SCOPE_WHY SCOPE_ROUTES_FOR SCOPE_CELLS
 SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""; SCOPE_ROUTES="*"; SCOPE_ROUTES_NOTE=""; SCOPE_H5_PROBE_ROUTES_JSON=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
 scoped_skip=0
 VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
@@ -220,8 +220,9 @@ scope_hit() {
   [ "$SCOPE_MODE" = "full" ] && return 0
   local r="${SCOPE_RUN[$id]:-}"
   if [ -z "$r" ] || [ "$r" = "1" ]; then return 0; fi
-  scoped_skip=$((scoped_skip+1))
-  printf "  ${Y}SCOPED-SKIP${N}  %s(%s)\n" "$id" "${SCOPE_WHY[$id]:-}"
+  local cells="${SCOPE_CELLS[$id]:-1}"   # 该门在本脚本里出几格(manifest cells,缺省 1):跳过按格计,deep 判据 ③ ran+scoped_skip 才守恒
+  scoped_skip=$((scoped_skip+cells))
+  printf "  ${Y}SCOPED-SKIP${N}  %s(%s)%s\n" "$id" "${SCOPE_WHY[$id]:-}" "$( [ "$cells" -gt 1 ] && echo " ×$cells 格" )"
   return 1
 }
 
