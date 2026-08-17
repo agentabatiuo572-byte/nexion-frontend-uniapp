@@ -154,7 +154,9 @@ test("remote free-trial store never persists or locally advances an authoritativ
   assert.match(source, /refreshRemote\(true\)/);
   assert.match(source, /authorityRequestSequence/);
   assert.match(source, /if \(remoteApiEnabled\) return refreshRemote\(\)/);
-  assert.match(source, /if \(remoteApiEnabled\) return;/);
+  // 结算包(pkg/ad,2026-08-16)让 persist() 返落盘判决后守卫写成 `return true` / `return snapshot()`;意图不变(远端档不落盘不推进),
+  // 三种形态都认。此前的裸 `return;` 判据过期后靠 npm 链 fail-fast 藏了两天(包 ar 的 runner 不 fail-fast 才把它翻出来)。
+  assert.match(source, /if \(remoteApiEnabled\) return( true| snapshot\(\))?;/);
   assert.match(source, /authorityStatus/);
   assert.match(source, /refreshInFlightAccount === boundKey/);
   assert.match(source, /reason: "unknown"/);
