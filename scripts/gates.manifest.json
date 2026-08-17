@@ -236,7 +236,7 @@
     "type-check:cached": {
       "kind": "static",
       "always": true,
-      "$why": "走 typecheck-cached(指纹缓存 + vue-tsc --incremental)"
+      "$why": "走 typecheck-cached(指纹缓存;真跑 = 裸 vue-tsc,--incremental 因假绿禁用)"
     },
     "test:contract-registry": {
       "kind": "test",

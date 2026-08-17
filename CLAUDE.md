@@ -19,16 +19,16 @@ This file provides guidance to Claude Code when working in this repository.
 VITE_NEXGRID_API_MODE=mock npm run dev:h5     # H5 dev（verify 的合法靶必须是 mock 模式）
 npm run dev:mp-weixin     # 微信小程序 dev
 npm run build:h5          # H5 生产构建 → dist/
-npm run type-check        # vue-tsc --noEmit（裸跑）；npm run type-check:cached = 指纹缓存 + --incremental（门链都走这个）
-npm run verify            # 🔴 全量档（full）：18 步链 runner（tsc → 契约测试 → 生产构建 → 运行时探针 → verify.sh 458 格），自起本树隔离 server，~15 min
-npm run verify:scoped     # 范围档：只跑「git 改动集 ∩ 门声明输入」命中的重门（scripts/gates.manifest.json），子任务交 tester 前用，2-5 min
-npm run verify:static     # 静态档：不起 server，vue-tsc（缓存）+ 静态哨兵，~3 min（Stop hook 每回合末自动跑）
+npm run type-check        # vue-tsc --noEmit（裸跑）；npm run type-check:cached = 指纹缓存壳（同树重复 1s；变了裸跑 ~35s;--incremental 因假绿禁用，门链都走这个）
+npm run verify            # 🔴 全量档（full）：18 步链 runner（tsc → 契约测试 → 生产构建 → 运行时探针 → verify.sh 458 格），各步自起本树隔离 server，实测 ~24 min（基线 29）
+npm run verify:scoped     # 范围档：只跑「git 改动集 ∩ 门声明输入」命中的重门（scripts/gates.manifest.json），子任务交 tester 前用；耗时与改动面成正比（只碰页面/组件类文件明显省；碰 src/store/** 因多数运行时门都依赖 store,接近全量 ~18 min；改门基建/全局清单文件自动升 full）
+npm run verify:static     # 静态档：不起 server，vue-tsc（缓存）+ 静态哨兵，实测 3-4 min（Stop hook 每回合末自动跑；树未变 / 只改文档秒退）
 node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 ```
 
 🔴 **verify 三档只有 full 算数**（主人 2026-08-17 拍板）：scoped / static 只买内循环速度，结果行与 `.verify-exit.code` 第 2 行都带 `mode=`；宣布 done / 合并主线前必须在最后一次提交之后跑一次 `npm run verify`（工作树干净），合并守卫 `PLAN/.claude/hooks/verify-fresh-before-merge.mjs` 会核 `.verify-cache/last-run.json` 的 full 绿树对象 == 被合分支树。范围由机器算（`node scripts/lib/verify-scope.mjs plan --mode scoped`），改动命中全局不变量清单自动升 full；未声明的门照跑；改 `gates.manifest.json` 后跑 `npm run verify:scope-audit:deep`（scoped vs full 双跑比对）。
 
-runner 自己起「本树 + mock/remote」一对 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 mock server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 mock 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
+runner 各步自起「本树」隔离 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399（`--pool` 可选共享一对，默认关）。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 mock server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 mock 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
 
 verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有哨兵文件：`.verify-exit.code`（verify.sh）与 `.verify-chain.code` / `.verify-cache/last-run.json`（runner）—— `| tail` 会吞掉真实退出码，**外部判定读文件不读管道**。
 

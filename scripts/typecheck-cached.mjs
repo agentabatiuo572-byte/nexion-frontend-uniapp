@@ -5,9 +5,11 @@
 // 每次 35s 全量。类型检查是 f(源码, tsconfig, 编译器版本) 的确定性函数 —— 输入没变结论不变。
 //   ① 指纹 = 所有输入文件(src/** + tsconfig* + shims + package.json)的内容哈希 + vue-tsc/typescript 版本;
 //   ② 指纹等于上次 PASS 记录 → 直接报 PASS(cached),0 秒;
-//   ③ 否则跑 `vue-tsc --noEmit --incremental --tsBuildInfoFile .verify-cache/tsbuildinfo`(实测冷 28s / 热 9s),
-//      PASS 才写记录;FAIL 不写(下次照跑)。
-// 缓存目录 .verify-cache/ 不入库。`--force` 跳过缓存但仍用 incremental;`--no-incremental` 回到裸 vue-tsc。
+//   ③ 否则**裸跑** `vue-tsc --noEmit`(~30s),PASS 才写记录;FAIL 不写(下次照跑)。
+// 🔴 不用 `--incremental`(tester-A 2026-08-17 P0,本人复现):vue-tsc 1.8.27 + TS 4.9.5 下 `--noEmit --incremental` 的
+//    warm tsbuildinfo 会把**上一跑**的诊断集端出来 —— 注入真类型错报 0 errors(假绿)、干净树报幻影错(假红),双向确定性复现。
+//    指纹缓存本身是健全的(同输入同结论),但它记的必须是一次真跑;真跑只能是裸 vue-tsc。省下的是「同树重复跑」那几遍,
+//    不是单次 30s。`--force` 跳过指纹缓存;`--no-incremental` 保留为兼容参数(现在本来就不增量)。
 // 报法三态:PASS(cached · fp xxxx)/ PASS(ran)/ FAIL —— cached 是同输入的既有裁决,不是「没跑」。
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -16,10 +18,24 @@ import crypto from "node:crypto";
 import { ROOT, CACHE_DIR } from "./lib/verify-scope.mjs";
 
 const args = process.argv.slice(2);
+if (args.includes("--selftest")) {
+  // 结构自证(秒级;真跑级变异测试太贵不进门链):① tsc 参数不含 --incremental(warm buildinfo 双向假结论,tester-A P0)
+  // ② FAIL 路径删 pass 记录(否则错指纹会被记成 pass 粘住)③ 记录含 fp/verdict(缓存键必须是内容指纹)
+  const self = fs.readFileSync(new URL(import.meta.url), "utf8");
+  const bits = [];
+  const argLine = (self.match(/const tscArgs = \[[^\n]*\];/) || [""])[0];
+  if (!argLine || /--incremental/.test(argLine.replace(/noIncremental \? \[\] : \[[^\]]*\]/, ""))) bits.push("①tsc 参数行仍可能带 --incremental");
+  if (!/const noIncremental = true/.test(self)) bits.push("①noIncremental 不再写死为 true");
+  if (!/rmSync\(RECORD, \{ force: true \}\)/.test(self)) bits.push("②FAIL 路径不再删 pass 记录");
+  if (!/verdict: "pass"/.test(self) || !/fp, verdict/.test(self)) bits.push("③pass 记录缺 fp/verdict");
+  if (bits.length) { console.log("typecheck-cached selftest FAIL: " + bits.join(" · ")); process.exit(1); }
+  console.log("typecheck-cached selftest PASS(裸 vue-tsc · FAIL 删记录 · 记录带内容指纹)");
+  process.exit(0);
+}
 const force = args.includes("--force");
-const noIncremental = args.includes("--no-incremental");
+const noIncremental = true; // 见头注释:增量已禁用,参数只作兼容
 const RECORD = path.join(CACHE_DIR, "typecheck.json");
-const BUILDINFO = path.join(CACHE_DIR, "tsbuildinfo");
+const BUILDINFO = path.join(CACHE_DIR, "tsbuildinfo"); // 历史遗留:若存在则清掉,免得别的路径误用
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -50,6 +66,7 @@ if (!force && record && record.fp === fp && record.verdict === "pass") {
   process.exit(0);
 }
 fs.mkdirSync(CACHE_DIR, { recursive: true });
+try { fs.rmSync(BUILDINFO, { force: true }); } catch { /* 无则忽略 */ }
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 const tscArgs = ["vue-tsc", "--noEmit", ...(noIncremental ? [] : ["--incremental", "--tsBuildInfoFile", BUILDINFO])];
 const r = spawnSync(npx, tscArgs, { cwd: ROOT, encoding: "utf8", shell: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -57,7 +74,7 @@ const out = (r.stdout || "") + (r.stderr || "");
 const ms = Date.now() - t0;
 if (r.status === 0) {
   fs.writeFileSync(RECORD, JSON.stringify({ fp, verdict: "pass", at: new Date().toISOString(), ms, files: count, incremental: !noIncremental }, null, 1));
-  console.log(`vue-tsc 0 errors (ran ${(ms / 1000).toFixed(1)}s${noIncremental ? "" : " · incremental"} · fp ${fp.slice(0, 8)})`);
+  console.log(`vue-tsc 0 errors (ran ${(ms / 1000).toFixed(1)}s · 裸跑 · fp ${fp.slice(0, 8)})`);
   process.exit(0);
 }
 try { fs.rmSync(RECORD, { force: true }); } catch { /* 记录删不掉也不影响判红 */ }

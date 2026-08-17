@@ -170,7 +170,7 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
 export function planToShell(p) {
   const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
   const lines = [`SCOPE_MODE=${q(p.mode)}`, `SCOPE_REQUESTED=${q(p.requested)}`, `SCOPE_UPGRADED=${q(p.upgraded || "")}`,
-    `SCOPE_CHANGED_COUNT=${p.changed ? p.changed.files.length : -1}`, `SCOPE_BASE=${q(p.changed ? p.changed.base : "")}`];
+    `SCOPE_CHANGED_COUNT=${p.changed ? p.changed.files.length : -1}`, `SCOPE_BASE_USED=${q(p.changed ? p.changed.base : "")}`];
   for (const [id, d] of Object.entries(p.gates)) {
     lines.push(`SCOPE_RUN[${q(id)}]=${d.run ? 1 : 0}`);
     lines.push(`SCOPE_WHY[${q(id)}]=${q(d.reason)}`);

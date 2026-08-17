@@ -10,7 +10,7 @@
 //   ① 不是 git 树 / runner 不存在 → 提示后放行(环境不满足 ≠ 代码有问题);
 //   ② 当前树指纹 == .verify-cache/last-run.json 里最近一次绿(任一档)的树 → 秒退,不重跑;
 //   ③ 相对上次记录只改了文档类(不在 src/scripts/配置面)→ 放行并说明(文档改动不触发静态门);
-//   ④ 否则跑 `node scripts/verify-chain.mjs --static`;红 → 只回喂 FAIL/SCOPED-SKIP 摘要 + result 行,exit 2;绿 → exit 0。
+//   ④ 否则跑 `node scripts/verify-chain.mjs --static`;红 → 只回喂 FAIL 行 + result 行(SCOPED-SKIP 行是噪音,不回喂),exit 2;绿 → exit 0。
 // 语义提醒:static 绿 ≠ 全量绿。宣布 done / 合并前仍须 `npm run verify`(full);合并守卫会查。
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
