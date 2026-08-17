@@ -42,7 +42,7 @@
               <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ commission.unlockedNEX().toLocaleString() }} NEX</text>
             </view>
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">Cooling</text>
+              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ t.commissions.cooling }}</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-warning)')">${{ commission.coolingUSDT().toFixed(2) }}</text>
               <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ coolingOverviewText }}</text>
             </view>

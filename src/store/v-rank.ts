@@ -273,46 +273,57 @@ export const useVRank = defineStore("vRank", () => {
   return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, setMyRank, setProgress, bindAccount, refreshCanonicalVRank };
 });
 
+/**
+ * 一条到下一阶的缺口。
+ *
+ * 🔴 返回**结构**不返回句子:原来这里直接拼英文(`Self-buy $299 more`),两个消费点原样渲染,
+ * 于是中文 / 越南语界面直出英文,而 `t.rank.need*` 四条三语文案早写好却是死键(2026-08-17
+ * 独立验收抓到)。同文件下面的 `PrimaryGap` 早就是这个形状 —— 措辞归 UI 层
+ * (`src/lib/v-rank-copy.ts` 的 `rankGapText`),store 只给事实。
+ */
+export type RankGap =
+  | { kind: "selfBuy"; amount: number }
+  | { kind: "directRefs"; n: number }
+  | { kind: "teamVolume"; amount: number }
+  // 只给档位号,头衔名由 copy 层按语言解析(`lib/v-rank-copy` 的 rankTitle)——
+  // store 存一份英文 title 就等于把「中文界面显示什么」定死在数据层。
+  | { kind: "vDownlines"; n: number; vLevel: number };
+
 /** 计算到下一阶的进度(0-1) */
 export function nextRankProgress(state: VRankData, ladder: VRankDef[] = V_RANKS): {
   next: VRankDef | null;
   progressPct: number;
-  missing: string[];
+  missing: RankGap[];
 } {
   const next = ladder[state.myRank + 1];
   if (!next) return { next: null, progressPct: 1, missing: [] };
   const c = next.conditions;
-  const missing: string[] = [];
+  const missing: RankGap[] = [];
   const checks: number[] = [];
 
   if (c.selfBuyUSD) {
     checks.push(Math.min(1, state.selfBuyUSD / c.selfBuyUSD));
     if (state.selfBuyUSD < c.selfBuyUSD) {
-      missing.push(`Self-buy $${(c.selfBuyUSD - state.selfBuyUSD).toLocaleString()} more`);
+      missing.push({ kind: "selfBuy", amount: c.selfBuyUSD - state.selfBuyUSD });
     }
   }
   if (c.directRefs) {
     checks.push(Math.min(1, state.directRefs / c.directRefs));
     if (state.directRefs < c.directRefs) {
-      const n = c.directRefs - state.directRefs;
-      missing.push(`${n} more direct invite${n === 1 ? "" : "s"}`);
+      missing.push({ kind: "directRefs", n: c.directRefs - state.directRefs });
     }
   }
   if (c.teamVolumeUSD) {
     checks.push(Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD));
     if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      missing.push(`$${(c.teamVolumeUSD - state.teamVolumeUSD).toLocaleString()} more team volume`);
+      missing.push({ kind: "teamVolume", amount: c.teamVolumeUSD - state.teamVolumeUSD });
     }
   }
   if (c.vDownlines) {
     for (const [v, n] of Object.entries(c.vDownlines)) {
       const have = state.vDownlineCounts[Number(v) as VRank] ?? 0;
       checks.push(Math.min(1, have / n));
-      if (have < n) {
-      const def = ladder[Number(v)] ?? EMPTY_V_RANK;
-        const need = n - have;
-        missing.push(`${need} more ${def.title} (V${v})`);
-      }
+      if (have < n) missing.push({ kind: "vDownlines", n: n - have, vLevel: Number(v) });
     }
   }
 

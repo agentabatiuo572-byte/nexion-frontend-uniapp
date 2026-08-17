@@ -198,7 +198,7 @@
                 </view>
               </view>
               <view class="text-right">
-                <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ remoteApiEnabled ? `$${m.monthVolumeUSD} vol` : `+$${memberCommission(m).toFixed(2)}` }}</text>
+                <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ remoteApiEnabled ? fmt(t.uiChrome.volumeShort, { amount: `$${m.monthVolumeUSD}` }) : `+$${memberCommission(m).toFixed(2)}` }}</text>
               </view>
             </view>
             <!-- View more — explicit user click (leaderboard idiom), 44px ghost. -->
