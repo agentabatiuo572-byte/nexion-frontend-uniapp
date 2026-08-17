@@ -142,7 +142,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
   const before = consoleErrors.length;
   try {
     await page.goto(`${BASE}/?nx_device=off&es=${i}#/${route}`, { waitUntil: "domcontentloaded" });
-    await settleNetwork(page); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待
+    await settleNetwork(page); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;PROBE_CONCURRENCY=1 时空转(F-04)
     await page.waitForTimeout(1300);
     // 常量数据源的页面:往搜索框打不可能命中的词
     if (spec.type) {
@@ -155,7 +155,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
       }, spec.type);
       await page.waitForTimeout(700);
     }
-    const res = await page.evaluate(async (theme) => {
+    const res = await page.evaluate(async ([theme, pollMs]) => {
       const app = document.querySelector("#app")?.__vue_app__;
       const pinia = app?.config?.globalProperties?.$pinia;
       if (!pinia) return { err: "no pinia" };
@@ -176,7 +176,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
       await new Promise((r) => setTimeout(r, 600));
       const t0 = performance.now();
       const ready = () => { const e = document.querySelector(".nx-empty"); const a = e && (e.querySelector("img") || e.querySelector(".nx-empty__art img")); return !!(e && a && a.complete && a.naturalWidth > 0); };
-      while (!ready() && performance.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 100));
+      while (!ready() && performance.now() - t0 < pollMs) await new Promise((r) => setTimeout(r, 100));
       const el = document.querySelector(".nx-empty");
       if (!el) return { cleared, empty: false };
       const art = el.querySelector("img") || el.querySelector(".nx-empty__art img");
@@ -191,7 +191,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
         overflowX: doc.scrollWidth > doc.clientWidth + 1,
         box: Math.round(el.getBoundingClientRect().width) + "x" + Math.round(el.getBoundingClientRect().height),
       };
-    }, THEME);
+    }, [THEME, spec.unreachable ? 0 : 5000]); // 标了 unreachable 的页面(本来就 skip)不轮询封顶,免得每页白等 5s(串行 55s→70s 就是它)
     // 🔴 页签遍历(2026-08-17 变异实测逼出来的):上面只断言了**落地那一屏**。
     //    同一页里切了页签才看得到的空态,这门此前一概不查 —— 实测把创世市场「活动」
     //    页签的空态整块删掉,门照样 21/21 全绿(而「在售」那个删掉就判红,因为它是默认页签)。
@@ -206,6 +206,11 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
 await browser.close();
 
 let fail = 0;
+if (!rows.length) {
+  // tester-F F-12:0 页要显形 —— scoped 下是「范围外」(与其余探针同款一行);非 scoped 0 页 = 判据失效按红,不许 0/0 通过
+  if (SCOPE.scoped) { console.log(`空状态探针 PASS —— scoped 0/${ROUTES.length} 路由在受影响范围内,本轮无可扫(末轮全量会扫)`); process.exit(0); }
+  console.error("空状态探针 判据失效:一页都没扫到(ROUTES 为空?)—— 按红处理"); process.exit(1);
+}
 console.log(`空状态探针(theme=${THEME}) — ${SPECS.length} 个接入页${SCOPE.scoped ? `(scoped ${SPECS.length}/${ROUTES.length})` : ""}\n`);
 for (const r of rows) {
   const bad = [];

@@ -184,6 +184,9 @@ if (MODE === "selftest") {
   const SCOPE = scopeRoutes(allRoutes, "DOM-QA");
   const routes = SCOPE.routes;
   if (SCOPE.scoped && !routes.length) { console.log(`DOM-QA PASS:scoped 0/${allRoutes.length} 路由在受影响范围内,本轮无可扫(末轮全量会扫)`); await browser.close(); process.exit(0); }
+  // 范围模式一律不许改台账(与 zero-border / theme / tap 同口径;tester-F F-13):本门 --update-ledger 虽是 merge 语义不丢存量,
+  //   但会用部分扫描覆写 smallTextCensus,且「只扫半场就收编」本身就不该发生。
+  if (SCOPE.scoped && UPDATE) { console.error("DOM-QA:PROBE_ROUTES 范围模式下不许 --update-ledger(只扫了一部分路由)。不设 PROBE_ROUTES 全量跑再收编。"); await browser.close(); process.exit(2); }
   const findings = [];
   const completedRoutes = [];
   const crashes = [];
