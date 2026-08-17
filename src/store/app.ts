@@ -1737,7 +1737,7 @@ export const useApp = defineStore("app", () => {
    * 我自己动过的那部分」后,delta 恒等于我那一笔的反向增量,别人的改动一分不动。
    * 与提现落盘重放同一条纪律:先取现状,再基于它推导增量(见 submitWithdrawal 重放段)。
    *
-   * 副作用:期间本页发生的**别的**入账(挖矿结算 / 奖励)不再被这一笔冲正抹平 —— 它们不在
+   * 副作用:期间本页发生的**别的**入账(算力结算 / 奖励)不再被这一笔冲正抹平 —— 它们不在
    * moneyApplied 的这段差值里(那些路径不走这四个原语),写绝对值时则会被一起回退。
    */
   function restoreMoney(snap: MoneySnapshot): boolean {

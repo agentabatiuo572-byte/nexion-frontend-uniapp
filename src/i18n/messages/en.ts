@@ -1012,7 +1012,7 @@ export const en = {
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal timing + extra security checks",
-    s4Body: "Withdrawal processing time follows the server-side order state. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, mining and referrals.",
+    s4Body: "Withdrawal processing time follows the server-side order state. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, compute tasks and referrals.",
     s4BodyLargeAmount: "Withdrawals above ${large} may need a {d}-day extra security check; the later of the two dates applies.",
     s5Title: "Staking lock-ups are irreversible",
     s5Body: "Staking pools (30d / 90d / 180d / 365d) lock principal for the full term. Early unlock forfeits 100% of accrued yield premium and deducts 5% / 15% / 30% / 50% of principal respectively. Read each pool's terms separately before locking.",
@@ -1218,7 +1218,7 @@ export const en = {
     breakdown: {
       label: "POSITION BREAKDOWN",
       liquid: "Liquid balance",
-      mining: "Today's mining accrual",
+      mining: "Today's compute accrual",
       miningHint: "From your active fleet",
       pending: "Pending cooldown",
       pendingHint: "No NEX in cooldown",
@@ -1240,7 +1240,7 @@ export const en = {
       label: "RECENT NEX ACTIVITY",
       viewAll: "View all",
       empty: "No NEX activity yet",
-      miningLabel: "Mining payout · fleet",
+      miningLabel: "Compute payout · fleet",
     },
     note: "NEX is the NexGrid platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
   },
@@ -2368,7 +2368,7 @@ export const en = {
   session: {
     kickedTitle: "Session ended",
     kickedBodyKicked: "You've been signed out. Sign back in to continue — your account and funds are unaffected.",
-    kickedBodyLoggedOut: "You've been signed out. Mining is paused on this device.",
+    kickedBodyLoggedOut: "You've been signed out. Compute tasks are paused on this device.",
     kickedTaskNote: "Tasks running on this device were stopped; unsettled portions aren't counted. Go back online to keep earning — contact support with any questions.",
     kickedCta: "Sign in again",
   },
@@ -3224,7 +3224,7 @@ export const en = {
     a_social_star_d: "Refer 5 friends to NexGrid",
     a_hardware_owner: "Hardware Owner",
     a_hardware_owner_d: "Purchase your first NexGridBox device",
-    a_diamond_miner: "Diamond Miner",
+    a_diamond_miner: "Diamond Contributor",
     a_diamond_miner_d: "Cumulative earnings reach $1,000",
   },
   developer: {
@@ -3855,7 +3855,7 @@ export const en = {
       "We still cannot confirm whether your earlier request is being processed, so we are keeping it for you. Check withdrawal status first; if it is not there, try the same request again later — do not start a new one.",
     withdrawDailyLimitWithPending:
       "You have used today's withdrawal count. Your earlier request may already be processing and may have used today's allowance — check withdrawal status first, and do not start a new request.",
-    earnNexCta: "Mine more NEX",
+    earnNexCta: "Earn more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
     feeConfirmRow: "Network confirmation fee",
     feeCharged: "Fee",
@@ -3864,7 +3864,7 @@ export const en = {
     feeOffsetOffHint: "Turn on to cover this fee with NEX. You hold {n} NEX.",
     feeOffsetOnFull: "Will use {nex} NEX · the fee is fully covered ($0.00).",
     feeOffsetOnPartial: "Will use {nex} NEX · covers ${waived}, ${rest} still payable.",
-    feeOffsetNoNex: "No NEX available to cover the fee. Earn NEX through check-ins and mining.",
+    feeOffsetNoNex: "No NEX available to cover the fee. Earn NEX through check-ins and device compute.",
     feeOffsetFreeNetwork: "This network currently charges no fee — nothing to cover.",
     feeWhyTitle: "About the fee",
     feeWhyClose: "Close",
@@ -4985,7 +4985,7 @@ export const en = {
     nexUse: "Exchange to USDT · offset fees",
     s2Title: "Where does NEX come from?",
     s2Intro:
-      "NEX is minted (created) only when real activity happens on the network. There's no pre-mine, no team unlock cliff, no fixed supply schedule.",
+      "NEX is minted (created) only when real activity happens on the network. There's no pre-mint, no team unlock cliff, no fixed supply schedule.",
     src1Label: "AI inference output",
     src1Body:
       "Every completed inference job on the network mints a small amount of NEX, paid to the device that did the work. Bigger / harder jobs mint more.",

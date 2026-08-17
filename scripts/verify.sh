@@ -570,6 +570,15 @@ sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|
 # 「真实用户会把这种卡片发到…」解说套路 —— 产品要对用户直说,不许旁白解说用户行为。
 i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate|真实用户|[Rr]eal users|Người dùng thật' src/i18n/messages 2>/dev/null | head -5)
 if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
+# 产品语义:NexGrid 出租 AI 算力,不做加密挖矿 —— 用户可见文案里的挖矿词族既是品牌语义错,
+# 也是上架合规风险。现场 / 判据 / 两处刻意放行(en "Mine ({n})" = 我的;vi đào tạo = 培训)
+# 与判据自检都在 scripts/mining-copy-gate.mjs 里说明。同型第二次:上一轮只删了单句、哨兵也只
+# 钉死那单句(见下方 SPEC-4 段仍保留的那条),词族其余成员因此活了下来 → 本门改判整个词族。
+if "$NODE_BIN" scripts/mining-copy-gate.mjs >/tmp/uni-mining-copy.log 2>&1; then
+  ok "$(cat /tmp/uni-mining-copy.log)"
+else
+  bad "crypto-mining vocabulary in i18n copy"; sed 's/^/        /' /tmp/uni-mining-copy.log
+fi
 # copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
 # literal stars/backticks, and route-path literals violate the no-jargon rule.
 # (added 2026-07-09: owner caught **直接版税** + `/team/binary` in how-page copy.)
