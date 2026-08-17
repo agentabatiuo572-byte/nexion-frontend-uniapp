@@ -90,6 +90,7 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     clock.value = mockServerNow();
     if (sessions.value.some((s) => !isSessionLive(s, clock.value))) {
       const now = clock.value;
+      // persist-verdict-ok: 读入面自愈 / 到点剪除是尽力而为的整理:没落盘 = 磁盘行原样、内存已回灌;下一 tick / 下一次回灌重试,不影响 begin/consume 的 CAS 判决
       commitSessions((cur) => {
         const live = pruneExpiredSessions(cur, now);
         return live.length === cur.length ? null : { next: live, result: true };
@@ -108,6 +109,7 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
   function refreshFromDisk() {
     if (fundsServerEnabled) return;
     const now = mockServerNow();
+    // persist-verdict-ok: 读入面自愈 / 到点剪除是尽力而为的整理:没落盘 = 磁盘行原样、内存已回灌;下一 tick / 下一次回灌重试,不影响 begin/consume 的 CAS 判决
     commitSessions((cur) => {
       const live = pruneExpiredSessions(cur, now);
       return live.length === cur.length && live.length <= 1 ? null : { next: live.slice(0, 1), result: true };
@@ -132,6 +134,7 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     // 读入面也守不变量:磁盘上若有多张活票(老版本纯追加写下的行 / 手改 storage),只留最早那张 ——
     // 否则 begin() 永远拒开、浮动条只露一张、用户 30 分钟内下不了任何链上单。
     sessions.value = live.slice(0, 1);
+    // persist-verdict-ok: 读入面自愈 / 到点剪除是尽力而为的整理:没落盘 = 磁盘行原样、内存已回灌;下一 tick / 下一次回灌重试,不影响 begin/consume 的 CAS 判决
     if (live.length > 1) commitSessions((cur) => ({ next: pruneExpiredSessions(cur, clock.value).slice(0, 1), result: true }));
   }
 
@@ -196,13 +199,33 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
       : null)) === true;
   }
 
-  /** 用户放弃 / 支付时刻守卫回弹作废 —— 这张发票不再有任何可恢复动作(结算走 consume,不走这里)。 */
-  function remove(id: string) {
+  /**
+   * 用户放弃 / 支付时刻守卫回弹作废 —— 这张发票不再有任何可恢复动作(结算走 consume,不走这里)。
+   * 返回「磁盘上还有没有这张票」:true = 已删或本就不在;false = 在册但删不掉(storage 写失败)——
+   * 调用方不许把它当已取消(审计 R8 P1:此前返回 void,取消可静默失败,票还活着还催付)。
+   */
+  function remove(id: string): boolean {
     if (viewingId.value === id) viewingId.value = null;
     // 不按内存早退:内存可能陈旧,磁盘上那张才是要删的(删不到也顺带把最新行回灌进来)。
-    commitSessions((cur) => (cur.some((s) => s.id === id)
+    const r = commitSessions((cur) => (cur.some((s) => s.id === id)
       ? { next: cur.filter((s) => s.id !== id), result: true }
       : null));
+    return r === true || !sessions.value.some((s) => s.id === id);
+  }
+
+  /**
+   * 一次成交的购买意图已兑现 → 同账号该商品的在窗发票作废(不论这一单是链上、卡还是 $0 直付)。
+   * 否则卡支付付完款,链上开的那张旧票仍在磁盘上、浮动条继续催第二笔(审计 R8 P0)。链上腿的票已在
+   * 结算前 consume,这里是 no-op;返回同 remove 语义。
+   */
+  function settleProduct(productId: string): boolean {
+    const now = mockServerNow();
+    const r = commitSessions((cur) => {
+      const next = cur.filter((s) => !(s.productId === productId && isSessionLive(s, now)));
+      return next.length === cur.length ? null : { next, result: true };
+    });
+    if (viewingId.value && !sessions.value.some((s) => s.id === viewingId.value)) viewingId.value = null;
+    return r === true || !sessions.value.some((s) => s.productId === productId && isSessionLive(s, now));
   }
 
   /** 首次离开时返回 true(调用方据此给一次性提示);之后恒 false。 */
@@ -218,5 +241,5 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
     viewingId.value = id;
   }
 
-  return { sessions, current, barSession, viewingId, clock, bindAccount, refreshFromDisk, get, isLive, secondsLeft, begin, consume, remove, markLeftNotice, setViewing };
+  return { sessions, current, barSession, viewingId, clock, bindAccount, refreshFromDisk, get, isLive, secondsLeft, begin, consume, remove, settleProduct, markLeftNotice, setViewing };
 });

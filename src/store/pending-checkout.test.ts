@@ -219,4 +219,20 @@ describe("usePendingCheckout (mock leg)", () => {
     store.refreshFromDisk();
     expect((memory.get(TABLE) as Record<string, { rev?: number }>)["acct-a"]!.rev).toBe(revBefore);
   });
+
+  it("settleProduct(): a completed purchase of a product voids that product's live invoice only (memory + disk); remove() reports", () => {
+    const store = usePendingCheckout();
+    store.bindAccount("acct-a");
+    const inv = store.begin(INPUT)!;
+    expect(store.settleProduct("stellarbox-pro")).toBe(true); // other product: nothing to void, still true
+    expect(store.sessions.map((s) => s.id)).toEqual([inv.id]);
+    expect(store.settleProduct(INPUT.productId)).toBe(true);
+    expect(store.sessions).toHaveLength(0);
+    expect(diskSessions("acct-a")).toHaveLength(0);
+    // remove(): true when the row is gone (removed or never there)
+    const again = store.begin(INPUT)!;
+    expect(store.remove(again.id)).toBe(true);
+    expect(store.remove("pc-nope")).toBe(true);
+    expect(diskSessions("acct-a")).toHaveLength(0);
+  });
 });

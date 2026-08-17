@@ -272,6 +272,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
 
   /** Day-30 里程碑发 bonus 票。增量型:冲突时在**别处写完的最新票数**上重放这次加票。 */
   function grantBonusTicket(n: number) {
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({ next: { ...cur, bonusTickets: cur.bonusTickets + n }, result: true as const }));
   }
 
@@ -343,6 +344,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     phase.value = "idle";
     lastWonPrizeId.value = null;
     // 退票:免费则清除今日已抽标记,否则退还 1 张 bonus
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({
       next: wasFree
         ? { ...cur, lastFreeSpinDate: "" }
@@ -360,6 +362,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
   /** 记录中奖历史(组件派奖后调用)。追加型:冲突时重放到别处写完的最新记录上,两边的都留得住。*/
   function pushHistory(prizeId: string) {
     const ts = mockServerNow();
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({
       next: { ...cur, history: [{ prizeId, ts }, ...cur.history].slice(0, 20) },
       result: true as const,
@@ -368,13 +371,16 @@ export const useLuckySpin = defineStore("luckySpin", () => {
 
   // ── mock 演示开关(dev / 用于演示边界态)──
   function setRealPrizeSoldOut(v: boolean) {
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({ next: { ...cur, realPrizeSoldOut: v }, result: true as const }));
   }
   function setCoverageDegraded(v: boolean) {
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({ next: { ...cur, coverageDegraded: v }, result: true as const }));
   }
   /** dev:重置今日免费次数(便于演示)*/
   function resetDailyFree() {
+    // persist-verdict-ok: 奖池 / 票数状态更新,失败时内存已回灌磁盘行,用户看到的是磁盘真值;补票 / 中奖入账由收口点另行落盘(残余:票数增量可能丢一次,归活动包)
     rows.commit((cur) => ({ next: { ...cur, lastFreeSpinDate: "" }, result: true as const }));
   }
 

@@ -394,6 +394,7 @@ export const useDeposits = defineStore("deposits", () => {
     }
     // 记账走收口点的幂等变体(以 txHash 为 ref 判重),不再裸调 bills.addOnce ——
     // 「钱动了、账没记上」那一族的收口纪律,入金轨同样适用。
+    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
     postReceiptOnce({
       type: "topup",
       symbol: "USDT",
@@ -439,6 +440,7 @@ export const useDeposits = defineStore("deposits", () => {
       if (rec.status !== "confirming") return; // 终态/dust_hold 不再推进
       const required = rec.requiredConfirmations ?? 1;
       const confs = Math.min(required, (rec.confirmations ?? 0) + 1);
+      // persist-verdict-ok: 到账确认数进度,失败下一次轮询重放同一值
       patchRecord(depositId, { confirmations: confs });
       if (confs >= required) {
         // 🔴 接返回值再重排:settleCredited 会因 CAS 冲突耗尽 / 落盘失败 / recordDeposit
@@ -553,6 +555,7 @@ export const useDeposits = defineStore("deposits", () => {
           if (boundKey() !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
           const cur = intents.value.find((i) => i.intentId === intentId);
           if (!cur || cur.status !== "awaiting_payment") return;
+          // persist-verdict-ok: 意向单过期标记,失败下一次扫描重放
           patchIntent(intentId, { status: "expired" });
         },
         Math.max(0, intent.expireAt - mockServerNow()),
@@ -568,6 +571,7 @@ export const useDeposits = defineStore("deposits", () => {
     intents.value
       .filter((i) => i.status === "awaiting_payment")
       .forEach((i) => {
+        // persist-verdict-ok: 意向单过期标记,失败下一次扫描重放
         if (i.expireAt <= now) patchIntent(i.intentId, { status: "expired" });
         else scheduleIntentExpiry(i.intentId);
       });
@@ -702,6 +706,7 @@ export const useDeposits = defineStore("deposits", () => {
       return false;
     }
     // 与链上轨同口径:记账走收口点的幂等变体(ref=intentId 判重),不裸调账单写入。
+    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
     postReceiptOnce({
       type: "topup",
       symbol: "USDT",
@@ -850,6 +855,7 @@ export const useDeposits = defineStore("deposits", () => {
       if (!undone.ok) reportStuckFunds(useApp().captureMoney(), rec.depositId);
       return null;
     }
+    // persist-verdict-ok: 收口点内部已弹「账单未记录」;入金已由 recordDeposit 落定不回滚,收据补写按 ref 幂等靠到账引擎重放(残余:无恢复行,归入金包)
     postReceiptOnce({
       type: "topup",
       symbol: "USDT",
