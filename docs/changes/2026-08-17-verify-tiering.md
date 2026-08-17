@@ -101,7 +101,7 @@ Agentic 侧:Aider **lint 只跑被编辑文件、test 跑整套**(https://aider.
 2. **改动集** = `git diff --name-only $(git merge-base HEAD main)` ∪ `git status --porcelain`(含未跟踪);`SCOPE_BASE` 可覆盖;git 不可用/算不出 → 自动降为 C 档并打印原因。
 3. **全局不变量清单**(命中即升 C 档):§2 表第二行。
 4. **三态 + 哨兵扩展**:`.verify-exit.code` 第 2 行加 `mode=full|scoped|static scoped_skip=K tree=<指纹>`;结果行 `━━ result: 435 ran / 22 scoped-skip(输入未变) / 0 fail ━━`;`scoped_skip` 与 `skip` **分开计数**(跳过≠放宽)。
-5. **去重**:vue-tsc 走 `--incremental`(tsbuildinfo 进 .gitignore)并加树指纹缓存壳 `scripts/typecheck-cached.mjs`,verify.sh [1] / npm 首步 / 审计 Step0 / Stop hook 全部走它;verify.sh 末尾「H5 运行时门隔离起服」在 runner 已跑过同指纹时跳过并如实标 `reused`;`build:h5` 只在 C 档。
+5. **去重**:vue-tsc 加树指纹缓存壳 `scripts/typecheck-cached.mjs`(实施时发现 `--incremental` 在 vue-tsc 1.8.27 + TS 4.9.5 下双向假结论,已禁用,见 §8),verify.sh [1] / npm 首步 / 审计 Step0 / Stop hook 全部走它;verify.sh 末尾「H5 运行时门隔离起服」在 runner 已跑过同指纹时跳过并如实标 `reused`;`build:h5` 只在 C 档。
 6. **链 runner** `scripts/verify-chain.mjs` 取代 `&&`:自起 1 对 server 传给所有子步骤(它们已支持 `BASE_URL/REMOTE_BASE_URL`),跑完所有步骤再汇总(fail 与「没跑」分开列),轻测试并行 3-4 路,重探针仍串行(防 CPU 争用抖动)。
 7. **元门** `verify:scoped-vs-full-check`:改 manifest 时必跑一次、以及周期性——双跑比对失败集,不一致即红。
 8. **Stop hook 改档**:`verify-on-stop.mjs` 改为跑 A 档(前提不满足时跑纯静态部分而不是整体跳过);红仍 exit 2。**C 档焊到合并主线**:扩 `guard-package-branch.mjs`——命中 `git merge pkg/*`(到主线)/ `git push origin <主线>` 时,要求 `.verify-exit.code` 记录的 full 绿指纹 == 待合并 tip 的树指纹,否则 exit 2;逃生阀 `# ALLOW-UNVERIFIED-MERGE`(给「凭证据链合并」那种主人明令场景)。
@@ -201,3 +201,21 @@ audit-pending-tracker INCLUDE 加 `admin-ops/app/`(去掉退役线)· admin-ops 
 - B 不动:admin-ops 功能改动继续绕过审计门,阀残留继续。
 
 > 主人只需回「Q1A Q2A Q3A Q4A Q5A」或逐条改;签字后走 T2 起的包分支实施,每子任务独立 tester + 红测,收尾 done-review + EVOLUTION-LEDGER 记 WF 条目。
+
+---
+
+## 8. 实测更新(2026-08-17 晚,实施后回填;`[COMPUTED]`,同机多 agent 并发、数字偏保守)
+
+| 项 | 提案预估 | 实测 | 说明 |
+|---|---|---|---|
+| full 全量 | ~15 min | **~24-26 min**(run#3 25.8 min;基线 29.1) | 省下的是 h5 探针重复(~7 min)+ tsc 缓存 + 一次起服;剩余 ~20 min 是 verify.sh 里 23 格重探针本身(零-border 194s、h5 隔离门 ~400s 等),要再降只能做单探针提速(§4.4),不是范围化能省的 |
+| static 静态档 | ≤1.5 min | **3-4 min**(不起 server;树未变 / 只改文档秒退) | 402 格 <0.5s 合计 37s 是地板 + 33 格中速静态门 + 指纹/lint 开销 |
+| scoped 范围档 | 2-5 min | 机制 PASS(tester A:store 改动 → 15/20 门 + 17/18 步 + h5 8/10 子探针,SCOPED-SKIP 逐条点名);**碰 src/store/** ≈ 18-24 min**,只碰页面/组件才明显省;改门基建 / 全局清单文件自动升 full | 根因是清单口径粗:多数运行时门都声明 `src/store/**`、11 个测试步骤声明 `src/**`;下一步拆细声明(§4.4 同批) |
+| tsc `--incremental` | 冷 28s / 热 9s | **已禁用**(tester A P0:vue-tsc 1.8.27 + TS 4.9.5 下 warm buildinfo 双向假结论,本人复现) | 只留指纹缓存:同树重复 1s,变了裸跑 ~30-35s;加 `--selftest` 结构自证 |
+| 起服一对共享(pool) | 省 2-3 min | **默认关**(`--pool` 可选) | 共享 server 连跑有拥塞退化风险且收益仅 ~10s |
+| h5 探针首跑抖动 | — | 三轮全量各抖一次(不同探针),单跑三次全绿 | 归同机负载;runner 对 runtime 类步骤「失败重跑 1 次、大声标记」(与 verify.sh probe_retry 同款) |
+| admin-ops 全量 | — | 116-128s(64 齿,不 fail-fast,写 last-run.json) | T7 |
+| Stop hook | ≤1.5 min | 3-4 min(功能面文件变了才跑;树未变 / 只改文档 1s) | 与 static 同 |
+
+**结论修正**:内循环收益成立但幅度比预估小(static 3-4 min、scoped 与改动面成正比、Stop 不再 20 分钟);**全量收益从「29→15」修正为「29→~24」**。下一刀:§4.4 单探针提速 + 清单拆细(store 类门按具体 store 文件声明),不在本包。
+连锁后果:runner 不 fail-fast 后,既有红 `test:contract-registry`(h2 契约正则在结算包合并后过期)会挡住 `pkg.mjs close` 完成门 —— 本包把该正则放宽为同时认新旧守卫形态(意图不变),见 `scripts/h2-trial-remote-api.test.mjs`。

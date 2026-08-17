@@ -190,7 +190,7 @@ sentinel_present() {
 VERIFY_MODE="${VERIFY_MODE:-full}"
 case "$VERIFY_MODE" in full|scoped|static) ;; *) echo "VERIFY_MODE 只认 full|scoped|static(给的是 $VERIFY_MODE)"; exit 2 ;; esac
 declare -A SCOPE_RUN SCOPE_WHY
-SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE=""
+SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
 scoped_skip=0
 VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
 if [ "$VERIFY_MODE" != "full" ]; then
@@ -212,7 +212,7 @@ scope_hit() {
 }
 
 echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE · mode=$SCOPE_MODE${SCOPE_UPGRADED:+(请求 $SCOPE_REQUESTED → $SCOPE_UPGRADED)}${VERIFY_TREE_START:+ · tree ${VERIFY_TREE_START:0:10}} ━━${N}"
-if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; fi
+if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; fi
 # 门的门:manifest ↔ verify.sh 接线一致 + glob 都命中(改了清单没接线 / 接了线没声明 / 路径漂移,任一即红;三档都跑)
 if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > /tmp/uni-scope-lint.log 2>&1; then
   ok "gates.manifest 接线门 — $(tail -1 /tmp/uni-scope-lint.log)"
@@ -277,7 +277,13 @@ vite_watch_anchor_gate() {
 vite_watch_anchor_gate
 
 echo -e "${C}[1] vue-tsc type-check${N}"
-# 包 ar:走指纹缓存壳(输入未变 → PASS(cached);变了 → vue-tsc --incremental 真跑)。同一棵树一轮里 tsc 只算一次。
+# 包 ar:走指纹缓存壳(输入未变 → PASS(cached);变了 → 裸 vue-tsc 真跑;--incremental 因 warm buildinfo 假绿禁用)。同一棵树一轮里 tsc 只算一次。
+# 壳的自证先跑(结构判据:不带 --incremental · FAIL 路径必删 pass 记录 · 记录带指纹)—— 2026-08-17 那次 P0 是外部 tester 逮到的,不是门逮到的
+if "$NODE_BIN" scripts/typecheck-cached.mjs --selftest >/tmp/uni-tsc-selftest.log 2>&1; then
+  ok "typecheck-cached selftest — $(tail -1 /tmp/uni-tsc-selftest.log)"
+else
+  bad "typecheck-cached selftest 失败 — 缓存壳判据被改坏,本轮 tsc 结论按不可信解读"; tail -5 /tmp/uni-tsc-selftest.log | sed 's/^/        /'
+fi
 if "$NODE_BIN" scripts/typecheck-cached.mjs >/tmp/uni-tsc.log 2>&1; then
   ok "$(tail -1 /tmp/uni-tsc.log)"
 else

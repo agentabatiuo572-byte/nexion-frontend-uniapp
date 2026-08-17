@@ -150,7 +150,7 @@ for (const step of STEPS) {
     }
   }
   const status = r.notRun ? "NOT-RUN" : r.code === 0 ? (r.cached ? "CACHED" : "PASS") : "FAIL";
-  results.push({ step, status, ms: r.ms, code: r.code, retried: !!r.retried, reason: r.notRun ? r.out : (r.retried ? `after-retry ⚠(首跑 exit ${r.firstCode})` : undefined) });
+  results.push({ step, status, ms: r.ms, code: r.code, retried: !!r.retried, reason: r.notRun ? r.out : (r.retried ? (r.code === 0 ? `after-retry ⚠(首跑 exit ${r.firstCode})` : `重跑仍红(首跑 exit ${r.firstCode},重跑 exit ${r.code})`) : undefined) });
   const secs = `${(r.ms / 1000).toFixed(1)}s`;
   if (status === "PASS") say(`${C.g}✓ PASS${C.n} ${C.d}${secs}${C.n}${r.retried ? ` ${C.y}(after-retry ⚠ 首跑 exit ${r.firstCode})${C.n}` : ""}`);
   else if (status === "CACHED") say(`${C.g}≡ CACHED${C.n} ${C.d}${secs} · ${r.out.trim().split(/\r?\n/).at(-1)}${C.n}`);
