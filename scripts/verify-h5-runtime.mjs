@@ -1,49 +1,27 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from "node:child_process";
-import fs from "node:fs";
-import http from "node:http";
-import net from "node:net";
+// H5 运行时门:隔离起服 + 22 场景 / 6 直接探针(默认档),或单探针档:
+//   --server-session-reload-recovery(sandbox 档 server)/ --remote-withdraw(remote 档 server)。
+//
+// 包 ar(2026-08-17)两处扩展,行为不变、只加两个入口:
+//   ① 复用 server:env H5_RUNTIME_REUSE_MOCK_URL / _SANDBOX_URL / _REMOTE_URL 指向 runner 已起的 server 时,
+//      先核身份(本树 + 模式,与 verify.sh [2.5] 同判据),通过才复用;不通过照旧自己起(lib/dev-server-pool.mjs)。
+//   ② 子探针缩范围:env H5_RUNTIME_ONLY="a.mjs,b.mjs"(runner 按 gates.manifest h5Probes 算出)→ 只跑列出的探针,
+//      其余按 SCOPED-SKIP 逐个点名;不设该 env = 全跑。两道路由守卫探针仍串行、其余并行(见下方注释)。
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureServer } from "./lib/dev-server-pool.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverSessionReloadRecoveryOnly = process.argv.includes("--server-session-reload-recovery");
 // --remote-withdraw:给「提现账单行 runtime」门起一台**远端档**隔离 server(该门要求 fundsServerEnabled 且非 sandbox,
 // mock 靶下必红)。verify.sh 在 REMOTE_BASE_URL 未给时走这条,不再依赖手动多传环境变量(2026-08-17 主人拍板)。
 const remoteWithdrawOnly = process.argv.includes("--remote-withdraw");
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address ? address.port : 0;
-      server.close((error) => error ? reject(error) : resolve(port));
-    });
-  });
-}
-
-function probe(url) {
-  return new Promise((resolve) => {
-    const request = http.get(url, (response) => {
-      response.resume();
-      resolve(response.statusCode === 200);
-    });
-    request.setTimeout(1000, () => request.destroy());
-    request.once("error", () => resolve(false));
-  });
-}
-
-async function waitForServer(url, child, output) {
-  const deadline = Date.now() + 45_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`H5 dev server exited early (${child.exitCode})\n${output()}`);
-    if (await probe(url)) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`H5 dev server did not become ready\n${output()}`);
-}
+const mode = remoteWithdrawOnly ? "remote" : serverSessionReloadRecoveryOnly ? "sandbox" : "mock";
+const reuseUrl = { mock: process.env.H5_RUNTIME_REUSE_MOCK_URL, sandbox: process.env.H5_RUNTIME_REUSE_SANDBOX_URL, remote: process.env.H5_RUNTIME_REUSE_REMOTE_URL }[mode] || null;
+const onlyList = (process.env.H5_RUNTIME_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
+const only = (script) => !onlyList.length || onlyList.includes(script);
+const skippedProbes = [];
 
 function runGate(script, baseUrl, args = []) {
   return new Promise((resolve, reject) => {
@@ -61,42 +39,18 @@ function runGate(script, baseUrl, args = []) {
       : reject(new Error(`${script} failed (${code})\n${output}`)));
   });
 }
-
-function stopTree(child) {
-  if (!child.pid || child.exitCode !== null) return;
-  if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-  } else {
-    child.kill("SIGTERM");
-  }
+/** 缩范围时被跳过的探针:点名 + 记账,输出格式与真跑的最后一行同位(供 verify.sh 的 tail -1 读)。 */
+function skipGate(script) {
+  skippedProbes.push(script);
+  return Promise.resolve(`SCOPED-SKIP ${script}(输入未变,H5_RUNTIME_ONLY 未列出)`);
 }
+const gate = (script, baseUrl, args) => (only(script) ? runGate(script, baseUrl, args) : skipGate(script));
 
-const port = await freePort();
-const baseUrl = `http://127.0.0.1:${port}`;
-const npmCliCandidates = [
-  process.env.npm_execpath,
-  path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
-].filter((candidate) => candidate && fs.existsSync(candidate));
-const serverCommand = npmCliCandidates.length ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm");
-const serverArgs = [
-  ...(npmCliCandidates.length ? [npmCliCandidates[0]] : []),
-  "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort",
-];
-const server = spawn(serverCommand, serverArgs, {
-  cwd: root,
-  env: {
-    ...process.env,
-    VITE_NEXGRID_API_MODE: remoteWithdrawOnly ? "remote" : serverSessionReloadRecoveryOnly ? "sandbox" : "mock",
-  },
-  shell: false,
-  stdio: ["ignore", "pipe", "pipe"],
-});
-let serverOutput = "";
-server.stdout.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
-server.stderr.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
+const server = await ensureServer({ root, mode, reuseUrl, timeoutMs: 45_000, log: (m) => console.log(`h5-runtime: ${m}`) });
+const baseUrl = server.baseUrl;
+const port = new URL(baseUrl).port;
 
 try {
-  await waitForServer(`${baseUrl}/?nx_device=off`, server, () => serverOutput);
   // The two route-guard suites deliberately keep pages open across several
   // one-second guard ticks. Running them beside eight Chromium-heavy probes can
   // starve those timers on Windows and create a false red even though the same
@@ -107,29 +61,32 @@ try {
     : serverSessionReloadRecoveryOnly
     ? [await runGate("server-session-reload-recovery-runtime.mjs", baseUrl)]
     : [
-      await runGate("guard-liveness-runtime.mjs", baseUrl),
-      await runGate("auth-guard-verify.mjs", baseUrl),
+      // 每条都保留字面量 runGate("<探针>") —— scripts/probe-safety-contract.test.mjs 以此为接线证据(缩范围只挡执行,不动接线)
+      only("guard-liveness-runtime.mjs") ? await runGate("guard-liveness-runtime.mjs", baseUrl) : await skipGate("guard-liveness-runtime.mjs"),
+      only("auth-guard-verify.mjs") ? await runGate("auth-guard-verify.mjs", baseUrl) : await skipGate("auth-guard-verify.mjs"),
       ...await Promise.all([
-        runGate("business-loop-liveness-runtime.mjs", baseUrl),
-        runGate("spec6-entry-surface-runtime.mjs", baseUrl),
-        runGate("trial-check.mjs", baseUrl),
-        runGate("sticky-check.mjs", baseUrl),
-        runGate("backnav-check.mjs", baseUrl),
-        runGate("profile-identity-check.mjs", baseUrl),
-        runGate("pending-checkout-runtime.mjs", baseUrl),
-        runGate("page-check.mjs", baseUrl, [
+        only("business-loop-liveness-runtime.mjs") ? runGate("business-loop-liveness-runtime.mjs", baseUrl) : skipGate("business-loop-liveness-runtime.mjs"),
+        only("spec6-entry-surface-runtime.mjs") ? runGate("spec6-entry-surface-runtime.mjs", baseUrl) : skipGate("spec6-entry-surface-runtime.mjs"),
+        only("trial-check.mjs") ? runGate("trial-check.mjs", baseUrl) : skipGate("trial-check.mjs"),
+        only("sticky-check.mjs") ? runGate("sticky-check.mjs", baseUrl) : skipGate("sticky-check.mjs"),
+        only("backnav-check.mjs") ? runGate("backnav-check.mjs", baseUrl) : skipGate("backnav-check.mjs"),
+        only("profile-identity-check.mjs") ? runGate("profile-identity-check.mjs", baseUrl) : skipGate("profile-identity-check.mjs"),
+        only("pending-checkout-runtime.mjs") ? runGate("pending-checkout-runtime.mjs", baseUrl) : skipGate("pending-checkout-runtime.mjs"),
+        only("page-check.mjs") ? runGate("page-check.mjs", baseUrl, [
           "/#/pages/index/index",
           "h5-runtime-home",
           ".home-earnings-cluster",
-        ]),
+        ]) : skipGate("page-check.mjs"),
       ]),
     ];
   for (const output of outputs) console.log(output.split(/\r?\n/).at(-1));
+  const where = `${server.reused ? "reused" : "isolated"} server ${port}`;
+  const scopedNote = onlyList.length ? ` · scoped: ran ${outputs.length - skippedProbes.length}/${outputs.length} probes, SCOPED-SKIP ${skippedProbes.length}` : "";
   console.log(remoteWithdrawOnly
-    ? `withdraw-bill runtime: PASS (isolated remote-mode server ${port})`
+    ? `withdraw-bill runtime: PASS (${server.reused ? "reused" : "isolated"} remote-mode server ${port})`
     : serverSessionReloadRecoveryOnly
-    ? `H5 server-session reload recovery: PASS (isolated server ${port}, returning + fresh flows)`
-    : `H5 runtime gates: PASS (isolated server ${port}, 22 scenarios + 6 direct probes)`);
+    ? `H5 server-session reload recovery: PASS (${where}, returning + fresh flows)`
+    : `H5 runtime gates: PASS (${where}, 22 scenarios + 6 direct probes${scopedNote})`);
 } finally {
-  stopTree(server);
+  server.stop();
 }
