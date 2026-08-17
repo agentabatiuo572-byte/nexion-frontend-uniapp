@@ -197,10 +197,13 @@ useDialogA11y(computed(() => props.open), ".nx-os-overlay", emitClose);
 </script>
 
 <style scoped>
+/* 🔴 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 120 低于里程碑庆祝
+   (780):这块是阻断式外链弹窗,自带 2.4s loading→error 自迁移,被庆祝盖住时用户
+   既看不到失败态也点不到「返回」,而计时器照样在走。 */
 .nx-os-overlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 790;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -69,52 +69,103 @@ export const LADDER = [
    **付款半屏**漏在窗外 —— stake-sheet / genesis purchase-sheet / eligibility-sheet
    当时是 79/80(比秩序表记的 790/800 少一位数),庆祝 780 压在它们之上并**吃掉
    「锁仓」按钮的点击**(elementFromPoint 实测命中 .ms-backdrop)。那三张已归位到
-   790/800,下沿同时降到 201 = 底盘 chrome 最高值(PC 设备卡长按菜单 200)+1,
-   此后 201 以上任何新浮层都在判据的扫描面内。
-   ⚠️ 已知残留(不在带内,门管不到):消息抽屉 110/120、opensea 弹窗 120。
-   它们仍在庆祝之下会被盖住;要收进来需连带重排 chrome 与状态栏,属独立任务。 */
-export const BUSINESS_BAND_FLOOR = 201; // 仅供文档/红测引用;判据已改为结构式,不再按数值取带
+   790/800。2026-08-17 三处残留(消息抽屉 110/120 · opensea 弹窗 120 · PC 设备卡长按
+   菜单 200)也已迁入 790/800,下沿随之降到 111 = 底盘常驻件最高值(模拟设备状态栏
+   110)+1;此后 111 以上任何新浮层都在扫描面内。 */
+export const BUSINESS_BAND_FLOOR = 111; // 仅供文档/红测引用;判据已改为结构式,不再按数值取带
 
 /**
- * 结构判据的**显式欠账清单** —— 这三处也是全屏模态遮罩,数值确实低于庆祝浮层(780),
- * 庆祝会画在它们之上。没有随本次一起修,是因为它们不属本次缺陷族(与首页自动弹层无关),
- * 且各自带滑入动画/长按手势,重排层级要连带回归,属独立任务。
+ * 结构判据的**显式欠账清单** —— 空 = 目标状态(2026-08-17 三条全部清掉:消息抽屉
+ * 110/120 · opensea 弹窗 120 · PC 设备卡长按菜单 200,均已迁入 790/800 业务半屏带)。
  * 🔴 这是**记账不是豁免**:清单在这里就是为了让下一个人看见它、而不是让门装作没看见。
- * 清掉一条就从这里删一条;新增任何一条都必须在这里写明理由,否则门直接判红。
+ * 清掉一条就从这里删一条;新增任何一条都必须在这里写明理由,否则等于把缺陷藏进门里。
+ *
+ * 🔴 清空它的同时必须补扫描面,否则「清单空了」只是话术:实测三条里只有 opensea 一条
+ * 真被门挡着,另两条摘掉后门照样 0 违例 —— 抽屉写的是 position:absolute(判据只认
+ * fixed)、设备卡写的是内联 style(判据只扫 <style> 块)。所以本轮同时:
+ *   · 抽屉改写成 fixed 满屏遮罩,与其余 19 个同形 → 自然落进扫描面;
+ *   · 判据补扫 <template> 里的内联 style(见 scanFullScreenScrims);
+ *   · 加 BAND_ANCHOR 钉住这三处,防「改回 absolute」这类绕过扫描面的回退。
  */
-export const SCRIM_EXEMPT = [
-  { file: "src/components/message-drawer.vue", z: "110/120", reason: "消息抽屉,滑入动画 + 独立焦点管理,重排需回归通知链路" },
-  { file: "src/components/genesis/opensea-modal.vue", z: "120", reason: "创世外链弹窗,自带 2.4s 状态自迁移,与本族无关" },
-  { file: "src/components/earn/device-card-pc.vue", z: "200", reason: "PC 设备卡长按菜单,内联 style 且依赖长按手势坐标" },
+export const SCRIM_EXEMPT = [];
+
+/**
+ * 回退锚 —— 这三处是 2026-08-17 从 110/120/200 迁进业务带的,必须一直**被扫描面看得见**。
+ * 与 SCRIM_EXEMPT 极性相反:那张是「别管这些」,这张是「这些必须在管辖内」。
+ * why:光靠数值判据挡不住「把 position 改回 absolute」——形态一变判据就看不见它,
+ * 于是 z 掉回 110 也全绿(这正是本轮之前的真实状态)。锚按文件断言,改名/删除同样红。
+ */
+export const BAND_ANCHOR = [
+  "src/components/message-drawer.vue",
+  "src/components/genesis/opensea-modal.vue",
+  "src/components/earn/device-card-pc.vue",
 ];
 
+/** 一段 CSS 声明是不是「全屏遮罩」:position:fixed + 四边贴边 + 带 z-index;是则返回 z */
+function scrimZ(body) {
+  if (!/position:\s*fixed/.test(body)) return null;
+  const zm = body.match(/z-index:\s*(\d+)/);
+  if (!zm) return null;
+  const fullBleed =
+    /inset:\s*0(\s|;|$)/.test(body) ||
+    (/top:\s*0/.test(body) && /right:\s*0/.test(body) && /bottom:\s*0/.test(body) && /left:\s*0/.test(body));
+  return fullBleed ? parseInt(zm[1], 10) : null;
+}
+
 /**
- * 扫「全屏遮罩」——position:fixed 且四边贴边、且带 z-index 的规则块。
+ * 同一个形态的第三种写法:`<script>` 里的 JS 样式对象(`position: "fixed"` + `zIndex: 790`),
+ * 由 `:style="xxxStyle"` 绑上去。引号 + camelCase,scrimZ 的 CSS 正则一个都对不上。
+ * 🔴 这条轴不是假想:2026-08-17 按它一扫,当场扫出三处**从没被任何门看见过**的违例 ——
+ * device-deactivate-sheet / fx-rate-line / wallet-withdraw 的费用说明半屏都是 79/80,
+ * 正是 2026-08-16 修付款半屏时那个「比 790/800 少一位数」的笔误同族;那轮只修好了写在
+ * <style> 块里的三张,写成 JS 对象的这三张连红都没红过(其中一张还在提现路径上)。
+ */
+function scrimZFromJsObject(win) {
+  if (!/position:\s*["']fixed["']/.test(win)) return null;
+  const zm = win.match(/zIndex:\s*["']?(\d+)["']?/);
+  if (!zm) return null;
+  const fullBleed =
+    /inset:\s*["']?0/.test(win) ||
+    (/top:\s*["']?0/.test(win) && /right:\s*["']?0/.test(win) && /bottom:\s*["']?0/.test(win) && /left:\s*["']?0/.test(win));
+  return fullBleed ? parseInt(zm[1], 10) : null;
+}
+
+/**
+ * 扫「全屏遮罩」——position:fixed 且四边贴边、且带 z-index。
  * 这个形态就是模态层(遮罩铺满视口、吃掉底下的点击),与它的 z 数值无关;
  * 底盘 chrome(header 只贴 top/left/right、tabbar 只贴 bottom)不满足四边贴边,天然排除。
+ * 🔴 两种写法都要扫:<style> 块里的规则**和** <template> 里的内联 style。只扫前者时,
+ * 「同一个形态换个写法」就整块隐形 —— 实测 PC 设备卡长按菜单(内联 fixed+inset:0+z:200)
+ * 被庆祝盖住多时,而门一直报 0 违例,把它从豁免清单摘掉也照样绿。
  */
 export function scanFullScreenScrims(files) {
   const out = [];
   for (const f of files) {
-    const text = f.text.replace(/\/\*[\s\S]*?\*\//g, "");
-    const styleOnly = text.replace(/<template[\s\S]*?<\/template>/g, "");
+    // 用 stripComments(空格填充)而不是删除:行号不漂,且注释里的示例样式不算数
+    const text = stripComments(f.text);
+    const styleOnly = text.replace(/<template[\s\S]*?<\/template>/g, (m) => m.replace(/[^\n]/g, " "));
     const ruleRe = /([.#][\w-]+(?:\[[^\]]*\])?)\s*\{([^}]*)\}/g;
     let m;
     while ((m = ruleRe.exec(styleOnly)) !== null) {
-      const [, sel, body] = m;
-      if (!/position:\s*fixed/.test(body)) continue;
-      const zm = body.match(/z-index:\s*(\d+)/);
-      if (!zm) continue;
-      const fullBleed =
-        /inset:\s*0(\s|;|$)/.test(body) ||
-        (/top:\s*0/.test(body) && /right:\s*0/.test(body) && /bottom:\s*0/.test(body) && /left:\s*0/.test(body));
-      if (!fullBleed) continue;
-      out.push({
-        file: f.rel,
-        line: styleOnly.slice(0, m.index).split("\n").length,
-        sel,
-        z: parseInt(zm[1], 10),
-      });
+      const z = scrimZ(m[2]);
+      if (z === null) continue;
+      out.push({ file: f.rel, line: styleOnly.slice(0, m.index).split("\n").length, sel: m[1], z });
+    }
+    const attrRe = /style="([^"]*)"/g;
+    while ((m = attrRe.exec(text)) !== null) {
+      const z = scrimZ(m[1]);
+      if (z === null) continue;
+      out.push({ file: f.rel, line: text.slice(0, m.index).split("\n").length, sel: "内联 style", z });
+    }
+    // 第三种写法:<script> 里的 JS 样式对象。从每个 position:"fixed" 往回找对象起点,
+    // 取一段窗口当作这个对象的声明体(足够覆盖一个样式对象,不会跨到下一个)。
+    const jsRe = /position:\s*["']fixed["']/g;
+    while ((m = jsRe.exec(text)) !== null) {
+      const start = text.lastIndexOf("{", m.index);
+      if (start < 0) continue;
+      const z = scrimZFromJsObject(text.slice(start, start + 900));
+      if (z === null) continue;
+      out.push({ file: f.rel, line: text.slice(0, m.index).split("\n").length, sel: "JS 样式对象", z });
     }
   }
   return out;
@@ -184,6 +235,18 @@ export function evaluate(files = readVueFiles()) {
       );
   }
 
+  // ③-锚 曾经的欠账三处必须**仍在扫描面内**(不是「值对不对」,是「门还看不看得见它」)。
+  //     只断言数值挡不住形态回退:改回 position:absolute 或把样式挪成内联,判据就整块失明,
+  //     此时 z 掉回 110 也全绿。按文件钉,改名 / 删除 / 换写法一律红。
+  //     文件被删 / 改名同样红(照 LADDER 的老规矩:不许因为「遍历不到」而静默放行)。
+  const bandFiles = new Set(scanFullScreenScrims(files).map((h) => h.file));
+  for (const rel of BAND_ANCHOR)
+    if (!bandFiles.has(rel))
+      problems.push(
+        `扫描面丢了成员:${rel} 不再被识别为全屏遮罩 —— 它 2026-08-17 才从 110/120/200 迁进业务带,` +
+          `形态一改(absolute / 挪写法)判据就看不见它,z 掉回去也不会红`,
+      );
+
   // ② 天花板
   const capt = rungs.find((r) => r.sel === ".cs-layer");
   const exemptFiles = new Set(CEILING_EXEMPT.map((e) => e.file));
@@ -250,11 +313,73 @@ function selftest() {
       evaluate(files).problems.join(" / "));
   }
   {
-    // 轴 3「扫描面塌空」:业务带一个成员都扫不到时不许判绿 —— 期望是空集的断言天然假绿。
-    const files = base.filter((f) => {
-      const hits = scanAll([f]);
-      return !hits.some((h) => h.z >= BUSINESS_BAND_FLOOR && h.z <= BUSINESS_BAND_CEIL && h.file !== MILESTONE_FILE);
+    // 🔴 轴「换写法」:同一个形态写成内联 style,只扫 <style> 块的判据整块看不见它。
+    //    这一靶就是 2026-08-17 之前的真实盲区(PC 设备卡长按菜单 fixed+inset:0+z:200)。
+    const files = clone();
+    files.push({
+      rel: "src/components/fake-inline-sheet.vue",
+      text: `<template>\n  <view style="position: fixed; inset: 0; z-index: 750; background: #000" />\n</template>`,
     });
+    p("红测③-内联 内联 style 写的 750 全屏模态必红(只扫 <style> 块时对此全瞎)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 🔴 轴「JS 样式对象」:引号 + camelCase 的写法,CSS 正则一条都对不上。
+    //    这一靶是实账:按它一扫当场抓出三处从没红过的 79/80(含提现路径的费用说明半屏)。
+    const files = clone();
+    files.push({
+      rel: "src/components/fake-js-style-sheet.vue",
+      text: `<script setup lang="ts">\nconst scrimStyle = { position: "fixed", inset: 0, zIndex: 750 };\n</script>`,
+    });
+    p("红测③-JS对象 JS 样式对象写的 750 全屏模态必红(CSS 正则对引号+camelCase 全瞎)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 事故现场原样:三张 JS 对象半屏退回 79/80(2026-08-17 修复前的真实磁盘状态)。
+    const files = patch("src/pages/me/wallet-withdraw.vue",
+      (t) => t.replace(/(feeWhyScrimStyle[\s\S]{0,200}?zIndex:\s*)790/, "$179"));
+    p("红测③-事故现场 提现费用说明半屏退回 79 必红(此前它连红都没红过)",
+      evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 🔴 轴「形态回退」:把抽屉改回 position:absolute —— 数值判据看不见它了,
+    //    此时 z 掉回 110 也不会红。锚必须抓住「扫描面少了成员」这件事本身。
+    const files = patch("src/components/message-drawer.vue",
+      (t) => t.replace(/(\.md-root\s*\{[^}]*?)position:\s*fixed/s, "$1position: absolute"));
+    p("红测③-锚 抽屉改回 position:absolute 必红(形态一变判据就失明)",
+      evaluate(files).problems.some((x) => x.startsWith("扫描面丢了成员")),
+      evaluate(files).problems.join(" / "));
+  }
+  {
+    // 锚的另一面:文件整体消失(删除 / 改名)也必须红,不许静默少守一处。
+    const files = clone().filter((f) => f.rel !== "src/components/genesis/opensea-modal.vue");
+    p("红测③-锚-消失 锚定文件被删/改名必红(不许因遍历不到而放行)",
+      evaluate(files).problems.some((x) => x.startsWith("扫描面丢了成员")));
+  }
+  {
+    // 三处迁入后的数值本身:任一处掉回庆祝之下必红(锚管形态,这条管数值)。
+    for (const [rel, from, to] of [
+      ["src/components/message-drawer.vue", /(\.md-root\s*\{[^}]*?z-index:\s*)\d+/s, "$1110"],
+      ["src/components/genesis/opensea-modal.vue", /(\.nx-os-overlay\s*\{[^}]*?z-index:\s*)\d+/s, "$1120"],
+      ["src/components/earn/device-card-pc.vue", /(position: fixed; inset: 0; z-index: )\d+/, "$1200"],
+    ]) {
+      const files = patch(rel, (t) => t.replace(from, to));
+      p(`红测③-回退 ${rel.split("/").pop()} 掉回庆祝之下必红`,
+        evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
+        evaluate(files).problems.join(" / "));
+    }
+  }
+  {
+    // 轴 3「扫描面塌空」:业务带一个成员都扫不到时不许判绿 —— 期望是空集的断言天然假绿。
+    // 🔴 用 scanFullScreenScrims 而不是 scanAll 来挑要剔除的文件:判据认的是「全屏遮罩」
+    // 这个形态,而 scanAll 只认 CSS 写法的 `z-index:`,对 JS 对象的 `zIndex:` 是瞎的 ——
+    // 拿它挑剩下的文件里会残留几张 JS 对象半屏,带根本塌不空,这一靶就永远测不到它想测的东西。
+    const files = base.filter(
+      (f) => f.rel === MILESTONE_FILE || !scanFullScreenScrims([f]).some((h) => h.z <= BUSINESS_BAND_CEIL),
+    );
     p("红测③-塌空 业务带扫不到成员时必红(不许因『没找到违例』而假绿)",
       evaluate(files).problems.some((x) => x.startsWith("业务浮层带扫不到任何成员")));
   }
