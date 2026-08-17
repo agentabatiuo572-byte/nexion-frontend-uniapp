@@ -128,6 +128,7 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
       clearRemoteFacts();
       return;
     }
+    // persist-verdict-ok: 每日加成状态重置,失败下一次进入重算(非资金)
     rows.commit(() => ({ next: defaults(), result: true as const }));
   }
 

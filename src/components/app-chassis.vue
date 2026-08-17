@@ -98,7 +98,7 @@
              clipped everything above the header so there was nothing behind the
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
-        <view class="nx-page-enter" :style="{ paddingTop: contentTop + 'px', paddingBottom: contentBottom + 'px' }">
+        <view class="nx-page-enter" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom + 'px' }">
           <slot name="pageTop" />
           <!-- Voucher fallback banner — chassis-injected at content top so the
                5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
@@ -152,6 +152,9 @@
       <LuckySpinSheet />
       <StickyCtaBar />
       <MessageDrawer />
+      <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
+           自隐藏:无在途会话 / 已过期 / 结算页正在展示它。位置见 pendingBarTop / pendingBarInset。 -->
+      <PendingCheckoutBar :top="pendingBarTop" />
     </template>
 
     <!-- Global overlay host (toast / confirm / netError) -->
@@ -160,12 +163,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
+import PendingCheckoutBar from "@/components/pending-checkout-bar.vue";
 import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
 import MessageDrawer from "@/components/message-drawer.vue";
@@ -183,6 +187,8 @@ import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { usePendingCheckout } from "@/store/pending-checkout";
+import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
@@ -203,6 +209,7 @@ const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
 const voucher = useVoucher();
 const voucherClaimSheet = useVoucherClaimSheet();
+const pendingCheckout = usePendingCheckout();
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
 let voucherPushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -451,6 +458,18 @@ const TABBAR_INSET = 104; // floating pill (64) + home indicator (22) + 18 breat
 const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTTOM));
+// ── 待支付浮动条的落位 ──
+// 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
+// 任何页都不被盖住:tab 页 / useSetPageHeader 子页的 chassis 头在带之上;用 sub-page-header(内容内
+// sticky 行)的子页,那一行随内容一起下让,并经 provide 拿到同一个内缩值当自己的 sticky top —— 滚动时
+// 钉在带的下沿,不再从浮动条底下穿过。(此前只给有 chassis 头的页内缩,~55 个 sub-page-header 子页的
+// 首屏被压 36px:独立审查按像素常量推算 + Playwright 实测 daily / wallet-nex 页 overlap=36。)
+const PENDING_BAR_INSET = 60;
+// 与渲染条件同谓词:静态审查路由 / 首帧 route 未解析时条不渲染,内容也不能白让一带。
+const pendingBarVisible = computed(() => !!pendingCheckout.barSession && showBusinessOverlays.value);
+const pendingBarTop = computed(() => contentTop.value + 8);
+const pendingBarInset = computed(() => (pendingBarVisible.value ? PENDING_BAR_INSET : 0));
+provide(PENDING_BAR_INSET_KEY, pendingBarInset);
 const topChromeHeight = computed(() => contentTop.value);
 
 // lucide-style outline paths (Home / Zap / ShoppingBag / Users / User)

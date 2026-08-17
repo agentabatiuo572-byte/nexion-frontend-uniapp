@@ -239,6 +239,7 @@ async function submit() {
   // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。
   const opened = staking.stake(amount.value, term);
   if (!opened.ok) {
+    // persist-verdict-ok: 冲正腿:收口点内部对退不回去已走 reportStuckFunds 响亮终态、退得回去弹 txNotSaved,调用方无需再动作
     postMoneyBill(
       {
         type: "stake",

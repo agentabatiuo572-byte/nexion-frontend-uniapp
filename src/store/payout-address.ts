@@ -124,6 +124,7 @@ function hydrate(accountKey: string): PayoutAddressBook {
         console.error("[payout-address] legacy rebind $1 refund failed", e);
       }
     }
+    // persist-verdict-ok: 地址簿迁移写:失败下次启动重迁(非资金)
     writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, accountKey, migrated.book);
     // 迁移地址按**原验证时刻**登记风控首见 —— 既有「新地址持有期」信号看到的是老地址,
     // 不产生新保护期(规格 ② 异常6:可直接提现、无需重验)。
@@ -324,6 +325,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
       next[network] = { ...next[network], freezeUntil: null, nextChangeAt: null };
     }
     book.value = next;
+    // persist-verdict-ok: 提现地址簿落盘:失败时内存与磁盘分叉到下次重绑(非资金;提现真伪由服务端校验)
     persist();
     return true;
   }
@@ -332,6 +334,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   function _devResetAddresses(): boolean {
     if (import.meta.env.PROD || payoutAddressServerEnabled) return false;
     book.value = emptyBook();
+    // persist-verdict-ok: 提现地址簿落盘:失败时内存与磁盘分叉到下次重绑(非资金;提现真伪由服务端校验)
     persist();
     return true;
   }

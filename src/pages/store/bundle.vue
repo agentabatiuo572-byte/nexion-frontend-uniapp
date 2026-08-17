@@ -200,7 +200,8 @@ import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
+import { usePendingCheckout } from "@/store/pending-checkout";
+import { postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -211,6 +212,7 @@ const cart = useCart();
 const phase = useProductPhase();
 const app = useApp();
 const orders = useOrders();
+const pending = usePendingCheckout();
 
 const catalogStatus = computed(() => productCatalogState.status);
 const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
@@ -272,7 +274,7 @@ function retryReceiptWrite() {
   }
   receiptRetrying.value = true;
   try {
-    if (!postReceiptOnly(failure.draft)) return;
+    if (!postReceiptOnce(failure.draft)) return; // 按 ref 幂等
     receiptWriteFailure.value = null;
     clearReceiptRecovery(failure.accountKey);
     cart.clear();
@@ -305,15 +307,20 @@ const receiptRetrying = ref(false);
 function restoreReceiptRecovery() {
   const accountKey = orders.currentAccountKey();
   const row = readAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey);
-  receiptWriteFailure.value = row?.accountKey === accountKey ? row : null;
+  // 磁盘没有行时保留内存里同账号的卡(恢复行自己也可能写不进去,那张卡是唯一补写入口);换号才清。
+  const memRow = receiptWriteFailure.value?.accountKey === accountKey ? receiptWriteFailure.value : null;
+  receiptWriteFailure.value = (row?.accountKey === accountKey ? row : null) ?? memRow;
 }
 
 function persistReceiptRecovery(failure: BundleReceiptRecovery) {
   receiptWriteFailure.value = failure;
-  writeAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, failure.accountKey, failure);
+  if (!writeAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, failure.accountKey, failure)) {
+    reportStuckFunds(app.captureMoney(), failure.orderIds.join(","), "receipt");
+  }
 }
 
 function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
+  // persist-verdict-ok: 清不掉最多让卡多露一次;补写走 postReceiptOnce 按 ref 幂等
   writeAccountRow<BundleReceiptRecovery | null>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey, null);
 }
 
@@ -349,6 +356,7 @@ function acquireBundleKey(list: Product[], accountKey: string): string {
   const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const key = `bundle:${suffix}`;
+  // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, {
     commands: { ...(row?.commands ?? {}), [fingerprint]: key },
   });
@@ -358,6 +366,7 @@ function retireBundleKey(list: Product[], accountKey: string): void {
   const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
   const commands = { ...(row?.commands ?? {}) };
   delete commands[bundleFingerprint(list)];
+  // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, { commands });
 }
 
@@ -419,22 +428,40 @@ async function onCheckout() {
   }
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;
-  if (!app.debitBalance(charge)) {
+  // 与单品结算同一套两分支处置:数值闸 + 只读余额预检先出局(用户可自解),之后 debit 的 false 只剩落盘失败(系统故障)。
+  if (!Number.isFinite(charge) || charge < 0) {
+    toast.warn(t.value.store.coTotalQuoteChanged);
+    return;
+  }
+  if (app.user.usdtBalance < charge) {
     toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
+    return;
+  }
+  const beforePay = app.captureMoney();
+  if (!app.debitBalance(charge)) {
+    toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
     return;
   }
   const pct = discountPct.value;
   // 逐商品建单;组合折扣按单价比例分摊到各单(展示净额)。
   // ponytail: 账本单源 = debitBalance(total)+bills;各单 net 之和的四舍五入分差不入账。
-  const created = list.map((p) =>
-    orders.createOrder({
-      productId: p.id as Order["productId"],
-      productName: p.name,
-      unitPrice: p.price,
-      paymentMethod: "balance",
-      discount: +(p.price * pct).toFixed(2),
-    }),
-  );
+  // 一批一次落盘(store 保证):要么全部建成,要么一单不留 —— 不存在「前几单落了、后几单没落」的半执行态。
+  const created = orders.createOrders(list.map((p) => ({
+    productId: p.id as Order["productId"],
+    productName: p.name,
+    unitPrice: p.price,
+    paymentMethod: "balance" as const,
+    discount: +(p.price * pct).toFixed(2),
+  })));
+  // 这批成交 = 这些商品的购买意图已兑现:同账号仍在窗内的链上旧票一并作废(否则浮动条继续催第二笔)。
+  // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出,用户回去看到的是可取消的旧票
+  if (created) for (const p of list) pending.settleProduct(p.id);
+  if (!created) {
+    // 整批没落盘:钱按快照精确冲正,冲不回去走响亮终态。
+    if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+    else reportStuckFunds(beforePay);
+    return;
+  }
   // 🔴 走 postReceiptOnly 而不是 postMoneyBill(与 checkout.vue 主账单同口径):扣款必须
   // 发生在建单之前,而单子已经建好并进入履约 —— 收据写失败时回滚资金只还钱、还不回那几台设备。
   // 既定处置是让用户明确看见收据没记上,而不是像原来那样丢弃返回值静默吞掉。

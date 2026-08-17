@@ -18,7 +18,7 @@ import { ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
 
@@ -105,10 +105,10 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
   }
 }
 
-function hydrate(accountKey: string): Order[] {
-  const row = readAccountRow<{ orders?: Order[] }>(ACCOUNTS_KEY, accountKey);
-  if (row && Array.isArray(row.orders)) return row.orders;
-  return [];
+type OrdersRow = { orders: Order[] };
+function parseOrdersRow(raw: unknown): OrdersRow {
+  const row = raw as { orders?: unknown } | null;
+  return { orders: row && Array.isArray(row.orders) ? (row.orders as Order[]) : [] };
 }
 
 // app store optional device-CRUD surface — these actions land on useApp when the
@@ -116,8 +116,9 @@ function hydrate(accountKey: string): Order[] {
 // then this typed view lets advanceOrder() compile and degrade gracefully: the
 // order still advances to "activated", just without spawning a Device.
 type DeviceSpawnApp = {
-  addDevice?: (kind: DeviceKind, options?: { paidPriceUsdt?: number }) => string;
+  addDevice?: (kind: DeviceKind, options?: { paidPriceUsdt?: number }) => string | null;
   activateDevice?: (id: string, reservedSlots?: number) => boolean;
+  discardSpawnedDevice?: (id: string) => boolean;
   devices: { id: string; activatedAt?: number | null }[];
 };
 
@@ -128,19 +129,37 @@ export const useOrders = defineStore("orders", () => {
   // Any in-flight server response is scoped to this binding generation. A logout
   // or account switch must not project the prior account into the new session.
   let boundEpoch = 0;
-  const orders = ref<Order[]>(remoteApiEnabled ? [] : hydrate(boundKey));
+  const orders = ref<Order[]>([]);
 
-  function persist() {
-    if (remoteApiEnabled) return;
-    writeAccountRow<{ orders: Order[] }>(ACCOUNTS_KEY, boundKey, { orders: orders.value });
+  /**
+   * 🔴 落盘走 CAS 提交器(与 pending-checkout / deposits 同款),不再整行覆盖写(审计 R10 P0):
+   * H5 多标签页各持一份内存副本、永久不同步,覆盖写 = 后写者用陈旧数组抹掉别的标签页刚落盘的已付款订单
+   * (钱按增量合并保住了,单却没了 → 履约永不发生)。每次变更在**磁盘最新行**上 apply,提交结果 sync 回内存。
+   * 远端档不落本地盘(状态归服务端):提交器不建、不读。
+   */
+  const rows = createAccountRowCommit<OrdersRow>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseOrdersRow,
+    snapshot: () => ({ orders: orders.value }),
+    sync: (row) => { orders.value = row.orders; },
+  });
+
+  /** 在磁盘最新行上改订单列表;返回提交是否成功(前置不成立 / 写失败都是 false,内存已按提交器语义处理)。 */
+  function commitOrders(apply: (cur: Order[]) => Order[] | null): boolean {
+    if (remoteApiEnabled) return false;
+    return rows.commit((cur) => {
+      const next = apply(cur.orders);
+      return next ? { next: { orders: next }, result: true as const } : null;
+    }).ok;
   }
 
-  /** 账号切换重绑:装载该账号的订单行(变更处处即时 persist,旧账号无需先落盘)。 */
+  /** 账号切换重绑:装载该账号的订单行。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     boundEpoch += 1;
-    orders.value = remoteApiEnabled ? [] : hydrate(boundKey);
+    orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
   }
+  bindAccount(boundKey); // boot 期先挂 "default";账号确定后由 rebindAccountScopedStores 重绑
 
   function fromCanonical(row: CanonicalOrder): Order {
     const status: OrderStatus = row.canonicalStatus;
@@ -200,8 +219,26 @@ export const useOrders = defineStore("orders", () => {
     }
   }
 
-  function createOrder(input: CreateOrderInput): Order {
+  /**
+   * 建单并落盘。落盘失败 → 内存那条一并撤掉,返回 null:一张只活在内存里的「已付」订单会在刷新时
+   * 消失,而调用方此前已经扣款 / 下架旧机 —— 必须让调用方知道并按原路退回,不能静默吞掉。
+   */
+  function createOrder(input: CreateOrderInput): Order | null {
+    return createOrders([input])?.[0] ?? null;
+  }
+
+  /**
+   * 一批建单 = **一次**落盘:全部进内存后只写一次盘,失败整批撤掉返 null —— 组合购买不存在「前几单落了、
+   * 后几单没落」的半执行态(审计 R5 P1:逐单写盘中途失败,整笔退款而已落盘的单子照发设备)。
+   */
+  function createOrders(inputs: CreateOrderInput[]): Order[] | null {
     if (remoteApiEnabled) throw new Error("REMOTE_ORDER_CREATE_REQUIRES_SERVER_API");
+    const batch = inputs.map(buildOrder);
+    // 追加在**磁盘最新**列表之上(不是本标签页的内存副本):别的标签页刚建的单不会被本次落盘抹掉。
+    return commitOrders((cur) => [...batch.slice().reverse(), ...cur]) ? batch : null;
+  }
+
+  function buildOrder(input: CreateOrderInput): Order {
     const {
       productId, productName, unitPrice, paymentMethod,
       discount = 0, tradeInCredit = 0, tradeInDeviceId,
@@ -233,8 +270,6 @@ export const useOrders = defineStore("orders", () => {
         { status: "paid", ts: now + 1000, note: `Settled via ${paymentMethod}` },
       ],
     };
-    orders.value = [order, ...orders.value];
-    persist();
     return order;
   }
 
@@ -261,8 +296,9 @@ export const useOrders = defineStore("orders", () => {
       if (!spawnedDeviceId && typeof app.addDevice === "function") {
         // FEAT-DEV02:阶梯抵扣基数 = 实付净额(order.total 已扣券与置换抵扣),
         // 不是目录价——否则券/抵扣买入的设备下一跳置换基数被系统性高估。
-        spawnedDeviceId = app.addDevice(cur.productId, { paidPriceUsdt: cur.total });
-        spawnedDeviceId = spawnedDeviceId ?? app.devices.slice(-1)[0]?.id;
+        spawnedDeviceId = app.addDevice(cur.productId, { paidPriceUsdt: cur.total }) ?? undefined;
+        // 生不出设备(落盘失败)= 这一跳不发生:不把幽灵 id 写进订单,下一 tick 整跳重试。
+        if (!spawnedDeviceId) return;
       }
       if (spawnedDeviceId && typeof app.activateDevice === "function") {
         const alreadyActive = app.devices.some((d) => d.id === spawnedDeviceId && d.activatedAt !== null);
@@ -274,44 +310,55 @@ export const useOrders = defineStore("orders", () => {
       ? "Waiting for an empty device slot"
       : statusNote(next, cur.dataCenter);
 
-    orders.value = orders.value.map((o) =>
-      o.id !== id
-        ? o
-        : {
-            ...o,
-            status: targetStatus,
-            deviceId: spawnedDeviceId ?? o.deviceId,
-            activatedAt: targetStatus === "activated" ? Date.now() : o.activatedAt,
-            timeline: [
-              ...o.timeline,
-              { status: targetStatus, ts: Date.now(), note: targetNote },
-            ],
-          },
-    );
-    persist();
+    // CAS 前置:磁盘上这张单仍是我看到的那一跳(status 相同、还没被别的标签页配上设备)。别的标签页已经推进
+    // 过 → 前置不成立 → 本次不写,刚为它生的那台设备撤回(否则两个标签页各发一台);写失败同样撤回、下一 tick 重试。
+    const committed = commitOrders((list) => {
+      const disk = list.find((o) => o.id === id);
+      if (!disk || disk.status !== cur.status || (spawnedDeviceId && !cur.deviceId && disk.deviceId)) return null;
+      return list.map((o) =>
+        o.id !== id
+          ? o
+          : {
+              ...o,
+              status: targetStatus,
+              deviceId: spawnedDeviceId ?? o.deviceId,
+              activatedAt: targetStatus === "activated" ? Date.now() : o.activatedAt,
+              timeline: [
+                ...o.timeline,
+                { status: targetStatus, ts: Date.now(), note: targetNote },
+              ],
+            },
+      );
+    });
+    if (!committed && spawnedDeviceId && !cur.deviceId) {
+      // 撤回自己的落盘不再追(R5 结构反思:撤销的撤销是无穷回归)。
+      const app = useApp() as unknown as DeviceSpawnApp;
+      void app.discardSpawnedDevice?.(spawnedDeviceId);
+    }
   }
 
-  function markActivated(id: string, deviceId: string) {
-    if (remoteApiEnabled) return;
-    orders.value = orders.value.map((o) =>
-      o.id === id
-        ? {
-            ...o,
-            status: "activated",
-            activatedAt: Date.now(),
-            deviceId,
-            timeline: [
-              ...o.timeline.filter((e) => e.status !== "activated"),
-              {
+  function markActivated(id: string, deviceId: string): boolean {
+    if (remoteApiEnabled) return false;
+    return commitOrders((list) => (list.some((o) => o.id === id)
+      ? list.map((o) =>
+          o.id === id
+            ? {
+                ...o,
                 status: "activated",
-                ts: Date.now(),
-                note: "Device live · joined NexGrid network",
-              },
-            ],
-          }
-        : o,
-    );
-    persist();
+                activatedAt: Date.now(),
+                deviceId,
+                timeline: [
+                  ...o.timeline.filter((e) => e.status !== "activated"),
+                  {
+                    status: "activated",
+                    ts: Date.now(),
+                    note: "Device live · joined NexGrid network",
+                  },
+                ],
+              }
+            : o,
+        )
+      : null));
   }
 
   // Cancel is allowed ONLY pre-payment ("placed"). Once paid, DC provisioning
@@ -321,26 +368,25 @@ export const useOrders = defineStore("orders", () => {
     // There is no user-facing canonical cancellation command. Remote mode must
     // remain HOLD/pending rather than pretending a local mutation succeeded.
     if (remoteApiEnabled) return false;
-    const cancellable = orders.value.some((o) => o.id === id && o.status === "placed");
-    if (!cancellable) return false;
-    orders.value = orders.value.map((o) =>
-      o.id === id && o.status === "placed"
-        ? {
-            ...o,
-            status: "cancelled",
-            timeline: [
-              ...o.timeline,
-              {
+    // 前置在磁盘最新行上复核(placed 才可取消);没落盘 = 没取消(刷新后仍是 placed),如实返 false。
+    return commitOrders((list) => (list.some((o) => o.id === id && o.status === "placed")
+      ? list.map((o) =>
+          o.id === id && o.status === "placed"
+            ? {
+                ...o,
                 status: "cancelled",
-                ts: Date.now(),
-                note: "Order cancelled · refund queued",
-              },
-            ],
-          }
-        : o,
-    );
-    persist();
-    return true;
+                timeline: [
+                  ...o.timeline,
+                  {
+                    status: "cancelled",
+                    ts: Date.now(),
+                    note: "Order cancelled · refund queued",
+                  },
+                ],
+              }
+            : o,
+        )
+      : null));
   }
 
   function currentAccountKey(): string {
@@ -351,7 +397,7 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
+  return { orders, createOrder, createOrders, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

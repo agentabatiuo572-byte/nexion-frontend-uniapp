@@ -43,7 +43,10 @@ export interface StuckFundsCase {
   /** 业务单号(账单 ref);没有就是空串。 */
   ref: string;
   restoreTo: MoneySnapshot;
+  /** 卡住的是什么:钱退不回 / 券放不回 / 收据与它的恢复行都写不进去(钱与单都对,只缺凭据)。 */
+  kind: StuckKind;
 }
+export type StuckKind = "funds" | "voucher" | "receipt" | "device" | "trial" | "payout";
 
 /** 尽力持久化(storage 正是刚刚出故障的那一层,写不进去也只能认)。 */
 const STUCK_KEY = "nexgrid-funds-stuck-v1";
@@ -67,8 +70,8 @@ export function stuckFundsCases(): StuckFundsCase[] {
  * 让用户明确看见 + 留下可对账的凭据,残余风险显式交给后端对账。
  * PRODUCTION:整段消失 —— 服务端单事务里根本没有「回滚失败」这个状态。
  */
-export function reportStuckFunds(restoreTo: MoneySnapshot, ref = ""): "stuck" {
-  const record: StuckFundsCase = { id: mockServerId("FIX"), at: Date.now(), ref, restoreTo };
+export function reportStuckFunds(restoreTo: MoneySnapshot, ref = "", kind: StuckKind = "funds"): "stuck" {
+  const record: StuckFundsCase = { id: mockServerId("FIX"), at: Date.now(), ref, restoreTo, kind };
   stuckQueue.push(record);
   if (stuckQueue.length > STUCK_CAP) stuckQueue.splice(0, stuckQueue.length - STUCK_CAP);
   try {
@@ -77,7 +80,15 @@ export function reportStuckFunds(restoreTo: MoneySnapshot, ref = ""): "stuck" {
   } catch {
     // storage 不可用正是走到这里的原因之一 —— 内存队列 + 用户手上的交易号已是兜底。
   }
-  toast.error(getT().errors.fundsStuckTitle, fmt(getT().errors.fundsStuckMsg, { id: record.id }));
+  // 三种卡法三套话:钱没退回 / 券没放回 / 收据与恢复行都没写上 —— 都给交易号 + 找人,但不许对券 / 收据说「金额被扣着」。
+  const T = getT().errors;
+  const [title, msg] = kind === "voucher" ? [T.voucherStuckTitle, T.voucherStuckMsg]
+    : kind === "receipt" ? [T.billMissingTitle, T.receiptGapMsg]
+    : kind === "device" ? [T.deviceStuckTitle, T.deviceStuckMsg]
+    : kind === "trial" ? [T.trialStuckTitle, T.trialStuckMsg]
+    : kind === "payout" ? [T.payoutStuckTitle, T.payoutStuckMsg]
+    : [T.fundsStuckTitle, T.fundsStuckMsg];
+  toast.error(title, fmt(msg, { id: record.id }));
   return "stuck";
 }
 

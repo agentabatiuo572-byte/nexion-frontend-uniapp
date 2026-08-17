@@ -612,7 +612,7 @@ group();
   // 掉到门槛以下 = 有路径被摘出去自己写盘了,这道闸就漏了。
   const CONVERTED = {
     "deposits.ts": 11, "voucher.ts": 2, "nex-faucet.ts": 3,
-    "daily-powerup.ts": 2, "lucky-spin.ts": 7,
+    "daily-powerup.ts": 2, "lucky-spin.ts": 7, "orders.ts": 1,
   };
   for (const [file, minCommits] of Object.entries(CONVERTED)) {
     const s = strip(readSrc("src", "store", file));
@@ -647,6 +647,8 @@ group();
     "daily-powerup.ts": ["claimed", "claimedAt"],
     "nex-faucet.ts": ["history", "lastSignedInAt", "signInStreak", "longestStreak", "streakSavers", "claimedMilestones"],
     "lucky-spin.ts": ["bonusTickets", "lastFreeSpinDate", "history", "realPrizeSoldOut", "coverageDegraded"],
+    "pending-checkout.ts": ["sessions"], // 2026-08-16 pkg/ad:待支付发票(begin/consume/remove/markLeftNotice 全部走 CAS)
+    "orders.ts": ["orders"], // 2026-08-17 pkg/ad R10:订单行 CAS(create / advance / markActivated / cancel 全部走 commit;remote-apply 缝 refreshRemote 自守)
   };
   // 🔴 清单是手抄的 → 加一道覆盖门(z1 R2 对抗审计 P1-17c:c37e662 那批新接远端缝的
   //    store 不在册,清单静默漏检)。判据从磁盘来:凡是走了 CAS 提交器
