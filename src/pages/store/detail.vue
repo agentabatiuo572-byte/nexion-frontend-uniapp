@@ -152,7 +152,7 @@
               <view :style="roiCellStyle(0)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
-                <text class="block" :style="roiSubStyle">{{ t.store.detVsPhone }}</text>
+                <text class="block" :style="roiSubStyle">{{ vsPhoneSubText }}</text>
               </view>
               <view :style="roiCellStyle(1)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
@@ -401,6 +401,10 @@ const stockLow = computed(
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
 const phoneDailyEarnText = computed(() => specText(t.value, product.value?.phoneDailyEarn));
+// Same server figure the vs-phone strip shows. It used to be baked into the copy
+// as "$0.06", which contradicted the strip whenever the server said otherwise —
+// or said nothing at all (strip degraded, this line still claimed $0.06).
+const vsPhoneSubText = computed(() => fmt(t.value.store.detVsPhone, { n: phoneDailyEarnText.value }));
 const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
 const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
 const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));
@@ -625,7 +629,9 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
     marginTop: "4px",
   };
 }
-const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
+// textWrap pretty: the vs-phone subline now carries a server-sized figure, so it
+// can wrap in the half-width cell — keep the last line from stranding one char.
+const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", textWrap: "pretty" };
 const trustCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   padding: "16px",
