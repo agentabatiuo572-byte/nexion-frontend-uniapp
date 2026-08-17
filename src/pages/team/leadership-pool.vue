@@ -201,7 +201,7 @@ const weeklyDescText = computed(() => {
 const POOL_UNLOCK_RANK: VRank = 3;
 // 中文界面用中文头衔(主人 2026-08-17 拍板:V3 = 舰长),与 zh 词典里 requiresV3 那句的写法必须一致
 const isZh = computed(() => useLocaleStore().code === "zh");
-const poolUnlockRankLabel = computed(() => rankLabel(POOL_UNLOCK_RANK, isZh.value));
+const poolUnlockRankLabel = computed(() => rankLabel(POOL_UNLOCK_RANK, isZh.value, vState.ladder));
 const requiresV3Parts = computed(() => {
   // 🔴 「句子里必然包含这个头衔」是一条无门保护的不变量(独立审计点出):某天单侧改了译文,
   //    split 拿不到第二段,原来会渲染成「整句 + 重复头衔」。取不到就退化成整句 + 不高亮。
@@ -210,7 +210,7 @@ const requiresV3Parts = computed(() => {
   if (i < 0) return [sentence, "", ""];
   return [sentence.slice(0, i), poolUnlockRankLabel.value, sentence.slice(i + poolUnlockRankLabel.value.length)];
 });
-const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: myRank.value, title: rankTitle(myRank.value, isZh.value) }));
+const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: myRank.value, title: rankTitle(myRank.value, isZh.value, vState.ladder) }));
 const totalPeopleText = computed(() =>
   fmt(t.value.pool.totalPeople, { n: Object.values(dist.value).reduce((a, b) => a + b, 0).toLocaleString() }),
 );
@@ -236,7 +236,7 @@ const voteRows = computed(() => {
     const shareOfPool = totalVotes.value > 0 ? vTotalVotes / totalVotes.value : 0;
     return {
       v,
-      label: rankLabel(v, isZh.value),
+      label: rankLabel(v, isZh.value, vState.ladder),
       isMine: v === vState.myRank,
       peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes }),
       shareOfPool,

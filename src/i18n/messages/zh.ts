@@ -3839,6 +3839,7 @@ export const zh: Messages = {
     },
     needSelfBuy: "再自买 ${n}",
     needRefs: "再邀请 {n} 人",
+    needRefsOne: "再邀请 {n} 人",
     needTeam: "团队再 ${n}",
     needV: "再 {n} 个 {title}(V{v})",
     upgradeCta: "升级路径(购买设备 + 邀请)",
