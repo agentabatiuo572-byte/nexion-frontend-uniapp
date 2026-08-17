@@ -207,7 +207,9 @@ import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
 import { buildShareLink } from "@/lib/share";
 import { isDeviceOnline } from "@/lib/hashpower";
-import { useVRank, V_RANKS } from "@/store/v-rank";
+import { useVRank } from "@/store/v-rank";
+import { rankTitle } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { proofApi, remoteApiEnabled } from "@/api/runtime";
@@ -220,6 +222,7 @@ const t = useT();
 const app = useApp();
 const profile = useProfile();
 const vRank = useVRank();
+const isZh = computed(() => useLocaleStore().code === "zh");
 const network = useNetwork();
 const faucet = useNexFaucet();
 
@@ -286,7 +289,7 @@ const shareText = computed(() => {
 // ── derived labels ──
 const memberSinceText = computed(() => fmt(t.value.proof.memberSince, { m: joined.value }));
 const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPct.replace("{n}", "—") : t.value.proof.topPct.replace("{n}", String(topPct.value)));
-const vRankChip = computed(() => myRank.value === null ? "V—" : fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: V_RANKS[myRank.value].title }));
+const vRankChip = computed(() => myRank.value === null ? "V—" : fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: rankTitle(myRank.value, isZh.value, vRank.ladder) }));
 const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value ?? "—") }));
 const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value ?? "—") }));
 const daysActiveChip = computed(() => fmt(t.value.proof.badges.daysActive, { n: String(activeDays.value ?? "—") }));

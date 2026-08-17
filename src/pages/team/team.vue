@@ -203,6 +203,8 @@ import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
 import NetworkOrbBackdrop from "@/components/team/network-orb-backdrop.vue";
 import { useT } from "@/i18n/use-t";
 import { useVRank, nextRankProgress } from "@/store/v-rank";
+import { rankLabel } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
@@ -214,6 +216,7 @@ import { useApp } from "@/store/app";
 const t = useT();
 const app = useApp();
 const vrank = useVRank();
+const isZh = computed(() => useLocaleStore().code === "zh");
 const network = useNetwork();
 const commission = useCommission();
 const pool = useLeadershipPool();
@@ -223,7 +226,8 @@ const remotePoolState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEna
 let remotePoolRequest = 0;
 
 const myRank = computed(() => vrank.myRank);
-const myRankDisplay = computed(() => remoteApiEnabled && vrank.ladder.length === 0 ? "V—" : `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
+// 头衔显示名按语言取(中文界面出中文头衔),拼法收在 lib/v-rank-copy;远端档位未到仍显示 V—
+const myRankDisplay = computed(() => (remoteApiEnabled && vrank.ladder.length === 0 ? "V—" : rankLabel(vrank.myRank, isZh.value, vrank.ladder)));
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);

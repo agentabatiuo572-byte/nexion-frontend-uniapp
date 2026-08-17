@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { assertKeyInAllLocales } from "./lib/i18n-namespace.mjs";
+import { assertKeyInAllLocales, namespaceBlock } from "./lib/i18n-namespace.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -69,6 +69,29 @@ test("remote market board renders only the server-owned home truth rows", () => 
   // key 名收尾带边界:不带的话 `unavailableXX` 这种笔误 key 照样匹配,页面渲染空白而门报绿。
   assert.match(board, /t\.uiChrome\.unavailable\b(?!\w)/);
   assertKeyInAllLocales(read, "uiChrome", ["unavailable"]);
+});
+
+// 🔴 上一条断言依赖「按命名空间切片」这个前提,而那个前提本身此前没有任何靶:独立验收把
+// `namespaceBlock` 改成 `return source`(退化成整文件),两个契约测试 10/10 照样全绿 ——
+// 因为 `unavailable` 这个 key 名在别的命名空间也存在,整文件匹配时它会替 uiChrome 那条满足断言。
+// 这条测试把前提本身钉住。
+test("i18n 命名空间切片不许退化成整文件(否则同名 key 跨命名空间互相顶替)", () => {
+  // 🔴 三份词典都验(en.ts / zh.ts / vi.ts)—— 这条不变量在三语上都该成立,而且仓内元门
+  //    selfcheck-gate-targets 判「点名了一种语言就得点名三种」。它按**字面量**扫语言文件名,
+  //    所以动态拼 `${locale}.ts` 它看不见 —— 三个名字必须在源码里各出现一次,
+  //    让「三语都覆盖」这件事 grep 可见(元门抓到过我这条测试只写了一种)。
+  for (const locale of ["en", "zh", "vi"]) {
+    const dict = read(`src/i18n/messages/${locale}.ts`);
+    // 前提:该 key 名确实在多个命名空间并存 —— 前提不成立时这条测试就没有意义,要大声失败。
+    const wholeFileHits = (dict.match(/\bunavailable:\s*"/g) ?? []).length;
+    assert.ok(wholeFileHits >= 2, `${locale}.ts:前提不再成立,整份词典里 unavailable 只出现 ${wholeFileHits} 次,请换一个跨命名空间重名的 key 做靶`);
+    const ns = namespaceBlock(dict, "uiChrome");
+    assert.ok(ns.length < dict.length, `${locale}.ts:切片等于整文件 = 退化`);
+    assert.equal((ns.match(/\bunavailable:\s*"/g) ?? []).length, 1, `${locale}.ts:切片里该 key 只该出现一次`);
+  }
+  // 纯空白值不算有值(旧判据 `"[^"]+"` 会把 `" "` 判成有值,而页面渲染空白)
+  const fake = () => '  uiChrome: {\n    unavailable: " ",\n  },\n';
+  assert.throws(() => assertKeyInAllLocales(fake, "uiChrome", ["unavailable"], ["en"]), /为空\/纯空白/);
 });
 
 test("purchase social proof consumes the authenticated storefront activity API", () => {
