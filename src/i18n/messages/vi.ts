@@ -1637,7 +1637,7 @@ export const vi: Messages = {
     detMonthly: "Mỗi tháng",
     detAnnual: "Mỗi năm",
     detPayback: "Hoàn vốn",
-    detVsPhone: "so với điện thoại $0.06",
+    detVsPhone: "so với điện thoại {n}",
     detPerMoSuffix: "% / tháng",
     detRoiSuffix: "% ROI",
     detToBreakEven: "để hòa vốn",

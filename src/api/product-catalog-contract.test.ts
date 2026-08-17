@@ -17,10 +17,40 @@ describe("product catalog strict specification contract", () => {
     expect(result.products[0]).toMatchObject({ gpu: "H100", datacenter: "Singapore DC", warranty: "24 months" });
   });
 
-  it("accepts explicit unavailable values but rejects blank specification fields", () => {
+  it("accepts explicit unavailable values", () => {
     const unavailable = { ...product, gpu: "unavailable", vram: "unavailable", power: "unavailable", datacenter: "unavailable", uptime: "unavailable", warranty: "unavailable", phoneDailyEarn: "unavailable", phoneDailyEarnNEX: "unavailable" };
     expect(() => parseProductCatalogPayload({ source: "nx_product", revision: null, products: [unavailable] })).not.toThrow();
-    expect(() => parseProductCatalogPayload({ source: "nx_product", revision: null, products: [{ ...product, power: "  " }] })).toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
+  });
+
+  // 🔴 这一格以前不存在,而它才是真后端的常态:`uptime` / `warranty` / `phoneDailyEarn` /
+  // `phoneDailyEarnNEX` 在后端既无列、也无运营录入面、PRD 亦未承诺;`gpu` / `vram` / `power` /
+  // `datacenter` 后端可空,运营在后台表单留空即不下发。旧契约把八个字段全设成必填,于是
+  // **少一个规格 = 整份目录抛错 = 商城一件商品都没有**。缺失必须降级,不能作废全量。
+  const SPEC_FIELDS = ["gpu", "vram", "power", "datacenter", "uptime", "warranty", "phoneDailyEarn", "phoneDailyEarnNEX"] as const;
+
+  it("keeps the catalog alive when the server omits display specs", () => {
+    const serverShaped: Record<string, unknown> = { ...product };
+    for (const f of SPEC_FIELDS) delete serverShaped[f];
+    const parsed = parseProductCatalogPayload({ source: "nx_product", revision: null, products: [serverShaped] });
+    expect(parsed.products).toHaveLength(1);
+    for (const f of SPEC_FIELDS) expect(parsed.products[0][f]).toBeUndefined();
+  });
+
+  it("treats every absent / null / blank spec as missing rather than fatal", () => {
+    for (const f of SPEC_FIELDS) {
+      for (const blank of [undefined, null, "", "   "]) {
+        const one = { ...product, [f]: blank };
+        expect(() => parseProductCatalogPayload({ source: "nx_product", revision: null, products: [one] }),
+          `${f} = ${JSON.stringify(blank)} must not void the whole catalog`).not.toThrow();
+      }
+    }
+  });
+
+  it("still rejects a spec of the wrong type", () => {
+    for (const bad of [42, {}, []]) {
+      expect(() => parseProductCatalogPayload({ source: "nx_product", revision: null, products: [{ ...product, gpu: bad }] }))
+        .toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
+    }
   });
 
   it("requires a reason when the server blocks purchase", () => {
