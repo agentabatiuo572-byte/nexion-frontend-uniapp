@@ -36,9 +36,13 @@ const RENDER_FACE = ["src/pages", "src/components"];
 // Rule B(裸字面量)只圈商品域:别的域(network-rank / fx / genesis / geo)拿 "unavailable"
 // 当**状态枚举成员**是合法写法,在全域判它会淹没在误报里。Rule C 靠字段名精确定位,不受此限。
 const LITERAL_FACE = ["src/pages/store", "src/components/store"];
-// 降级映射的函数名。Rule C 认它;改名会让 Rule C 全体判红,改名的人必须同步这里 —— 比
-// 「悄悄失效」好:门宁可吵,不可瞎。
-const MAPPER = "specText";
+// 认可的降级包装函数。两个都住在 src/lib/product-copy.ts,都在同一处消化哨兵值:
+//   · specText —— 值位显示,缺失时给本地化占位串(单值展示位没法「隐藏一行」);
+//   · specRow  —— 表格行,缺失时整行不出现(空行不携带信息)。
+// 🔴 只许收录**集中消化哨兵值的**函数,别把「碰巧包了一层」的函数塞进来 —— 这份名单每多
+// 一个,Rule C 的判定面就少一块。改名会让 Rule C 全体判红,改名的人必须同步这里:
+// 门宁可吵,不可瞎。
+const MAPPERS = ["specText", "specRow"];
 // 非展示用途(取数值去算术等)的显式豁免标记,写在该行。默认收紧、例外留痕。
 const EXEMPT_MARK = "spec-sentinel-ok";
 const SCAN_EXT = /\.(vue|ts)$/;
@@ -86,10 +90,10 @@ function readSentinelFields(contractSrc) {
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** 求 `MAPPER(` 每次调用的实参区间(括号配对),用于判「这次字段读取是不是裹在映射里」。 */
+/** 求每个认可包装函数调用的实参区间(括号配对),用于判「这次字段读取是不是裹在映射里」。 */
 function mapperSpans(text) {
   const spans = [];
-  const call = new RegExp(`\\b${escape(MAPPER)}\\s*\\(`, "g");
+  const call = new RegExp(`\\b(?:${MAPPERS.map(escape).join("|")})\\s*\\(`, "g");
   for (const m of text.matchAll(call)) {
     let depth = 0;
     for (let i = m.index + m[0].length - 1; i < text.length; i += 1) {
@@ -183,7 +187,7 @@ function run() {
   if (hits.length) {
     console.error(`FAIL 哨兵值 "${sentinel.value}" 有 ${hits.length} 处会原样到达界面:`);
     for (const h of hits) console.error(`  [${h.rule}] ${h.file}:${h.line}${h.field ? ` (${h.field})` : ""}  ${h.text}`);
-    console.error(`  改法:展示取值一律裹 ${MAPPER}(),降级到 t.store.${I18N_KEY};判定用 import 进来的 ${sentinel.name}`);
+    console.error(`  改法:展示取值一律裹 ${MAPPERS.map((m) => `${m}()`).join(" 或 ")};判定用 import 进来的 ${sentinel.name}`);
     return 1;
   }
   console.log(
@@ -227,7 +231,10 @@ function selftest() {
     ["🔴 跨行:取值换到下一行", P, "{\n  v:\n    p.uptime,\n}", 1],
     ["🔴 字符串模板拼接裸读", P, "const s = `${p.gpu} · ${p.vram}`;", 2],
     ["🔴 一行里两个裸读各算一条", P, "[{ v: p.gpu }, { v: p.vram }]", 2],
-    ["合法:裹了降级映射", P, "{ k: s.specGpu, v: specText(t.value, p.gpu) },", 0],
+    ["合法:裹了降级映射 specText", P, "{ k: s.specGpu, v: specText(t.value, p.gpu) },", 0],
+    ["合法:裹了行构造器 specRow(空行整行隐藏那条路)", P, "specRow(s.specGpu, p.gpu),", 0],
+    ["🔴 名字像但不在认可名单里的包装不算(防「碰巧包一层」就免检)", P, "wrapSpec(p.gpu),", 1],
+    ["🔴 认可名单里的函数**改名**后,原写法立刻判红", P, "specRowV2(s.specGpu, p.gpu),", 1],
     ["合法:嵌套在映射实参里的第二个字段也算裹住", P, "`${specText(t, p.gpu)} · ${specText(t, p.vram)}`", 0],
     ["合法:本行显式豁免标记", P, "const raw = product.value?.phoneDailyEarn; // spec-sentinel-ok: 取数值算术", 0],
     ["合法:上一行显式豁免标记(模板里同行塞注释难看)", P, "<!-- spec-sentinel-ok: 不是目录字段 -->\n<text>{{ it.vram }}</text>", 0],
