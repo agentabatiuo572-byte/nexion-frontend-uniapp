@@ -239,7 +239,8 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { productCopy, specText } from "@/lib/product-copy";
+import { productCopy, specText, warrantyText } from "@/lib/product-copy";
+import { typicalPhoneDailyUsdt } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -325,12 +326,10 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
-const phoneDailyEarnValue = computed(() => {
-  const raw = product.value?.phoneDailyEarn; // spec-sentinel-ok: parsed for arithmetic, never rendered
-  if (!raw || raw === SPEC_UNAVAILABLE) return 0;
-  const match = raw.match(/[0-9]+(?:\.[0-9]+)?/);
-  return match ? Number(match[0]) : 0;
-});
+// 「你的手机」是平台手机档位配置里的典型档(Tier 3),对所有商品都是同一个数 —— 它从来
+// 不是商品属性(后端也没有这一列)。0 = 运营配置取不到,此时降级、不许拿旧值或猜测顶上,
+// 否则页面会用一个编出来的基准去宣称倍数。
+const phoneDailyEarnValue = computed(() => typicalPhoneDailyUsdt());
 const speedup = computed(() =>
   product.value && !isShare.value
     && phoneDailyEarnValue.value > 0
@@ -366,8 +365,9 @@ const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
     { k: s.specVram, v: specText(t.value, p.vram) },
     { k: s.specPower, v: specText(t.value, p.power) },
     { k: s.specDatacenter, v: specText(t.value, p.datacenter) },
-    { k: s.specUptime, v: specText(t.value, p.uptime) },
-    { k: s.specWarranty, v: specText(t.value, p.warranty) },
+    // 在线率是**平台**统一的托管承诺,对每件商品都一样,故走文案不走商品字段。
+    { k: s.specUptime, v: s.specUptimeValue },
+    { k: s.specWarranty, v: warrantyText(t.value, p.warrantyMonths) },
   ];
 });
 
@@ -400,7 +400,9 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
-const phoneDailyEarnText = computed(() => specText(t.value, product.value?.phoneDailyEarn));
+const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
+  ? `$${phoneDailyEarnValue.value.toFixed(2)}`
+  : t.value.store.specValueUnavailable));
 // Same server figure the vs-phone strip shows. It used to be baked into the copy
 // as "$0.06", which contradicted the strip whenever the server said otherwise —
 // or said nothing at all (strip degraded, this line still claimed $0.06).
