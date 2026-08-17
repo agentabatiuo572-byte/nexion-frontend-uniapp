@@ -225,6 +225,7 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
     changed: changedInfo ? { base: changedInfo.base, baseReason: changedInfo.baseReason, files: changedInfo.files } : null,
     routes: mode === "full" ? { all: allPages.map((p) => p.route), affected: "*", reason: "full:全部路由" } : (routes || { all: allPages.map((p) => p.route), affected: "*", reason: "改动集不可用:全部路由" }),
     gates: withUmbrella(manifest.gates), steps: withUmbrella(manifest.steps), h5Probes: h5Table,
+    cells: Object.fromEntries(Object.entries(manifest.gates || {}).map(([id, e]) => [id, Number.isInteger(e.cells) && e.cells >= 1 ? e.cells : 1])), // 每门在 verify.sh 里出几格(跳过时按格计数,deep 判据 ③ 守恒)
   };
 }
 
@@ -276,6 +277,7 @@ export function planToShell(p) {
     lines.push(`SCOPE_RUN[${q(id)}]=${d.run ? 1 : 0}`);
     lines.push(`SCOPE_WHY[${q(id)}]=${q(d.reason)}`);
     lines.push(`SCOPE_ROUTES_FOR[${q(id)}]=${q(routesOfDecision(d))}`);
+    lines.push(`SCOPE_CELLS[${q(id)}]=${Number.isInteger(p.cells?.[id]) ? p.cells[id] : 1}`);
   }
   return lines.join("\n") + "\n";
 }
@@ -309,6 +311,7 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
   for (const [k, e] of Object.entries({ ...(manifest.gates || {}), ...(manifest.steps || {}), ...(manifest.h5Probes || {}) })) {
     const hasPages = e.pages === "*" || (Array.isArray(e.pages) && e.pages.length);
     if (e.pages !== undefined && !hasPages) problems.push(`${k}.pages 必须是 "*" 或非空数组(现在是 ${JSON.stringify(e.pages)} —— 会被静默当成没声明)`);
+    if (e.cells !== undefined && !(Number.isInteger(e.cells) && e.cells >= 1)) problems.push(`${k}.cells 必须是 ≥1 的整数(现在是 ${JSON.stringify(e.cells)})`);
     if (e.routeScoped && !hasPages) problems.push(`${k} 标了 routeScoped 却没有 pages —— 路由范围无从算起`);
     if (Array.isArray(e.pages)) {
       for (const pg of e.pages) {
