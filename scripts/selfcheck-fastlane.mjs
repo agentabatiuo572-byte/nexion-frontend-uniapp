@@ -878,8 +878,11 @@ function functionBody(src, opener) {
       //   而用户提现成功后余额会停在旧数字直到下次重载 —— 还能照着旧数字接着提)。
       //   withdraw-bill-runtime ⑥ 守的是「不许影子扣款」(别多扣),守不到「必须重拉」(别不减)。
       //   两条是相反方向的漏,各守各的。
+      // 🔴 判据切到 handleSubmit 函数体内:全文 includes 会被别处的同名调用哄绿(2026-08-17 接手合并实测:
+      //    abandonPendingAttempt 里也有一句 await app.refreshRemoteFleet(),删掉建单成功后那句,全文 includes 照绿,
+      //    withdraw-rail-alias 红测「建单成功后不重拉服务端余额」当场抓出这格无牙)。
       check("🔴 接线:服务端持有余额时,建单成功后**必须重拉服务端余额**(不拉 = 余额停在旧数字)",
-        withdrawPageCode.includes("await app.refreshRemoteFleet();"));
+        (functionBody(withdrawPageCode, "async function handleSubmit(") ?? "").includes("await app.refreshRemoteFleet();"));
     }
     // 服务端持有远端余额、订单与账本权威；同时保留更直接的负向接线门，
     // 防止页面或 store 在新分支重新引入本地扣款/账单伪造。
