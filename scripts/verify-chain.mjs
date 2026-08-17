@@ -8,8 +8,10 @@
 //      (跑批门必须区分「失败」与「没跑」—— feedback_gate_chain_silently_stopped);
 //   ② 三档:full 全跑 · scoped 按 gates.manifest 的输入交集跑 · static 不起 server 只跑静态门
 //      (改动集由 git 算,不由模型判;算不出/命中全局清单 → 自动升 full 并说明);
-//   ③ 去重:dev server 只起 1 对(mock + remote)传给各步复用(各步先核身份再用);
-//      vue-tsc 走指纹缓存壳;h5-runtime 探针跑一遍后把树指纹交给 verify.sh 末尾同名门复用。
+//   ③ 去重:vue-tsc 走指纹缓存壳;h5-runtime 探针跑一遍后把树指纹交给 verify.sh 末尾同名门复用(省 ~7 min);
+//      dev server **默认各步各起**(与从前一致):实测 2026-08-17 两轮全量,共享一对 server 给 h5-runtime + verify.sh
+//      连跑会触发 P-097 拥塞退化(backnav 探针首跑红、h5 门 after-retry、legacy 慢 3 分钟),得不偿失;
+//      `--pool` 可选开启共享(各步先核树身份再复用),留给以后单探针提速后再评估。
 // 步骤清单仍声明在 package.json `verify:steps`(`&&` 串,可直接裸跑作对照)—— 门是否在链上的契约测试
 // 读那一行,不读本文件;本文件只负责「怎么跑」。
 // 产物:.verify-cache/last-run.json(mode/tree/steps/verdict,给 Stop hook / 合并守卫读)、
@@ -27,6 +29,7 @@ const opt = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : nu
 const requestedMode = flag("--static") ? "static" : flag("--scoped") ? "scoped" : "full";
 const only = (opt("--only") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const forceTypecheck = flag("--force-typecheck");
+const usePool = flag("--pool"); // 默认关:见头注释 ③
 const LOG_DIR = path.join(CACHE_DIR, "logs");
 fs.mkdirSync(LOG_DIR, { recursive: true });
 
@@ -45,6 +48,8 @@ const manifest = loadManifest();
 const P = plan({ mode: requestedMode, manifest });
 const mode = P.mode;
 const fpStart = treeFingerprint();
+// 🔴 开跑即写 verdict:"running" 占位:半路崩掉时,守卫不许拿**上一轮**的 pass 记录放行(headTree 没变时完全对得上)。
+try { fs.writeFileSync(LAST_RUN_PATH, JSON.stringify({ mode, verdict: "running", startedAt: new Date().toISOString(), tree: null, headTree: null, dirty: fpStart?.dirty ?? null, head: fpStart?.head || null, steps: [] }, null, 1)); } catch { /* 写不了占位不影响跑 */ }
 say(`${C.c}━━ verify-chain · mode=${mode}${P.upgraded ? `(请求 ${P.requested} → ${P.upgraded})` : ""} · ${STEPS.length} 步 · tree ${fpStart ? fpStart.fingerprint.slice(0, 10) : "?"}${fpStart?.dirty ? "(dirty)" : ""} ━━${C.n}`);
 if (P.changed) say(`${C.d}  改动集 ${P.changed.files.length} 个文件(base ${P.changed.base.slice(0, 10)} · ${P.changed.baseReason})${P.changed.files.length ? ":" + P.changed.files.slice(0, 12).join(", ") + (P.changed.files.length > 12 ? " …" : "") : ""}${C.n}`);
 
@@ -58,7 +63,7 @@ const h5OnlyEnv = mode === "scoped" ? { H5_RUNTIME_ONLY: h5Only.join(",") || "__
 const NEEDS_SERVER = new Set(["test:h5-runtime", "test:legacy-suite"]);
 let pool = null;
 async function ensurePool() {
-  if (pool || mode === "static") return pool;
+  if (pool || mode === "static" || !usePool) return pool;
   const t0 = Date.now();
   const [mock, remote] = await Promise.all([
     ensureServer({ root: ROOT, mode: "mock", log: (m) => say(`${C.d}  pool: ${m}${C.n}`) }),
