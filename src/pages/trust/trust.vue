@@ -105,6 +105,7 @@
               <text class="block truncate" :style="leaderPrevStyle">{{ p.prev }}</text>
             </view>
             <view class="flex items-center shrink-0" :style="inBadgeStyle">
+              <!-- i18n-en-ok: LinkedIn 的 `in` 字标(配外链箭头图标),是品牌标识不是介词 -->
               <text style="margin-right: 4px">in</text>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
             </view>

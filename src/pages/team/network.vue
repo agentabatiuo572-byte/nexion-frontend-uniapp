@@ -89,13 +89,13 @@
             <!-- center YOU node -->
             <g>
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
-              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">YOU</text>
+              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">{{ t.network.diagramYou }}</text>
               <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">{{ myRankText }}</text>
             </g>
 
             <!-- orbit labels -->
-            <text x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(198,255,58,0.45)" letter-spacing="1.5">DIRECT</text>
-            <text x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(144,119,255,0.55)" letter-spacing="1.5">EXTENDED</text>
+            <text x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(198,255,58,0.45)" letter-spacing="1.5">{{ t.network.badgeDirect }}</text>
+            <text x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(144,119,255,0.55)" letter-spacing="1.5">{{ t.network.badgeExtended }}</text>
           </svg>
 
           <!-- Legend -->

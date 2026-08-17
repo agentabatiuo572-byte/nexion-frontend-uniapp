@@ -59,7 +59,9 @@
             d="M 270 230 Q 222 230 222 192 Q 222 152 268 152 Q 280 118 320 118 Q 354 96 392 122 Q 426 96 462 122 Q 498 118 510 152 Q 552 152 552 192 Q 552 230 502 230 Z"
             fill="url(#cloud-puff)" stroke="var(--v5-brand)" stroke-opacity="0.6" stroke-width="1.6" />
           <path d="M 270 162 Q 318 132 388 138" stroke="var(--v5-brand)" stroke-opacity="0.5" stroke-width="1.2" fill="none" />
+          <!-- i18n-en-ok: 产品渲染图上的丝印,实物机箱印的就是英文;本地化丝印会让图片与到手设备不一致 -->
           <text x="386" y="190" text-anchor="middle" font-size="22" font-weight="700" fill="var(--v5-brand)" fill-opacity="0.65" letter-spacing="5" font-family="ui-monospace, monospace">CLOUD SHARE</text>
+          <!-- i18n-en-ok: 同上,丝印第二行 -->
           <text x="386" y="212" text-anchor="middle" font-size="10" font-weight="600" fill="var(--v5-ink-3)" letter-spacing="3" font-family="ui-monospace, monospace">DISTRIBUTED · NO HARDWARE</text>
         </g>
 

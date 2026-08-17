@@ -490,6 +490,9 @@ export const vi: Messages = {
     feedWhoPeer: "Thành viên",
     feedWhoLock: "Khóa",
     feedValLocked: "đã khóa",
+    ledgerEmpty: "Chưa có thu nhập từ nhiệm vụ hoàn thành.",
+    liveFeedTitle: "Phân bổ nhiệm vụ",
+    liveFeedEmpty: "Chưa có hoạt động nhiệm vụ.",
   },
   earn: {
     title: "Sinh lời",
@@ -642,6 +645,8 @@ export const vi: Messages = {
     rangeAll: "Tất cả",
     computeEarned: "Thu nhập điện toán",
     jobsCount: "{n} tác vụ",
+    taskLockTitle: "Khóa nhiệm vụ",
+    taskLockRemaining: "{n} phút",
   },
   market: {
     title: "Tổng quan thị trường",
@@ -673,6 +678,7 @@ export const vi: Messages = {
       cloudShare: "Rào cản thấp nhất",
       phone: "Hạng NPU di động",
     },
+    oursTag: "CỦA CHÚNG TÔI",
   },
 
   genesisHolder: {
@@ -2531,12 +2537,16 @@ export const vi: Messages = {
     typeWalletPairing: "Xác minh ví (cũ)",
     sigCopied: "Đã sao chép chữ ký",
     clearedToast: "Đã xóa {n} biên lai",
+    stampVerified: "ĐÃ XÁC MINH",
+    statusRecorded: "Đã ghi nhận",
+    statusSettled: "Đã thanh toán",
   },
   language: {
     pageTitle: "Ngôn ngữ",
     intro: "Chọn ngôn ngữ bạn thích. Bản dịch được triển khai theo mức ưu tiên — mọi lựa chọn đều xem trước được bố cục & RTL.",
     autoDetect: "tự động nhận diện sắp ra mắt",
     backToAccount: "Về Tài khoản",
+    countLine: "{n} ngôn ngữ",
   },
   ui: {
     confirm: "Xác nhận",
@@ -3169,6 +3179,7 @@ export const vi: Messages = {
     regionLatencyUnavailable: "Độ trễ TB {n}",
     metricUnavailable: "--",
     projectionUpdatedAt: "Máy chủ cập nhật lúc {at}",
+    uptimeLine: "Thời gian hoạt động {v}",
   },
   proof: {
     title: "Bằng chứng thu nhập",
@@ -3354,6 +3365,7 @@ export const vi: Messages = {
     chips: {
       devices: "{n} thiết bị",
       teamSize: "{n} thành viên",
+      directs: "{n} trực tiếp",
     },
     cta: {
       share: "Chia sẻ link mời của tôi",
@@ -3391,12 +3403,14 @@ export const vi: Messages = {
       topYield: "Lợi suất cao nhất",
     },
     penaltySuffix: "phí phạt rút sớm",
+    vaultMin: "Tối thiểu {amount}",
     calc: {
       label: "Máy tính lãi kép",
       principal: "Số tiền khóa",
       singlePayout: "Nhận 1 chu kỳ",
       compoundPayout: "Tái khóa {n}× (1 năm)",
       disclaimer: "Lãi kép giả định tái khóa mỗi lần đáo hạn theo APY hiện tại. APY thực tế có thể thay đổi giữa các chu kỳ.",
+      compoundSuffix: "từ lãi kép · tái khóa {n}× khi đáo hạn",
     },
     sheet: {
       title: "Khóa {n} ngày",
@@ -3427,6 +3441,8 @@ export const vi: Messages = {
       startedOn: "Bắt đầu",
       autoClaimToast: "Tự động nhận khi mở khóa",
       autoClaimSubtitle: "Mở khóa sau {n} ngày",
+      statusLabel: "Trạng thái",
+      remainingLabel: "Còn lại",
     },
     toast: {
       stakeSuccess: "Khóa thành công",
@@ -3451,6 +3467,10 @@ export const vi: Messages = {
       openFailedStorageSubtitle: "Thiết bị này chưa lưu được vị thế nên khoản này đã dừng lại. Toàn bộ số tiền đã về lại số dư — hãy giải phóng bớt dung lượng hoặc tắt chế độ ẩn danh rồi thử lại.",
     },
     howItWorksEntry: "Quy tắc",
+    earningChip: "đang sinh lời",
+    todayAccrued: "{amount} hôm nay",
+    activeCount: "{n} đang hoạt động",
+    maturedCount: "{n} đã đáo hạn",
   },
 
   stakingHowItWorks: {
@@ -3799,6 +3819,7 @@ export const vi: Messages = {
       peer: "Đồng cấp",
       pool: "Quỹ",
       votes: "phiếu",
+      unlimitedExtended: "Mở rộng không giới hạn",
     },
     cond: {
       selfBuy: "Tự mua ≥ ${n}",
@@ -4421,6 +4442,7 @@ export const vi: Messages = {
     projectionErrorTitle: "Không thể tải mạng lưới đội nhóm",
     projectionErrorDesc: "Không lấy được dữ liệu quyền lực từ máy chủ. Lỗi tải sẽ không được hiển thị giả thành 0 thành viên hoặc 0 doanh số.",
     retry: "Thử lại",
+    diagramYou: "BẠN",
   },
 
   tree: {
@@ -4804,6 +4826,7 @@ export const vi: Messages = {
     alreadyBar: "Bạn đã ở trên NexGrid rồi. Link mời chỉ dành cho người mới — quà chào mừng mỗi tài khoản chỉ một lần.",
     enterApp: "Vào NexGrid",
     previewUnavailable: "Không thể xác nhận quà mời lúc này. Vui lòng thử lại sau.",
+    certikAudited: "CertiK đã kiểm toán",
   },
 
   upsell: {
@@ -5313,6 +5336,13 @@ export const vi: Messages = {
     decreaseQty: "Giảm số lượng",
     increaseQty: "Tăng số lượng",
     copyHashFor: "Sao chép hash cho {target}",
+    removeItem: "Xoá {name}",
+    addItem: "Thêm {name}",
+    unavailable: "Không có dữ liệu",
+    volumeShort: "{amount} doanh số",
+    joinedDaysAgo: "{n} ngày trước",
+    perMonth: "{amount}/tháng",
+    earnsPerDay: "Kiếm {amount}/ngày",
   },
   fx: {
     rateLabel: "Tỷ giá",

@@ -107,8 +107,8 @@
       <view v-if="!task && taskLockRemainingMinutes > 0" class="flex items-center justify-between"
         style="margin: 0 20px 12px; padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb, var(--v5-warning) 10%, transparent)"
         :data-task-lock-until="device.taskLockUntil">
-        <text style="font-size: 12px; color: var(--v5-warning-ink)">Task lock</text>
-        <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">{{ taskLockRemainingMinutes }} min</text>
+        <text style="font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.taskLockTitle }}</text>
+        <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">{{ fmt(t.earn.taskLockRemaining, { n: taskLockRemainingMinutes }) }}</text>
       </view>
 
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->

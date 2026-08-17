@@ -57,6 +57,7 @@
         <text class="block" :style="syncFailBodyStyle">{{ t.wallet.syncFailedBody }}</text>
       </view>
       <view v-if="fundsAuthorityError" :style="syncFailBoxStyle">
+        <!-- i18n-en-ok: 资金权威同步失败的工程话标题,下一行直接吐后端错误串,受众是排障的人 -->
         <text class="block" :style="syncFailTitleStyle">SANDBOX</text>
         <text class="block break-all" :style="syncFailBodyStyle">{{ fundsAuthorityError }}</text>
       </view>
