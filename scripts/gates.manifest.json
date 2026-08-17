@@ -25,6 +25,8 @@
     "src/components/global-ui.vue",
     "src/styles/**",
     "src/i18n/**",
+    "src/static/**",
+    "src/uni.scss",
     "src/api/runtime.ts",
     "src/api/runtime-config.ts",
     ".claude/hooks/**"

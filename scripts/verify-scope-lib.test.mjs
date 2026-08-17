@@ -97,12 +97,18 @@ test("verify-scope.plan(真仓 + 注入改动集):单页 → 只该页;壳下游
   assert.deepEqual(p1.gates["zero-border-runtime"].routes, ["/pages/team/rank"]);
   assert.equal(p1.gates["dom-qa-runtime"].run, false, "rank 不在 dom-qa 射程(5 tab)内");
   assert.equal(p1.h5Probes["sticky-check"].run, true);
-  // 壳下游:只被 App.vue 引用的模块 → 全路由 + 所有 pages 类门都跑
-  const shellOnly = "src/lib/retired-route-migrations.ts";
-  if (fs.existsSync(path.join(ROOT, shellOnly))) {
-    const p2 = plan({ mode: "scoped", changed: sim([shellOnly]) });
-    assert.equal(p2.routes.affected.length, p2.routes.all.length, "壳下游 → 全部路由");
-    assert.equal(p2.h5Probes["auth-guard-verify"].run, true, "专测它行为的门必须跑(tester-F F-01)");
+  // 壳下游:只被 App.vue 等壳根引用的模块 → 全路由 + 所有 pages 类门都跑。
+  // 候选**动态**从图里找(tester-F R2-09:写死 retired-route-migrations.ts 一旦被删,整段断言静默消失);找不到候选就明说,不静默。
+  {
+    const g = buildGraph(ROOT);
+    const shell = closure(g, APP_SHELL_ROOTS);
+    const pageFiles = pageRoutes(ROOT).map((p) => p.file);
+    const anyPage = closure(g, pageFiles);
+    const shellOnly = [...shell].filter((f) => f.startsWith("src/lib/") && !anyPage.has(f) && !APP_SHELL_ROOTS.includes(f));
+    assert.ok(shellOnly.length >= 1, "今天应存在「只被壳引用的 src/lib 模块」(如 retired-route-migrations / a11y-activate);若拓扑变了,请更新本断言而不是让它静默过");
+    const p2 = plan({ mode: "scoped", changed: sim([shellOnly[0]]) });
+    assert.equal(p2.routes.affected.length, p2.routes.all.length, `壳下游 ${shellOnly[0]} → 全部路由`);
+    assert.equal(p2.h5Probes["auth-guard-verify"].run, true, "专测壳级行为的门必须跑(tester-F F-01)");
     assert.equal(p2.gates["dom-qa-runtime"].routes, "*");
   }
   for (const r of APP_SHELL_ROOTS) assert.ok(fs.existsSync(path.join(ROOT, r)), `壳根存在:${r}`);
