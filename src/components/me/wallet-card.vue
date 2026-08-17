@@ -1,8 +1,9 @@
 <!--
   WalletCard — ported from me/page.tsx WalletCard (+ design draft tech-money-card).
-  Dual-currency hero: USDT (48px) on top, NEX (32px) below a dashed divider, then
-  a "Quick actions" 3-button grid (Top-up / Withdraw / Exchange), then a
-  conditional empty-slot conversion hook ("Unlock +$X/d more · Add device").
+  Dual-currency hero: USDT (48px) on top, NEX (32px) below, then a "Quick actions"
+  3-button grid (Top-up / Withdraw / Exchange), then a conditional empty-slot
+  conversion hook ("Unlock +$X/d more · Add device"). Blocks are separated by 28px
+  whitespace only — no rules (主人 2026-08-17 去线).
   Reads useApp for balances/devices; derivePromoUpgrade for slot potential;
   trialReservesSlotNow for the shadow-trial slot; useBills for this-month count.
 
@@ -35,7 +36,7 @@
         </view>
         <text class="block tabular-nums" :style="pendingStyle">{{ pendingLine }}</text>
 
-        <!-- NEX hero — equal weight below dashed divider -->
+        <!-- NEX hero — equal weight, separated by whitespace -->
         <view :style="nexBlockStyle">
           <view class="flex items-center justify-between" style="margin-bottom: 8px">
             <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.uiChrome.nexBalance }}</text>
@@ -218,10 +219,10 @@ const pendingStyle: CSSProperties = {
   color: "var(--v5-success-ink)",
   fontVariantNumeric: "tabular-nums",
 };
+// 主人 2026-08-17:卡内三道虚线分隔全删,分组改由留白独扛(块间 28px 对内部 4-8px,
+// 层级差 3.5×,不靠线也读得出组)。几何总距与有线时代一致,只是线没了。
 const nexBlockStyle: CSSProperties = {
-  marginTop: "14px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  marginTop: "28px",
 };
 const nexBadgeStyle: CSSProperties = {
   padding: "2px 7px",
@@ -248,14 +249,10 @@ const nexSubRowStyle: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
 };
 const actionsBlockStyle: CSSProperties = {
-  marginTop: "14px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  marginTop: "28px",
 };
 const slotBlockStyle: CSSProperties = {
-  marginTop: "14px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  marginTop: "28px",
   gridTemplateColumns: "minmax(0,1fr) auto",
   gap: "12px",
 };
