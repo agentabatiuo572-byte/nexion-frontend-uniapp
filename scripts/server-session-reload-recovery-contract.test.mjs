@@ -42,6 +42,10 @@ test("a refreshed server-mode account trace goes to login with a recoverable exp
     "the recovery contract must have a named formal verification gear");
   assert.match(packageJson.scripts["test:session-reload-recovery"] ?? "", /verify-h5-runtime\.mjs --server-session-reload-recovery/,
     "the formal gear must execute its browser runtime proof against an isolated H5 server");
-  assert.match(packageJson.scripts.verify, /npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness/,
-    "full verify must include recovery before the existing guard/build/runtime gates");
+  // 包 ar(2026-08-17):npm run verify 改由 scripts/verify-chain.mjs 执行,步骤清单声明在 verify:steps(&& 串)。
+  // 三段缺一不可:清单里有它 · verify 真的走 runner · runner 真的读这份清单 —— 少任何一段,门就成孤儿。
+  assert.match(packageJson.scripts["verify:steps"] ?? "", /npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness/,
+    "verify:steps must include recovery before the existing guard/build/runtime gates");
+  assert.match(packageJson.scripts.verify ?? "", /scripts\/verify-chain\.mjs/, "npm run verify must execute the chain runner");
+  assert.match(read("scripts/verify-chain.mjs"), /scripts\["verify:steps"\]/, "the chain runner must read its step list from verify:steps");
 });

@@ -3,6 +3,10 @@
 #
 # Usage: bash scripts/verify.sh [module]     # default: all
 #   BASE_URL overrides the H5 dev origin (default http://localhost:5173).
+#   VERIFY_MODE=full|scoped|static(包 ar,2026-08-17):full 全跑(默认);scoped 只跑「git 改动集 ∩ 门声明输入」
+#     命中的重门(清单 scripts/gates.manifest.json,未声明的门照跑,命中全局不变量清单自动升 full);
+#     static 不需要 dev server,只跑静态门(runtime/server 类一律 SCOPED-SKIP)。跳过的格三态点名,
+#     结果行与 .verify-exit.code 第 2 行都带 mode= scoped_skip=,scoped/static 绿 ≠ 全量绿。
 #
 # Checks:
 #   (1) vue-tsc type-check (whole project, must be 0 errors)
@@ -55,8 +59,14 @@ _write_exit_sentinel() {
   local rc=$?
   # 🔴 第一行**保持纯退出码**不变(文档与既有习惯都是 `cat` 出来直接跟 0 比,加字段会打坏它);
   # 基数另起第二行 `pass=N fail=N skip=N`,新判定读第二行,老读法一个字都不用改。
-  printf '%s\npass=%s fail=%s skip=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
-    && mv -f "$VERIFY_EXIT_SENTINEL.tmp$$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
+  # 包 ar:第 2 行追加 mode= scoped_skip= tree=(老读法 pass=/fail=/skip= 位置不变;tree 与开跑时不等 → moved)
+  local tree_end="" tree_tag="unknown"
+  tree_end=$("${NODE_BIN:-node}" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
+  if [ -n "$tree_end" ]; then
+    if [ -z "${VERIFY_TREE_START:-}" ] || [ "$tree_end" = "$VERIFY_TREE_START" ]; then tree_tag="$tree_end"; else tree_tag="moved"; fi
+  fi
+  printf '%s\npass=%s fail=%s skip=%s mode=%s scoped_skip=%s tree=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" "${SCOPE_MODE:-full}" "${scoped_skip:-0}" "$tree_tag" > "$VERIFY_EXIT_SENTINEL.tmp$" 2>/dev/null \
+    && mv -f "$VERIFY_EXIT_SENTINEL.tmp$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
   return $rc
 }
 trap _write_exit_sentinel EXIT
@@ -173,7 +183,42 @@ sentinel_present() {
   if grep -qE "$pattern" "$file" 2>/dev/null; then ok "$label"; else bad "$label (missing /$pattern/ in $file)"; fi
 }
 
-echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE ━━${N}"
+# ── 范围化(包 ar,2026-08-17 主人拍板 Q1A):三档 full | scoped | static ──────────────────────
+# 范围由机器算(scripts/lib/verify-scope.mjs:git 改动集 ∩ gates.manifest 声明的输入),不由模型判。
+# 失败方向偏保守:计划算不出 → 升 full;门未在清单声明 → 照跑;改动命中全局不变量清单 → 升 full。
+# 跳过的格走 scoped_skip 计数(与 skip 分开:skip=该跑没跑成=红;scoped_skip=按范围有意不跑=不红,但结果行必点名)。
+VERIFY_MODE="${VERIFY_MODE:-full}"
+case "$VERIFY_MODE" in full|scoped|static) ;; *) echo "VERIFY_MODE 只认 full|scoped|static(给的是 $VERIFY_MODE)"; exit 2 ;; esac
+declare -A SCOPE_RUN SCOPE_WHY
+SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
+scoped_skip=0
+VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
+if [ "$VERIFY_MODE" != "full" ]; then
+  if scope_plan=$("$NODE_BIN" scripts/lib/verify-scope.mjs plan --mode "$VERIFY_MODE" --format shell 2>/tmp/uni-scope-plan.err); then
+    eval "$scope_plan"
+  else
+    SCOPE_MODE=full; SCOPE_UPGRADED="范围计划算不出($(head -1 /tmp/uni-scope-plan.err 2>/dev/null))→ full(保守方向)"
+  fi
+fi
+# 用法:if scope_hit <id>; then …真跑… ; fi —— 返回 1 时已自行计数并点名 SCOPED-SKIP;未声明的 id 照跑
+scope_hit() {
+  local id="$1"
+  [ "$SCOPE_MODE" = "full" ] && return 0
+  local r="${SCOPE_RUN[$id]:-}"
+  if [ -z "$r" ] || [ "$r" = "1" ]; then return 0; fi
+  scoped_skip=$((scoped_skip+1))
+  printf "  ${Y}SCOPED-SKIP${N}  %s(%s)\n" "$id" "${SCOPE_WHY[$id]:-}"
+  return 1
+}
+
+echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE · mode=$SCOPE_MODE${SCOPE_UPGRADED:+(请求 $SCOPE_REQUESTED → $SCOPE_UPGRADED)}${VERIFY_TREE_START:+ · tree ${VERIFY_TREE_START:0:10}} ━━${N}"
+if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; fi
+# 门的门:manifest ↔ verify.sh 接线一致 + glob 都命中(改了清单没接线 / 接了线没声明 / 路径漂移,任一即红;三档都跑)
+if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > /tmp/uni-scope-lint.log 2>&1; then
+  ok "gates.manifest 接线门 — $(tail -1 /tmp/uni-scope-lint.log)"
+else
+  bad "gates.manifest 接线门失败 — node scripts/lib/verify-scope.mjs lint 看明细"; sed 's/^/        /' /tmp/uni-scope-lint.log | head -12
+fi
 
 # ── (1) type-check ──
 echo -e "${C}[0] 静态门(不依赖 dev server,必须排在任何 preflight 之前)${N}"
@@ -232,8 +277,15 @@ vite_watch_anchor_gate() {
 vite_watch_anchor_gate
 
 echo -e "${C}[1] vue-tsc type-check${N}"
-if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then
-  ok "vue-tsc 0 errors"
+# 包 ar:走指纹缓存壳(输入未变 → PASS(cached);变了 → 裸 vue-tsc 真跑;--incremental 因 warm buildinfo 假绿禁用)。同一棵树一轮里 tsc 只算一次。
+# 壳的自证先跑(结构判据:不带 --incremental · FAIL 路径必删 pass 记录 · 记录带指纹)—— 2026-08-17 那次 P0 是外部 tester 逮到的,不是门逮到的
+if "$NODE_BIN" scripts/typecheck-cached.mjs --selftest >/tmp/uni-tsc-selftest.log 2>&1; then
+  ok "typecheck-cached selftest — $(tail -1 /tmp/uni-tsc-selftest.log)"
+else
+  bad "typecheck-cached selftest 失败 — 缓存壳判据被改坏,本轮 tsc 结论按不可信解读"; tail -5 /tmp/uni-tsc-selftest.log | sed 's/^/        /'
+fi
+if "$NODE_BIN" scripts/typecheck-cached.mjs >/tmp/uni-tsc.log 2>&1; then
+  ok "$(tail -1 /tmp/uni-tsc.log)"
 else
   bad "vue-tsc errors"; tail -15 /tmp/uni-tsc.log | sed 's/^/        /'
 fi
@@ -249,7 +301,7 @@ store_unreachable_gate() {
     grep -E "^(FAIL|  FAIL)" /tmp/uniapp-store-unreachable.log | head -6 | sed "s/^/        /"
   fi
 }
-store_unreachable_gate
+if scope_hit store-unreachable; then store_unreachable_gate; fi
 
 echo -e "${C}[1.5] i18n mirror${N}"
 if "$NODE_BIN" scripts/i18n-key-mirror.mjs >/tmp/uni-i18n-mirror.log 2>&1; then
@@ -389,11 +441,13 @@ done
 # 字面量,认不出等价的 fundsServerEnabled,退款腿实际已被整条关掉却一路报绿)。
 # 修后判据按等价类解析 + 钉正向定型串,而关系型/解析型判据更容易在重构里悄悄失去牙齿 ——
 # 6 靶红测钉住它真会红,其中 4 靶是「旧判据漏、新判据抓」的资金缺陷形状。
+if scope_hit withdraw-rail-alias-redtest; then
 if "$NODE_BIN" scripts/withdraw-rail-alias.redtest.mjs > /tmp/uni-withdraw-rail-alias.log 2>&1; then
   ok "withdraw-rail-alias redtest — $(tail -1 /tmp/uni-withdraw-rail-alias.log)"
 else
   bad "withdraw-rail-alias redtest 失败(哨兵失效即门失效;node scripts/withdraw-rail-alias.redtest.mjs 看明细)"
   tail -12 /tmp/uni-withdraw-rail-alias.log | sed 's/^/        /'
+fi
 fi
 
 # 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
@@ -406,14 +460,17 @@ else
 fi
 # 账号隔离 / 过期剪除 / 一次性离开提示 + 建单落盘契约(createOrder / createOrders 落盘失败返 null,不留内存孤儿单;一批一次落盘)+ 单次券核销 CAS(先占后花,双实例只成一次;release 放回)+ 恢复发票逐项 min 对账 + 存储行取值域 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
 # (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
+if scope_hit pending-checkout-vitest; then
 if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts src/store/free-trial.persist.test.ts > /tmp/uni-pending-checkout-vitest.log 2>&1; then
   ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
 else
   bad "pending-checkout vitest 失败(npx vitest run src/store/pending-checkout*.test.ts 看明细)"
   sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | tail -15 | sed 's/^/        /'
 fi
+fi
 
 # ── (2) H5 routing (dev server must be up) ──
+if scope_hit route-http; then
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   # 🔴 先认工程再认状态码:同机跑着 CC(:5273)/ janus(:5174),端口被串台时
@@ -432,6 +489,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   # check_http "Earn" "/#/pages/earn/earn"
 else
   skipped "dev server not running at $BASE_URL (run: npm run dev:h5)"
+fi
 fi
 
 # ── (3) source hygiene sentinels ──
@@ -476,6 +534,7 @@ else
   norm_root_selftest=broken
   bad "树身份判据自检失败 —— _norm_tree_path 归一化坏了,下面的树身份判断不可信(动过它就看这条)"
 fi
+if scope_hit api-mode-preflight; then
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
 served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
 expect_root="$PROJECT_DIR"
@@ -492,13 +551,16 @@ elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$expect_root")
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
+fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
 # (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
+if scope_hit remote-refresh-resilience; then
 if "$NODE_BIN" scripts/selfcheck-remote-refresh-resilience.mjs > /tmp/uni-remote-resilience.log 2>&1; then
   ok "远端刷新韧性门 — $(tail -1 /tmp/uni-remote-resilience.log)"
 else
   bad "远端刷新韧性门失败 — node scripts/selfcheck-remote-refresh-resilience.mjs 看明细"
   tail -8 /tmp/uni-remote-resilience.log | sed 's/^/        /'
+fi
 fi
 
 # ── [2.7] dev server 健康 preflight(P-097 对策③④,环境门)──────────────────
@@ -521,6 +583,7 @@ _shell_latency() {  # 量一次 $BASE_URL/ 的 time_total(秒);连不上输出�
   esac
 }
 _over_health_max() { [ -n "$1" ] && awk -v t="$1" -v m="$HEALTH_MAX_S" 'BEGIN{exit !(t+0 > m+0)}'; }
+if scope_hit server-health-preflight; then
 echo -e "${C}[2.7] dev server health preflight(P-097 环境门)${N}"
 HEALTH_T1=""; HEALTH_T2=""
 for _hi in 1 2; do
@@ -539,6 +602,7 @@ for _hi in 1 2; do
 done
 if [ -n "$HEALTH_T2" ]; then
   ok "server health preflight:2 次 shell 延迟 ${HEALTH_T1}s / ${HEALTH_T2}s(均 ≤ ${HEALTH_MAX_S}s)"
+fi
 fi
 
 echo -e "${C}[3] grep sentinels over src/${N}"
@@ -697,6 +761,7 @@ then
 else
   bad "bare login-entry system chrome contract"; sed 's/^/        /' /tmp/uni-auth-system-chrome.log
 fi
+if scope_hit login-entry-chrome-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-auth-system-chrome-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs; then
     ok "bare login-entry system chrome runtime geometry (P-069)"
@@ -705,6 +770,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   fi
 else
   skipped "bare login-entry system chrome runtime geometry (dev server not running at $BASE_URL)"
+fi
 fi
 # ── SPEC-1 R7: factor reads device truth, never the viewing carrier ──
 sentinel_present "SPEC-1 R7 online seam exported" src/lib/hashpower.ts 'export function isDeviceOnline'
@@ -1538,6 +1604,7 @@ spec6_entry_surface_homes_present() {
   fi
 }
 spec6_entry_surface_homes_present
+if scope_hit spec6-entry-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-spec6-entry-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
     ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
@@ -1547,8 +1614,10 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
 else
   skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
 fi
+fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
+if scope_hit r7-device-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-r7-device-detail-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs; then
     ok "$(cat /tmp/uni-r7-device-detail-runtime.log)"
@@ -1557,6 +1626,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   fi
 else
   skipped "R7 + device detail runtime (dev server not running at $BASE_URL)"
+fi
 fi
 # 注册成功页的平台边界是编译条件,UA 伪造无法证明 App 分支。锁住 H5
 # 提醒块、App 无提醒、底部继续入口和官网配置字段这四个不变量。
@@ -1756,6 +1826,7 @@ else
 fi
 # FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
 # “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
+if scope_hit spec7-k1-auth02-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-spec7-risk-gate-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs; then
     ok "$(cat /tmp/uni-spec7-risk-gate-runtime.log)"
@@ -1772,6 +1843,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
 else
   bad "SPEC-7 K1 device/payment registration gates (dev server not running at $BASE_URL)"
   bad "AUTH02 registered-number + success-page runtime (EN/ZH; dev server not running at $BASE_URL)"
+fi
 fi
 # ── SPEC-4 account-cloud + multi-carrier session sentinels ──
 sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexgrid-account-cloud-v1'
@@ -1912,6 +1984,7 @@ if "$NODE_BIN" scripts/spec4-account-cloud-merge-check.mjs >/tmp/uni-spec4-merge
 else
   bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
 fi
+if scope_hit spec4-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-spec4-app-sync.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
     ok "$(cat /tmp/uni-spec4-app-sync.log)"
@@ -1927,18 +2000,17 @@ else
   skipped "SPEC-4 account-cloud app sync (dev server not running at $BASE_URL)"
   skipped "SPEC-4 runtime session guard (dev server not running at $BASE_URL)"
 fi
+fi
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`
 # close tag compiles fine under vue-tsc/volar (lenient: script extends to EOF)
 # but THROWS in vite:vue / uni's @vue/compiler-sfc → "Element is missing end tag"
 # → page 500s at runtime. vue-tsc green ≠ compiler OK (cf. P-008). Every .vue
 # that opens <script> MUST close it; same for <template>/<style>.
 sfc_script_closed() {
-  local miss=""
-  local f
-  while IFS= read -r f; do
-    if grep -q '<script' "$f" && ! grep -q '</script>' "$f"; then miss="$miss$f\n"; fi
-    if grep -q '<template' "$f" && ! grep -q '</template>' "$f"; then miss="$miss$f (template)\n"; fi
-  done < <(find src -name '*.vue')
+  # 包 ar:原写法逐文件 spawn 两次 grep(~300 文件 → Windows 上 29s);判据不变,改成两次全量 grep + grep -L 差集(<1s)。
+  local miss="" f
+  for f in $(grep -rl --include='*.vue' '<script' src 2>/dev/null | xargs -r grep -L '</script>' 2>/dev/null); do miss="$miss$f\n"; done
+  for f in $(grep -rl --include='*.vue' '<template' src 2>/dev/null | xargs -r grep -L '</template>' 2>/dev/null); do miss="$miss$f (template)\n"; done
   if [ -z "$miss" ]; then ok "every .vue closes its <script>/<template> (0 hits)";
   else bad "unclosed SFC block (missing </script> or </template>)"; printf "$miss" | sed 's/^/        /'; fi
 }
@@ -2874,7 +2946,7 @@ theme_constant_gate() {
     tail -10 /tmp/uniapp-theme-const.log | sed 's/^/        /'
   fi
 }
-theme_constant_gate
+if scope_hit theme-constant-runtime; then theme_constant_gate; fi
 
 # ── 零-border 铁律 · 运行时门(C2 批次 2026-07-23) ──
 # 《03》§3:带 bg 填充的卡片/板块一律零 border,border 只属透明容器(分组 hairline /
@@ -2895,7 +2967,7 @@ zero_border_gate() {
     tail -10 /tmp/uniapp-zero-border.log | sed 's/^/        /'
   fi
 }
-zero_border_gate
+if scope_hit zero-border-runtime; then zero_border_gate; fi
 
 # ── DOM-QA 体检哨兵(vibe-playbook P1-A 2026-07-22 主人批):5 探针事实层 ──
 # ① 横向溢出 ② 文字<10px(10-12 普查不 gate) ③ tap<44pt ④ img broken ⑤ 按钮无可达名。
@@ -2916,7 +2988,7 @@ dom_qa_gate() {
     tail -12 /tmp/uniapp-dom-qa.log | sed 's/^/        /'
   fi
 }
-dom_qa_gate
+if scope_hit dom-qa-runtime; then dom_qa_gate; fi
 
 # ── tap 目标哨兵(C3 2026-07-23):热区 ≥44pt + 按下有可感知反馈 ──
 # 与 dom-qa 的 tap 探针**互补不重复**:dom-qa 靠「交互标签/role + cursor:pointer」找候选,
@@ -2925,6 +2997,7 @@ dom_qa_gate
 # 反馈判定走 CDP CSS.forcePseudoState 实测(不是 grep class,声明了但被 inline style 压掉的会被抓出来)。
 # 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
 tap_feedback_gate() {
+  if scope_hit tap-feedback-runtime; then
   if probe_retry /tmp/uniapp-tap-selftest.log "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
     ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
   else
@@ -2938,8 +3011,10 @@ tap_feedback_gate() {
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
     tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
   fi
+  fi
   # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
   # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
+  if scope_hit orphan-line-runtime; then
   if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
     ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
   else
@@ -2952,6 +3027,7 @@ tap_feedback_gate() {
   else
     bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
     tail -8 /tmp/uniapp-orphan.log | sed 's/^/        /'
+  fi
   fi
 }
 tap_feedback_gate
@@ -3007,7 +3083,7 @@ empty_state_gate() {
     grep -E "^FAIL" /tmp/uniapp-empty-state.log | head -8 | sed 's/^/        /'
   fi
 }
-empty_state_gate
+if scope_hit empty-state-runtime; then empty_state_gate; fi
 
 # ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
 # 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;
@@ -3216,7 +3292,7 @@ withdraw_bill_runtime_gate() {
     grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
   fi
 }
-withdraw_bill_runtime_gate
+if scope_hit withdraw-bill-runtime; then withdraw_bill_runtime_gate; fi
 
 # 🗑 【2026-08-13 回退】这里曾挂过「提现扣款自愈门」(scripts/withdraw-debit-selfheal-runtime.mjs)。
 #    它守的实现 —— App.vue 对账里的扣款补扣格 —— 被 R1 独立审计整格否决并回退,门随之退役,
@@ -3653,11 +3729,21 @@ a11y_activate_gate() {
 a11y_activate_gate
 
 # Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
-if probe_retry /tmp/uni-h5-runtime-gates.log "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
-  ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
+# 包 ar:runner(verify-chain.mjs)在同一轮里已对同一棵树跑过 test:h5-runtime 并 PASS 时,经 H5_RUNTIME_REUSED_TREE 把
+#   当时的树指纹传进来;这里**重新算一次当前树指纹**,相等才复用(树动过一个字都不复用)。复用条明写「复用」,
+#   不冒充新跑;裸跑 verify.sh(没有该 env)行为与从前完全一样。
+if scope_hit h5-runtime-isolated; then
+_h5_tree_now=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
+if [ -n "${H5_RUNTIME_REUSED_TREE:-}" ] && [ -n "$_h5_tree_now" ] && [ "$H5_RUNTIME_REUSED_TREE" = "$_h5_tree_now" ]; then
+  ok "H5 运行时门 — 复用本轮 runner 已跑过的同树结果(tree ${_h5_tree_now:0:10}${H5_RUNTIME_ONLY:+ · scoped 子探针 $H5_RUNTIME_ONLY});未另起服"
 else
-  bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
-  tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
+  if probe_retry /tmp/uni-h5-runtime-gates.log "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
+    ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
+  else
+    bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
+    tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
+  fi
+fi
 fi
 
 # 重试留痕回显:哪个探针、几点、首败退出码 —— 反复出现同一探针 = 可能是真偶发 bug,要追
@@ -3678,5 +3764,5 @@ if [ -n "${HEALTH_T1:-}" ] && [ -n "${HEALTH_T2:-}" ]; then
     echo "server health 首尾延迟:preflight ${HEALTH_T1}s/${HEALTH_T2}s → 收尾 ${HEALTH_T_END}s(均 ≤ ${HEALTH_MAX_S}s)"
   fi
 fi
-echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
+echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" )$( [ "$SCOPE_MODE" != "full" ] && echo -e ", ${Y}$scoped_skip scoped-skip${N} · mode=$SCOPE_MODE(≠ 全量绿:宣布 done / 合并前仍须 full)" ) ━━"
 [ $fail -eq 0 ] && [ $skip -eq 0 ]
