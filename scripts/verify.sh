@@ -202,7 +202,7 @@ if [ "$VERIFY_MODE" != "full" ]; then
 fi
 # 路由级范围(包 ax,主人拍板 B):scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)只扫
 #   「受影响路由 ∩ 探针射程」;探针读 env PROBE_ROUTES(scripts/lib/probe-routes.mjs)。门因自身输入(脚本/基线/台账)
-#   变化而跑 → SCOPE_ROUTES_FOR[id]='*' 全扫。full 一律清空 —— 外层残留不许把 full 变半量。用法:if scope_hit X; then route_scope X; …
+#   变化而跑 → SCOPE_ROUTES_FOR[id]='*' 全扫。full 一律清空 —— 外层残留不许把 full 变半量。用法:门的 scope_hit 判定之后紧跟 `route_scope <同一门 id>` 再起探针。
 unset PROBE_ROUTES
 if [ "$SCOPE_MODE" = "scoped" ] && [ -n "$SCOPE_H5_PROBE_ROUTES_JSON" ]; then export H5_PROBE_ROUTES="$SCOPE_H5_PROBE_ROUTES_JSON"; else unset H5_PROBE_ROUTES; fi
 route_scope() {
