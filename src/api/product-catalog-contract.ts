@@ -71,9 +71,26 @@ function integer(value: unknown, minimum = 0): number {
  */
 export const SPEC_UNAVAILABLE = "unavailable";
 
-function displayString(value: unknown): string {
-  // SPEC_UNAVAILABLE is a deliberate server truth, never a client fallback.
-  return nonEmptyString(value);
+/**
+ * Server-owned display spec. Absent / null / blank means "the server has no value
+ * here" and degrades to a locale string at render time (see specText); a present
+ * value of the wrong type is still a contract breach and fails the payload.
+ *
+ * 🔴 This used to be `nonEmptyString`, i.e. all eight spec fields were mandatory.
+ * That was fatal rather than strict: the parser throws for the WHOLE payload, so
+ * one absent spec emptied the entire store. And absence is the normal case —
+ * `uptime` / `warranty` / `phoneDailyEarn` / `phoneDailyEarnNEX` have no column,
+ * no operator input and no PRD entry on the server side at all, while the four
+ * that do exist (`gpu` / `vram` / `power` / `datacenter`) are nullable there and
+ * the console sends `undefined` for any field an operator leaves blank.
+ * Spec incompleteness already has a graceful, purpose-built channel —
+ * `purchaseBlocked` + `purchaseBlockedReason` — so hard-failing here was a second,
+ * catastrophic implementation of the same concern.
+ */
+function displayString(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  const normalized = requiredString(value).trim();
+  return normalized || undefined;
 }
 
 function booleanValue(value: unknown): boolean {

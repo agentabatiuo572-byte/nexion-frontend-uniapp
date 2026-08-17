@@ -37,8 +37,11 @@ export interface Product {
   tier: "Entry" | "Pro" | "Flagship" | "Share";
   tagline: string;
   badge?: string;
-  gpu: string;
-  vram: string;
+  // 🔴 全部服务端显示规格一律可选:后端这几列本就可空(运营在后台表单留空即不下发),
+  // 而 uptime/warranty/phoneDailyEarn* 后端连列都没有。缺失在渲染层降级成本地化占位串
+  // (lib/product-copy.ts 的 specText),不是解析失败——解析失败会连整份目录一起作废。
+  gpu?: string;
+  vram?: string;
   hashRate?: string;
   power?: string;
   /** Server-owned managed-service specification; explicit "unavailable" is valid. */
