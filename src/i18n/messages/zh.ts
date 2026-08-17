@@ -1637,7 +1637,7 @@ export const zh: Messages = {
     detMonthly: "每月",
     detAnnual: "每年",
     detPayback: "回本",
-    detVsPhone: "对比手机 $0.06",
+    detVsPhone: "对比手机 {n}",
     detPerMoSuffix: "% / 月",
     detRoiSuffix: "% 回报",
     detToBreakEven: "回本所需",

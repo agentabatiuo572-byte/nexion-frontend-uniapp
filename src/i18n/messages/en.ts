@@ -1703,7 +1703,7 @@ export const en = {
     detMonthly: "Monthly",
     detAnnual: "Annual",
     detPayback: "Payback",
-    detVsPhone: "vs your phone $0.06",
+    detVsPhone: "vs your phone {n}",
     detPerMoSuffix: "% / mo",
     detRoiSuffix: "% ROI",
     detToBreakEven: "to break even",
