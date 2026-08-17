@@ -5319,6 +5319,10 @@ export const en = {
     messagesDesc: "Reach out and support will reply here",
     commissionsTitle: "No commissions yet",
     commissionsDesc: "Earnings from your invites show up here",
+    genesisListingsTitle: "No listings right now",
+    genesisListingsDesc: "When a holder puts a node up for sale, you'll see it here first",
+    genesisActivityTitle: "No activity yet",
+    genesisActivityDesc: "Listings and sales land here as they happen",
   },
   topupChrome: {
     change: "Change",
