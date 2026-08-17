@@ -154,7 +154,20 @@ test("remote free-trial store never persists or locally advances an authoritativ
   assert.match(source, /refreshRemote\(true\)/);
   assert.match(source, /authorityRequestSequence/);
   assert.match(source, /if \(remoteApiEnabled\) return refreshRemote\(\)/);
-  assert.match(source, /if \(remoteApiEnabled\) return;/);
+  // 🔴 「远端档不落本地盘」——判据锚在 persist() 的函数头上,不是全文找一个字符串。
+  // 原判据是 /if \(remoteApiEnabled\) return;/,写于 5d3c92e(当时 persist() 是 void);
+  // da445ec(审计 R5)把 persist() 改成返回落盘判决(convert 据此决定终态算不算落定)后,
+  // 这条恒红至今,而且方向是**奖励回退**:谁把 persist() 改回 void 它就转绿。
+  // 锚定形态顺带守住位置语义 —— 短路必须是函数第一句,挪到 writeAccountRow 之后就红。
+  assert.match(source, /function persist\(\)[^{]*\{\s+if \(remoteApiEnabled\) return true;/,
+    "[persist-guard] persist() 的第一句必须是 `if (remoteApiEnabled) return true;` —— 远端档一个字节都不许落本地盘");
+  // 测试名承诺的另一半「不本地推进终态」原先一条断言都没有(缺失轴天然假绿)。
+  // advanceTo 是唯一的边界推进入口(poll / convert 共用),远端档必须原样返回快照。
+  assert.match(source, /function advanceTo\(now: number\)[^{]*\{\s+if \(remoteApiEnabled\) return snapshot\(\);/,
+    "[advance-guard] advanceTo() 的第一句必须是 `if (remoteApiEnabled) return snapshot();` —— 远端档禁止本地推进状态机");
+  // 守卫在位 ≠ 绕不过去:落盘口必须唯一,否则在别处新开一条 writeAccountRow 就整条绕过短路。
+  assert.equal(source.match(/writeAccountRow[<(]/g)?.length, 1,
+    "[single-writer] free-trial 的本地落盘口必须唯一(只有 persist() 内那一次调用);多出来的写盘绕过了远端短路");
   assert.match(source, /authorityStatus/);
   assert.match(source, /refreshInFlightAccount === boundKey/);
   assert.match(source, /reason: "unknown"/);
