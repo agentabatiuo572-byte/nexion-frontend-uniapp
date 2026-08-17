@@ -497,7 +497,7 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
 .nx-globe-drawer {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 790;
   display: flex;
   align-items: flex-end;
   justify-content: center;

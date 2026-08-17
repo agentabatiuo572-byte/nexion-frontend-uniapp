@@ -1594,11 +1594,13 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
   transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
   transition: "transform 160ms ease",
 }));
-// 费用说明半屏(scrim z79 + panel z80,同 device-deactivate-sheet 范式)。
+// 费用说明半屏(scrim z790 + panel z800,同 device-deactivate-sheet 范式)。
+// 🔴 原写的是 79/80 —— 那个「少一位数」的笔误跟着「范式」一起被抄了过来,低于里程碑
+// 庆祝(780):费用说明弹出时被庆祝盖住并吞掉关闭按钮,而这里正是提现路径。2026-08-17 归位。
 const feeWhyScrimStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 79,
+  zIndex: 790,
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
@@ -1607,7 +1609,7 @@ const feeWhySheetStyle: CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  zIndex: 80,
+  zIndex: 800,
   borderTopLeftRadius: "16px",
   borderTopRightRadius: "16px",
   background: "var(--v5-surface)",

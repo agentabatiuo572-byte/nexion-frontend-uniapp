@@ -107,10 +107,12 @@ const infoBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
+// 🔴 790/800 = 业务半屏带(理由同 device-deactivate-sheet.vue:原 79/80 低于庆祝 780,
+// 会被盖住并吞点击;写成 JS 样式对象所以此前逃过机器门,2026-08-17 补齐)。
 const scrimStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 79,
+  zIndex: 790,
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
@@ -119,7 +121,7 @@ const sheetStyle: CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  zIndex: 80,
+  zIndex: 800,
   borderTopLeftRadius: "16px",
   borderTopRightRadius: "16px",
   background: "var(--v5-surface)",

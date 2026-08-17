@@ -154,16 +154,19 @@ export const useMilestones = defineStore("milestones", () => {
 
   /**
    * Promote the next queued celebration onto the screen — the ONLY path from
-   * queue → `active`. Money-flow routes (checkout / withdraw / trial) suspend
-   * promotion; an already-showing overlay is parked back at the FRONT of the
-   * queue (programmatic redirect edge) so it replays in full after leaving.
+   * queue → `active`. Two independent suspension axes: money-flow routes
+   * (checkout / withdraw / trial), and `screenBusy` (another auto-popup holds
+   * the screen — see store/popup-arbiter). On a money-flow route an
+   * already-showing overlay is parked back at the FRONT of the queue
+   * (programmatic redirect edge) so it replays in full after leaving; a busy
+   * screen only blocks NEW promotions and never yanks a showing one.
    * Called on a short interval by milestone-celebration.vue with the current
    * route. Returns true when a celebration was promoted.
    */
   // dismiss 后的连播冷却时刻(CELEBRATION_GAP_MS 见模块顶部);park 路径不设值。
   let coolUntil = 0;
 
-  function advance(route: string): boolean {
+  function advance(route: string, screenBusy = false): boolean {
     if (isMoneyFlowRoute(route)) {
       if (active.value) {
         pendingCelebrations.value = [active.value, ...pendingCelebrations.value];
@@ -171,6 +174,13 @@ export const useMilestones = defineStore("milestones", () => {
       }
       return false;
     }
+    // 🔴 别的自动弹层正占着屏(store/popup-arbiter 的令牌)→ 与钱链路同样挂起。
+    // 主人 2026-08-16 拍板 C1「永不顶替」:这里**只拦上屏,不收回已上屏的那条** ——
+    // 已经在放的庆祝不该被后来的领取弹层打断(收回是钱链路 park 的语义,不是这里的)。
+    // 实测缺陷:庆祝浮层 z 8900 画在领取弹层 z 790/800 之上并模糊背景数十秒,
+    // 根因就是它此前只按路由挂起、对「屏上有没有别人」完全无感。
+    // 判据由调用方(宿主组件)传入而不是本 store 自己去读 —— 保持 store 不互 import(P-031)。
+    if (screenBusy) return false;
     if (active.value || pendingCelebrations.value.length === 0) return false;
     if (Date.now() < coolUntil) return false;
     const [next, ...rest] = pendingCelebrations.value;
