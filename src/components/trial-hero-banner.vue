@@ -46,7 +46,7 @@
           >{{ t.trial.heroDeviceName }}</text>
           <text
             class="block"
-            style="margin-top: 4px; font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink-3); letter-spacing: -0.005em; line-height: 1.4"
+            style="margin-top: 4px; font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink-3); letter-spacing: -0.005em; line-height: 1.4; text-wrap: pretty"
           >{{ taglineText }}</text>
         </view>
 
@@ -55,9 +55,10 @@
           <view style="width: 1px; align-self: stretch; margin: 12px 0; background: repeating-linear-gradient(180deg, var(--v5-border-strong) 0 4px, transparent 4px 8px)" />
         </view>
 
-        <!-- RIGHT stub -->
-        <view style="padding: 16px 16px 14px 4px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 116px">
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.06em">{{ earnLabelText }}</text>
+        <!-- RIGHT stub — max-width 上限:长语种(vi)标签过宽会把左列标题挤到折行,
+             超限就让标签自己右对齐换行,不许挤压左列(主人 2026-08-17 vi 卡片乱) -->
+        <view style="padding: 16px 16px 14px 4px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 116px; max-width: 170px">
+          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.06em; text-align: right">{{ earnLabelText }}</text>
           <view
             class="inline-flex items-baseline"
             style="margin-top: 6px; gap: 1px; font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.024em; line-height: 1"
@@ -65,7 +66,7 @@
             <text style="font-size: 20px; font-weight: 500; color: var(--v5-quest-violet-ink)">$</text>
             <text style="font-size: 36px">{{ est }}</text>
           </view>
-          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ dailyEarnText }}</text>
+          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); white-space: nowrap">{{ dailyEarnText }}</text>
         </view>
       </view>
 
@@ -78,11 +79,13 @@
           <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-quest-ember); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-quest-ember) 70%, transparent); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
           <text style="color: var(--v5-quest-ember-ink)">{{ trialsLeftText }}</text>
         </view>
+        <!-- CTA 文字禁折行:uni 的 text 组件自带 white-space,不继承容器的 nowrap,
+             必须写在 text 自己身上;flex-shrink:0 保胶囊拿满内容宽(vi 曾折成两行) -->
         <view
           class="inline-flex items-center"
-          style="padding: 8px 14px; border-radius: 999px; background: transparent; color: var(--v5-quest-violet-ink); font-family: var(--font-v5); font-weight: 600; font-size: 13px; border: 1px solid color-mix(in srgb, var(--v5-quest-violet-ink) 45%, transparent); gap: 5px; letter-spacing: -0.005em; white-space: nowrap"
+          style="padding: 8px 14px; border-radius: 999px; background: transparent; color: var(--v5-quest-violet-ink); font-family: var(--font-v5); font-weight: 600; font-size: 13px; border: 1px solid color-mix(in srgb, var(--v5-quest-violet-ink) 45%, transparent); gap: 5px; letter-spacing: -0.005em; white-space: nowrap; flex-shrink: 0"
         >
-          <text style="color: var(--v5-quest-violet-ink)">{{ t.trial.heroClaimCta }}</text>
+          <text style="color: var(--v5-quest-violet-ink); white-space: nowrap">{{ t.trial.heroClaimCta }}</text>
           <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px; color: var(--v5-quest-violet-ink)">→</text>
         </view>
       </view>
