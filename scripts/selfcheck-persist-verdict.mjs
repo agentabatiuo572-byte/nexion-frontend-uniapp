@@ -72,8 +72,15 @@ const VERDICT_CALLS = new Set([
   "persist", "writeAccountRow", "writeAccountRowCas", "persistAccountSnapshot",
   "markUsed", "release", "consume", "restoreMoney", "debitBalance", "creditBalance", "creditNex",
   "createOrder", "createOrders", "cancelOrder", "markActivated", "postMoneyBill", "postReceiptOnly", "postReceiptOnce",
-  "addDevice", "activateDevice", "discardSpawnedDevice", "commit",
+  "addDevice", "activateDevice", "deactivateDevice", "discardSpawnedDevice", "retireDevice", "restoreDevice", "patchDevice", "settleProduct", "commit",
 ]);
+/**
+ * 第二条规则(审计 R9 critic:门只看调用形,对赋值式旁路失明):**页面 / 组件不许直写账户状态**——
+ * `app.devices = …` / `app.user.x = …` / `app.withdrawals = …` / `app.earnings = …` 绕过了 store 的落盘与判决,
+ * 是「落盘判决被丢弃」这族最原始的形状。store 文件自己写自己的 ref 不在此列(app.ts 是唯一的持有者)。
+ */
+const APP_STATE_ROOTS = new Set(["devices", "user", "withdrawals", "earnings"]);
+const APP_STORE_FILE = "src/store/app.ts";
 const OK_MARK = "persist-verdict-ok";
 
 function scriptBlocks(file, src) {
@@ -185,7 +192,26 @@ export function findDiscardedVerdicts(code, fileLabel = "snippet.ts") {
     if (ts.isArrayLiteralExpression(e)) { for (const el of e.elements) collectDiscarded(el, out); return; }
     if (ts.isObjectLiteralExpression(e)) { for (const pr of e.properties) if (ts.isPropertyAssignment(pr)) collectDiscarded(pr.initializer, out); return; }
   };
+  const isDirectAppStateWrite = (e) => {
+    if (!ts.isBinaryExpression(e)) return false;
+    const k = e.operatorToken.kind;
+    if (!(k === ts.SyntaxKind.EqualsToken || (k >= ts.SyntaxKind.FirstCompoundAssignment && k <= ts.SyntaxKind.LastCompoundAssignment))) return false;
+    // left = app.<root>[.…] — walk down to the root property access on identifier `app`
+    let left = e.left;
+    while (ts.isPropertyAccessExpression(left) || ts.isElementAccessExpression(left)) {
+      const obj = left.expression;
+      if (ts.isIdentifier(obj) && obj.text === "app" && ts.isPropertyAccessExpression(left) && APP_STATE_ROOTS.has(left.name.text)) return true;
+      if (ts.isIdentifier(obj) && obj.text === "app") return false;
+      left = obj;
+    }
+    return false;
+  };
   const visit = (node) => {
+    if (ts.isExpressionStatement(node) && fileLabel !== APP_STORE_FILE && isDirectAppStateWrite(node.expression)) {
+      const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+      const here = lines[line] ?? ""; const prev = lines[line - 1] ?? "";
+      if (!here.includes(OK_MARK) && !prev.includes(OK_MARK)) hits.push({ line: line + 1, name: "app-state-write", text: here.trim().slice(0, 120) });
+    }
     if (ts.isExpressionStatement(node)) {
       const found = [];
       collectDiscarded(node.expression, found);
@@ -226,6 +252,9 @@ function selftest() {
     "const rel = () => claimed ? store.release(id) : true; function g(){ rel(); }",                                     // arrow wrapper
     "function w1(){ return persist(); } function w2(){ return w1(); } function g(){ w2(); }",                             // wrapper of wrapper
     "function tick(){ rows.commit(() => null); } function g(){ tick(); }",  // exactly ONE hit: the inner bare call; the void helper itself is not a wrapper (g() must not be flagged)
+    "function f(){ app.devices = app.devices.filter((d) => d.id !== id); }",   // page-level direct write to account state
+    "function f(){ app.user.usdtBalance = 0; }",
+    "function f(){ app.devices = [...app.devices, dev]; }",
   ];
   const good = [
     "function f(){ if (!persist()) return false; }",
@@ -240,6 +269,9 @@ function selftest() {
     "function f(){ return cond ? persist() : true; }",
     "function f(){ persist() ? doA() : doB(); }",               // verdict drives the branch = consumed
     "function f(){ toast.warn(fmt(msg)); }",                    // no verdict primitive at all
+    "function f(){ app.devices.forEach((d) => d); }",            // read is fine
+    "function f(){ const x = app.user.usdtBalance; return x; }",  // read is fine
+    "function f(){ localState.devices = []; }",                   // not the app store
     "function createOrder(x){ items.push(x); } function g(){ createOrder(1); }", // local non-verdict function shadowing a base name
     "async function claim(id){ const r = rows.commit((c) => null); return r.ok; } async function g(){ await api.claim(id); }", // same-name METHOD on another object is not the local wrapper
     "function advanceTo(now){ const x = resolve(now); persist(); /* persist-verdict-ok: pure re-derivation */ return x; } function g(){ advanceTo(1); }", // calls a verdict but returns something else → not a wrapper
@@ -264,7 +296,7 @@ const FILES = discoverFiles();
 for (const must of MUST_INCLUDE) {
   if (!FILES.includes(must)) { console.error(`persist-verdict: 构造性发现漏掉了 ${must} —— 入册判据漂了(或文件被搬走),门失效`); process.exit(2); }
 }
-if (FILES.length < MUST_INCLUDE.length + 5) { console.error(`persist-verdict: 只发现 ${FILES.length} 个钱路文件,低于地板 ${MUST_INCLUDE.length + 5}(扫描面塌空?)`); process.exit(2); }
+if (FILES.length < 24) { console.error(`persist-verdict: 只发现 ${FILES.length} 个钱路文件,低于地板 24(2026-08-17 实发现 32;扫描面塌空?)`); process.exit(2); }
 for (const rel of FILES) {
   const abs = path.join(ROOT, rel);
   if (!fs.existsSync(abs)) { console.error(`persist-verdict: missing file ${rel} (钱路文件清单与仓库不符 → 门失效)`); process.exit(2); }
@@ -272,7 +304,7 @@ for (const rel of FILES) {
   const blocks = scriptBlocks(rel, src);
   if (blocks.length === 0) { console.error(`persist-verdict: no <script> block in ${rel}`); process.exit(2); }
   for (const b of blocks) {
-    const hits = findDiscardedVerdicts(b.code, rel);
+    const hits = findDiscardedVerdicts(b.code, rel); // rel 用作文件标签(store 自身写自己的 ref 不算直写)
     // line numbers relative to the block → absolute
     const before = src.slice(0, b.offset).split(/\r?\n/).length - 1;
     for (const h of hits) report.push({ file: rel, line: h.line + before, name: h.name, text: h.text });

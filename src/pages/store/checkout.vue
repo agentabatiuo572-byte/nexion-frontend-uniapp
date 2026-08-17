@@ -390,13 +390,12 @@ onLoad(async (options) => {
   // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
   // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
   const pp = getProduct(productId.value);
-  // 三道跳转门任一命中且带 ?resume=:那张票在这个 SKU 上再也付不了 —— 顺手作废,别让浮动条把人
-  // 反复带回来又弹走(审计 R3:门序把 resume 排在门后形成无出口循环)。
+  // 三道跳转门任一命中且带 ?resume=:这张票在这个 SKU 上暂时付不了。**不销毁**它 —— 用户可能已经按地址转账,
+  // 静默删票 = 地址与金额从本地消失、资金孤儿化(审计 R9 P1;R3 曾为断「浮动条→门→弹回」循环而删票,方向反了)。
+  // 处置:票保留在册,明确告知「待支付订单已保留 / 已转账请联系客服」;到点自然作废,或用户从扫码步取消。
   const dropResumeInvoice = () => {
     if (!resumeSessionId) return;
-    // 只作废属于本商品页的那张;?resume= 指向别的商品的票(拼错 / 拼接的 URL)不归这里处置。
-    // persist-verdict-ok: 门命中时顺手作废;删不掉 = 票留在磁盘,浮动条下次点进来再经同一道门
-    if (pending.get(resumeSessionId)?.productId === productId.value) pending.remove(resumeSessionId);
+    if (pending.get(resumeSessionId)?.productId === productId.value) toast.warn(t.value.store.pendingResumeBlocked);
     resumeSessionId = null;
   };
   if (pp?.purchaseBlocked) {
@@ -1196,7 +1195,8 @@ function releaseSessionOnLeave() {
   activeSession.value = null;
   if (pending.viewingId === s.id) pending.setViewing(null);
   if (pending.isLive(s) && pending.markLeftNotice(s.id)) {
-    toast.info(fmt(t.value.store.pendingKeptToast, { min: String(PENDING_CHECKOUT_WINDOW_MIN) }));
+    // 报的是这张票**真实**剩余分钟(与浮动条倒计时同源),不是编译期的 30(审计 R9 P1:剩 3 分钟却说保留 30 分钟)。
+    toast.info(fmt(t.value.store.pendingKeptToast, { min: String(Math.max(1, Math.ceil(pending.secondsLeft(s) / 60))) }));
   }
 }
 
@@ -1713,8 +1713,15 @@ watch(step, async (s) => {
       const releaseVoucher = (): boolean => (voucherClaimed && usedVoucherId ? voucher.release(usedVoucherId) : true);
       const invoice = activeSession.value;
       if (invoice) {
-        if (!pending.consume(invoice.id)) {
+        const taken = pending.consume(invoice.id);
+        if (taken !== "consumed") {
           if (!releaseVoucher()) reportStuckFunds(app.captureMoney(), invoice.id, "voucher");
+          if (taken === "failed") {
+            // storage 故障:票还活着、地址还在,用户可能已转账 —— 留在扫码步,让他重试,别谎称「已在别处结算」。
+            toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+            step.value = "pay-instructions";
+            return;
+          }
           toast.warn(t.value.store.pendingSettledElsewhere);
           activeSession.value = null;
           step.value = "select-payment";
@@ -1746,17 +1753,20 @@ watch(step, async (s) => {
       }
       // 扣款成功后同步移除旧机(下架),再清抵扣上下文——全程同步无 await,
       // 不存在半执行窗口;失败路径(上面 return)未动任何状态。
+      let retiredByMe = false;
       if (ti) {
-        app.devices = app.devices.filter((d) => d.id !== ti.device.id);
-        if (!app.persistAccountSnapshot()) {
-          // 下架没落盘(store 已把内存拨回磁盘那份,设备仍在):抵扣的前提不成立,这一单不能按抵扣价
-          // 成交。钱按快照精确冲正;冲不回去 = 响亮终态。(审计 R4 P0:此前丢弃返回值 —— 设备复活、
-          // 扣款照旧、订单还写着 tradeInDeviceId。)
+        // 只在设备此刻仍在册时下架(store 内断言 + 落盘):别的结算实例已经拿它抵扣过 → "absent" → 这一单不许
+        // 再吃一次抵扣(审计 R9 P0:页面直写 filter 对不在册设备是 no-op,同一台旧机两处各抵扣一次)。
+        const retired = app.retireDevice(ti.device.id);
+        retiredByMe = retired === "retired";
+        if (retired !== "retired") {
+          // "absent":抵扣的前提不成立(设备已被别处消费);"unpersisted":下架没落盘(内存已拨回,设备仍在)。
+          // 两种都不能按抵扣价成交:钱按快照精确冲正;冲不回去 = 响亮终态。
           tradein.clearApplied(tradeinOwner);
           const voucherBack = releaseVoucher();
           const moneyBack = app.restoreMoney(beforePay);
-          if (moneyBack && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-          else reportStuckFunds(beforePay, "", moneyBack ? "voucher" : "funds");
+          if (moneyBack && voucherBack && !applyTrial) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+          else reportStuckFunds(beforePay, applyTrial ? p.id : "", !moneyBack ? "funds" : !voucherBack ? "voucher" : "trial");
           step.value = "select-payment";
           return;
         }
@@ -1775,16 +1785,17 @@ watch(step, async (s) => {
         // 单子没落盘(store 已把内存那条撤掉):把上面已做掉的两件事按原路退回 —— 旧机重新上架、
         // 资金精确冲正;任一退不回去 = 响亮终态(交易号 + 待对账),绝不静默让「钱扣了 / 设备没了 /
         // 单子查无」并存(审计 R4 P1)。试用 convert 已落终态,与上面 convert 之后各失败面同一残余。
-        // 三件都做(不短路):设备回架、资金冲正、券放回;任一没成 → 响亮终态。
-        const deviceBack = !ti || app.devices.some((d) => d.id === ti.device.id)
-          || ((app.devices = [...app.devices, ti.device]), app.persistAccountSnapshot());
+        // 三件都做(不短路):设备回架(只还**本实例**下架的那台 —— 别处合法抵扣掉的不许被本实例复活)、资金冲正、券放回;
+        // 任一没成 → 响亮终态。试用已被 convert 打成终态(不可逆)→ 单独一档告知 + 登记,不许说「没有产生任何记录」。
+        const deviceBack = !retiredByMe || app.restoreDevice(ti!.device);
         const moneyBack = app.restoreMoney(beforePay);
         const voucherBack = releaseVoucher();
-        if (deviceBack && moneyBack && voucherBack) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
-        // 优先级 钱 > 设备 > 券;设备卡住时 ref 带上设备 id,对账端才知道该还哪一台。
+        if (deviceBack && moneyBack && voucherBack && !applyTrial) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        // 优先级 钱 > 设备 > 券 > 试用;设备卡住时 ref 带上设备 id,对账端才知道该还哪一台。
         else if (!moneyBack) reportStuckFunds(beforePay, "", "funds");
         else if (!deviceBack) reportStuckFunds(beforePay, ti ? ti.device.id : "", "device");
-        else reportStuckFunds(beforePay, "", "voucher");
+        else if (!voucherBack) reportStuckFunds(beforePay, "", "voucher");
+        else reportStuckFunds(beforePay, p.id, "trial");
         step.value = "select-payment";
         return;
       }

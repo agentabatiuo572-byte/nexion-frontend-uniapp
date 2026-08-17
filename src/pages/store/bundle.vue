@@ -428,9 +428,18 @@ async function onCheckout() {
   }
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;
+  // 与单品结算同一套两分支处置:数值闸 + 只读余额预检先出局(用户可自解),之后 debit 的 false 只剩落盘失败(系统故障)。
+  if (!Number.isFinite(charge) || charge < 0) {
+    toast.warn(t.value.store.coTotalQuoteChanged);
+    return;
+  }
+  if (app.user.usdtBalance < charge) {
+    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
+    return;
+  }
   const beforePay = app.captureMoney();
   if (!app.debitBalance(charge)) {
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
+    toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
     return;
   }
   const pct = discountPct.value;

@@ -191,12 +191,19 @@ export const usePendingCheckout = defineStore("pendingCheckout", () => {
    * 结算前的原子消费:磁盘最新行里这张票仍在册且在窗内 → 删掉并返 true(本调用方抢到了结算权);
    * 已被别处结算 / 取消 / 过期 → false,调用方必须拒单。花钱动作只许排在它之后。
    */
-  function consume(id: string): boolean {
+  function consume(id: string): "consumed" | "absent" | "failed" {
+    if (fundsServerEnabled) return "failed";
     if (viewingId.value === id) viewingId.value = null;
     const now = mockServerNow();
-    return commitSessions((cur) => (cur.some((s) => s.id === id && isSessionLive(s, now))
-      ? { next: cur.filter((s) => s.id !== id), result: true }
-      : null)) === true;
+    // 三态而不是布尔(审计 R9 P1):「票不在册 / 过期 = 别处已结算或取消」与「在册但写不进去 = storage 故障,票还活着」
+    // 对调用方是两件事 —— 后者不许告诉已转账用户「已在别处结算」,该让他重试。
+    const r = rows.commit<true>((cur) => (cur.sessions.some((s) => s.id === id && isSessionLive(s, now))
+      ? { next: { sessions: cur.sessions.filter((s) => s.id !== id) }, result: true }
+      : null));
+    if (r.ok) return "consumed";
+    // 提交器对「前置不成立」会把磁盘最新行同步进内存(票已不在);对「写失败」内存不动(票仍在)—— 用内存里
+    // 这张票还在不在把两种失败分开。
+    return sessions.value.some((s) => s.id === id && isSessionLive(s, now)) ? "failed" : "absent";
   }
 
   /**
