@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { scopeRoutes, concurrencyFromEnv } from "./lib/probe-routes.mjs";
 import {
   assertDirectPageCoverage,
   assertUniAppRuntimeIdentity,
@@ -63,10 +64,7 @@ function assertNoBusinessStorage(snapshot, route) {
   }
 }
 
-async function main() {
-  const browser = await chromium.launch({ headless: true });
-
-  for (const route of routes) {
+async function checkRoute(browser, route) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
     const pageErrors = [];
     const consoleErrors = [];
@@ -107,10 +105,25 @@ async function main() {
     }, businessStorageKeys);
     assertNoBusinessStorage(storage, route);
     await page.close();
-  }
+}
 
+async function main() {
+  const browser = await chromium.launch({ headless: true });
+  // 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。
+  const SCOPE = scopeRoutes(routes, "SPEC-6 entry-surface", (r) => r.replace(/^\/#/, ""));
+  // 包 ax:每条路由仍是「独立 page(独立 context / storage)+ 4.7s 稳定等待」的原口径,只是 N 条并行(PROBE_CONCURRENCY,默认 3)。
+  const queue = [...SCOPE.routes];
+  const lanes = Math.max(1, Math.min(concurrencyFromEnv(), queue.length || 1));
+  let firstErr = null;
+  await Promise.all(Array.from({ length: lanes }, async () => {
+    while (queue.length && !firstErr) {
+      const route = queue.shift();
+      try { await checkRoute(browser, route); } catch (e) { firstErr = firstErr || e; }
+    }
+  }));
   await browser.close();
-  console.log("SPEC-6 entry surfaces runtime PASS");
+  if (firstErr) throw firstErr;
+  console.log(`SPEC-6 entry surfaces runtime PASS${SCOPE.scoped ? `(scoped ${SCOPE.routes.length}/${routes.length} 路由)` : ""}`);
 }
 
 main().catch(async (err) => {

@@ -17,6 +17,7 @@
 //   node scripts/tap-feedback-probe.mjs --sweep all       # pages.json 全 88 页
 //   node scripts/tap-feedback-probe.mjs --update-ledger   # 人工审阅后重建基线
 import { chromium } from "playwright";
+import { scopeRoutes, mapRoutes } from "./lib/probe-routes.mjs";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
 // 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 统一名)——只认前者会在非 5173 端口静默打到别的工程树。
@@ -133,6 +134,8 @@ async function probeRoute(page, cdp, route, idx) {
   //    重载同时让 addInitScript 的 hook 重新注入,__tapList 不跨路由累积。
   const url = `${BASE}/?nx_device=off&r=${idx}#/${route}`;
   await page.goto(url, { waitUntil: "domcontentloaded" });
+  // 包 ax:这里**不加** settleNetwork —— 多等 1-2s 会跨过 App.vue 4s 轮询弹出的 milestone 庆祝层(ms-card),把它算进 tap 目标
+  //   (它缺 :active 反馈,属既有债,已上报);原 1200ms 窗口下并行 3 路实测目标数与串行一致(165),不需要补等。
   await page.waitForTimeout(1200);
   await page.addStyleTag({ content: NO_TRANSITION });
   const targets = await page.evaluate(markTargets, TAP_MIN);
@@ -320,17 +323,35 @@ if (SELFTEST) {
   process.exit(exitCode);
 }
 
-const routes = routesOf(SWEEP_ALL);
+const allRoutes = routesOf(SWEEP_ALL);
+// 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。ledger 只拦「新指纹」,缩范围不会假红;scoped 下 --update-ledger 拒绝。
+const SCOPE = scopeRoutes(allRoutes, "tap-feedback");
+const routes = SCOPE.routes;
+if (SCOPE.scoped && !routes.length) { console.log(`tap-feedback 无新违例(scoped 0/${allRoutes.length} 路由在受影响范围内,本轮无可扫;末轮全量会扫)`); await browser.close(); process.exit(0); }
+if (SCOPE.scoped && UPDATE) { console.error("tap-feedback:PROBE_ROUTES 范围模式下不许 --update-ledger(只扫了一部分路由,重建会丢掉没扫路由的存量)。不设 PROBE_ROUTES 全量跑再重建。"); await browser.close(); process.exit(2); }
 const results = [];
 const failedRoutes = [];
-for (const [i, r] of routes.entries()) {
-  try {
-    results.push(await probeRoute(page, cdp, r, i));
-  } catch (e) {
-    console.error(`  ! ${r}: ${e.message.split("\n")[0]}`);
-    failedRoutes.push(r);
-  }
-}
+// 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一条路由(PROBE_CONCURRENCY,默认 3);每个 lane page 自带 HOOK 注入 + 独立 CDP 会话,
+//   每条路由仍是「整页重载 → 1200ms → 逐目标 :active 判定」的原口径;结果按路由原顺序合并。
+const laneCdp = new WeakMap();
+const laneReady = async (lane) => {
+  if (laneCdp.has(lane)) return laneCdp.get(lane);
+  lane.setDefaultTimeout(15000);
+  await lane.addInitScript(HOOK);
+  const c = await lane.context().newCDPSession(lane);
+  await c.send("DOM.enable");
+  await c.send("CSS.enable");
+  laneCdp.set(lane, c);
+  return c;
+};
+const perRoute = await mapRoutes(browser, routes, async (lane, r) => {
+  const c = await laneReady(lane);
+  return await probeRoute(lane, c, r, allRoutes.indexOf(r));
+}, { context: { viewport: { width: 390, height: 844 }, locale: "en-US" } });
+perRoute.forEach((res, k) => {
+  if (!res || res.error) { console.error(`  ! ${routes[k]}: ${String(res?.error ?? "unknown").split("\n")[0]}`); failedRoutes.push(routes[k]); return; }
+  results.push(res);
+});
 await browser.close();
 
 // 指纹 = 路由 + 签名 + 类别(尺寸数值会因文案变动,不入指纹)
@@ -377,4 +398,4 @@ if (fresh.length) {
   if (fresh.length > 25) console.error(`  … 另 ${fresh.length - 25} 条`);
   process.exit(1);
 }
-console.log(`tap-feedback 无新违例(扫 ${routes.length} 路由 / ${total} 个 tap 目标;存量黄灯 ${known.size} 条)`);
+console.log(`tap-feedback 无新违例(扫 ${routes.length} 路由${SCOPE.scoped ? `(scoped ${routes.length}/${allRoutes.length})` : ""} / ${total} 个 tap 目标;存量黄灯 ${known.size} 条)`);
