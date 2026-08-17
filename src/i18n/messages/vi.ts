@@ -968,7 +968,7 @@ export const vi: Messages = {
     s3Title: "Rủi ro thị trường của token (NEX)",
     s3Body: "NEX là token thưởng của nền tảng. Giá trị quy ra USD có thể biến động ±20% mỗi ngày, tùy theo nhu cầu suy luận AI, dòng mua lại và bối cảnh thị trường crypto nói chung. Token nắm giữ không được bảo hiểm FDIC / SIPC. Đừng staking hay giữ nhiều NEX hơn mức bạn có thể chịu mất.",
     s4Title: "Thời gian rút tiền + xác nhận an toàn bổ sung",
-    s4Body: "Thời gian xử lý rút tiền theo trạng thái lệnh phía máy chủ. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng NEX — tùy chọn mặc định tắt, không bật thì không dùng NEX. Kiếm NEX qua điểm danh / đào / giới thiệu.",
+    s4Body: "Thời gian xử lý rút tiền theo trạng thái lệnh phía máy chủ. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng NEX — tùy chọn mặc định tắt, không bật thì không dùng NEX. Kiếm NEX qua điểm danh / tác vụ tính toán / giới thiệu.",
     s4BodyLargeAmount: "Lệnh rút trên ${large} có thể cần thêm bước xác nhận an toàn trong {d} ngày; thời điểm về ví lấy mốc muộn hơn trong hai mốc.",
     s5Title: "Khóa staking là không thể đảo ngược",
     s5Body: "Các pool staking (30 / 90 / 180 / 365 ngày) khóa vốn gốc trọn kỳ hạn. Mở sớm sẽ mất 100% phần lợi nhuận cộng thêm đã tích và bị trừ lần lượt 5% / 15% / 30% / 50% vốn gốc. Đọc kỹ điều khoản của từng pool trước khi khóa.",
@@ -1174,7 +1174,7 @@ export const vi: Messages = {
     breakdown: {
       label: "CƠ CẤU NẮM GIỮ",
       liquid: "Số dư khả dụng",
-      mining: "NEX đào được hôm nay",
+      mining: "NEX từ tính toán hôm nay",
       miningHint: "Từ đội thiết bị đang chạy của bạn",
       pending: "Đang chờ hồi",
       pendingHint: "Không có NEX đang hồi",
@@ -1196,7 +1196,7 @@ export const vi: Messages = {
       label: "HOẠT ĐỘNG NEX GẦN ĐÂY",
       viewAll: "Xem tất cả",
       empty: "Chưa có hoạt động NEX nào",
-      miningLabel: "Trả thưởng đào · dàn thiết bị",
+      miningLabel: "Trả thưởng tính toán · dàn thiết bị",
     },
     note: "NEX là token của nền tảng NexGrid. Bạn có thể đổi sang USDT ở mục Quy đổi, hoặc dùng để bù phí rút USDT.",
   },
@@ -2275,7 +2275,7 @@ export const vi: Messages = {
   session: {
     kickedTitle: "Phiên đã kết thúc",
     kickedBodyKicked: "Bạn đã đăng xuất khỏi phiên này. Đăng nhập lại để tiếp tục — tài khoản và tiền của bạn không bị ảnh hưởng.",
-    kickedBodyLoggedOut: "Bạn đã đăng xuất. Việc khai thác trên thiết bị này đã tạm dừng.",
+    kickedBodyLoggedOut: "Bạn đã đăng xuất. Tác vụ tính toán trên thiết bị này đã tạm dừng.",
     kickedTaskNote: "Nhiệm vụ đang chạy trên thiết bị này đã dừng; phần chưa quyết toán không được tính. Online trở lại để tiếp tục kiếm — có thắc mắc cứ liên hệ hỗ trợ.",
     kickedCta: "Đăng nhập lại",
   },
@@ -3096,7 +3096,7 @@ export const vi: Messages = {
     a_social_star_d: "Giới thiệu 5 người bạn đến NexGrid",
     a_hardware_owner: "Chủ sở hữu phần cứng",
     a_hardware_owner_d: "Mua thiết bị NexGridBox đầu tiên của bạn",
-    a_diamond_miner: "Thợ đào kim cương",
+    a_diamond_miner: "Người đóng góp kim cương",
     a_diamond_miner_d: "Thu nhập tích lũy đạt $1,000",
   },
   developer: {
@@ -3720,7 +3720,7 @@ export const vi: Messages = {
       "Chúng tôi vẫn chưa xác nhận được yêu cầu trước đó có đang được xử lý hay không, nên vẫn giữ lại yêu cầu đó cho bạn. Hãy kiểm tra trạng thái rút tiền trước; nếu không thấy, hãy thử lại đúng yêu cầu đó sau — đừng tạo yêu cầu mới.",
     withdrawDailyLimitWithPending:
       "Bạn đã dùng hết số lần rút tiền hôm nay. Yêu cầu trước đó có thể đang được xử lý và đã dùng hạn mức hôm nay — hãy kiểm tra trạng thái rút tiền trước và đừng tạo yêu cầu mới.",
-    earnNexCta: "Đào thêm NEX",
+    earnNexCta: "Kiếm thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",
     feeCharged: "Phí",
@@ -3729,7 +3729,7 @@ export const vi: Messages = {
     feeOffsetOffHint: "Bật để dùng NEX bù khoản phí này. Bạn đang có {n} NEX.",
     feeOffsetOnFull: "Sẽ dùng {nex} NEX · phí được bù toàn bộ ($0.00).",
     feeOffsetOnPartial: "Sẽ dùng {nex} NEX · bù được ${waived}, còn phải trả ${rest}.",
-    feeOffsetNoNex: "Chưa có NEX để bù phí. Kiếm NEX qua điểm danh và đào bằng thiết bị.",
+    feeOffsetNoNex: "Chưa có NEX để bù phí. Kiếm NEX qua điểm danh và tính toán bằng thiết bị.",
     feeOffsetFreeNetwork: "Mạng này hiện miễn phí, không cần bù.",
     feeWhyTitle: "Về khoản phí",
     feeWhyClose: "Đóng",
@@ -4840,7 +4840,7 @@ export const vi: Messages = {
     nexUse: "Đổi sang USDT · bù phí",
     s2Title: "NEX từ đâu ra?",
     s2Intro:
-      "NEX chỉ được đúc (tạo ra) khi có hoạt động thật diễn ra trên mạng lưới. Không đào trước, không có đợt mở khóa tập trung cho đội ngũ, không có lịch phát hành cố định.",
+      "NEX chỉ được đúc (tạo ra) khi có hoạt động thật diễn ra trên mạng lưới. Không đúc trước, không có đợt mở khóa tập trung cho đội ngũ, không có lịch phát hành cố định.",
     src1Label: "Sản lượng suy luận AI",
     src1Body:
       "Mỗi tác vụ suy luận hoàn tất trên mạng lưới đúc ra một lượng nhỏ NEX, trả cho thiết bị đã làm việc đó. Tác vụ càng lớn / càng khó thì đúc càng nhiều.",

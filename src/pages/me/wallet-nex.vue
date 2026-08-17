@@ -3,7 +3,7 @@
   User-level NEX holdings detail (vs /market platform-level). Surface:
     1. Hero — NEX balance + USD value + 24h change + sparkline + view-market link
     2. Quick actions 2-cell — Buy / Sell (NEX↔USDT exchange)
-    3. Position breakdown — Liquid / Mining accrual / Pending
+    3. Position breakdown — Liquid / Compute accrual / Pending
     4. P&L card — cost basis + unrealized P&L
     5. Use NEX — Exchange to USDT / Offset withdrawal fees (NEX = 2 functions only)
     6. Recent NEX activity list (mining + commission)

@@ -950,7 +950,7 @@ export const zh: Messages = {
     s3Title: "代币(NEX)市场风险",
     s3Body: "NEX 是平台奖励代币。其美元计价价值可能每日 ±20% 波动,受 AI 推理需求 / 回购流 / 加密市场环境影响。代币持有不受 FDIC / SIPC 保险。锁仓或持有的 NEX 数量不应超过你可承受的损失。",
     s4Title: "提现时效与安全确认",
-    s4Body: "提现处理时刻以服务端订单状态为准。每笔提现收取一笔按网络设定的固定网络确认费,不随金额浮动,部分网络可能免费;可自选用 NEX 抵扣该费用 —— 该选项默认关闭,未开启时不会消耗 NEX。NEX 可通过签到 / 挖矿 / 推荐活动获得。",
+    s4Body: "提现处理时刻以服务端订单状态为准。每笔提现收取一笔按网络设定的固定网络确认费,不随金额浮动,部分网络可能免费;可自选用 NEX 抵扣该费用 —— 该选项默认关闭,未开启时不会消耗 NEX。NEX 可通过签到 / 算力任务 / 推荐活动获得。",
     s4BodyLargeAmount: "超过 ${large} 的提现可能需要 {d} 天的额外安全确认,到账时间以两者中更晚者为准。",
     s5Title: "Staking 锁仓不可撤销",
     s5Body: "Staking 池(30d / 90d / 180d / 365d)锁仓全期不可取出。提前赎回扣除全部累计溢价,并依次扣除 5% / 15% / 30% / 50% 本金。锁仓前请单独阅读各档条款。",
@@ -1154,7 +1154,7 @@ export const zh: Messages = {
     breakdown: {
       label: "持仓结构",
       liquid: "可用余额",
-      mining: "今日挖矿收益",
+      mining: "今日算力收益",
       miningHint: "来自活跃设备",
       pending: "冷却中",
       pendingHint: "无 NEX 在冷却",
@@ -1176,7 +1176,7 @@ export const zh: Messages = {
       label: "NEX 近期记录",
       viewAll: "查看全部",
       empty: "暂无 NEX 记录",
-      miningLabel: "挖矿收益 · 设备群",
+      miningLabel: "算力收益 · 设备群",
     },
     note: "NEX 是 NexGrid 平台代币,可兑换 USDT,或用于抵扣 USDT 提现手续费。",
   },
@@ -2293,7 +2293,7 @@ export const zh: Messages = {
   session: {
     kickedTitle: "登录已结束",
     kickedBodyKicked: "当前登录已退出,重新登录即可继续;账户与资金不受影响。",
-    kickedBodyLoggedOut: "你已退出登录,本设备的挖矿已暂停。",
+    kickedBodyLoggedOut: "你已退出登录,本设备的算力任务已暂停。",
     kickedTaskNote: "本设备进行中的任务已中断,未结算部分不计入;重新上线即可继续赚取,有疑问可联系客服。",
     kickedCta: "重新登录",
   },
@@ -3114,7 +3114,7 @@ export const zh: Messages = {
     a_social_star_d: "推荐 5 位好友加入 NexGrid",
     a_hardware_owner: "硬件持有人",
     a_hardware_owner_d: "购买第一台 NexGridBox 设备",
-    a_diamond_miner: "钻石矿工",
+    a_diamond_miner: "钻石贡献者",
     a_diamond_miner_d: "累计收益达 $1,000",
   },
   developer: {
@@ -3725,7 +3725,7 @@ export const zh: Messages = {
     // 重放时撞上日限:与首次提交的日限话术不同 —— 首次是「今天不能提了」,
     // 重放是「今天不能提了,而且先前那笔可能已经占掉了额度」。
     withdrawDailyLimitWithPending: "今日提现次数已用完。先前那一笔可能已经在处理并占用了今天的额度 —— 请先到提现进度里确认,不要重新发起一笔新的。",
-    earnNexCta: "去挖矿赚 NEX",
+    earnNexCta: "去赚更多 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
     feeConfirmRow: "网络确认费",
     feeCharged: "手续费",
@@ -3734,7 +3734,7 @@ export const zh: Messages = {
     feeOffsetOffHint: "开启后用 NEX 抵扣本笔费用。当前持有 {n} NEX。",
     feeOffsetOnFull: "将消耗 {nex} NEX · 本笔费用全额抵扣($0.00)。",
     feeOffsetOnPartial: "将消耗 {nex} NEX · 可抵 ${waived},仍需支付 ${rest}。",
-    feeOffsetNoNex: "暂无 NEX 可抵扣。通过签到与设备挖矿可获得 NEX。",
+    feeOffsetNoNex: "暂无 NEX 可抵扣。通过签到与设备算力任务可获得 NEX。",
     feeOffsetFreeNetwork: "该网络当前免手续费,无需抵扣。",
     feeWhyTitle: "费用说明",
     feeWhyClose: "关闭",
@@ -4824,7 +4824,7 @@ export const zh: Messages = {
     nexUse: "兑换 USDT · 抵扣手续费",
     s2Title: "NEX 从哪来?",
     s2Intro:
-      "NEX 只在网络上发生真实活动时才被铸造(创建)——没有预挖、没有团队解锁、没有固定释放节奏。",
+      "NEX 只在网络上发生真实活动时才被铸造(创建)——没有预先铸币、没有团队解锁、没有固定释放节奏。",
     src1Label: "AI 推理产出",
     src1Body:
       "网络上每完成一笔推理任务都铸造少量 NEX 给做工作的设备。任务越大越难铸造越多。",
