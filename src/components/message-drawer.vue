@@ -13,8 +13,8 @@
   the drawer and the /me/notifications page share one feed + read state. Open
   state comes from the dedicated src/store/message-drawer.ts (NOT ui.ts). The
   chassis header BELL calls useMessageDrawer().show(); always mounted so the
-  slide-in/out plays. Backdrop + panel are absolute, scoped to the chassis (the
-  fixed positioned ancestor), matching the prototype.
+  slide-in/out plays. Root is a fixed full-bleed scrim + absolute panel — the
+  same shape as every other business half-sheet (see .md-root note below).
 
   i18n: reuses the existing `notifs` namespace (kind labels / markAll / empty
   states + drawer-only drawerTitle / unreadCount / allCaughtUp / prefsFooter).
@@ -35,7 +35,7 @@
             <text class="md-head-sub">{{ unreadLabel }}</text>
           </view>
         </view>
-        <view class="md-close" @click="close">
+        <view class="md-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -48,6 +48,9 @@
               v-if="id === 'all' || countOf(id) > 0"
               class="md-tab"
               :class="{ 'md-tab--on': filter === id }"
+              role="tab"
+              tabindex="0"
+              :aria-selected="filter === id ? 'true' : 'false'"
               @click="filter = id"
             >
               <text class="md-tab-t" :class="{ 'md-tab-t--on': filter === id }">{{ filterLabel(id) }}</text>
@@ -57,7 +60,7 @@
             </view>
           </template>
           <view class="md-tabs-spacer" />
-          <view v-if="unread > 0" class="md-markall" @click="markAll">
+          <view v-if="unread > 0" class="md-markall" role="button" tabindex="0" :aria-label="t.notifs.markAll" @click="markAll">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></svg>
             <text class="md-markall-t">{{ t.notifs.markAll }}</text>
           </view>
@@ -68,7 +71,7 @@
       <scroll-view scroll-y class="md-list" :show-scrollbar="false">
         <view v-if="notifs.error" class="md-empty">
           <text class="md-empty-t">{{ notifsErrorText }}</text>
-          <view class="md-detail-cta" data-testid="drawer-notification-retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">{{ t.ui.retry }}</text></view>
+          <view class="md-detail-cta" data-testid="drawer-notification-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">{{ t.ui.retry }}</text></view>
         </view>
         <view v-if="filtered.length === 0" class="md-empty">
           <text class="md-empty-t">{{ emptyText }}</text>
@@ -80,7 +83,7 @@
           class="md-item"
           :class="{ 'md-item--unread': !n.readAt }"
         >
-          <view class="md-row" @click="toggle(n)">
+          <view class="md-row" role="button" tabindex="0" :aria-expanded="expandedId === n.id ? 'true' : 'false'" :aria-label="n.title" @click="toggle(n)">
             <view class="md-row-ico" :style="iconBoxStyle(n.kind, !n.readAt)">
               <view v-html="kindIcon(n.kind, !n.readAt)" />
             </view>
@@ -102,7 +105,7 @@
             <view class="md-detail-inner">
               <text v-if="n.body" class="md-detail-body">{{ n.body }}</text>
               <text class="md-detail-abs tabular-nums">{{ absoluteTime(n.ts) }}</text>
-              <view v-if="n.ctaLabel && n.ctaHref" class="md-detail-cta" @click.stop="onCta(n)">
+              <view v-if="n.ctaLabel && n.ctaHref" class="md-detail-cta" role="button" tabindex="0" :aria-label="n.ctaLabel" @click.stop="onCta(n)">
                 <text class="md-detail-cta-t">{{ n.ctaLabel }}</text>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
               </view>
@@ -125,6 +128,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications, type NotifKind, type Notification } from "@/store/notifications";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { navTo } from "@/lib/route";
 
 const t = useT();
@@ -198,6 +202,12 @@ function markAll() {
 function close() {
   drawer.close();
 }
+// 🔴 焦点管理:遮罩只拦指针不拦键盘 —— 抽屉此前一个 tabindex 都没有,键盘用户既进不来
+// (关闭 / 分类 / 标记全读 / 条目 CTA 全都 Tab 不到)、Tab 又会径直走到背景的提现下单按钮。
+// 这个洞一直在,只是 .md-root 之前写成 position:absolute,机器门不把它当全屏弹层所以看不见;
+// 本轮改成 fixed 后门立刻判红(a11y-activate [G]),按仓内统一写法接平台层。
+// Enter/Space 由 lib/a11y-activate.ts 自动补,故上面只声明 role + tabindex,不手写 @keydown。
+useDialogA11y(computed(() => drawer.open), ".md-root", close);
 async function onCta(notification: Notification) {
   const canonicalRoute = await notifs.recordCta(notification.id);
   if (!canonicalRoute) return;
@@ -227,10 +237,17 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 </script>
 
 <style scoped>
+/* 🔴 层级 790/800 = 业务半屏带,与 trial-claim / voucher-claim 等同档(秩序表单源见
+   captcha-slider.vue)。原值 110/120 低于里程碑庆祝(780),抽屉开着时庆祝画在它上面
+   并模糊背景 —— 抽屉是用户主动点铃铛打开的,庆祝是自动弹的,谁让谁没有悬念。
+   position 由 absolute 改 fixed:与其余 19 个全屏遮罩同形,几何上等价(.nx-chassis 本身
+   就是 fixed + inset:0,无 transform 祖先),但**同形才进得了机器门的扫描面** ——
+   scripts/zindex-order.mjs 契约③ 只认 position:fixed 的满屏遮罩,写成 absolute 时
+   这块对门是隐形的(实测:把它从豁免清单里摘掉,门照样 0 违例)。 */
 .md-root {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 110;
+  z-index: 790;
 }
 .md-backdrop {
   position: absolute;
@@ -245,7 +262,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 120;
+  z-index: 800;
   width: 88%;
   display: flex;
   flex-direction: column;

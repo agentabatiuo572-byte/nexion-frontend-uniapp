@@ -62,6 +62,9 @@
 <script setup lang="ts">
 import { computed, watch, onMounted, onUnmounted } from "vue";
 import { useMilestones } from "@/store/milestones";
+import { usePopupArbiter } from "@/store/popup-arbiter";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -71,6 +74,9 @@ const PARTICLE_COUNT = 36;
 const ADVANCE_TICK_MS = 300;
 
 const m = useMilestones();
+const arbiter = usePopupArbiter();
+const voucherClaimSheet = useVoucherClaimSheet();
+const trialClaimSheet = useTrialClaimSheet();
 const t = useT();
 
 // ── Queue pump — same route source as global-ui.vue readRoute / App.vue
@@ -93,9 +99,28 @@ function readRoute(): string {
   return "";
 }
 
+// 令牌同步 —— 庆祝浮层与领取弹层共用一个「此刻谁占屏」的裁决点(store/popup-arbiter)。
+// 每一拍都把令牌对齐到真实状态,而不是在 promote / dismiss / park 三条出口上分别挂钩:
+// 出口漏接一个就会把令牌永久扣住,之后谁都再弹不出来;而对齐写法天然幂等,
+// 页面栈里 N 份宿主副本同时跑也收敛到同一结果(uni 不卸载被压住的页面)。
+function pumpCelebrationQueue() {
+  const route = readRoute();
+  // 🔴 「屏上有没有别人」不能只问令牌:领取弹层可以被用户从 banner 手动打开,那条路径
+  // 不经仲裁(申请失败也照开),令牌因此会与屏幕真实状态背离。独立审计实测的后果是
+  // 庆祝在弹层背后播完 5.2s 被 dismiss 消耗掉,而 markFired 早已落盘 —— 用户永远
+  // 看不到这一级奖励通知。所以直接问弹层开没开。
+  const sheetOpen = voucherClaimSheet.open || trialClaimSheet.open;
+  // B1「一次进首页只弹一个」:名额用掉后,本次进首页不再放新的庆祝上屏。
+  // 只拦首页、且只拦**新上屏**;已在放的那条不受影响(C1 永不顶替)。
+  const homeSlotUsed = route === "pages/index/index" && arbiter.visitClaimed;
+  m.advance(route, arbiter.busyForOthers("milestone") || sheetOpen || homeSlotUsed);
+  if (m.active) arbiter.acquire("milestone");
+  else arbiter.release("milestone");
+}
+
 let advTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
-  advTimer = setInterval(() => m.advance(readRoute()), ADVANCE_TICK_MS);
+  advTimer = setInterval(pumpCelebrationQueue, ADVANCE_TICK_MS);
 });
 
 // ── Derived copy (i18n) ──
@@ -188,6 +213,11 @@ watch(
       timer = setTimeout(() => m.dismiss(), OVERLAY_DURATION_MS);
     }
   },
+  // 🔴 immediate 必须留着:切底部 tab 走的是 reLaunch,会**真卸载**整个页面栈
+  // (不是 deactivate),新页面挂载出一份新宿主。而 active 是 Pinia 态、跨卸载存活 ——
+  // 不加 immediate,新宿主对这条**继承来的**庆祝不会安排关闭定时器,于是它永远不关,
+  // 泵每拍都重新 acquire 令牌,代金券/试用弹层此后整个会话再也拿不到令牌(死锁)。
+  { immediate: true },
 );
 
 onUnmounted(() => {
@@ -196,6 +226,9 @@ onUnmounted(() => {
     clearInterval(advTimer);
     advTimer = null;
   }
+  // 宿主被摘掉时(如切到静态走查路由)必须还令牌,否则占屏状态会一直扣着,
+  // 领取弹层此后永远拿不到令牌 —— 死锁比多弹一次严重得多。
+  arbiter.release("milestone");
 });
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
@@ -205,14 +238,23 @@ useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss(
 </script>
 
 <style scoped>
-/* 层级契约(2026-08-03 三路走查同族修复):庆祝弹层必须压在业务 UI 之下 —
-   .ms-overlay(8900) < .nx-toast-host(9000) < .nx-mask(9100, global-ui.vue)。
-   9300 时代它盖住支付确认弹窗与 toast 并吞点击;verify 门 selfcheck-milestone-queue
-   断言此不等式,改回 ≥9000 会红。 */
+/* 层级契约(2026-08-03 三路走查同族修复;2026-08-16 补齐业务半屏那一面):
+   庆祝弹层必须压在**业务 UI 之下** —
+   .ms-overlay(780) < 业务半屏(790/800) < .nx-toast-host(9000) < .nx-mask(9100)。
+
+   🔴 8900 是这句话没被兑现的那些年:契约原文一直写着「必须在业务 UI 之下」,
+   数值却压在全部业务半屏(790/800)之上 —— 实测表现为庆祝浮层叠在代金券领取弹层
+   正上方,并用自带的 backdrop blur 把它糊掉数十秒。两道门当时都是绿的:
+   zindex-order.mjs 的阶梯只排了登录/注册页共挂的 6 层,业务半屏一条都不在表里;
+   selfcheck-milestone-queue 也只比了庆祝对 toast / 对 .nx-mask。
+   现在两道门都补了业务半屏这一面,改回 ≥790 会红。
+
+   时间维度的互斥另有一层(store/popup-arbiter):有别的自动弹层占屏时庆祝根本不上屏。
+   本层级是它的兜底 —— 万一时间维度失效,庆祝也只会垫在业务 UI 底下,不会盖住它。 */
 .ms-overlay {
   position: fixed;
   inset: 0;
-  z-index: 8900;
+  z-index: 780;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -110,10 +110,14 @@ const taskRewardLine = computed(() => {
   });
 });
 
+// 🔴 790/800 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 79/80 是「比 790/800
+// 少一位数」那个老笔误的同族残留:低于里程碑庆祝(780),半屏开着时被庆祝盖住并吞点击。
+// 同族前三张付款半屏 2026-08-16 已归位,这三处(本文件 / fx-rate-line / wallet-withdraw)
+// 因为写成 JS 样式对象、机器门只扫 <style> 块与内联 style,当时没被扫到,2026-08-17 补齐。
 const scrimStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 79,
+  zIndex: 790,
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
@@ -122,7 +126,7 @@ const sheetStyle: CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  zIndex: 80,
+  zIndex: 800,
   borderTopLeftRadius: "16px",
   borderTopRightRadius: "16px",
   background: "var(--v5-surface)",

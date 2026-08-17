@@ -399,7 +399,7 @@ useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
 .nx-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 79;
+  z-index: 790;
   background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px);
 }
@@ -408,7 +408,7 @@ useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 80;
+  z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
 }

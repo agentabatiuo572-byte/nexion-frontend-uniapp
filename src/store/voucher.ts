@@ -68,10 +68,18 @@ export const useVoucher = defineStore("voucher", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   const claimed = ref<ClaimRecord[]>([]);
   const remoteCatalog = ref<VoucherDef[]>([]);
+  /**
+   * 目录是否已到货。mock 档目录是同步字面量,恒为 true;remote 档要等 refreshRemote 落地。
+   * 🔴 存在的意义:空目录有**两种**含义 —— 「还没拉回来」与「拉回来了确实没有可领券」。
+   * 自动弹层编排必须能区分:前者要等(否则低优先级的试用弹层会抢跑,这正是实测缺陷),
+   * 后者要立刻让位。仅凭 `claimableVouchers.length === 0` 两者不可区分。
+   */
+  const catalogReady = ref(!remoteApiEnabled);
 
   function clearRemoteFacts() {
     claimed.value = [];
     remoteCatalog.value = [];
+    catalogReady.value = !remoteApiEnabled;
   }
 
   function toVoucherDef(row: Awaited<ReturnType<typeof voucherApi.state>>["vouchers"][number]): VoucherDef {
@@ -109,9 +117,12 @@ export const useVoucher = defineStore("voucher", () => {
           claimedAt: 0,
           usedAt: voucher.grantStatus === "USED" ? 0 : null,
         }));
+      catalogReady.value = true;
       return true;
     } catch {
       clearRemoteFacts();
+      // 拉取失败也算「等到头了」:再等下去只会把自动弹层无限期卡住,让位给下一个候选。
+      catalogReady.value = true;
       return false;
     }
   }
@@ -285,6 +296,7 @@ export const useVoucher = defineStore("voucher", () => {
     refreshRemote,
     claimableVouchers,
     catalog,
+    catalogReady,
     claimedUnused,
     expiredVouchers,
     hasClaimableForSurface,
