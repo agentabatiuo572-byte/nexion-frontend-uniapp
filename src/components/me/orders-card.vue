@@ -89,8 +89,7 @@ const browseBtnStyle: CSSProperties = {
   fontSize: "13px",
 };
 const footerStyle: CSSProperties = {
-  marginTop: "12px",
-  paddingTop: "12px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  // 去线(主人 2026-08-17 全站令):分组靠留白,总间距沿用有线时代的 12+12。
+  marginTop: "24px",
 };
 </script>
