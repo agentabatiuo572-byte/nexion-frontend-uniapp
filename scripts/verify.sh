@@ -141,7 +141,7 @@ probe_retry_selftest() {
   # ③ 接线完整性:被包真跑调用点数 = census 期望(解包/漏包即红)。锚定行首 if(注释诱饵免疫,
   # tester M5)+ 绝对路径(cwd≠仓根时 $0 相对路径假红,P2-4)+ 不用 `|| echo 0`(grep -c 零命中
   # 时打印 0 且退出码 1,会产出 "0\n0" 两行值,P2-10)
-  local expected_sites=18 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live)
+  local expected_sites=19 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live);2026-08-17 包 am:+1 = 提现账单行门远端档隔离起服
   actual_sites=$(grep -cE '^[[:space:]]*if probe_retry .*"\$NODE_BIN" scripts/' "$vfile" 2>/dev/null); actual_sites=${actual_sites:-0}
   [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
   if [ -z "$bad_bits" ]; then
@@ -3148,8 +3148,19 @@ bill_producer_gate
 # 判据:①两条同单号分录(USDT 负额在途 + NEX 负额)②共用 ts 且真落盘 ③金额取服务端回执
 # (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
 # 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
+# 该门要求 fundsServerEnabled(远端档)server:给了 REMOTE_BASE_URL 就用它;没给就自己起一台远端档隔离 server
+# (verify-h5-runtime.mjs --remote-withdraw,同 H5 运行时门的隔离起服机制)—— 裸跑 verify 不再因为只有 mock 靶而必红。
 withdraw_bill_runtime_gate() {
-  local withdraw_base_url="${REMOTE_BASE_URL:-$BASE_URL}"
+  if [ -z "${REMOTE_BASE_URL:-}" ]; then
+    if probe_retry /tmp/uniapp-withdraw-bill-runtime.log "$NODE_BIN" scripts/verify-h5-runtime.mjs --remote-withdraw; then
+      ok "提现账单行 runtime 门(远端档隔离起服)— $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
+    else
+      bad "提现账单行 runtime 门失败 — node scripts/verify-h5-runtime.mjs --remote-withdraw 看明细(或给 REMOTE_BASE_URL 指一台远端档 server)"
+      grep -E "^  FAIL|Error" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
+    fi
+    return
+  fi
+  local withdraw_base_url="$REMOTE_BASE_URL"
   if probe_retry /tmp/uniapp-withdraw-bill-runtime.log env BASE_URL="$withdraw_base_url" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
     ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
   else

@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverSessionReloadRecoveryOnly = process.argv.includes("--server-session-reload-recovery");
+// --remote-withdraw:给「提现账单行 runtime」门起一台**远端档**隔离 server(该门要求 fundsServerEnabled 且非 sandbox,
+// mock 靶下必红)。verify.sh 在 REMOTE_BASE_URL 未给时走这条,不再依赖手动多传环境变量(2026-08-17 主人拍板)。
+const remoteWithdrawOnly = process.argv.includes("--remote-withdraw");
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -83,7 +86,7 @@ const server = spawn(serverCommand, serverArgs, {
   cwd: root,
   env: {
     ...process.env,
-    VITE_NEXGRID_API_MODE: serverSessionReloadRecoveryOnly ? "sandbox" : "mock",
+    VITE_NEXGRID_API_MODE: remoteWithdrawOnly ? "remote" : serverSessionReloadRecoveryOnly ? "sandbox" : "mock",
   },
   shell: false,
   stdio: ["ignore", "pipe", "pipe"],
@@ -99,7 +102,9 @@ try {
   // starve those timers on Windows and create a false red even though the same
   // witness passes immediately in isolation. Keep the security-critical route
   // suites deterministic, then parallelise only the independent DOM probes.
-  const outputs = serverSessionReloadRecoveryOnly
+  const outputs = remoteWithdrawOnly
+    ? [await runGate("withdraw-bill-runtime.mjs", baseUrl)]
+    : serverSessionReloadRecoveryOnly
     ? [await runGate("server-session-reload-recovery-runtime.mjs", baseUrl)]
     : [
       await runGate("guard-liveness-runtime.mjs", baseUrl),
@@ -120,7 +125,9 @@ try {
       ]),
     ];
   for (const output of outputs) console.log(output.split(/\r?\n/).at(-1));
-  console.log(serverSessionReloadRecoveryOnly
+  console.log(remoteWithdrawOnly
+    ? `withdraw-bill runtime: PASS (isolated remote-mode server ${port})`
+    : serverSessionReloadRecoveryOnly
     ? `H5 server-session reload recovery: PASS (isolated server ${port}, returning + fresh flows)`
     : `H5 runtime gates: PASS (isolated server ${port}, 22 scenarios + 6 direct probes)`);
 } finally {
