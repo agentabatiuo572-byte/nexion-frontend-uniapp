@@ -7,6 +7,10 @@
 #     命中的重门(清单 scripts/gates.manifest.json,未声明的门照跑,命中全局不变量清单自动升 full);
 #     static 不需要 dev server,只跑静态门(runtime/server 类一律 SCOPED-SKIP)。跳过的格三态点名,
 #     结果行与 .verify-exit.code 第 2 行都带 mode= scoped_skip=,scoped/static 绿 ≠ 全量绿。
+#   包 ax(2026-08-18):门可在清单里声明 `pages`(页面文件 / glob / "*"),范围 = inputs ∪ 页面 import 闭包
+#     (scripts/lib/import-graph.mjs);scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)
+#     只扫「受影响路由 ∩ 射程」(env PROBE_ROUTES,由 route_scope <门id> 按门下发;门自身脚本/基线变了仍全扫;full 一律清空)。
+#     探针多 lane 并行:PROBE_CONCURRENCY(默认 3;theme 门固定 1;=1 即回到逐路由串行)。
 #
 # Checks:
 #   (1) vue-tsc type-check (whole project, must be 0 errors)

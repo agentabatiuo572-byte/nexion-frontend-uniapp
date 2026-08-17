@@ -20,8 +20,8 @@ VITE_NEXGRID_API_MODE=mock npm run dev:h5     # H5 dev（verify 的合法靶必�
 npm run dev:mp-weixin     # 微信小程序 dev
 npm run build:h5          # H5 生产构建 → dist/
 npm run type-check        # vue-tsc --noEmit（裸跑）；npm run type-check:cached = 指纹缓存壳（同树重复 1s；变了裸跑 ~35s;--incremental 因假绿禁用，门链都走这个）
-npm run verify            # 🔴 全量档（full）：18 步链 runner（tsc → 契约测试 → 生产构建 → 运行时探针 → verify.sh 458 格），各步自起本树隔离 server，实测 ~24 min（基线 29）
-npm run verify:scoped     # 范围档：只跑「git 改动集 ∩ 门声明输入」命中的重门（scripts/gates.manifest.json），子任务交 tester 前用；耗时与改动面成正比（只碰页面/组件类文件明显省；碰 src/store/** 因多数运行时门都依赖 store,接近全量 ~18 min；改门基建/全局清单文件自动升 full）
+npm run verify            # 🔴 全量档（full）：18 步链 runner（tsc → 契约测试 → 生产构建 → 运行时探针 → verify.sh 462 格），各步自起本树隔离 server，实测 ~16 min（route 类探针多 lane 并行后；此前 24-26,基线 29）
+npm run verify:scoped     # 范围档：只跑「git 改动集 ∩（门声明输入 ∪ 门驱动页面的 import 闭包）」命中的重门（scripts/gates.manifest.json 的 inputs/pages），且 route 类探针只扫受影响路由；子任务交 tester 前用；耗时与改动面成正比（只碰一页/一个页面局部组件实测 ~2.6 min；碰被 app-chassis 间接引用的 store（多数）仍接近全量,那是真实耦合不是清单粗；改门基建/全局清单文件自动升 full）
 npm run verify:static     # 静态档：不起 server，vue-tsc（缓存）+ 静态哨兵，实测 3-4 min（Stop hook 每回合末自动跑；树未变 / 只改文档秒退）
 node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 ```
