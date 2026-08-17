@@ -2,21 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { namespaceBlock } from "./lib/i18n-namespace.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 /** 按大括号配对抠出某个顶层 i18n 命名空间的正文;抠不到就抛,不返回空串(空集会让断言全过)。 */
-function namespaceBlock(source, name) {
-  const start = source.search(new RegExp(`^  ${name}: \\{`, "m"));
-  assert.ok(start >= 0, `i18n 词典里找不到命名空间 ${name} —— 判据失效,按红处理`);
-  let depth = 0;
-  for (let i = source.indexOf("{", start); i < source.length; i += 1) {
-    if (source[i] === "{") depth += 1;
-    else if (source[i] === "}") { depth -= 1; if (depth === 0) return source.slice(start, i + 1); }
-  }
-  assert.fail(`命名空间 ${name} 的大括号未闭合 —— 判据失效,按红处理`);
-}
+// 🔴 2026-08-17 起搬到 `scripts/lib/i18n-namespace.mjs`,与 social-facts-authority-contract 共用一份
+//(那边同日也要按命名空间锚 i18n key)。留在这里让另一处复制 = 「修了一道门、漏了另一道」。
+//    本文件下面那两条「按命名空间取值,不许整文件子串匹配」的断言就是共享模块的回归靶。
 
 test("G1 remote mode consumes the server staking authority and fails closed", () => {
   const source = read("src/store/staking.ts");

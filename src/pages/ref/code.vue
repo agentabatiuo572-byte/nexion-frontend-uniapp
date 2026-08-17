@@ -110,7 +110,7 @@
           <text>SOC 2 Type II</text>
           <text>ISO 27001</text>
           <text>GDPR · MSB</text>
-          <text>CertiK audited</text>
+          <text>{{ t.ref.certikAudited }}</text>
         </view>
       </view>
 

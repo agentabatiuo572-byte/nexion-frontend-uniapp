@@ -281,6 +281,33 @@ i18n_cjk_gate() {
 }
 i18n_cjk_gate
 
+# ── 硬编码英文用户文案哨兵(2026-08-17)────────────────────────────────────────
+# 上面那道门只判**中文**,英文那一面此前无人守(它最后一条红测把纯英文页面明确放行)。
+# 实证代价:wallet-card.vue 的槽位行长期写成 `{{ n }} live · {{ m }} slots open`,
+# 中文 / 越南语界面直出英文,456 格门一条都没响,是独立验收 agent 在越南语截图里肉眼发现的。
+# 本门补这条轴:渲染位(模板文本节点 / 静态可见属性 / 插值展示位 / pages.json 标题)上
+# 出现的每个英文词都必须被显式授权(ticker / 品牌 / 认证名 / 单位 / 格式掩码),否则拦。
+# 判据形状是实测定的:script 里的字符串字面量有 15579 条候选,那条轴判不了,故不在判定面内。
+i18n_en_gate() {
+  # 日志名带 PID:多棵树并发跑同一道门时,固定名会让 `tail -1` 打印**别的树**那轮的总结行
+  # (memory 里有实付案例:据末行判成 4 红、实为并发别人的)。判决本身取自退出码,不受影响。
+  local slog="${TMPDIR:-/tmp}/uni-i18n-en-selftest.$$.log" glog="${TMPDIR:-/tmp}/uni-i18n-en.$$.log"
+  if "$NODE_BIN" scripts/i18n-hardcoded-en-copy-sentinel.mjs --selftest > "$slog" 2>&1; then
+    ok "$(tail -1 "$slog")"
+  else
+    bad "i18n-en selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-en-copy-sentinel.mjs --selftest 看明细)"
+    tail -8 "$slog" | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/i18n-hardcoded-en-copy-sentinel.mjs > "$glog" 2>&1; then
+    ok "$(tail -1 "$glog")"
+  else
+    bad "页面/组件的渲染位上有硬编码英文用户文案 — 真文案搬进 src/i18n/messages/{en,zh,vi}.ts;技术词进 TECH_TOKENS;属性名进 NON_COPY_ATTRS;工程话写 i18n-en-ok: 理由"
+    tail -14 "$glog" | sed 's/^/        /'
+  fi
+}
+i18n_en_gate
+
 # ── 远端权威契约门(2026-08-10 接线)────────────────────────────────────────────
 # 它此前是**孤儿门**:package.json 的 verify 链没有它,本文件也没有它 —— 于是它红了
 # 半天没人知道(实测:本轮把 wallet-exchange 的中文文案收进 i18n 后 G2 立刻红,

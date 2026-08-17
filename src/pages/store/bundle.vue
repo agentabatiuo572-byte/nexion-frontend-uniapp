@@ -91,10 +91,10 @@
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="itemNameStyle">{{ p.name }}</text>
             <text class="block" :style="itemMetaStyle">
-              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">Earns +${{ p.dailyEarn.toFixed(2) }}/d</text>
+              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
             </text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="`Remove ${p.name}`" @click.stop="remove(p.id)">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: p.name })" @click.stop="remove(p.id)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -111,13 +111,13 @@
             :style="suggestionRowStyle(i === suggestions.length - 1)"
             role="button"
             tabindex="0"
-            :aria-label="`Add ${p.name}`"
+            :aria-label="fmt(t.uiChrome.addItem, { name: p.name })"
             @click.stop="onAddSuggestion(p)"
           >
             <view class="flex-1 min-w-0 text-left">
               <text class="block truncate" :style="suggestionNameStyle">{{ p.name }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">Earns +${{ p.dailyEarn.toFixed(2) }}/d</text>
+                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
               </text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">

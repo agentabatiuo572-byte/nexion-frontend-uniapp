@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { assertKeyInAllLocales } from "./lib/i18n-namespace.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -59,7 +60,15 @@ test("remote market board renders only the server-owned home truth rows", () => 
   assert.match(board, /app\.homeTruth\?\.marketBoard\.workloads \?\? \[\]/);
   assert.match(board, /v-if="!remoteApiEnabled"/);
   assert.match(board, /v-if="homeMarketRows\.length"/);
-  assert.match(board, /Unavailable/);
+  // 🔴 2026-08-17:原断言钉的是**英文字面量** `Unavailable`,而那句话已收进 i18n(它此前在
+  //    中文 / 越南语界面直出英文,由 i18n-hardcoded-en-copy-sentinel 抓出)。字面量断言与
+  //    「文案必须走词典」这条不变量方向相反 —— 任何一次正确的 i18n 收编都会让它翻红,
+  //    于是两道门不可能同时绿(同 g-remote-authority-contract 早先踩过的那一坑)。
+  //    改锚 i18n key + 三语有值,守的语义(无权威时显式不可用、不编数)没变而且更强:
+  //    key 被删或某语种译文被清空时也判红,字面量断言对这两种失效全瞎。
+  // key 名收尾带边界:不带的话 `unavailableXX` 这种笔误 key 照样匹配,页面渲染空白而门报绿。
+  assert.match(board, /t\.uiChrome\.unavailable\b(?!\w)/);
+  assertKeyInAllLocales(read, "uiChrome", ["unavailable"]);
 });
 
 test("purchase social proof consumes the authenticated storefront activity API", () => {

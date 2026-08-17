@@ -79,7 +79,8 @@
             <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):进词典就成了
                  用户文案契约,词典打包摇不掉会原样进生产包。本门只判中文,这行英文不撞门 —— 别收进词典。
                  另:这个按钮宽 44px 写死,换文案前先量宽度("处理中"36px→"Submitting…"70.6px 会溢出;
-                 "Wait…"34.8px 才放得下)。 -->
+                 "Wait…"34.8px 才放得下)。
+                 i18n-en-ok: 沙箱直充按钮的工程话,仅验收沙箱档可见 -->
             <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "+25 USDT" }}</text>
           </view>
         </view>

@@ -64,7 +64,9 @@
         <!-- Footnote nudging toward re-staking -->
         <view v-if="extraFromCompounding > 0" class="tabular-nums" :style="footnoteStyle">
           <text style="color: var(--v5-brand); font-weight: 500">+${{ extraText }}</text>
-          <text> from compounding · re-stake {{ cycles }}× at maturity</text>
+          <!-- 分隔空格显式拼在表达式里,不藏在词典值的前导空格里(不可见契约,trim 型格式化会静默吃掉);
+               也不能只在模板里打一个空格 —— Vue 的空白折叠会把标签边上的空白删掉(实景实测粘成 `+$550来自复投`)。 -->
+          <text>{{ " " + fmt(t.stakingV3.calc.compoundSuffix, { n: cycles }) }}</text>
         </view>
       </template>
 

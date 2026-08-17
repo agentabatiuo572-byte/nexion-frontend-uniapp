@@ -91,7 +91,7 @@
               <text class="block truncate" :style="podiumHandleStyle">{{ p.row.handle }}</text>
               <text class="block" :style="{ fontSize: '12px' }">{{ p.row.flag }}</text>
               <text class="block font-mono-tabular tabular-nums" :style="podiumEarnStyle(p.prize.color)">{{ fmtCompactUSD(p.row.earnedUSDT) }}</text>
-              <text class="block" :style="{ marginTop: '2px', fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ p.row.directs }} directs</text>
+              <text class="block" :style="{ marginTop: '2px', fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ fmt(t.leaderboard.chips.directs, { n: p.row.directs }) }}</text>
             </view>
           </view>
           <view style="margin-top: 14px; padding: 10px 2px 0; border-top: 1px solid var(--v5-border); display: flex; flex-direction: column; gap: 6px">
@@ -133,7 +133,7 @@
                 </view>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <text class="font-mono-tabular" :style="vRankChipStyle">V{{ row.vRank }}</text>
-                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)' }">{{ row.teamSize.toLocaleString() }} team</text>
+                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)' }">{{ fmt(t.leaderboard.chips.teamSize, { n: row.teamSize.toLocaleString() }) }}</text>
                   <text v-if="row.delta !== 0" class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: row.delta > 0 ? 'var(--v5-brand)' : 'var(--v5-brand-2)' }">{{ row.delta > 0 ? "↑" : "↓" }}{{ Math.abs(row.delta) }}</text>
                 </view>
               </view>

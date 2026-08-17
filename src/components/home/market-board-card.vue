@@ -47,7 +47,7 @@
         <text class="truncate" style="font-size: 12px; color: var(--v5-ink-2)">{{ row.name ?? row.code }}</text>
         <text class="font-mono-tabular" style="color: var(--v5-ink)">{{ row.price === null ? "—" : `$${row.price}` }} <text style="color: var(--v5-ink-3)">{{ row.deltaPct === null ? "" : `${row.deltaPct >= 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%` }}</text></text>
       </view>
-      <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">Unavailable</text>
+      <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
     </view>
   </view>
 </template>
