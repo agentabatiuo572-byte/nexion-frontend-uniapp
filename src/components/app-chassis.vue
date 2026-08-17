@@ -139,8 +139,9 @@
     </view>
 
     <!-- Nova 浮标 — tab routes only. Remote mode keeps the real Gemma entry
-         resident; mock mode retains the prototype's unread-triggered behavior. -->
-    <NovaBubble v-if="isTabRoute" />
+         resident; mock mode retains the prototype's unread-triggered behavior.
+         `dimmed` = 正在滚动 → 让路给内容(见 markScrolling)。 -->
+    <NovaBubble v-if="isTabRoute" :dimmed="scrolling" />
 
     <!-- Chassis-level overlays (each self-gates on its own store's open state,
          mirroring the prototype IOSFrame). Ported P-043. -->
@@ -359,7 +360,24 @@ function pageScrollKey(): string {
     return route.value;
   }
 }
+// ── Nova 浮标让路 —— 滚动中淡出,停下再淡回 ──
+// 浮标 fixed 在右下角,而内容区一直延伸到它下面(内容底部只留 TABBAR_INSET=104px,
+// 浮标含浮动动画顶到 152px)→ 它永远横在正在读的内容上。滚动 = 用户在看内容,
+// 此刻让它隐身;停下 SCROLL_IDLE_MS 后淡回(主人 2026-08-17 拍板)。
+// 复位靠 debounce 而非 scrollend:后者 Safari / uni webview 都还没有。
+const SCROLL_IDLE_MS = 200;
+const scrolling = ref(false);
+let scrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
+function markScrolling() {
+  scrolling.value = true;
+  if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+  scrollIdleTimer = setTimeout(() => {
+    scrolling.value = false;
+    scrollIdleTimer = null;
+  }, SCROLL_IDLE_MS);
+}
 function onChassisScroll() {
+  markScrolling();
   const el = chassisScrollDom();
   if (el) saveScrollPos(scrollMemKey, el.scrollTop);
 }
@@ -470,6 +488,7 @@ onUnmounted(() => {
   if (scrollDom && typeof scrollDom.removeEventListener === "function") {
     scrollDom.removeEventListener("scroll", onChassisScroll);
   }
+  if (scrollIdleTimer) { clearTimeout(scrollIdleTimer); scrollIdleTimer = null; }
   stopAutoPush();
 });
 
