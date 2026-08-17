@@ -83,27 +83,46 @@
 
         <!-- LISTINGS TAB -->
         <template v-if="tab === 'listings'">
-          <scroll-view scroll-x class="nx-sort-row">
-            <view class="flex items-center" style="gap: 6px; white-space: nowrap">
-              <text class="inline-flex items-center" :style="sortLabelStyle">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-                <text>{{ t.marketplace.sortLabel }}</text>
-              </text>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
-            </view>
-          </scroll-view>
+          <template v-if="sortedListings.length > 0">
+            <scroll-view scroll-x class="nx-sort-row">
+              <view class="flex items-center" style="gap: 6px; white-space: nowrap">
+                <text class="inline-flex items-center" :style="sortLabelStyle">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+                  <text>{{ t.marketplace.sortLabel }}</text>
+                </text>
+                <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
+                <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
+                <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
+              </view>
+            </scroll-view>
 
-          <view class="grid grid-cols-2" style="gap: 10px">
-            <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" :disabled="secondaryBlock !== null" @buy="handleBuy(l)" />
-          </view>
+            <view class="grid grid-cols-2" style="gap: 10px">
+              <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" :disabled="secondaryBlock !== null" @buy="handleBuy(l)" />
+            </view>
+          </template>
+          <!-- 一条挂单都没有 ——《06 缺省页规范》禁空容器/白屏。排序 pill 一并撤:
+               对空列表排序点了没有可观测变化,属规范里的 dead control。
+               关闭态不给「从一级预订」CTA:一级与二级同读 marketOpenState,那时跳过去是死路,
+               而关闭原因顶部已有说明条讲清,这里不复述。 -->
+          <EmptyState
+            v-else
+            kind="empty-list"
+            :title="t.empty.genesisListingsTitle"
+            :desc="t.empty.genesisListingsDesc"
+            :cta-label="secondaryBlock === null ? t.marketplace.reservePrimary : undefined"
+            emphasis
+            @cta="goGenesis"
+          />
         </template>
 
         <!-- ACTIVITY TAB(真实成交 + 虚拟成交混排,FEAT-GEN10)-->
-        <view v-else-if="tab === 'activity'" class="overflow-hidden" :style="listCardStyle">
-          <ActivityRow v-for="(e, i) in mergedActivity" :key="e.id" :e="e" :is-last="i === mergedActivity.length - 1" />
-        </view>
+        <template v-else-if="tab === 'activity'">
+          <view v-if="mergedActivity.length > 0" class="overflow-hidden" :style="listCardStyle">
+            <ActivityRow v-for="(e, i) in mergedActivity" :key="e.id" :e="e" :is-last="i === mergedActivity.length - 1" />
+          </view>
+          <!-- 同上:零事件时原样渲染 listCardStyle 会留一个零高度的空 surface 盒子。 -->
+          <EmptyState v-else kind="empty-list" :title="t.empty.genesisActivityTitle" :desc="t.empty.genesisActivityDesc" />
+        </template>
 
         <!-- MINE TAB -->
         <template v-else>
@@ -140,6 +159,7 @@ import ActivityRow, { type ActivityEvent } from "@/components/genesis/activity-r
 import MyTokenCard from "@/components/genesis/my-token-card.vue";
 import OpenSeaModal from "@/components/genesis/opensea-modal.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
@@ -318,9 +338,8 @@ const ercLineStyle: CSSProperties = {
   letterSpacing: "0.02em",
 };
 const statGridStyle: CSSProperties = {
-  marginTop: "14px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 14+14。
+  marginTop: "28px",
   gap: "8px",
 };
 const statLabelStyle: CSSProperties = {

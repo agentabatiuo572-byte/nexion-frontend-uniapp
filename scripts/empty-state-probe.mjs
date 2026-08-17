@@ -43,6 +43,11 @@ const ROUTES = [
   { r: "pages/support/messages" },
   { r: "pages/store/bundle" },
   { r: "pages/me/rewards-list" },
+  // 默认落在「在售」页签,清空 remoteListings 即空态。
+  // 🔴 这条是 2026-08-17 独立验收抓出来的:本表只登记「已经接了 EmptyState 的页面」,
+  //    所以**压根没接**的页面对它天然隐形 —— 创世市场在售列表空了 400px 白,门一路报绿。
+  //    补这条只是把本页纳管;「哪些页该有空态却没有」是本门看不见的另一条轴,已上报。
+  { r: "pages/genesis/marketplace" },
 ];
 
 const browser = await chromium.launch({ headless: true });
