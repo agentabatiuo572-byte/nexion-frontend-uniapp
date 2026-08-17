@@ -78,7 +78,7 @@
           <view style="min-width: 0">
             <view class="flex items-center" style="gap: 6px">
               <view aria-hidden :style="pulseDotStyle" />
-              <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-3)">{{ onlineCount }} live · {{ emptySlots }} slots open</text>
+              <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-3)">{{ slotsLine }}</text>
             </view>
             <view class="flex items-baseline" style="gap: 4px; margin-top: 4px">
               <text style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-ink-2)">{{ t.me.walletSlotUnlock }}</text>
@@ -140,6 +140,7 @@ const onlineCount = computed(
   () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length + trialSlot.value,
 );
 const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUpgrade(app.visibleDevices).targetDaily));
+const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { online: onlineCount.value, open: emptySlots.value }));
 
 const billsThisMonth = computed(() => {
   const now = new Date();

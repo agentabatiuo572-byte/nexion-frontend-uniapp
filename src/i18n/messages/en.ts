@@ -2447,6 +2447,7 @@ export const en = {
     quickActions: "Quick actions",
     walletSlotUnlock: "Unlock",
     walletSlotMore: "more",
+    walletSlotsLine: "{online} live · {open} slots open",
     withdrawalLocked: "Minimum not reached yet",
     withdrawalLockedBody: "You need ${min} minimum (need ${short} more). At phone-tier earnings of $0.06/d, that's ~325 days. A NexGridBox S1 hits $20 in under 3 days.",
     withdrawalLockedBrowse: "Browse hardware",
