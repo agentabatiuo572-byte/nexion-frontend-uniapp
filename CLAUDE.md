@@ -35,7 +35,7 @@ verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另�
 ## 完成门（宣布 module done 前必走）
 
 1. `npm run verify` → 全绿（full 档；含 vue-tsc 0 错。**setup store 别写 `(): ReturnType =>` 返回类型注解**，让 Pinia 自动推导（否则 TS2740））。
-2. verify.sh 458 格里含 15+ 源码哨兵：React 残留（`className=`/`useState`/JSX 自闭）、反向词（庞氏/杀猪盘/ponzi）、hex 硬码（禁用色号）、SFC 闭合、native `<button>` 禁用、chassis 完整性、CSS 基础、路由有效性；子任务内循环用 `verify:scoped`，回合末 Stop hook 跑 `verify:static`。
+2. verify.sh 462 格里含 15+ 源码哨兵：React 残留（`className=`/`useState`/JSX 自闭）、反向词（庞氏/杀猪盘/ponzi）、hex 硬码（禁用色号）、SFC 闭合、native `<button>` 禁用、chassis 完整性、CSS 基础、路由有效性；子任务内循环用 `verify:scoped`，回合末 Stop hook 跑 `verify:static`。
 3. Browser self-check（Playwright）：每个改动路由 navigate + console error=0 + 截图。**verify 绿 ≠ 渲染 OK**（只有浏览器抓 hydration / 遮挡 / 字色回归）。
 4. 清理 `.playwright-mcp/` 和临时 `*.png`。
 5. PRD sync：按 `nexion-prd-sync` Step 2 判据**自行判定**并执行（主人 2026-08-15 拍板：不再询问），收尾汇报写明「已同步 §X / 未同步+理由」（标准 PRD 风格，不加 changelog）。

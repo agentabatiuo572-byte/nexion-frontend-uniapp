@@ -252,7 +252,7 @@ export function probeScriptRoots(entry) {
   return [...roots];
 }
 
-/** 门级路由范围 → env 串:"*" 全扫;[] → "__none__"(探针扫 0 条);否则逗号串。 */
+/** 门级路由范围 → env 串:"*" 全扫;[] 也回 "*"(交集空 = 全扫,绝不下发 0 扫描;F-03);否则逗号串(无前导 /)。 */
 export function routesOfDecision(d) {
   if (!d || d.routes === undefined || d.routes === "*") return "*";
   // 🔴 去掉前导 "/":Git Bash(MSYS)会把以 / 开头的 env 值当 POSIX 路径改写成 C:/Program Files/Git/pages/…(实测 PROBE_ROUTES 整串被改,探针 0 命中);
@@ -304,6 +304,32 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
     if (e.routeScoped && !routeScopeCalls.has(k)) problems.push(`gates.${k} 标了 routeScoped,verify.sh 里却没有 route_scope ${k}(探针会继承别的门的 PROBE_ROUTES / 或全扫)`);
   }
   for (const id of routeScopeCalls) if (!(manifest.gates || {})[id]?.routeScoped) problems.push(`verify.sh 调了 route_scope ${id},但 manifest.gates.${id} 没标 routeScoped:true`);
+  // R2-06:route_scope 必须排在同门 scope_hit 之后(scope_hit 入口会 unset PROBE_ROUTES,倒序 = 白设、门静默退回全扫)
+  for (const [k, e] of Object.entries(manifest.gates || {})) {
+    if (!e.routeScoped) continue;
+    const hitAt = verifySh.search(new RegExp(`scope_hit\\s+${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w.-])`));
+    const rsAt = verifySh.search(new RegExp(`route_scope\\s+${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w.-])`));
+    if (hitAt >= 0 && rsAt >= 0 && rsAt < hitAt) problems.push(`gates.${k}: route_scope 排在 scope_hit 之前 —— scope_hit 会先 unset PROBE_ROUTES,倒序等于没缩范围`);
+  }
+  // R2-02:routeScoped 门声明的每一页,探针脚本里必须真的会扫(路由字面出现在探针脚本里);pages:"*" 的门探针从 pages.json 取,免查
+  for (const [k, e] of Object.entries(manifest.gates || {})) {
+    if (!e.routeScoped || e.pages === "*" || !Array.isArray(e.pages)) continue;
+    let src = ""; for (const inp of e.inputs || []) if (/^scripts\/[^*?]+\.mjs$/.test(inp)) { try { src += fs.readFileSync(path.join(ROOT, inp), "utf8"); } catch { /* skip */ } }
+    for (const pg of expandPages(e, pageRoutes(ROOT))) {
+      const route = pg.replace(/^src\//, "").replace(/\.vue$/, "");
+      if (!src.includes(route)) problems.push(`gates.${k}: pages 声明了 ${pg},但探针脚本里没有路由字面 ${route} —— 探针不会扫它,scoped 下会「跑了却扫 0 条」`);
+    }
+  }
+  // R2-07:两个 h5 伞门的 inputs 必须 = verify-h5-runtime.mjs + h5Probes 全部子探针脚本(三处手抄会漂)
+  {
+    const expected = new Set(["scripts/verify-h5-runtime.mjs", ...Object.keys(manifest.h5Probes || {}).map((id) => `scripts/${id}.mjs`)]);
+    for (const [sec, id] of [["gates", "h5-runtime-isolated"], ["steps", "test:h5-runtime"]]) {
+      const e = (manifest[sec] || {})[id]; if (!e) continue;
+      const got = new Set(e.inputs || []);
+      const missing = [...expected].filter((x) => !got.has(x)); const extra = [...got].filter((x) => !expected.has(x));
+      if (missing.length || extra.length) problems.push(`${sec}.${id}.inputs 必须恰好 = verify-h5-runtime.mjs + h5Probes 子探针脚本(缺 ${missing.join(",") || "-"};多 ${extra.join(",") || "-"})`);
+    }
+  }
   const allPagesL = pageRoutes(ROOT); const pageFilesL = new Set(allPagesL.map((p) => p.file));
   for (const [k, e] of Object.entries(manifest.gates || {})) checkGlobs(`gates.${k}`, e.inputs);
   for (const [k, e] of Object.entries(manifest.steps || {})) checkGlobs(`steps.${k}`, e.inputs);
