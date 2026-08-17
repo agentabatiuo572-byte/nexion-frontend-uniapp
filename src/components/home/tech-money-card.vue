@@ -12,9 +12,11 @@
     class="relative isolate"
     style="padding: 8px 2px 12px"
   >
-    <!-- Left purple glow — soft radial, blurred so its edges feather into the black page bg -->
+    <!-- Left purple glow — soft radial, blurred so its edges feather into the black page bg.
+         Reads --v5-nex (not legacy --accent-purple): identical #7C5CFF in light, lifted to
+         #B47FFF in dark so the glow tracks the theme instead of staying constant. -->
     <view
-      style="position: absolute; inset: 0; background: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--accent-purple) 45%, transparent) 0%, transparent 66%); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
+      style="position: absolute; inset: 0; background: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--v5-nex) 45%, transparent) 0%, transparent 66%); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
     />
     <!-- Tech grid (brand-tinted, masked) -->
     <view
