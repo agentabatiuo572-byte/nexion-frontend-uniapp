@@ -357,6 +357,23 @@ else
   tail -12 /tmp/uni-withdraw-rail-alias.log | sed 's/^/        /'
 fi
 
+# 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
+# 钱路「落盘 / CAS 判决必须被消费」—— AST 门(审计 R4→R6 同族五次:返回值当语句丢掉)。先自测门本身会红,再扫钱路文件。
+if node scripts/selfcheck-persist-verdict.mjs --selftest > /tmp/uni-persist-verdict-selftest.log 2>&1 && node scripts/selfcheck-persist-verdict.mjs > /tmp/uni-persist-verdict.log 2>&1; then
+  ok "persist-verdict — $(tail -1 /tmp/uni-persist-verdict.log)"
+else
+  bad "persist-verdict:钱路上有落盘 / CAS / 资金原语的返回值被丢弃(node scripts/selfcheck-persist-verdict.mjs 看明细)"
+  cat /tmp/uni-persist-verdict-selftest.log /tmp/uni-persist-verdict.log | tail -20 | sed 's/^/        /'
+fi
+# 账号隔离 / 过期剪除 / 一次性离开提示 + 建单落盘契约(createOrder / createOrders 落盘失败返 null,不留内存孤儿单;一批一次落盘)+ 单次券核销 CAS(先占后花,双实例只成一次;release 放回)+ 恢复发票逐项 min 对账 + 存储行取值域 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
+# (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
+if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts src/store/free-trial.persist.test.ts > /tmp/uni-pending-checkout-vitest.log 2>&1; then
+  ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
+else
+  bad "pending-checkout vitest 失败(npx vitest run src/store/pending-checkout*.test.ts 看明细)"
+  sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | tail -15 | sed 's/^/        /'
+fi
+
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
@@ -502,6 +519,23 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 # with Ref unwrapping (state typed as a plain value ≠ the returned Ref<T>) →
 # TS2740. Setup stores must let Pinia infer the return (cf. market/profile).
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
+# 付款腿禁止定时器自动推进(2026-08-16 pkg/ad checkout-cancel):chain-payment.vue 曾用 12s setTimeout
+# 模拟「网络看到入金」自动 emit("complete") —— 把「取消」变成 12 秒按钮、把用户推进一笔他没确认的扣款。
+# 付款完成只能来自用户动作(我已完成支付)或服务端权威回读。判据:付款腿组件里 setTimeout/setInterval
+# 的回调体(≤300 字符内)不得出现 emit("complete")。ceiling(如实):回调体超长或经变量间接 emit 抓不到,
+# 运行时判据由 tester「扫码页停 60s 不自行推进」+ scripts/pending-checkout-runtime.mjs(停 15s 不推进)兜。
+# ceiling 补充(2026-08-16 审计):文件名枚举(第三条腿要手动加进来)/ 变量间接 emit 抓不到;checkout.vue 里
+# awaiting→confirmed 的 2.4s 定时器是用户点「我已完成支付」**之后**的 mock 结算腿,不在本门语义内。
+# 红测:把 12s 定时器加回 chain-payment → 本门红。
+pay_auto=$("$NODE_BIN" -e '
+const fs=require("fs");const bad=[];
+for (const f of ["src/components/store/chain-payment.vue","src/components/store/card-payment.vue"]) {
+  if(!fs.existsSync(f)) { bad.push(f+": missing (payment leg component renamed? update the sentinel)"); continue; }
+  const s=fs.readFileSync(f,"utf8"); const re=/set(?:Timeout|Interval)\(([\s\S]{0,300}?)emit\(\s*["'"'"']complete["'"'"']\s*\)/g; let m;
+  while((m=re.exec(s))){ const line=s.slice(0,m.index).split(/\r?\n/).length; bad.push(f+":"+line+" timer-driven emit(\"complete\")"); }
+}
+if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
+if [ -z "$pay_auto" ]; then ok "payment leg never auto-completes (no timer-driven emit(\"complete\"))"; else bad "payment leg has a timer-driven complete (mock auto-arrival)"; echo "$pay_auto" | sed 's/^/        /'; fi
 # 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-096;合并重编号,勿与 P-097=server 退化混淆):toLocale* 不传 locale
 # (无参 / undefined / [])= 跟浏览器走,应用 en + 浏览器 zh 时渲染 "Member since 2026年7月",
 # 同字符串还会画进 proof 分享海报 canvas。Date 格式化一律传 src/i18n/format.ts 的 dateLocale()。
@@ -1712,7 +1746,7 @@ sentinel_present "P2-8 account-scope helper rebinds orders" src/lib/account-scop
 sentinel_present "P2-8 account-scope helper rebinds bills" src/lib/account-scope.ts 'useBills\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds staking" src/lib/account-scope.ts 'useStaking\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds commission" src/lib/account-scope.ts 'useCommission\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 orders store is account-scoped" src/store/orders.ts 'writeAccountRow'
+sentinel_present "P2-8 orders store is account-scoped" src/store/orders.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 bills store is account-scoped" src/store/bills.ts 'writeAccountRow'
 sentinel_present "P2-8 staking store is account-scoped" src/store/staking.ts 'writeAccountRow'
 sentinel_present "P2-8 commission store is account-scoped" src/store/commission.ts 'writeAccountRow'

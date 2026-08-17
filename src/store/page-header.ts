@@ -21,12 +21,21 @@ export interface PageHeaderPayload {
 
 export const usePageHeader = defineStore("pageHeader", () => {
   const header = ref<PageHeaderPayload | null>(null);
+  // Who registered the current header. Page teardown (onHide / onUnmounted) is not
+  // ordered against the next page's onShow: after checkout → checkout(resume) → back,
+  // the popped page's clear() used to run AFTER the surviving page had re-set its
+  // header, wiping it (no back button, no title). A clear only clears its own entry.
+  let owner: symbol | null = null;
 
-  function set(payload: PageHeaderPayload) {
+  function set(payload: PageHeaderPayload, by: symbol | null = null) {
     header.value = payload;
+    owner = by;
   }
-  function clear() {
+  /** Clear the header — when `by` is given, only if that page still owns it. */
+  function clear(by: symbol | null = null) {
+    if (by !== null && owner !== null && owner !== by) return;
     header.value = null;
+    owner = null;
   }
 
   return { header, set, clear };

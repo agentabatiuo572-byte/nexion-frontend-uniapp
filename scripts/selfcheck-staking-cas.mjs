@@ -334,9 +334,11 @@ function diskRev() {
   // 未登记的消费者就红 —— 台账不写在被查文件里,否则改代码顺手改台账 = 门等于没有。
   // 沿革:二期原本还有第六个 withdraw-daily-count,已于 2026-08-11 随包 z2 整体删除
   // (日限改由提现单列表现算,没有第二份计数状态,自然也不需要 CAS 防覆盖)。
+  // 2026-08-16 pkg/ad:pending-checkout(结算待支付发票)三期接入 —— 「同账号至多一张活票」与「一张票至多结算一次」
+  // 两条不变量都靠磁盘最新行复核,纯覆盖写在多标签页下必双开/双付。
   const CAS_CONSUMERS = [
     "daily-powerup.ts", "deposits.ts", "lucky-spin.ts", "nex-faucet.ts",
-    "staking.ts", "voucher.ts",
+    "orders.ts", "pending-checkout.ts", "staking.ts", "voucher.ts", // orders 2026-08-17 R10:整行覆盖写丢已付款单 → CAS
   ];
   const storeFiles = readdirSync(STORE_DIR).filter((f) => f.endsWith(".ts"));
   samples.storeFiles = storeFiles.length;

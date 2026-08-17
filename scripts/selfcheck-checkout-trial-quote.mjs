@@ -157,14 +157,14 @@ export function build(deps) {
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
           voucherDiscount, tradeinCredit, nowTick, reportStuckFunds,
-          remoteApiEnabled, tradein } = deps;
+          remoteApiEnabled, tradein, activeSession, pending, voucher, appliedTradeinView } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
 ${viewSlice}
 ${netPriceSlice}
   async function settle(ctx) {
-    const { trialQuote, quotedTotal, p, discount, ti, isCard, step } = ctx;
+    const { trialQuote, quotedTotal, p, discount, ti, isCard, step, usedVoucherId } = ctx;
 ${paySlice}
     return { charged: true, chargeTotal, net, fee, applyTrial, promo,
              trialOffsetUSD, trialRemainderUSD, shadowNEXNow };
@@ -198,7 +198,8 @@ const T = {
       coTrialQuoteChanged: "TRIAL_QUOTE_CHANGED",
       coTotalQuoteChanged: "TOTAL_QUOTE_CHANGED",
     },
-    errors: { insufficientBalanceMsg: "INSUFFICIENT {amt}" },
+    errors: { insufficientBalanceMsg: "INSUFFICIENT {amt}", txNotSavedTitle: "TX_NOT_SAVED", txNotSavedMsg: "TX_NOT_SAVED_MSG" },
+    voucher: { quoteChanged: "VOUCHER_QUOTE_CHANGED" },
   },
 };
 
@@ -215,12 +216,19 @@ async function bench(opts) {
     productPrice = null,
     // R5 固定靶:退款自己也落盘失败(补偿链的下一层),必须走响亮终态而不是通用文案。
     restoreFails = false,
+    // 2026-08-17 pkg/ad(审计 R5 P1:R4 的两条钱路规则零机器门):
+    //   invoiceAmount = 本页持有的链上发票票面;结算必须恰好按它成交(≠ 即拒单)。null = 无发票(卡 / 余额)。
+    //   voucherClaimOk = 单次券核销 CAS 的判决(false = 别处已用掉这张券 → 必须拒单、零扣款)。
+    invoiceAmount = null,
+    voucherClaimOk = true,
   } = opts;
   const store = { row: { ...row }, converted: false };
   const toasts = [];
   const debits = [];
   const restores = [];
   const stuck = [];
+  const voucherClaims = [];
+  const voucherReleases = [];
   let payClock = payClockAt;
   const deps = {
     computed: computedShim,
@@ -228,7 +236,7 @@ async function bench(opts) {
     accruedShadow,
     mockServerNow: () => payClock,
     cardFeeUsd: (n) => +(n * 0.029).toFixed(2),
-    toast: { warn: (m) => toasts.push(m), success: () => {}, info: () => {} },
+    toast: { warn: (m) => toasts.push(m), error: (m) => toasts.push(m), success: () => {}, info: () => {} },
     t: T,
     fmt: fmtShim,
     app: {
@@ -268,6 +276,18 @@ async function bench(opts) {
     tradein: { appliedTradein: null },
     remoteApiEnabled: false,
     nowTick: { value: clockAt },
+    // 2026-08-16 pkg/ad:结算块在扣款前先原子消费待支付发票(pending.consume);本 harness 验的是
+    // 报价链,不持发票 —— 桩成「无发票」让该段跳过(发票一次性语义由 pending-checkout.test.ts 与
+    // 运行时门 pending-checkout-runtime 场景 E 看守)。少这两个桩 = ReferenceError 整门崩掉。
+    activeSession: { value: invoiceAmount == null ? null : { id: "inv-1", amountUsdt: invoiceAmount } },
+    // R6:netPrice 的服务端权威抵扣报价改从 appliedTradeinView 读(不再直读全局槽);本 harness 钉本地链 → null
+    appliedTradeinView: { value: null },
+    pending: { consume: () => "consumed" },
+    // 券 store:核销 = CAS 判决(先占后花);release = 之后失败面放回。真语义在 store/voucher.ts。
+    voucher: {
+      markUsed: (id) => { voucherClaims.push(id); return voucherClaimOk; },
+      release: (id) => { voucherReleases.push(id); return true; },
+    },
   };
   const api = mod.build(deps);
   // ── 展示侧:确认页此刻渲染的净额 / 总额(卡费按净额算,与页面同式)──
@@ -288,9 +308,10 @@ async function bench(opts) {
     ti: tradein > 0 ? { credit: tradein, device: { id: "dev-old", name: "Old" } } : null,
     isCard: { value: isCard },
     step,
+    usedVoucherId: voucher > 0 ? "V-1" : null,
   });
   return { shownNet, shownTotal, snapshot, mode, out, step: step.value, toasts, debits, restores, stuck,
-    converted: store.converted };
+    converted: store.converted, voucherClaims, voucherReleases };
 }
 
 // ── ② 正常 grace 内 → 按展示净额扣款(基线:守卫不能误伤正常单)──
@@ -449,7 +470,7 @@ async function bench(opts) {
   check("wiring", "W8 convert 判定在扣款之后(不可逆终态不许排在钱扣住之前)",
     idxConvert > 0 && idxDebit > 0 && idxDebit < idxConvert);
   check("wiring", "W8b convert 失败分支必须退款,且退款返回值被消费(退不回去 → 响亮终态)",
-    /if\s*\(app\.restoreMoney\(beforePay\)\)/.test(payBare) && /reportStuckFunds\(beforePay\)/.test(payBare));
+    /(?:if\s*\(|const \w+ = )app\.restoreMoney\(beforePay\)/.test(payBare) && /reportStuckFunds\(beforePay/.test(payBare));
   check("wiring", "W9 建单在扣款之后(任一前置守卫 return 都必然零建单)", idxOrder > idxDebit);
   check("wiring", "W10 族级兜底闸在位:扣款额超过展示总额一律拒单",
     /if\s*\(chargeTotal > quotedTotal\)/.test(payBare));
@@ -473,6 +494,31 @@ async function bench(opts) {
   check("settle", "⑥金额非数值 → 零扣款", b.debits.length === 0);
   check("settle", "⑥金额非数值 → 试用**未被烧成终态**(守卫排在 convert 之前)", b.converted === false);
   check("settle", "⑥金额非数值 → 回报价步 + 提示", b.step === "select-payment" && b.toasts.length > 0);
+}
+
+// ── ⑦ 链上发票按票面恰好成交(R4 P1 / R5 P1 机器门):实扣 ≠ 票面 → 拒单零扣款;相等 → 成交 ──
+{
+  const exact = await bench({ row: rowGrace, clockAt: T0 + 5 * D, invoiceAmount: 608 });
+  check("settle", "⑦票面 608 = 实扣 608 → 成交", exact.out && exact.out.charged === true && exact.debits.length === 1);
+  const under = await bench({ row: rowGrace, clockAt: T0 + 5 * D, invoiceAmount: 649 });
+  check("settle", "⑦票面 649 > 实扣 608(窗内多出的优惠)→ 拒单,零扣款", under.out === undefined && under.debits.length === 0);
+  check("settle", "⑦票面不等 → 回报价步 + 「金额已变」提示", under.step === "select-payment" && under.toasts.includes("TOTAL_QUOTE_CHANGED"));
+  const over = await bench({ row: rowGrace, clockAt: T0 + 5 * D, invoiceAmount: 600 });
+  check("settle", "⑦票面 600 < 实扣 608(优惠没了)→ 票面闸拒单,零扣款", over.out === undefined && over.debits.length === 0);
+  check("settle", "⑦拒单时试用未被烧成终态", under.converted === false && over.converted === false);
+}
+
+// ── ⑧ 单次券先占后花(R5 P0):核销 CAS 排在扣款之前;抢不到 → 拒单零扣款;之后失败 → 放回 ──
+{
+  const win = await bench({ row: rowGrace, clockAt: T0 + 5 * D, voucher: 100 });
+  check("settle", "⑧券核销成功 → 成交,核销恰一次且排在扣款之前", win.out && win.voucherClaims.length === 1 && win.debits.length === 1);
+  const lose = await bench({ row: rowGrace, clockAt: T0 + 5 * D, voucher: 100, voucherClaimOk: false });
+  check("settle", "⑧券已在别处用掉(CAS 失败)→ 拒单,零扣款,试用未烧", lose.out === undefined && lose.debits.length === 0 && lose.converted === false);
+  check("settle", "⑧券 CAS 失败 → 回报价步 + 券提示", lose.step === "select-payment" && lose.toasts.includes("VOUCHER_QUOTE_CHANGED"));
+  const later = await bench({ row: rowGrace, clockAt: T0 + 5 * D, voucher: 100, convertReturns: false });
+  check("settle", "⑧核销后 convert 拒绝 → 券放回(release 恰一次)+ 退款", later.out === undefined && later.voucherReleases.length === 1 && later.restores.length === 1);
+  const noVoucher = await bench({ row: rowGrace, clockAt: T0 + 5 * D });
+  check("settle", "⑧无券单不碰券 store(既不核销也不放回)", noVoucher.voucherClaims.length === 0 && noVoucher.voucherReleases.length === 0);
 }
 
 // ── 收口:样本量地板(防空集假绿)──

@@ -326,8 +326,8 @@ async function handleDeactivate(d: Device) {
   });
   if (ok && remoteApiEnabled) await runRemoteDeviceCommand(d, "deactivate");
   else if (ok) {
-    app.deactivateDevice(d.id);
-    toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
+    if (app.deactivateDevice(d.id)) toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
+    else toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg); // 没落盘 = 没停用,设备还在跑,别宣布已停用
   }
 }
 
@@ -415,9 +415,10 @@ async function onSheetForce() {
   const d = sheetDevice.value;
   if (!d) return;
   if (remoteApiEnabled) await runRemoteDeviceCommand(d, "deactivate");
-  else {
-    app.deactivateDevice(d.id);
+  else if (app.deactivateDevice(d.id)) {
     toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
+  } else {
+    toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
   }
   sheetDevice.value = null;
 }

@@ -12,7 +12,7 @@
   at once with no per-page edits.
 -->
 <template>
-  <view class="spv" :style="{ top: statusBarHeight + 'px', height: rowH + 'px' }">
+  <view class="spv" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
     <view
       class="spv-side spv-back"
       role="button"
@@ -48,7 +48,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject, ref } from "vue";
+import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications } from "@/store/notifications";
 import { useT } from "@/i18n/use-t";
@@ -57,6 +58,9 @@ import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const props = defineProps<{ back: string; title?: string; subtitle?: string }>();
+// 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
+// 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
+const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
 
 const drawer = useMessageDrawer();
 const notifications = useNotifications();

@@ -190,9 +190,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     };
   }
 
-  function persist() {
-    if (remoteApiEnabled) return;
-    writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
+  /** 远端档不落本地盘 = 预期结果;mock 档如实返回写入结果(convert 据此决定终态算不算落定)。 */
+  function persist(): boolean {
+    if (remoteApiEnabled) return true;
+    return writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
   }
 
   /** 边界推进唯一入口:resolve 后有变化才落盘(poll/convert 共用;渲染路径禁调)。 */
@@ -202,7 +203,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const resolved = resolveTrialAt(row, now, useTrialConfig().config);
     if (resolved !== row) {
       load(resolved);
-      persist();
+      persist(); // persist-verdict-ok: 边界推进 = 行 + now 纯推导,没落盘下次从旧行重算得到同一结果
     }
     return resolved;
   }
@@ -387,6 +388,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const cfg = useTrialConfig().config;
     const now = mockServerNow();
     const exp = now + cfg.trialDays * ONE_DAY_MS;
+    // 🔴 快照取在**任何**字段改动之前(审计 R7 P0:曾取在 status 置 active 之后,落盘失败回滚成
+    // 「active + 全空边界」的坏行,解析器 fail-closed 判 ended 并被 poll 落盘 —— 一次性试用资格被永久烧掉)。
+    const beforeStart = snapshot();
     status.value = "active";
     startedAt.value = now;
     expiresAt.value = exp;
@@ -395,7 +399,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     shadowFrozenAtUSD.value = 0;
     shadowFrozenAtNEX.value = 0;
     legacyCardMigrated.value = false;
-    persist();
+    if (!persist()) {
+      load(beforeStart); // 没落盘 = 没开始:别让页面宣布「试用已开始」而刷新后什么都没有
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 
@@ -454,9 +461,17 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const now = mockServerNow();
     const resolved = advanceTo(now);
     if (resolved.status !== "active" && resolved.status !== "grace") return { ok: false, reason: "used" };
+    const prevStatus = status.value;
+    const prevFinishedAt = finishedAt.value;
     status.value = "converted";
     finishedAt.value = now;
-    persist();
+    // 终态必须落盘才算裁决成立:写不进去就退回内存,报 ok:false —— 否则调用方按「已转化」发放试用减免与
+    // 入账,刷新后试用行仍是 active,同一份福利可再吃一次(审计 R5 P1)。
+    if (!persist()) {
+      status.value = prevStatus;
+      finishedAt.value = prevFinishedAt;
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 
@@ -490,9 +505,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
     }
     if (status.value !== "active") return { ok: false, reason: eligibility().reason ?? "unknown" };
+    const beforeEnd = snapshot();
     status.value = "ended";
     finishedAt.value = mockServerNow();
-    persist();
+    if (!persist()) {
+      load(beforeEnd);
+      return { ok: false, reason: "unknown" };
+    }
     return { ok: true };
   }
 

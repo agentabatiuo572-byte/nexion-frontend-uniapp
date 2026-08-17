@@ -853,6 +853,7 @@ export const useApp = defineStore("app", () => {
     };
     miningPaused.value = false;
     adoptAccountSnapshot(boundSnapshot, true);
+    // persist-verdict-ok: 换号后的首拍落盘;失败时磁盘保持原样、内存已拨回,后续每次资金动作各自落盘复验
     persistAccountSnapshot();
   }
 
@@ -1085,6 +1086,7 @@ export const useApp = defineStore("app", () => {
     }
     // R1 释放判定: attest 达标 → 释放待审/锁定;熔断命中 → 待审升锁定。
     user.value = applyReleaseOutcome(user.value, evaluateAttestRelease(accountKey.value, clusterEval), now);
+    // persist-verdict-ok: 收益结算 tick 每秒重跑,这一拍没落盘下一拍从磁盘状态重算(单调、幂等)
     persistAccountSnapshot();
   }
 
@@ -1119,6 +1121,7 @@ export const useApp = defineStore("app", () => {
   function _devGrantManualRelease() {
     if (import.meta.env.PROD) return; // 资金释放入口,store 层二层 guard(硬规则5)
     user.value = applyReleaseOutcome(user.value, _devGrantManualReleaseLedger(accountKey.value), Date.now());
+    // persist-verdict-ok: dev 入口,非生产路径
     persistAccountSnapshot();
   }
 
@@ -1146,6 +1149,7 @@ export const useApp = defineStore("app", () => {
             onlineHeartbeatAt: null,
           };
     });
+    // persist-verdict-ok: 手机运行态遥测,非资金;失败时内存已拨回,下一次心跳重写
     persistAccountSnapshot();
   }
 
@@ -1170,6 +1174,7 @@ export const useApp = defineStore("app", () => {
           }
         : d,
     );
+    // persist-verdict-ok: 手机校准遥测,非资金;失败时内存已拨回,下一次心跳重写
     persistAccountSnapshot();
   }
 
@@ -1185,6 +1190,7 @@ export const useApp = defineStore("app", () => {
         ? { ...d, currentTask: null, interruptedAt: null, miningSince: null, lastSettledAt: null, onlineHeartbeatAt: null }
         : d,
     );
+    // persist-verdict-ok: 任务中断态,失败时内存已拨回;任务引擎下一 tick 复验
     persistAccountSnapshot();
   }
 
@@ -1192,6 +1198,7 @@ export const useApp = defineStore("app", () => {
   // recalibration complete). tick() resumes assigning tasks + accruing.
   function resumeMining() {
     miningPaused.value = false;
+    // persist-verdict-ok: 任务恢复态,同上
     persistAccountSnapshot();
   }
 
@@ -1204,12 +1211,52 @@ export const useApp = defineStore("app", () => {
   // Returns the new device id so callers that chain activate/debit/bill use
   // the returned id, NOT `.filter(kind).pop()` (Batch C Round 1 P0 #4: pop()
   // picked the wrong same-kind device when inventory already held one).
-  function addDevice(kind: DeviceKind, options: CreateDeviceOptions = {}): string {
+  /**
+   * 结算抵扣下架:只在这台设备**此刻仍在册**时才删并落盘 —— "retired" = 本实例下架成功;"absent" = 别的实例已经
+   * 拿它抵扣过(或它早就没了),这一单不许再吃一次抵扣;"unpersisted" = 在册但落盘失败(内存已拨回)。
+   * (审计 R9 P0:页面直写 devices.filter 对不在册的设备是 no-op,persistAccountSnapshot 只说写盘成没成,
+   * 同一台旧机被两个结算实例各抵扣一次。券与发票都有 CAS,设备是梯子上第三个一次性资产。)
+   */
+  function retireDevice(deviceId: string): "retired" | "absent" | "unpersisted" {
+    if (!devices.value.some((d) => d.id === deviceId)) return "absent";
+    devices.value = devices.value.filter((d) => d.id !== deviceId);
+    deviceTimers.delete(deviceId);
+    return persistAccountSnapshot() ? "retired" : "unpersisted";
+  }
+
+  /** 补偿:把本实例刚下架的那台设备原样放回(只放回自己下架的;不在册才放,已在册 = 别处已还)。返回落盘结果。 */
+  function restoreDevice(device: Device): boolean {
+    if (devices.value.some((d) => d.id === device.id)) return true;
+    devices.value = [...devices.value, device];
+    deviceTimers.set(device.id, { vital: 0 });
+    return persistAccountSnapshot();
+  }
+
+  /** 改一台设备的字段并落盘(页面不许直写 devices;补偿 / 回滚用)。 */
+  function patchDevice(deviceId: string, patch: Partial<Device>): boolean {
+    if (!devices.value.some((d) => d.id === deviceId)) return false;
+    devices.value = devices.value.map((d) => (d.id === deviceId ? { ...d, ...patch } : d));
+    return persistAccountSnapshot();
+  }
+
+  /** 撤回一台刚生出来、还没被任何单据引用的设备(履约推进落盘失败的补偿)。返回落盘结果。 */
+  function discardSpawnedDevice(deviceId: string): boolean {
+    devices.value = devices.value.filter((d) => d.id !== deviceId);
+    deviceTimers.delete(deviceId);
+    return persistAccountSnapshot();
+  }
+
+  /** 生一台设备。落盘失败 → 内存已被 persistAccountSnapshot 拨回磁盘那一拍(设备不在),返回 null:
+   *  调用方拿不到 id 就不许把它当已存在的设备用(审计 R7 P1:此前失败照样返回 id,履约把幽灵 id 写进订单)。 */
+  function addDevice(kind: DeviceKind, options: CreateDeviceOptions = {}): string | null {
     const id = `${kind}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
     const newDevice = createDevice(kind, id, options);
     deviceTimers.set(id, { vital: 0 });
     devices.value = [...devices.value, newDevice];
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      deviceTimers.delete(id);
+      return null;
+    }
     return id;
   }
 
@@ -1224,11 +1271,11 @@ export const useApp = defineStore("app", () => {
     const normalizedModel = gpuModel.trim() || "NVIDIA GeForce RTX 4070";
     const gpuTier = matchGpuTier(normalizedModel, cfg.config.computeShare.gpuTiers);
     const deviceId = addDevice("pc-gpu", { gpuModel: normalizedModel, gpuTier });
+    if (!deviceId) return { ok: false, reason: "activation-failed" };
     const ok = activateDevice(deviceId, reservedSlots);
     if (!ok) {
-      devices.value = devices.value.filter((d) => d.id !== deviceId);
-      deviceTimers.delete(deviceId);
-      persistAccountSnapshot();
+      // persist-verdict-ok: 撤回刚生的设备;撤不掉也只是多一台未激活库存机,下面照样返回失败
+      discardSpawnedDevice(deviceId);
       return { ok: false, reason: "activation-failed" };
     }
     settle();
@@ -1251,14 +1298,14 @@ export const useApp = defineStore("app", () => {
         ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), onlineHeartbeatAt: null, pendingDeactivate: false }
         : d,
     );
-    persistAccountSnapshot();
-    return true;
+    // 落盘失败 = 没激活(内存已拨回):如实返 false,调用方按「激活未成」处置,别把幽灵激活当成功。
+    return persistAccountSnapshot();
   }
 
   // Clears activatedAt + zeroes runtime telemetry so the device exits earnings
   // contribution while staying in inventory. Per spec the current-task reward
   // is forfeited (currentTask → null without dispatching its reward).
-  function deactivateDevice(id: string) {
+  function deactivateDevice(id: string): boolean {
     devices.value = devices.value.map((d) =>
       d.id === id
         ? {
@@ -1277,7 +1324,8 @@ export const useApp = defineStore("app", () => {
           }
         : d,
     );
-    persistAccountSnapshot();
+    // 停用没落盘 = 没停用(内存已拨回):如实返回,调用方据此决定文案(设备页) / 是否继续(置换)。
+    return persistAccountSnapshot();
   }
 
   // Sprint #146-1 supplement: graceful deactivation. Marks the device for
@@ -1304,6 +1352,7 @@ export const useApp = defineStore("app", () => {
           : { ...d, pendingDeactivate: true }
         : d,
     );
+    // persist-verdict-ok: 排期停用标记,失败时内存已拨回,用户可重按;非资金
     persistAccountSnapshot();
   }
 
@@ -1384,6 +1433,7 @@ export const useApp = defineStore("app", () => {
           const refundedAt = cur.nexRefundedAt ?? mockServerNow();
           withdrawals.value = withdrawals.value.map((w) =>
             (w.id === wd.id ? { ...w, nexRefunded: burnedNex, nexRefundedAt: refundedAt } : w));
+          // persist-verdict-ok: 退款证据没落盘 → 下次调用按幂等键重放补写(见上文注释)
           persistAccountSnapshot();
         }
       }
@@ -2323,6 +2373,7 @@ export const useApp = defineStore("app", () => {
     const updated: Withdrawal =
       nextStatus === "confirmed" ? { ...wd, status: nextStatus, confirmedAt: wd.estimatedCompletion } : { ...wd, status: nextStatus };
     withdrawals.value = withdrawals.value.map((w, i) => (i === pos ? updated : w));
+    // persist-verdict-ok: dev 入口,非生产路径
     persistAccountSnapshot();
   }
 
@@ -2358,6 +2409,6 @@ export const useApp = defineStore("app", () => {
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
-    addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
+    addDevice, discardSpawnedDevice, retireDevice, restoreDevice, patchDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });
