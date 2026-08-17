@@ -37,19 +37,24 @@ export interface Product {
   tier: "Entry" | "Pro" | "Flagship" | "Share";
   tagline: string;
   badge?: string;
-  // 🔴 全部服务端显示规格一律可选:后端这几列本就可空(运营在后台表单留空即不下发),
-  // 而 uptime/warranty/phoneDailyEarn* 后端连列都没有。缺失在渲染层降级成本地化占位串
-  // (lib/product-copy.ts 的 specText),不是解析失败——解析失败会连整份目录一起作废。
+  // 🔴 服务端显示规格一律可选:后端这几列本就可空(运营在后台表单留空即不下发)。
+  // 缺失在渲染层降级成本地化占位串(lib/product-copy.ts 的 specText),不是解析失败——
+  // 解析失败会连整份目录一起作废(P-110)。
   gpu?: string;
   vram?: string;
   hashRate?: string;
   power?: string;
   /** Server-owned managed-service specification; explicit "unavailable" is valid. */
   datacenter?: string;
-  uptime?: string;
-  warranty?: string;
-  phoneDailyEarn?: string;
-  phoneDailyEarnNEX?: string;
+  /**
+   * 质保期,**月数**。单位由前端按语言拼(与 ai.* 同一模式),因此天然三语;
+   * 各 SKU 不同(整机 24 个月、Pro v2 / Rack P1 五年、Rack P2 十年),不是平台常量。
+   * 🔴 曾经是自由串 `warranty?: string` 且后端无此列,于是详情页恒显示英文兜底;
+   * 更早还曾对**所有** SKU 一律显示「24 个月」——对 10 年质保的机型是假承诺。
+   * 在线率 SLA 与手机日收益已从本模型移除:前者是平台统一承诺(走 i18n 文案),
+   * 后者是平台手机档位配置(走 mock/phone-tiers 的 typicalPhoneDailyUsdt),都不是商品属性。
+   */
+  warrantyMonths?: number;
   dailyEarn: number;        // USDT/day
   dailyEarnNEX: number;     // NEX/day (spec §3.1)
   // Q9: annual ROI is DERIVED, not stored — see annualRoiPct() below. A stored
@@ -99,6 +104,7 @@ export const PRODUCTS: Product[] = [
     vram: "96GB VRAM",
     hashRate: "1,240 MH/s",
     power: "1,200W TDP",
+    warrantyMonths: 24,
     dailyEarn: 7,
     dailyEarnNEX: 40,
     price: 649,
@@ -132,6 +138,7 @@ export const PRODUCTS: Product[] = [
     vram: "192GB VRAM",
     hashRate: "2,480 MH/s",
     power: "2,400W TDP",
+    warrantyMonths: 24,
     dailyEarn: 13,
     dailyEarnNEX: 80,
     price: 1199,
@@ -167,6 +174,7 @@ export const PRODUCTS: Product[] = [
     vram: "256GB VRAM",
     hashRate: "5,120 MH/s",
     power: "2,200W TDP",
+    warrantyMonths: 60,
     dailyEarn: 14,
     dailyEarnNEX: 90,
     price: 1319,
@@ -201,6 +209,7 @@ export const PRODUCTS: Product[] = [
     vram: "640GB VRAM",
     hashRate: "3,840 MH/s",
     power: "3,200W TDP",
+    warrantyMonths: 60,
     dailyEarn: 45,
     dailyEarnNEX: 300,
     price: 4499,
@@ -236,6 +245,7 @@ export const PRODUCTS: Product[] = [
     vram: "1,024GB VRAM",
     hashRate: "9,600 MH/s",
     power: "4,000W TDP",
+    warrantyMonths: 120,
     dailyEarn: 75,
     dailyEarnNEX: 500,
     price: 7499,

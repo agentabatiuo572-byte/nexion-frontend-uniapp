@@ -13,6 +13,7 @@
 import type { Messages } from "@/i18n/messages/en";
 import type { Product } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
+import { fmt } from "@/i18n/format";
 
 export interface ProductCopy {
   tagline: string;
@@ -43,4 +44,21 @@ export function productCopy(t: Messages, p: Product): ProductCopy {
  */
 export function specText(t: Messages, value: string | undefined): string {
   return !value || value === SPEC_UNAVAILABLE ? t.store.specValueUnavailable : value;
+}
+
+/**
+ * Warranty term. The server owns a month count; the unit word is ours, so the row
+ * is three-language by construction instead of arriving as untranslatable prose
+ * ("24 months" rendered inside a Chinese spec sheet).
+ *
+ * Whole terms of three years or more read as years, matching how those SKUs
+ * advertise themselves ("5-year extended warranty"); shorter terms stay in months,
+ * matching the established box copy. Absent → the same placeholder as any other
+ * missing spec.
+ */
+export function warrantyText(t: Messages, months: number | undefined): string {
+  if (!months || months <= 0) return t.store.specValueUnavailable;
+  return months >= 36 && months % 12 === 0
+    ? fmt(t.store.specWarrantyYears, { n: months / 12 })
+    : fmt(t.store.specWarrantyMonths, { n: months });
 }
