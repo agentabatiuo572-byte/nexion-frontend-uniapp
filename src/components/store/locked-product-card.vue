@@ -47,7 +47,8 @@
       </view>
 
       <!-- Phase progress bar -->
-      <view v-if="detailsOpen && progress" class="mt-3.5 pt-3.5" style="border-top: 1px dashed var(--v5-border-strong)">
+      <!-- 去线(主人 2026-08-17 全站令):mt-7 = 原 mt-3.5 + pt-3.5 的总间距 -->
+      <view v-if="detailsOpen && progress" class="mt-7">
         <view class="flex items-center justify-between font-mono-tabular" style="font-size: 12px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3)">{{ t.store.lockedPhase }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-weight: 600">{{ progress.current }}/{{ progress.total }}</text> · {{ t.store.lockedUnlockProgress }}</text>
           <text class="tabular-nums" style="color: var(--v5-brand-2-ink); font-weight: 600">{{ progress.pct }}%</text>

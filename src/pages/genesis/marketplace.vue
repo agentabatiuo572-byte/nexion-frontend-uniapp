@@ -338,9 +338,8 @@ const ercLineStyle: CSSProperties = {
   letterSpacing: "0.02em",
 };
 const statGridStyle: CSSProperties = {
-  marginTop: "14px",
-  paddingTop: "14px",
-  borderTop: "1px dashed var(--v5-border-strong)",
+  // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 14+14。
+  marginTop: "28px",
   gap: "8px",
 };
 const statLabelStyle: CSSProperties = {
