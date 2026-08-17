@@ -7,6 +7,7 @@
     aria-live="polite"
     style="margin: 0 16px 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--v5-warning) 36%, transparent); border-radius: 12px; background: var(--v5-warning-soft); text-align: center"
   >
+    <!-- i18n-en-ok: 验收沙箱徽标是工程话(source=mock / SANDBOX 是档位标识),按中文门失败提示的出路②保持英文技术串,不进三语词典 -->
     <text class="font-mono-tabular" style="font-size: 12px; font-weight: 800; letter-spacing: 0.01em; color: var(--v5-warning)">Acceptance Sandbox · source=mock · SANDBOX</text>
   </view>
 </template>

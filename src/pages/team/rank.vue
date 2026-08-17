@@ -31,7 +31,7 @@
             <view class="flex items-center" style="margin-top: 8px; gap: 12px">
               <VBadgeIcon :v="myRank" :size="48" />
               <view>
-                <text class="block" :style="heroRankStyle">V{{ myRank }} {{ currentDef.title }}</text>
+                <text class="block" :style="heroRankStyle">{{ rankLabel(myRank, isZh) }}</text>
                 <text class="block" :style="heroSubStyle">{{ heroSubText }}</text>
               </view>
             </view>
@@ -40,7 +40,7 @@
               <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 6px">
                 <text :style="{ color: 'var(--v5-ink-3)' }">
                   <text>{{ t.rank.next }} </text>
-                  <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">V{{ prog.next.v }} {{ prog.next.title }}</text>
+                  <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ rankLabel(prog.next.v, isZh) }}</text>
                 </text>
                 <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">{{ Math.round(prog.progressPct * 100) }}%</text>
               </view>
@@ -50,7 +50,7 @@
               <view v-if="prog.missing.length > 0" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px">
                 <view v-for="(m, i) in prog.missing" :key="i" class="flex items-center" style="gap: 6px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ rankGapText(t, m, isZh) }}</text>
                 </view>
               </view>
               <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="upgradeCtaStyle" @click="go('/pages/store/store')">
@@ -73,7 +73,7 @@
             <VBadgeIcon :v="r.v" :size="36" />
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 8px; flex-wrap: wrap">
-                <text class="font-display" :style="rowTitleStyle">V{{ r.v }} {{ r.title }}</text>
+                <text class="font-display" :style="rowTitleStyle">{{ rankLabel(r.v, isZh) }}</text>
                 <view v-if="rowStatus(r.v) === 'done'" class="flex items-center" style="gap: 2px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   <text :style="{ fontSize: '12px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>
@@ -84,10 +84,10 @@
               <text class="block" :style="condStyle">{{ formatConditions(r) }}</text>
 
               <view class="flex" style="margin-top: 8px; gap: 6px; flex-wrap: wrap">
-                <text v-if="r.directBonus > 0.05" :style="chipStyle('default')">Direct {{ Math.round(r.directBonus * 100) }}%</text>
-                <text v-if="r.unilevelDepth > 1" :style="chipStyle('default')">{{ r.unilevelDepth >= 99 ? "Unlimited extended" : "Extended royalty" }}</text>
-                <text v-if="r.peerBonus > 0" :style="chipStyle('default')">Peer {{ Math.round(r.peerBonus * 100) }}%</text>
-                <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">Pool {{ r.leadershipVotes }} votes</text>
+                <text v-if="r.directBonus > 0.05" :style="chipStyle('default')">{{ t.rank.chips.direct }} {{ Math.round(r.directBonus * 100) }}%</text>
+                <text v-if="r.unilevelDepth > 1" :style="chipStyle('default')">{{ r.unilevelDepth >= 99 ? t.rank.chips.unlimitedExtended : t.teamV3.extendedRoyalty }}</text>
+                <text v-if="r.peerBonus > 0" :style="chipStyle('default')">{{ t.rank.chips.peer }} {{ Math.round(r.peerBonus * 100) }}%</text>
+                <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">{{ t.rank.chips.pool }} {{ r.leadershipVotes }} {{ t.rank.chips.votes }}</text>
                 <text v-if="r.cultivationBonus > 0" :style="chipStyle('lemon')">🎁 {{ r.cultivationBonus.toLocaleString() }} NEX</text>
               </view>
             </view>
@@ -105,10 +105,14 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { useVRank, nextRankProgress, type VRank, type VRankDef } from "@/store/v-rank";
+import { rankGapText, rankConditionsText, rankLabel } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
+// 中文界面显示中文头衔(主人 2026-08-17 拍板:V3 = 舰长),拼法收在 lib/v-rank-copy
+const isZh = computed(() => useLocaleStore().code === "zh");
 const vState = useVRank();
 const { elRef: rankBarRef, inView: rankBarInView } = useScrollGrowProgress();
 
@@ -135,26 +139,17 @@ onMounted(() => {
 
 const heroSubText = computed(() => {
   const d = currentDef.value;
-  return `Direct bonus ${Math.round(d.directBonus * 100)}%${d.unilevelDepth > 1 ? " · Extended royalty" : ""}`;
+  // 三语:词典里 teamV3.directBonus / teamV3.extendedRoyalty 早就有(此前是死键,这里原本拼英文)
+  const head = `${t.value.teamV3.directBonus} ${Math.round(d.directBonus * 100)}%`;
+  return d.unilevelDepth > 1 ? `${head} · ${t.value.teamV3.extendedRoyalty}` : head;
 });
 
 function rowStatus(v: VRank): "done" | "current" | "locked" {
   return v < vState.myRank ? "done" : v === vState.myRank ? "current" : "locked";
 }
 
-function formatConditions(r: VRankDef): string {
-  const c = r.conditions;
-  const parts: string[] = [];
-  if (c.selfBuyUSD) parts.push(`Self-buy ≥ $${c.selfBuyUSD}`);
-  if (c.directRefs) parts.push(`Direct refs ≥ ${c.directRefs}`);
-  if (c.teamVolumeUSD) parts.push(`Team $${c.teamVolumeUSD.toLocaleString()}`);
-  if (c.vDownlines) {
-    for (const [v, n] of Object.entries(c.vDownlines)) {
-      parts.push(`${n}× V${v}`);
-    }
-  }
-  return parts.length ? parts.join(" + ") : "Register immediately";
-}
+// 三语:词典里 rank.cond.* 五条早就有(此前是死键,这里原本拼英文)
+const formatConditions = (r: VRankDef): string => rankConditionsText(t.value, r.conditions);
 
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });

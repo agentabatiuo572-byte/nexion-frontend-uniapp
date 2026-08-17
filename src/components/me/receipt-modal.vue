@@ -21,13 +21,13 @@
 
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? "Wallet Verification (legacy)" : "Proof of Compute" }}</text>
+        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute }}</text>
         <view class="flex items-center" style="margin-top: 6px; gap: 8px">
           <text class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">VERIFIED</text>
+            <text style="margin-left: 4px">{{ t.receipt.stampVerified }}</text>
           </text>
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isLegacyVerification ? "Recorded" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isLegacyVerification ? t.receipt.statusRecorded : t.receipt.statusSettled }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
       </view>
 
@@ -188,6 +188,11 @@ function detailRows(d: ReceiptDetails): DescRow[] {
   }
 }
 
+// 🔴 正文行的 `k` 是 snake_case 技术字段名(`compliance_id` / `program` / `model_size` …),**刻意的**:
+// 主人 2026-08-17 拍板 —— 这份收据要做成**技术凭证**的样子(像链上回单),字段名逐字可核才是它的价值,
+// 所以不适用「页面文案禁止字段名」那条不变量,也不进三语词典。
+// 独立审计 2026-08-17 曾把这 ~20 行报为 P2(撞不变量),按此拍板结案;**下一轮别重复上报**。
+// 头部的凭证类型 / 印章 / 结算状态是给人读的,已接三语(t.receipt.*)—— 两者的分界就是「给人读」还是「给人核」。
 const sections = computed<DescSection[]>(() => {
   const r = props.receipt;
   if (!r) return [];

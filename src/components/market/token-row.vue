@@ -24,7 +24,7 @@
       <view class="min-w-0">
         <view class="flex items-center" style="gap: 6px">
           <text class="truncate" :style="symbolStyle">{{ token.symbol }}</text>
-          <text v-if="isNEX" class="font-mono-tabular" :style="oursStyle">OURS</text>
+          <text v-if="isNEX" class="font-mono-tabular" :style="oursStyle">{{ t.market.oursTag }}</text>
         </view>
         <text class="block truncate" :style="subStyle">{{ token.name }} · {{ fmtBig(token.marketCapUSD) }}</text>
       </view>
@@ -58,8 +58,10 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import type { Token } from "@/mock/tokens";
+import { useT } from "@/i18n/use-t";
 
 const props = defineProps<{ token: Token; starred: boolean }>();
+const t = useT();
 const emit = defineEmits<{ (e: "toggleStar"): void }>();
 
 const SPARK_W = 60;

@@ -8,7 +8,7 @@
 <template>
   <view v-if="remoteApiEnabled">
     <view class="px-0.5 pt-1 pb-2.5">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink)">Task assignments</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink)">{{ t.home.liveFeedTitle }}</text>
     </view>
     <view v-if="remoteTaskRows.length" class="font-mono-tabular" style="padding: 0 2px 6px; font-size: 12px">
       <view v-for="(r, i) in remoteTaskRows" :key="r.id" class="grid items-center gap-2.5 py-2" :style="{ gridTemplateColumns: '44px 1fr auto', borderBottom: i < remoteTaskRows.length - 1 ? '1px solid var(--v5-border)' : 'none' }">
@@ -17,7 +17,7 @@
         <text class="tabular-nums" style="color: var(--v5-success); font-weight: 500">+${{ r.reward.toFixed(5) }}</text>
       </view>
     </view>
-    <text v-else class="block px-1 py-3" style="font-size: 12px; color: var(--v5-ink-3)">No task activity available.</text>
+    <text v-else class="block px-1 py-3" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.liveFeedEmpty }}</text>
   </view>
   <view v-else>
     <!-- Tab switcher + see-all shortcut -->

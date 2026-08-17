@@ -22,7 +22,7 @@
     <!-- Price Index -->
     <view>
       <text class="block" :style="sectionLabelStyle">{{ t.market.priceIndex }}</text>
-      <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">Unavailable</text>
+      <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
       <view
         v-for="(w, i) in priceIndex"
         :key="w.code"
@@ -49,7 +49,7 @@
     <!-- Device earnings ranking -->
     <view class="mt-4 pt-4" style="border-top: 1px solid var(--v5-border)">
       <text class="block" :style="sectionLabelStyle">{{ t.market.deviceRanking }}</text>
-      <text v-if="!deviceRankings.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">Unavailable</text>
+      <text v-if="!deviceRankings.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
       <view
         v-for="(d, i) in deviceRankings"
         :key="d.rank"

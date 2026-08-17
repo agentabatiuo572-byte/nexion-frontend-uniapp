@@ -35,7 +35,7 @@
           <text class="block tabular-nums" :style="cellVStyle(true)">+${{ accruedText }}</text>
         </view>
         <view>
-          <text class="block" :style="cellKStyle">{{ isMatured ? "Status" : "Remaining" }}</text>
+          <text class="block" :style="cellKStyle">{{ isMatured ? t.stakingV3.position.statusLabel : t.stakingV3.position.remainingLabel }}</text>
           <text class="block tabular-nums" :style="cellVStyle(false)">{{ isMatured ? t.stakingV3.position.unlocked : `${remainingDays}d` }}</text>
         </view>
       </view>

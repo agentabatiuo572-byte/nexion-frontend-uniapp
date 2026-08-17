@@ -24,7 +24,7 @@
         <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ r.amt }}</text>
         <text class="font-mono-tabular text-right" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
       </view>
-      <text v-if="remoteApiEnabled && rows.length === 0" class="block px-2 py-3" style="font-size: 12px; color: var(--v5-ink-3)">No completed task earnings yet.</text>
+      <text v-if="remoteApiEnabled && rows.length === 0" class="block px-2 py-3" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.ledgerEmpty }}</text>
     </view>
   </view>
 </template>

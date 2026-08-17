@@ -41,12 +41,12 @@
             </view>
             <view class="flex items-center" style="margin-top: 2px; gap: 6px">
               <view class="rounded-full" :style="statusDotStyle(m.status)" />
-              <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ daysAgo(m.joinedAt) }}d ago</text>
+              <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ fmt(t.uiChrome.joinedDaysAgo, { n: daysAgo(m.joinedAt) }) }}</text>
             </view>
           </view>
           <view class="text-right shrink-0">
             <text v-if="showContribution" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
+            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ fmt(t.uiChrome.volumeShort, { amount: `$${m.monthVolumeUSD}` }) }}</text>
           </view>
         </view>
       </view>
@@ -59,6 +59,8 @@ import { computed, type CSSProperties } from "vue";
 import VBadge from "./v-badge.vue";
 import type { NetworkMember, MemberStatus } from "@/store/network";
 import { UNILEVEL_USDT } from "@/store/commission";
+import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 
 const props = defineProps<{
   color: string;
@@ -74,6 +76,7 @@ const props = defineProps<{
   showContribution?: boolean;
 }>();
 const emit = defineEmits<{ toggle: [] }>();
+const t = useT();
 const showContribution = computed(() => props.showContribution !== false);
 
 const sortedMembers = computed(() => [...props.members].sort((a, b) => b.monthVolumeUSD - a.monthVolumeUSD));

@@ -53,7 +53,8 @@
             <input class="rg-phone__in" type="number" :placeholder="t.register.phonePlaceholder" :value="phone" @input="onPhone" />
           </view>
           <text v-if="phoneLenHint" class="rg-phone-hint">{{ phoneLenHint }}</text>
-          <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除) -->
+          <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除)
+               i18n-en-ok: 工程话,指名端口与启动方式,受众是开发者不是用户 -->
           <view v-if="devBackendDown" class="rg-devbanner"><text class="rg-devbanner__t">Dev build · sandbox API unreachable — start the 8110 backend or run mock mode</text></view>
         </view>
 

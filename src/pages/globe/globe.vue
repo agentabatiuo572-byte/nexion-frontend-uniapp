@@ -179,7 +179,7 @@
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · {{ remoteApiEnabled ? fmt(t.globe.projectionUpdatedAt, { at: generatedAtText }) : `uptime ${uptimeText}` }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · {{ remoteApiEnabled ? fmt(t.globe.projectionUpdatedAt, { at: generatedAtText }) : fmt(t.globe.uptimeLine, { v: uptimeText }) }}</text>
         </view>
       </view>
       </template>

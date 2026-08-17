@@ -16,7 +16,7 @@
         <text v-if="ribbon" :style="ribbonStyle">{{ ribbon.label }}</text>
       </view>
       <text class="block" :style="blurbStyle">{{ blurb }}</text>
-      <text class="block tabular-nums" :style="metaStyle">Min ${{ minText }} · {{ penaltyPct }}% {{ penaltySuffix }}</text>
+      <text class="block tabular-nums" :style="metaStyle">{{ fmt(t.stakingV3.vaultMin, { amount: `$${minText}` }) }} · {{ penaltyPct }}% {{ penaltySuffix }}</text>
     </view>
 
     <!-- Arrow -->
@@ -27,6 +27,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import type { StakingTerm } from "@/store/staking";
+import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 
 interface Ribbon {
   label: string;
@@ -49,6 +51,7 @@ const props = defineProps<{
   isLast: boolean;
 }>();
 const emit = defineEmits<{ open: [] }>();
+const t = useT();
 
 const TIER_TONES: Record<StakingTerm, TierTone> = {
   30: { softBg: "var(--v5-success-soft)", text: "var(--v5-success)" },
