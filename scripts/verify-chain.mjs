@@ -9,9 +9,10 @@
 //   ② 三档:full 全跑 · scoped 按 gates.manifest 的输入交集跑 · static 不起 server 只跑静态门
 //      (改动集由 git 算,不由模型判;算不出/命中全局清单 → 自动升 full 并说明);
 //   ③ 去重:vue-tsc 走指纹缓存壳;h5-runtime 探针跑一遍后把树指纹交给 verify.sh 末尾同名门复用(省 ~7 min);
-//      dev server **默认各步各起**(与从前一致):实测 2026-08-17 两轮全量,共享一对 server 给 h5-runtime + verify.sh
-//      连跑会触发 P-097 拥塞退化(backnav 探针首跑红、h5 门 after-retry、legacy 慢 3 分钟),得不偿失;
-//      `--pool` 可选开启共享(各步先核树身份再复用),留给以后单探针提速后再评估。
+//      dev server **默认各步各起**(与从前一致)。2026-08-17 三轮全量实测:h5-runtime 首跑在有/无共享 server 下都抖过
+//      (run#2 pool 下 backnav 红、run#3 无 pool 下 guard-liveness 红;同一脚本单跑三次全绿)—— 抖动来自同机负载,
+//      不是 pool;但把 h5-runtime + verify.sh 的全部探针压在同一对 server 上有 P-097 拥塞退化风险(实测那轮 legacy 慢 3 分钟),
+//      收益只有 ~10s 起服,所以默认关;`--pool` 可选(各步先核树身份再复用)。runtime 类步骤失败重跑 1 次(见下)。
 // 步骤清单仍声明在 package.json `verify:steps`(`&&` 串,可直接裸跑作对照)—— 门是否在链上的契约测试
 // 读那一行,不读本文件;本文件只负责「怎么跑」。
 // 产物:.verify-cache/last-run.json(mode/tree/steps/verdict,给 Stop hook / 合并守卫读)、
@@ -128,15 +129,30 @@ for (const step of STEPS) {
       const env = { ...poolEnv(), ...h5OnlyEnv, VERIFY_MODE: mode };
       if (step === "test:legacy-suite" && h5RuntimeTree) env.H5_RUNTIME_REUSED_TREE = h5RuntimeTree;
       r = await npmRun(step, env, logFile);
+      // 🔴 runtime 类步骤失败自动重跑 1 次、以第二次为准(与 verify.sh probe_retry 族同款纪律,2026-08-17 实测三轮全量
+      //   h5-runtime 首跑各抖一次不同探针:backnav / guard-liveness,单跑三次全绿 —— 是负载抖动不是代码红)。
+      //   重试必须大声:状态标 PASS(after-retry ⚠)+ 首败日志留 *.attempt1;稳定红两跑仍红,不被洗绿。
+      if (r.code !== 0 && manifest.steps[step]?.kind === "runtime") {
+        try { fs.copyFileSync(logFile, logFile + ".attempt1"); } catch { /* 留痕失败不影响判定 */ }
+        say(`${C.y}↻ 首跑红(runtime 类步骤),重跑 1 次,首败日志 ${path.relative(ROOT, logFile).replace(/\\/g, "/")}.attempt1${C.n}`);
+        const r2 = await npmRun(step, env, logFile);
+        r = { ...r2, ms: r.ms + r2.ms, retried: true, firstCode: r.code };
+      }
       if (step === "test:h5-runtime" && r.code === 0) { const fp = treeFingerprint(); h5RuntimeTree = fp ? fp.fingerprint : null; }
     }
   } else {
     r = await npmRun(step, { VERIFY_MODE: mode, ...h5OnlyEnv }, logFile);
+    if (r.code !== 0 && manifest.steps[step]?.kind === "runtime") {
+      try { fs.copyFileSync(logFile, logFile + ".attempt1"); } catch { /* 同上 */ }
+      say(`${C.y}↻ 首跑红(runtime 类步骤),重跑 1 次,首败日志 ${path.relative(ROOT, logFile).replace(/\\/g, "/")}.attempt1${C.n}`);
+      const r2 = await npmRun(step, { VERIFY_MODE: mode, ...h5OnlyEnv }, logFile);
+      r = { ...r2, ms: r.ms + r2.ms, retried: true, firstCode: r.code };
+    }
   }
   const status = r.notRun ? "NOT-RUN" : r.code === 0 ? (r.cached ? "CACHED" : "PASS") : "FAIL";
-  results.push({ step, status, ms: r.ms, code: r.code, reason: r.notRun ? r.out : undefined });
+  results.push({ step, status, ms: r.ms, code: r.code, retried: !!r.retried, reason: r.notRun ? r.out : (r.retried ? `after-retry ⚠(首跑 exit ${r.firstCode})` : undefined) });
   const secs = `${(r.ms / 1000).toFixed(1)}s`;
-  if (status === "PASS") say(`${C.g}✓ PASS${C.n} ${C.d}${secs}${C.n}`);
+  if (status === "PASS") say(`${C.g}✓ PASS${C.n} ${C.d}${secs}${C.n}${r.retried ? ` ${C.y}(after-retry ⚠ 首跑 exit ${r.firstCode})${C.n}` : ""}`);
   else if (status === "CACHED") say(`${C.g}≡ CACHED${C.n} ${C.d}${secs} · ${r.out.trim().split(/\r?\n/).at(-1)}${C.n}`);
   else if (status === "NOT-RUN") say(`${C.y}⊘ NOT-RUN${C.n} ${r.out.trim().split(/\r?\n/)[0]}`);
   else {
