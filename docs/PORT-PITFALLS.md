@@ -1810,3 +1810,13 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **为什么补调用点收敛不了**:调用点是开放集合(每一轮修法自己都会新增),审计只能抓已存在的;而「返回值被丢弃」不产生任何运行时痕迹(mock storage 平时不坏),tester / 运行时门都看不见。
 - **升层**:`scripts/selfcheck-persist-verdict.mjs` —— TypeScript AST(vue 只取 `<script>` 块),钱路 6 个文件里 17 个落盘 / CAS / 资金原语(`persist / writeAccountRow / persistAccountSnapshot / markUsed / release / consume / restoreMoney / debitBalance / creditBalance / createOrder(s) / cancelOrder / postMoneyBill / postReceiptOnly / commit …`)**不许作为裸表达式语句出现**;`void x()` 是显式丢弃放行,确需忽略写 `persist-verdict-ok: <理由>`。`--selftest` 4 红 7 绿,真文件塞一行 `persist();` 即红;已挂 verify.sh。首跑抓 14 处(含审计的 2 处 + 12 处同形),逐个消费或标注理由(远端命令键 4 处 → HANDOFF U-21)。
 - **同族提醒**:① 「返回布尔的动作」在钱路上必须被 if / const / return 接住,接不住就写下为什么;② 一族修到第二次就该问「能不能机器测」——这条本可以在 R4 就焊,晚了两轮;③ 门的判据用 AST 不用正则:换行 / 链式 / 泛型实参 / 模板字符串都不影响,正则版一定漏。2026-08-17。
+
+
+## P-118 长期红的门,红绿方向可能是**反的** —— 判据锚在「实现形态」上,一次加固就够让它开始奖励回退
+
+- **症状**:`scripts/h2-trial-remote-api.test.mjs:157` 断言 `src/store/free-trial.ts` 里必须出现 `if (remoteApiEnabled) return;`,长期红,挡在 `npm run verify` 第 2 步(`test:contract-registry`)—— 47 个契约测试里唯一的红,全链一次跑不通;其余 46 条 + 后 15 步 + legacy-suite 458 格全绿。这两个文件自 `5030cd1` 起一个字未变,不是新回归。
+- **根因**:判据写于 `5d3c92e`,那时 `persist()` 是 void。`da445ec`(审计 R5)为了让 convert 能判「终态到底落没落盘」,把 `persist()` 改成返回落盘判决(`if (remoteApiEnabled) return true;`),判据从此永不命中。**架构没退化,是被加固了** —— 判据钉的是实现形态而不是不变量,加固一样让它过期。
+- **危险在方向不在红**(2×2 实测:判据新旧 × 源码当前/回退):旧判据 × 当前源码 = 红;旧判据 × **回退源码(persist 退回 void)= 绿**;新判据 × 当前源码 = 绿;新判据 × 回退源码 = 红。也就是说,**拆掉审计 R5/R6/R7 焊进来的落盘判决族(P-117),这道门会转绿给正反馈**。
+- **落地修法**:判据锚到函数头 —— `/function persist\(\)[^{]*\{\s+if \(remoteApiEnabled\) return true;/`,要求短路是函数**第一句**。锚定一次性守住四条变异轴:删除 / 取反 / 注释掉 / **挪位**;其中挪位是关键 —— 守卫字符串原样还留在文件里,无锚点的存在式判据对它完全失明,而写盘已经发生了。
+- **顺带补的两条缝**:① 测试名承诺「never persists **or locally advances**」,而「本地推进」那一半原先**一条断言都没有**(缺失轴天然假绿)—— 补 `advanceTo()` 同款锚定;② 守卫在位 ≠ 绕不过去 —— 补「落盘口唯一」(`writeAccountRow[<(]` 恰好 1 处),否则在远端分支另开一条写盘口,两条守卫全都健在也照样绕过。
+- **同族提醒**:① 判长期红的门第 0 步问「它守的形态是不是被一次**加固**改掉了」,不只问「架构还在吗」——[[stale-gate-rewards-regression]] 的第一例是迁移,这例是变强,同样过期;② 门只有一条 assert 时「数 fail 条数」这招失效(任何变异都是红),改跑 **2×2 真值表**才看得出方向;③ 把测试名当规格逐句读,每个分句都得有断言接着;④ 变异集落盘为 `scripts/h2-trial-remote-gate.redtest.mjs`(9 条,单条隔离注入 + 注入不生效当场炸 + 收尾复绿),挂在 `test:contract-registry`;⑤ 判据带 tag 消息(`[persist-guard]` / `[advance-guard]` / `[single-writer]`),红测才能断定「红的是这一条」而不是被别的判据顺带抓到 —— 靠行号会随编辑漂。2026-08-17。
