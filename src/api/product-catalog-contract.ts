@@ -166,10 +166,11 @@ function product(value: unknown): Product {
     hashRate: optionalString(source.hashRate),
     power: displayString(source.power),
     datacenter: displayString(source.datacenter),
-    uptime: displayString(source.uptime),
-    warranty: displayString(source.warranty),
-    phoneDailyEarn: displayString(source.phoneDailyEarn),
-    phoneDailyEarnNEX: displayString(source.phoneDailyEarnNEX),
+    // 质保是**按 SKU 不同**的数值(月),单位由前端按语言拼 —— 与 ai.* 同一模式。
+    // uptime / phoneDailyEarn / phoneDailyEarnNEX 已移出商品契约:前者是平台统一承诺
+    // (走 i18n 文案),后两者是平台手机档位配置(GET /api/config/phone-tiers),
+    // 都不是商品属性,后端也从来没有这三列。
+    warrantyMonths: optionalInteger(source.warrantyMonths, 1),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     price: finiteNumber(source.price, Number.EPSILON),

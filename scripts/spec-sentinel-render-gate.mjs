@@ -246,9 +246,14 @@ function selftest() {
   if (readSentinelFields("const x = 1;").length !== 0) {
     failed += 1; console.error("  ✗ 无 displayString 的源码不该解析出字段");
   }
+  // 判据来源自证:能真从契约里解析出字段(而不是恒空 → Rule C 恒真)。
+  // 🔴 别在这里枚举完整字段集 —— 它会随字段归属调整而合法变化(P-111 就把 uptime /
+  // warranty / phoneDailyEarn* 移出了商品契约,各归平台文案 / 平台配置 / 按 SKU 月数),
+  // 枚举式锚点届时会对**正确的实现**判红。锚一个稳定字段 + 一个下限即可;
+  // 「一个都解析不到」那种真失效由 run() 里的 `fields.length === 0 → FAIL` 兜底。
   const realFields = readSentinelFields(fs.readFileSync(CONTRACT, "utf8"));
-  if (!realFields.includes("gpu") || !realFields.includes("warranty")) {
-    failed += 1; console.error(`  ✗ 从 ${CONTRACT} 现读 displayString 字段失败 —— Rule C 的判据来源断了(实得 ${realFields.length} 个)`);
+  if (realFields.length < 2 || !realFields.includes("gpu")) {
+    failed += 1; console.error(`  ✗ 从 ${CONTRACT} 现读 displayString 字段失败 —— Rule C 的判据来源断了(实得 ${realFields.length} 个:${realFields.join(", ")})`);
   }
   // 判据来源自证:契约里读不到常量时必须判红,而不是扫出 0 条然后报绿。
   if (readSentinel("const SPEC_UNAVAILABLE = \"unavailable\";") !== null) {
