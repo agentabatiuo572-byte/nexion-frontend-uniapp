@@ -24,6 +24,11 @@ import path from "node:path";
 import { transformSync } from "esbuild";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+/** 全 src 的 .ts/.vue 扫描面。两处消费:扣款调用点集合等式、日限消费点集合等式。 */
+const walkSrc = (dir = path.join(root, "src")) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  const p = path.join(dir, e.name);
+  return e.isDirectory() ? walkSrc(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
+});
 const src = readFileSync(path.join(root, "src", "store", "withdrawal-eligibility-core.ts"), "utf8");
 const { code } = transformSync(src, { loader: "ts", format: "esm" });
 const core = await import("data:text/javascript;base64," + Buffer.from(code, "utf8").toString("base64"));
@@ -887,6 +892,53 @@ function functionBody(src, opener) {
     check("🔴 远端账单只消费服务端投影，不由提现页面直接 add/伪造", !!pageSubmitBody
       && !/(?:bills\.)?(?:add|addMany|addManyForAccountOnce|postMoneyBill)\s*\(/.test(pageSubmitBody)
       && billsCode.includes("if (fundsServerEnabled) return null"));
+    // 🔴🔴 扣款的**调用点集合等式** —— 上面两支都只看提现页,看不见**别的文件**里的第二个减记者。
+    //    实测(2026-08-16,主线 b3b53d1):往 App.vue 对账里塞一句 `app.applyWithdrawalDebit(wd);`,
+    //    fastlane 117 格、tsc、verify 全绿 —— 而「谁减记余额」这件事已经失控。
+    //    这不是假想:同一段代码正下方那条 🗑 记着,2026-08-13 真的有人在 App.vue 对账里加过
+    //    「扣款补扣格」,被 R1 独立审计**整格否决**(立论前提错 + z5 明令禁止无条件遍历补扣)。
+    //    实现退役了,**禁令却没留下任何门** —— 下一个人照着同样的直觉再写一遍,没有一道门会拦。
+    //  为什么第二个调用点是资金缺陷(不只是「不干净」):
+    //    · 它写扣款幂等键,而退款腿的「没扣过就没得退」正是按这个键判 —— 键被凭空置位,
+    //      失败终态时就会退一笔本客户端从没扣过的钱;
+    //    · 它可以挂在对账循环上(5s 一拍)、重试里、别的页面里,时机完全不可控,
+    //      而提现页那一处是有冻结账号 snap 保护的,别处没有。
+    //  判据是**集合等式**不是「不许出现」:页面接了本地扣款腿时它就该有一处(且只在提现页),
+    //  没接时一处都不许有 —— 与上面两支同一个分流,哪条架构赢都不必回来改。
+    //  🔴 扫描面必须自证非空:没接本地腿时**期望就是空集**,于是「扫不到」与「没违规」
+    //     产出同一个绿 —— 这一格若不自带扫描面证据,walkSrc 一坏它就变成永久的假绿。
+    //     (日限那格也守 walkSrc,但守的是它自己那次调用;这里被改成扫别的目录时它不会红。)
+    //  🔴🔴 扫的是**裸标识符**,不是 `.applyWithdrawalDebit(` 这种「调用写法」。按轴自查时实测出两个假绿面:
+    //     ① **间接引用**:`const debitFn = app.applyWithdrawalDebit; debitFn(wd);` —— 缺陷实体与直接调用
+    //        **完全相同**(第二个减记者、照写扣款幂等键),而带左括号的判据一个字都扫不到,全绿;
+    //     ② **改名**:函数一改名,带括号的串恒不命中 → 实扫空集,而没接本地腿时期望**也是**空集 → 判绿
+    //        (那次靠同块邻格连带报红兜住了,但本格自己是瞎的,不能指望邻格)。
+    //     换成「提到这个名字的文件集合 + 每个文件提几行」之后,三条轴一并抓住:
+    //     多一个文件 → 集合不等;改名 → 集合塌成空、与含定义处的期望不等;
+    //     同一文件里多提一次(第二个减记者藏在 store 自己内部)→ 行数不等。
+    //  🔴 期望里**含定义处**(app.ts 的函数声明 + 返回对象导出、types.ts 的接口声明),
+    //     正是这一点让「改名/删除」也判红 —— 期望非空,空集就不可能等于它,「扫不到」再也换不到绿。
+    //  能力上界(写下来免得下一个人高估):行数判据认的是「提了几次」,不是「提的是不是调用」——
+    //     app.ts 内把导出行挪个位置、或写成等价的另一种导出语法,行数不变故不报;
+    //     那属于同文件内重构,由同块另外三格(签名切片、定型串守卫、幂等读盘)接住。
+    //  🔴 用**词边界**匹配,不用 includes:`applyWithdrawalDebitV2` 这种改名**包含**原名子串,
+    //     includes 版对它照样计数、行数不变 → 改名轴仍旧判绿(实测过,这是第二次修同一格)。
+    const scannedFiles = walkSrc();
+    const debitMentions = {};
+    for (const p of scannedFiles) {
+      const lines = stripComments(readFileSync(p, "utf8"))
+        .split(/\r?\n/).filter((l) => /\bapplyWithdrawalDebit\b/.test(l)).length;
+      if (lines > 0) debitMentions[path.relative(root, p).replace(/\\/g, "/")] = lines;
+    }
+    const expectedMentions = {
+      "src/store/app.ts": 2,                                    // 函数声明 + 返回对象里的导出
+      "src/store/types.ts": 1,                                  // store 对外接口声明
+      ...(PAGE_DEBITS_LOCALLY ? { "src/pages/me/wallet-withdraw.vue": 1 } : {}),
+    };
+    const norm = (o) => Object.keys(o).sort().map((k) => `${k}:${o[k]}`).join(",");
+    check("🔴 扣款调用点**集合等式**(第二个减记者藏在别的文件里,上面两格都看不见)",
+      scannedFiles.length >= 100 && norm(debitMentions) === norm(expectedMentions),
+      `扫了 ${scannedFiles.length} 个源文件 实扫=${norm(debitMentions)} 应为=${norm(expectedMentions)}`);
     // 🗑 【2026-08-13 回退】这里曾加过一格「接线门②」,守 App.vue 对账里的扣款补扣格。
     //    实现被 R1 独立审计整格否决(立论前提错 + z5 已明令禁止无条件遍历补扣),
     //    门随实现一起退役 —— 留着就是绿着守一段不存在的代码。
@@ -1025,11 +1077,7 @@ function functionBody(src, opener) {
   {
     const pgSrc2 = readSrc("src/pages/me/wallet-withdraw.vue");
     const trackSrc2 = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
-    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-      const p = path.join(dir, e.name);
-      return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
-    });
-    const files = walk(path.join(root, "src"));
+    const files = walkSrc();
     // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
     check(`🔴 日限扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
 
