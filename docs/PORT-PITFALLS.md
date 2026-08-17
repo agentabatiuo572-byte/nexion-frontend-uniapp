@@ -1704,13 +1704,13 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **已转哨兵**:`scripts/withdraw-rail-alias.redtest.mjs`(挂 verify.sh [1.6] fastlane 之后)—— 6 靶全部**变异前绿、变异后红**且还原逐字节一致,其中 **4 靶是「旧判据报绿、新判据报红」**(退款腿闸被拆=印钞 / 被取反=打死 mock 轨退款 / 只剩装饰性提及 / 扣款腿闸被拆=生产轨双扣),另 2 靶守「没扣过就没得退」前置(P-105 的贡献,证明重写时没弄丢)与解析面为空 fail-closed。元验证:把同档判据削成恒真 → 红测精确报 4 靶 ✗ 并 exit 1;第 4 靶此时红的是**隔壁格**,红测按格名比对判 ✗ —— 证明它不会被邻格的红蒙混过关。
 - **同族提醒**:① 凡判据里出现**手写的标识符**(标志名 / 端点名 / 键名),都要问「这个名字有没有同义写法」——有就必须解析等价类,否则失效方式恰好是**报绿**(与 P-102 提醒② 同源:靠人记得同步的清单都会静默失效);② 红测判「红的是不是**这一格**」要按**格名**比对,只看 `fail > 0` 会被隔壁格的红蒙混过关(本轮元验证第 4 靶实证);③ 靶在 `app.ts` 这类大文件里定位,用**函数体切片内的单行串**——`if (fundsServerEnabled) return [];` 全文有两处,全文级替换会打错地方,而跨行靶受混用行尾影响(P-105 提醒①)。2026-08-16。
 
-## P-111 worktree 下的 dev server **没有 HMR** —— vite 把 `**/.claude/**` 整个拉黑,而 worktree 根就在它底下
+## P-115 worktree 下的 dev server **没有 HMR** —— vite 把 `**/.claude/**` 整个拉黑,而 worktree 根就在它底下
 
 - **症状**:在 `.claude/worktrees/<x>` 起的 dev server 改文件不热更、也不整页 reload;浏览器里跑的是**旧模块图**,与磁盘不一致却毫无提示。实测形态:改了 checkout.vue 的 cleanup 逻辑,页面「返回后会话保留态没写盘」,像是逻辑坏了 —— 其实浏览器根本没拿到新代码;更阴险的是**混合图**(有的模块新有的旧),行为看似随机。
 - **根因**:`vite.config.ts` 2026-08-15/16 为断 junction 递归环(主 5173 连崩)加了 `server.watch.ignored: ["**/.claude/**", …]`。该 glob 按**绝对路径**匹配,worktree 根 `…/Nexion-uniapp/.claude/worktrees/<x>/src/**` 全命中 → 自己的源码一个都不监视。
 - **对策**:① worktree 里每次改完源码**冷重启** dev server(kill → 起),再验;② 判「代码坏 vs 环境坏」先 `curl <dev>/src/<file>` 与磁盘 grep 比对(同 [[feedback_dev_server_stale_module_graph]]);③ 根治候选(未落地,待主人点头):把 ignore 改成只拉黑**本树根**下的 `.claude`(`path.resolve(__dirname, ".claude") + "/**"`),主检出仍断环、worktree 恢复监视 —— 改的是共享构建配置,归包外决策。2026-08-16。
 
-## P-112 同路由推栈 / 重定向后 chassis 导航头被**上一页的卸载清掉**(useSetPageHeader 曾是无主单槽)
+## P-116 同路由推栈 / 重定向后 chassis 导航头被**上一页的卸载清掉**(useSetPageHeader 曾是无主单槽)
 
 - **症状**:① `checkout(B)` → 浮动条 push `checkout(A)?resume=…` → 返回 B:B 的返回键与「Checkout」标题**没了**,浮动条压住 Review order 标题(T3 黑盒 P1-1,主路径确定性复现);② 同路由 `uni.redirectTo` 也一样;跨路由 redirectTo 反而正常。
 - **根因**:`usePageHeader` 是全局单槽 store;页面 A 的 onHide/onUnmounted 与页面 B 的 onShow **没有先后保证**——A 卸载晚一拍执行 `clear()`,把 B 刚重新 set 的头抹掉。
@@ -1719,7 +1719,7 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **同族提醒**:全局单槽 store(page-header / sticky-cta / 各类 sheet 的 open 位)凡是「谁 set 谁 clear」而 set/clear 分属两个页面实例的,都要问一句「清的是不是自己那条」。2026-08-16。
 - **同族第二例(2026-08-17,审计 R5 P0,运行时红测复现)**:结算页的抵扣上下文 `tradein.appliedTradein` 也是无主单槽 —— 浮动条 / 绑卡返回让两个结算页实例同栈,上层实例 cleanup 的 `clearApplied()`(含晚一拍的 onUnmounted 第二次调用)把在世实例的抵扣抹掉,它的活票随即按全价复算、被「金额已变」拒单并销票(用户已转的钱成孤儿)。修法同款:store 记 owner(`applyTradein(..., owner)` / `clearApplied(owner)` 只清自己的)+ 页面镜像自己可见时的选择、onShow 重挂 + cleanup 幂等(`pageAlive` 门,第二次直接返回)。**判据**:一个页面写全局单槽后,把它 push 出第二个自己再返回,槽还在不在。
 
-## P-113 钱路上「落盘 / CAS 的判决当语句丢掉」是一族,不是一处 —— 逐轮补调用点补了五次才升成 AST 门
+## P-117 钱路上「落盘 / CAS 的判决当语句丢掉」是一族,不是一处 —— 逐轮补调用点补了五次才升成 AST 门
 
 - **症状**:同一形状在审计 R4→R6 连出五次:`persistAccountSnapshot();`(旧机下架没落盘,设备复活扣款照旧)、orders `persist();`(内存孤儿单)、`voucher.markUsed()` 返回 void(单次券两处各结算一次)、free-trial `persist();`(convert 报 ok 但没落终态,试用福利可二次兑现)、`writeAccountRow()` 写恢复行(唯一补写入口随 onShow 蒸发)、`voucher.release()`(券放不回还弹「什么都没记录」)、orders `advanceOrder` 的 `persist();`(下一 tick 再发一台设备)。每一处单看都像「忘了接返回值」,合起来是**结构**:store 的写盘原语返回布尔,页面把它当动作而不是判决。
 - **为什么补调用点收敛不了**:调用点是开放集合(每一轮修法自己都会新增),审计只能抓已存在的;而「返回值被丢弃」不产生任何运行时痕迹(mock storage 平时不坏),tester / 运行时门都看不见。

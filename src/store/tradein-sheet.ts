@@ -79,7 +79,7 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
    *  仅内存态(不持久):刷新丢弃=放弃抵扣,旧设备原状,无半执行风险。 */
   const appliedTradein = ref<{ oldDeviceId: string; targetKind: DeviceKind; canonicalQuote?: CanonicalTradeinQuote } | null>(null);
   /**
-   * 🔴 全局单槽 + owner(page-header 同款,P-112):浮动条 / 绑卡返回会让**两个结算页实例同时在栈上**,
+   * 🔴 全局单槽 + owner(page-header 同款,P-116):浮动条 / 绑卡返回会让**两个结算页实例同时在栈上**,
    * 上层实例的卸载(含晚一拍的 onUnmounted)若无条件清槽,会抹掉在世实例正在用的抵扣上下文 ——
    * 它的活票随即按全价复算、被「金额已变」拒单并销票(审计 R5 P0,运行时红测复现)。
    * 带 owner 的 clear 只清自己写的那份;不带 owner 的 apply / clear 是可见页面上的用户动作,照旧无条件。

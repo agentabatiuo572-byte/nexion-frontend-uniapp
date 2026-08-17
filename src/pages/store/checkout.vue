@@ -1493,7 +1493,7 @@ function restartRemoteOrderPolling() {
 // ── 抵扣上下文的页级镜像(审计 R5 P0)──
 // tradein.appliedTradein 是全局单槽,而浮动条 / 绑卡返回会让两个结算页实例同时在栈上:上层实例的
 // adoptSession / cleanup 会改写它。本页只在**可见**时把槽的变化收进自己的镜像(用户在本页做的选择),
-// 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-112 同款)。
+// 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
 let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
