@@ -10,6 +10,13 @@
  * 确需忽略的行尾或上一行写 `persist-verdict-ok: <理由>`)。
  *
  * 判据用 TypeScript AST(vue SFC 只取 <script> 块),不是正则:换行 / 链式 / 泛型实参都不影响。
+ *
+ * 两条构造性规则(审计 R8 P1 ×2:手写文件闭集 + 包装一层门就失明):
+ *   · 扫描面不是手写清单:src 下凡 import 了 money-receipt / account-scoped-storage、或调用了账户快照 / 设备 /
+ *     发票 / 券原语的文件自动入册(测试文件除外);再手写一份名单只会再漂一次。
+ *   · 本地包装函数继承原语属性:文件里凡「调用了判决原语且有返回值」的函数(如 pending-checkout 的 commitSessions、
+ *     checkout 的 releaseVoucher)自动加入该文件的判决集合,并迭代到不动点 —— 抽一层 helper 不再能让门失明。
+ *     反过来,文件里自己定义的同名非判决函数(如组件本地的 createOrder)在本文件内不算判决原语(遮蔽)。
  * Usage: node scripts/selfcheck-persist-verdict.mjs [--selftest]
  */
 import fs from "node:fs";
@@ -21,8 +28,16 @@ const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** 钱路 / 发票链上的文件(结算页 + 它调用的每个会落盘的 store)。 */
-const FILES = [
+/** 入册判据(构造性):文件文本命中任一 → 它在钱路上。 */
+const MONEY_PATH_MARKERS = [
+  /from\s+["'][^"']*money-receipt["']/,            // 资金 ⊗ 收据收口点
+  /\bcreateAccountRowCommit\b/,                   // CAS 提交器(多标签页并发敏感的行:发票 / 券 / 入金 / 奖池 / 质押)
+  /\bpersistAccountSnapshot\s*\(/,               // 账户快照权威落盘(app.ts 本体与消费者)
+  /\.(debitBalance|creditBalance|creditNex|restoreMoney)\s*\(/, // 资金原语消费者
+  /\.(addDevice|activateDevice|discardSpawnedDevice|markUsed|release|consume|settleProduct|createOrders?|cancelOrder|markActivated)\s*\(/,
+];
+/** 结算链核心(种子,常驻在册);构造性发现在此之上扩张,少了任何一个种子 = 判据漂了。 */
+const MUST_INCLUDE = [
   "src/pages/store/checkout.vue",
   "src/pages/store/bundle.vue",
   "src/components/tradein-sheets.vue",
@@ -30,8 +45,28 @@ const FILES = [
   "src/store/voucher.ts",
   "src/store/free-trial.ts",
   "src/store/pending-checkout.ts",
-  "src/store/app.ts", // 落盘权威原语(persistAccountSnapshot / addDevice / activateDevice)住这里 —— 守调用点也守被调用方
+  "src/store/app.ts",
+  "src/lib/money-receipt.ts",
 ];
+function walk(dir, out) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) walk(full, out);
+    else if (/\.(ts|vue)$/.test(ent.name) && !/\.test\.ts$/.test(ent.name) && !/\.d\.ts$/.test(ent.name)) out.push(full);
+  }
+  return out;
+}
+function discoverFiles() {
+  const all = walk(path.join(ROOT, "src"), []);
+  const hit = [];
+  for (const abs of all) {
+    const src = fs.readFileSync(abs, "utf8");
+    if (MONEY_PATH_MARKERS.some((re) => re.test(src))) hit.push(path.relative(ROOT, abs).replace(/\\/g, "/"));
+  }
+  // 结算链核心常驻在册(收口点自己不 import 自己;free-trial 是被结算页 convert 的被调用方,没有外向标记)。
+  for (const core of MUST_INCLUDE) if (!hit.includes(core) && fs.existsSync(path.join(ROOT, core))) hit.push(core);
+  return hit.sort();
+}
 /** 返回「成没成」的原语:落盘 / CAS / 资金移动 / 收据收口。 */
 const VERDICT_CALLS = new Set([
   "persist", "writeAccountRow", "writeAccountRowCas", "persistAccountSnapshot",
@@ -62,6 +97,68 @@ export function findDiscardedVerdicts(code, fileLabel = "snippet.ts") {
   const sf = ts.createSourceFile(fileLabel, code, ts.ScriptTarget.ES2020, true, ts.ScriptKind.TS);
   const lines = code.split(/\r?\n/);
   const hits = [];
+  // ── 本文件的判决集合 = 基础原语 ∪ 本地包装(调用了判决原语且有返回值)− 本地遮蔽(同名非判决函数),迭代到不动点 ──
+  const localFns = new Map(); // name → { returnsValue, returnCallees:Set, verdictVarCallees:Map }
+  const fnBody = (fn) => fn.body;
+  // 名字提取:基础原语可经属性访问调用(store.markUsed);本地包装只按裸标识符调用(commitSessions(...)),
+  // 属性访问同名(pointsApi.claimMilestone / voucherApi.claim)是别的对象的方法,不算。
+  const callName = (call, verdictSet) => {
+    const ex = call.expression;
+    const stripped = ts.isNonNullExpression(ex) || ts.isParenthesizedExpression(ex) ? ex.expression : ex;
+    if (ts.isIdentifier(stripped)) return stripped.text;
+    if (ts.isPropertyAccessExpression(stripped)) return VERDICT_CALLS.has(stripped.name.text) ? stripped.name.text : null;
+    return null;
+  };
+  const collectFn = (name, fn) => {
+    if (!name || !fn) return;
+    const varInit = new Map(); // local var → callee names it was initialised from
+    const returnExprs = [];
+    let returnsValue = false;
+    const body = fnBody(fn);
+    if (body && !ts.isBlock(body)) { returnsValue = true; returnExprs.push(body); }
+    const walkFn = (n) => {
+      if (n !== fn && (ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n))) return; // nested fns are their own scope
+      if (ts.isReturnStatement(n) && n.expression) { returnsValue = true; returnExprs.push(n.expression); }
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) {
+        const calls = new Set();
+        const w = (m) => { if (ts.isCallExpression(m)) { const cn = callName(m); if (cn) calls.add(cn); } ts.forEachChild(m, w); };
+        w(n.initializer);
+        if (calls.size) varInit.set(n.name.text, calls);
+      }
+      ts.forEachChild(n, walkFn);
+    };
+    walkFn(fn);
+    localFns.set(name, { returnsValue, returnExprs, varInit });
+  };
+  // 返回值是否派生自判决:return 表达式里含判决调用,或引用了由判决调用初始化的局部变量
+  const returnDerives = (info, verdictSet) => info.returnExprs.some((expr) => {
+    let hit = false;
+    const w = (m) => {
+      if (hit) return;
+      if (ts.isCallExpression(m)) { const cn = callName(m); if (cn && verdictSet.has(cn)) { hit = true; return; } }
+      if (ts.isIdentifier(m)) { const inits = info.varInit.get(m.text); if (inits && [...inits].some((c) => verdictSet.has(c))) { hit = true; return; } }
+      ts.forEachChild(m, w);
+    };
+    w(expr);
+    return hit;
+  });
+  const collectDecls = (n) => {
+    if (ts.isFunctionDeclaration(n) && n.name) collectFn(n.name.text, n);
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) collectFn(n.name.text, n.initializer);
+    ts.forEachChild(n, collectDecls);
+  };
+  collectDecls(sf);
+  const VERDICT = new Set(VERDICT_CALLS);
+  for (const [name, info] of localFns) { if (VERDICT_CALLS.has(name) && !info.returnsValue) VERDICT.delete(name); } // 遮蔽:本地同名非判决函数
+  const DERIVED = new Set();
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [name, info] of localFns) {
+      if (VERDICT.has(name) || !info.returnsValue) continue;
+      if (returnDerives(info, VERDICT)) { VERDICT.add(name); DERIVED.add(name); grew = true; }
+    }
+  }
   // 「丢弃位」:表达式语句里,值最终没人接的那些位置 —— 裸调用 / await 裸调用 / 括号 / 非空断言 /
   // 逻辑与或空值合并的任一操作数(ok && persist();)/ 逗号表达式 / 三元的两个分支 / 一元 ! /
   // 数组·对象字面量元素 / 非判决调用的实参(Boolean(persist());)。赋值 / return / if / const 都算消费;
@@ -71,8 +168,8 @@ export function findDiscardedVerdicts(code, fileLabel = "snippet.ts") {
     if (ts.isVoidExpression(e)) return;
     if (ts.isAwaitExpression(e) || ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e) || ts.isTypeAssertionExpression(e)) return collectDiscarded(e.expression, out);
     if (ts.isCallExpression(e)) {
-      const name = calleeName(e.expression);
-      if (name && VERDICT_CALLS.has(name)) { out.push({ node: e, name }); return; }
+      const name = callName(e);
+      if (name && VERDICT.has(name)) { out.push({ node: e, name }); return; }
       for (const arg of e.arguments) collectDiscarded(arg, out);
       return;
     }
@@ -125,6 +222,10 @@ function selftest() {
     "function f(){ [persist()]; }",
     "function f(){ store?.persist?.(); }",                // optional call
     "function f(){ setTimeout(() => { persist(); }, 0); }", // nested statement
+    "function commitX(a){ const r = rows.commit(a); return r.ok ? r.result : null; } function g(){ commitX(() => null); }", // wrapper (audit R8: commitSessions)
+    "const rel = () => claimed ? store.release(id) : true; function g(){ rel(); }",                                     // arrow wrapper
+    "function w1(){ return persist(); } function w2(){ return w1(); } function g(){ w2(); }",                             // wrapper of wrapper
+    "function tick(){ rows.commit(() => null); } function g(){ tick(); }",  // exactly ONE hit: the inner bare call; the void helper itself is not a wrapper (g() must not be flagged)
   ];
   const good = [
     "function f(){ if (!persist()) return false; }",
@@ -139,6 +240,9 @@ function selftest() {
     "function f(){ return cond ? persist() : true; }",
     "function f(){ persist() ? doA() : doB(); }",               // verdict drives the branch = consumed
     "function f(){ toast.warn(fmt(msg)); }",                    // no verdict primitive at all
+    "function createOrder(x){ items.push(x); } function g(){ createOrder(1); }", // local non-verdict function shadowing a base name
+    "async function claim(id){ const r = rows.commit((c) => null); return r.ok; } async function g(){ await api.claim(id); }", // same-name METHOD on another object is not the local wrapper
+    "function advanceTo(now){ const x = resolve(now); persist(); /* persist-verdict-ok: pure re-derivation */ return x; } function g(){ advanceTo(1); }", // calls a verdict but returns something else → not a wrapper
   ];
   let fail = 0;
   for (const s of bad) { const h = findDiscardedVerdicts(s); if (h.length !== 1) { console.error("SELFTEST FAIL (should flag):", s, h); fail++; } }
@@ -156,6 +260,11 @@ if (process.argv.includes("--selftest")) { selftest(); process.exit(0); }
 
 let total = 0;
 const report = [];
+const FILES = discoverFiles();
+for (const must of MUST_INCLUDE) {
+  if (!FILES.includes(must)) { console.error(`persist-verdict: 构造性发现漏掉了 ${must} —— 入册判据漂了(或文件被搬走),门失效`); process.exit(2); }
+}
+if (FILES.length < MUST_INCLUDE.length + 5) { console.error(`persist-verdict: 只发现 ${FILES.length} 个钱路文件,低于地板 ${MUST_INCLUDE.length + 5}(扫描面塌空?)`); process.exit(2); }
 for (const rel of FILES) {
   const abs = path.join(ROOT, rel);
   if (!fs.existsSync(abs)) { console.error(`persist-verdict: missing file ${rel} (钱路文件清单与仓库不符 → 门失效)`); process.exit(2); }
@@ -176,4 +285,4 @@ if (report.length) {
   console.error(`  消费它(if/const/return)或写明 ${OK_MARK}: <理由>`);
   process.exit(1);
 }
-console.log(`PERSIST-VERDICT: PASS (${FILES.length} files, ${total} script blocks, ${VERDICT_CALLS.size} verdict primitives, 0 discarded)`);
+console.log(`PERSIST-VERDICT: PASS (${FILES.length} files discovered by import/call markers, ${total} script blocks, ${VERDICT_CALLS.size} base primitives + local wrappers, 0 discarded)`);

@@ -215,7 +215,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
-import { postMoneyBill } from "@/lib/money-receipt";
+import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
@@ -652,7 +652,7 @@ function onReplace() {
   const newId = app.addDevice(s.newKind);
   const activated = !!newId && app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
-    if (newId) app.devices = app.devices.filter((d) => d.id !== newId);
+    if (newId && !app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
@@ -673,7 +673,9 @@ function onReplace() {
   if (paid !== "ok") {
     // 钱没扣成(余额不足)或没记上账(收口点已还原资金 + 弹错)——设备侧的改动必须一起退回,
     // 否则用户白得一台新机、老机还停着。
-    app.devices = app.devices.filter((d) => d.id !== newId);
+    // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
+
+    if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
@@ -738,7 +740,9 @@ function onKeepBuy() {
     memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
   });
   if (paid !== "ok") {
-    app.devices = app.devices.filter((d) => d.id !== newId);
+    // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
+
+    if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;
     return;
@@ -807,9 +811,9 @@ function onForce() {
   const activated = app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
     // Rollback: remove new, restore the snapshotted task, re-activate old.
-    app.devices = app.devices
-      .filter((d) => d.id !== newId)
-      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
+
+    app.devices = app.devices.map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
@@ -830,9 +834,9 @@ function onForce() {
     }),
   });
   if (paid !== "ok") {
-    app.devices = app.devices
-      .filter((d) => d.id !== newId)
-      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
+
+    app.devices = app.devices.map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
     if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));

@@ -221,6 +221,7 @@ async function handlePurchase() {
       if (!r.ok) {
         // 铸造失败 → 走**同一个**收口点冲正:restoreTo 精确还原可提额度(裸 credit 只加总余额,
         // 一次「扣款→失败→退款」就把可提额永久压低),并补一条反向分录(退款也必须有账)。
+        // persist-verdict-ok: 冲正腿:收口点内部对退不回去已走 reportStuckFunds 响亮终态、退得回去弹 txNotSaved,调用方无需再动作
         postMoneyBill({
           type: "purchase",
           symbol: "USDT",

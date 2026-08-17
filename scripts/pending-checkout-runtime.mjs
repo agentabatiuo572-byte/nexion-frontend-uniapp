@@ -14,6 +14,8 @@
  *   E 一票只结算一次:两个标签页共用同一张票,第二个结算后第一个再点「已完成」不再扣款 / 建单。
  *   F 抵扣上下文不被同栈的第二个结算页实例抹掉(审计 R5 P0):A 带旧机抵扣开票(票面 634.08)→ push 第二个
  *     结算页实例 → 返回 A → 付款 → 恰按票面成交、旧机下架、订单记 tradeInCredit;不出现「金额已变」拒单 + 销票。
+ *   G 成交即兑现意图(审计 R8 P0):链上开票 X 后离开 → 全新结算页实例改用卡支付同一 SKU 成交 → 旧票 X 必须作废
+ *     (storage 0 张、浮动条消失),否则浮动条继续催第二笔;订单恰 +1。
  *
  * 判据全部是构造性的(读页面文本 / storage / 订单数),不扫源码形状。
  * Usage: BASE_URL=http://127.0.0.1:<port> node scripts/pending-checkout-runtime.mjs
@@ -139,6 +141,55 @@ async function goToPayStepWithTradeIn(page) {
   const st = await readState(page);
   if (!st.onPayStep || !st.address || st.sessions.length !== 1) fail(`F: could not reach the pay step with a trade-in: ${JSON.stringify(st)}`);
   return st;
+}
+
+/** Card leg: pick the card method (4th option), confirm, bind a card if the account has none, enter CVV, pay. */
+async function payByCard(page) {
+  await page.goto(directAppUrl(BASE, CHECKOUT), { waitUntil: "networkidle", timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await dismissSheets(page);
+  // payment method list = uni-view rows with "rounded-xl border"; mock methods: trc20 / bep20 / erc20 / card
+  const pickCardAndContinue = async () => {
+    const picked = await page.evaluate(() => {
+      const pages = [...document.querySelectorAll('uni-page[data-page="pages/store/checkout"]')];
+      const scope = pages[pages.length - 1] ?? document;
+      const rows = [...scope.querySelectorAll("uni-view")].filter((e) => /rounded-xl border/.test(e.className));
+      const card = rows.find((e) => /card/i.test(e.textContent || ""));
+      if (!card) return false;
+      card.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      return true;
+    });
+    if (!picked) fail("G: card payment method row not found on the select-payment step");
+    await page.waitForTimeout(600);
+    await tapButton(page, "Continue");
+    await tapButton(page, "Continue to payment"); // card leg CTA label (chain leg says "Pay now")
+    await page.waitForTimeout(800);
+  };
+  await pickCardAndContinue();
+  const addCard = page.locator('uni-page[data-page="pages/store/checkout"] [role="button"][aria-label="Add a card"]');
+  if ((await addCard.count()) > 0) {
+    await addCard.first().click({ timeout: 5000 });
+    await page.waitForTimeout(1800);
+    const ins = page.locator("input");
+    await ins.nth(0).fill("4111111111111111");
+    await ins.nth(1).fill("12/29");
+    await ins.nth(2).fill("123");
+    await ins.nth(3).fill("ALEX TURNER");
+    await page.waitForTimeout(400);
+    await page.locator('[role="button"][aria-label="Complete binding"]').click({ timeout: 8000 });
+    await page.waitForTimeout(2500);
+    await dismissSheets(page); // the fresh instance re-fires the trade-in intercept sheet
+    // binding returns to a fresh checkout instance (card preselected); walk back to the card step if it landed on selection
+    const cont = page.locator('uni-page[data-page="pages/store/checkout"] [role="button"][aria-label="Continue"]');
+    if ((await cont.count()) > 0) await pickCardAndContinue(); // fresh instance defaults to the chain method again
+  }
+  const cvv = page.locator('uni-page[data-page="pages/store/checkout"] input').last();
+  await cvv.fill("123");
+  await page.waitForTimeout(800);
+  const payBtn = page.locator('uni-page[data-page="pages/store/checkout"] [role="button"]').filter({ hasText: /^Pay \$/ }).last();
+  if ((await payBtn.count()) === 0) fail("G: card Pay button not found after CVV");
+  await payBtn.click({ timeout: 5000 });
+  await page.waitForTimeout(5000); // awaiting → confirmed → order
 }
 
 async function goBack(page) {
@@ -302,8 +353,28 @@ try {
     await ctx.close();
   }
 
+  // ── G: a completed card purchase of the same SKU voids the chain invoice left behind ──
+  {
+    const { ctx, page, errors } = await openPage(null);
+    const t0 = await goToPayStep(page);           // chain invoice X for the SKU
+    await goBack(page);
+    const left = await readState(page);
+    if (left.sessions.length !== 1 || !left.pill) fail(`G: invoice not kept / bar missing after leaving: ${JSON.stringify(left)}`);
+    await payByCard(page);                        // fresh checkout instance, same SKU, card leg
+    const paid = await readState(page);
+    if (paid.orderCount !== t0.orderCount + 1) fail(`G: card purchase did not settle (orders ${t0.orderCount} → ${paid.orderCount}; toast=${paid.toast})`);
+    if (paid.sessions.length !== 0) fail(`G: chain invoice survived a completed card purchase of the same SKU — the bar would nag for a second payment (${JSON.stringify(paid.sessions)})`);
+    await page.goto(directAppUrl(BASE, "/#/pages/store/store"), { waitUntil: "networkidle", timeout: 30000 });
+    await page.waitForTimeout(1200);
+    const after = await readState(page);
+    if (after.pill) fail(`G: floating bar still shows after the intent was fulfilled: ${after.pill}`);
+    report.G = { invoice: t0.address, ordersBefore: t0.orderCount, ordersAfter: paid.orderCount, errors };
+    assertNoRuntimeErrors(errors, "pending-checkout G");
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(report, null, 2));
-  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune · E two tabs settle once · F sibling instance keeps trade-in)");
+  console.log("PENDING-CHECKOUT-RUNTIME: PASS (A no-auto-advance 15s · B leave/resume same invoice · C bounce voids + single live · D expiry prune · E two tabs settle once · F sibling instance keeps trade-in · G card purchase voids the chain invoice)");
 } finally {
   await browser.close();
 }

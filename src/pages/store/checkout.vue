@@ -395,6 +395,7 @@ onLoad(async (options) => {
   const dropResumeInvoice = () => {
     if (!resumeSessionId) return;
     // 只作废属于本商品页的那张;?resume= 指向别的商品的票(拼错 / 拼接的 URL)不归这里处置。
+    // persist-verdict-ok: 门命中时顺手作废;删不掉 = 票留在磁盘,浮动条下次点进来再经同一道门
     if (pending.get(resumeSessionId)?.productId === productId.value) pending.remove(resumeSessionId);
     resumeSessionId = null;
   };
@@ -1162,7 +1163,12 @@ async function onChainCancel() {
   });
   dialogsOpen -= 1;
   if (!pageAlive || !ok || activeSession.value !== s) return;
-  dropActiveSession();
+  // 取消 = 磁盘上那张票必须真的没了;删不掉就别宣布已取消(票还在、浮动条还会催,页面若丢了引用用户就找不回它)。
+  if (!pending.remove(s.id)) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
+  activeSession.value = null;
   goConfirm();
 }
 
@@ -1175,6 +1181,7 @@ function onChainRestart() {
 function dropActiveSession() {
   const s = activeSession.value;
   if (!s) return;
+  // persist-verdict-ok: 回弹 / 重开时作废本页那张票;删不掉 = 票留在磁盘,浮动条会继续露出它、用户仍能回去处理,本页只是不再展示
   pending.remove(s.id);
   activeSession.value = null;
 }
@@ -1718,10 +1725,10 @@ watch(step, async (s) => {
       const beforePay = app.captureMoney();
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
-        // Insufficient balance — bail out of the auto-advance chain (402),
-        // with an explicit toast (was a silent bounce, PR-D debt #3).
+        // 余额预检已经在上面过了、金额也过了数值闸,这里 false 只剩一种可能:落盘失败(store 已把内存拨回,
+        // 余额没动)。那是系统故障,不许说成「余额不足」把用户支去充值(审计 R8 P1)。
         if (!releaseVoucher()) reportStuckFunds(beforePay, "", "voucher");
-        toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+        toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
         step.value = "select-payment";
         return;
       }
@@ -1782,7 +1789,10 @@ watch(step, async (s) => {
         return;
       }
       orderId.value = ord.id;
-      // 发票已在扣款前被 consume(见上),这里不再有会话要收。
+      // 链上腿的票已在扣款前被 consume(见上);卡 / $0 直付腿从不碰票 —— 这一单成交 = 该商品的购买意图已兑现,
+      // 同账号仍在窗内的那张链上旧票一并作废,否则浮动条继续催第二笔(审计 R8 P0)。
+      // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出;用户回去看到的是可取消的旧票,不会二次扣款(consume 仍要 CAS)
+      pending.settleProduct(p.id);
       // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
       // convert() 已在扣款前裁决并落 converted(见上);这里只做返还入账。设备由
       // 既有订单履约管线生成(tickOrders → advanceOrder → addDevice,吃 order.total

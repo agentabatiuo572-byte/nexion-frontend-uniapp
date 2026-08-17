@@ -200,6 +200,7 @@ import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
+import { usePendingCheckout } from "@/store/pending-checkout";
 import { postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
@@ -211,6 +212,7 @@ const cart = useCart();
 const phase = useProductPhase();
 const app = useApp();
 const orders = useOrders();
+const pending = usePendingCheckout();
 
 const catalogStatus = computed(() => productCatalogState.status);
 const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
@@ -442,6 +444,9 @@ async function onCheckout() {
     paymentMethod: "balance" as const,
     discount: +(p.price * pct).toFixed(2),
   })));
+  // 这批成交 = 这些商品的购买意图已兑现:同账号仍在窗内的链上旧票一并作废(否则浮动条继续催第二笔)。
+  // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出,用户回去看到的是可取消的旧票
+  if (created) for (const p of list) pending.settleProduct(p.id);
   if (!created) {
     // 整批没落盘:钱按快照精确冲正,冲不回去走响亮终态。
     if (app.restoreMoney(beforePay)) toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
