@@ -5172,6 +5172,10 @@ export const vi: Messages = {
     messagesDesc: "Nhắn cho hỗ trợ, phản hồi sẽ hiện ở đây",
     commissionsTitle: "Chưa có hoa hồng",
     commissionsDesc: "Thu nhập từ lời mời của bạn sẽ hiện ở đây",
+    genesisListingsTitle: "Chưa có tin rao nào",
+    genesisListingsDesc: "Khi có người rao bán node, bạn sẽ thấy ngay tại đây",
+    genesisActivityTitle: "Chưa có hoạt động nào",
+    genesisActivityDesc: "Tin rao và giao dịch sẽ hiện ở đây ngay khi phát sinh",
   },
   topupChrome: {
     change: "Đổi",
