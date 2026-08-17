@@ -135,14 +135,14 @@ const consoleErrorsFor = (page) => {
   return errorsOf.get(page);
 };
 
-const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
+const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
   const i = ROUTES.indexOf(spec);
   const route = spec.r;
   const consoleErrors = consoleErrorsFor(page);
   const before = consoleErrors.length;
   try {
     await page.goto(`${BASE}/?nx_device=off&es=${i}#/${route}`, { waitUntil: "domcontentloaded" });
-    await settleNetwork(page); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;PROBE_CONCURRENCY=1 时空转(F-04)
+    await settleNetwork(page, 5000, lanes); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;实际 1 lane 时空转(F-04 / R2-03)
     await page.waitForTimeout(1300);
     // 常量数据源的页面:往搜索框打不可能命中的词
     if (spec.type) {
