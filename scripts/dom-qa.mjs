@@ -195,7 +195,7 @@ if (MODE === "selftest") {
   const pageErrors = {};
   // 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一条路由(PROBE_CONCURRENCY,默认 3);每条路由仍是 goto → 1400ms → probe 的原节奏,判据不动;结果按路由原顺序合并。
   const timeoutSet = new WeakSet();
-  const perRoute = await mapRoutes(browser, routes, async (lane, route) => {
+  const perRoute = await mapRoutes(browser, routes, async (lane, route, _i, lanes) => {
     if (!timeoutSet.has(lane)) { lane.setDefaultTimeout(10000); timeoutSet.add(lane); }
     const url = `${BASE}/?nx_device=off#/${route}`;
     const routePageErrors = [];
@@ -203,7 +203,7 @@ if (MODE === "selftest") {
     lane.on("pageerror", onPageError);
     try {
       await lane.goto(url, { waitUntil: "domcontentloaded" });
-      await settleNetwork(lane); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待
+      await settleNetwork(lane, 5000, lanes); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;实际 1 lane 时空转(R2-03)
       await lane.waitForTimeout(1400); // 渲染/动效落定
       const ui = await landedFrame(lane);
       const landed = (await lane.evaluate(() => location.hash)).replace(/^#\//, "").split("?")[0];

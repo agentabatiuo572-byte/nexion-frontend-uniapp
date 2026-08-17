@@ -41,7 +41,7 @@ export async function mapRoutes(browser, routes, worker, { concurrency = concurr
       for (;;) {
         const i = next++;
         if (i >= routes.length) break;
-        try { results[i] = await worker(page, routes[i], i); }
+        try { results[i] = await worker(page, routes[i], i, lanes); } // 第 4 参 = 实际 lane 数(scoped 只剩 1 条路由时为 1,settleNetwork 据此空转;tester-F R2-03)
         catch (e) { results[i] = { error: e?.message || String(e), route: routes[i] }; }
       }
     } finally { await ctx.close().catch(() => {}); }
@@ -54,7 +54,7 @@ export async function mapRoutes(browser, routes, worker, { concurrency = concurr
 //   在固定等待之前先等本页网络空闲(封顶 timeoutMs,超时不抛 —— 有轮询的页面不该因此红),只补齐「服务器忙」那部分,判定不动。
 //   🔴 只在真的并行(有效 lane 数 > 1)时等;PROBE_CONCURRENCY=1 = 串行 = 没有拥塞,直接返回 —— 否则「拥塞时降到 1」的逃生阀反而更慢
 //   (tester-F F-04:orphan 33s→74s、empty-state 55s→89s)。lanes 由调用方传(探针知道自己实际开了几条 lane),不传按 env 算。
-export async function settleNetwork(page, timeoutMs = 5000, lanes = concurrencyFromEnv()) {
+export async function settleNetwork(page, timeoutMs = 5000, lanes = concurrencyFromEnv()) { // 调用方应传 mapRoutes 给的实际 lane 数,不传才退回 env
   if (lanes <= 1) return;
   await page.waitForLoadState("networkidle", { timeout: timeoutMs }).catch(() => {});
 }
