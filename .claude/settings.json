@@ -6,9 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/verify-on-stop.mjs"
+            "command": "node .claude/hooks/verify-on-stop.mjs",
+            "timeout": 600
           }
-        ]
+        ],
+        "description": "verify-on-stop(包 ar 2026-08-17):回合末跑 static 档(vue-tsc 指纹缓存 + 静态哨兵,不起 server,~3 分钟;树未变 / 只改文档 → 秒退),红 exit 2。full 不在回合末,焊在合并主线(PLAN/.claude/hooks/verify-fresh-before-merge.mjs)。timeout 600s:hook 默认 60s 会把静态门半路杀掉,那不是绿。"
       }
     ]
   }

@@ -50,6 +50,73 @@ const ROUTES = [
   { r: "pages/genesis/marketplace" },
 ];
 
+/** 页内页签遍历:认出页签行 → 逐个点 → 每切一次要求**页签下方那块区域里有内容**。
+ *
+ *  🔴 判据是**存在性**,不是几何尺寸(2026-08-17 连错四轮才收敛):先后试过「内容之间的最大空隙」
+ *  「清空前后的差值」「距屏幕底的死区」,全部栽在同一件事上——**用尺寸判「有没有东西」**。
+ *  实测反例:钱包账单切到 Credit、创世市场切到 Mine,空态都好好地渲染着,只因为那两个空态**比较矮**、
+ *  底下剩的屏幕多,就被判红。阈值再调也只是挪线,矮一点的空态照样中枪。
+ *  空态本身就是内容 —— 该问的是「这块区域是不是什么都没有」,不是「空了多少像素」。 */
+const TAB_SWEEP = async () => {
+  const host = () => document.querySelector(".nx-page-enter") || document.body;
+  /** 页签行下方区域里的「内容像素高度」合计(空态、卡片、文字都算)。 */
+  const contentBelow = (y) => {
+    const spans = [];
+    for (const el of host().querySelectorAll("*")) {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2 || r.bottom <= y) continue;
+      const ownText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      const media = /^(IMG|SVG|CANVAS|VIDEO|UNI-IMAGE)$/i.test(el.tagName);
+      const bg = cs.backgroundImage !== "none"
+        || (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent")
+        || (cs.borderTopWidth !== "0px" && cs.borderTopStyle !== "none");
+      if (!ownText && !media && !bg) continue;
+      if (r.height > innerHeight * 0.9 && bg && !ownText && !media) continue; // 整页背景板不算内容
+      spans.push([Math.max(r.top, y), r.bottom]);
+    }
+    if (!spans.length) return 0;
+    spans.sort((a, b) => a[0] - b[0]);
+    const merged = [spans[0].slice()];
+    for (const [t, b] of spans.slice(1)) {
+      const last = merged[merged.length - 1];
+      if (t <= last[1]) last[1] = Math.max(last[1], b); else merged.push([t, b]);
+    }
+    return Math.round(merged.reduce((n, [t, b]) => n + (b - t), 0));
+  };
+
+  // 页签行 = 内容区里一组「横向对齐、高度一致、文本短、恰有一个底色与众不同」的可点兄弟元素
+  let row = null;
+  for (const parent of host().querySelectorAll("uni-view")) {
+    const kids = [...parent.children].filter((c) => c.tagName === "UNI-VIEW");
+    if (kids.length < 2 || kids.length > 5) continue;
+    const rects = kids.map((k) => k.getBoundingClientRect());
+    if (rects.some((r) => r.height < 28 || r.width < 40)) continue;
+    if (rects.some((r) => Math.abs(r.top - rects[0].top) > 4)) continue;
+    const texts = kids.map((k) => (k.innerText || "").trim());
+    if (texts.some((t) => !t || t.length > 24)) continue;
+    if (new Set(kids.map((k) => getComputedStyle(k).backgroundColor)).size !== 2) continue;
+    row = { kids, texts }; break;
+  }
+  if (!row) return { tabs: 0 };
+
+  // 「有内容」的下限:最矮的合法空态(创世市场 Mine 的虚线框)实测在页签下方也有 200px+ 内容;
+  // 而空态被删掉时,页签下方只剩页脚一行(≤40px)。取 72px —— 两者相差 5 倍,不是需要调的参数。
+  const FLOOR = 72;
+  const bad = [];
+  const seen = [];
+  for (let i = 0; i < row.kids.length; i++) {
+    row.kids[i].click();
+    await new Promise((r) => setTimeout(r, 450));
+    const y = row.kids[0].getBoundingClientRect().bottom;
+    const h = contentBelow(y);
+    seen.push(`${row.texts[i].slice(0, 10)}=${h}px`);
+    if (h < FLOOR) bad.push(`${row.texts[i].slice(0, 14)} 页签下方只有 ${h}px 内容`);
+  }
+  return { tabs: row.kids.length, tabLabels: row.texts.map((t) => t.slice(0, 12)), tabBad: bad, tabSeen: seen };
+};
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "en-US" });
 page.setDefaultTimeout(20000);
@@ -107,7 +174,13 @@ for (const [i, spec] of ROUTES.entries()) {
         box: Math.round(el.getBoundingClientRect().width) + "x" + Math.round(el.getBoundingClientRect().height),
       };
     }, THEME);
-    rows.push({ route, unreachable: spec.unreachable, ...res, newErrors: consoleErrors.length - before });
+    // 🔴 页签遍历(2026-08-17 变异实测逼出来的):上面只断言了**落地那一屏**。
+    //    同一页里切了页签才看得到的空态,这门此前一概不查 —— 实测把创世市场「活动」
+    //    页签的空态整块删掉,门照样 21/21 全绿(而「在售」那个删掉就判红,因为它是默认页签)。
+    //    这里把页内页签逐个点一遍,每切一次都要求「内容区不能留大片白」。
+    //    识别不出页签的页面 tabs 记 0 并打印 —— **不许静默跳过**(认不出 ≠ 没有页签)。
+    const tabRes = res.empty ? await page.evaluate(TAB_SWEEP) : { tabs: 0, note: "落地屏已判红,跳过页签" };
+    rows.push({ route, unreachable: spec.unreachable, ...res, ...tabRes, newErrors: consoleErrors.length - before });
   } catch (e) {
     rows.push({ route, err: e.message.split("\n")[0].slice(0, 60) });
   }
@@ -126,9 +199,13 @@ for (const r of rows) {
     if (!r.title) bad.push("标题为空");
     if (r.overflowX) bad.push("横向溢出");
     if (r.newErrors) bad.push(`console error ×${r.newErrors}`);
+    if (r.tabBad?.length) bad.push(`页签切过去是大片白 → ${r.tabBad.join(" / ")}`);
   }
   if (bad.length) fail++;
-  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""} ${bad.join(" · ")}`);
+  // 🔴 tabs=N 恒打印:认不出页签(0)也要显形。静默跳过 = 判据失效却看不出来。
+  const tabInfo = r.tabs === undefined ? "" : r.tabs > 0 ? ` [页签 ${r.tabs}: ${(r.tabLabels || []).join("/")}]` : " [无页签]";
+  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
 }
-console.log(`\n${rows.length - fail}/${rows.length} 通过`);
+const withTabs = rows.filter((r) => r.tabs > 0).length;
+console.log(`\n${rows.length - fail}/${rows.length} 通过 · 其中 ${withTabs} 页做了页签遍历`);
 process.exit(fail ? 1 : 0);
