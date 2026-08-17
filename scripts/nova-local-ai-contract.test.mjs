@@ -49,7 +49,15 @@ test("remote tab routes keep a persistent Nova launcher without mock push timers
   const chassis = read("src/components/app-chassis.vue");
   const bubble = read("src/components/nova/nova-bubble.vue");
 
-  assert.match(chassis, /<NovaBubble v-if="isTabRoute"\s*\/>/);
+  // 守的是「浮标在 tab 路由上无条件常驻」——挂载条件必须**恰好**是 isTabRoute,
+  // 不许被任何模式/状态判断关掉。属性本身放行:纯视觉 prop(如 :dimmed 控制滚动时
+  // 淡出)不改变「在不在」。原判据写成自闭合精确形状,把「没有别的属性」和「没有别的
+  // 挂载条件」混成一条,加个视觉 prop 就误红。放宽形状 + 下面两条把绕路堵死:
+  //   · v-if 里加与条件 → 引号内多出内容,第一条正则直接失配;
+  //   · 改用 v-show / v-else 藏起来 → 第二条抓;
+  //   · 用 !remoteApiEnabled 关掉远端档 → 第三条抓(原有)。
+  assert.match(chassis, /<NovaBubble v-if="isTabRoute"[^>]*\/>/);
+  assert.doesNotMatch(chassis, /<NovaBubble[^>]*v-(show|else)/);
   assert.doesNotMatch(chassis, /NovaBubble[^>]+!remoteApiEnabled/);
   assert.match(bubble, /const visible = computed\(\(\) => remoteApiEnabled \|\| totalUnread\.value > 0\)/);
   assert.match(bubble, /v-if="showUnreadBadge"/);
