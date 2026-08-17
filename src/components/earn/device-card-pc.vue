@@ -16,11 +16,13 @@
 -->
 <template>
   <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
-    <!-- Long-press quick menu (full-viewport bottom sheet) -->
+    <!-- Long-press quick menu (full-viewport bottom sheet).
+         🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
+         庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
     <view
       v-if="menuOpen"
       class="nx-device-quick-menu flex items-end"
-      style="position: fixed; inset: 0; z-index: 200; background: var(--v5-bg-color-mask)"
+      style="position: fixed; inset: 0; z-index: 790; background: var(--v5-bg-color-mask)"
       role="dialog"
       aria-modal="true"
       :aria-label="displayName"

@@ -280,9 +280,18 @@ onUnmounted(() => {
    ── 低 ──────────────────────────────────────────────────────────── 高 ──
      0–50   页内装饰 / 页面 chrome(aurora · refresher 5 · tabbar 30 · stickyCTA 35 · sub-page header 50)
     90–100  底盘 chrome(.nx-top-chrome 90 · .nx-header/.nx-navheader 100)
-   110–200  底盘之上的常驻件(状态栏 110 · 消息抽屉 110/120 · opensea 120 · PC 设备卡 200)
+       110  底盘之上的常驻件(模拟设备状态栏)
        780  里程碑庆祝 —— 必须在业务 UI 之下(2026-08-03 定,2026-08-16 兑现,见 milestone-celebration.vue)
-   790/800  业务半屏(trial-claim · slot-action · lucky-spin · voucher-claim · tradein · trial)
+   790/800  业务半屏(trial-claim · slot-action · lucky-spin · voucher-claim · tradein · trial
+            · 消息抽屉 · opensea 外链弹窗 · PC 设备卡长按菜单
+            · device-deactivate · fx-rate-line · wallet-withdraw 费用说明)
+            └ 前三者 2026-08-17 从 110/120/200 迁入,原登记在 zindex-order.mjs 的
+              SCRIM_EXEMPT 欠账清单里,迁入后清单已清空(为空 = 目标状态,不是「门没在管」)。
+            └ 后三者同日从 79/80 迁入 —— 是「比 790/800 少一位数」那个老笔误的残留同族。
+              2026-08-16 修的是写在 <style> 块里的三张付款半屏,这三张写成 **JS 样式对象**
+              (`position:"fixed"` + `zIndex`),机器门当时只扫 <style>,所以它们连红都没红过。
+              🔴 同一个「全屏遮罩」形态在本仓有三种写法,判据三种都要扫:<style> 规则 /
+              内联 style / JS 样式对象。少扫一种,那一种就是缺陷的藏身处(已三次实证)。
        900  说明型半屏(capacity-explainer · tradein-ladder)
  8000/8001  分享半屏(share-channel · share-poster)
  9000/9001  瞬时层 / 选择器(toast host · 国家区号半屏)
