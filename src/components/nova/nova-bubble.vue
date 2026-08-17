@@ -18,7 +18,7 @@
 -->
 <template>
   <view>
-    <view v-if="visible" class="nx-nova-bubble nova-float" @click="open">
+    <view v-if="visible" class="nx-nova-bubble nova-float" :class="{ 'nx-nova-bubble--dimmed': dimmed }" @click="open">
       <view class="nx-nova-btn nova-pulse">
         <NovaAvatar :size="36" pulse />
         <view v-if="showUnreadBadge" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
@@ -40,6 +40,12 @@ import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import NovaAvatar from "./nova-avatar.vue";
+
+// dimmed:chassis 在页面滚动期间置真 —— 浮标横在内容上,滚动时先让路(淡出 +
+// 不吃点击),停下由 chassis 复位再淡回。不传 = 旧行为(undefined 即 falsy)。
+// 🔴 不要写成 `const { dimmed } = defineProps(...)`:响应式解构是 Vue 3.5 特性,
+//    本仓锁 3.4.21,那样写会静默丢响应性(浮标从此永不淡出)。模板直接用 prop 名。
+defineProps<{ dimmed?: boolean }>();
 
 const t = useT();
 const nova = useNova();
@@ -189,12 +195,26 @@ onUnmounted(() => {
   bottom: 100px;
   z-index: 40;
   transition: opacity 0.15s;
+  /* 命中区跟着视觉走。这层是 48×48 的**方框**,而看得见的球是内切圆 —— 四角那
+     22% 面积是透明的却照样截走点击(实测 144 点网格:144 点全被吃,只有 112 点
+     在圆内)。实付:赚取页「添加设备」按钮左上角约 1/4 面积点下去开的是 Nova。
+     border-radius 参与命中测试,加上它四角就还给页面了;圆内与溢出在外的未读
+     角标都不受影响(角标是子元素,不被父级圆角裁剪)。 */
+  border-radius: 999px;
 }
 /* 《08》§2 按下反馈。全站五个 tab 都能看到这个球,原先按下去毫无变化。
    只动 opacity 不动 transform —— .nova-float 的 animation 一直在写 transform,
    普通声明压不过 animation,写了也不会生效。 */
 .nx-nova-bubble:active {
   opacity: 0.7;
+}
+/* 滚动让路态。注意它压不过上面的 :active(带伪类,特异性更高)—— 靠的是
+   pointer-events:none 让 :active 根本无从成立,不是靠选择器权重或书写顺序。
+   淡出淡入沿用上面那条 0.15s 过渡,不新造时长档。opacity 归零而非
+   visibility/display:后两者没有过渡帧,会闪。 */
+.nx-nova-bubble--dimmed {
+  opacity: 0;
+  pointer-events: none;
 }
 .nx-nova-btn {
   position: relative;
