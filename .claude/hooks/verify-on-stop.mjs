@@ -1,74 +1,65 @@
 #!/usr/bin/env node
-// Stop 门 —— 把 verify.sh 的判决真正**送到**该看的人手里。
+// Stop 门(包 ar 2026-08-17,主人拍板 Q2A):回合末跑 **static 档**(A 档),红就阻断。
 //
-// 为什么要这层壳(2026-08-11):
-//   settings.json 以前直接挂 `bash scripts/verify.sh all`。Claude Code 的 hook 语义是
-//   exit 2 = 阻断并把 **stderr** 回喂给 Claude,exit 0/1/其它 = 不阻断。而 verify.sh
-//   末行只会给 0 或 1,且 158 处 FAIL 全打 **stdout** —— 于是「红了」这件事:
-//     ① 拦不住任何东西(1 不阻断);② 明细走 stdout,exit≠0 时被丢弃。
-//   门是装饰品。同工作区的 Nexion-admin-prototype/.claude/hooks/verify-on-stop.mjs
-//   早就是对的写法(捕获 stdout → 写 stderr → exit 2),本仓照抄。
+// 以前(2026-08-11 版)这里每回合跑一整遍 `bash scripts/verify.sh all`(~20 分钟),且只在 BASE_URL 上恰好是
+// 「本树 + mock」的 server 时才跑 —— 主 checkout 上是 20 分钟/回合,worktree 会话则前提不满足静默空转,两头都不对。
+// 三档制后:回合末只跑不需要 dev server 的静态部分(vue-tsc 指纹缓存 + ~430 格静态哨兵,实测 ~3 分钟),
+// 树没变就秒退;全量(full)不在回合末,而是焊在「合并主线」这个动作上(PLAN/.claude/hooks/verify-fresh-before-merge.mjs)。
 //
-// 环境不满足 ≠ 代码有问题:
-//   verify.sh 的 13 道运行时门要一台**本树 + mock 模式**的 dev server。没有它时
-//   verify 必红(preflight 是 fail-closed 的)。若照直阻断,任何没起 server 的机器
-//   每回合都会被顶回去 —— 所以这里先探环境:靶子不对就只警告不阻断,和 admin 仓
-//   「dev server 未起则跳过 verify(仅警告),不阻断」同一条约定。
-import { execSync } from "node:child_process";
+// 判据顺序:
+//   ① 不是 git 树 / runner 不存在 → 提示后放行(环境不满足 ≠ 代码有问题);
+//   ② 当前树指纹 == .verify-cache/last-run.json 里最近一次绿(任一档)的树 → 秒退,不重跑;
+//   ③ 相对上次记录只改了文档类(不在 src/scripts/配置面)→ 放行并说明(文档改动不触发静态门);
+//   ④ 否则跑 `node scripts/verify-chain.mjs --static`;红 → 只回喂 FAIL/SCOPED-SKIP 摘要 + result 行,exit 2;绿 → exit 0。
+// 语义提醒:static 绿 ≠ 全量绿。宣布 done / 合并前仍须 `npm run verify`(full);合并守卫会查。
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 
 const PROJECT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE_URL = process.env.BASE_URL || "http://localhost:5173";
+const RUNNER = join(PROJECT_DIR, "scripts", "verify-chain.mjs");
+const SCOPE = join(PROJECT_DIR, "scripts", "lib", "verify-scope.mjs");
+const LAST = join(PROJECT_DIR, ".verify-cache", "last-run.json");
+const FUNCTIONAL = /^(src\/|scripts\/|package(-lock)?\.json$|tsconfig[^/]*\.json$|vite\.config\.ts$|vitest\.config\.ts$|uno\.config\.ts$|index\.html$|shims-uni\.d\.ts$|\.claude\/hooks\/)/;
 
-// 🔴 服务端那份是**源码文本**里的 JSON 转义值,分隔符是两个反斜杠字符(`C:\\Users\\…`),
-//    本地 path.resolve 出来的是一个。不折叠连续斜杠 → 恒不相等 → 这道门永远「跳过」,
-//    也就永远不阻断(红测 [A] 就是这么抓出来的,别删这一步)。
-const norm = (p) =>
-  p.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^([A-Za-z]):/, "$1").replace(/\/+$/, "").toLowerCase();
+const note = (m) => process.stderr.write(`[verify-on-stop] ${m}\n`);
 
-// ── 1) 靶子对不对?(和 verify.sh [2.5]/[2.6] 同判据,只是提前问一遍)──
-let envHead = "";
-try {
-  envHead = execSync(`curl -s --max-time 5 "${BASE_URL}/src/api/runtime-config.ts"`, {
-    encoding: "utf8",
-  }).split("\n").slice(0, 2).join("\n");
-} catch {
-  envHead = "";
-}
+if (!fs.existsSync(RUNNER) || !fs.existsSync(SCOPE)) { note("(提示)本树没有 scripts/verify-chain.mjs,跳过静态门"); process.exit(0); }
+let fp = null;
+try { fp = JSON.parse(execFileSync(process.execPath, [SCOPE, "fingerprint"], { cwd: PROJECT_DIR, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { /* 非 git 树 */ }
+if (!fp) { note("(提示)算不出树指纹(非 git 树?),跳过静态门"); process.exit(0); }
 
-const servedRoot = (envHead.match(/"VITE_ROOT_DIR": *"([^"]*)"/) || [])[1] || "";
-const isMock = /"VITE_NEXGRID_API_MODE": *"mock"/.test(envHead);
-const isThisTree = servedRoot && norm(servedRoot) === norm(PROJECT_DIR);
-
-if (!envHead || !servedRoot || !isThisTree || !isMock) {
-  const why = !envHead
-    ? `${BASE_URL} 上没有 vite dev server`
-    : !servedRoot
-      ? `${BASE_URL} 的 env 里没有 VITE_ROOT_DIR(uni 版本变了?)`
-      : !isThisTree
-        ? `${BASE_URL} 服务的是另一棵树:${servedRoot}(本树 ${PROJECT_DIR})`
-        : `${BASE_URL} 不是 mock 模式`;
-  process.stderr.write(
-    `[verify-on-stop] (提示)跳过 verify.sh —— ${why}。\n` +
-      `  要让这道门真正生效:VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port <本树端口>,\n` +
-      `  然后 BASE_URL=http://localhost:<本树端口> 跑。环境不满足只警告、不阻断。\n`,
-  );
+let last = null;
+try { last = JSON.parse(fs.readFileSync(LAST, "utf8")); } catch { /* 无记录 */ }
+if (last && last.verdict === "pass" && !last.treeMoved && last.tree === fp.fingerprint) {
+  note(`✓ 树未变(${fp.fingerprint.slice(0, 10)}),复用上次 ${last.mode} 绿(${last.at});${last.mode === "full" ? "" : "static/scoped 绿 ≠ 全量绿,合并前仍须 npm run verify"}`);
   process.exit(0);
 }
-
-// ── 2) 靶子对了 → verify 说了算,红就阻断,并把明细送到 stderr ──
-try {
-  execSync("bash scripts/verify.sh all", { cwd: PROJECT_DIR, stdio: "pipe", env: process.env });
-} catch (e) {
-  const out = (e.stdout ? e.stdout.toString() : "") + (e.stderr ? e.stderr.toString() : "");
-  // 只回喂 FAIL/SKIP 行 + 末尾 result —— 400+ 行全文回喂等于没说。
-  const lines = out.split("\n");
-  const verdicts = lines.filter((l) => /\bFAIL\b|\bSKIP\b|━━ result:/.test(l));
-  process.stderr.write(
-    "[verify-on-stop] ✗ verify.sh 未通过,先修再收工:\n" +
-      (verdicts.length ? verdicts.join("\n") : out.slice(-4000)) +
-      "\n",
-  );
-  process.exit(2);
+// ③ 文档类改动不触发:相对上次记录的 head 与工作树的改动都不在功能面
+if (last && last.head) {
+  const files = new Set(fp.dirtyFiles || []);
+  try {
+    execFileSync("git", ["-C", PROJECT_DIR, "diff", "--name-only", `${last.head}..HEAD`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split(/\r?\n/).filter(Boolean).forEach((f) => files.add(f.replace(/\\/g, "/")));
+    if (files.size && ![...files].some((f) => FUNCTIONAL.test(f))) {
+      note(`✓ 相对上次绿(${last.at})只改了非功能面文件(${[...files].slice(0, 5).join(", ")}${files.size > 5 ? " …" : ""}),不触发静态门`);
+      process.exit(0);
+    }
+  } catch { /* 上次 head 已不可达(rebase 等):按「树变了」处理,往下跑 */ }
 }
+// ④ 跑 static 档
+const r = spawnSync(process.execPath, [RUNNER, "--static"], { cwd: PROJECT_DIR, encoding: "utf8", env: process.env, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+const out = (r.stdout || "") + (r.stderr || "");
+if (r.status === 0) {
+  const tail = out.trim().split(/\r?\n/).filter((l) => /verify-chain result|PASS \d+ · CACHED/.test(l)).slice(-2).join(" | ").replace(/\x1b\[[0-9;]*m/g, "");
+  note(`✓ static 档绿(${tail});static ≠ 全量,宣布 done / 合并前仍须 npm run verify(full)`);
+  process.exit(0);
+}
+const lines = out.split(/\r?\n/).map((l) => l.replace(/\x1b\[[0-9;]*m/g, ""));
+const verdicts = lines.filter((l) => /\bFAIL\b|✗|NOT-RUN|━━ result:|verify-chain result|PASS \d+ · CACHED/.test(l) && !/SCOPED-SKIP/.test(l));
+process.stderr.write(
+  "[verify-on-stop] ✗ static 档未通过,先修再收工(只回喂 FAIL 行 + 结果行;全文见 .verify-cache/logs/):\n" +
+  (verdicts.length ? verdicts.slice(-40).join("\n") : out.slice(-4000)) + "\n",
+);
+process.exit(2);
