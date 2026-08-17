@@ -9,6 +9,7 @@
 //
 // 用法:node scripts/empty-state-probe.mjs [--theme light]
 import { chromium } from "playwright";
+import { scopeRoutes, mapRoutes, settleNetwork } from "./lib/probe-routes.mjs";
 import { collectAppConsoleErrors, isThirdPartyResourceError } from "./lib/console-origin-filter.mjs";
 
 // 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 统一名)——只认前者会在非 5173 端口静默打到别的工程树。
@@ -118,19 +119,30 @@ const TAB_SWEEP = async () => {
 };
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "en-US" });
-page.setDefaultTimeout(20000);
-const consoleErrors = [];
-page.on("console", (m) => {
-  if (m.type() === "error" && !/favicon/i.test(m.text()) && !isThirdPartyResourceError(m.text(), m.location?.().url, BASE)) consoleErrors.push(m.text().slice(0, 90));
-});
+// 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。
+const SCOPE = scopeRoutes(ROUTES, "空状态探针", (spec) => spec.r);
+const SPECS = SCOPE.routes;
+// 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一页(PROBE_CONCURRENCY,默认 3);每页仍是原节奏,判据不动;console error 按 lane page 各记各的。
+const errorsOf = new WeakMap();
+const consoleErrorsFor = (page) => {
+  if (!errorsOf.has(page)) {
+    const arr = []; errorsOf.set(page, arr);
+    page.setDefaultTimeout(20000);
+    page.on("console", (m) => {
+      if (m.type() === "error" && !/favicon/i.test(m.text()) && !isThirdPartyResourceError(m.text(), m.location?.().url, BASE)) arr.push(m.text().slice(0, 90));
+    });
+  }
+  return errorsOf.get(page);
+};
 
-const rows = [];
-for (const [i, spec] of ROUTES.entries()) {
+const rows = await mapRoutes(browser, SPECS, async (page, spec) => {
+  const i = ROUTES.indexOf(spec);
   const route = spec.r;
+  const consoleErrors = consoleErrorsFor(page);
   const before = consoleErrors.length;
   try {
     await page.goto(`${BASE}/?nx_device=off&es=${i}#/${route}`, { waitUntil: "domcontentloaded" });
+    await settleNetwork(page); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待
     await page.waitForTimeout(1300);
     // 常量数据源的页面:往搜索框打不可能命中的词
     if (spec.type) {
@@ -158,7 +170,13 @@ for (const [i, spec] of ROUTES.entries()) {
           }
         }
       }
+      // 包 ax:原来固定 600ms 后快照;并行时插画请求会排队 1-2s(见 settleNetwork 注释),改为至少等 600ms、
+      //   之后每 100ms 轮询直到「.nx-empty 在 + 插画 <img> 就绪」或封顶 5s —— 只多给时间不改判据:5s 还没有 .nx-empty 照判红,
+      //   插画 404(complete 但 naturalWidth=0)照判「插画没加载出来」。
       await new Promise((r) => setTimeout(r, 600));
+      const t0 = performance.now();
+      const ready = () => { const e = document.querySelector(".nx-empty"); const a = e && (e.querySelector("img") || e.querySelector(".nx-empty__art img")); return !!(e && a && a.complete && a.naturalWidth > 0); };
+      while (!ready() && performance.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 100));
       const el = document.querySelector(".nx-empty");
       if (!el) return { cleared, empty: false };
       const art = el.querySelector("img") || el.querySelector(".nx-empty__art img");
@@ -180,15 +198,15 @@ for (const [i, spec] of ROUTES.entries()) {
     //    这里把页内页签逐个点一遍,每切一次都要求「内容区不能留大片白」。
     //    识别不出页签的页面 tabs 记 0 并打印 —— **不许静默跳过**(认不出 ≠ 没有页签)。
     const tabRes = res.empty ? await page.evaluate(TAB_SWEEP) : { tabs: 0, note: "落地屏已判红,跳过页签" };
-    rows.push({ route, unreachable: spec.unreachable, ...res, ...tabRes, newErrors: consoleErrors.length - before });
+    return { route, unreachable: spec.unreachable, ...res, ...tabRes, newErrors: consoleErrors.length - before };
   } catch (e) {
-    rows.push({ route, err: e.message.split("\n")[0].slice(0, 60) });
+    return { route, err: e.message.split("\n")[0].slice(0, 60) };
   }
-}
+}, { context: { viewport: { width: 390, height: 844 }, locale: "en-US" } }).then((rs) => rs.map((r, k) => r && !r.error ? r : { route: SPECS[k].r, err: String(r?.error ?? "unknown").slice(0, 60) }));
 await browser.close();
 
 let fail = 0;
-console.log(`空状态探针(theme=${THEME}) — ${ROUTES.length} 个接入页\n`);
+console.log(`空状态探针(theme=${THEME}) — ${SPECS.length} 个接入页${SCOPE.scoped ? `(scoped ${SPECS.length}/${ROUTES.length})` : ""}\n`);
 for (const r of rows) {
   const bad = [];
   if (r.unreachable) { console.log(`skip  ${r.route.padEnd(30)} 探针够不着:${r.unreachable}`); continue; }
