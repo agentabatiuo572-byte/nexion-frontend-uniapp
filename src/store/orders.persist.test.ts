@@ -70,4 +70,25 @@ describe("useOrders.createOrder persistence contract", () => {
     again.bindAccount("acct-a");
     expect(again.orders).toHaveLength(0);
   });
+
+  it("two tabs never overwrite each other's orders (CAS row): a stale tab's create / advance keeps the other tab's paid order on disk", () => {
+    const tabA = useOrders();
+    tabA.bindAccount("acct-a");
+    setActivePinia(createPinia());
+    const tabB = useOrders();
+    tabB.bindAccount("acct-a");                    // both hydrated the same (empty) row; from now on their memories drift
+    const o1 = tabA.createOrder(INPUT)!;             // tab A pays for O1
+    const o2 = tabB.createOrder({ ...INPUT, productName: "second" })!; // tab B (stale memory: []) pays for O2
+    setActivePinia(createPinia());
+    const disk = useOrders();
+    disk.bindAccount("acct-a");
+    expect(disk.orders.map((o) => o.id).sort()).toEqual([o1.id, o2.id].sort()); // O1 was NOT erased by tab B's write
+    // tab A advances its own order with a stale in-memory list that lacks O2 → O2 must survive
+    tabA.advanceOrder(o1.id);
+    setActivePinia(createPinia());
+    const disk2 = useOrders();
+    disk2.bindAccount("acct-a");
+    expect(disk2.orders.some((o) => o.id === o2.id)).toBe(true);
+    expect(disk2.orders.find((o) => o.id === o1.id)!.status).not.toBe("paid");
+  });
 });

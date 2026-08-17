@@ -74,8 +74,8 @@
         <view class="w-full inline-flex items-center justify-center active:opacity-90 active:scale-[0.98]" :style="confirmBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCompletedPayment" @click.stop="emitComplete">
           <text>{{ t.store.coCompletedPayment }}</text>
         </view>
-        <view class="w-full grid place-items-center active:opacity-70" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="emitCancel">
-          <text>{{ t.store.coCancel }}</text>
+        <view class="w-full grid place-items-center active:opacity-70" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.pendingCancelConfirm" @click.stop="emitCancel">
+          <text>{{ t.store.pendingCancelConfirm }}</text>
         </view>
         <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5; text-wrap: pretty">{{ sendExactLabel }}</text>
       </view>
