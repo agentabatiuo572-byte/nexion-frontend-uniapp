@@ -4,8 +4,9 @@
   + 6 surface+border section cards with nested sub-cards). HowHero +
   HowSection(purple = brand, the page's historic accent) + HowStepRow +
   HowFaqRow; the SVG tree diagram + track totals, reward-math table and Sarah
-  timeline stay page-local, downgraded to borderless surface-2 tiles (P-013:
-  uni webview renders inline SVG incl <text> nodes). De-MLM'd wording kept
+  timeline stay page-local, downgraded to borderless surface-2 tiles (P-013
+  SVG shapes; in-SVG labels use <SvgText>, P-121 — a template <text> inside
+  <svg> compiles to <uni-text> and never renders). De-MLM'd wording kept
   (Track A/B, auto-placement, network partner).
 -->
 <template>
@@ -46,17 +47,17 @@
 
             <!-- You node -->
             <circle cx="170" cy="22" r="14" fill="var(--v5-surface-2)" stroke="var(--v5-ink)" stroke-opacity="0.55" stroke-width="1.5" />
-            <text x="170" y="26" text-anchor="middle" font-size="10" fill="var(--v5-ink)" font-weight="600">{{ w.diagYou }}</text>
+            <SvgText x="170" y="26" text-anchor="middle" font-size="10" fill="var(--v5-ink)" font-weight="600">{{ w.diagYou }}</SvgText>
 
             <!-- Left wing main node -->
             <circle cx="86" cy="78" r="12" fill="var(--v5-brand)" fill-opacity="0.18" stroke="var(--v5-brand)" stroke-opacity="0.7" stroke-width="1.3" />
-            <text x="86" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-brand)" font-weight="600">A</text>
-            <text x="86" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagLeftLabel }}</text>
+            <SvgText x="86" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-brand)" font-weight="600">A</SvgText>
+            <SvgText x="86" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagLeftLabel }}</SvgText>
 
             <!-- Right wing main node -->
             <circle cx="254" cy="78" r="12" fill="var(--v5-tech-cyan)" fill-opacity="0.22" stroke="var(--v5-tech-cyan-soft)" stroke-opacity="0.75" stroke-width="1.3" />
-            <text x="254" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-tech-cyan-soft)" font-weight="600">B</text>
-            <text x="254" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagRightLabel }}</text>
+            <SvgText x="254" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-tech-cyan-soft)" font-weight="600">B</SvgText>
+            <SvgText x="254" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagRightLabel }}</SvgText>
 
             <!-- Left children -->
             <circle cx="56" cy="132" r="5.5" fill="var(--v5-brand)" fill-opacity="0.7" stroke="var(--v5-brand)" stroke-opacity="0.9" stroke-width="0.6" />
@@ -172,6 +173,7 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import SvgText from "@/components/svg-text";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
