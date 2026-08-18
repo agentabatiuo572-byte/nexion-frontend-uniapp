@@ -37,13 +37,14 @@
       <view class="lg-body">
         <!-- Step 1: phone (+ password for password mode) -->
         <view v-if="step === 1" class="lg-col">
-          <view class="lg-phone">
+          <view class="lg-phone" :class="{ 'lg-phone--err': phone && !phoneOk }">
             <view class="lg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="lg-phone__in" type="number" :placeholder="t.login.phonePlaceholder" :value="phone" @input="onPhone" />
+            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" @input="onPhone" />
           </view>
+          <text id="login-phone-format" data-testid="auth-phone-hint" class="lg-phone-hint" :class="{ 'lg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
               <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" @input="onPwd" />
@@ -62,6 +63,9 @@
         <view v-else-if="step === 2" class="lg-col">
           <view class="lg-otp">
             <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
+          </view>
+          <view v-if="sandboxOtpEnabled" class="lg-sandbox-otp" data-testid="sandbox-otp-code" role="status">
+            <text class="lg-sandbox-otp__t">{{ fmt(t.authOtp.sandboxCodeHint, { code: sandboxOtpCode }) }}</text>
           </view>
           <view class="lg-resend">
             <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
@@ -106,12 +110,7 @@
       <!-- OAuth (step 1, not reset) -->
       <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
-        <view class="lg-social">
-          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="startOauth(o.label)" @keydown.enter.prevent="startOauth(o.label)" @keydown.space.prevent="startOauth(o.label)">
-            <view class="lg-social__ic" v-html="o.svg" />
-            <text class="lg-social__lbl">{{ oauthDisplayLabel(o.label) }}</text>
-          </view>
-        </view>
+        <AuthProviderGrid :busy="loading" :sandbox="apiRuntimeConfig.mode === 'sandbox' && apiRuntimeConfig.modeExplicit" @select="startOauth" />
       </view>
 
       <!-- Footer -->
@@ -133,7 +132,9 @@ import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
+import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
@@ -147,14 +148,9 @@ import { apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
+import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
 
 const t = useT();
-const oauth = [
-  { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
-  { label: "Google", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.5 3.6-5.5 3.6-3.3 0-6-2.7-6-6.1S8.7 5.5 12 5.5c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3 14.6 2 12 2 6.9 2 2.7 6.1 2.7 11.6S6.9 21.3 12 21.3c6.9 0 9.4-4.9 9.4-7.4 0-.5 0-.9-.1-1.3L12 10.2z"/></svg>' },
-  { label: "Apple", svg: '<svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M17.06 12.43c0-2.6 2.13-3.85 2.23-3.91-1.22-1.78-3.11-2.02-3.78-2.04-1.61-.16-3.14.95-3.96.95-.82 0-2.08-.93-3.42-.9-1.76.02-3.38 1.02-4.29 2.6-1.83 3.18-.47 7.88 1.31 10.46.87 1.27 1.91 2.69 3.27 2.64 1.32-.05 1.81-.85 3.41-.85 1.59 0 2.04.85 3.42.82 1.41-.02 2.31-1.29 3.18-2.56 1-1.47 1.41-2.9 1.43-2.97-.03-.02-2.75-1.06-2.79-4.24zM14.5 4.74c.73-.88 1.21-2.11 1.08-3.33-1.04.04-2.31.69-3.06 1.57-.67.77-1.26 2.02-1.1 3.22 1.16.09 2.34-.59 3.08-1.46z"/></svg>' },
-  { label: "Telegram", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#229ED9" d="M9.78 16.32 9.45 20c.48 0 .69-.2.94-.45l2.27-2.17 4.7 3.44c.86.48 1.48.23 1.7-.79l3.08-14.43c.3-1.34-.48-1.87-1.32-1.56L1.6 9.5c-1.3.5-1.29 1.24-.22 1.57l4.62 1.44 10.73-6.77c.5-.31.97-.14.59.21L9.78 16.32z"/></svg>' },
-];
 
 type Step = 1 | 2 | 3;
 type LoginMode = "password" | "otp" | "reset";
@@ -180,7 +176,7 @@ interface RemoteTwoFactorAttemptContext {
 
 const mode = ref<LoginMode>("password");
 const step = ref<Step>(1);
-const country = ref("+1");
+const country = ref(dialCodeForLocale(useLocaleStore().code));
 const showCountries = ref(false);
 const phone = ref("");
 const password = ref("");
@@ -215,8 +211,14 @@ onLoad((options) => {
 
 const showCaptcha = ref(false);
 
-const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
-const phoneOk = computed(() => /^\d{6,15}$/.test(phoneClean.value));
+const phoneClean = computed(() => sanitizePhoneInput(phone.value));
+const phoneOk = computed(() => validateNationalPhone(country.value, phoneClean.value));
+const phoneFormatMessage = computed(() => {
+  const params = { example: phoneFormatHint(country.value) };
+  return phone.value && !phoneOk.value
+    ? fmt(t.value.countryCodes.phoneInvalidHint, params)
+    : fmt(t.value.countryCodes.phoneExampleHint, params);
+});
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const otpScene = computed<OtpScene>(() => (mode.value === "reset" ? "reset" : "login"));
 const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
@@ -241,6 +243,12 @@ const titleText = computed(() => {
   return t.value.login.title;
 });
 const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
+const sandboxOtpCode = String(import.meta.env.VITE_NEXGRID_SANDBOX_OTP_CODE || "").trim();
+const sandboxOtpEnabled = computed(() =>
+  apiRuntimeConfig.mode === "sandbox"
+  && apiRuntimeConfig.modeExplicit
+  && /^\d{6}$/.test(sandboxOtpCode)
+);
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
   if (step.value === 2) return t.value.login.verify;
@@ -274,17 +282,6 @@ function oauthProvider(label: string): OAuthProvider | null {
     : null;
 }
 
-function oauthDisplayLabel(label: string): string {
-  return apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? `${label} · Mock` : label;
-}
-
-function oauthSubject(provider: OAuthProvider): string {
-  // Explicit non-secret sandbox identity: it survives a page refresh/re-login
-  // without reading browser storage, while provider + server environment keep
-  // Google and Apple accounts isolated on the server.
-  return `app-${provider.toLowerCase()}-sandbox`;
-}
-
 function oauthError(cause: unknown, provider: OAuthProvider): string {
   const code = cause instanceof ApiError ? cause.message : "";
   if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
@@ -308,7 +305,6 @@ async function startOauth(label: string) {
     const result = await authApi.oauthExchange({
       provider,
       mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
-      externalSubject: oauthSubject(provider),
       displayName: `${provider} Sandbox`,
     });
     if (!mounted || flowVersion !== otpFlowVersion) {
@@ -338,7 +334,7 @@ function inputVal(e: Event): string {
 }
 function onPhone(e: Event) {
   invalidateOtpFlow();
-  phone.value = inputVal(e);
+  phone.value = sanitizePhoneInput(inputVal(e));
   error.value = null;
 }
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
@@ -803,9 +799,12 @@ onUnmounted(() => cleanup());
 .lg-body { margin-top: 28px; }
 .lg-col { display: flex; flex-direction: column; gap: 12px; }
 .lg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
+.lg-phone--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); }
 .lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .lg-phone__cc-t { font-size: 15px; color: var(--v5-ink); }
 .lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
+.lg-phone-hint { display: block; margin-top: -4px; padding: 0 4px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); }
+.lg-phone-hint--err { color: var(--v5-brand-2); }
 .lg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
 .lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
 .lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: 15px; color: var(--v5-ink); }
@@ -815,6 +814,8 @@ onUnmounted(() => cleanup());
 .lg-forgot-row { display: flex; justify-content: flex-end; }
 .lg-forgot { font-size: 13px; color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
 .lg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lg-sandbox-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.lg-sandbox-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
 .lg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .lg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
 .lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
@@ -834,11 +835,6 @@ onUnmounted(() => cleanup());
 .lg-divider { display: flex; align-items: center; margin: 28px 0; }
 .lg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
 .lg-divider__t { padding: 0 12px; font-size: 12px; color: var(--v5-ink-3); }
-.lg-social { display: flex; align-items: center; gap: 10px; }
-.lg-social__btn { flex: 1; min-width: 0; height: 64px; border-radius: 16px; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform 0.15s, opacity 0.15s; }
-.lg-social__btn:active { transform: scale(0.98); opacity: 0.8; }
-.lg-social__ic { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
-.lg-social__lbl { font-size: 12px; font-weight: 500; color: var(--v5-ink-3); }
 .lg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .lg-footer__acc { display: block; font-size: 13px; color: var(--v5-ink-3); }
 /* 句中行内链接:WCAG 2.5.8 对 inline 目标豁免 44pt(强撑高会拆掉整句行高),

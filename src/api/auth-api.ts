@@ -49,7 +49,8 @@ export type OAuthExchangeMode = "SANDBOX_MOCK" | "PROVIDER";
 export interface OAuthExchangeRequest {
   provider: OAuthProvider;
   mode: OAuthExchangeMode;
-  externalSubject: string;
+  /** Provider-verified subject/credential placeholder; never used by Sandbox. */
+  externalSubject?: string;
   displayName?: string;
 }
 export interface OAuthExchangeResult {
@@ -226,6 +227,19 @@ function oauthExchangeFromResponse(value: unknown, vault: SessionVault, expected
   return { user: data.user, vaultRevision: expectedRevision + 1, source: "mock", sandbox: true };
 }
 
+function oauthSandboxChallengeFromResponse(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    throw new ApiError({ kind: "protocol", message: "OAUTH_SANDBOX_CHALLENGE_INVALID" });
+  }
+  const data = value as Record<string, unknown>;
+  if (typeof data.challengeNo !== "string" || !/^OAUTH-[a-f0-9]{32}$/.test(data.challengeNo)
+      || !Number.isSafeInteger(data.expiresInSec) || Number(data.expiresInSec) < 1
+      || Number(data.expiresInSec) > 600) {
+    throw new ApiError({ kind: "protocol", message: "OAUTH_SANDBOX_CHALLENGE_INVALID" });
+  }
+  return data.challengeNo;
+}
+
 export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
   const revokeRefreshTokenBestEffort = (refreshToken: string) => {
     void client.request({
@@ -351,10 +365,23 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
     },
     async oauthExchange(request) {
       const revision = vault.revision();
+      const body = request.mode === "SANDBOX_MOCK"
+        ? {
+            provider: request.provider,
+            mode: request.mode,
+            displayName: request.displayName,
+            challengeNo: oauthSandboxChallengeFromResponse(await client.request<unknown>({
+              path: "/auth/users/oauth/sandbox/challenge",
+              method: "POST",
+              body: { provider: request.provider },
+              authenticated: false,
+            })),
+          }
+        : request;
       const data = await client.request<unknown>({
         path: "/auth/users/oauth/exchange",
         method: "POST",
-        body: request,
+        body,
         authenticated: false,
       });
       return oauthExchangeFromResponse(data, vault, revision);
