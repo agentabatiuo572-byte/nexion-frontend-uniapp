@@ -144,8 +144,19 @@ Agentic 侧:Aider **lint 只跑被编辑文件、test 跑整套**(https://aider.
 ### 4.3 陈旧 hook 修复(S 级,顺手)
 audit-pending-tracker INCLUDE 加 `admin-ops/app/`(去掉退役线)· admin-ops 补 `.claude/settings.json` 挂同一套门 · 退役线 Nexion-admin-prototype 的 Stop tsc hook 摘掉 · 逃生阀残留 19 个文件清理 + 阀带会话消费/TTL · Nexion-uniapp/CLAUDE.md `[2.6]` 段号更正。
 
-### 4.4 单门自身优化(后续,按需)
-零-border 194s(一门起一浏览器串行扫全路由,可复用 browser + 路由级范围化)· `.vue` 闭合门 29s(重写成单次 node 扫描)· AUTH02 双语 67s(同一场景跑两语,可共享起服)· orphan-line 54s / empty-state 46s(路由级范围化)。
+### 4.4 单门自身优化(包 ax,2026-08-18 已落地;主人 08-17 批 A+B)
+- **清单拆细 = pages 闭包**:门声明它驱动的页面(`pages`:字面 / glob / "*"),输入 = inputs ∪ 页面静态 import 闭包(`scripts/lib/import-graph.mjs`,582 文件 / 2617 边 0.5s)∪ 探针脚本里 `import("/src/…")` 的模块;**app 壳闭包**(App.vue / main.ts / app-chassis / global-ui 的下游,含 94/99 个 store)命中 = 全部路由、所有 pages 类门都跑(tester-F F-01/F-02:P-031 让 store 不互 import、编排上移 App 层,只被壳引用的模块不在任何页面闭包里却作用于每一页)。实测:只改一页 / 页面局部组件 → runtime 门 6-10/20、h5 子探针 1-2/10、路由 1/91;改壳闭包内 store → 全量 —— **这是真实耦合不是清单粗**,范围化对这类改动省不出时间。
+- **路由级范围**:`routeScoped:true` 的 7 个 route 类门(spec6 / theme / zero-border / dom-qa / tap / orphan / empty)scoped 时只扫「受影响路由 ∩ 射程」(env `PROBE_ROUTES`,verify.sh 按门 `route_scope <id>`,`scope_hit` 每门先清空,lint 双向配对);门因自身脚本 / 基线 / 台账变化而跑 → 全扫;交集为空 → 全扫(不产出 0 扫描);full 一律不缩(runner / verify.sh 显式清空)。scoped 下探针拒绝 `--update-baseline` / `--update-ledger`,棘轮「消失」只对扫过的路由比。🔴 路由 env 值不带前导 `/`:Git Bash(MSYS)会把 `/pages/…` 改写成 Windows 路径,曾整串失效、探针 0 命中却绿。
+- **多 lane 并行**(`scripts/lib/probe-routes.mjs`,`PROBE_CONCURRENCY` 默认 3):每 lane **独立 BrowserContext**(同 context 多页共用渲染主线程,JS 交错执行把按串行校准的固定等待拖穿 —— theme 基线 4 条曾随机「消失」0-4 条);并行共用一台 Vite dev server,别页拉模块把本页图片 / 懒加载排到 1-2s 后 → 有界 `settleNetwork`(封顶 5s,只在 lane>1 时等)+ 空态探针有界轮询「空态 + 插画就绪」;判定逻辑不动。theme 门固定 concurrency 1、tap 门不加 settle(见「既有问题」1/4)。zero-border 每路由整页重载(`&zb=i`),基线 159→86。
+- **实测(同机)**:zero-border 201s → 89-99s;empty-state 56s → 29-40s;orphan 54s → 34-53s(多行文案 40 → 40-47 段);dom-qa 15s → 9-13s;tap 15s → 10s;spec6 25s → 15-18s;full 全量 **24-26 min → 16.2 min**(18/18 PASS,verify.sh 462 格 0 fail);scoped 对「只改一页」**~2.6 min**(15 PASS / 3 SCOPED-SKIP)。`verify:scope-audit:deep`(只改一页的树上 scoped ↔ full 双跑比对):PASS(scoped 15 PASS / 3 SCOPED-SKIP · full 18/18 14.8 min · verify.sh 462 格守恒;首跑抓出多格门 7 格差 → manifest cells 声明后复跑守恒)。
+- **独立验收**:tester-F 报告 `PLAN/.claude/evidence/verify-timing-2026-08-17/tF-probe-scoping-test.md`(0 P0 / 5 P1 / 10 P2,R1 全修:壳闭包、交集空→全扫、route_scope 配对 lint + scope_hit 清空、settle 串行空转、伞门 inputs 对齐、pages 类型 lint、库单测挂 probe-safety、empty-state 0 页显形、dom-qa scoped 拒写台账、注释与基线收缩、CRLF)。
+
+**既有问题(包 ax 实测暴露,未在本包修,待主人裁)**
+1. theme-constant 门:`/pages/index/index` tech-money-card 的 aurora 用遗留 token `--accent-purple`(双主题恒定 #7C5CFF)+ 14s transform 动画,配对键含尺寸 → 命中看动画相位:原版串行 4 跑 1 红,并行 3 lane 时 3 跑 2 红。**既有**间歇红(verify.sh probe_retry 兜着),本包把该门并行度固定 1。根治:改 v5 主题感知 token(需 nexion-design 判定用哪个;`--v5-nex` 仅限图表/badge,`--v5-brand-2` 已是橙)。
+2. tap-feedback `--update-ledger` 是「以本次快照整体替换」不是合并:某次跑没看到的存量会被删掉,下次看到又成「新违例」(本人实测 11 → 2 后立即还原)。建议改 dom-qa 同款合并语义 + 单独「消失」核对。
+3. milestone 庆祝层 `.ms-card`(App.vue 4s 轮询弹出)缺 `:active` 反馈:探针停留 >4s 就会把它算进 tap 目标并判违例(tap 探针因此不加 settleNetwork,维持原 1200ms 窗口)。产品侧 UI 债。
+4. `test:session-reload-recovery` fresh-context 步(`waitForFunction` 8s)与 `withdraw-bill-runtime` 各出现一次首跑红重跑绿 —— 与 08-17 三轮观察同族(冷 server 负载抖动),重跑纪律在兜。
+5. zero-border 基线里 `/pages/me/notifications` 等条目因 mock 文案随机(行高 65/66)指纹抖动 —— 指纹含 size + 随机内容的既有不稳定。
 
 ---
 
@@ -218,4 +229,5 @@ audit-pending-tracker INCLUDE 加 `admin-ops/app/`(去掉退役线)· admin-ops 
 | Stop hook | ≤1.5 min | 3-4 min(功能面文件变了才跑;树未变 / 只改文档 1s) | 与 static 同 |
 
 **结论修正**:内循环收益成立但幅度比预估小(static 3-4 min、scoped 与改动面成正比、Stop 不再 20 分钟);**全量收益从「29→15」修正为「29→~24」**。下一刀:§4.4 单探针提速 + 清单拆细(store 类门按具体 store 文件声明),不在本包。
+**包 ax 回填(2026-08-18)**:全量 **~24 → 16.2 min**(route 类探针多 lane 并行 + zero-border 整页重载);scoped 只改一页 **~2.6 min**;改壳闭包内 store 仍接近全量(真实耦合)。详见 §4.4。
 连锁后果:runner 不 fail-fast 后,既有红 `test:contract-registry`(h2 契约正则在结算包合并后过期)会挡住 `pkg.mjs close` 完成门 —— 本包把该正则放宽为同时认新旧守卫形态(意图不变),见 `scripts/h2-trial-remote-api.test.mjs`。

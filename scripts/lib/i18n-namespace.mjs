@@ -27,9 +27,21 @@ export function namespaceBlock(source, name) {
  */
 export function assertKeyInAllLocales(read, ns, keys, locales = ["en", "zh", "vi"]) {
   for (const locale of locales) {
-    const block = namespaceBlock(read(`src/i18n/messages/${locale}.ts`), ns);
+    const source = read(`src/i18n/messages/${locale}.ts`);
+    const block = namespaceBlock(source, ns);
+    // 🔴 切片退化成「整文件」时,别的命名空间的同名 key 会替本命名空间满足断言(该模块存在的全部理由)。
+    //    这条自证必须在这里,而不是留给调用方 —— 独立验收把 namespaceBlock 改成 `return source`,
+    //    两个契约测试 10/10 照样全绿,再叠加清空 vi 的那条值仍然全绿。
+    assert.ok(
+      block.length < source.length,
+      `${locale}.ts 的 ${ns} 切片等于整文件 —— 命名空间切片失效,同名 key 会跨命名空间互相顶替`,
+    );
     for (const key of keys) {
-      assert.match(block, new RegExp(`\\b${key}:\\s*"[^"]+"`), `${locale}.ts 的 ${ns} 命名空间缺 ${key} 或值为空`);
+      // 值必须含至少一个非空白字符:`"[^"]+"` 会把 `" "` 判成有值,而那渲染出来是空白。
+      assert.match(block, new RegExp(`\\b${key}:\\s*"[^"]*\\S[^"]*"`), `${locale}.ts 的 ${ns} 命名空间缺 ${key} 或值为空/纯空白`);
+      // 切片正确时,该 key 在块内只应出现一次;出现多次说明切到了别的命名空间。
+      const hits = block.match(new RegExp(`\\b${key}:\\s*"`, "g")) ?? [];
+      assert.equal(hits.length, 1, `${locale}.ts 的 ${ns} 切片里 ${key} 命中 ${hits.length} 次(应为 1)—— 切片范围不对`);
     }
   }
 }

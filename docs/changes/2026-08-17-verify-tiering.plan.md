@@ -44,8 +44,15 @@
 
 ### [x] T9 · 审计轮次收敛(主人同日签 A)
 - **范围**:`PLAN/.claude/workflows/nexion-audit-ledger.mjs`(新,init/args/merge/resolve/summary/selftest,守恒核对 + 篡改检测)`nexion-audit-v4.mjs`(范围轮只审改动 + open finding 单元;killed 未变不派 skeptic;open 未变 carried;P2 carried 记数;done 须全量轮)`nexion-audit/SKILL.md`(模式 A 步骤 + 完成条件 + 报告 open 曲线)
-- **AC 结果**:selftest 12/12;逻辑自证 PASS;tester E 报告待收(`tE-audit-ledger-test.md`)
+- **AC 结果**:selftest 12/12 → R3 后 27/27;逻辑自证 PASS;tester E 三轮报告 `D:/WORKS/PLAN/.claude/evidence/verify-timing-2026-08-17/tE-audit-ledger-test.md` / `-r2.md` / `-r3.md`(R1/R2/R3 发现全修)
 - **回源三问**:① 是(不设轮上限 / 全报 / 独立性未动;台账 = 事实交底)② 待 tester E ③ 成立
+
+### [x] T10 · 包 ax:清单拆细(pages 闭包)+ 探针路由级范围 / 多 lane 并行(主人 2026-08-17 批 A+B;分支 `pkg/ax-probe-scoping`)
+- **范围**:`scripts/lib/import-graph.mjs` `scripts/lib/probe-routes.mjs`(新)· `verify-scope.mjs`(pages / 壳闭包 / runIfAny / deleted-src / routeScoped 门级 routes / lint 五项)· `gates.manifest.json`(pages + routeScoped 声明,伞门 inputs 对齐)· `verify-chain.mjs` `verify-h5-runtime.mjs` `verify.sh`(H5_PROBE_ROUTES / route_scope / scope_hit 清空)· 7 个探针接线 · `scripts/verify-scope-lib.test.mjs`(挂 test:probe-safety)· zero-border 基线 159→86
+- **AC 结果**:lint PASS + 红测(pages 不存在 / 非登记页 / glob 不命中 / 探针路由未覆盖 / pages 字符串 / route_scope 漏调·多调 全红);库测试 5/5;plan 模拟(单页 → 6-10/20 门 · 1/91 路由;壳下游 → 全路由 · auth-guard 跑;删 src → 全开;globals → full);各探针 A/B(原版 vs 现版 vs concurrency=1)结论一致;full 18/18 16.2 min;scoped 单页 157s;deep 双跑 PASS(scoped 15 PASS / 3 SCOPED-SKIP · full 18/18 14.8 min · verify.sh 462 格守恒;首跑抓出多格门 7 格差 → manifest cells 声明后复跑守恒);tester F 报告 `D:/WORKS/PLAN/.claude/evidence/verify-timing-2026-08-17/tF-probe-scoping-test.md`(0 P0 / 5 P1 / 10 P2 → R1 全修)
+- **R2(合并后复验,包 `pkg/ay-scope-r2`)**:tester-F R2 报告 `…/tF-probe-scoping-test-r2.md`(0 P0 / 1 P1 / 9 P2):R2-01 orphan 并行档少检 2/40 段 → 该门固定串行;R2-03 settleNetwork 用实际 lane 数(scoped 单路由不再白等 ~2s);R2-04 `src/static/**` + `src/uni.scss` 进 globals;R2-02/06/07 三条 lint(声明页必须在探针射程内 / route_scope 必须在 scope_hit 之后 / 两伞门 inputs = verify-h5-runtime + 全部子探针);R2-08 注释;R2-09 单测动态找壳独有文件;F-14 CLAUDE.md 第二处 462。R2-05(cells 值靠 deep 判据 ③ 守,lint 只查类型)记为已知。
+- **回源三问**:① 是(full 语义不变:PROBE_ROUTES 一律清空;探针判定逻辑不动,只加有界等待;zero-border 导航语义变了已写明)② tester F R1/R2 报告见上 ③ 成立(既有问题 5 条另列于提案 §4.4,未混入)
+- **踩坑 → 进化**:MSYS 把以 `/` 开头的 env 值改写成 Windows 路径(PROBE_ROUTES 整串失效、探针 0 命中却绿)→ 路由 env 一律去前导斜杠 + 两边归一 + memory env 条;同 context 多页共用渲染主线程 → 每 lane 独立 context;并行共用 dev server → 有界 settleNetwork(串行空转);探针停留时长变化会暴露定时弹层类既有违例(ms-card)→ 加等待要核「窗口内会不会多出定时 UI」;tap `--update-ledger` 替换语义踩坑(已还原,报既有问题);闭包模型 = 代码引用面 ≠ 渲染影响面 → 壳闭包兜 App 层下游(tester-F);Bash 工具 10 min 上限会杀前台长命令 → 长跑一律 run_in_background。
 
 ## 总回测
 - [x] 全量机器门:run#3 full 25.8 min,verify.sh 459/0;既有红 contract-registry(h2 正则过期)本包已放宽守卫形态判据 → 全绿待 close 复跑

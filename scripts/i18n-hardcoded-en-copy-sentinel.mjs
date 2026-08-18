@@ -90,11 +90,18 @@ for (const group of TECH_TOKENS) {
 // ── 非文案属性 ───────────────────────────────────────────────────────────────
 // 🔴 判定面反转的另一半:属性**默认进判定面**,这张表把确定不渲染文字的属性挖掉。
 // 每组带理由 + 0 命中即失效(死豁免同样是静默后门)。新增的组件 prop 不在表里 → 默认被判。
+// 🔴 两类豁免的**存活规则不同**,这是判据分类而不是偷懒(红测抓出来的):
+//   · `langLevel: true` —— Vue / HTML **语言级**写法(指令语法、事件处理器)。「它的值不是文案」是
+//     语言事实,可从规范推出,不需要本仓出现过才成立。把它们按「0 命中即失效」剪掉,只会让第一个
+//     写 `v-on:click` 长写法的人吃一条纯误报 —— 那不是门在守东西,是门在添乱。
+//   · 其余(组件 prop 名等)—— 是**对本仓的观察**,必须逐名判存活:投机性地预先塞一个名字进去,
+//     等于给「某天有人用这个 prop 装文案」提前免检(独立验收实测当时 47/161 条是死的)。
 const NON_COPY_ATTRS = [
   {
     id: "vue-directive",
     why: "Vue 指令与结构性属性:值是表达式 / 键 / 分支条件,不渲染成文字",
-    names: ["v-if", "v-else-if", "v-else", "v-show", "v-for", "v-once", "v-pre", "v-cloak", "v-on", "v-bind", "key", "ref", "slot", "is"],
+    langLevel: true,
+    names: ["v-if", "v-else-if", "v-else", "v-show", "v-for", "v-on", "v-bind", "v-once", "v-pre", "v-cloak", "key", "ref", "slot", "is"],
     // `v-model:open` / `v-slot:foo` / `#foo` 带参数;`v-html` 的值是**构造 HTML 的表达式**
     // (仓内实测里面是 `<text style="color: var(--v5-ink-4)">…` 这种拼串),判它是纯误报 ——
     // v-html 里的真文案属于 script 表达式面,见文件末 KNOWN GAPS;`v-text` 是纯文本,照判。
@@ -103,21 +110,21 @@ const NON_COPY_ATTRS = [
   {
     id: "style-hook",
     why: "样式挂载点:class 名与内联 CSS / CSS 变量,值来自设计系统词汇表(`flex` / `truncate` / `var(--v5-ink-4)`),不是给人读的句子",
-    names: ["class", "style", "font-family", "font-size", "font-weight", "letter-spacing", "text-anchor", "dominant-baseline", "text-transform",
+    names: ["class", "style", "font-family", "font-size", "font-weight", "letter-spacing", "text-anchor", "dominant-baseline",
       "placeholder-class", "placeholder-style", "input-style", "icon-bg", "tint", "accent", "previous-margin", "next-margin"],
   },
   {
     id: "svg-geometry",
     why: "SVG 几何 / 绘制 / SMIL 动画属性:坐标 · 路径 · 颜色 · 描边与动画枚举(`round` / `indefinite` / `SourceAlpha`),与语言无关",
-    names: ["d", "points", "viewBox", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "width", "height", "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "stroke-dashoffset", "transform", "opacity", "offset", "stop-color", "stop-opacity", "gradientUnits", "patternUnits", "clip-path", "mask", "filter", "preserveAspectRatio", "vector-effect",
-      "attributeName", "repeatCount", "dur", "begin", "end", "values", "keyTimes", "calcMode", "keySplines", "from", "to", "by", "rotate", "path", "in", "in2", "result", "stdDeviation", "focusable", "additive", "accumulate"],
+    names: ["d", "points", "viewBox", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "width", "height", "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "transform", "opacity", "offset", "stop-color", "stop-opacity", "filter", "preserveAspectRatio",
+      "attributeName", "repeatCount", "dur", "begin", "values", "keyTimes", "from", "to", "rotate", "path", "in", "stdDeviation", "focusable"],
   },
   {
     id: "element-mechanics",
     why: "元素机制类属性:类型 / 模式 / 资源地址 / 表单取值 / 画布 id / 无障碍**状态**(取值是 ARIA 规定的枚举,不是文案)",
-    names: ["type", "mode", "name", "id", "for", "src", "href", "xlink:href", "value", "min", "max", "step", "maxlength", "rows", "cols", "role", "tabindex", "inputmode", "canvas-id",
-      "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-current", "aria-controls", "aria-labelledby", "aria-describedby", "aria-atomic", "aria-haspopup", "aria-busy",
-      "disabled", "readonly", "checked", "selected", "autofocus", "scroll-y", "scroll-x", "scroll-into-view", "cursor-spacing", "confirm-type", "adjust-position", "hold-keyboard", "password", "focus", "auto-height", "show-confirm-bar", "selection-start", "selection-end"],
+    names: ["type", "mode", "name", "id", "src", "href", "value", "min", "maxlength", "rows", "role", "tabindex", "inputmode", "canvas-id",
+      "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-describedby", "aria-atomic", "aria-haspopup", "aria-busy",
+      "disabled", "checked", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {
     id: "data-hook",
@@ -127,18 +134,39 @@ const NON_COPY_ATTRS = [
   {
     id: "event-handler",
     why: "事件处理器:值是语句,里面的字面量是事件名 / 路由 / 键名(`emit('close')` 极常见),判它是纯误报 —— 属 script 表达式面,见文件末 KNOWN GAPS",
+    langLevel: true,
     prefix: ["@", "v-on:"],
   },
   {
     id: "component-enum-prop",
     why: "本仓组件的**枚举型 / 路由型** prop(色调 · 变体 · 对齐 · 图标名 · 当前 tab · 目标路由):取值来自组件自身的联合类型或 pages.json 的路径,不是文案",
-    names: ["tone", "variant", "align", "kind", "icon", "color", "accent-bg", "accent-text", "badge-tone", "size", "shape", "status", "state", "back", "to", "route", "link", "active", "surface", "context"],
+    // `to` 归到上面的 SMIL 动画组(那才是它在本仓的真实用途);这里不再重复列,
+    // 否则逐名存活判定对它失效(跨组重复 = 永不判死)。
+    names: ["tone", "kind", "icon", "color", "accent-bg", "accent-text", "size", "status", "back", "link", "active", "surface", "context"],
   },
 ];
 
 const NON_COPY_NAMES = new Map();
-for (const g of NON_COPY_ATTRS) for (const n of g.names ?? []) NON_COPY_NAMES.set(n.toLowerCase(), g.id);
+const DUP_ATTR_NAMES = [];
+for (const g of NON_COPY_ATTRS) {
+  for (const n of g.names ?? []) {
+    const k = n.toLowerCase();
+    if (NON_COPY_NAMES.has(k)) DUP_ATTR_NAMES.push(n);
+    NON_COPY_NAMES.set(k, g.id);
+  }
+}
 const NON_COPY_PREFIX = NON_COPY_ATTRS.flatMap((g) => (g.prefix ?? []).map((p) => [p.toLowerCase(), g.id]));
+
+// ── 两张表之间的判据强度必须守恒 ─────────────────────────────────────────────
+// 🔴 独立验收(2026-08-17)点出:「死授权是静默后门」这条纪律逐 token 焊在 TECH_TOKENS 上,
+//    却没焊在豁免表上 —— 而判定面反转之后,**真正决定宽严的是豁免表**。实测当时 161 个名字里
+//    47 个全仓 0 命中(纯投机),那批正是「某天有人写 `state="Cooling down"` 时帮它免检」的形状。
+//    47 个已全部剪掉,并在 run() 里补上逐名存活判定 —— 表 100% 活,这条判据才立得住。
+// 🔴 顺带钉住一条不变量:一个属性名不许**同时**是文案属性与非文案属性。
+//    (`name` 这个名字在 .vue 面是过渡动画名 / 图标名,在 json 面是应用名 = 文案 ——
+//     两个判定面各判各的,不是矛盾;这条断言防的是**同一个面**里两张表打架。)
+const VISIBLE_ATTRS_SET = new Set(["placeholder", "title", "label", "alt", "aria-label", "confirm-text", "cancel-text", "content", "v-text"]);
+const ATTR_TABLE_CONFLICT = [...VISIBLE_ATTRS_SET].filter((n) => NON_COPY_NAMES.has(n));
 
 /** 属性名 → 判定方式。返回 { skip } 或 { kind: "text" | "expr", exemptId? }。 */
 export function attrMode(rawName) {
@@ -147,9 +175,9 @@ export function attrMode(rawName) {
   const bare = lower.replace(/^(:|v-bind:)/, "");
   // 🔴 前缀要在**剥掉绑定前缀之后**也判一次:`:data-online` 的原名以 `:` 开头,只判原名的话
   //    `data-` 这条整族豁免对所有绑定写法失效(全量实测冒出 9 处 `:data-*` 误报)。
-  for (const [p, id] of NON_COPY_PREFIX) if (lower.startsWith(p) || bare.startsWith(p)) return { skip: true, exemptId: id };
+  for (const [p, id] of NON_COPY_PREFIX) if (lower.startsWith(p) || bare.startsWith(p)) return { skip: true, exemptId: id, matchedName: `prefix:${p}` };
   const id = NON_COPY_NAMES.get(bare);
-  if (id) return { skip: true, exemptId: id };
+  if (id) return { skip: true, exemptId: id, matchedName: bare };
   const bound = lower !== bare || lower === "v-text";
   return { skip: false, kind: bound ? "expr" : "text" };
 }
@@ -420,7 +448,8 @@ export function scanVue(file, src) {
   for (const tag of tags) {
     for (const attr of tagAttrs(tag.raw, tag.start)) {
       const mode = attrMode(attr.name);
-      if (mode.skip) { attrExemptHits.push(mode.exemptId); continue; }
+      // 记到「组」也记到「名」:逐名存活才拦得住投机性豁免(逐组只要组里一个名字活着就永不判死)
+      if (mode.skip) { attrExemptHits.push(mode.exemptId); if (mode.matchedName) attrExemptHits.push(`name:${mode.matchedName}`); continue; }
       if (!hasLatin(attr.value)) continue;
       if (mode.kind === "text") {
         // 行号取**值**的位置,不取属性名的位置 —— 属性名与值跨行时(`title=\n  "…"`),
@@ -522,12 +551,28 @@ function run() {
     console.error(`i18n-en FAIL:TECH_TOKENS 里有大小写重复条目(${DUP_TOKENS.join(" · ")})—— 表是大小写不敏感的,重复条目既不可能独立死也不可能独立报,「逐 token 判存活」被它悄悄削弱`);
     return 1;
   }
+  if (DUP_ATTR_NAMES.length) {
+    console.error(`i18n-en FAIL:NON_COPY_ATTRS 里有跨组重复的属性名(${DUP_ATTR_NAMES.join(" · ")})—— 同上,重复条目会让逐名存活判定失效`);
+    return 1;
+  }
+  if (ATTR_TABLE_CONFLICT.length) {
+    console.error(`i18n-en FAIL:${ATTR_TABLE_CONFLICT.join(" · ")} 同时被列为「用户可见文案属性」与「非文案属性」—— 两张表打架时后者赢,等于把文案属性静默免检`);
+    return 1;
+  }
 
   // ── 死授权 = 静默后门。逐 token / 逐短语 / 逐属性豁免组判存活。
   const dead = [];
   for (const g of TECH_TOKENS) for (const tk of g.tokens) if (!tokenCount.get(tk.toLowerCase())) dead.push(`${tk}(${g.id})`);
   for (const g of TECH_PHRASES) for (const p of g.phrases) if (!tokenCount.get(`phrase:${p.toLowerCase()}`)) dead.push(`"${p}"(${g.id})`);
-  for (const g of NON_COPY_ATTRS) if (!attrExemptCount.get(g.id)) dead.push(`属性豁免组 ${g.id}`);
+  for (const g of NON_COPY_ATTRS) {
+    if (!attrExemptCount.get(g.id)) dead.push(`属性豁免组 ${g.id}`);
+    // 🔴 逐**名**判存活,不只逐组 —— 判定面反转后真正决定宽严的是这张表,而逐组判定下
+    //    「组里一个名字活着」就能让同组其余投机性条目永不判死(独立验收实测 47/161 是死的)。
+    //    `langLevel` 组豁免于此:它们是语言事实不是本仓观察,理由见 NON_COPY_ATTRS 的头注。
+    if (g.langLevel) continue;
+    for (const n of g.names ?? []) if (!attrExemptCount.get(`name:${n.toLowerCase()}`)) dead.push(`属性豁免 ${n}(${g.id})`);
+    for (const p of g.prefix ?? []) if (!attrExemptCount.get(`name:prefix:${p.toLowerCase()}`)) dead.push(`属性豁免前缀 ${p}(${g.id})`);
+  }
   if (dead.length) {
     console.error(
       `i18n-en FAIL:${dead.length} 条授权 / 豁免在判定面上 0 命中 —— 死授权是给未来英文文案开的静默后门,请删除:\n  ` + dead.join(" · "),
@@ -601,7 +646,11 @@ function selftest() {
     ["style 注释里的英文放行", P, "<template><view /></template>\n<style>/* task lock pill */\n.a{color:red}</style>", 0],
     ["🔴 script 区的字符串字面量**不在**判定面(15579 条候选,判不了)", P, '<template><view /></template>\n<script>const msg = "No task activity available";</script>', 0],
     ["🔴 模板里的 // 不是注释(其后英文照抓)", P, "<template><text>a // Task lock</text></template>", 1],
-    ["🔴 注释里提到 <style> 不该让区域判定跑偏(其后模板的 // 仍非注释)", P, "<template><!-- 见 <style> 说明 --><text>a // Task lock</text></template>", 1],
+    // 🔴 这一格必须用 `<script>`,不能用 `<style>`:只有 script 区域会把 `//` 当行注释,
+    //    所以只有 script 那一面对「开标签锚行首」这条修法有牙。原先写的是 `<style>` —— 撤掉
+    //    共享剥离器里全部 5 处行首锚,84 + 30 格红测**照样全绿**(独立验收变异实测),那是装饰性靶。
+    ["🔴 注释里提到 <script> 不该让区域判定跑偏(其后模板的 // 仍非注释)", P, "<template><!-- 见 <script> 说明 --><text>a // Task lock</text></template>", 1],
+    ["🔴 注释里提到 <style> 同样不该让区域判定跑偏", P, '<template><!-- 见 <style> 说明 --><text>Task lock</text></template>', 1],
     // ── A:属性(默认判,靠 NON_COPY_ATTRS 挖掉)────────────────────────────
     ["🔴 静态 placeholder 是用户可见文案", P, '<template><input placeholder="Enter amount" /></template>', 1],
     ["🔴 静态 title / label 同样判", P, '<template><EmptyState title="No orders yet" /></template>', 1],

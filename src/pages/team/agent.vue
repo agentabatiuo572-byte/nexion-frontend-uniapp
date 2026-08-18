@@ -185,7 +185,9 @@ import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
-import { useVRank, V_RANKS } from "@/store/v-rank";
+import { useVRank } from "@/store/v-rank";
+import { rankTitle } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
@@ -197,6 +199,7 @@ import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/amba
 
 const t = useT();
 const vrank = useVRank();
+const isZh = computed(() => useLocaleStore().code === "zh");
 const app = useApp();
 
 const myRank = computed(() => vrank.myRank);
@@ -278,7 +281,7 @@ function onBudgetInput() {
 }
 
 const lockedSubText = computed(() =>
-  fmt(t.value.agent.lockedSub, { n: vrank.myRank, title: V_RANKS[vrank.myRank].title }),
+  fmt(t.value.agent.lockedSub, { n: vrank.myRank, title: rankTitle(vrank.myRank, isZh.value, vrank.ladder) }),
 );
 function hostedByText(c: ApprovedCase): string {
   return fmt(t.value.agent.hostedBy, { name: c.host, attendees: c.attendees });

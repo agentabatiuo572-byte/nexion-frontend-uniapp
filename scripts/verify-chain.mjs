@@ -20,7 +20,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { ROOT, CACHE_DIR, LAST_RUN_PATH, loadManifest, plan, treeFingerprint } from "./lib/verify-scope.mjs";
+import { ROOT, CACHE_DIR, LAST_RUN_PATH, loadManifest, plan, treeFingerprint, h5ProbeRoutesMap } from "./lib/verify-scope.mjs";
 import { ensureServer } from "./lib/dev-server-pool.mjs";
 import { findBash } from "./lib/find-bash.mjs";
 
@@ -58,7 +58,13 @@ if (P.changed) say(`${C.d}  改动集 ${P.changed.files.length} 个文件(base $
 const h5Only = mode === "scoped"
   ? Object.entries(P.h5Probes).filter(([, d]) => d.run).map(([id]) => `${id}.mjs`)
   : [];
-const h5OnlyEnv = mode === "scoped" ? { H5_RUNTIME_ONLY: h5Only.join(",") || "__none__" } : {};
+// 路由级范围(包 ax):scoped 时 h5 子探针各自的 PROBE_ROUTES 由 H5_PROBE_ROUTES(JSON,脚本名 → 路由串)下发,
+//   verify-h5-runtime.mjs 起子进程时逐个设;verify.sh 里的 route 类门由它自己的 plan 算(SCOPE_ROUTES_FOR[id])。
+//   PROBE_ROUTES 本身一律清空 —— 外层 shell 残留的 PROBE_ROUTES 绝不能让 full 悄悄变半量。
+const h5OnlyEnv = mode === "scoped"
+  ? { H5_RUNTIME_ONLY: h5Only.join(",") || "__none__", H5_PROBE_ROUTES: JSON.stringify(h5ProbeRoutesMap(P)), PROBE_ROUTES: "" }
+  : { H5_PROBE_ROUTES: "", PROBE_ROUTES: "" };
+if (mode === "scoped" && P.routes) say(`${C.d}  路由范围 ${P.routes.affected === "*" ? "全部" : `${P.routes.affected.length}/${P.routes.all.length}`}(${P.routes.reason});route 类探针只扫「这些 ∩ 探针射程」,门自身输入变了仍全扫${P.routes.affected !== "*" && P.routes.affected.length ? ":" + P.routes.affected.slice(0, 8).join(", ") + (P.routes.affected.length > 8 ? " …" : "") : ""}${C.n}`);
 
 // ── 起服(只在需要时、只起一对)────────────────────────────────────────────────
 const NEEDS_SERVER = new Set(["test:h5-runtime", "test:legacy-suite"]);

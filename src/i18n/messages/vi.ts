@@ -3830,6 +3830,7 @@ export const vi: Messages = {
     },
     needSelfBuy: "Tự mua thêm ${n}",
     needRefs: "Mời trực tiếp thêm {n}",
+    needRefsOne: "Mời trực tiếp thêm {n}",
     needTeam: "Thêm ${n} doanh số nhóm",
     needV: "Thêm {n} {title} (V{v})",
     upgradeCta: "Lộ trình thăng cấp (mua thiết bị + mời)",

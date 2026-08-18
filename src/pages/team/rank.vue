@@ -31,7 +31,7 @@
             <view class="flex items-center" style="margin-top: 8px; gap: 12px">
               <VBadgeIcon :v="myRank" :size="48" />
               <view>
-                <text class="block" :style="heroRankStyle">{{ rankLabel(myRank, isZh) }}</text>
+                <text class="block" :style="heroRankStyle">{{ rankLabel(myRank, isZh, rankDefs) }}</text>
                 <text class="block" :style="heroSubStyle">{{ heroSubText }}</text>
               </view>
             </view>
@@ -40,7 +40,7 @@
               <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 6px">
                 <text :style="{ color: 'var(--v5-ink-3)' }">
                   <text>{{ t.rank.next }} </text>
-                  <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ rankLabel(prog.next.v, isZh) }}</text>
+                  <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ rankLabel(prog.next.v, isZh, rankDefs) }}</text>
                 </text>
                 <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">{{ Math.round(prog.progressPct * 100) }}%</text>
               </view>
@@ -50,7 +50,7 @@
               <view v-if="prog.missing.length > 0" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px">
                 <view v-for="(m, i) in prog.missing" :key="i" class="flex items-center" style="gap: 6px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ rankGapText(t, m, isZh) }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ rankGapText(t, m, isZh, rankDefs) }}</text>
                 </view>
               </view>
               <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="upgradeCtaStyle" @click="go('/pages/store/store')">
@@ -73,7 +73,7 @@
             <VBadgeIcon :v="r.v" :size="36" />
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 8px; flex-wrap: wrap">
-                <text class="font-display" :style="rowTitleStyle">{{ rankLabel(r.v, isZh) }}</text>
+                <text class="font-display" :style="rowTitleStyle">{{ rankLabel(r.v, isZh, rankDefs) }}</text>
                 <view v-if="rowStatus(r.v) === 'done'" class="flex items-center" style="gap: 2px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   <text :style="{ fontSize: '12px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>

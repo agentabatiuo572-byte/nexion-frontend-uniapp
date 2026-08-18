@@ -107,7 +107,7 @@ for (let i = 0; i < 8 && !tapped; i++) {
     tapped = true;
   } catch {
     await page.evaluate(() => {
-      for (const sel of [".vcs-close", ".vcs-backdrop", ".ms-overlay"]) {
+      for (const sel of [".vcs-close", ".vcs-backdrop", ".ms-backdrop"]) { // .ms-overlay 是 fixed,offsetParent 恒 null,原分支从没生效(tester-G P2-7);backdrop 是 absolute 子节点
         const el = document.querySelector(sel);
         if (el && el.offsetParent !== null) { el.click(); return; }
       }
