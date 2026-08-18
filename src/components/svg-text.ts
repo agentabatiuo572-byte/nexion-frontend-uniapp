@@ -18,6 +18,8 @@
 //   · 只解决 H5(uni-h5)。App-vue 的视图层对模板里的整个 `<svg>` 都是 `document.createElement` 建的
 //     HTML 未知元素(读 uni-app-view.umd.js 的 CREATE 分支),图本身就不出,不是本组件能救的 —— 见 P-121 追记与 HANDOFF。
 //   · SVG 文字不换行;要换行的长文案请放 SVG 外。
+//   · `ref` 拿到的是**组件实例**不是 DOM 元素(原生 `<text ref>` 给 Element);要元素走 `$el`。13 处现用法都没用 ref。
+//   · 目标端是 H5 + App-vue;小程序端(mp-*)本仓不是目标 —— 那边压根没有内联 SVG,渲染函数组件也不走同一条编译路。
 //   · 机器门:`scripts/svg-text-source-gate.mjs`(svg 内禁 `<text`,本组件只许在 svg 内)+
 //     `scripts/svg-text-render-probe.mjs`(运行时 bbox > 0 · 字号属性未被 CSS 劫持)。
 import { defineComponent, h } from "vue";
