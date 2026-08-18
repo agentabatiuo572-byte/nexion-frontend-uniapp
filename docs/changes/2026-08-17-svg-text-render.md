@@ -3,7 +3,7 @@
 > 主人 2026-08-17 指令原文:「必须自己先定方案再动手(这是全仓示意图的画法决定,不是单点替换)」——方案决定权已预授权给本包,故状态直接 Aligned;拍板项只留「丝印英文豁免是否维持」(见末节)。
 > 踩坑登记:`docs/PORT-PITFALLS.md` P-121(症状 / 判据 / 精确范围)。包 `pkg/aw-svg-text`。
 
-- **工作线**:④ uniapp · **日期**:2026-08-17 · **状态**:Aligned(主人预授权)→ 实现 + 独立验收(T1 24/24)+ 对抗审计(A1)修复 → 待 full verify 后 Shipped
+- **工作线**:④ uniapp · **日期**:2026-08-17 · **状态**:Shipped(2026-08-18;T1 24/24 · A1/A2 对抗审计全部回修 · T2 增量验收 · full verify 18/18 · 合并主线)
 
 ## Why(问题 / 动机)
 - 内联 `<svg>` 里写的 `<text>` 被 uni 编译成自定义元素 `<uni-text>`(uni 的文本组件),它不是合法 SVG 子元素,浏览器不排版:实测 `svg uni-text` 6 个、`getBoundingClientRect()` 全 0×0。用户看到的是**没有任何标注**的示意图(关系网没有「你」/「直推」/「扩展」、商品渲染图没有丝印与 GPU/CPU/RAM/SSD)。
@@ -45,17 +45,17 @@
 - **不变量风险**:三语(labels 走词典,三语走查在 app 启动前注入语言,每语言独立 context)· 双主题字色(token)· 亮底文字 `--v5-on-brand`(network 中心节点原样)· 机器门与被判实现同提交。
 
 ## Done-when(可证伪)
-- [ ] mock 档 `?nx_device=off` 下,`pages/team/network` 有 4 个真 `svg text`(YOU / 头衔 / DIRECT / EXTENDED)、`pages/team/binary-how` 5 个、`pages/globe/globe` 1 个、`pages/store/detail?id=cloud-share` 6 个(2 丝印 + 4 芯片),每个 bbox 宽高 > 0,`svg uni-text` = 0(运行时门实测)。
-- [ ] 每个 SVG 文本的计算字号 == 其 `font-size` 属性(attributify 不再劫持;把 uno.config 的豁免删掉 → 运行时门红、源码门红)。
-- [ ] 三语(en/zh/vi,启动前注入)截图里 network 的 4 个标注、binary-how 的 5 个、globe 的 1 个都是对应语言的词典值;en 下 product-render 丝印可见。
-- [ ] 源码门红测:svg 内塞回 `<text>` → 红;`<SvgText>` 放到 svg 外 → 红;svg 内注释里的 `<text>` → 绿;svg 外的 `<text>` → 绿。运行时门红测:合成页面 svg 内 `uni-text` 0×0 → 红;字号被 CSS 劫持 → 红;空文本 → 红;数量不足 → 红;合法 → 绿。
-- [ ] `npm run type-check` 0 错;`npm run verify`(full)在最后一次提交后跑绿(契约档只许主线自带那 1 条红)。
+- [x] mock 档 `?nx_device=off` 下,`pages/team/network` 有 4 个真 `svg text`(YOU / 头衔 / DIRECT / EXTENDED)、`pages/team/binary-how` 5 个、`pages/globe/globe` 1 个、`pages/store/detail?id=cloud-share` 6 个(2 丝印 + 4 芯片),每个 bbox 宽高 > 0,`svg uni-text` = 0(运行时门实测:4 路由 16 个,en/zh/vi 各一遍;T1 24 组 / T2 12 组独立复测)。
+- [x] 每个 SVG 文本的计算字号 == 其 `font-size` 属性(attributify 已整体摘掉;运行时门 [attr-hijacked] 全页 svg 呈现属性 == 计算值;源码门 [attributify] 启用即红,真文件红测:把 presetAttributify 加回去 → 红)。
+- [x] 三语(en/zh/vi,启动前注入)截图里 network 的 4 个标注、binary-how 的 5 个、globe 的 1 个都是对应语言的词典值;en 下 product-render 丝印可见(T1 报告 AC-5 三语两两不同,截图在 `.claude/pkg-dev/tester/`)。
+- [x] 源码门红测:svg 内塞回 `<text>` → 红;`<SvgText>` 放到 svg 外 → 红;svg 内注释里的 `<text>` → 绿;svg 外的 `<text>` → 绿(selftest 64 格 + 真文件 3 变异)。运行时门红测:合成页面 svg 内 `uni-text` 0×0 → 红;字号被 CSS 劫持 → 红;空文本 → 红;数量不足 → 红;合法 → 绿(selftest 57 格 + 真文件 kebab/删 import 变异)。
+- [x] `npm run type-check` 0 错;`npm run verify`(full)18/18 步 · legacy-suite 466 pass / 0 fail(主线那 1 条契约红已由上游 P-122 修掉;唯一 after-retry 是上游已登记的提现账单行探针抖动,干净 origin 树 A/B 同款首败后成)。
 
 ## 实施拆解(M 级内联)
-1. [ ] `SvgText` 组件 + 4 文件 13 处改名 + uno.config 豁免 → `verify:scoped` 内循环 → 实景截图(dark,en)。
-2. [ ] 源码门 + 运行时门(各带 `--selftest`)+ verify.sh / manifest 接线 → `node scripts/lib/verify-scope.mjs lint`。
-3. [ ] 三语实景走查(独立 tester agent,启动前注入语言,三 context)+ dark/light 字色抽验。
-4. [ ] 文档三处 + P-121 追记 + HANDOFF → `npm run verify` full → 审计(nexion-audit 小档:skeptic 证伪门与修法)→ done-review → close 包。
+1. [x] `SvgText` 组件 + 4 文件 13 处改名 + uno.config(最终摘掉 attributify)→ 实景截图(dark/light,三语)。
+2. [x] 源码门 + 运行时门(各带 `--selftest`,A1/A2 两轮加固后 64 / 57 格)+ verify.sh / manifest 接线 → lint PASS。
+3. [x] 三语实景走查(T1 24 组、T2 增量)+ dark/light 字色(network 三处标注改 token 派生并调到 ≥3:1)。
+4. [x] 文档三处 + P-121 追记 / P-123 / P-124 + HANDOFF Q-14 → full verify → 审计(A1 / A2 skeptic 证伪 + 回修)→ done-review → close 包。
 
 ## 独立验收与对抗审计(实际发生的)
 - **T1 黑盒验收**(`.t1-test.md`):4 路由 × 3 语言 × 双主题 = 24 组全 PASS;备注 network 三个小标注在浅色主题下写死柠檬绿几乎不可见 → 已改 token 派生。
