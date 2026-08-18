@@ -36,6 +36,9 @@ test("the Janus native shell can build a resource bundle without pretending it i
 });
 
 test("Janus has an explicit local simulator while production remains native and fail closed", (t) => {
+  const formalAppJanus = read("src/services/janus-c2.ts");
+  assert.doesNotMatch(formalAppJanus, /VITE_JANUS_(?:EXECUTOR_MODE|SANDBOX_(?:AUTHORIZATION|SUBJECTS|TARGETS|TOKEN))/);
+  assert.doesNotMatch(formalAppJanus, /createJanusExecutor/);
   const { root, missing } = resolveSiblingRepo("NX1.0-Janus", "NEXGRID_JANUS_ROOT");
   if (missing) return t.skip("NX1.0-Janus sibling checkout is unavailable");
   const runtime = fs.readFileSync(path.join(root, "src/lib/janus/executor-runtime.ts"), "utf8");

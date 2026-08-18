@@ -192,7 +192,7 @@ import { usePendingCheckout } from "@/store/pending-checkout";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { usePopupArbiter, runPriorityRound, type AutoPushCandidate, type PopupId } from "@/store/popup-arbiter";
-import { navBack as navBackTo } from "@/lib/route";
+import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
@@ -589,7 +589,7 @@ function go(tab: { key: string; route: string }) {
     dom.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
     return;
   }
-  uni.reLaunch({ url: tab.route, fail: () => {} });
+  navTo(tab.route);
 }
 function goSearch() {
   uni.navigateTo({ url: "/pages/search/search", fail: () => {} });
