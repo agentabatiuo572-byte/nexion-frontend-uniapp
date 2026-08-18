@@ -48,7 +48,7 @@
             </defs>
 
             <!-- Outer dashed orbit -->
-            <!-- 轨道线走 border 档:此前用 surface-2,浅色档它是近白(#FAF7F0),压在米色底上几乎看不见 -->
+            <!-- 轨道线走 border 档:此前用 surface-2,浅色档它接近白,压在米色底上几乎看不见 -->
             <circle cx="120" cy="120" r="108" fill="none" stroke="var(--v5-border-strong)" stroke-width="1" stroke-dasharray="2 5" />
 
             <!-- 4 fixed satellites -->
@@ -79,7 +79,7 @@
               <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
             </circle>
 
-            <!-- Middle thin ring —— 此前写死 #262626,浅色档就是那圈扎眼的黑环。
+            <!-- Middle thin ring —— 此前写死一个深灰色号,浅色档就是那圈扎眼的黑环。
                  取 border(不是 border-strong):原值在黑底上几乎看不见,是「结构线」不是「装饰线」,
                  轨道的视觉重量该留给 brand 色的卫星与脉冲环。 -->
             <circle cx="120" cy="120" r="72" fill="none" stroke="var(--v5-border)" stroke-width="1" />
@@ -518,9 +518,12 @@ html[data-theme="dark"] .orb-appicon--dark {
   border-radius: 9999px;
   /* 🔴 此前写死 rgba(15,15,15,0.8) —— 浅色主题下是**深色药丸**,而里面的数字走
      --v5-ink(浅色档=近黑),等于深底压深字,主人实测「人眼根本看不清」。
-     改走 surface 档:浅色是白药丸配近黑字,暗色是 #141414 配浅字,两边都读得出。
-     不加 border:《03》§3 要求带填充的容器零描边,层级靠 surface 微差色 —— 白 #FFFFFF
-     压在米色底 #F4F1E9 上本身就是一档可读色差。(我加过一次 border,被 zero-border 门当场逮住) */
+     改走 surface 档:浅色是白药丸配近黑字,暗色是深色药丸配浅字,两边都读得出。
+     不加 border:《03》§3 要求带填充的容器零描边,层级靠 surface 微差色 ——
+     --v5-surface 压在 --v5-bg 上本身就是一档可读色差。(我加过一次 border,被 zero-border 门当场逮住)
+     🔴 注释里也别写色号:verify 那道「no hardcoded hex」哨兵扫**全文**(含注释),
+     我就是在这行写了页面底色的十六进制被它逮住。描述颜色一律用 token 名 ——
+     被点名的只是若干个有 token 对应的色号,但写 token 名本来就更准(值会变,角色不变)。 */
   background: color-mix(in srgb, var(--v5-surface) 80%, transparent);
   backdrop-filter: blur(12px);
 }
