@@ -81,7 +81,9 @@ async function tapBar(page) {
   if ((await bar.count()) === 0) fail("floating bar not present");
   // Mock celebrations (milestone overlay) and toasts may legitimately sit on top for a moment;
   // dismiss the celebration, then require a REAL click to land within 15s (a backdrop that stays = red).
-  await page.evaluate(() => { const o = document.querySelector(".ms-overlay"); if (o) o.click(); });
+  // 包 az 起关闭监听挂在 .ms-backdrop(不在 .ms-overlay 根):合成 click 不做命中测试,点根节点到不了子节点,
+  // 所以这里直接点 backdrop(tester-G P1-2);找不到 backdrop 时退回根节点(旧结构)。
+  await page.evaluate(() => { const o = document.querySelector(".ms-overlay .ms-backdrop") || document.querySelector(".ms-overlay"); if (o) o.click(); });
   await page.waitForTimeout(300);
   await bar.click({ timeout: 15000 });
 }
