@@ -32,7 +32,6 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
-import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
 import {
   configureBehaviorAnalyticsContext,
   pauseBehaviorAnalytics,
@@ -883,7 +882,6 @@ function stopBusinessLoops() {
   businessLoopsRunning = false;
   stopBusinessTimeouts();
   useDeposits().pauseMockEngine();
-  stopJanusC2Sync();
   pauseBehaviorAnalytics();
   stopTick();
   stopArrivalPoll();
@@ -937,7 +935,6 @@ function ensureBusinessLoopsRunning(): boolean {
     startTrialPoll();
     startOrderPoll();
     startMilestonePoll();
-    startJanusC2Sync();
     startBehaviorAnalytics();
   } catch (error) {
     stopBusinessLoops();

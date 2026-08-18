@@ -7,40 +7,30 @@ import {
   type JanusStatus,
   type JanusTakeoverProgress,
 } from "@/api/janus-api";
-import { janusApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { getDeviceIdentity } from "@/lib/device-id";
-import { applyJanusRuntime, type JanusRuntimeState } from "./janus-runtime";
-import { JANUS_RUNTIME_KEY } from "./janus-runtime";
+import type { JanusRuntimeState } from "./janus-runtime";
 
 const REPORT_KEY = "nexgrid-janus-pending-report-v2";
 const ACK_KEY = "nexgrid-janus-pending-ack-v2";
 const COUNTERS_KEY = "nexgrid-janus-counters-v2";
-const JANUS_SYNC_MS = 60_000;
 const STATUS_SET = new Set<string>(JANUS_STATUSES);
 const DEVICE_APP_VERSION = "NX1.0-UniApp";
 
 /**
- * The UniApp H5 bundle is a remote user interface, not a Janus device
- * executor. It has no device-bound claim signer, so posting a report would
- * inevitably fail the server's executor-claim contract. Keep that limitation
- * explicit for any surface that wants to render the runtime state.
+ * The formal UniApp is a remote user interface, not a Janus device executor.
+ * It has no device-bound claim signer on any target platform, so posting a
+ * report would inevitably fail the server's executor-claim contract. Keep
+ * that limitation explicit for any surface that renders the runtime state.
  */
-export type JanusSyncAvailability =
-  | { state: "READY" }
-  | { state: "HOLD"; code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
+export type JanusSyncAvailability = {
+  state: "HOLD";
+  code: "JANUS_NATIVE_EXECUTOR_REQUIRED";
+};
 
 function janusSyncAvailability(): JanusSyncAvailability {
-  // The native Janus shell owns device identity and executor claims. H5 may
-  // display account state, but must never impersonate that executor.
-  try {
-    if (String(uni.getSystemInfoSync().uniPlatform || "").toLowerCase() === "web") {
-      return { state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
-    }
-  } catch {
-    // A host without the UniApp runtime cannot prove it owns a native executor.
-    return { state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
-  }
-  return { state: "READY" };
+  // NX1.0-Janus alone owns Sandbox enrollment and the production native
+  // bridge. A native UniApp container is still not proof of executor identity.
+  return { state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
 }
 
 export function currentJanusSyncAvailability(): JanusSyncAvailability {
@@ -315,12 +305,6 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
   return { sync };
 }
 
-const uniStorage: KeyValueStore = {
-  get: (key) => uni.getStorageSync(key),
-  set: (key, value) => uni.setStorageSync(key, value),
-  delete: (key) => uni.removeStorageSync(key),
-};
-
 function uid(prefix: string): string {
   const random = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -445,77 +429,6 @@ export function buildJanusReport(now = Date.now()): JanusReport {
       foregroundDurationSeconds: counters.foregroundDurationSeconds,
     },
   };
-}
-
-async function applyConfiguredJanusRuntime(state: JanusRuntimeState, signal?: AbortSignal): Promise<JanusRuntimeState> {
-  // The formal App never signs device claims. NX1.0-Janus owns both the
-  // server-issued Sandbox enrollment and the production native bridge.
-  return applyJanusRuntime(state, undefined, signal);
-}
-
-const defaultCoordinator = createJanusCoordinator({
-  api: janusApi,
-  storage: uniStorage,
-  buildReport: buildJanusReport,
-  applyRuntime: applyConfiguredJanusRuntime,
-  now: Date.now,
-  scope: () => String(sessionVault.read()?.user.userId || ""),
-});
-
-let timer: ReturnType<typeof setInterval> | undefined;
-let syncGeneration = 0;
-let activeController: AbortController | undefined;
-const syncingGenerations = new Set<number>();
-
-async function runJanusC2(generation: number, signal: AbortSignal): Promise<void> {
-  if (
-    generation !== syncGeneration
-    || signal.aborted
-    || !remoteApiEnabled
-    || janusSyncAvailability().state !== "READY"
-    || !sessionVault.read()?.accessToken
-    || syncingGenerations.has(generation)
-  ) return;
-  syncingGenerations.add(generation);
-  try {
-    await defaultCoordinator.sync(signal);
-    throwIfJanusSyncCancelled(signal);
-    if (generation !== syncGeneration) throw new Error("JANUS_SYNC_CANCELLED");
-  } finally {
-    syncingGenerations.delete(generation);
-  }
-}
-
-export async function syncJanusC2(): Promise<void> {
-  const controller = activeController;
-  if (!controller) return;
-  await runJanusC2(syncGeneration, controller.signal);
-}
-
-export function startJanusC2Sync(): void {
-  stopJanusC2Sync();
-  if (!remoteApiEnabled || janusSyncAvailability().state !== "READY") return;
-  const generation = syncGeneration;
-  const controller = new AbortController();
-  activeController = controller;
-  void syncJanusC2().catch(() => {
-    // Stable report/ACK facts remain persisted for the next foreground or poll.
-  });
-  timer = setInterval(() => {
-    void runJanusC2(generation, controller.signal).catch(() => {
-      // The next poll retries the exact persisted fact.
-    });
-  }, JANUS_SYNC_MS);
-}
-
-export function stopJanusC2Sync(): void {
-  syncGeneration += 1;
-  activeController?.abort();
-  activeController = undefined;
-  if (timer) {
-    clearInterval(timer);
-    timer = undefined;
-  }
 }
 
 export function currentJanusStatus(): JanusStatus | null {

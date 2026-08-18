@@ -64,7 +64,6 @@ function evaluate(text) {
     "startTrialPoll",
     "startOrderPoll",
     "startMilestonePoll",
-    "startJanusC2Sync",
   ]) {
     assert.match(ensureRunning, new RegExp(`\\b${start}\\(\\)`), `${start} missing from central recovery`);
     assert.equal((text.match(new RegExp(`\\b${start}\\(\\);`, "g")) || []).length, 1,
@@ -129,7 +128,6 @@ function evaluate(text) {
     assert.match(body, new RegExp(`clearInterval\\(${timer}\\)`), `${stop} must clear ${timer}`);
     assert.match(body, new RegExp(`${timer}\\s*=\\s*undefined`), `${stop} must clear its liveness handle`);
   }
-  assert.match(stopLoops, /\bstopJanusC2Sync\(\)/, "stopJanusC2Sync missing from central stop");
   const probe = functionBody(text, "installBusinessLoopProbe");
   for (const timer of Object.values(localStops)) {
     assert.match(probe, new RegExp(`${timer}\\s*!==\\s*undefined`), `runtime probe must identify ${timer}`);

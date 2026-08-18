@@ -289,14 +289,7 @@ async function loadEntry(contents, runtimeStub, mode) {
 // 登记了却其实能触发的(陈旧登记)由下面的 stale 断言顶回来 —— 登记表本身也要被守。
 // 🔴 登记**不是免检**:下面还有一条机器判据要求每个登记项的全仓调用点个个 .catch() 兜底,
 //    否则红 —— 「门外触发不到」只豁免探针执行,不豁免不变量。
-const UNREACHABLE = {
-  // 2026-08-16 判据重建后新进覆盖面的缝。runJanusC2 未导出,且要 (generation, signal)
-  // 两个业务参数 + 模块级 activeController 状态,探针的两条门外路径(直调导出 / bindAccount)
-  // 都够不到。它按「保留 reject + 调用点兜底」那族实现,两个调用点(startJanusC2Sync 的
-  // 首发与 setInterval 轮询)各自 .catch() —— 这条由下面的机器判据守着,不是口头约定。
-  "src/services/janus-c2.ts#runJanusC2":
-    "未导出 + 需 (generation, signal) 业务参数与模块级 activeController 状态,门外触发不到;保留 reject 由两个调用点 .catch() 兜底(调用点兜底判据守)",
-};
+const UNREACHABLE = {};
 // ── 两轮探针:mode ∈ {remote, sandbox},覆盖取并集 ─────────────────────────────
 // 🔴 为什么两轮而不是把某个旗标钉死:deposits 两条缝是对偶守卫 ——
 //    refreshRemoteVietQrDeposits 首行 `if (fundsSandboxEnabled) return;`,
