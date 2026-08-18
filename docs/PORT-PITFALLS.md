@@ -1886,6 +1886,13 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **范围**(精确扫,不是估):模板 `<svg>…</svg>` 之内的 `<text>` 共 **4 个文件 / 13 个节点** —— `product-render.vue`×3 · `globe.vue`×1 · `binary-how.vue`×5 · `network.vue`×4。仓内其余 `<text>` 都在 SVG 之外,是正确用法。
 - **与本轮的关系**:这 13 个节点里有几个是硬编码英文(`YOU` / `DIRECT` / `EXTENDED` / `CLOUD SHARE` / `DISTRIBUTED · NO HARDWARE`),英文文案门照判(判据是「渲染位上有没有英文」,而它们在源码上确实是渲染位)。把它们接进词典**不改变可见结果**,因为压根不可见 —— 这属于**另一个缺陷**:该有的文字不在。
 - **留给主人拍板**(不擅自改):要让 SVG 里的文字显示,得改画法(改用原生 SVG `text` 需要绕过 uni 的组件编译,或者把文字挪到 SVG 外用绝对定位叠上去),这是全仓示意图的画法决定,不是单点修补。**判据教训**:`<text>` 在本仓有两种语义(uni 组件 / SVG 元素),写在 SVG 里的那种是**静默失效**——不报错、不留痕,只是没有字。2026-08-17。
+### P-121 追记(2026-08-17,包 aw):修法 = `<SvgText>` 渲染函数组件;两道门;两颗顺手挖出的雷
+
+- **修法(H5)**:`src/components/svg-text.ts` —— `defineComponent` + `h("text", attrs, slot)`,不经模板编译的标签改写;Vue 把父级 `<svg>` 的命名空间传给子组件子树,所以它以 `createElementNS(svg,"text")` 建出**真 SVG 文字**。4 文件 13 处 `<text …>` 只改标签名为 `<SvgText …>`,属性 / 绑定 / `v-if` / `v-for` / `i18n-en-ok` 注释全部原样;丝印与芯片字样字重 700/800 → 600(V5 上限,之前不可见故无人管)。实测(mock,`?nx_device=off`,414×896):4 路由 16 个 `svg text` 全部 bbox>0,en/zh/vi 三语各自出词典值,console 0。
+- **为什么不是 foreignObject / 绝对定位叠字 / v-html / canvas**:候选逐项评估见 `docs/changes/2026-08-17-svg-text-render.md`。一句话:问题的本质只是「`<text>` 在 uni 模板里有两个意思」,给 SVG 那个意思一个不会被改写的名字就够了 —— 零几何重算、零结构重排、i18n 三道门继续判到这些文本节点;foreignObject 的换行优势这 13 处用不上却要 13 份盒几何 + WebKit filter/transform 下的历史坑;叠字是两套坐标系的长期税;v-html 让文案离开模板判定面且它对 App 的好处本环境证不了(见 P-124);canvas 丢交互丢主题。仓内 lucky-spin 转盘用的是 v-html 版(先例保留,不改)。
+- **两道门(同一提交落地)**:`scripts/svg-text-source-gate.mjs`(源码:svg 内禁 `<text` / `<Text` · `<SvgText>` 只许在 svg 内 · 用了必 import · uno.config 的 attributify 豁免在位 · 判定面塌缩判红;`--selftest` 27 格)+ `scripts/svg-text-render-probe.mjs`(运行时:逐路由 `svg text` 数量 ≥ 静态期望 · 每个 bbox>0 · 非空 · 在 svg 视口内 · `svg uni-text`=0 · **`font-size` 属性 == 计算值** · console 0;含 `<SvgText>` 的文件必须登记路由,未登记即红不静默跳过(P-118 反着写);`--selftest` 18 格用合成页面逐条隔离)。真文件红测:塞回一个 `<text>` → 源码门 [svg-text] 红 + 运行时门 [uni-text-in-svg] 红;删 import → [svgtext-import] 红;uno.config 去掉 font-size 豁免 → [attributify-exempt] 红;整份备份还原后 hash 相等、复绿。
+- **顺手挖出的雷 ①**:UnoCSS attributify 劫持 SVG 的 `font-size` 属性 → P-123。**雷 ②**:App-vue 视图层从源码看压根不渲染模板里的 `<svg>` → P-124(P-009 / P-013 的「App 端也可用」是从 H5 webview 推断的)。
+- **同族提醒**:一个词在框架里有两个意思(uni 的 `<text>` 组件 vs SVG 的 `<text>` 元素、uni 的 `<image>` vs SVG 的 `<image>`!)时,写在另一个语境里的那个会**静默**走错分支;判据是「运行时量出来的形状」(bbox / 命名空间),不是源码长得像不像。仓内 SVG 里的 `<image>` 目前 0 处,门只守 text;真要用 SVG `<image>` 先照 SvgText 的路子做一个 SvgImage 并把门扩到它。
 ## P-122 长期红的门,红绿方向可能是**反的** —— 判据锚在「实现形态」上,一次加固就够让它开始奖励回退
 
 - **症状**:`scripts/h2-trial-remote-api.test.mjs:157` 断言 `src/store/free-trial.ts` 里必须出现 `if (remoteApiEnabled) return;`,长期红,挡在 `npm run verify` 第 2 步(`test:contract-registry`)—— 47 个契约测试里唯一的红,全链一次跑不通;其余 46 条 + 后 15 步 + legacy-suite 458 格全绿。这两个文件自 `5030cd1` 起一个字未变,不是新回归。
@@ -1894,3 +1901,19 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **落地修法**:判据锚到函数头 —— `/function persist\(\)[^{]*\{\s+if \(remoteApiEnabled\) return true;/`,要求短路是函数**第一句**。锚定一次性守住四条变异轴:删除 / 取反 / 注释掉 / **挪位**;其中挪位是关键 —— 守卫字符串原样还留在文件里,无锚点的存在式判据对它完全失明,而写盘已经发生了。
 - **顺带补的两条缝**:① 测试名承诺「never persists **or locally advances**」,而「本地推进」那一半原先**一条断言都没有**(缺失轴天然假绿)—— 补 `advanceTo()` 同款锚定;② 守卫在位 ≠ 绕不过去 —— 补「落盘口唯一」(`writeAccountRow[<(]` 恰好 1 处),否则在远端分支另开一条写盘口,两条守卫全都健在也照样绕过。
 - **同族提醒**:① 判长期红的门第 0 步问「它守的形态是不是被一次**加固**改掉了」,不只问「架构还在吗」——[[stale-gate-rewards-regression]] 的第一例是迁移,这例是变强,同样过期;② 门只有一条 assert 时「数 fail 条数」这招失效(任何变异都是红),改跑 **2×2 真值表**才看得出方向;③ 把测试名当规格逐句读,每个分句都得有断言接着;④ 变异集落盘为 `scripts/h2-trial-remote-gate.redtest.mjs`(9 条,单条隔离注入 + 注入不生效当场炸 + 收尾复绿),挂在 `test:contract-registry`;⑤ 判据带 tag 消息(`[persist-guard]` / `[advance-guard]` / `[single-writer]`),红测才能断定「红的是这一条」而不是被别的判据顺带抓到 —— 靠行号会随编辑漂。2026-08-17。
+
+## P-123 UnoCSS attributify 把 SVG 的 `font-size="N"` 属性当工具类:真 SVG 文字放大 4 倍
+
+- **症状**:P-121 修好、SVG 文字第一次真渲染出来时,`font-size="9.5"` 的标注量出来是 38px(2.375rem),`font-size="22"` 会是 88px。文字是「有了」,但大得离谱、被视口裁掉。此前 SVG 文字从没渲染过,所以谁也没见过。
+- **根因**:`uno.config.ts` 开着 `presetAttributify()`。attributify 的提取器把源码里**任何**属性名当工具类前缀扫(`font-size="9.5"` → 候选 `font-size-9.5`),preset-mini 有 `(text|font)-size-*` 规则 → 生成 `[font-size~="9.5"]{font-size:2.375rem}`(数字 × 0.25rem),选择器正好匹配这个元素,CSS 覆盖了 SVG 呈现属性。UnoCSS 自己的**默认豁免表**就已经为同一件事豁免了 `fill` / `opacity` / `stroke-opacity`,只是没包含 `font-size`。同批实测:`fill-opacity="0.65"` 被扫成 `--un-fill-opacity: 0.0065`(目前无消费者,同族隐患);`letter-spacing` / `font-weight` / `text-anchor` / `dominant-baseline` / `stroke-width` 要么没规则、要么值相同,无害。
+- **修法**:在根上修 —— `presetAttributify({ ignoreAttributes: ["placeholder", "fill", "opacity", "stroke-opacity", "font-size", "fill-opacity"] })`(传了就整表覆盖,默认四项要照抄)。全仓 `font-size=` 属性只出现在 `<svg>` 里的 13 处 `<SvgText>` 上,HTML 元素零使用,对现有可见 UI 影响为 0。守卫:`svg-text-source-gate.mjs` [attributify-exempt](静态,豁免在位;`prefixedOnly:true` / 不启用也算合规)+ `svg-text-render-probe.mjs` [font-size-hijacked](运行时,属性值 == 计算值,任何 CSS 劫持都现形)。
+- **可选(未做,待拍板)**:全仓未发现属性式工具类用法(`<view flex="~">` 这类 0 处),`presetAttributify` 疑似 0 使用,整体摘掉可根除同族;本包只加豁免不摘。
+- **同族提醒**:① 「原子化 CSS 的属性模式」与「SVG 呈现属性」是同一个语法位上的两套语义,凡启用 attributify 的工程,SVG 的 `font-size` / `stroke-width` / `fill-opacity` 都是嫌疑人 —— 判据是**运行时属性值 vs 计算值**,不是看源码;② 「第一次真渲染出来」的东西要当新功能验一遍,它身上可能压着别的、从没被触发过的雷。2026-08-17。
+
+## P-124 App-vue 视图层从源码看**不渲染模板里的任何 `<svg>`**(不只是 P-121 的字缺)—— P-009 / P-013 的「App 端也可用」是推断,未真机证实
+
+- **发现路径**:评估 P-121 候选方案的「App(iOS/Android webview)是否成立」轴时回源读 `@dcloudio/uni-app-plus/dist/uni-app-view.umd.js`(3.0.0-4080420251103001)。
+- **事实(`[COMPUTED]`,读源码不是跑出来的)**:App-vue 是服务层(JS 引擎跑 Vue)→ 视图层(webview)DOM 同步。服务层 `UniElement` 的 `nodeName = tagName.toUpperCase()`,不带命名空间;视图层 CREATE 动作 `Zy(id, nodeName, …)`:`Xy[nodeName]`(VIEW / TEXT / IMAGE … 内置组件表)命中则建对应组件,**否则 `document.createElement(nodeName)`** —— `SVG` / `CIRCLE` / `PATH` / `G` 全部走这条,得到的是 **HTML 命名空间的未知元素**,不是 SVG,浏览器不画;`TEXT` 走 uni-text 组件(= P-121 在 App 上的同款)。`v-html` 走 `setAttr("innerHTML")` → `this.$.innerHTML = …`,由浏览器解析,是唯一能在 App-vue 出真 SVG 的模板内路径(未真机证实)。DCloud 问答 67267 也说「template 里没有 svg 标签,动态创建的才可用」。
+- **意味着什么**:全站几十处内联 SVG 图标(lucide 风格)与四张示意图,在 App-vue 上从源码看**一张都不出**;这远大于 P-121。P-009(「内联 svg 在 .vue 双端可用」)/ P-013(「uni webview 渲染 SVG + SMIL」)是在 H5 上验证后**推断**到 App 的,与源码相悖。本环境无 HBuilderX / 真机,**无法运行时证实或证伪**,不据此改任何 App 策略。
+- **本包的处理**:不更坏(`<SvgText>` 在 App 服务层同样落到 TEXT 节点,与其它 svg 子元素一样不出)、不锁死方向(v-html / renderjs / iconfont / `<image src=svg>` 都仍可选);上报为包外 P0 待真机定案,HANDOFF 已登记。
+- **同族提醒**:「webview 渲染 = 浏览器行为」这个推断在 App-vue 上**不成立**,因为中间隔着一层 DOM 同步协议,协议不传的东西(命名空间、innerHTML 之外的原生元素)webview 就没有;凡「App 端也可用」这类跨端断言,要么真机跑过、要么读过视图层源码,二者都没有的一律标 `[INFERRED]`。2026-08-17。

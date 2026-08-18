@@ -108,7 +108,7 @@
               <animate attributeName="r" values="5;24" dur="1.6s" repeatCount="1" />
               <animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="1" />
             </circle>
-            <text
+            <SvgText
               v-if="r.isYou"
               :x="r.cx * W + 8"
               :y="r.cy * H - 8"
@@ -116,7 +116,7 @@
               font-size="10"
               font-weight="600"
               font-family="ui-monospace, monospace"
-            >{{ t.globe.yourNodeBadge }}</text>
+            >{{ t.globe.yourNodeBadge }}</SvgText>
           </g>
         </svg>
         <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
@@ -189,6 +189,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import SvgText from "@/components/svg-text";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import EmptyState from "@/components/empty-state.vue";

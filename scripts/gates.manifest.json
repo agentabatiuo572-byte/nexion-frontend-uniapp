@@ -230,6 +230,16 @@
         "scripts/page-check.mjs"
       ],
       "$why": "runner 已跑过同树 → verify.sh 复用;否则按 h5Probes 子探针级缩范围"
+    },
+    "svg-text-runtime": {
+      "kind": "runtime",
+      "inputs": [
+        "src/pages/**",
+        "src/components/**",
+        "src/styles/**",
+        "uno.config.ts",
+        "scripts/svg-text-render-probe.mjs"
+      ]
     }
   },
   "steps": {
