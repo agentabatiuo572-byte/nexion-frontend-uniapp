@@ -13,6 +13,7 @@
 //   node scripts/orphan-line-probe.mjs              # 三语 × 核心路由
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
+import { scopeRoutes, mapRoutes, settleNetwork } from "./lib/probe-routes.mjs";
 
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const SELFTEST = process.argv.includes("--selftest");
@@ -112,35 +113,47 @@ if (SELFTEST) {
 const known = new Set(
   JSON.parse(readFileSync("src/pages.json", "utf8").replace(/\/\/[^\n"]*$/gm, "")).pages.map((p) => p.path),
 );
-const routes = ROUTES.filter((r) => known.has(r));
-if (!routes.length) { console.error("orphan-line 判据失效:pages.json 里一条目标路由都不存在"); await browser.close(); process.exit(1); }
+const allRoutes = ROUTES.filter((r) => known.has(r));
+if (!allRoutes.length) { console.error("orphan-line 判据失效:pages.json 里一条目标路由都不存在"); await browser.close(); process.exit(1); }
+// 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。
+const SCOPE = scopeRoutes(allRoutes, "orphan-line");
+const routes = SCOPE.routes;
 
 let totalMultiline = 0, failedRoutes = 0;
 const hits = [];
+await page.close();
+// 包 ax:按语言分批,每批 N 条 lane(各自独立 context / 渲染进程,localStorage 天然隔离,语言注入不互相踩)并行各扫一条路由
+//   (PROBE_CONCURRENCY,默认 3);每条路由仍是 goto → 注入 → reload → 900ms 的原节奏,判据不动。
 for (const locale of LOCALES) {
-  for (const route of routes) {
-    try {
-      await page.goto(`${BASE}/?nx_device=off#/${route}`, { waitUntil: "domcontentloaded", timeout: 20000 });
-      // uni storage 的 H5 形态是 {type,data} —— 少 type 会被当字符串读回,语言注入静默失效
-      await page.evaluate((code) => {
-        localStorage.setItem("nexgrid-locale-v1", JSON.stringify({ type: "object", data: { code, userSet: true } }));
-      }, locale);
-      await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
-      await page.waitForTimeout(900);
-      const r = await page.evaluate(scanOrphans);
-      totalMultiline += r.multiline;
-      for (const o of r.orphans) hits.push(`${locale} · ${route} · 末行「${o.tail}」 ← ${o.text}`);
-    } catch (e) {
-      failedRoutes++;
-      console.error(`  探测失败 ${locale}/${route}: ${String(e).slice(0, 120)}`);
-    }
-  }
+  // tester-F R2-01:并行 3 lane 时首页/我的页布局晚稳定,多行文案分母稳定少 2/40 段(= 那 2 段没被查孤字),而 full 走的就是默认档;
+  //   并行本来只省 ~4s,不值得赌检出力 → 固定 concurrency 1(与 theme 门同款);路由级范围化保留。
+  const results = await mapRoutes(browser, routes, async (p, route) => {
+    await p.goto(`${BASE}/?nx_device=off#/${route}`, { waitUntil: "domcontentloaded", timeout: 20000 });
+    // uni storage 的 H5 形态是 {type,data} —— 少 type 会被当字符串读回,语言注入静默失效
+    await p.evaluate((code) => {
+      localStorage.setItem("nexgrid-locale-v1", JSON.stringify({ type: "object", data: { code, userSet: true } }));
+    }, locale);
+    await p.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
+    await settleNetwork(p, 5000, 1); // 本门固定串行(R2-01)→ 空转;留调用点是为了将来若再开并行时不忘等
+    await p.waitForTimeout(900);
+    return await p.evaluate(scanOrphans);
+  }, { concurrency: 1, context: { viewport: { width: WIDTH, height: HEIGHT } } });
+  results.forEach((r, i) => {
+    const route = routes[i];
+    if (!r || r.error) { failedRoutes++; console.error(`  探测失败 ${locale}/${route}: ${String(r?.error ?? "unknown").slice(0, 120)}`); return; }
+    totalMultiline += r.multiline;
+    for (const o of r.orphans) hits.push(`${locale} · ${route} · 末行「${o.tail}」 ← ${o.text}`);
+  });
 }
 await browser.close();
 
 if (failedRoutes) {
   console.error(`orphan-line 判据失效:${failedRoutes} 条路由探测失败 —— 按红处理`);
   process.exit(1);
+}
+if (SCOPE.scoped && routes.length === 0) {
+  console.log(`orphan-line PASS —— scoped 0/${allRoutes.length} 路由在受影响范围内,本轮无可扫(末轮全量会扫)`);
+  process.exit(0);
 }
 if (totalMultiline === 0) {
   console.error("orphan-line 判据失效:三语全部路由都没扫到多行文案(应 >0)—— 按红处理,不许当「无违例」");
@@ -151,4 +164,4 @@ if (hits.length) {
   for (const h of hits.slice(0, 12)) console.error(`        ${h}`);
   process.exit(1);
 }
-console.log(`orphan-line PASS —— ${LOCALES.length} 语 × ${routes.length} 路由 @${WIDTH}px,多行文案 ${totalMultiline} 段,孤字 0`);
+console.log(`orphan-line PASS —— ${LOCALES.length} 语 × ${routes.length} 路由 @${WIDTH}px,多行文案 ${totalMultiline} 段,孤字 0${SCOPE.scoped ? ` · scoped ${routes.length}/${allRoutes.length} 路由` : ""}`);

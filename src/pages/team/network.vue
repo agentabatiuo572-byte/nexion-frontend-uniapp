@@ -156,7 +156,7 @@
           </view>
           <view :style="{ marginTop: '12px', fontSize: '12px', color: 'var(--v5-ink-3)' }">
             <text>{{ t.network.title }}: </text>
-            <text :style="{ color: 'var(--v5-ink)' }">{{ rankTitle(selected) }}</text>
+            <text :style="{ color: 'var(--v5-ink)' }">{{ memberRankTitle(selected) }}</text>
             <text> · {{ t.network.status }}: </text>
             <text :style="{ color: statusColor(selected.status) }">{{ selected.status }}</text>
           </view>
@@ -175,7 +175,9 @@ import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
-import { useVRank, V_RANKS } from "@/store/v-rank";
+import { useVRank } from "@/store/v-rank";
+import { rankTitle } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 
@@ -197,6 +199,8 @@ interface Plotted {
 const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
+const vState = vRank;
+const isZh = computed(() => useLocaleStore().code === "zh");
 
 const members = computed(() => network.members);
 const myRank = computed(() => vRank.myRank);
@@ -253,8 +257,9 @@ const idleSuffixText = computed(() => fmt(t.value.network.idleSuffix, { n: idleC
 function daysJoined(m: NetworkMember): number {
   return Math.floor((Date.now() - m.joinedAt) / 86400000);
 }
-function rankTitle(m: NetworkMember): string {
-  return V_RANKS[m.vRank].title;
+// 头衔显示名收在 lib/v-rank-copy(中文界面用中文头衔;档位表由 store 给,不直读 MOCK-ONLY 的 V_RANKS)
+function memberRankTitle(m: NetworkMember): string {
+  return rankTitle(m.vRank, isZh.value, vState.ladder);
 }
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";

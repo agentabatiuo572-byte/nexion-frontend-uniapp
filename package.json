@@ -41,7 +41,7 @@
     "test:final-commerce-closure": "node --test scripts/final-commerce-closure-contract.test.mjs",
     "test:phase-isolation": "node --test scripts/phase-isolation-contract.test.mjs",
     "test:kyc-removal": "node --test scripts/kyc-removal-contract.test.mjs",
-    "test:probe-safety": "node --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs",
+    "test:probe-safety": "node --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs scripts/verify-scope-lib.test.mjs",
     "test:earnings-accrual": "node --experimental-strip-types --test scripts/earnings-accrual-contract.test.mjs",
     "test:business-loop-liveness": "node scripts/selfcheck-business-loop-liveness.mjs",
     "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",

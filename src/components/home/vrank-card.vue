@@ -56,7 +56,7 @@ const next = computed(() => rankInfo.value.next);
 const pct = computed(() => Math.round(rankInfo.value.progressPct * 100));
 const missing = computed(() => rankInfo.value.missing);
 const isZh = computed(() => useLocaleStore().code === "zh");
-const missingText = computed(() => missing.value.map((g) => rankGapText(t.value, g, isZh.value)).join(" · "));
+const missingText = computed(() => missing.value.map((g) => rankGapText(t.value, g, isZh.value, vrank.ladder)).join(" · "));
 const unlockAtText = computed(() => (next.value ? fmt(t.value.home.rankUnlockAt, { n: next.value.v }) : ""));
 // 实物奖已删 → 改展示下一阶的 NEX 培育奖(cultivationBonus);为 0 时不显示 chip
 const rewardNex = computed(() => next.value?.cultivationBonus ?? 0);

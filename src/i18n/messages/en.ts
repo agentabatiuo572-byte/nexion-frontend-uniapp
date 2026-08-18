@@ -3969,6 +3969,7 @@ export const en = {
     },
     needSelfBuy: "Self-buy ${n} more",
     needRefs: "{n} more direct invites",
+    needRefsOne: "{n} more direct invite",
     needTeam: "${n} more team volume",
     needV: "{n} more {title} (V{v})",
     upgradeCta: "Upgrade path (buy device + invite)",

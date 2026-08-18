@@ -10,6 +10,7 @@
 //   node scripts/dom-qa.mjs --sweep core --update-ledger # 重建基线(人工审阅后)
 // 同源双胞胎:Nexion-admin-prototype/scripts/dom-qa-probe.mjs(agent-browser 版);改 PROBE 逻辑两边同步。
 import { chromium } from "playwright";
+import { scopeRoutes, mapRoutes, settleNetwork } from "./lib/probe-routes.mjs";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { assertSweepCoverage } from "./lib/probe-coverage.mjs";
 
@@ -178,45 +179,67 @@ if (MODE === "selftest") {
   if (clean.length) { console.error(`SELFTEST FAIL(假阳):干净 fixture 报了 ${clean.map((f) => f.check + ":" + f.sig).join(", ")}`); exitCode = 1; }
   if (!exitCode) console.log("SELFTEST PASS:5/5 阳性命中 + 普查 info + 干净 fixture 0 gate");
 } else {
-  const routes = routesOf(SWEEP);
+  const allRoutes = routesOf(SWEEP);
+  // 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量。ledger 只拦「新指纹」,不比消失,缩范围不会假红。
+  const SCOPE = scopeRoutes(allRoutes, "DOM-QA");
+  const routes = SCOPE.routes;
+  if (SCOPE.scoped && !routes.length) { console.log(`DOM-QA PASS:scoped 0/${allRoutes.length} 路由在受影响范围内,本轮无可扫(末轮全量会扫)`); await browser.close(); process.exit(0); }
+  // 范围模式一律不许改台账(与 zero-border / theme / tap 同口径;tester-F F-13):本门 --update-ledger 虽是 merge 语义不丢存量,
+  //   但会用部分扫描覆写 smallTextCensus,且「只扫半场就收编」本身就不该发生。
+  if (SCOPE.scoped && UPDATE) { console.error("DOM-QA:PROBE_ROUTES 范围模式下不许 --update-ledger(只扫了一部分路由)。不设 PROBE_ROUTES 全量跑再收编。"); await browser.close(); process.exit(2); }
   const findings = [];
   const completedRoutes = [];
   const crashes = [];
   const landings = {};
   const witnesses = {};
   const pageErrors = {};
-  for (const route of routes) {
+  // 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一条路由(PROBE_CONCURRENCY,默认 3);每条路由仍是 goto → 1400ms → probe 的原节奏,判据不动;结果按路由原顺序合并。
+  const timeoutSet = new WeakSet();
+  const perRoute = await mapRoutes(browser, routes, async (lane, route, _i, lanes) => {
+    if (!timeoutSet.has(lane)) { lane.setDefaultTimeout(10000); timeoutSet.add(lane); }
     const url = `${BASE}/?nx_device=off#/${route}`;
     const routePageErrors = [];
     const onPageError = (error) => routePageErrors.push(String(error));
-    page.on("pageerror", onPageError);
+    lane.on("pageerror", onPageError);
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1400); // 渲染/动效落定
-      const ui = await landedFrame(page);
-      const landed = (await page.evaluate(() => location.hash)).replace(/^#\//, "").split("?")[0];
+      await lane.goto(url, { waitUntil: "domcontentloaded" });
+      await settleNetwork(lane, 5000, lanes); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;实际 1 lane 时空转(R2-03)
+      await lane.waitForTimeout(1400); // 渲染/动效落定
+      const ui = await landedFrame(lane);
+      const landed = (await lane.evaluate(() => location.hash)).replace(/^#\//, "").split("?")[0];
       const res = await ui.evaluate(probe);
-      landings[route] = landed;
-      witnesses[route] = await ui.evaluate(() => ({
+      const witness = await ui.evaluate(() => ({
         appChildren: document.querySelector("#app")?.childElementCount ?? 0,
         iframeCount: document.querySelectorAll("iframe").length,
         bodyElements: document.querySelectorAll("body *").length,
         bodyTextLength: (document.body?.innerText || "").trim().length,
       }));
-      pageErrors[route] = routePageErrors;
-      completedRoutes.push(route);
+      let debug = null;
       if (process.env.DOM_QA_DEBUG) {
         const g = res.filter((f) => f.sev === "gate").length, i = res.length - g;
         const nodes = await ui.evaluate(() => document.querySelectorAll("body *").length);
-        console.log(`  ${route} → landed=${landed} nodes=${nodes} gate=${g} info=${i}`);
+        debug = `  ${route} → landed=${landed} nodes=${nodes} gate=${g} info=${i}`;
       }
-      for (const f of res) findings.push({ ...f, route: landed, fp: `${landed}|${f.check}|${f.sig}` });
+      return { route, ok: true, landed, res, witness, routePageErrors, debug };
     } catch (e) {
-      crashes.push(route);
-      findings.push({ check: "probe-crash", sig: "page", detail: String(e).slice(0, 120), sev: "gate", route, fp: `${route}|probe-crash|page` });
+      return { route, ok: false, err: String(e).slice(0, 120) };
     } finally {
-      page.off("pageerror", onPageError);
+      lane.off("pageerror", onPageError);
     }
+  }, { context: { viewport: { width: 390, height: 844 } } });
+  for (const r of perRoute) {
+    const route = r?.route ?? "?";
+    if (!r || r.error || !r.ok) {
+      crashes.push(route);
+      findings.push({ check: "probe-crash", sig: "page", detail: String(r?.err ?? r?.error ?? "unknown").slice(0, 120), sev: "gate", route, fp: `${route}|probe-crash|page` });
+      continue;
+    }
+    landings[route] = r.landed;
+    witnesses[route] = r.witness;
+    pageErrors[route] = r.routePageErrors;
+    completedRoutes.push(route);
+    if (r.debug) console.log(r.debug);
+    for (const f of r.res) findings.push({ ...f, route: r.landed, fp: `${r.landed}|${f.check}|${f.sig}` });
   }
   let coverageFailed = false;
   try {
@@ -258,7 +281,7 @@ if (MODE === "selftest") {
     console.error(`(确认为合法例外 → --update-ledger 收编并在 entry 写 qaOk 理由;否则修复)`);
     exitCode = 1;
   } else {
-    console.log(`DOM-QA PASS:${routes.length} 路由,gate ${gates.length} 条全在 ledger(存量),新违例 0;small-text 普查 ${infos.length} 条`);
+    console.log(`DOM-QA PASS:${routes.length} 路由${SCOPE.scoped ? `(scoped ${routes.length}/${allRoutes.length})` : ""},gate ${gates.length} 条全在 ledger(存量),新违例 0;small-text 普查 ${infos.length} 条`);
   }
 }
 

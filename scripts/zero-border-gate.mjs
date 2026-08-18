@@ -25,6 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { scopeRoutes, mapRoutes, settleNetwork } from "./lib/probe-routes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -39,6 +40,11 @@ const ROUTES = (() => {
   for (const g of pj.subPackages ?? []) for (const p of g.pages ?? []) out.push("/" + g.root + "/" + p.path);
   return out;
 })();
+// 路由级范围(包 ax):PROBE_ROUTES 有值 → 只扫「射程 ∩ 受影响路由」;未设 = 全量,行为与从前完全一样。
+//   scoped 下:棘轮「消失」只对扫过的路由比(没扫的路由不算修好);--update-baseline 一律拒绝(会把没扫的路由从基线里删掉)。
+const SCOPE = scopeRoutes(ROUTES, "零-border");
+const SCAN = SCOPE.routes;
+const SCANNED = new Set(SCAN);
 
 /* ── 判定纯函数(可离线红测) ── */
 export function parseColor(s) {
@@ -194,31 +200,43 @@ function evaluate(raw) {
 async function sweep() {
   const { chromium } = require("playwright");
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US" });
-  const page = await ctx.newPage();
   const found = new Map();
   // 🔴 导航失败必须记账,不能静默跳过(2026-07-23 独立验收 v2 抓出):
   // 少扫的路由在下游会被当成「违例已修好」→ 触发棘轮哨兵假红 → 照提示重建基线
   // 就把**真违例从基线里删掉**。漏扫必须让整个门失败,而不是产出一份残缺结果。
   const failed = [];
-  for (const route of ROUTES) {
+  // 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一条路由(PROBE_CONCURRENCY,默认 3);每条路由仍是 goto → 700ms →
+  //   两主题各 300+300ms 的原节奏,判定逻辑不动;结果按路由原顺序合并,found 的插入顺序与串行一致。
+  // 🔴 导航语义变了(tester-F F-06 要求写明):query 带 &zb=<序号> → 每条路由**整页重载**,不再是同文档换 hash。
+  //   原来 checkout 页弹开的支付面板(.tis-panel)会留在 DOM 里被记到后面 74 条路由名下(基线 159 条里 73 条是它);
+  //   现在只归属它真正所在的路由,hit 少 46% 全是这一类假归属,没丢覆盖(full 3 条逐字一致,并行 3 与串行 1 逐字节一致)。
+  //   基线里那 73 条从此稳定「消失」(partial 只报不拦),用不带 PROBE_ROUTES 的 --update-baseline 收缩。
+  const perRoute = await mapRoutes(browser, SCAN, async (page, route, i, lanes) => {
     try {
-      await page.goto(`${BASE}/?nx_device=off#${route}`, { waitUntil: "networkidle", timeout: 20000 });
-    } catch { failed.push(route); continue; }
+      await page.goto(`${BASE}/?nx_device=off&zb=${i}#${route}`, { waitUntil: "networkidle", timeout: 20000 });
+    } catch { return { route, failed: true, raws: [] }; }
     await page.waitForTimeout(700);
+    const raws = [];
     for (const theme of ["dark", "light"]) {
       await page.evaluate((m) => document.querySelector("#app")?.__vue_app__?.config?.globalProperties?.$pinia?._s?.get("theme")?.setMode(m), theme);
       await page.waitForTimeout(300);
       await page.evaluate(() => { const s = document.querySelector(".nx-scroll"); if (s) s.scrollTop = s.scrollHeight; });
+      await settleNetwork(page, 3000, lanes); // 包 ax:滚到底可能触发懒加载;并行时 dev server 忙,先等本页网络空闲(有界);实际 1 lane 时空转(R2-03)
       await page.waitForTimeout(300);
-      for (const raw of await page.evaluate(PROBE)) {
-        const v = evaluate(raw);
-        if (!v) continue;
-        // 指纹不含主题:同一元素两主题都违例算一条
-        const fp = `${route}|${v}|${raw.cls}|${raw.w}x${raw.h}`;
-        if (!found.has(fp)) found.set(fp, { route, kind: v, cls: raw.cls, size: `${raw.w}x${raw.h}`, radius: raw.radius, sample: raw.txt, count: 0 });
-        found.get(fp).count++;
-      }
+      raws.push(...await page.evaluate(PROBE));
+    }
+    return { route, failed: false, raws };
+  }, { context: { viewport: { width: 390, height: 844 }, locale: "en-US" } });
+  for (const r of perRoute) {
+    if (!r || r.error) { failed.push(r?.route ?? "?"); continue; }
+    if (r.failed) { failed.push(r.route); continue; }
+    for (const raw of r.raws) {
+      const v = evaluate(raw);
+      if (!v) continue;
+      // 指纹不含主题:同一元素两主题都违例算一条
+      const fp = `${r.route}|${v}|${raw.cls}|${raw.w}x${raw.h}`;
+      if (!found.has(fp)) found.set(fp, { route: r.route, kind: v, cls: raw.cls, size: `${raw.w}x${raw.h}`, radius: raw.radius, sample: raw.txt, count: 0 });
+      found.get(fp).count++;
     }
   }
   await browser.close();
@@ -302,7 +320,7 @@ if (process.argv.includes("--selftest")) selftest();
 const { hits, failed } = await sweep();
 // 🔴 覆盖率断言排在所有下游逻辑之前:漏扫过的结果**一律不许**用来判违例、更不许写基线。
 if (failed.length) {
-  console.error(`零-border:${failed.length}/${ROUTES.length} 条路由导航失败,结果不完整,拒绝据此判定或写基线\n`);
+  console.error(`零-border:${failed.length}/${SCAN.length} 条路由导航失败,结果不完整,拒绝据此判定或写基线\n`);
   for (const r of failed) console.error(`  ${r}`);
   console.error(`\n先确认 dev server(${BASE})健康再重跑。`);
   process.exit(2);
@@ -317,6 +335,7 @@ const allowed = (h) =>
 const live = hits.filter((h) => !allowed(h));
 
 if (process.argv.includes("--update-baseline")) {
+  if (SCOPE.scoped) { console.error("零-border:PROBE_ROUTES 范围模式下不许 --update-baseline(只扫了一部分路由,重建会把没扫的路由从基线里删掉)。不设 PROBE_ROUTES 全量跑再重建。"); process.exit(2); }
   // 🔴 note 必须按 key 继承(2026-07-23 C2 第二轮 audit 抓出):原实现把每条 note 硬编码冲成
   // "存量,C2 批次待判",与本文件 _doc 自称的「每条 note 写为什么还在」自相矛盾 ——
   // 重建一次就把历轮的裁决理由(为什么留 / 谁拍的板)全抹了,下一轮只能从无理由的清单重判。
@@ -341,7 +360,8 @@ if (process.argv.includes("--list")) {
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")).entries ?? [] : [];
 const known = new Set(baseline.map(key));
 const added = live.filter((h) => h.kind === "full" && !known.has(key(h)));
-const gone = baseline.filter((b) => !live.some((h) => key(h) === key(b)));
+// scoped:只对扫过的路由比「消失」—— 没扫的路由不算修好,也不催缩棘轮
+const gone = baseline.filter((b) => SCANNED.has(b.route) && !live.some((h) => key(h) === key(b)));
 
 // 🔴 顺序不可调换(2026-07-23 独立验收 v2 抓出的洞 A):
 // 「新增违例」必须**先于**「棘轮该缩了」报出。反过来的话,当一次改动同时
@@ -360,7 +380,7 @@ if (added.length) {
 // 棘轮必须跟着缩:违例修好后若不重建基线,那些**陈旧 key 仍留在 known 集合里** ——
 // 同款违例原样改回来,门查 known 命中、判为「存量」直接放行,等于修过的地方从此不设防。
 // 只对 full 生效:partial 多是极小 hairline,受滚动深度/浮层时机影响会抖,拿它当硬门会假红。
-const goneFull = baseline.filter((b) => b.kind === "full" && !live.some((h) => key(h) === key(b)));
+const goneFull = baseline.filter((b) => b.kind === "full" && SCANNED.has(b.route) && !live.some((h) => key(h) === key(b)));
 if (goneFull.length) {
   console.error(`零-border:基线有 ${goneFull.length} 条 full 已修好但基线没跟着缩 —— 棘轮必须收紧,否则这些位置改回来门抓不到\n`);
   for (const b of goneFull) console.error(`  ${b.route}  ${b.size}  .${b.cls}`);
@@ -368,4 +388,4 @@ if (goneFull.length) {
   console.error(`(此处已确保 added=0 —— 不存在被一并洗白的新违例。)`);
   process.exit(1);
 }
-console.log(`零-border:无新增 full 违例(基线 ${baseline.length} 条,本次消失 ${gone.length} 条)`);
+console.log(`零-border:无新增 full 违例(基线 ${baseline.length} 条,本次消失 ${gone.length} 条${SCOPE.scoped ? ` · scoped ${SCAN.length}/${ROUTES.length} 路由` : ""})`);

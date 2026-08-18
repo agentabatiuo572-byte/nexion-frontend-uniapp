@@ -1,19 +1,22 @@
 <!--
   VBadge — ported from Nexion-prototype/app/components/v3/v-badge.tsx.
   V-rank title pill (V0-V12); colour climbs with level. showTitle toggles the
-  english title text. Gradient badges (V10+) add a text-shadow for legibility.
+  title text —— 显示名按语言取(中文界面出中文头衔,2026-08-17 起收在 lib/v-rank-copy)。
+  Gradient badges (V10+) add a text-shadow for legibility.
   Reused by team.vue + binary.vue. <span>→<text> (badge is inline text).
 -->
 <template>
   <text class="nx-vbadge font-mono-tabular" :style="badgeStyle">
     <text :style="vTextStyle">V{{ v }}</text>
-    <text v-if="showTitle" class="font-display" :style="titleStyle">{{ def.title }}</text>
+    <text v-if="showTitle" class="font-display" :style="titleStyle">{{ rankTitle(v, isZh, vState.ladder) }}</text>
   </text>
 </template>
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { V_RANKS, type VRank } from "@/store/v-rank";
+import { V_RANKS, useVRank, type VRank } from "@/store/v-rank";
+import { rankTitle } from "@/lib/v-rank-copy";
+import { useLocaleStore } from "@/store/locale";
 
 const props = withDefaults(
   defineProps<{ v: VRank; size?: "sm" | "md" | "lg"; showTitle?: boolean }>(),
@@ -56,7 +59,10 @@ const SIZES = {
   lg: { padding: "4px 10px", fontSize: "13px", gap: "6px" },
 } as const;
 
+// 颜色档位仍取本地表(纯视觉,与权威数据无关);**显示名**走 store 的 ladder + 语言
 const def = computed(() => V_RANKS[props.v]);
+const vState = useVRank();
+const isZh = computed(() => useLocaleStore().code === "zh");
 const c = computed(() => COLORS[props.v]);
 const sz = computed(() => SIZES[props.size]);
 const isGradient = computed(() => c.value.bg.startsWith("linear"));
