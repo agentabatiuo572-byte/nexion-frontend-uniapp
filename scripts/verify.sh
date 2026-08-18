@@ -363,7 +363,7 @@ i18n_en_gate
 # ── SVG 内文字源码门(P-121,2026-08-17)────────────────────────────────────────
 # 模板里的 <text> 是 uni 的文本组件,写在 <svg> 里会编成 <uni-text>(不是合法 SVG 子元素)→ 0×0 静默不渲染,
 # 源码看起来完全正常、i18n 三道门全绿。判据:svg 内禁 <text>(用 <SvgText>,src/components/svg-text.ts 渲染函数直出真 SVG text)
-# + <SvgText> 只许在 svg 内 + 用了必 import + uno.config 的 attributify 豁免在位(它会把 font-size="9.5" 劫持成 2.375rem)
+# + <SvgText> 只许在 svg 内 + 用了必 import(kebab/别名也认)+ 同族 uni 内置标签也禁 + uno.config 不许启用 attributify(它把 font-size="9.5" 劫持成 2.375rem、:opacity 劫持成 0.0025)
 # + 判定面塌缩(0 个 svg 块 / 0 个 SvgText)判红。渲染面另有 svg_text_render_gate(运行时 bbox>0)。
 svg_text_source_gate() {
   local slog="${TMPDIR:-/tmp}/uni-svg-text-src-selftest.$.log" glog="${TMPDIR:-/tmp}/uni-svg-text-src.$.log"
@@ -3109,8 +3109,8 @@ empty_state_gate() {
 if scope_hit empty-state-runtime; then empty_state_gate; fi
 
 # ── SVG 内文字运行时门(P-121,2026-08-17):字真的排出来了吗 ──
-# 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 在 svg 视口内
-# · svg 内 uni-text=0 · font-size 属性==计算值(attributify 劫持在这里现形)· console 0;含 <SvgText> 的文件必须登记路由(未登记即红,不静默跳过)。
+# 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 可见(visibility/opacity/fill 链)· 在 svg 盒内 · 文档内 · 未被祖先裁
+# · svg 内 uni-text=0 · 全页 svg 元素呈现属性==计算值(attributify 劫持在这里现形)· console error 与 Vue resolve warn 0;svg 里有文字候选的文件必须登记路由(未登记即红,不静默跳过)。
 svg_text_render_gate() {
   if probe_retry /tmp/uniapp-svg-text-render-selftest.log "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
     ok "$(tail -1 /tmp/uniapp-svg-text-render-selftest.log)"
@@ -3123,7 +3123,7 @@ svg_text_render_gate() {
     ok "$(tail -1 /tmp/uniapp-svg-text-render.log)"
   else
     bad "SVG 内文字没渲染出来 / 字号被劫持 / 新示意图未登记 —— UNI_BASE_URL=$BASE_URL node scripts/svg-text-render-probe.mjs 看明细"
-    grep -E "^FAIL|^  [" /tmp/uniapp-svg-text-render.log | head -10 | sed 's/^/        /'
+    grep -E "^FAIL|^  \[" /tmp/uniapp-svg-text-render.log | head -10 | sed 's/^/        /'
   fi
 }
 if scope_hit svg-text-runtime; then svg_text_render_gate; fi

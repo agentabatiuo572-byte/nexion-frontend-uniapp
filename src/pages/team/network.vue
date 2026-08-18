@@ -90,12 +90,12 @@
             <g>
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
               <SvgText x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">{{ t.network.diagramYou }}</SvgText>
-              <SvgText x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">{{ myRankText }}</SvgText>
+              <SvgText x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="color-mix(in srgb, var(--v5-brand) 85%, transparent)" letter-spacing="1.5">{{ myRankText }}</SvgText>
             </g>
 
             <!-- orbit labels -->
-            <SvgText x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(198,255,58,0.45)" letter-spacing="1.5">{{ t.network.badgeDirect }}</SvgText>
-            <SvgText x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(144,119,255,0.55)" letter-spacing="1.5">{{ t.network.badgeExtended }}</SvgText>
+            <SvgText x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-brand) 45%, transparent)" letter-spacing="1.5">{{ t.network.badgeDirect }}</SvgText>
+            <SvgText x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-tech-cyan) 55%, transparent)" letter-spacing="1.5">{{ t.network.badgeExtended }}</SvgText>
           </svg>
 
           <!-- Legend -->
