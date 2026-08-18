@@ -116,11 +116,23 @@
   --v5-tabbar-shadow: 0 8px 24px rgba(20,16,8,0.06), inset 0 1px 0 rgba(255,255,255,0.80);
   --v5-home-indicator: rgba(19,20,26,0.55);
 
-  /* Spotlight tokens — only active in dark mode (light keeps no glow per v5 SKILL).
-     Default to `none` so components can unconditionally reference them. */
+  /* Spotlight / ambient tokens — glow that exists only in dark mode. All default
+     to `none` here so components can reference them unconditionally.
+
+     🔴 别把下面这句读成全站不变量(2026-08-18 全站 91 路由实测后改写):
+     「亮色无辉光」只对**本组 token 覆盖到的那部分**成立。
+     - box-shadow 组(--v5-spotlight-brand / -brand-2)已接线 25 处,亮色确实塌成
+       none、辉光确实自动消失 —— 规则在这一面是落地的。
+     - 背景渐变组只有 --v5-ambient-nex 有消费者(首页英雄卡);其余三个
+       --v5-ambient-* 与 --v5-spotlight-brand-strong 当前**零引用**,属「设计好了
+       没接线」,不是死代码,别删。
+     - 另有 54 层装饰性辉光是各组件**手拼**的 radial-gradient,亮色下不消失而是
+       渲染成浅色品牌色晕。主人 2026-08-18 拍板保持现状(只修「暗色色号直接糊到
+       浅底」的个别缺陷),所以那批不受本条约束。 */
   --v5-ambient-glow: none;
   --v5-ambient-overlay-brand: none;
   --v5-ambient-overlay-brand-2: none;
+  --v5-ambient-nex: none;
   --v5-spotlight-brand: none;
   --v5-spotlight-brand-strong: none;
   --v5-spotlight-brand-2: none;
@@ -323,12 +335,18 @@ html[data-theme="dark"] {
   --v5-nex-border: rgba(180,127,255,0.45);
 
   /* Conversion spotlight tokens — hierarchy = "谁该 glow 谁就 glow".
-     Used ONLY on the 7 conversion touchpoints (main Buy CTA / Hero amount /
-     task progress / repurchase / stake / mint / genesis bid).
-     Bills / Settings / Notifications keep flat dark surface as visual silence. */
+     意图:只给 7 个转化触点(main Buy CTA / Hero amount / task progress /
+     repurchase / stake / mint / genesis bid)用;Bills / Settings /
+     Notifications 保持纯平深色作为视觉静默。
+     🔴 意图 ≠ 现状:全站另有 54 层手拼辉光散在 24 组组件上,不少并非转化触点
+     (帮助页 / 里程碑弹层 / 开发者页 / 信任页都有)。主人 2026-08-18 拍板保持
+     现状,所以上面这句是**本组 token 的使用约束**,不是全站已达成的事实。 */
   --v5-ambient-glow: radial-gradient(70% 50% at 80% 0%, rgba(158,220,29,0.10) 0%, transparent 65%);
   --v5-ambient-overlay-brand: radial-gradient(80% 60% at 50% 0%, rgba(158,220,29,0.06) 0%, transparent 70%);
   --v5-ambient-overlay-brand-2: radial-gradient(80% 60% at 50% 0%, rgba(255,122,61,0.06) 0%, transparent 70%);
+  /* Hero amount 的极光层(首页「今日收益」)。值与 2026-08-17 前内联写法逐字节
+     等价,所以暗色 0 像素变化;亮色塌成 none,不再把 #7C5CFF 45% 糊到米色底上。 */
+  --v5-ambient-nex: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--v5-nex) 45%, transparent) 0%, transparent 66%);
   --v5-spotlight-brand: 0 0 32px rgba(158,220,29,0.30), 0 0 12px rgba(158,220,29,0.18);
   --v5-spotlight-brand-strong: 0 0 40px rgba(158,220,29,0.45), 0 0 16px rgba(158,220,29,0.28);
   --v5-spotlight-brand-2: 0 0 32px rgba(255,122,61,0.30), 0 0 12px rgba(255,122,61,0.18);

@@ -284,8 +284,12 @@ function metricValueStyle(color: string): CSSProperties {
 // 分层」的前提(存在可用的 surface 微差)在这里**不成立**。按 §3 本体,这是
 // 「**透明容器**」形态(平底=地板,可见的只有装饰性 radial wash),而 border
 // **正是**规范允许透明容器使用的边界。已登记 ZERO-BORDER-ALLOWLIST。
+// 🔴 wash 用 --v5-nex-soft,不写死 rgba(124,92,255,0.18):后者是**暗色调过的紫**,
+// 双主题恒定,落到米色底上是一团发灰的紫晕(2026-08-18 实测)。这层 wash 又不能删
+// (见上,它是本卡的可见主体),所以按全站其余 54 层同一个写法走 *-soft 档:
+// 亮色 #ECE7FF 淡紫、暗色 rgba(180,127,255,0.20)。
 const orbCardStyle: CSSProperties = {
-  background: "radial-gradient(60% 50% at 50% 50%, rgba(124,92,255,0.18) 0%, transparent 65%), var(--v5-bg)",
+  background: "radial-gradient(60% 50% at 50% 50%, var(--v5-nex-soft) 0%, transparent 65%), var(--v5-bg)",
   border: "1px solid var(--v5-border)",
 };
 const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "12px", color: "var(--v5-ink-3)" };
