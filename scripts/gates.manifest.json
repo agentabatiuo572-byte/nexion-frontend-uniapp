@@ -281,6 +281,18 @@
         "scripts/pending-checkout-runtime.mjs",
         "scripts/page-check.mjs"
       ]
+    },
+    "svg-text-runtime": {
+      "kind": "runtime",
+      "pages": [
+        "src/pages/team/network.vue",
+        "src/pages/team/binary-how.vue",
+        "src/pages/globe/globe.vue",
+        "src/pages/store/detail.vue"
+      ],
+      "inputs": [
+        "scripts/svg-text-render-probe.mjs"
+      ]
     }
   },
   "steps": {
