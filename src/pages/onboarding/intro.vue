@@ -48,7 +48,8 @@
             </defs>
 
             <!-- Outer dashed orbit -->
-            <circle cx="120" cy="120" r="108" fill="none" stroke="var(--v5-surface-2)" stroke-width="1" stroke-dasharray="2 5" />
+            <!-- 轨道线走 border 档:此前用 surface-2,浅色档它是近白(#FAF7F0),压在米色底上几乎看不见 -->
+            <circle cx="120" cy="120" r="108" fill="none" stroke="var(--v5-border-strong)" stroke-width="1" stroke-dasharray="2 5" />
 
             <!-- 4 fixed satellites -->
             <g v-for="(s, i) in satellites" :key="`sat-${i}`">
@@ -78,8 +79,10 @@
               <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
             </circle>
 
-            <!-- Middle thin ring -->
-            <circle cx="120" cy="120" r="72" fill="none" stroke="#262626" stroke-width="1" />
+            <!-- Middle thin ring —— 此前写死 #262626,浅色档就是那圈扎眼的黑环。
+                 取 border(不是 border-strong):原值在黑底上几乎看不见,是「结构线」不是「装饰线」,
+                 轨道的视觉重量该留给 brand 色的卫星与脉冲环。 -->
+            <circle cx="120" cy="120" r="72" fill="none" stroke="var(--v5-border)" stroke-width="1" />
             <!-- Center radial glow -->
             <circle cx="120" cy="120" r="56" fill="url(#orb-core)" />
 
@@ -279,10 +282,14 @@ function goTerms() {
   overflow-y: auto;
   background: var(--v5-bg);
 }
+/* 🔴 本页三层背景此前全是**为纯黑底调的写死值**(遗留品牌绿 + 纯黑渐变),浅色主题下
+   分别表现为:顶部一条突兀的黑色渐变、柠檬绿雾霭糊在米色上。主人 2026-08-18 拍板
+   本页浅色不再豁免,故三层一律改走 token,由主题决定色。暗色侧取值与原写死值等价
+   (--v5-bg 就是 #000),观感不变。 */
 .intro-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 70% at 50% -10%, rgba(198, 255, 58, 0.18), transparent 60%);
+  background: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--v5-brand) 18%, transparent), transparent 60%);
 }
 .intro-vignette {
   position: absolute;
@@ -291,12 +298,23 @@ function goTerms() {
   top: 0;
   height: 180px;
   pointer-events: none;
-  background: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.85) 25%, rgba(0, 0, 0, 0.45) 60%, transparent 100%);
+  /* 作用是把页顶融进状态栏边缘,所以要跟的是**页面底色**而不是黑色 */
+  background: linear-gradient(
+    180deg,
+    var(--v5-bg) 0%,
+    color-mix(in srgb, var(--v5-bg) 85%, transparent) 25%,
+    color-mix(in srgb, var(--v5-bg) 45%, transparent) 60%,
+    transparent 100%
+  );
 }
 .intro-dotgrid {
   position: absolute;
   inset: 0;
   opacity: 0.5;
+  /* 覆盖全局 .dot-grid 的遗留柠檬绿 —— 那个全局类还被商品实拍图衬底用着,
+     而那处按基线**必须**跟图不跟主题(见 THEME-CONSTANT-BASELINE),所以只在本页覆盖。 */
+  background-image:
+    radial-gradient(circle at center, color-mix(in srgb, var(--v5-brand) 14%, transparent) 1px, transparent 1.5px);
 }
 .intro-node {
   position: absolute;
@@ -498,7 +516,11 @@ html[data-theme="dark"] .orb-appicon--dark {
   gap: 4px 12px;
   padding: 6px 14px;
   border-radius: 9999px;
-  background: rgba(15, 15, 15, 0.8);
+  /* 🔴 此前写死 rgba(15,15,15,0.8) —— 浅色主题下是**深色药丸**,而里面的数字走
+     --v5-ink(浅色档=近黑),等于深底压深字,主人实测「人眼根本看不清」。
+     改走 surface 档:浅色是白药丸配近黑字,暗色是 #141414 配浅字,两边都读得出。 */
+  background: color-mix(in srgb, var(--v5-surface) 80%, transparent);
+  border: 1px solid var(--v5-border);
   backdrop-filter: blur(12px);
 }
 .stat-item {
