@@ -239,7 +239,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { productCopy, specRow, warrantyText, type SpecRow } from "@/lib/product-copy";
+import { productCopy, specRow, type SpecRow } from "@/lib/product-copy";
 import { typicalPhoneDailyUsdt } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -356,7 +356,8 @@ const paybackLabel = computed(() => {
 // Hardware spec rows — per-SKU values are server-owned and optional, so labels
 // localise while values render as authored upstream, and a row with nothing to
 // say is dropped rather than filled with a placeholder. Uptime is a platform-wide
-// promise and warranty is a month count we format ourselves.
+// promise. Warranty is server-authored per SKU and is rendered without changing
+// its unit or terms.
 const hardwareSpecs = computed<SpecRow[]>(() => {
   const p = product.value;
   if (!p) return [];
@@ -369,7 +370,7 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
     // 在线率是**平台**统一的托管承诺,对每件商品都一样,故走文案不走商品字段。
     { k: s.specUptime, v: s.specUptimeValue },
     // 无质保的条目(如 Cloud Share —— 用户不拥有硬件)整行不出现,而不是显示「暂无数据」。
-    p.warrantyMonths ? { k: s.specWarranty, v: warrantyText(t.value, p.warrantyMonths) } : null,
+    specRow(s.specWarranty, p.warranty),
   ].filter((r): r is SpecRow => r !== null);
 });
 

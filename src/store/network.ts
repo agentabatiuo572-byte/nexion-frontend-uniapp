@@ -1,7 +1,12 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { onScopeDispose, ref } from "vue";
 import type { VRank } from "./v-rank";
 import { remoteApiEnabled, teamNetworkApi } from "@/api/runtime";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/network.ts + network-seed.ts
@@ -135,14 +140,32 @@ export const useNetwork = defineStore("network", () => {
   let accountEpoch = 0;
   let refreshSequence = 0;
 
+  function clearRemoteNetwork(): void {
+    refreshSequence += 1;
+    members.value = [];
+    totalMembers.value = 0;
+    totalMonthVolumeUSD.value = 0;
+    totalAllTimeVolumeUSD.value = null;
+    remoteStatus.value = "idle";
+  }
+
+  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+    if (!remoteApiEnabled) return;
+    clearRemoteNetwork();
+    void refreshCanonicalNetwork();
+  });
+  onScopeDispose(unsubscribeCommerceRun);
+
   async function refreshCanonicalNetwork(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const epoch = accountEpoch;
     const request = ++refreshSequence;
+    const runScope = captureCommerceSandboxRun();
+    const current = () => epoch === accountEpoch && request === refreshSequence && isCurrentCommerceSandboxScope(runScope);
     remoteStatus.value = "loading";
     try {
       const snapshot = await teamNetworkApi.snapshot();
-      if (epoch !== accountEpoch || request !== refreshSequence) return false;
+      if (!current()) return false;
       members.value = snapshot.members.map((member) => ({
         id: member.id, name: member.name, avatar: member.avatarUrl ?? member.name.slice(0, 1).toUpperCase(),
         vRank: member.vRank as VRank, layer: member.layer,
@@ -158,7 +181,7 @@ export const useNetwork = defineStore("network", () => {
       remoteStatus.value = "ready";
       return true;
     } catch {
-      if (epoch !== accountEpoch || request !== refreshSequence) return false;
+      if (!current()) return false;
       remoteStatus.value = "error";
       return false;
     }
@@ -166,7 +189,8 @@ export const useNetwork = defineStore("network", () => {
 
   function bindAccount(_accountKey: string): void {
     accountEpoch += 1;
-    refreshSequence += 1;
+    if (remoteApiEnabled) clearRemoteNetwork();
+    else refreshSequence += 1;
     const next = remoteApiEnabled ? [] : NETWORK_SEED;
     members.value = [...next];
     totalMembers.value = next.length;

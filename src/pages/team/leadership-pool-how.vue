@@ -12,6 +12,14 @@
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="purple" />
 
+      <view v-if="remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
+        <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.pool.loading : t.pool.loadError }}</text>
+        <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemotePool">
+          <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.pool.retry }}</text>
+        </view>
+      </view>
+
+      <template v-else>
       <HowSection :title="w.s1Title" accent="purple">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
@@ -88,12 +96,14 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
         </view>
       </view>
+      </template>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
@@ -104,22 +114,72 @@ import HowCalloutBox from "@/components/how/how-callout-box.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
-import { useLeadershipPool, V_VOTES } from "@/store/leadership-pool";
+import { teamInsightsApi } from "@/api/runtime";
+import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
+import { useApp } from "@/store/app";
 import type { VRank } from "@/store/v-rank";
+import { leadershipHowRows } from "@/lib/leadership-pool-remote";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 const t = useT();
 const w = computed(() => t.value.poolHowItWorks);
-const pool = useLeadershipPool();
+const app = useApp();
+const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
+const remoteState = ref<"loading" | "ready" | "error">("loading");
+let remoteRequest = 0;
+let mounted = true;
 
 // 周分红占比 = 单人份额(votes / 全网总票),从 store 派生,不再硬编码。高阶单人份额指数递增。
 const voteRows = computed(() => {
-  const total = pool.totalVotes();
   const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  return ranks.map((v) => {
-    const votes = V_VOTES[v];
-    const share = total > 0 ? votes / total : 0;
-    return { r: `V${v}`, v: votes, s: `≈ ${(share * 100).toFixed(2)}%` };
-  });
+  return leadershipHowRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, ranks).map((row) => ({
+    r: `V${row.rank}`,
+    v: row.votes === null ? "—" : row.votes,
+    s: row.sharePct === null ? "—" : `≈ ${row.sharePct.toFixed(2)}%`,
+  }));
+});
+
+async function loadRemotePool() {
+  const request = ++remoteRequest;
+  const accountKey = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
+  remoteState.value = "loading";
+  remotePool.value = null;
+  const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
+    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+  try {
+    const snapshot = await teamInsightsApi.leadershipPool();
+    if (!current()) { if (request === remoteRequest) { remotePool.value = null; remoteState.value = "error"; } return; }
+    remotePool.value = snapshot;
+    remoteState.value = "ready";
+  } catch {
+    if (!current()) { if (request === remoteRequest) { remotePool.value = null; remoteState.value = "error"; } return; }
+    remotePool.value = null;
+    remoteState.value = "error";
+  }
+}
+
+watch(() => app.accountKey, () => {
+  void loadRemotePool();
+});
+const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+  remoteRequest += 1;
+  remotePool.value = null;
+  remoteState.value = "loading";
+  void loadRemotePool();
+});
+onShow(() => { void loadRemotePool(); });
+onUnmounted(() => {
+  mounted = false;
+  remoteRequest += 1;
+  remotePool.value = null;
+  unsubscribeRemotePoolRun();
 });
 
 function goBack() {

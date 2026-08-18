@@ -193,8 +193,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onShow, onUnload } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -214,6 +214,13 @@ import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { proofApi, remoteApiEnabled } from "@/api/runtime";
 import type { ProofSnapshot } from "@/api/proof-api";
+import { proofStreakFacts } from "@/lib/proof-streak";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 type Variant = "earnings" | "streak" | "network";
 const VARIANTS: Variant[] = ["earnings", "streak", "network"];
@@ -231,17 +238,53 @@ const exportingPoster = ref(false);
 const remoteSnapshot = ref<ProofSnapshot | null>(null);
 const remoteError = ref(false);
 let remoteRequest = 0;
+let remoteMounted = true;
+
+function clearRemoteProof(): void {
+  remoteRequest += 1;
+  remoteSnapshot.value = null;
+  remoteError.value = false;
+}
+
+function invalidateRemoteProof(): void {
+  if (!remoteMounted) return;
+  remoteMounted = false;
+  clearRemoteProof();
+}
+
 async function refreshRemoteProof() {
   const request = ++remoteRequest;
   remoteError.value = false;
   const expectedAccount = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
+  const current = () => remoteMounted && request === remoteRequest
+    && expectedAccount === app.accountKey
+    && isCurrentAccountScope(accountScope)
+    && isCurrentCommerceSandboxScope(runScope);
   try {
     const value = await proofApi.snapshot();
-    if (request === remoteRequest && expectedAccount === app.accountKey) remoteSnapshot.value = value;
+    if (current()) remoteSnapshot.value = value;
   } catch {
-    if (request === remoteRequest && expectedAccount === app.accountKey) { remoteSnapshot.value = null; remoteError.value = true; }
+    if (current()) { remoteSnapshot.value = null; remoteError.value = true; }
   }
 }
+
+watch(() => String(app.accountKey), () => {
+  if (!remoteApiEnabled || !remoteMounted) return;
+  remoteRequest += 1;
+  remoteSnapshot.value = null;
+  remoteError.value = false;
+  void refreshRemoteProof();
+});
+const unsubscribeProofRun = subscribeCurrentCommerceSandboxRun(() => {
+  if (!remoteApiEnabled || !remoteMounted) return;
+  clearRemoteProof();
+  void refreshRemoteProof();
+});
+onUnload(invalidateRemoteProof);
+onUnmounted(invalidateRemoteProof);
+onUnmounted(unsubscribeProofRun);
 onShow(() => {
   if (remoteApiEnabled) {
     void refreshRemoteProof();
@@ -258,9 +301,15 @@ const onlineDevices = computed(
 const profileName = computed(() => profile.displayName);
 const myRank = computed(() => remoteApiEnabled && vRank.ladder.length === 0 ? null : vRank.myRank);
 const totalMembers = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? null : network.totalMembers);
-const streak = computed<number | null>(() => remoteApiEnabled ? null : faucet.signInStreak);
-const longestStreak = computed<number | null>(() => remoteApiEnabled ? null : faucet.longestStreak);
-const longestOrCurrent = computed<number | null>(() => longestStreak.value ?? streak.value ?? null);
+const streakFacts = computed(() => proofStreakFacts(
+  remoteApiEnabled,
+  remoteSnapshot.value,
+  faucet.signInStreak,
+  faucet.longestStreak,
+));
+const streak = computed<number | null>(() => streakFacts.value.current);
+const longestStreak = computed<number | null>(() => streakFacts.value.longest);
+const longestOrCurrent = computed<number | null>(() => streakFacts.value.display);
 
 const joined = computed(() => {
   const raw = remoteApiEnabled ? remoteSnapshot.value?.joinedAt : app.user.joinedAt;

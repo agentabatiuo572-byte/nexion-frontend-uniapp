@@ -212,6 +212,12 @@ import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useReferralReward } from "@/store/referral-reward";
 import { useApp } from "@/store/app";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 const t = useT();
 const app = useApp();
@@ -224,6 +230,7 @@ const referralRewards = useReferralReward();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
 const remotePoolState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
 let remotePoolRequest = 0;
+let remotePoolMounted = true;
 
 const myRank = computed(() => vrank.myRank);
 // 头衔显示名按语言取(中文界面出中文头衔),拼法收在 lib/v-rank-copy;远端档位未到仍显示 V—
@@ -344,21 +351,38 @@ async function refreshRemotePool() {
   if (!remoteApiEnabled) return;
   const request = ++remotePoolRequest;
   const accountKey = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
   remotePoolState.value = "loading";
+  remotePool.value = null;
+  const current = () => remotePoolMounted && request === remotePoolRequest
+    && accountKey === app.accountKey && isCurrentAccountScope(accountScope)
+    && isCurrentCommerceSandboxScope(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
-    if (request !== remotePoolRequest || accountKey !== app.accountKey) return;
+    if (!current()) return;
     remotePool.value = snapshot;
     remotePoolState.value = "ready";
   } catch {
-    if (request !== remotePoolRequest || accountKey !== app.accountKey) return;
+    if (!current()) return;
     remotePool.value = null;
     remotePoolState.value = "error";
   }
 }
 watch(() => app.accountKey, () => { if (remoteApiEnabled) { remotePool.value = null; void refreshRemotePool(); } });
+const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+  if (!remoteApiEnabled || !remotePoolMounted) return;
+  remotePoolRequest += 1;
+  remotePool.value = null;
+  remotePoolState.value = "loading";
+  void refreshRemotePool();
+});
 onUnmounted(() => {
   if (unlockTimer) clearInterval(unlockTimer);
+  unsubscribeRemotePoolRun();
+  remotePoolMounted = false;
+  remotePoolRequest += 1;
+  remotePool.value = null;
 });
 
 // ─── styles ───

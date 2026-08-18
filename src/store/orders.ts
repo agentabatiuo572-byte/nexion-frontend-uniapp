@@ -14,13 +14,18 @@
  */
 
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { onScopeDispose, ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 /** Server status is rendered verbatim in remote mode; no terminal outcome is collapsed into cancellation. */
 export type OrderStatus = CanonicalOrderStatus;
@@ -129,7 +134,15 @@ export const useOrders = defineStore("orders", () => {
   // Any in-flight server response is scoped to this binding generation. A logout
   // or account switch must not project the prior account into the new session.
   let boundEpoch = 0;
+  let refreshGeneration = 0;
   const orders = ref<Order[]>([]);
+
+  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+    if (!remoteApiEnabled) return;
+    refreshGeneration += 1;
+    orders.value = [];
+  });
+  onScopeDispose(unsubscribeCommerceRun);
 
   /**
    * 🔴 落盘走 CAS 提交器(与 pending-checkout / deposits 同款),不再整行覆盖写(审计 R10 P0):
@@ -157,6 +170,7 @@ export const useOrders = defineStore("orders", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     boundEpoch += 1;
+    refreshGeneration += 1;
     orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
   }
   bindAccount(boundKey); // boot 期先挂 "default";账号确定后由 rebindAccountScopedStores 重绑
@@ -197,24 +211,40 @@ export const useOrders = defineStore("orders", () => {
     if (!remoteApiEnabled) return;
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
-    const canonical = await orderApi.list();
-    if (boundKey !== requestBoundKey || boundEpoch !== requestEpoch) return;
-    orders.value = canonical.orders.map(fromCanonical);
+    const requestGeneration = ++refreshGeneration;
+    const requestRunScope = captureCommerceSandboxRun();
+    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
+      && requestGeneration === refreshGeneration
+      && isCurrentCommerceSandboxScope(requestRunScope);
+    try {
+      const canonical = await orderApi.list();
+      if (!isCurrent()) return;
+      orders.value = canonical.orders.map(fromCanonical);
+    } catch (error) {
+      if (!isCurrent()) return;
+      throw error;
+    }
   }
 
   async function cancelOrderRemote(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return cancelOrder(id);
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
+    const requestRunScope = captureCommerceSandboxRun();
+    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
+      && isCurrentCommerceSandboxScope(requestRunScope);
     try {
       await orderApi.cancel(id, `order-cancel:${id}`);
-      if (boundKey !== requestBoundKey || boundEpoch !== requestEpoch) return false;
+      if (!isCurrent()) return false;
       await refreshRemote();
+      if (!isCurrent()) return false;
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     } catch {
+      if (!isCurrent()) return false;
       // The command may have committed before the response was lost. Read-back is
       // the only safe result for the UI; never project a local cancellation.
       try { await refreshRemote(); } catch { return false; }
+      if (!isCurrent()) return false;
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     }
   }

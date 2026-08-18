@@ -5,7 +5,7 @@ import { createTeamInsightsApi } from "./team-insights-api";
 describe("team unilevel API", () => {
   it("accepts server-owned cycle, source, layer and currency split", async () => {
     const request = vi.fn().mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", runId: "", period: "week",
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", period: "week",
       events: [{ id: "CM-21", source: "network", sourceUserName: "Bob", cycle: "2026-W33",
         layer: 1, orderId: "ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
         currency: "USDT", status: "cooling", ts: 1755043200000, unlockAt: 1757635200000 }],
@@ -22,7 +22,7 @@ describe("team unilevel API", () => {
 
   it("rejects unilevel events that expose source user ids", async () => {
     const request = vi.fn().mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", runId: "", period: "week",
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", period: "week",
       events: [{ id: "CM-21", source: "network", sourceUserId: "8", sourceUserName: "Bob", cycle: "2026-W33",
         layer: 1, orderId: null, orderAmountUSD: 0, amountUSDT: 1, amountNEX: 0, currency: "USDT",
         status: "cooling", ts: 1755043200000, unlockAt: 1757635200000 }],

@@ -122,11 +122,11 @@
             v-for="(h, i) in poolHistory"
             :key="h.weekId"
             class="flex items-center justify-between"
-            :style="historyRowStyle(i === pool.history.length - 1)"
+            :style="historyRowStyle(i === poolHistory.length - 1)"
           >
             <view>
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ h.weekId }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
+              <text v-if="poolTotalText(h)" class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
             </view>
             <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: h.payoutUSDT > 0 ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ h.payoutUSDT > 0 ? `+$${h.payoutUSDT.toFixed(2)}` : "—" }}</text>
           </view>
@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -153,6 +153,13 @@ import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
+import { leadershipMainRows } from "@/lib/leadership-pool-main";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+} from "@/api/order-api";
 
 const t = useT();
 const app = useApp();
@@ -161,6 +168,7 @@ const pool = useLeadershipPool();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
 const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
 let remoteRequest = 0;
+let mounted = true;
 
 const myRank = computed(() => (remoteApiEnabled ? remotePool.value?.myRank ?? 0 : vState.myRank) as VRank);
 const unlocked = computed(() => myRank.value >= 3);
@@ -229,15 +237,21 @@ const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n
 
 const voteRows = computed(() => {
   const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const canonicalRows = remoteApiEnabled
+    ? leadershipMainRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, myRank.value, ranks)
+    : [];
+  const canonicalByRank = new Map(canonicalRows.map((row) => [row.rank, row]));
   return ranks.map((v) => {
-    const count = dist.value[v] ?? 0;
-    const votes = remoteApiEnabled ? remoteVotesByRank.value[v] ?? 0 : V_VOTES[v];
-    const vTotalVotes = count * votes;
-    const shareOfPool = totalVotes.value > 0 ? vTotalVotes / totalVotes.value : 0;
+    const canonical = canonicalByRank.get(v);
+    const count = remoteApiEnabled ? canonical?.people ?? 0 : dist.value[v] ?? 0;
+    const votes = remoteApiEnabled ? canonical?.votes ?? 0 : V_VOTES[v];
+    const shareOfPool = remoteApiEnabled
+      ? (canonical?.sharePct ?? 0) / 100
+      : totalVotes.value > 0 ? (count * votes) / totalVotes.value : 0;
     return {
       v,
       label: rankLabel(v, isZh.value, vState.ladder),
-      isMine: v === vState.myRank,
+      isMine: remoteApiEnabled ? canonical?.isMine === true : v === vState.myRank,
       peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes }),
       shareOfPool,
       perPerson: ((currentWeekPoolUSDT.value * shareOfPool) / Math.max(count, 1)).toFixed(0),
@@ -246,6 +260,7 @@ const voteRows = computed(() => {
 });
 
 function poolTotalText(h: LeadershipPayout): string {
+  if (remoteApiEnabled && h.poolUSDT <= 0) return "";
   return fmt(t.value.pool.poolTotalShort, { k: (h.poolUSDT / 1000).toFixed(1), n: h.totalVotes.toLocaleString() });
 }
 
@@ -257,14 +272,19 @@ async function loadRemotePool() {
   if (!remoteApiEnabled) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
   remoteState.value = "loading";
+  remotePool.value = null;
+  const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
+    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
-    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    if (!current()) return;
     remotePool.value = snapshot;
     remoteState.value = "ready";
   } catch {
-    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    if (!current()) return;
     remotePool.value = null;
     remoteState.value = "error";
   }
@@ -275,7 +295,20 @@ watch(() => app.accountKey, () => {
   remotePool.value = null;
   void loadRemotePool();
 });
+const unsubscribePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+  if (!remoteApiEnabled || !mounted) return;
+  remoteRequest += 1;
+  remotePool.value = null;
+  remoteState.value = "loading";
+  void loadRemotePool();
+});
 onShow(() => { if (remoteApiEnabled) void loadRemotePool(); });
+onUnmounted(() => {
+  unsubscribePoolRun();
+  mounted = false;
+  remoteRequest += 1;
+  remotePool.value = null;
+});
 
 // ─── styles ───
 // Soft tint only — pills carry no border (chip/pill whitelist rule).
