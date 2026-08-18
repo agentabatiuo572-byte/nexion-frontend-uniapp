@@ -71,17 +71,27 @@
           <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ CHAIN_DEPOSIT_FEE_USDT[activeNet] }} USDT</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ CHAIN_REQUIRED_CONFIRMATIONS[activeNet] }}</text></text></view>
         </view>
-        <view v-if="fundsSandboxEnabled" :style="warnlineStyle">
+        <view v-if="fundsSandboxEnabled" class="flex items-center" :style="sandboxTopupStyle">
           <view class="flex-1 min-w-0">
-            <text class="block" :style="warnTextStyle">Cregis USDT-BEP20</text>
+            <text class="block" :style="warnTextStyle">Cregis USDT-BEP20 · SANDBOX</text>
+            <view class="flex items-center" style="margin-top: 6px; gap: 6px">
+              <input
+                v-model="sandboxAmount"
+                class="font-mono-tabular flex-1 min-w-0"
+                :style="sandboxAmountInputStyle"
+                type="text"
+                inputmode="decimal"
+                :disabled="sandboxSubmitting"
+                aria-label="Sandbox USDT top-up amount"
+              />
+              <text style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
+            </view>
           </view>
-          <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
+          <view class="grid place-items-center active:opacity-80" :style="sandboxSubmitStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
             <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):进词典就成了
                  用户文案契约,词典打包摇不掉会原样进生产包。本门只判中文,这行英文不撞门 —— 别收进词典。
-                 另:这个按钮宽 44px 写死,换文案前先量宽度("处理中"36px→"Submitting…"70.6px 会溢出;
-                 "Wait…"34.8px 才放得下)。
                  i18n-en-ok: 沙箱直充按钮的工程话,仅验收沙箱档可见 -->
-            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "+25 USDT" }}</text>
+            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "Credit" }}</text>
           </view>
         </view>
       </view>
@@ -258,13 +268,19 @@ function copyAddr() {
 }
 
 const sandboxSubmitting = ref(false);
+const sandboxAmount = ref("25");
 async function simulateSandboxTopup() {
   if (!fundsSandboxEnabled || sandboxSubmitting.value) return;
+  const amount = Number(sandboxAmount.value.trim());
+  if (!Number.isFinite(amount) || amount < MIN_DEPOSIT_USDT) {
+    toast.info(`${t.value.topupChrome.minDeposit} ${MIN_DEPOSIT_USDT} USDT`);
+    return;
+  }
   sandboxSubmitting.value = true;
   try {
-    const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", 25, dep.currentAccountKey());
+    const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", amount, dep.currentAccountKey());
     // 工程话,故意不进 i18n 词典(同 :79 的理由:出路②)。
-    if (record) toast.success("SANDBOX: server credited 25 USDT");
+    if (record) toast.success(`SANDBOX: server credited ${amount.toFixed(2)} USDT`);
   } catch (cause) {
     toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);
   } finally {
@@ -469,6 +485,25 @@ const warnTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-warning)",
   lineHeight: 1.45,
+};
+const sandboxTopupStyle: CSSProperties = {
+  ...warnlineStyle,
+  gap: "12px",
+};
+const sandboxAmountInputStyle: CSSProperties = {
+  height: "34px",
+  padding: "0 10px",
+  borderRadius: "8px",
+  background: "var(--v5-surface)",
+  color: "var(--v5-ink)",
+  fontSize: "13px",
+};
+const sandboxSubmitStyle: CSSProperties = {
+  minWidth: "64px",
+  height: "44px",
+  padding: "0 10px",
+  borderRadius: "10px",
+  background: "var(--v5-surface-3)",
 };
 const linkRowStyle: CSSProperties = {
   minHeight: "48px",

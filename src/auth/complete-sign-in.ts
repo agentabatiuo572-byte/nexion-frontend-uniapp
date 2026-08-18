@@ -6,6 +6,7 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { safeReturnTo } from "@/routing/safe-return-to";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
 import { authApi, remoteApiEnabled } from "@/api/runtime";
 import type { UserSession } from "@/api/contracts";
@@ -159,11 +160,18 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   if (remoteApiEnabled && options.serverProfile) {
     app.projectServerIdentity(options.serverProfile);
     useProfile().projectServerIdentity(options.serverProfile);
-    // authApi persisted this matching Bearer session before completeSignIn.
-    // Reassert the wallet read here because an H5 reLaunch does not guarantee a
-    // fresh App lifecycle; the store rejects a missing/mismatched session and
-    // leaves all sandbox claims hidden instead of falling back to local facts.
-    void app.refreshFundsSandboxForAccount(options.identity);
+  }
+  // App.onShow is not guaranteed after an H5 reLaunch. Complete the fleet
+  // bootstrap here as well. The catalog is the RunID authority for every
+  // isolated sandbox store, so the wallet read must start only after that
+  // attempt settles; firing both in parallel can make a valid first-login
+  // wallet response stale and leave every Sandbox badge hidden until reload.
+  if (remoteApiEnabled) {
+    void refreshRemoteFleetAfterCatalog(options.identity).finally(() => {
+      // authApi persisted this matching Bearer session before completeSignIn.
+      // The store still rejects a failed/missing catalog or mismatched account.
+      void app.refreshFundsSandboxForAccount(options.identity);
+    });
   }
   // reLaunch does not reliably emit App.onShow in an existing H5 document.
   // Fetch the new account's server buckets here; a failed request leaves the

@@ -31,6 +31,10 @@ const trackingPage = read("src/pages/me/wallet-withdraw-tracking.vue");
 const withdrawPage = read("src/pages/me/wallet-withdraw.vue");
 const mutationKeys = read("src/lib/funds-mutation-key.ts");
 const sandboxBadge = read("src/components/me/funds-sandbox-badge.vue");
+const fundsRefresh = squeeze(app.slice(
+  app.indexOf("async function refreshFundsSandbox"),
+  app.indexOf("function refreshFundsSandboxForAccount"),
+));
 
 assert.match(app, /const bootSnapshot = remoteApiEnabled[\s\S]{0,180}\? createServerEmptySnapshot[\s\S]{0,180}: hydrateSnapshotEconomics\(readAccountSnapshot/,
   "server boot must not adopt the legacy local account snapshot");
@@ -40,7 +44,7 @@ assert.match(app, /if \(remoteApiEnabled\)[\s\S]{0,1200}withdrawals\.value = \[\
   "server account rebind must clear the prior subject's withdrawals synchronously");
 assert.match(app, /lastCloudSnapshot = createServerEmptySnapshot\(/,
   "server account rebind must replace the local merge base");
-assert.match(app, /async function refreshFundsSandbox[\s\S]{0,1200}expectedAccountKey !== accountKey\.value[\s\S]{0,1400}withdrawals\.value = \[\]/,
+assert.match(fundsRefresh, /expectedAccountKey !== accountKey\.value[\s\S]*isCurrentFundsSandboxRequestScope\(expectedScope[\s\S]*withdrawals\.value = \[\]/,
   "a stale or failed account refresh must fail closed without adopting another subject's facts");
 assert.match(walletPage, /fundsAuthorityError[\s\S]{0,250}fundsSandboxError/,
   "wallet refresh failure must remain visible instead of falling back to a local balance");
