@@ -7,9 +7,14 @@
        stay suspended on money-flow routes (checkout / withdraw / trial) and
        replay one-by-one afterwards; each shown one auto-dismisses after
        OVERLAY_DURATION_MS. -->
-  <view v-if="m.active" class="ms-overlay" role="dialog" aria-modal="true" @click="m.dismiss()">
-    <!-- Backdrop dim + blur — lowers chassis noise so the medal is the focus. -->
-    <view class="ms-backdrop" />
+  <view v-if="m.active" class="ms-overlay" role="dialog" aria-modal="true">
+    <!-- Backdrop dim + blur — lowers chassis noise so the medal is the focus.
+         Tap-to-dismiss lives HERE (the full-screen scrim), not on the overlay root:
+         the medal card then needs no @click.stop swallow handler — a no-op click
+         listener made the card a "tap target without :active feedback" for the
+         tap-feedback probe (tester-F R2 / 包 ax). Halo + confetti are pointer-events:none,
+         so taps there fall through to this scrim exactly as before. -->
+    <view class="ms-backdrop" @click="m.dismiss()" />
 
     <!-- Glow halo behind the medal card. -->
     <view class="ms-halo" />
@@ -25,7 +30,7 @@
     </view>
 
     <!-- Medal card -->
-    <view class="ms-card" @click.stop>
+    <view class="ms-card">
       <view class="ms-card__inner">
         <view class="ms-medal">
           <svg

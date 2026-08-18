@@ -372,14 +372,23 @@ if (failedRoutes.length || total === 0) {
   process.exit(1);
 }
 if (UPDATE) {
+  // 🔴 合并语义,不是快照替换(tester-F R2 / 包 ax 实测:替换语义把 11 条存量写成 2 条 —— 本轮没被看见的存量条目
+  //   (定时弹层 / 时序相关目标)会被删掉,下次被看见又成「新违例」红)。旧条目一律保留(含 tapOk 豁免与理由),
+  //   新指纹追加;本轮没见到的存量单独点名为「消失」,由人判是修好了(手工删条目)还是没扫到。dom-qa 同款。
+  const prev = existsSync(LEDGER_PATH) ? JSON.parse(readFileSync(LEDGER_PATH, "utf8")) : { entries: [] };
+  const merged = new Map((prev.entries || []).map((e) => [e.fp, e]));
+  let added = 0;
+  for (const [k, v] of found.entries()) if (!merged.has(k)) { merged.set(k, { fp: k, ...v, since: new Date().toISOString().slice(0, 10) }); added++; }
+  const gone = (prev.entries || []).filter((e) => !found.has(e.fp));
   writeFileSync(LEDGER_PATH, JSON.stringify({
     generatedAt: new Date().toISOString(),
-    note: "tap 目标存量黄灯台账(C3)。entry 加 tapOk:'理由' = 人工豁免;删 entry = 要求修复。gate 只拦 ledger 外新指纹。",
+    note: "tap 目标存量黄灯台账(C3)。entry 加 tapOk:'理由' = 人工豁免;删 entry = 要求修复。gate 只拦 ledger 外新指纹。--update-ledger 是合并(只增不删),本轮未见的存量按运行输出人工判处。",
     scope: SWEEP_ALL ? "all" : "core",
     totalTargets: total,
-    entries: [...found.entries()].map(([k, v]) => ({ fp: k, ...v })),
+    entries: [...merged.values()],
   }, null, 2) + "\n");
-  console.log(`基线已重建:${found.size} 条(扫 ${routes.length} 路由 / ${total} 个 tap 目标)`);
+  console.log(`台账已合并:${merged.size} 条(本轮新收 ${added};扫 ${routes.length} 路由 / ${total} 个 tap 目标)`);
+  if (gone.length) { console.log(`  本轮未见的存量 ${gone.length} 条(修好了就手工删条目;定时弹层类目标本来就时有时无):`); for (const g of gone) console.log(`    - ${g.fp}`); }
   process.exit(0);
 }
 
