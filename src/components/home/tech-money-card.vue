@@ -13,10 +13,11 @@
     style="padding: 8px 2px 12px"
   >
     <!-- Left purple glow — soft radial, blurred so its edges feather into the black page bg.
-         Reads --v5-nex (not legacy --accent-purple): identical #7C5CFF in light, lifted to
-         #B47FFF in dark so the glow tracks the theme instead of staying constant. -->
+         走 --v5-ambient-nex:暗色是原样的极光(0 像素变化),亮色塌成 none。
+         此前虽已从 legacy --accent-purple 换到 --v5-nex 让门变绿,但两个 token 的
+         **亮色值都是 #7C5CFF**,米色底上那团发灰的淡紫斑一直还在(2026-08-18 实测)。 -->
     <view
-      style="position: absolute; inset: 0; background: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--v5-nex) 45%, transparent) 0%, transparent 66%); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
+      style="position: absolute; inset: 0; background: var(--v5-ambient-nex); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
     />
     <!-- Tech grid (brand-tinted, masked) -->
     <view
