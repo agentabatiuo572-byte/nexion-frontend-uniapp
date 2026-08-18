@@ -1,5 +1,9 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiMode } from "./runtime-config";
+import { isCurrentCommerceSandboxRun } from "./order-api";
+
+export type CommissionSourceEnvironment = "PRODUCTION" | "SANDBOX";
 
 export interface CanonicalCommissionConfig {
   source: string;
@@ -30,6 +34,9 @@ export interface CanonicalBinaryMatch {
 
 export interface CanonicalBinaryState {
   source: string;
+  serverCanonical: true;
+  sourceEnvironment: CommissionSourceEnvironment;
+  runId: string | null;
   asOfDate: string;
   trackA: number;
   trackB: number;
@@ -158,12 +165,19 @@ function binaryStatus(value: unknown): CanonicalBinaryMatch["status"] {
   return invalid();
 }
 
-function parseBinary(value: unknown): CanonicalBinaryState {
+function parseBinary(value: unknown, mode: ApiMode): CanonicalBinaryState {
   const source = record(value);
+  const sourceEnvironment = typeof source.sourceEnvironment === "string" ? source.sourceEnvironment.trim().toUpperCase() : "";
+  const runId = source.runId;
+  const production = source.source === "server" && mode === "remote" && source.serverCanonical === true
+    && sourceEnvironment === "PRODUCTION" && runId === null;
+  const sandbox = source.source === "server" && mode === "sandbox" && source.serverCanonical === true
+    && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId);
   if (!Array.isArray(source.recentMatches)
       || typeof source.spilloverEnabled !== "boolean"
       || typeof source.paused !== "boolean"
-      || typeof source.blockedReason !== "string") return invalid();
+      || typeof source.blockedReason !== "string"
+      || (!production && !sandbox)) return invalid();
   const settlePeriod = text(source.settlePeriod) as CanonicalBinarySettlePeriod;
   const residualPolicy = text(source.residualPolicy) as CanonicalBinaryResidualPolicy;
   if (!["daily", "weekly", "monthly"].includes(settlePeriod)
@@ -190,6 +204,9 @@ function parseBinary(value: unknown): CanonicalBinaryState {
   });
   return {
     source: text(source.source),
+    serverCanonical: true,
+    sourceEnvironment: sourceEnvironment as CommissionSourceEnvironment,
+    runId: sandbox ? runId as string : null,
     asOfDate: isoDate(source.asOfDate),
     trackA,
     trackB,
@@ -211,7 +228,7 @@ function parseBinary(value: unknown): CanonicalBinaryState {
   };
 }
 
-export function createCommissionConfigApi(client: ApiClient): CommissionConfigApi {
+export function createCommissionConfigApi(client: ApiClient, mode: ApiMode = "remote"): CommissionConfigApi {
   return {
     async rates() {
       return parse(await client.request<unknown>({
@@ -224,7 +241,7 @@ export function createCommissionConfigApi(client: ApiClient): CommissionConfigAp
       return parseBinary(await client.request<unknown>({
         method: "GET",
         path: "/api/team/binary",
-      }));
+      }), mode);
     },
   };
 }

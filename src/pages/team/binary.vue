@@ -15,15 +15,15 @@
 
         <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
           <EmptyState
-            v-if="remoteApiEnabled && commission.binaryStatus !== 'ready'"
-            :kind="commission.binaryStatus === 'error' ? 'recoverable-error' : 'empty-list'"
-            :title="commission.binaryStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
-            :desc="commission.binaryStatus === 'error' ? t.network.projectionErrorDesc : undefined"
-            :cta-label="commission.binaryStatus === 'error' ? t.network.retry : undefined"
+            v-if="remoteApiEnabled && (commission.binaryStatus !== 'ready' || network.remoteStatus !== 'ready')"
+            :kind="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? 'recoverable-error' : 'empty-list'"
+            :title="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
+            :desc="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.projectionErrorDesc : undefined"
+            :cta-label="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.retry : undefined"
             compact
-            @cta="commission.refreshCanonicalBinary()"
+            @cta="retryCanonicalData"
           />
-          <template v-if="!remoteApiEnabled || commission.binaryStatus === 'ready'">
+          <template v-if="!remoteApiEnabled || (commission.binaryStatus === 'ready' && network.remoteStatus === 'ready')">
         <!-- match hero — de-carded: the number sits on the page floor. Rules-intro
              pill rides the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
         <view :style="heroStyle">
@@ -166,7 +166,7 @@ const settleDays = computed(() => SETTLE_PERIOD_DAYS[settlePeriod.value]);
 const MIN_THRESHOLD = computed(() => remoteApiEnabled ? snapshot.value?.threshold ?? 0 : 1000);
 const MATCH_RATE = computed(() => remoteApiEnabled ? snapshot.value?.matchRate ?? 0 : 0.1);
 const DAILY_CAP = computed(() => remoteApiEnabled ? snapshot.value?.dailyCap ?? 0 : phase.value.binaryDailyCapUSD);
-const sides = computed(() => remoteApiEnabled ? { left: [] as NetworkMember[], right: [] as NetworkMember[] } : network.byBinary());
+const sides = computed(() => network.byBinary());
 const leftMonthVol = computed(() => remoteApiEnabled ? remoteTrackA.value : network.leftVolumeMonth());
 const rightMonthVol = computed(() => remoteApiEnabled ? remoteTrackB.value : network.rightVolumeMonth());
 const weakSide = computed(() => (leftMonthVol.value <= rightMonthVol.value ? "left" : "right"));
@@ -207,7 +207,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: remoteApiEnabled ? snapshot.value?.trackAMembers ?? 0 : sides.value.left.length,
+    count: sides.value.left.length,
     monthVol: leftMonthVol.value,
     isWeak: weakSide.value === "left",
     color: "var(--v5-brand)",
@@ -216,7 +216,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: remoteApiEnabled ? snapshot.value?.trackBMembers ?? 0 : sides.value.right.length,
+    count: sides.value.right.length,
     monthVol: rightMonthVol.value,
     isWeak: weakSide.value === "right",
     color: "var(--v5-tech-cyan)",
@@ -254,9 +254,15 @@ function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
 }
 
+function retryCanonicalData(): void {
+  void commission.refreshCanonicalBinary();
+  void network.refreshCanonicalNetwork();
+}
+
 onMounted(() => {
-  // Local track or commission data is not used in remote mode.
-  if (remoteApiEnabled) void commission.refreshCanonicalBinary();
+  // The projection owns rule/settlement aggregates; the network projection
+  // owns the actual A/B members shown inside each wing.
+  if (remoteApiEnabled) retryCanonicalData();
 });
 
 // ─── styles ───

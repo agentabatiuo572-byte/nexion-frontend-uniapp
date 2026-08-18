@@ -102,10 +102,13 @@ export const purchaseEligibilityApi = createPurchaseEligibilityApi(apiClient);
 export const withdrawalApi = createWithdrawalApi(apiClient);
 export const earnConfigApi = createEarnConfigApi(apiClient);
 export const deviceE3Api = createDeviceE3Api(apiClient);
-export const orderApi = createOrderApi(apiClient);
+export const orderApi = createOrderApi(apiClient, apiRuntimeConfig.mode);
 export const platformConfigApi = createPlatformConfigApi(apiClient);
 export const vRankApi = createVRankApi(apiClient);
-export const commissionConfigApi = createCommissionConfigApi(apiClient);
+export const commissionConfigApi = createCommissionConfigApi(
+  apiClient,
+  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
+);
 export const stakingApi = createStakingApi(apiClient);
 export const exchangeApi = createExchangeApi(apiClient);
 export const marketApi = createMarketApi(apiClient);
@@ -139,13 +142,13 @@ export const developerAccessApi = createDeveloperAccessApi(apiClient);
 export const bundleOrderApi = createBundleOrderApi(apiClient);
 export const commercePaymentApi = createCommercePaymentApi(apiClient);
 export const ambassadorApplicationApi = createAmbassadorApplicationApi(apiClient);
-export const teamInsightsApi = createTeamInsightsApi(apiClient);
+export const teamInsightsApi = createTeamInsightsApi(apiClient, apiRuntimeConfig.mode);
 export const walletBillsApi = createWalletBillsApi(apiClient);
 export const storefrontActivityApi = createStorefrontActivityApi(apiClient);
 export const genesisPointsApi = createGenesisPointsApi(apiClient);
 export const networkRankApi = createNetworkRankApi(apiClient);
 export const teamQuotaApi = createTeamQuotaApi(apiClient);
-export const proofApi = createProofApi(apiClient);
+export const proofApi = createProofApi(apiClient, apiRuntimeConfig.mode);
 export const appHomeApi = createAppHomeApi(apiClient);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {

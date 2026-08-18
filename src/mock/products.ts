@@ -54,6 +54,8 @@ export interface Product {
    * 在线率 SLA 与手机日收益已从本模型移除:前者是平台统一承诺(走 i18n 文案),
    * 后者是平台手机档位配置(走 mock/phone-tiers 的 typicalPhoneDailyUsdt),都不是商品属性。
    */
+  /** Server-authored per-SKU warranty terms for canonical remote catalogs. */
+  warranty?: string;
   warrantyMonths?: number;
   dailyEarn: number;        // USDT/day
   dailyEarnNEX: number;     // NEX/day (spec §3.1)

@@ -21,8 +21,13 @@ assert.match(env, /^VITE_NEXGRID_API_PREVIEW_TARGET=http:\/\/127\.0\.0\.1:8110$/
 assert.match(launcher, /VITE_NEXGRID_API_MODE\s*=\s*'sandbox'/);
 assert.match(launcher, /npm\.cmd run dev:h5 -- --mode acceptance-h5/);
 assert.doesNotMatch(launcher, /VITE_NEXGRID_API_MODE\s*=\s*'production'/);
-assert.match(orders, /const requestBoundKey = boundKey;[\s\S]*const requestEpoch = boundEpoch;[\s\S]*await orderApi\.list\(\);[\s\S]*boundKey !== requestBoundKey \|\| boundEpoch !== requestEpoch/,
-  "a remote order response must be discarded after logout or account rebinding");
+assert.ok(orders.includes("const requestGeneration = ++refreshGeneration")
+  && orders.includes("const requestRunScope = captureCommerceSandboxRun()")
+  && orders.includes("requestGeneration === refreshGeneration")
+  && orders.includes("isCurrentCommerceSandboxScope(requestRunScope)")
+  && orders.includes("const canonical = await orderApi.list()")
+  && orders.includes("if (!isCurrent()) return"),
+"a remote order response must be discarded after logout, account rebinding, or sandbox-run switching");
 assert.match(checkout, /REMOTE_CHECKOUT_COMMANDS_KEY[\s\S]*readAccountRow[\s\S]*writeAccountRow/,
   "remote checkout idempotency must survive an H5 reload in the account-scoped store");
 assert.match(checkout, /retireRemoteOrderKey\(\);[\s\S]*step\.value = "live"/,

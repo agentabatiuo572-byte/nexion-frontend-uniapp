@@ -3,6 +3,7 @@ import type { PhaseId } from "@/store/product-phase";
 
 export interface ProductCatalogSnapshot {
   source: string;
+  serverCanonical: true;
   revision: string | null;
   products: Product[];
   sourceEnvironment?: "SANDBOX";
@@ -166,11 +167,9 @@ function product(value: unknown): Product {
     hashRate: optionalString(source.hashRate),
     power: displayString(source.power),
     datacenter: displayString(source.datacenter),
-    // 质保是**按 SKU 不同**的数值(月),单位由前端按语言拼 —— 与 ai.* 同一模式。
-    // uptime / phoneDailyEarn / phoneDailyEarnNEX 已移出商品契约:前者是平台统一承诺
-    // (走 i18n 文案),后两者是平台手机档位配置(GET /api/config/phone-tiers),
-    // 都不是商品属性,后端也从来没有这三列。
-    warrantyMonths: optionalInteger(source.warrantyMonths, 1),
+    // 质保直接消费 nx_admin_device_sku.warranty 的服务端原文；它可能是月数、年数或
+    // 限定条款，客户端不得改造成并不存在的 warrantyMonths 再猜单位。
+    warranty: displayString(source.warranty),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     price: finiteNumber(source.price, Number.EPSILON),
@@ -192,6 +191,7 @@ function product(value: unknown): Product {
 export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnapshot {
   const source = record(payload);
   const catalogSource = nonEmptyString(source.source);
+  if (source.serverCanonical !== true) return invalid();
   if (source.revision !== null && typeof source.revision !== "string") return invalid();
   if (!Array.isArray(source.products)) return invalid();
   const sourceEnvironment = source.sourceEnvironment;
@@ -201,8 +201,10 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
   if (catalogSource === "mock" && !isSandbox) return invalid();
   if (isSandbox && (catalogSource !== "mock" || sourceEnvironment !== "SANDBOX"
       || typeof runId !== "string" || !RUN_ID.test(runId))) return invalid();
+  if (!isSandbox && catalogSource !== "nx_product") return invalid();
   return {
     source: catalogSource,
+    serverCanonical: true,
     revision: source.revision as string | null,
     products: source.products.map(product),
     ...(isSandbox ? { sourceEnvironment: "SANDBOX" as const, runId: runId as string } : {}),

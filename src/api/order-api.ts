@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiMode } from "./runtime-config";
 
 export const ORDER_STATUSES = [
   "placed",
@@ -48,6 +49,7 @@ export interface CanonicalOrderList {
   source: "server" | "mock";
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string | null;
+  serverCanonical?: true;
   orders: CanonicalOrder[];
 }
 
@@ -70,7 +72,10 @@ export interface CancelledOrder {
   orderNo: string;
   orderStatus: "CANCELLED";
   paymentStatus: "CANCELLED";
+  serverCanonical: true;
+  source: "server" | "mock";
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
   idempotent: boolean;
 }
 
@@ -90,14 +95,47 @@ export interface OrderApi {
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 let currentSandboxRunId: string | null = null;
+let currentSandboxRunEpoch = 0;
+const sandboxRunListeners = new Set<(scope: CommerceSandboxRunScope) => void>();
+
+export interface CommerceSandboxRunScope {
+  runId: string | null;
+  epoch: number;
+}
 
 /** The catalogue is the current run-scoped commerce proof for checkout. */
 export function setCurrentCommerceSandboxRun(runId: string | null): void {
-  currentSandboxRunId = runId !== null && RUN_ID.test(runId) ? runId : null;
+  const nextRunId = runId !== null && RUN_ID.test(runId) ? runId : null;
+  if (nextRunId !== currentSandboxRunId) {
+    currentSandboxRunEpoch += 1;
+    currentSandboxRunId = nextRunId;
+    const scope = captureCommerceSandboxRun();
+    sandboxRunListeners.forEach((listener) => listener(scope));
+    return;
+  }
+  currentSandboxRunId = nextRunId;
+}
+
+/** Notify account-scoped stores when the product catalogue selects a new run. */
+export function subscribeCurrentCommerceSandboxRun(
+  listener: (scope: CommerceSandboxRunScope) => void,
+): () => void {
+  sandboxRunListeners.add(listener);
+  return () => sandboxRunListeners.delete(listener);
 }
 
 export function isCurrentCommerceSandboxRun(runId: unknown): runId is string {
   return typeof runId === "string" && RUN_ID.test(runId) && runId === currentSandboxRunId;
+}
+
+/** Capture both the selected sandbox RunID and its generation before a request. */
+export function captureCommerceSandboxRun(): CommerceSandboxRunScope {
+  return { runId: currentSandboxRunId, epoch: currentSandboxRunEpoch };
+}
+
+/** Reject a response after the catalog/runtime moved to another environment or RunID. */
+export function isCurrentCommerceSandboxScope(scope: CommerceSandboxRunScope): boolean {
+  return scope.epoch === currentSandboxRunEpoch && scope.runId === currentSandboxRunId;
 }
 
 function invalid(): never {
@@ -250,17 +288,32 @@ function createdOrder(value: unknown): CreatedOrder {
   return parsed;
 }
 
-function cancelledOrder(value: unknown): CancelledOrder {
+function cancelledOrder(value: unknown, mode: ApiMode): CancelledOrder {
   const source = record(value);
   if (typeof source.orderNo !== "string" || !source.orderNo.trim()
       || source.orderStatus !== "CANCELLED" || source.paymentStatus !== "CANCELLED"
+      || typeof source.serverCanonical !== "boolean" || source.serverCanonical !== true
+      || (source.source !== "server" && source.source !== "mock")
       || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
+      || typeof source.runId !== "string"
       || typeof source.idempotent !== "boolean") return invalid();
+  const production = mode === "remote"
+    && source.source === "server"
+    && source.sourceEnvironment === "PRODUCTION"
+    && source.runId === "";
+  const sandbox = mode === "sandbox"
+    && source.source === "mock"
+    && source.sourceEnvironment === "SANDBOX"
+    && RUN_ID.test(source.runId)
+    && isCurrentCommerceSandboxRun(source.runId);
+  if (!production && !sandbox) return invalid();
   return { orderNo: source.orderNo.trim(), orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
-    sourceEnvironment: source.sourceEnvironment, idempotent: source.idempotent };
+    serverCanonical: true, source: production ? "server" : "mock",
+    sourceEnvironment: production ? "PRODUCTION" : "SANDBOX", runId: production ? "" : source.runId,
+    idempotent: source.idempotent };
 }
 
-export function createOrderApi(client: ApiClient): OrderApi {
+export function createOrderApi(client: ApiClient, mode: ApiMode = "remote"): OrderApi {
   return {
     async list(): Promise<CanonicalOrderList> {
       const payload = record(await client.request<unknown>({
@@ -271,14 +324,19 @@ export function createOrderApi(client: ApiClient): OrderApi {
       const source = nonEmptyString(payload.source);
       const sourceEnvironment = nonEmptyString(payload.sourceEnvironment);
       const rawRunId = payload.runId;
-      const sandbox = source === "mock" && sourceEnvironment === "SANDBOX"
+      if (payload.serverCanonical !== true) return invalid();
+      const sandbox = mode === "sandbox"
+        && source === "mock" && sourceEnvironment === "SANDBOX"
         && typeof rawRunId === "string" && RUN_ID.test(rawRunId) && rawRunId === currentSandboxRunId;
-      const production = source === "server" && sourceEnvironment === "PRODUCTION" && (rawRunId === null || rawRunId === undefined);
+      const production = mode === "remote"
+        && source === "server" && sourceEnvironment === "PRODUCTION"
+        && (rawRunId === null || rawRunId === undefined);
       if (!sandbox && !production) return invalid();
       return {
         source: source as "server" | "mock",
         sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX",
         runId: sandbox ? rawRunId : null,
+        serverCanonical: true,
         orders: payload.orders.map(canonicalOrder),
       };
     },
@@ -308,7 +366,7 @@ export function createOrderApi(client: ApiClient): OrderApi {
         method: "POST",
         path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
         idempotencyKey,
-      }));
+      }), mode);
     },
   };
 }
