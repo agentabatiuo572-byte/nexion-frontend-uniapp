@@ -39,6 +39,8 @@ test("Janus has an explicit local simulator while production remains native and 
   const formalAppJanus = read("src/services/janus-c2.ts");
   assert.doesNotMatch(formalAppJanus, /VITE_JANUS_(?:EXECUTOR_MODE|SANDBOX_(?:AUTHORIZATION|SUBJECTS|TARGETS|TOKEN))/);
   assert.doesNotMatch(formalAppJanus, /createJanusExecutor/);
+  assert.doesNotMatch(formalAppJanus, /(?:start|stop|sync)JanusC2|runJanusC2|defaultCoordinator/);
+  assert.match(formalAppJanus, /return \{ state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" \};/);
   const { root, missing } = resolveSiblingRepo("NX1.0-Janus", "NEXGRID_JANUS_ROOT");
   if (missing) return t.skip("NX1.0-Janus sibling checkout is unavailable");
   const runtime = fs.readFileSync(path.join(root, "src/lib/janus/executor-runtime.ts"), "utf8");

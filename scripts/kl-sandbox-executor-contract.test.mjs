@@ -8,5 +8,6 @@ test("the formal App cannot compile a static-credential Janus Sandbox executor",
   assert.equal(existsSync(new URL("../src/services/janus-sandbox-executor.ts", import.meta.url)), false);
   assert.doesNotMatch(source, /VITE_JANUS_(?:EXECUTOR_MODE|SANDBOX_(?:AUTHORIZATION|SUBJECTS|TARGETS|TOKEN))/);
   assert.doesNotMatch(source, /createJanusExecutor/);
-  assert.match(source, /NX1\.0-Janus owns both the[\s\S]*Sandbox enrollment[\s\S]*production native bridge/);
+  assert.doesNotMatch(source, /(?:start|stop|sync)JanusC2|runJanusC2|defaultCoordinator/);
+  assert.match(source, /NX1\.0-Janus alone owns Sandbox enrollment[\s\S]*production native/);
 });

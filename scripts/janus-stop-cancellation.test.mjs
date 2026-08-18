@@ -49,10 +49,8 @@ const compiledTransport = ts.transpileModule(transportModule, {
 }).outputText;
 const { createUniHttpTransport } = new Function(`${compiledTransport}\nreturn { createUniHttpTransport };`)();
 
-assert.match(extractFunction("stopJanusC2Sync"), /activeController\?\.abort\(\)/,
-  "stop must abort the active generation, not only clear its timer");
-assert.match(extractFunction("startJanusC2Sync"), /new AbortController\(\)/,
-  "start must allocate a fresh cancellation generation");
+assert.doesNotMatch(source, /(?:start|stop|sync)JanusC2|runJanusC2|defaultCoordinator/,
+  "the formal App must not own a Janus execution lifecycle");
 assert.match(janusApiSource, /report: async \(report, signal\)[\s\S]*?signal,/,
   "Janus API must forward cancellation into the HTTP client");
 
