@@ -163,6 +163,7 @@ export const en = {
     captchaFailCount: "Fails {n} / {max}",
     captchaLoadFailed: "Couldn't load. Check your connection and retry.",
     captchaRetry: "Retry",
+    sandboxCodeHint: "Sandbox SMS is not sent externally. The isolated local-service code is {code}.",
     errorTooFrequent: "Too frequent — retry in {s}s",
     errorOtpInvalid: "Incorrect code — {n} attempts left",
     errorOtpExpired: "Code expired — request a new one",
@@ -203,6 +204,9 @@ export const en = {
     thailand: "Thailand",
     uae: "UAE",
     russia: "Russia",
+    saudiArabia: "Saudi Arabia",
+    phoneExampleHint: "Example: {example}",
+    phoneInvalidHint: "Enter a valid mobile number, e.g. {example}.",
   },
   login: {
     title: "Sign in",

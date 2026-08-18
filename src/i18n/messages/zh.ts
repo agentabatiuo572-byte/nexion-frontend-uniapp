@@ -152,6 +152,7 @@ export const zh: Messages = {
     captchaFailCount: "失败 {n} / {max}",
     captchaLoadFailed: "加载失败,请检查网络后重试",
     captchaRetry: "重试",
+    sandboxCodeHint: "Sandbox 短信不会真实发送；本地隔离服务的验证码是 {code}。",
     errorTooFrequent: "操作过于频繁,{s} 秒后可重发",
     errorOtpInvalid: "验证码不正确,还可尝试 {n} 次",
     errorOtpExpired: "验证码已过期,请重新获取",
@@ -186,6 +187,9 @@ export const zh: Messages = {
     thailand: "泰国",
     uae: "阿联酋",
     russia: "俄罗斯",
+    saudiArabia: "沙特阿拉伯",
+    phoneExampleHint: "例如：{example}",
+    phoneInvalidHint: "手机号格式不正确，请按 {example} 输入。",
   },
   login: {
     title: "登录",

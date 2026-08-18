@@ -164,6 +164,7 @@ export const vi: Messages = {
     captchaFailCount: "Sai {n} / {max}",
     captchaLoadFailed: "Tải thất bại, vui lòng kiểm tra mạng rồi thử lại",
     captchaRetry: "Thử lại",
+    sandboxCodeHint: "SMS Sandbox không được gửi ra ngoài. Mã của dịch vụ cục bộ biệt lập là {code}.",
     errorTooFrequent: "Thao tác quá nhanh, vui lòng thử lại sau {s}s",
     errorOtpInvalid: "Mã sai — còn {n} lần thử",
     errorOtpExpired: "Mã đã hết hạn, vui lòng lấy mã mới.",
@@ -198,6 +199,9 @@ export const vi: Messages = {
     thailand: "Thái Lan",
     uae: "UAE",
     russia: "Nga",
+    saudiArabia: "Ả Rập Xê Út",
+    phoneExampleHint: "Ví dụ: {example}",
+    phoneInvalidHint: "Số điện thoại chưa đúng định dạng, ví dụ {example}.",
   },
   login: {
     title: "Đăng nhập",

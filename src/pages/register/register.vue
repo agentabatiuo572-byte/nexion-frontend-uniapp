@@ -33,6 +33,9 @@
 
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
+      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="rg-mode-badge" data-testid="auth-runtime-label">
+        <text class="rg-mode-badge__t">{{ modeLabel }}</text>
+      </view>
       <text class="rg-subtitle">
         <!-- 奖励金额护栏(包 zm T1):配置未到位/被中毒清零时金额句整体让位,$0 永不上转化首屏 -->
         <template v-if="step === 1"><template v-if="giftUsdt > 0"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { usd: giftUsdt }) }}</text>{{ t.register.subtitleRest }}</template><template v-else>{{ t.register.subtitleNoBonus }}</template></template>
@@ -45,14 +48,14 @@
         <!-- Step 1: phone。🔴 hint/横幅必须在本容器**内**:插在 v-if 与 v-else-if 之间会断步骤链,
              密码块曾因此在第 1 步恒渲染(独立验收 F1 抓获)。 -->
         <view v-if="step === 1">
-          <view class="rg-phone">
+          <view class="rg-phone" :class="{ 'rg-phone--err': phone && !phoneOk }">
             <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
               <text class="rg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="rg-phone__in" type="number" :placeholder="t.register.phonePlaceholder" :value="phone" @input="onPhone" />
+            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" @input="onPhone" />
           </view>
-          <text v-if="phoneLenHint" class="rg-phone-hint">{{ phoneLenHint }}</text>
+          <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除)
                i18n-en-ok: 工程话,指名端口与启动方式,受众是开发者不是用户 -->
           <view v-if="devBackendDown" class="rg-devbanner"><text class="rg-devbanner__t">Dev build · sandbox API unreachable — start the 8110 backend or run mock mode</text></view>
@@ -62,6 +65,9 @@
         <view v-else-if="step === 2" class="rg-step2">
           <view class="rg-otp">
             <input v-for="(d, i) in code" :key="i" class="rg-otp__in" :class="{ 'rg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
+          </view>
+          <view v-if="sandboxOtpEnabled" class="rg-sandbox-otp" data-testid="sandbox-otp-code" role="status">
+            <text class="rg-sandbox-otp__t">{{ fmt(t.authOtp.sandboxCodeHint, { code: sandboxOtpCode }) }}</text>
           </view>
           <view class="rg-resend">
             <text class="rg-resend__change" role="button" tabindex="0" :aria-label="t.register.changeNumber" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.register.changeNumber }}</text>
@@ -133,12 +139,7 @@
       <!-- OAuth (step 1) -->
       <view v-if="step === 1" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
-        <view class="rg-social">
-          <view v-for="o in oauth" :key="o.label" class="rg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="startOauth(o.label)" @keydown.enter.prevent="startOauth(o.label)" @keydown.space.prevent="startOauth(o.label)">
-            <view class="rg-social__ic" v-html="o.svg" />
-            <text class="rg-social__lbl">{{ oauthDisplayLabel(o.label) }}</text>
-          </view>
-        </view>
+        <AuthProviderGrid :busy="busy" :sandbox="apiRuntimeConfig.mode === 'sandbox' && apiRuntimeConfig.modeExplicit" @select="startOauth" />
       </view>
 
       <!-- Footer -->
@@ -161,6 +162,7 @@ import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
+import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -190,6 +192,7 @@ import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { restoreActivatedRegistrationSession } from "@/auth/complete-registration";
 import { stageRemoteRegistrationReceipt, clearRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
+import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
 
 const t = useT();
 const app = useApp();
@@ -206,13 +209,6 @@ const giftNex = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.nexAmount ?? 0
   : cfg.config.rewards.welcomeGift.nexAmount);
 
-const oauth = [
-  { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
-  { label: "Google", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.5 3.6-5.5 3.6-3.3 0-6-2.7-6-6.1S8.7 5.5 12 5.5c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3 14.6 2 12 2 6.9 2 2.7 6.1 2.7 11.6S6.9 21.3 12 21.3c6.9 0 9.4-4.9 9.4-7.4 0-.5 0-.9-.1-1.3L12 10.2z"/></svg>' },
-  { label: "Apple", svg: '<svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M17.06 12.43c0-2.6 2.13-3.85 2.23-3.91-1.22-1.78-3.11-2.02-3.78-2.04-1.61-.16-3.14.95-3.96.95-.82 0-2.08-.93-3.42-.9-1.76.02-3.38 1.02-4.29 2.6-1.83 3.18-.47 7.88 1.31 10.46.87 1.27 1.91 2.69 3.27 2.64 1.32-.05 1.81-.85 3.41-.85 1.59 0 2.04.85 3.42.82 1.41-.02 2.31-1.29 3.18-2.56 1-1.47 1.41-2.9 1.43-2.97-.03-.02-2.75-1.06-2.79-4.24zM14.5 4.74c.73-.88 1.21-2.11 1.08-3.33-1.04.04-2.31.69-3.06 1.57-.67.77-1.26 2.02-1.1 3.22 1.16.09 2.34-.59 3.08-1.46z"/></svg>' },
-  { label: "Telegram", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#229ED9" d="M9.78 16.32 9.45 20c.48 0 .69-.2.94-.45l2.27-2.17 4.7 3.44c.86.48 1.48.23 1.7-.79l3.08-14.43c.3-1.34-.48-1.87-1.32-1.56L1.6 9.5c-1.3.5-1.29 1.24-.22 1.57l4.62 1.44 10.73-6.77c.5-.31.97-.14.59.21L9.78 16.32z"/></svg>' },
-];
-
 type Step = 1 | 2 | 3;
 
 interface RemoteRegistrationAttemptContext {
@@ -222,10 +218,7 @@ interface RemoteRegistrationAttemptContext {
 }
 const step = ref<Step>(1);
 // 包 zm T4:初始国家码随 App 语言(仅初始默认;用户手选后以 pickCountry 为准)。
-const LOCALE_DIAL: Record<string, string> = {
-  vi: "+84", zh: "+86", ja: "+81", ko: "+82", ru: "+7", pt: "+55", de: "+49", fr: "+33", ar: "+966",
-};
-const country = ref(LOCALE_DIAL[useLocaleStore().code] ?? "+1");
+const country = ref(dialCodeForLocale(useLocaleStore().code));
 const showCountries = ref(false);
 const phone = ref("");
 const code = ref<string[]>(["", "", "", "", "", ""]);
@@ -282,20 +275,20 @@ onLoad(async (options) => {
 
 const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
 // 包 zm T5:主市场国别位数即时校验(不合法禁发送并就地提示);未列国别退回通用 6-15。
-const DIAL_LEN: Record<string, [number, number]> = {
-  "+86": [11, 11], "+84": [9, 10], "+1": [10, 10], "+81": [10, 11], "+82": [9, 11],
-  "+7": [10, 10], "+55": [10, 11], "+49": [10, 11], "+33": [9, 9], "+966": [9, 9],
-};
-const dialLen = computed(() => DIAL_LEN[country.value] ?? [6, 15]);
-const phoneOk = computed(() => {
-  const [min, max] = dialLen.value;
-  return new RegExp(`^\\d{${min},${max}}$`).test(phoneClean.value);
+const phoneOk = computed(() => validateNationalPhone(country.value, phoneClean.value));
+const phoneFormatMessage = computed(() => {
+  const params = { example: phoneFormatHint(country.value) };
+  return phone.value && !phoneOk.value
+    ? fmt(t.value.countryCodes.phoneInvalidHint, params)
+    : fmt(t.value.countryCodes.phoneExampleHint, params);
 });
-const phoneLenHint = computed(() => {
-  if (!phoneClean.value || phoneOk.value) return "";
-  const [min, max] = dialLen.value;
-  return fmt(t.value.register.phoneLenHint, { range: min === max ? String(min) : `${min}-${max}` });
-});
+const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
+const sandboxOtpCode = String(import.meta.env.VITE_NEXGRID_SANDBOX_OTP_CODE || "").trim();
+const sandboxOtpEnabled = computed(() =>
+  apiRuntimeConfig.mode === "sandbox"
+  && apiRuntimeConfig.modeExplicit
+  && /^\d{6}$/.test(sandboxOtpCode)
+);
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
@@ -334,17 +327,6 @@ function oauthProvider(label: string): OAuthProvider | null {
     : null;
 }
 
-function oauthDisplayLabel(label: string): string {
-  return apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? `${label} · Mock` : label;
-}
-
-function oauthSubject(provider: OAuthProvider): string {
-  // Explicit non-secret sandbox identity: it survives a page refresh/re-login
-  // without reading browser storage, while provider + server environment keep
-  // Google and Apple accounts isolated on the server.
-  return `app-${provider.toLowerCase()}-sandbox`;
-}
-
 function oauthError(cause: unknown, provider: OAuthProvider): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
@@ -368,7 +350,6 @@ async function startOauth(label: string) {
     const result = await authApi.oauthExchange({
       provider,
       mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
-      externalSubject: oauthSubject(provider),
       displayName: `${provider} Sandbox`,
     });
     if (!mounted || flowVersion !== otpFlowVersion) {
@@ -413,7 +394,7 @@ function inputVal(e: Event): string {
 }
 function onPhone(e: Event) {
   invalidateOtpFlow();
-  phone.value = inputVal(e);
+  phone.value = sanitizePhoneInput(inputVal(e));
   error.value = null;
   registrationRisk.value = null;
   otpRequestId.value = null;
@@ -899,11 +880,14 @@ onUnmounted(() => cleanup());
 .rg-subtitle__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .rg-body { margin-top: 28px; }
 .rg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
+.rg-phone--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); }
 .rg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .rg-phone__cc-t { font-size: 15px; color: var(--v5-ink); }
 .rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
 .rg-step2 { display: flex; flex-direction: column; gap: 20px; }
 .rg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rg-sandbox-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.rg-sandbox-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
 .rg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .rg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
 .rg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
@@ -929,6 +913,7 @@ onUnmounted(() => cleanup());
 .rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
 .rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
 .rg-phone-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); }
+.rg-phone-hint--err { color: var(--v5-brand-2); }
 .rg-devbanner { margin-top: 10px; border-radius: 8px; padding: 8px 12px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); }
 .rg-devbanner__t { font-size: 12px; color: var(--v5-warning); }
 .rg-error__t { flex: 1; }
@@ -942,11 +927,8 @@ onUnmounted(() => cleanup());
 .rg-divider { display: flex; align-items: center; margin: 24px 0; }
 .rg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
 .rg-divider__t { padding: 0 12px; font-size: 12px; color: var(--v5-ink-3); }
-.rg-social { display: flex; align-items: center; gap: 10px; }
-.rg-social__btn { flex: 1; min-width: 0; height: 64px; border-radius: 16px; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform 0.15s, opacity 0.15s; }
-.rg-social__btn:active { transform: scale(0.98); opacity: 0.8; }
-.rg-social__ic { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
-.rg-social__lbl { font-size: 12px; font-weight: 500; color: var(--v5-ink-3); }
+.rg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
+.rg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
 .rg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .rg-footer__acc { display: block; font-size: 13px; color: var(--v5-ink-3); }
 /* 同 login:inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 扩热区不撑行高 */

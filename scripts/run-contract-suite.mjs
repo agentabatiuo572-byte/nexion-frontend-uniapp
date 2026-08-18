@@ -54,6 +54,8 @@ const REGISTRY = {
   "risk-disclosure-sandbox-contract.test.mjs": { how: "chain" },
   "remote-external-data-hold-contract.test.mjs": { how: "chain" },
   "withdraw-p0-contract.test.mjs": { how: "chain" },
+  "auth-entry-ui-contract.test.mjs": { how: "chain" },
+  "identity-device-sandbox-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
   "country-code-selector-contract.test.mjs": { how: "chain" },
   "e18-e20-runtime-consumer-contract.test.mjs": { how: "chain" },

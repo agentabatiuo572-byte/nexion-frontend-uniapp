@@ -16,6 +16,7 @@ const readBackend = (relative) => fs.readFileSync(path.join(backendRoot, relativ
 
 test("OAuth exchange is a server call and the App rejects loose mock provenance", () => {
   const api = read("src/api/auth-api.ts");
+  assert.match(api, /path: "\/auth\/users\/oauth\/sandbox\/challenge"/);
   assert.match(api, /path: "\/auth\/users\/oauth\/exchange"/);
   assert.match(api, /data\.source !== "mock" \|\| data\.sandbox !== true/);
 });
@@ -23,20 +24,28 @@ test("OAuth exchange is a server call and the App rejects loose mock provenance"
 test("OAuth sandbox backend keeps the explicit exchange endpoint and strict mock provenance", { skip: backendMissing }, () => {
   const backendController = readBackend("src/main/java/ffdd/opsconsole/auth/web/AppUserAuthController.java");
   const backendService = readBackend("src/main/java/ffdd/opsconsole/auth/application/AppUserOAuthService.java");
+  const challengeService = readBackend("src/main/java/ffdd/opsconsole/auth/application/OAuthSandboxChallengeService.java");
+  assert.match(backendController, /@PostMapping\("\/oauth\/sandbox\/challenge"\)/);
   assert.match(backendController, /@PostMapping\("\/oauth\/exchange"\)/);
   assert.match(backendService, /SANDBOX_MOCK/);
   assert.match(backendService, /OAUTH_PROVIDER_NOT_CONFIGURED/);
   assert.match(backendService, /OAUTH_PROVIDER_UNAVAILABLE/);
   assert.match(backendService, /userMapper\.ensureRegisteredUserWallet/);
+  assert.match(backendService, /sandboxChallengeService\.consume/);
   assert.match(backendService, /auth\.oauth_sandbox_(account_created|login)/);
+  assert.match(challengeService, /ConcurrentHashMap/);
+  assert.match(challengeService, /AtomicReference/);
 });
 
 test("OAuth UI buttons invoke the server API and never persist provider subjects", () => {
+  const providerGrid = read("src/components/auth-provider-grid.vue");
+  assert.match(providerGrid, /emit\("select", provider\)/);
+  assert.match(providerGrid, /@click="activate\('Passkey'\)"/);
   for (const file of ["src/pages/login/login.vue", "src/pages/register/register.vue"]) {
     const page = read(file);
-    assert.match(page, /@click="startOauth\(o\.label\)"/);
+    assert.match(page, /<AuthProviderGrid[^>]+@select="startOauth"/);
     assert.match(page, /authApi\.oauthExchange/);
-    assert.match(page, /externalSubject: oauthSubject\(provider\)/);
+    assert.doesNotMatch(page, /externalSubject|oauthSubject/);
     assert.doesNotMatch(page, /localStorage|sessionStorage/);
   }
 });
