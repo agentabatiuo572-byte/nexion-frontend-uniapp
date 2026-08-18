@@ -13,9 +13,9 @@
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
       <FundsSandboxBadge />
 
-      <!-- Remote: VietQR is server-authoritative. Chain and card rails remain
-           hidden until their external providers can return verifiable facts. -->
-      <DepositBankPane v-if="remoteApiEnabled" />
+      <!-- Remote production: only VietQR has a real server authority. Explicit
+           Sandbox exposes the isolated simulated chain/bank/card rails below. -->
+      <DepositBankPane v-if="remoteApiEnabled && !fundsSandboxEnabled" />
 
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
       <view v-else class="flex" :style="segWrapStyle">
@@ -32,7 +32,7 @@
         </view>
       </view>
 
-      <template v-if="!remoteApiEnabled">
+      <template v-if="!remoteApiEnabled || fundsSandboxEnabled">
         <!-- USDT 链上通道段 -->
         <DepositUsdtPane v-if="seg === 'crypto'" />
 
@@ -55,13 +55,13 @@ import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
-import { remoteApiEnabled } from "@/api/runtime";
+import { fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
 const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
-const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
+const seg = ref<Seg>(remoteApiEnabled && !fundsSandboxEnabled ? "bank" : "crypto");
 function segLabel(id: Seg): string {
   const tc = t.value.topupChrome;
   if (id === "crypto") return tc.segUsdt;

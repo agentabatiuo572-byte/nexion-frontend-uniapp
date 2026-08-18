@@ -71,6 +71,12 @@ import {
   pendingFundsMutationKey,
   type FundsMutationIdentity,
 } from "@/lib/funds-mutation-key";
+import {
+  captureFundsSandboxRequestScope,
+  fundsSandboxStaleRequestError,
+  isCurrentFundsSandboxRequestScope,
+  isFundsSandboxStaleRequestError,
+} from "@/lib/funds-sandbox-request-scope";
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
@@ -1949,13 +1955,19 @@ export const useApp = defineStore("app", () => {
       fundsSandboxEvidence.value = null;
       return;
     }
+    const request = remoteAccountEpoch.snapshot();
     const expectedAccountKey = accountKey.value;
+    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, request.epoch);
     fundsSandboxStatus.value = "loading";
     fundsSandboxError.value = "";
     fundsSandboxEvidence.value = null;
     try {
       const overview = await fundsSandboxApi.overview();
       if (expectedAccountKey !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+      if (!remoteAccountEpoch.isCurrent(request)
+          || !isCurrentFundsSandboxRequestScope(expectedScope, accountKey.value, remoteAccountEpoch.snapshot().epoch)) {
+        throw fundsSandboxStaleRequestError();
+      }
       adoptFundsSandboxWallet(overview.wallet);
       const existing = new Map(withdrawals.value.map((item) => [item.id, item]));
       withdrawals.value = overview.orders
@@ -1967,7 +1979,9 @@ export const useApp = defineStore("app", () => {
       fundsSandboxEvidence.value = sandboxEvidenceFromOverview(overview);
       fundsSandboxStatus.value = "ready";
     } catch (cause) {
-      if (expectedAccountKey === accountKey.value) {
+      const current = remoteAccountEpoch.isCurrent(request)
+        && isCurrentFundsSandboxRequestScope(expectedScope, accountKey.value, remoteAccountEpoch.snapshot().epoch);
+      if (current && !isFundsSandboxStaleRequestError(cause)) {
         const current = withDefaultEarningBuckets(user.value);
         user.value = {
           ...current,
@@ -1979,7 +1993,7 @@ export const useApp = defineStore("app", () => {
         fundsSandboxError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_REFRESH_FAILED";
         fundsSandboxEvidence.value = null;
       }
-      throw cause;
+      throw current ? cause : fundsSandboxStaleRequestError();
     }
   }
 
@@ -2120,6 +2134,9 @@ export const useApp = defineStore("app", () => {
         estimatedCompletion: Date.parse(order.createdAt),
       });
       withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+      if (order.status === "CONFIRMED" || order.status === "FAILED") {
+        finishPendingFundsMutationByOrder(acct, "SANDBOX", order.orderNo);
+      }
       return canonical;
     }
     // D5 real boundary: the backend re-prices the request under policyVersion and

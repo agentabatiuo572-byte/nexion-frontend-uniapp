@@ -88,19 +88,6 @@
           <!-- ⑥ 再提一笔:今日额度用完时置灰 + 说明为什么,不做死按钮 -->
           <view class="flex flex-col items-center" style="gap: 6px">
             <view
-              v-if="fundsSandboxEnabled && wd.status === 'submitted'"
-              class="flex items-center justify-center active:opacity-80"
-              :style="againBtnStyle"
-              role="button" tabindex="0"
-              @click.stop="confirmSandboxCallback"
-            >
-              <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):
-                   进词典就成了用户文案契约,而词典是普通对象、打包摇不掉,会原样进生产包。
-                   2026-08-17 起英文面也有门了(i18n-hardcoded-en-copy-sentinel),所以要显式留痕。
-                   i18n-en-ok: 工程话,进词典就成了用户文案契约 -->
-              <text>SANDBOX: confirm server callback</text>
-            </view>
-            <view
               class="flex items-center justify-center"
               :class="againDisabled ? '' : 'active:opacity-80'"
               :style="againBtnStyle"
@@ -143,9 +130,6 @@ import type { WithdrawalStatus } from "@/store/types";
 import { navTo } from "@/lib/route";
 import { riskReasonLines, terminalReasonLine } from "@/lib/risk-reason-text";
 import { dailyLimitStatus } from "@/store/withdrawal-eligibility";
-import { fundsSandboxEnabled } from "@/api/runtime";
-import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { toast } from "@/store/ui";
 
 const STEP_DELAY_MS = 3500;
 
@@ -396,16 +380,6 @@ function goWallet() {
 }
 function goSupport() {
   navTo("/pages/me/support");
-}
-async function confirmSandboxCallback() {
-  const id = wd.value?.id;
-  if (!id) return;
-  try {
-    // 工程话,故意不进 i18n 词典(同 :97 的理由:出路②)。
-    if (!await app.applyFundsSandboxCallback(id, "CONFIRMED")) toast.info("SANDBOX: order status changed, refresh to see it");
-  } catch (cause) {
-    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.wallet.trackConfirmArrivalFailed);
-  }
 }
 
 /** ⑤ 骨架块。与真实结构同尺寸,加载完不跳版。 */

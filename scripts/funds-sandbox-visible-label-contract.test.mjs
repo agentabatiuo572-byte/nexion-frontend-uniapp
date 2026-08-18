@@ -24,7 +24,7 @@ const surfaces = [
 
 assert.match(app, /const fundsSandboxEvidence = ref<FundsSandboxEvidence \| null>\(null\)/,
   "a visible sandbox claim must start unproven");
-assert.match(app, /fundsSandboxEvidence\.value = null[\s\S]{0,600}const overview = await fundsSandboxApi\.overview\(\)[\s\S]{0,800}fundsSandboxEvidence\.value = sandboxEvidenceFromOverview\(overview\)/,
+assert.match(app, /const expectedScope = captureFundsSandboxRequestScope[\s\S]*fundsSandboxEvidence\.value = null[\s\S]*const overview = await fundsSandboxApi\.overview\(\)[\s\S]*isCurrentFundsSandboxRequestScope\(expectedScope[\s\S]*fundsSandboxEvidence\.value = sandboxEvidenceFromOverview\(overview\)/,
   "only a parsed server overview may establish the sandbox evidence");
 assert.match(app, /catch \(cause\) \{[\s\S]{0,1000}fundsSandboxEvidence\.value = null/,
   "a failed, missing, or contradictory overview must clear the claim");
@@ -35,6 +35,9 @@ assert.match(app, /if \(fundsSandboxEnabled\) void refreshFundsSandboxForAccount
   "every account bind must refresh the newly-bound sandbox facts");
 assert.match(completeSignIn, /app\.refreshFundsSandboxForAccount\(options\.identity\)/,
   "a completed server login must reassert the server wallet read after its Bearer session is saved");
+assert.match(completeSignIn,
+  /refreshRemoteFleetAfterCatalog\(options\.identity\)[\s\S]{0,240}\.finally\([\s\S]{0,180}app\.refreshFundsSandboxForAccount\(options\.identity\)/,
+  "first login must establish the catalog RunID before the funds authority read");
 assert.match(runtimeConfig, /const modeExplicit = rawMode === "mock" \|\| rawMode === "sandbox" \|\| rawMode === "remote"/,
   "a missing runtime mode cannot implicitly opt into money sandbox behavior");
 assert.match(runtime, /fundsSandboxEnabled = apiRuntimeConfig\.mode === "sandbox" && apiRuntimeConfig\.modeExplicit/,
