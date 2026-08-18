@@ -3112,18 +3112,19 @@ if scope_hit empty-state-runtime; then empty_state_gate; fi
 # 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 可见(visibility/opacity/fill 链)· 在 svg 盒内 · 文档内 · 未被祖先裁
 # · svg 内 uni-text=0 · 全页 svg 元素呈现属性==计算值(attributify 劫持在这里现形)· console error 与 Vue resolve warn 0;svg 里有文字候选的文件必须登记路由(未登记即红,不静默跳过)。
 svg_text_render_gate() {
-  if probe_retry /tmp/uniapp-svg-text-render-selftest.log "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
-    ok "$(tail -1 /tmp/uniapp-svg-text-render-selftest.log)"
+  local slog="${TMPDIR:-/tmp}/uniapp-svg-text-render-selftest.$.log" glog="${TMPDIR:-/tmp}/uniapp-svg-text-render.$.log"
+  if probe_retry "$slog" "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
+    ok "$(tail -1 "$slog")"
   else
     bad "svg-text-render selftest 失败(探针失效即门失效;node scripts/svg-text-render-probe.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-svg-text-render-selftest.log | sed 's/^/        /'
+    tail -6 "$slog" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-svg-text-render.log "$NODE_BIN" scripts/svg-text-render-probe.mjs; then
-    ok "$(tail -1 /tmp/uniapp-svg-text-render.log)"
+  if probe_retry "$glog" "$NODE_BIN" scripts/svg-text-render-probe.mjs; then
+    ok "$(tail -1 "$glog")"
   else
-    bad "SVG 内文字没渲染出来 / 字号被劫持 / 新示意图未登记 —— UNI_BASE_URL=$BASE_URL node scripts/svg-text-render-probe.mjs 看明细"
-    grep -E "^FAIL|^  \[" /tmp/uniapp-svg-text-render.log | head -10 | sed 's/^/        /'
+    bad "SVG 内文字没渲染出来 / 看不见 / 呈现属性被劫持 / 新示意图未登记 —— UNI_BASE_URL=$BASE_URL node scripts/svg-text-render-probe.mjs 看明细"
+    grep -E "^FAIL|^  \[" "$glog" | head -10 | sed 's/^/        /'
   fi
 }
 if scope_hit svg-text-runtime; then svg_text_render_gate; fi

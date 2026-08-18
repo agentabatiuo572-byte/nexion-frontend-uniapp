@@ -57,6 +57,13 @@
 3. [ ] 三语实景走查(独立 tester agent,启动前注入语言,三 context)+ dark/light 字色抽验。
 4. [ ] 文档三处 + P-121 追记 + HANDOFF → `npm run verify` full → 审计(nexion-audit 小档:skeptic 证伪门与修法)→ done-review → close 包。
 
+## 独立验收与对抗审计(实际发生的)
+- **T1 黑盒验收**(`.t1-test.md`):4 路由 × 3 语言 × 双主题 = 24 组全 PASS;备注 network 三个小标注在浅色主题下写死柠檬绿几乎不可见 → 已改 token 派生。
+- **A1 对抗审计**(`.a1-skeptic.md`):P0-1 kebab 无 import 两门全绿 · P0-2「加豁免 = 根上修」被证伪(绑定式 :opacity,globe 669 点隐形)· P0-3 只判排版不判可见 · P1-1~4 · P2-1~8 · P3 —— 全部按其修法回修(摘 attributify、共用谓词、可见性判据、Vue warn、min/whyMin、坏正则……)。
+- **T2 增量验收**(`.t2-test.md`):globe 圆点 opacity {0.25:367, 0.5:302} 精确命中、大陆点阵可见;4 路由 × 3 语言回归 12/12;3 条无关路由构建配置改动后健全;**AC-B FAIL**:EXTENDED 标注浅色主题 1.47:1 → 已改 `--v5-nex` 85%(实测浅色 3.11:1、DIRECT 3.78:1;深色 5.45 / 8.23:1)。
+- **A2 对抗审计**(`.a2-skeptic.md`):P0-1 外来 svg 文字可顶数 · P1-1 假岛 · P1-2 `{ default as X }` 隐形 · P1-3 route:null 无下限 · P1-4 百分比属性不比 · P2-1~8 —— 全部回修(出处标记 data-svgtext、岛按深度、import 形态、覆盖下限、属性形态、注释阀一对一、[masked]、变异存活格补齐、日志名)。
+- 未覆盖(如实):App 端无真机;小程序端非目标;`npm run verify` full 在最后一次提交后跑(见收尾汇报)。
+
 ## 拍板项(不阻塞,已按推荐落地)
 - **丝印英文豁免**:`CLOUD SHARE` / `DISTRIBUTED · NO HARDWARE` 现在可见了。选项 ① 维持英文 + `i18n-en-ok`(与同一张渲染图上 `NEXGRID` / `S1` / `Rack P1` 印刷体英文口径一致,是产品图上的字不是界面文案)② 第二行接词典三语。**推荐 ①**(一致性;丝印是排版装饰,一句话即可翻转成 ②)。不做的后果:无——只是主人要知道这两行英文现在真的会被中越用户看到。
 - **App-vue 内联 SVG 整站不渲染(源码结论,待真机)**:选项 ① 先真机跑一次 `uni build -p app` 装机看关系网 / 全球节点页(1 小时内定案)② 直接按「App 端不支持模板 svg」立项:图标走 iconfont / `<image src=svg>`,示意图走 v-html 或 renderjs ③ 不管。**推荐 ①**(先花一小时把「源码怎么写」变成「屏幕上有没有」再立项)。不做的后果:App 首发时全站图标与四张示意图全空,且现有门一条都不会响。

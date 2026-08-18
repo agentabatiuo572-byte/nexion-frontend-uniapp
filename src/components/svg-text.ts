@@ -28,6 +28,8 @@ export default defineComponent({
   name: "SvgText",
   inheritAttrs: false,
   setup(_props, { attrs, slots }) {
-    return () => h("text", attrs, slots.default?.());
+    // data-svgtext 是给运行时门认「这条 svg text 是从本组件出来的」的出处标记(scripts/svg-text-render-probe.mjs [count] 只数带标记的,
+    // 否则页面上任何别的 svg 文字都能顶数 —— 独立审计 A2 P0-1)。不影响渲染;attrs 在后,调用方写了同名属性以调用方为准。
+    return () => h("text", { "data-svgtext": "", ...attrs }, slots.default?.());
   },
 });

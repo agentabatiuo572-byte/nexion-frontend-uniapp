@@ -94,8 +94,8 @@
             </g>
 
             <!-- orbit labels -->
-            <SvgText x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-brand) 45%, transparent)" letter-spacing="1.5">{{ t.network.badgeDirect }}</SvgText>
-            <SvgText x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-tech-cyan) 55%, transparent)" letter-spacing="1.5">{{ t.network.badgeExtended }}</SvgText>
+            <SvgText x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-brand) 85%, transparent)" letter-spacing="1.5">{{ t.network.badgeDirect }}</SvgText>
+            <SvgText x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-nex) 85%, transparent)" letter-spacing="1.5">{{ t.network.badgeExtended }}</SvgText>
           </svg>
 
           <!-- Legend -->
