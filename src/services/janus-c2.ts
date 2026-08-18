@@ -11,7 +11,6 @@ import { janusApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { getDeviceIdentity } from "@/lib/device-id";
 import { applyJanusRuntime, type JanusRuntimeState } from "./janus-runtime";
 import { JANUS_RUNTIME_KEY } from "./janus-runtime";
-import { createJanusExecutor } from "./janus-sandbox-executor";
 
 const REPORT_KEY = "nexgrid-janus-pending-report-v2";
 const ACK_KEY = "nexgrid-janus-pending-ack-v2";
@@ -448,37 +447,10 @@ export function buildJanusReport(now = Date.now()): JanusReport {
   };
 }
 
-const sandboxEnabled = import.meta.env.DEV && import.meta.env.VITE_JANUS_EXECUTOR_MODE === "sandbox";
-const sandboxExecutor = sandboxEnabled ? createJanusExecutor({
-  mode: "sandbox",
-  production: import.meta.env.PROD,
-  profile: String(import.meta.env.VITE_JANUS_SANDBOX_PROFILE || ""),
-  authorization: String(import.meta.env.VITE_JANUS_SANDBOX_AUTHORIZATION || ""),
-  allowedSubjects: String(import.meta.env.VITE_JANUS_SANDBOX_SUBJECTS || "").split(","),
-  allowedTargetKeys: String(import.meta.env.VITE_JANUS_SANDBOX_TARGETS || "").split(","),
-  sandboxToken: String(import.meta.env.VITE_JANUS_SANDBOX_TOKEN || ""),
-  now: Date.now,
-}) : null;
-
 async function applyConfiguredJanusRuntime(state: JanusRuntimeState, signal?: AbortSignal): Promise<JanusRuntimeState> {
-  if (!sandboxExecutor) return applyJanusRuntime(state, undefined, signal);
-  const subject = String(sessionVault.read()?.user.userId || "");
-  const targetKey = state.remoteUrlKey || "none";
-  const evidence = await sandboxExecutor.apply({
-    subject,
-    targetKey,
-    targetUrl: state.remoteTargetUrl || "https://sandbox.invalid/reset",
-    targetVersion: state.remoteTargetVersion || 0,
-    targetCatalogVersion: state.remoteTargetCatalogVersion || 0,
-    commandVersion: state.commandVersion || state.revision,
-  });
-  if (!evidence.proofSignature) throw new Error("JANUS_SANDBOX_TOKEN_REQUIRED");
-  const applied = await applyJanusRuntime(state, async () => ({ handoffReceipt: evidence.handoffReceipt }), signal);
-  const persisted: JanusRuntimeState = { ...applied, ...evidence };
-  uni.setStorageSync(JANUS_RUNTIME_KEY, persisted);
-  const readback = uni.getStorageSync(JANUS_RUNTIME_KEY) as Partial<JanusRuntimeState> | "";
-  if (!readback || readback.handoffReceipt !== evidence.handoffReceipt) throw new Error("JANUS_SANDBOX_READBACK_FAILED");
-  return persisted;
+  // The formal App never signs device claims. NX1.0-Janus owns both the
+  // server-issued Sandbox enrollment and the production native bridge.
+  return applyJanusRuntime(state, undefined, signal);
 }
 
 const defaultCoordinator = createJanusCoordinator({
