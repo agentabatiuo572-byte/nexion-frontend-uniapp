@@ -518,9 +518,10 @@ html[data-theme="dark"] .orb-appicon--dark {
   border-radius: 9999px;
   /* 🔴 此前写死 rgba(15,15,15,0.8) —— 浅色主题下是**深色药丸**,而里面的数字走
      --v5-ink(浅色档=近黑),等于深底压深字,主人实测「人眼根本看不清」。
-     改走 surface 档:浅色是白药丸配近黑字,暗色是 #141414 配浅字,两边都读得出。 */
+     改走 surface 档:浅色是白药丸配近黑字,暗色是 #141414 配浅字,两边都读得出。
+     不加 border:《03》§3 要求带填充的容器零描边,层级靠 surface 微差色 —— 白 #FFFFFF
+     压在米色底 #F4F1E9 上本身就是一档可读色差。(我加过一次 border,被 zero-border 门当场逮住) */
   background: color-mix(in srgb, var(--v5-surface) 80%, transparent);
-  border: 1px solid var(--v5-border);
   backdrop-filter: blur(12px);
 }
 .stat-item {
