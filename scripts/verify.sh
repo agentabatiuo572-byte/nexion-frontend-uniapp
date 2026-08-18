@@ -155,7 +155,7 @@ probe_retry_selftest() {
   # ③ 接线完整性:被包真跑调用点数 = census 期望(解包/漏包即红)。锚定行首 if(注释诱饵免疫,
   # tester M5)+ 绝对路径(cwd≠仓根时 $0 相对路径假红,P2-4)+ 不用 `|| echo 0`(grep -c 零命中
   # 时打印 0 且退出码 1,会产出 "0\n0" 两行值,P2-10)
-  local expected_sites=19 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live);2026-08-17 包 am:+1 = 提现账单行门远端档隔离起服
+  local expected_sites=21 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live);2026-08-17 包 am:+1 = 提现账单行门远端档隔离起服;2026-08-17 包 aw:+2 = SVG 内文字运行时门(selftest+live)
   actual_sites=$(grep -cE '^[[:space:]]*if probe_retry .*"\$NODE_BIN" scripts/' "$vfile" 2>/dev/null); actual_sites=${actual_sites:-0}
   [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
   if [ -z "$bad_bits" ]; then
@@ -374,6 +374,29 @@ i18n_en_gate() {
   fi
 }
 i18n_en_gate
+
+# ── SVG 内文字源码门(P-121,2026-08-17)────────────────────────────────────────
+# 模板里的 <text> 是 uni 的文本组件,写在 <svg> 里会编成 <uni-text>(不是合法 SVG 子元素)→ 0×0 静默不渲染,
+# 源码看起来完全正常、i18n 三道门全绿。判据:svg 内禁 <text>(用 <SvgText>,src/components/svg-text.ts 渲染函数直出真 SVG text)
+# + <SvgText> 只许在 svg 内 + 用了必 import(kebab/别名也认)+ 同族 uni 内置标签也禁 + uno.config 不许启用 attributify(它把 font-size="9.5" 劫持成 2.375rem、:opacity 劫持成 0.0025)
+# + 判定面塌缩(0 个 svg 块 / 0 个 SvgText)判红。渲染面另有 svg_text_render_gate(运行时 bbox>0)。
+svg_text_source_gate() {
+  local slog="${TMPDIR:-/tmp}/uni-svg-text-src-selftest.$.log" glog="${TMPDIR:-/tmp}/uni-svg-text-src.$.log"
+  if "$NODE_BIN" scripts/svg-text-source-gate.mjs --selftest > "$slog" 2>&1; then
+    ok "$(tail -1 "$slog")"
+  else
+    bad "svg-text-source selftest 失败(哨兵失效即门失效;node scripts/svg-text-source-gate.mjs --selftest 看明细)"
+    tail -8 "$slog" | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/svg-text-source-gate.mjs > "$glog" 2>&1; then
+    ok "$(tail -1 "$glog")"
+  else
+    bad "<svg> 里有 <text>(编成 <uni-text> 不渲染)/ <SvgText> 用法或 attributify 豁免有误 —— node scripts/svg-text-source-gate.mjs 看明细"
+    grep -E "^FAIL" "$glog" | head -8 | sed 's/^/        /'
+  fi
+}
+svg_text_source_gate
 
 # ── 远端权威契约门(2026-08-10 接线)────────────────────────────────────────────
 # 它此前是**孤儿门**:package.json 的 verify 链没有它,本文件也没有它 —— 于是它红了
@@ -3099,6 +3122,27 @@ empty_state_gate() {
   fi
 }
 if scope_hit empty-state-runtime; then route_scope empty-state-runtime; empty_state_gate; fi
+
+# ── SVG 内文字运行时门(P-121,2026-08-17):字真的排出来了吗 ──
+# 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 可见(visibility/opacity/fill 链)· 在 svg 盒内 · 文档内 · 未被祖先裁
+# · svg 内 uni-text=0 · 全页 svg 元素呈现属性==计算值(attributify 劫持在这里现形)· console error 与 Vue resolve warn 0;svg 里有文字候选的文件必须登记路由(未登记即红,不静默跳过)。
+svg_text_render_gate() {
+  local slog="${TMPDIR:-/tmp}/uniapp-svg-text-render-selftest.$.log" glog="${TMPDIR:-/tmp}/uniapp-svg-text-render.$.log"
+  if probe_retry "$slog" "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
+    ok "$(tail -1 "$slog")"
+  else
+    bad "svg-text-render selftest 失败(探针失效即门失效;node scripts/svg-text-render-probe.mjs --selftest 看明细)"
+    tail -6 "$slog" | sed 's/^/        /'
+    return
+  fi
+  if probe_retry "$glog" "$NODE_BIN" scripts/svg-text-render-probe.mjs; then
+    ok "$(tail -1 "$glog")"
+  else
+    bad "SVG 内文字没渲染出来 / 看不见 / 呈现属性被劫持 / 新示意图未登记 —— UNI_BASE_URL=$BASE_URL node scripts/svg-text-render-probe.mjs 看明细"
+    grep -E "^FAIL|^  \[" "$glog" | head -10 | sed 's/^/        /'
+  fi
+}
+if scope_hit svg-text-runtime; then svg_text_render_gate; fi
 
 # ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
 # 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;
