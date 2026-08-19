@@ -2766,14 +2766,11 @@ function flattenAnd(expression) {
 }
 
 const visible = computedCallback("visibleTaskCards");
-need(ts.isBlock(visible.body), "visibleTaskCards must keep an explicit derivation block");
-need(compact(visible.body.getText(source)) === compact(`{
-  if (platformConfig.syncFailed) return [];
-  const cards: TaskCardId[] = [];
-  if (platformConfig.isEnabled("homeNewcomerTasksEnabled")) cards.push("newcomer");
-  if (platformConfig.isEnabled("homeWeeklyPromoEnabled")) cards.push("weekly");
-  return cards;
-}`), "visibleTaskCards no longer derives exact 0/1/2 state from sync failure + both flags");
+need(!ts.isBlock(visible.body), "visibleTaskCards must delegate to the tested derivation helper");
+need(compact(visible.body.getText(source)) === compact(`deriveHomeTaskCards(platformConfig.syncFailed, {
+  homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
+  homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
+})`), "visibleTaskCards no longer derives exact 0/1/2 state from sync failure + both flags");
 
 const cardinality = computedCallback("hasTaskCarousel");
 need(

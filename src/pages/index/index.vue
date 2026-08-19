@@ -125,8 +125,9 @@ import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
+import { deriveHomeTaskCards, type HomeTaskCardId } from "@/lib/home-task-carousel";
 
-type TaskCardId = "newcomer" | "weekly";
+type TaskCardId = HomeTaskCardId;
 
 interface TouchPoint {
   clientX: number;
@@ -145,6 +146,9 @@ const locale = useLocaleStore();
 const platformConfig = useConfig();
 const instance = getCurrentInstance();
 
+// PC 端更新任务配置后，用户回到首页即可读取最新投影，无需杀掉 App 重开。
+onShow(() => void platformConfig.load());
+
 const taskSlide = ref(0);
 const taskCarouselHeight = ref(TASK_CARD_COLLAPSED_HEIGHT);
 const newcomerExpanded = ref(false);
@@ -154,13 +158,12 @@ const taskCarouselAnnouncement = ref("");
 let taskTouchStart: TouchPoint | null = null;
 let touchCollapsedExpandedCard = false;
 
-const visibleTaskCards = computed<TaskCardId[]>(() => {
-  if (platformConfig.syncFailed) return [];
-  const cards: TaskCardId[] = [];
-  if (platformConfig.isEnabled("homeNewcomerTasksEnabled")) cards.push("newcomer");
-  if (platformConfig.isEnabled("homeWeeklyPromoEnabled")) cards.push("weekly");
-  return cards;
-});
+const visibleTaskCards = computed<TaskCardId[]>(() =>
+  deriveHomeTaskCards(platformConfig.syncFailed, {
+    homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
+    homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
+  }),
+);
 
 const taskCardSignature = computed(() => visibleTaskCards.value.join("-"));
 const hasTaskCarousel = computed(() => visibleTaskCards.value.length > 1);
