@@ -18,20 +18,21 @@ const page = await context.newPage();
 const responses = [];
 const consoleErrors = [];
 const pageErrors = [];
+let homeOverviewPayload = null;
 
-page.on("response", (response) => {
+page.on("response", async (response) => {
   const url = response.url();
   if ([
     "/api/config/market/", "/api/content/trust/", "/api/store/catalog",
-    "/api/app/home/overview", "/api/config/platform",
+    "/api/app/home/overview", "/api/config/platform", "/auth/users/oauth/",
   ].some((path) => url.includes(path))) {
     responses.push({ url, status: response.status() });
+    if (url.includes("/api/app/home/overview") && response.status() === 200) {
+      homeOverviewPayload = await response.json().catch(() => null);
+    }
   }
 });
 page.on("console", (message) => {
-  // Sandbox intentionally returns 503 for the unscoped Home projection; the
-  // card's explicit unavailable state is what this probe verifies. Browser
-  // resource diagnostics therefore are evidence, not JavaScript failures.
   if (message.type() === "error" && !/Failed to load resource/i.test(message.text())) {
     consoleErrors.push(message.text());
   }
@@ -69,6 +70,16 @@ try {
   if (await observationConfirm.isVisible().catch(() => false)) await observationConfirm.click();
 
   const scroller = page.locator(".nx-scroll");
+  if (await scroller.count() === 0) {
+    const diagnostic = {
+      url: page.url(),
+      body: (await page.locator("body").innerText()).slice(0, 2_000),
+      responses,
+      consoleErrors,
+      pageErrors,
+    };
+    throw new Error(`APP_HOME_NOT_REACHED ${JSON.stringify(diagnostic)}`);
+  }
   await scroller.evaluate((element) => { element.scrollTop = element.scrollHeight; });
   await page.waitForTimeout(1_200);
   const body = await page.locator("body").innerText();
@@ -88,15 +99,27 @@ try {
   const publicStats = platformPayload.body?.data?.publicStats;
   const nexMarket = livePayloads.nex.body?.data;
   const externalMarket = livePayloads.external.body?.data;
+  const trustSections = livePayloads.trust.body?.data?.sections ?? [];
+  const trustFields = Object.fromEntries(trustSections.flatMap((section) =>
+    (section.fields ?? []).map((field) => [field.key, field.value])));
+  const dailyUsdtPerDevice = livePayloads.platform.body?.data?.computerCompute?.yieldEstimate
+    ?.find((row) => row.key === "dailyUsdtPerBaseline")?.value;
+  const homeOverview = homeOverviewPayload?.data;
+  const onGridText = await page.locator('[data-home-section="on-grid"]').innerText();
+  const ledgerText = await page.locator('[data-home-section="earnings-ledger"]').innerText();
+  const computeMarketText = await page.locator('[data-home-section="compute-market"]').innerText();
+  const ledgerMode = homeOverview?.earningsLedgerMode;
+  const ledgerRows = homeOverview?.earningsLedger ?? [];
+  const ledgerSemanticsHonest = ledgerMode === "SETTLED"
+    ? ledgerRows.every((row) => row.synthetic === false)
+    : ledgerMode === "SANDBOX_QUOTE_EXAMPLES"
+      && ledgerRows.every((row) => row.synthetic === true)
+      && /不入账|not credited|không ghi có/i.test(ledgerText);
+  // Keep the visual artifact centered on the three cards repaired by this
+  // task; the JSON separately proves the lower trust/product sections.
+  await page.locator('[data-home-section="on-grid"]').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   await page.screenshot({ path: screenshot, fullPage: true });
-
-  const overviewResponsesBeforeRetry = responses.filter(({ url }) => url.includes("/api/app/home/overview")).length;
-  const computeRetry = page.locator('[data-home-action="compute-market-retry"]');
-  await computeRetry.focus();
-  const keyboardRetryResponse = page.waitForResponse((response) => response.url().includes("/api/app/home/overview"));
-  await page.keyboard.press("Space");
-  await keyboardRetryResponse;
-  const keyboardRetry = responses.filter(({ url }) => url.includes("/api/app/home/overview")).length > overviewResponsesBeforeRetry;
 
   const externalMarketLink = page.locator('[data-home-action="external-market-link"]');
   await externalMarketLink.focus();
@@ -124,15 +147,24 @@ try {
     productTrust: /商品信任资料|Product trust profile|Hồ sơ tin cậy sản phẩm/.test(body)
       && body.includes("StellarBox Pro"),
     trustCms: /算力需求支持的 NEX|Demand-backed NEX/.test(body) && body.includes("$128.4M"),
-    computeMarketTerminal: /算力市场|Compute market|Thị trường tính toán/.test(body)
-      && /暂不可用|Unavailable|unavailable|không khả dụng|重试|Retry|Thử lại/.test(body),
+    onGridLive: !/更新中|Updating|Đang cập nhật|重试|Retry|Thử lại/.test(onGridText)
+      && onGridText.includes(Number(homeOverview?.onGrid?.activeDevices).toLocaleString())
+      && /\+\$0\.\d+\/sec/.test(onGridText),
+    earningsLedger: await page.locator('[data-home-ledger-row="true"]').count() >= 5
+      && !/暂无|No earnings|Chưa có/.test(ledgerText)
+      && ledgerSemanticsHonest,
+    computeMarket: await page.locator('[data-home-market-row="true"]').count() >= 6
+      && !/暂不可用|Unavailable|unavailable|không khả dụng|重试|Retry|Thử lại/.test(computeMarketText),
+    homeProvenance: homeOverview?.serverCanonical === true
+      && homeOverview?.sourceEnvironment === "SANDBOX"
+      && homeOverview?.runId === expectedRunId
+      && homeOverview?.source === "server:sandbox-run-projection:nx_config_item,nx_admin_device_task,nx_product,nx_compute_sandbox_reward",
     warrantyIsNotInvented: /待后台配置|Not configured|Chưa cấu hình/.test(body),
-    keyboardRetry,
     keyboardLink,
     endpointStatuses: livePayloads.platform.status === 200
       && livePayloads.trust.status === 200
       && responses.some(({ url, status }) => url.includes("/api/store/catalog") && status === 200)
-      && responses.some(({ url, status }) => url.includes("/api/app/home/overview") && status === 503),
+      && responses.some(({ url, status }) => url.includes("/api/app/home/overview") && status === 200),
   };
   const failures = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
   const result = {
@@ -142,15 +174,52 @@ try {
     checks,
     publicStats: {
       fleetDevices: publicStats?.values?.fleetDevices,
+      onlineRatePct: publicStats?.values?.onlineRatePct,
+      onlineJitter: publicStats?.values?.onlineJitter,
       registeredUsersBase: publicStats?.values?.registeredUsersBase,
+      registeredUsersMonthlyGrowthPct: publicStats?.values?.registeredUsersMonthlyGrowthPct,
+      virtualUserCount: publicStats?.values?.virtualUserCount,
+      publishedDailyUsdtPerDevice: dailyUsdtPerDevice,
       serverCanonical: publicStats?.serverCanonical,
       sourceEnvironment: publicStats?.sourceEnvironment,
       runId: publicStats?.runId,
     },
     market: {
       nexRunId: nexMarket?.runId,
+      nexCurrentPrice: nexMarket?.currentPrice,
+      nexCostBasis: nexMarket?.costBasis,
+      nexSparkline: nexMarket?.sparkline,
       externalRunId: externalMarket?.runId,
       externalSymbols: externalMarket?.quotes?.map((quote) => quote.symbol),
+      externalQuotes: externalMarket?.quotes?.map((quote) => ({
+        symbol: quote.symbol,
+        priceUsd: quote.priceUsd,
+        change24hPct: quote.change24hPct,
+        volume24hUsd: quote.volume24hUsd,
+      })),
+    },
+    trust: {
+      runId: livePayloads.trust.body?.data?.runId,
+      sectionKeys: trustSections.map((section) => section.sectionKey),
+      tvlOnChain: trustFields.tvlOnChain,
+      mrrValue: trustFields.mrrValue,
+      activeAccountsValue: trustFields.activeAccountsValue,
+      devicesOnlineValue: trustFields.devicesOnlineValue,
+      payoutsProcessedValue: trustFields.payoutsProcessedValue,
+      nexNarrativeZh: trustFields["hero.zh"],
+    },
+    home: {
+      runId: homeOverview?.runId,
+      source: homeOverview?.source,
+      activeDevices: homeOverview?.onGrid?.activeDevices,
+      activeJobs: homeOverview?.onGrid?.activeJobs,
+      perSecUsdt: homeOverview?.onGrid?.perSecUsdt,
+      earningsLedgerMode: ledgerMode,
+      earningsLedgerRows: homeOverview?.earningsLedger?.length,
+      earningsLedgerSyntheticRows: ledgerRows.filter((row) => row.synthetic === true).length,
+      earningsLedgerDisclaimer: /不入账|not credited|không ghi có/i.test(ledgerText),
+      workloadRows: homeOverview?.marketBoard?.workloads?.length,
+      deviceRankingRows: homeOverview?.marketBoard?.deviceRankings?.length,
     },
     responses,
     coverageScope: "authenticated-home-data-only",

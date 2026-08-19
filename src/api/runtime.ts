@@ -152,7 +152,10 @@ export const genesisPointsApi = createGenesisPointsApi(apiClient);
 export const networkRankApi = createNetworkRankApi(apiClient);
 export const teamQuotaApi = createTeamQuotaApi(apiClient);
 export const proofApi = createProofApi(apiClient, apiRuntimeConfig.mode);
-export const appHomeApi = createAppHomeApi(apiClient);
+export const appHomeApi = createAppHomeApi(
+  apiClient,
+  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
+);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

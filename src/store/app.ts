@@ -410,6 +410,7 @@ export const useApp = defineStore("app", () => {
   const homeTruth = ref<AppHomeOverview | null>(null);
   const homeTruthStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const homeTruthError = ref<string | null>(null);
+  let homeTruthRefreshInFlight: { key: string; request: Promise<boolean> } | null = null;
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
@@ -738,6 +739,50 @@ export const useApp = defineStore("app", () => {
 
   // 权威不可达是常态输入,不 reject(selfcheck-remote-refresh-resilience);
   // 失败信号走返回值:false = 本轮没拿到权威快照(降级态已落好)。
+  function applyHomeEarnings(projection: AppHomeOverview) {
+    const range = projection.earnings;
+    earnings.value = {
+      ...earnings.value,
+      today: range.today.usdt ?? 0,
+      todayNEX: range.today.nex ?? 0,
+      thisWeek: range.week.usdt ?? 0,
+      thisMonth: range.month.usdt ?? 0,
+      total: range.all.usdt ?? 0,
+    };
+  }
+
+  function refreshHomeTruth(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+    if (!remoteApiEnabled) return Promise.resolve(true);
+    const key = `${request.accountKey}:${request.epoch}`;
+    if (homeTruthRefreshInFlight?.key === key) return homeTruthRefreshInFlight.request;
+    const refresh = (async () => {
+      const activeSession = sessionVault.read();
+      if (!activeSession || request.accountKey !== `user:${activeSession.user.userId}`) return false;
+      homeTruthStatus.value = "loading";
+      homeTruthError.value = null;
+      try {
+        const projection = await appHomeApi.fetch();
+        if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
+        homeTruth.value = projection;
+        applyHomeEarnings(projection);
+        homeTruthStatus.value = "ready";
+        return true;
+      } catch (cause) {
+        if (remoteAccountEpoch.isCurrent(request)) {
+          homeTruth.value = null;
+          homeTruthStatus.value = "error";
+          homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
+        }
+        return false;
+      }
+    })();
+    homeTruthRefreshInFlight = { key, request: refresh };
+    void refresh.finally(() => {
+      if (homeTruthRefreshInFlight?.request === refresh) homeTruthRefreshInFlight = null;
+    });
+    return refresh;
+  }
+
   async function refreshRemoteFleet(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const expectedAccountKey = request.accountKey;
@@ -748,6 +793,7 @@ export const useApp = defineStore("app", () => {
     try {
       const activeSession = sessionVault.read();
       if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
+      const homeRefresh = refreshHomeTruth(request);
       remoteFleetStatus.value = "loading";
       remoteFleetError.value = "";
       const [fleet, assignmentState] = await Promise.all([deviceE3Api.fleet(), taskAssignmentApi.state()]);
@@ -775,29 +821,8 @@ export const useApp = defineStore("app", () => {
         total: 0,
         history: [],
       };
-      homeTruthStatus.value = "loading";
-      try {
-        const projection = await appHomeApi.fetch();
-        if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
-        homeTruth.value = projection;
-        const range = projection.earnings;
-        earnings.value = {
-          ...earnings.value,
-          today: range.today.usdt ?? 0,
-          todayNEX: range.today.nex ?? 0,
-          thisWeek: range.week.usdt ?? 0,
-          thisMonth: range.month.usdt ?? 0,
-          total: range.all.usdt ?? 0,
-        };
-        homeTruthStatus.value = "ready";
-        homeTruthError.value = null;
-      } catch (cause) {
-        if (remoteAccountEpoch.isCurrent(request)) {
-          homeTruth.value = null;
-          homeTruthStatus.value = "error";
-          homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
-        }
-      }
+      await homeRefresh;
+      if (homeTruth.value && remoteAccountEpoch.isCurrent(request)) applyHomeEarnings(homeTruth.value);
       remoteFleetStatus.value = "ready";
       return true;
     } catch (cause) {
@@ -814,10 +839,6 @@ export const useApp = defineStore("app", () => {
             earningBuckets: createEarningBuckets(0, 0),
           }),
         };
-        earnings.value = { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] };
-        homeTruth.value = null;
-        homeTruthStatus.value = "error";
-        homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
       }
@@ -2418,7 +2439,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
     fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
