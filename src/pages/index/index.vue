@@ -128,7 +128,7 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled } from "@/api/runtime";
 import {
   deriveHomeTaskCards,
-  selectHomeWeeklySource,
+  isHomeWeeklyCardReady,
   type HomeTaskCardId,
 } from "@/lib/home-task-carousel";
 
@@ -167,10 +167,12 @@ const taskCarouselAnnouncement = ref("");
 let taskTouchStart: TouchPoint | null = null;
 let touchCollapsedExpandedCard = false;
 
-const weeklyCardReady = computed(() => !remoteApiEnabled || selectHomeWeeklySource(
-  [...weeklyQuestStore.tier1Quests, ...weeklyQuestStore.tier2Quests],
-  weeklyQuestStore.snapshot?.promoBanner ?? null,
-) !== null);
+const weeklyCardReady = computed(() => isHomeWeeklyCardReady(
+  remoteApiEnabled,
+  weeklyQuestStore.loading,
+  weeklyQuestStore.error,
+  weeklyQuestStore.snapshot,
+));
 const visibleTaskCards = computed<TaskCardId[]>(() =>
   deriveHomeTaskCards(platformConfig.syncFailed, {
     homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),

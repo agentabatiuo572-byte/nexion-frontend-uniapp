@@ -1,4 +1,4 @@
-import type { CanonicalPromoBanner, CanonicalQuest } from "@/api/quest-api";
+import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 
 export type HomeTaskCardId = "newcomer" | "weekly";
 
@@ -34,4 +34,15 @@ export function selectHomeWeeklySource(
   if (quest) return { kind: "quest", quest };
   if (promo?.status === "active") return { kind: "promo", promo };
   return null;
+}
+
+export function isHomeWeeklyCardReady(
+  remote: boolean,
+  loading: boolean,
+  error: string | null,
+  snapshot: QuestSnapshot | null,
+): boolean {
+  if (!remote) return true;
+  if (loading || error || !snapshot) return false;
+  return selectHomeWeeklySource(snapshot.quests, snapshot.promoBanner) !== null;
 }

@@ -75,6 +75,7 @@ import { refreshCanonicalOrders } from "@/store/order-canonical";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled } from "@/api/runtime";
 import { selectHomeWeeklySource } from "@/lib/home-task-carousel";
+import { navTo } from "@/lib/route";
 
 const MANAGED_POSITION = "home.conversion-banner";
 
@@ -94,7 +95,6 @@ onMounted(() => {
   });
 });
 
-const serverPromo = computed(() => app.homeTruth?.weeklyPromo ?? null);
 const weeklySource = computed(() => selectHomeWeeklySource(
   [...wq.tier1Quests, ...wq.tier2Quests],
   wq.snapshot?.promoBanner ?? null,
@@ -122,13 +122,6 @@ const contextLabel = computed(() => weeklyQuest.value ? t.value.headerTitles.mis
 const remainingLabel = computed(() => {
   if (remoteApiEnabled) {
     if (weeklyQuest.value) return weeklyQuest.value.layer === "WEEKLY_T1" ? "Tier 1" : "Tier 2";
-    const endAt = canonicalPromo.value ? serverPromo.value?.endAt : null;
-    if (endAt) {
-      const remainingMs = Math.max(0, Date.parse(endAt) - Date.now());
-      const days = Math.floor(remainingMs / 86400_000);
-      const hours = Math.floor((remainingMs % 86400_000) / 3600_000);
-      return `${days}d ${String(hours).padStart(2, "0")}h`;
-    }
     if (!canonicalPromo.value) return "—";
     const days = canonicalPromo.value.countdownDays;
     const hours = canonicalPromo.value.countdownHours;
@@ -189,9 +182,11 @@ function goTarget() {
     uni.navigateTo({ url: "/pages/missions/missions", fail: () => {} });
     return;
   }
-  const kind = remoteApiEnabled
-    ? canonicalPromo.value ? serverPromo.value?.product.kind : null
-    : promo.value.targetKind;
+  if (remoteApiEnabled) {
+    if (canonicalPromo.value) navTo("/store");
+    return;
+  }
+  const kind = promo.value.targetKind;
   if (!kind) return;
   uni.navigateTo({ url: `/pages/store/detail?id=${kind}`, fail: () => {} });
 }
