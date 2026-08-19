@@ -50,4 +50,15 @@ describe("home task carousel", () => {
     });
     expect(selectHomeWeeklySource([], pausedPromo)).toBeNull();
   });
+
+  it("does not keep an already claimed weekly mission on the home card", () => {
+    expect(selectHomeWeeklySource([{ ...weeklyQuest, status: "CLAIMED" }], pausedPromo)).toBeNull();
+    expect(selectHomeWeeklySource(
+      [{ ...weeklyQuest, status: "CLAIMED" }],
+      { ...pausedPromo, status: "active" },
+    )).toEqual({
+      kind: "promo",
+      promo: { ...pausedPromo, status: "active" },
+    });
+  });
 });

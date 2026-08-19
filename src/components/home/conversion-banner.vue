@@ -89,7 +89,6 @@ const locale = useLocaleStore();
 const wq = useWeeklyQuest();
 
 onMounted(() => {
-  if (remoteApiEnabled) void wq.refresh();
   void managedCopy.refresh(MANAGED_POSITION).then(() => {
     if (managedCopy.deliveries[MANAGED_POSITION]?.experimentId) void refreshCanonicalOrders(true);
   });
@@ -105,7 +104,7 @@ const canonicalPromo = computed(() => weeklySource.value?.kind === "promo" ? wee
 const promoMult = computed<number | null>(() => {
   if (!remoteApiEnabled) return 1.5;
   if (weeklyQuest.value) return wq.multiplier;
-  return canonicalPromo.value?.multiplier ?? serverPromo.value?.multiplier ?? null;
+  return canonicalPromo.value?.multiplier ?? null;
 });
 const baseReward = 800;
 const finalRewardText = computed(() => {
@@ -114,9 +113,7 @@ const finalRewardText = computed(() => {
       ? Math.round(weeklyQuest.value.rewardNex * (promoMult.value ?? 1))
       : canonicalPromo.value
         ? Math.round(canonicalPromo.value.baseReward * canonicalPromo.value.multiplier)
-        : serverPromo.value?.rewardNex == null
-          ? null
-          : Math.round(serverPromo.value.rewardNex)
+        : null
     : Math.round(baseReward * (promoMult.value ?? 1));
   return reward === null ? "—" : reward.toLocaleString();
 });
@@ -125,7 +122,7 @@ const contextLabel = computed(() => weeklyQuest.value ? t.value.headerTitles.mis
 const remainingLabel = computed(() => {
   if (remoteApiEnabled) {
     if (weeklyQuest.value) return weeklyQuest.value.layer === "WEEKLY_T1" ? "Tier 1" : "Tier 2";
-    const endAt = serverPromo.value?.endAt;
+    const endAt = canonicalPromo.value ? serverPromo.value?.endAt : null;
     if (endAt) {
       const remainingMs = Math.max(0, Date.parse(endAt) - Date.now());
       const days = Math.floor(remainingMs / 86400_000);
@@ -146,14 +143,14 @@ const remainingLabel = computed(() => {
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => {
   if (remoteApiEnabled) {
-    const value = canonicalPromo.value?.targetDaily ?? serverPromo.value?.product.dailyUsdt;
+    const value = canonicalPromo.value?.targetDaily;
     return value == null ? "—" : value.toFixed(2);
   }
   return promo.value.targetDaily.toFixed(2);
 });
 const managedCopyText = computed(() => managedCopy.localized(MANAGED_POSITION, locale.code));
 const subtitleText = computed(() =>
-  weeklyQuest.value?.name || managedCopyText.value || (remoteApiEnabled ? (canonicalPromo.value?.targetDevice || serverPromo.value?.product.name || "—") : promo.value.multiplier > 0
+  weeklyQuest.value?.name || managedCopyText.value || (remoteApiEnabled ? (canonicalPromo.value?.targetDevice || "—") : promo.value.multiplier > 0
     ? fmt(t.value.home.weeklyQuestActivateToClaim, {
         device: deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
       })
@@ -192,7 +189,9 @@ function goTarget() {
     uni.navigateTo({ url: "/pages/missions/missions", fail: () => {} });
     return;
   }
-  const kind = remoteApiEnabled ? serverPromo.value?.product.kind : promo.value.targetKind;
+  const kind = remoteApiEnabled
+    ? canonicalPromo.value ? serverPromo.value?.product.kind : null
+    : promo.value.targetKind;
   if (!kind) return;
   uni.navigateTo({ url: `/pages/store/detail?id=${kind}`, fail: () => {} });
 }
