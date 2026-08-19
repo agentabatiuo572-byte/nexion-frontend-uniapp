@@ -86,7 +86,8 @@
       <DoTheMathCard />
       <EarningsLedgerCard />
 
-      <!-- ZONE 6: market (NexPriceCard hidden for current stage, owner 2026-07-09) -->
+      <!-- ZONE 6: server-authoritative NEX trend + workload board -->
+      <NexPriceCard />
       <MarketBoardCard />
     </CardStagger>
   </AppChassis>
@@ -111,6 +112,7 @@ import NetworkPulseCard from "@/components/home/network-pulse-card.vue";
 import NovaCardSlot from "@/components/home/nova-card-slot.vue";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
+import NexPriceCard from "@/components/home/nex-price-card.vue";
 import MarketBoardCard from "@/components/home/market-board-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

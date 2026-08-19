@@ -30,9 +30,9 @@
               </view>
             </view>
             <view class="text-right">
-              <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ fmtPrice(nex.priceUSD) }}</text>
-              <text class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
-                {{ nexUp ? "▲" : "▼" }} {{ Math.abs(nex.change24h).toFixed(2) }}% (24h)
+              <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ nexPriceText }}</text>
+              <text v-if="market.isMockMode || market.remoteReady" class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
+                {{ nexDirection }} {{ Math.abs(nex.change24h).toFixed(2) }}% (24h)
               </text>
             </view>
           </view>
@@ -51,8 +51,11 @@
           </view>
 
           <!-- chart -->
-          <view class="rounded-xl overflow-hidden" :style="chartBoxStyle">
+          <view v-if="nexChartData.length >= 2" class="rounded-xl overflow-hidden" :style="chartBoxStyle">
             <NexChart :data="nexChartData" :up="nexUp" />
+          </view>
+          <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
+            <text class="active:opacity-70" :style="marketHoldBodyStyle" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : t.home.networkStatUpdating }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
@@ -85,9 +88,8 @@
           </view>
         </view>
 
-        <template v-if="market.isMockMode">
         <!-- ───────── EXCHANGE LISTINGS ───────── -->
-        <view class="rounded-2xl" :style="cardStyle">
+        <view v-if="market.isMockMode" class="rounded-2xl" :style="cardStyle">
           <text class="block font-mono-tabular" :style="listLabelStyle">{{ t.marketPage.listings.label }}</text>
           <text class="block" :style="listExStyle">{{ t.marketPage.listings.exchanges }}</text>
           <view class="inline-flex items-center" :style="pendingChipStyle">
@@ -95,6 +97,7 @@
           </view>
         </view>
 
+        <template v-if="market.isMockMode || market.externalReady">
         <!-- ───────── CATEGORY TABS ───────── -->
         <view class="grid grid-cols-5" :style="catGridStyle">
           <!-- 《08》§2 nx-press-sm 恒定:选中态原先是空 class,按下零反馈 -->
@@ -129,11 +132,13 @@
           </template>
         </view>
 
+        <text v-if="!market.isMockMode" class="block text-center" :style="sourceStyle">{{ market.externalSourceEnvironment }} · SERVER</text>
         <text class="block text-center" :style="noteStyle">{{ t.marketPage.note }}</text>
         </template>
         <view v-else data-testid="market-comparables-hold" :style="marketHoldStyle">
           <text class="block" :style="marketHoldTitleStyle">{{ t.marketPage.comparablesHoldTitle }}</text>
           <text class="block" :style="marketHoldBodyStyle">{{ t.marketPage.comparablesHoldBody }}</text>
+          <text class="block active:opacity-70" :style="retryMarketStyle" @click="retryMarkets">{{ t.ui.retry }}</text>
         </view>
       </view>
     </view>
@@ -151,7 +156,7 @@ import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
 import {
   TOKENS, CATEGORIES, TIMEFRAMES,
-  type TokenCategory, type Timeframe,
+  type Token, type TokenCategory, type Timeframe,
 } from "@/mock/tokens";
 
 const t = useT();
@@ -171,7 +176,8 @@ const nex = computed(() => market.isMockMode ? NEX : ({
   spark24h: market.klineHourly,
   spark30d: market.klineDaily,
 }));
-onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
+const nexPriceText = computed(() => market.isMockMode || market.remoteReady ? fmtPrice(nex.value.priceUSD) : "—");
+onMounted(() => { if (!market.isMockMode) void market.syncAll(); });
 
 type CatFilter = TokenCategory | "all" | "watchlist";
 const activeCat = ref<CatFilter>("all");
@@ -188,8 +194,26 @@ function toggleStar(sym: string) {
   starState[sym] = !starState[sym];
 }
 
+const colors: Record<string, string> = {
+  RNDR: "#CF1E4D", TAO: "#FFD23F", AKT: "#FF414C", FIL: "#0090FF", GRT: "#6F4CFF",
+};
+const remoteTokens = computed<Token[]>(() => [...(market.remoteReady ? [{
+  symbol: "NEX", name: "NexGrid", category: "self" as const, color: "#C6FF3A",
+  priceUSD: market.nexPriceUSDT, change24h: market.change24hPct, change7d: 0,
+  volume24hUSD: market.volume24hUSDT, marketCapUSD: market.marketCap, fdvUSD: 0,
+  circulating: market.circulating, totalSupply: 0, spark24h: market.klineHourly,
+  spark30d: market.klineDaily, ath: 0, athDate: "", rank: 0,
+}] : []), ...market.externalQuotes.map((quote) => ({
+  symbol: quote.symbol, name: quote.name, category: quote.category,
+  color: colors[quote.symbol] ?? "var(--v5-brand-2)",
+  priceUSD: quote.priceUsd, change24h: quote.change24hPct, change7d: 0,
+  volume24hUSD: quote.volume24hUsd, marketCapUSD: 0, fdvUSD: 0,
+  circulating: 0, totalSupply: 0, spark24h: quote.sparkline,
+  spark30d: quote.sparkline, ath: 0, athDate: "", rank: 0,
+}))]);
+
 const filtered = computed(() => {
-  let list = TOKENS;
+  let list = market.isMockMode ? TOKENS : remoteTokens.value;
   if (activeCat.value === "watchlist") {
     list = list.filter((tk) => starState[tk.symbol] === true);
   } else if (activeCat.value !== "all") {
@@ -202,10 +226,15 @@ const filtered = computed(() => {
   });
 });
 
+function retryMarkets() {
+  void market.syncAll();
+}
+
 const nexChartData = computed(() =>
   tf.value === "1M" || tf.value === "ALL" ? nex.value.spark30d : nex.value.spark24h,
 );
-const nexUp = computed(() => nex.value.change24h > 0);
+const nexUp = computed(() => nex.value.change24h >= 0);
+const nexDirection = computed(() => nex.value.change24h > 0 ? "▲" : nex.value.change24h < 0 ? "▼" : "•");
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
@@ -215,6 +244,7 @@ function fmtPrice(n: number): string {
   return `$${n.toFixed(4)}`;
 }
 function fmtBig(n: number): string {
+  if (n <= 0) return "—";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
@@ -260,7 +290,7 @@ const nexPriceStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHe
 const nexChangeStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
   fontSize: "12px",
-  color: nexUp.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
+  color: nex.value.change24h > 0 ? "var(--v5-brand)" : nex.value.change24h < 0 ? "var(--v5-brand-2)" : "var(--v5-ink-4)",
 }));
 const segWrapStyle: CSSProperties = {
   marginTop: "12px",
@@ -381,6 +411,7 @@ const noteStyle: CSSProperties = {
   lineHeight: 1.625,
   paddingTop: "4px",
 };
+const sourceStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", letterSpacing: "0.08em" };
 const marketHoldStyle: CSSProperties = {
   padding: "16px",
   borderRadius: "16px",
@@ -388,6 +419,7 @@ const marketHoldStyle: CSSProperties = {
 };
 const marketHoldTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const marketHoldBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", lineHeight: "18px", color: "var(--v5-ink-3)" };
+const retryMarketStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-brand)", fontWeight: 600 };
 </script>
 
 <style scoped>

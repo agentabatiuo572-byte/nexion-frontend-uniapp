@@ -183,7 +183,7 @@
           <SpecTable :rows="aiPerfRows" brand-value />
         </template>
 
-        <!-- === Section 7: Trust badges (mock-only until backed by a server projection) === -->
+        <!-- === Section 7: Trust material === -->
         <template v-if="!remoteApiEnabled">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
           <view class="mx-4 rounded-2xl" :style="trustCardStyle">
@@ -198,6 +198,27 @@
             <view class="flex flex-wrap" style="margin-top: 10px; gap: 8px">
               <text v-for="c in compliance" :key="c" :style="complianceChipStyle">{{ c }}</text>
             </view>
+          </view>
+        </template>
+        <template v-else>
+          <view style="padding: 22px 16px 4px"><SectionHeader :title="productTrustTitle" /></view>
+          <view class="mx-4 rounded-2xl" :style="trustCardStyle" data-testid="product-trust-material">
+            <text v-if="trustStatus === 'loading' || trustStatus === 'idle'" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
+            <template v-else-if="trustStatus === 'ready' && (productComplianceRows.length || productAuditRows.length)">
+              <view v-for="row in productComplianceRows" :key="row.Label" :style="trustDisclosureRowStyle">
+                <text class="block" :style="trustDisclosureTitleStyle">{{ row.Label }}</text>
+                <text class="block" :style="trustBodyStyle">{{ row.Body }}</text>
+              </view>
+              <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle" @click="openTrustUrl(row.Url)">
+                <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
+                <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
+                <text v-if="row.Url" class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
+              </view>
+            </template>
+            <template v-else>
+              <text class="block" :style="trustBodyStyle">{{ t.trust.errorUnavailable }}</text>
+              <text class="block active:opacity-70" :style="trustRetryStyle" @click="refreshTrustMaterial">{{ t.ui.retry }}</text>
+            </template>
           </view>
         </template>
 
@@ -233,6 +254,7 @@ import LiveSocialProof from "@/components/store/live-social-proof.vue";
 import SpecTable from "@/components/store/spec-table.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -247,21 +269,28 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
+import type { TrustLocale } from "@/api/trust-section-api";
+import { trustNumberedRows } from "@/lib/trust-fields";
+import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
 
 const t = useT();
+const locale = useLocaleStore();
 const phase = useProductPhase();
+const trustLanguage = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
+const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
 
 const id = ref("");
 const catalogRetrying = ref(false);
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
-  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), remoteApiEnabled ? refreshTrust() : Promise.resolve(true)]);
 });
 
 onShow(() => {
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
+  if (remoteApiEnabled) void refreshTrust();
 });
 
 async function retryCatalog() {
@@ -393,6 +422,31 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
 // their registered names in every locale.
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
 const compliance = ["SOC 2 Type II", "ISO 27001", "CE / FCC"];
+const productComplianceSection = computed(() => trustSections.value.find((section) => section.sectionKey === "complianceBadges"));
+const productAuditSection = computed(() => trustSections.value.find((section) => section.sectionKey === "auditsReserves"));
+const productTrustTitle = computed(() => t.value.store.detTrustedBy);
+const productComplianceRows = computed(() => trustNumberedRows(productComplianceSection.value?.fields ?? [], "badge", ["Label", "Body"] as const, trustLanguage.value));
+const productAuditRows = computed(() => trustNumberedRows(productAuditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, trustLanguage.value));
+
+async function refreshTrustMaterial() {
+  if (await refreshTrust(true)) recordPublishedTrustViews(["complianceBadges", "auditsReserves"], trustLanguage.value);
+}
+
+function openTrustUrl(raw: string) {
+  const value = raw.trim();
+  if (!value) return;
+  if (/^\/pages\/[A-Za-z0-9/_-]+$/.test(value)) { uni.navigateTo({ url: value, fail: () => {} }); return; }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return;
+    // #ifdef H5
+    window.open(parsed.toString(), "_blank");
+    // #endif
+    // #ifndef H5
+    (globalThis as { plus?: { runtime?: { openURL: (url: string) => void } } }).plus?.runtime?.openURL(parsed.toString());
+    // #endif
+  } catch { /* Invalid CMS link remains non-interactive. */ }
+}
 const faqs = computed(() => {
   const f = t.value.store.faq;
   return [f.location, f.withdraw, f.demand, f.refund];
@@ -657,6 +711,11 @@ const complianceChipStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   letterSpacing: "-0.005em",
 };
+const trustDisclosureRowStyle: CSSProperties = { padding: "12px 0", borderBottom: "1px solid var(--v5-border)" };
+const trustDisclosureTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const trustBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
+const trustLinkStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
+const trustRetryStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
 // FAQ de-carded to a transparent hairline group (spec: FAQ → floor). The
 // container border-top opens the group; each item keeps its own row hairline.
 const faqCardStyle: CSSProperties = {
