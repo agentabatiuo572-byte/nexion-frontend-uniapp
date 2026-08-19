@@ -111,7 +111,7 @@ export const commissionConfigApi = createCommissionConfigApi(
 );
 export const stakingApi = createStakingApi(apiClient);
 export const exchangeApi = createExchangeApi(apiClient);
-export const marketApi = createMarketApi(apiClient);
+export const marketApi = createMarketApi(apiClient, apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote");
 export const genesisApi = createGenesisApi(apiClient);
 export const repurchaseApi = createRepurchaseApi(apiClient);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
@@ -124,7 +124,7 @@ export const pointsApi = createPointsApi(apiClient);
 export const voucherApi = createVoucherApi(apiClient);
 export const contentCopyApi = createContentCopyApi(apiClient);
 export const notificationApi = createNotificationApi(apiClient);
-export const trustSectionApi = createTrustSectionApi(apiClient);
+export const trustSectionApi = createTrustSectionApi(apiClient, apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote");
 export const i18nApi = createI18nApi(apiClient);
 export const janusApi = createJanusApi(apiClient);
 export const behaviorAnalyticsApi = createBehaviorAnalyticsApi(apiClient);

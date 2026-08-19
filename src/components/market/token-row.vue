@@ -38,7 +38,7 @@
           <polyline
             :points="sparkPoints"
             fill="none"
-            :stroke="up ? 'var(--v5-brand)' : 'var(--v5-brand-2)'"
+            :stroke="trendColor"
             stroke-width="1"
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -50,7 +50,7 @@
 
     <!-- 24h change -->
     <text class="text-right font-mono-tabular tabular-nums" :style="changeStyle">
-      {{ up ? "+" : "" }}{{ token.change24h.toFixed(2) }}%
+      {{ token.change24h > 0 ? "+" : "" }}{{ token.change24h.toFixed(2) }}%
     </text>
   </view>
 </template>
@@ -68,7 +68,9 @@ const SPARK_W = 60;
 const SPARK_H = 14;
 
 const isNEX = computed(() => props.token.symbol === "NEX");
-const up = computed(() => props.token.change24h > 0);
+const trendColor = computed(() => props.token.change24h > 0
+  ? "var(--v5-brand)"
+  : props.token.change24h < 0 ? "var(--v5-brand-2)" : "var(--v5-ink-4)");
 
 function fmtPrice(n: number): string {
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -77,6 +79,7 @@ function fmtPrice(n: number): string {
   return `$${n.toFixed(4)}`;
 }
 function fmtBig(n: number): string {
+  if (n <= 0) return "—";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
@@ -138,7 +141,7 @@ const subStyle: CSSProperties = {
 const priceStyle: CSSProperties = { color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
 const changeStyle = computed<CSSProperties>(() => ({
   fontWeight: 600,
-  color: up.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
+  color: trendColor.value,
 }));
 </script>
 

@@ -1,9 +1,3 @@
-<!--
-  NexPriceCard — ZONE 6 $NEX live price (ported from mission-control.tsx
-  NexPriceCard). Pair label + live price + 24h change (tinted) + hourly kline
-  sparkline. Reads useMarket (live, ticking).
-  Hidden for current stage (owner 2026-07-09): not rendered on index.vue.
--->
 <template>
   <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 12px 14px; position: relative; overflow: hidden" @click="goMarket">
     <view class="grid items-center gap-3" style="grid-template-columns: 1fr 76px">
@@ -13,36 +7,46 @@
           <text style="color: var(--v5-ink-4)">{{ t.home.nexPricePair }}</text>
         </view>
         <view class="mt-1 flex items-baseline gap-1.5">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.020em; line-height: 1">${{ priceText }}</text>
-          <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: tint, fontWeight: 500 }">{{ changeText }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.020em; line-height: 1">{{ priceText }}</text>
+          <text v-if="ready" class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: tint, fontWeight: 500 }">{{ changeText }}</text>
+          <text v-else class="active:opacity-70" :style="retryStyle" @click.stop="retry">{{ market.remoteError ? t.ui.retry : t.home.networkStatUpdating }}</text>
         </view>
       </view>
       <view style="height: 36px">
-        <HomeSparkline :data="kline" :color="tint" :height="36" />
+        <HomeSparkline v-if="ready" :data="kline" :color="tint" :height="36" />
+        <view v-else :style="placeholderStyle" />
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
 import HomeSparkline from "./home-sparkline.vue";
 
 const t = useT();
 const market = useMarket();
-
+const ready = computed(() => market.remoteReady && market.nexPriceUSDT > 0 && market.klineHourly.length >= 2);
 const change = computed(() => market.change24hPct);
 const kline = computed(() => market.klineHourly);
-const livePrice = computed(() => market.nexPriceUSDT);
 const isUp = computed(() => change.value >= 0);
 const tint = computed(() => (isUp.value ? "var(--v5-success)" : "var(--v5-danger)"));
-
-const priceText = computed(() => livePrice.value.toFixed(3));
+const priceText = computed(() => ready.value ? `$${market.nexPriceUSDT.toFixed(3)}` : "—");
 const changeText = computed(() => `${isUp.value ? "+" : ""}${change.value.toFixed(1)}%`);
+const retryStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", fontWeight: 500 };
+const placeholderStyle: CSSProperties = { height: "2px", marginTop: "17px", borderRadius: "999px", background: "var(--v5-border)" };
+
+function retry() {
+  void market.syncRemote();
+}
 
 function goMarket() {
   uni.navigateTo({ url: "/pages/market/market", fail: () => {} });
 }
+
+onMounted(() => {
+  if (!market.isMockMode) void market.syncRemote();
+});
 </script>
