@@ -1,13 +1,13 @@
 <!--
   MarketBoardCard — ZONE 6 compute-price board (ported from mission-control.tsx
   MarketBoardCard). Header + column row + 6 mock market rows (tag · model · vol ·
-  sparkline · live price/unit · 24h). Price wiggles live via useTicker. Rows are
-  mock data (model/tag/vol proper nouns, untranslated).
+  sparkline · live price/unit · 24h). The local demo price wiggles via
+  useTicker; remote/Sandbox rows come from the Home canonical projection.
 -->
 <template>
-  <view>
+  <view data-home-section="compute-market">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text v-if="!remoteApiEnabled" class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text v-if="!remoteApiEnabled" class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text><text v-else-if="app.homeTruth?.sourceEnvironment === 'SANDBOX'" class="font-mono-tabular" style="font-size: 10px; color: var(--v5-ink-4)">· SANDBOX</text></text>
       <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">{{ t.home.marketBoardOpen }} →</text>
     </view>
 
@@ -47,7 +47,7 @@
       </view>
     </view>
     <view v-else class="rounded-xl" style="background: var(--v5-surface); padding: 14px">
-      <view v-for="row in homeMarketRows" :key="row.code" class="flex items-center justify-between py-1.5 active:opacity-70" role="link" tabindex="0" @click="goEarn" @keydown.enter.stop.prevent="goEarn" @keydown.space.stop.prevent="goEarn">
+      <view v-for="row in homeMarketRows" :key="row.code" data-home-market-row="true" class="flex items-center justify-between py-1.5 active:opacity-70" role="link" tabindex="0" @click="goEarn" @keydown.enter.stop.prevent="goEarn" @keydown.space.stop.prevent="goEarn">
         <text class="truncate" style="font-size: 12px; color: var(--v5-ink-2)">{{ row.name ?? row.code }}</text>
         <text class="font-mono-tabular" style="color: var(--v5-ink)">{{ row.price === null ? "—" : `$${row.price}` }} <text style="color: var(--v5-ink-3)">{{ row.deltaPct === null ? "" : `${row.deltaPct >= 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%` }}</text></text>
       </view>
@@ -123,6 +123,6 @@ function goEarn() {
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
 }
 function retryHome() {
-  void app.refreshRemoteFleet();
+  void app.refreshHomeTruth();
 }
 </script>

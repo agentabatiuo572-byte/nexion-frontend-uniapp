@@ -16,6 +16,8 @@ const valid = {
     month: { usdt: 5, nex: 10, jobCount: 12 },
     all: { usdt: 6, nex: 11, jobCount: 13 },
   },
+  earningsLedgerMode: "SETTLED",
+  earningsLedger: [{ id: "earning-1", client: "Pocket Studios", model: "SDXL Turbo", rewardUsdt: 0.00032, completedAt: "2026-08-15T00:00:00Z", synthetic: false }],
   marketBoard: { workloads: [], deviceRankings: [] },
   weeklyPromo: null,
   onboarding: { cumulativePaidUsdt: 99, activeDevices: 10 },

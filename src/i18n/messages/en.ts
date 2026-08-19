@@ -435,6 +435,8 @@ export const en = {
     doMathSeeCta: "See the math",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Earnings ledger",
+    sandboxQuoteLedgerTitle: "Sandbox task quote examples",
+    sandboxQuoteNoCredit: "Demo only · not credited",
     earningsLedgerViewAll: "View all",
     // NexPriceCard (ZONE 6)
     nexPricePair: "NEX / USDT",

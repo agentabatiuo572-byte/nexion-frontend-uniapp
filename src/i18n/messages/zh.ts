@@ -376,6 +376,8 @@ export const zh: Messages = {
     doMathSeeCta: "查看测算",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "收益流水",
+    sandboxQuoteLedgerTitle: "Sandbox 任务报价示例",
+    sandboxQuoteNoCredit: "仅联调展示 · 不入账",
     earningsLedgerViewAll: "查看全部",
     // NexPriceCard (ZONE 6)
     nexPricePair: "NEX / USDT",

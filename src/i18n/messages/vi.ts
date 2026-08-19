@@ -391,6 +391,8 @@ export const vi: Messages = {
     doMathSeeCta: "Xem cách tính",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Sổ thu nhập",
+    sandboxQuoteLedgerTitle: "Ví dụ báo giá tác vụ Sandbox",
+    sandboxQuoteNoCredit: "Chỉ minh họa · không ghi có",
     earningsLedgerViewAll: "Xem tất cả",
     // NexPriceCard (ZONE 6)
     nexPricePair: "NEX / USDT",

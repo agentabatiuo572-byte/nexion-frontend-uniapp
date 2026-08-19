@@ -2,13 +2,13 @@
   OnGridSection — ZONE 2 "what the network is computing now" (ported from
   mission-control.tsx OnGridSection). Header (On NexGrid grid · now · Map) + 3
   client rows (id badge · model · client·city · GPUs) + live footer. Client list
-  is mock data (proper nouns, untranslated).
+  is server-owned in remote/Sandbox; the local demo alone uses the mock rows.
 -->
 <template>
-  <view>
+  <view data-home-section="on-grid">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.onGridNow }}</text></text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goGlobe">{{ t.home.onGridMap }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.onGridNow }}<text v-if="app.homeTruth?.sourceEnvironment === 'SANDBOX'"> · SANDBOX</text></text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="on-grid-map" @click="goGlobe" @keydown.enter.stop.prevent="goGlobe" @keydown.space.stop.prevent="goGlobe">{{ t.home.onGridMap }} →</text>
     </view>
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
@@ -30,14 +30,19 @@
       <!-- 页脚活数字与脉搏三格同判据降级(主人 2026-08-06 拍板包 G P2#3 选项 a):
            此前配置坏时这里回种子锚,与隔壁「更新中」占位同屏自相矛盾;现口径一致。
            单项坏降单侧(规格异常3「单项非法只坏本格」);双坏切单条占位 + 点按重试。
-           上方三行客户内容是静态样本(非配置数值),不在降级面。 -->
+           上方客户内容在远端来自 Home canonical 投影；仅本地 demo 使用静态样本。 -->
       <view
         v-if="devicesBad && fleetBad"
         class="px-4 py-2 flex items-center justify-center font-mono-tabular active:opacity-70"
         style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3); min-height: 44px"
-        @click="retryConfig"
+        :role="app.homeTruthStatus === 'error' ? 'button' : undefined"
+        :tabindex="app.homeTruthStatus === 'error' ? 0 : undefined"
+        data-home-action="on-grid-status"
+        @click="app.homeTruthStatus === 'error' && retryConfig()"
+        @keydown.enter.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()"
+        @keydown.space.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()"
       >
-        <text>{{ t.home.networkStatUpdating }} · <text style="color: var(--v5-tech-cyan-ink)">{{ t.home.networkStatRetry }}</text></text>
+        <text>{{ gridStatusText }}<text v-if="app.homeTruthStatus === 'error'"> · <text style="color: var(--v5-tech-cyan-ink)">{{ t.home.networkStatRetry }}</text></text></text>
       </view>
       <view v-else class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="devicesBad">{{ t.home.networkStatUpdating }}</text>
@@ -71,17 +76,22 @@ const psHealth = computed(() => {
 });
 const devicesBad = computed(() => remoteApiEnabled ? app.homeTruth?.onGrid.activeDevices == null : cfg.syncFailed || !psHealth.value?.devicesOk);
 const fleetBad = computed(() => remoteApiEnabled ? app.homeTruth?.onGrid.perSecUsdt == null : cfg.syncFailed || !psHealth.value?.fleetOk);
+const gridStatusText = computed(() => remoteApiEnabled && app.homeTruthStatus === "error"
+  ? t.value.uiChrome.unavailable
+  : t.value.home.networkStatUpdating);
 const perSecText = computed(() => {
   if (remoteApiEnabled) {
     const value = app.homeTruth?.onGrid.perSecUsdt;
-    return value == null ? "" : `+$${value.toFixed(1)}/sec`;
+    if (value == null) return "";
+    const digits = value < 0.1 ? 4 : 1;
+    return `+$${value.toFixed(digits)}/sec`;
   }
   const ps = cfg.config.publicStats;
   if (!ps || fleetBad.value) return "";
   return `+$${payoutPerSecUsdOf(ps).toFixed(1)}/sec`;
 });
 function retryConfig() {
-  if (remoteApiEnabled) void app.refreshRemoteFleet();
+  if (remoteApiEnabled) void app.refreshHomeTruth();
   else void cfg.load();
 }
 
