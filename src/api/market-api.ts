@@ -62,8 +62,26 @@ function finite(value: unknown): number | null {
 }
 
 function sampledAt(value: unknown): string | null {
-  if (typeof value !== "string" || !value.trim() || !Number.isFinite(Date.parse(value))) return null;
-  return value;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  // Backend DATETIME projections are deliberately zone-less. Validate that
+  // exact wire format component-by-component instead of delegating it to
+  // Date.parse(), whose handling differs between Android WebView and iOS.
+  const local = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?$/.exec(normalized);
+  if (local) {
+    const [, year, month, day, hour, minute, second] = local.map(Number);
+    const candidate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    if (candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1
+        && candidate.getUTCDate() === day && candidate.getUTCHours() === hour
+        && candidate.getUTCMinutes() === minute && candidate.getUTCSeconds() === second) {
+      return normalized;
+    }
+    return null;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(normalized)
+      || !Number.isFinite(Date.parse(normalized))) return null;
+  return normalized;
 }
 
 function expectedSource(mode: ApiMode, production: string): string {
@@ -77,7 +95,7 @@ function provenance(data: Record<string, unknown>, mode: ApiMode, productionSour
   if (mode === "remote") return data.sourceEnvironment === "PRODUCTION" && data.runId === "";
   if (data.sourceEnvironment !== "SANDBOX" || typeof data.runId !== "string" || !RUN_ID.test(data.runId)) return false;
   const currentRun = captureCommerceSandboxRun().runId;
-  return currentRun === null || currentRun === data.runId;
+  return currentRun !== null && currentRun === data.runId;
 }
 
 export function parseNexMarketSnapshot(value: unknown, mode: ApiMode = "remote"): NexMarketSnapshot {

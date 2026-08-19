@@ -36,6 +36,8 @@ export interface AppHomeOnGridClient {
 }
 
 export interface AppHomeOverview {
+  sourceEnvironment: "PRODUCTION";
+  runId: "";
   generatedAt: string;
   accountScope: string;
   earnings: { today: AppHomePeriod; week: AppHomePeriod; month: AppHomePeriod; all: AppHomePeriod };
@@ -53,6 +55,8 @@ export interface AppHomeOverview {
 }
 
 type Row = Record<string, unknown>;
+const APP_HOME_SOURCE = "server:nx_compute_receipt,nx_compute_task,nx_user_device,nx_product,nx_growth_promo_banner";
+const APP_HOME_ACCOUNT_SCOPE = "authenticated-account";
 const TASKS = new Set<TaskCategory>(["IG", "VG", "LL", "FT", "EM", "SP"]);
 const DEVICE_KINDS = new Set<DeviceKind>(["phone", "cloud-share", "pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"]);
 const isRow = (v: unknown): v is Row => !!v && typeof v === "object" && !Array.isArray(v);
@@ -116,7 +120,9 @@ export function parseAppHomeOverview(value: unknown): AppHomeOverview {
   const market = isRow(row.marketBoard) ? row.marketBoard : null;
   const onboarding = isRow(row.onboarding) ? row.onboarding : null;
   const grid = isRow(row.onGrid) ? row.onGrid : null;
-  if (!generatedAt || !accountScope || !source || row.serverCanonical !== true || !e || !market || !onboarding || !grid
+  if (!generatedAt || row.sourceEnvironment !== "PRODUCTION" || row.runId !== ""
+      || accountScope !== APP_HOME_ACCOUNT_SCOPE || source !== APP_HOME_SOURCE
+      || row.serverCanonical !== true || !e || !market || !onboarding || !grid
       || !isRow(e.today) || !isRow(e.week) || !isRow(e.month) || !isRow(e.all)
       || !Array.isArray(market.workloads) || !Array.isArray(market.deviceRankings) || !Array.isArray(grid.clients)) return invalid();
   const promoRow = row.weeklyPromo;
@@ -140,7 +146,7 @@ export function parseAppHomeOverview(value: unknown): AppHomeOverview {
   if ((onboarding.cumulativePaidUsdt != null && onboardingPaid === null) || (onboarding.activeDevices != null && onboardingDevices === null)
       || (grid.activeDevices != null && activeDevices === null) || (grid.activeJobs != null && activeJobs === null) || (grid.perSecUsdt != null && perSecUsdt === null)) return invalid();
   return {
-    generatedAt, accountScope,
+    sourceEnvironment: "PRODUCTION", runId: "", generatedAt, accountScope,
     earnings: { today: period(e.today), week: period(e.week), month: period(e.month), all: period(e.all) },
     marketBoard: { workloads: market.workloads.map(workload), deviceRankings: market.deviceRankings.map(ranking) },
     weeklyPromo, onboarding: { cumulativePaidUsdt: onboardingPaid, activeDevices: onboardingDevices },

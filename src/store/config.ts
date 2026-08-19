@@ -4,7 +4,9 @@ import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./conf
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
-import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
+import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { captureCommerceSandboxRun, subscribeCurrentCommerceSandboxRun } from "@/api/order-api";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -117,6 +119,7 @@ export const useConfig = defineStore("config", () => {
     },
   };
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
+  const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
@@ -156,8 +159,23 @@ export const useConfig = defineStore("config", () => {
    * 🔴 失败时**不得**把 config 重置成前端种子 —— 那等于回退写死值(FEAT-RISK02 异常3)。
    */
   const loading = ref(false);
+  let reloadAfterCurrentFlight = false;
+
+  function clearRemotePlatformAuthority() {
+    if (!remoteApiEnabled) return;
+    publicStatsAuthority.value = null;
+    config.value = {
+      ...config.value,
+      publicStats: { ...unavailableServerConfig.publicStats },
+    };
+    syncFailed.value = true;
+  }
+
   async function load(): Promise<void> {
-    if (loading.value) return;
+    if (loading.value) {
+      reloadAfterCurrentFlight = true;
+      return;
+    }
     loading.value = true;
     try {
       if (!remoteApiEnabled) {
@@ -166,6 +184,23 @@ export const useConfig = defineStore("config", () => {
         return;
       }
       const remote = await platformConfigApi.platformConfig();
+      const expectsSandbox = apiRuntimeConfig.modeExplicit && apiRuntimeConfig.mode === "sandbox";
+      if (expectsSandbox && remote.publicStatsAuthority.sourceEnvironment !== "SANDBOX") {
+        throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
+      }
+      if (!expectsSandbox && remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION") {
+        throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
+      }
+      if (remote.publicStatsAuthority.sourceEnvironment === "SANDBOX") {
+        const scope = captureCommerceSandboxRun();
+        if (scope.runId === null) {
+          clearRemotePlatformAuthority();
+          return;
+        }
+        if (scope.runId !== remote.publicStatsAuthority.runId) {
+          throw new Error("H9_PUBLIC_STATS_RUN_MISMATCH");
+        }
+      }
       config.value = {
         // The server snapshot is authoritative for every field it provides.
         // Keep only the client-only structural branches that are not part of
@@ -187,12 +222,32 @@ export const useConfig = defineStore("config", () => {
         computeShare: remote.computeShare,
         share: remote.share,
       };
+      publicStatsAuthority.value = remote.publicStatsAuthority;
       syncFailed.value = false;
     } catch {
-      syncFailed.value = true;
+      clearRemotePlatformAuthority();
     } finally {
       loading.value = false;
+      if (reloadAfterCurrentFlight && captureCommerceSandboxRun().runId !== null) {
+        reloadAfterCurrentFlight = false;
+        void load();
+      }
     }
+  }
+
+  if (remoteApiEnabled) {
+    subscribeCurrentCommerceSandboxRun((scope) => {
+      if (scope.runId === null) {
+        reloadAfterCurrentFlight = false;
+        clearRemotePlatformAuthority();
+        return;
+      }
+      if (publicStatsAuthority.value?.sourceEnvironment === "SANDBOX"
+          && publicStatsAuthority.value.runId === scope.runId) return;
+      clearRemotePlatformAuthority();
+      if (loading.value) reloadAfterCurrentFlight = true;
+      else void load();
+    });
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
@@ -224,7 +279,7 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, syncFailed, loading, load, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, publicStatsAuthority, syncFailed, loading, load, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
 // currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy
