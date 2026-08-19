@@ -53,7 +53,7 @@
               <text class="rg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" @input="onPhone" />
+            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @confirm="onCta" />
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除)
@@ -64,7 +64,7 @@
         <!-- Step 2: OTP + invite -->
         <view v-else-if="step === 2" class="rg-step2">
           <view class="rg-otp">
-            <input v-for="(d, i) in code" :key="i" class="rg-otp__in" :class="{ 'rg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
+            <input v-for="(d, i) in code" :key="i" class="rg-otp__in" :class="{ 'rg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onCta()" />
           </view>
           <view v-if="sandboxOtpEnabled" class="rg-sandbox-otp" data-testid="sandbox-otp-code" role="status">
             <text class="rg-sandbox-otp__t">{{ fmt(t.authOtp.sandboxCodeHint, { code: sandboxOtpCode }) }}</text>
@@ -85,21 +85,21 @@
               </view>
               <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
             </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :value="invite" @input="onInvite" />
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :value="invite" confirm-type="done" @input="onInvite" @confirm="onCta" />
           </view>
         </view>
 
         <!-- Step 3: password -->
         <view v-else class="rg-step3">
           <view class="rg-field-wrap" :class="{ 'rg-field-wrap--err': password && !pwdOk }">
-            <input class="rg-field rg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.register.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" @input="onPwd" />
+            <input class="rg-field rg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.register.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" confirm-type="next" @input="onPwd" @confirm="focusPasswordConfirmation" />
             <view class="rg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.register.hidePassword : t.register.showPassword" :aria-pressed="showPwd" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
           </view>
           <view class="rg-field-wrap" :class="{ 'rg-field-wrap--err': confirmPwd && (!pwdOk || password !== confirmPwd) }">
-            <input class="rg-field rg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.register.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" @input="onConfirm" />
+            <input class="rg-field rg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.register.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" :focus="confirmPasswordFocused" confirm-type="done" @input="onConfirm" @blur="confirmPasswordFocused = false" @confirm="onCta" />
             <view v-if="pwdMatch" class="rg-check">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></svg>
             </view>
@@ -227,6 +227,7 @@ const invite = ref("");
 const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
+const confirmPasswordFocused = ref(false);
 const error = ref<string | null>(null);
 const devBackendDown = ref(false);
 const showCaptcha = ref(false);
@@ -412,6 +413,10 @@ function onCode(i: number, e: Event) {
 }
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
+function focusPasswordConfirmation() {
+  confirmPasswordFocused.value = false;
+  void nextTick(() => { confirmPasswordFocused.value = true; });
+}
 
 function pickCountry(c: string) {
   invalidateOtpFlow();
