@@ -11,7 +11,7 @@ test("home exposes the server NEX trend with a fail-closed retry", () => {
   const card = read("src/components/home/nex-price-card.vue");
   assert.match(home, /<NexPriceCard/);
   assert.match(card, /market\.remoteReady/);
-  assert.match(card, /market\.syncRemote\(\)/);
+  assert.match(card, /market\.syncAll\(\)/);
   assert.doesNotMatch(card, /Hidden for current stage/);
 });
 

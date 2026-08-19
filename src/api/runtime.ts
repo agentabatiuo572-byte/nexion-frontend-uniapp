@@ -103,7 +103,10 @@ export const withdrawalApi = createWithdrawalApi(apiClient);
 export const earnConfigApi = createEarnConfigApi(apiClient);
 export const deviceE3Api = createDeviceE3Api(apiClient);
 export const orderApi = createOrderApi(apiClient, apiRuntimeConfig.mode);
-export const platformConfigApi = createPlatformConfigApi(apiClient);
+export const platformConfigApi = createPlatformConfigApi(
+  apiClient,
+  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
+);
 export const vRankApi = createVRankApi(apiClient);
 export const commissionConfigApi = createCommissionConfigApi(
   apiClient,

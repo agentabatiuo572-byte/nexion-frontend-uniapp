@@ -69,7 +69,7 @@ describe("market API provenance", () => {
     };
     const api = createMarketApi({ request: vi.fn().mockResolvedValueOnce(nex).mockResolvedValueOnce(external) } as never, "sandbox");
 
-    await expect(api.fetch()).resolves.toMatchObject({ runId: "market-sandbox-run-20260819" });
-    await expect(api.external()).resolves.toMatchObject({ runId: "market-sandbox-run-20260818" });
+    await expect(api.fetch()).rejects.toMatchObject({ message: "NEX_MARKET_RESPONSE_INVALID" });
+    await expect(api.external()).rejects.toMatchObject({ message: "EXTERNAL_MARKET_RESPONSE_INVALID" });
   });
 });

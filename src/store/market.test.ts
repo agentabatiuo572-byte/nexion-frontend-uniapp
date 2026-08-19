@@ -1,9 +1,10 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchNex, fetchExternal } = vi.hoisted(() => ({
+const { fetchNex, fetchExternal, runListeners } = vi.hoisted(() => ({
   fetchNex: vi.fn(),
   fetchExternal: vi.fn(),
+  runListeners: new Set<(scope: { runId: string | null; epoch: number }) => void>(),
 }));
 
 vi.mock("@/api/runtime", () => ({
@@ -12,7 +13,10 @@ vi.mock("@/api/runtime", () => ({
 }));
 
 vi.mock("@/api/order-api", () => ({
-  subscribeCurrentCommerceSandboxRun: vi.fn(),
+  subscribeCurrentCommerceSandboxRun: vi.fn((listener) => {
+    runListeners.add(listener);
+    return () => runListeners.delete(listener);
+  }),
 }));
 
 import { useMarket } from "./market";
@@ -51,6 +55,7 @@ describe("market refresh concurrency", () => {
     setActivePinia(createPinia());
     fetchNex.mockReset();
     fetchExternal.mockReset();
+    runListeners.clear();
   });
 
   it("lets a global NEX refresh join an in-flight atomic market refresh", async () => {
@@ -71,5 +76,42 @@ describe("market refresh concurrency", () => {
     expect(market.remoteReady).toBe(true);
     expect(market.externalReady).toBe(true);
     expect(market.externalQuotes).toHaveLength(1);
+  });
+
+  it("starts a fresh atomic refresh when the commerce Run changes during an old request", async () => {
+    const oldNex = deferred<typeof nexSnapshot>();
+    const oldExternal = deferred<typeof externalSnapshot>();
+    fetchNex.mockReturnValueOnce(oldNex.promise);
+    fetchExternal.mockReturnValueOnce(oldExternal.promise);
+    const market = useMarket();
+
+    const staleRefresh = market.syncAll();
+    fetchNex.mockResolvedValueOnce({ ...nexSnapshot, runId: "next-market-run-20260819", currentPrice: 0.2 });
+    fetchExternal.mockResolvedValueOnce({ ...externalSnapshot, runId: "next-market-run-20260819" });
+    runListeners.forEach((listener) => listener({ runId: "next-market-run-20260819", epoch: 2 }));
+
+    oldNex.resolve(nexSnapshot);
+    oldExternal.resolve(externalSnapshot);
+
+    await expect(staleRefresh).resolves.toBe(false);
+    await vi.waitFor(() => expect(market.remoteReady).toBe(true));
+    expect(fetchNex).toHaveBeenCalledTimes(2);
+    expect(fetchExternal).toHaveBeenCalledTimes(2);
+    expect(market.marketRunId).toBe("next-market-run-20260819");
+    expect(market.nexPriceUSDT).toBe(0.2);
+  });
+
+  it("keeps a validated NEX snapshot when only the external quote request fails", async () => {
+    fetchNex.mockResolvedValue(nexSnapshot);
+    fetchExternal.mockRejectedValue(new Error("external timeout"));
+    const market = useMarket();
+
+    await expect(market.syncAll()).resolves.toBe(false);
+
+    expect(market.remoteReady).toBe(true);
+    expect(market.nexPriceUSDT).toBe(0.125);
+    expect(market.remoteError).toBeNull();
+    expect(market.externalReady).toBe(false);
+    expect(market.externalError).toBe("EXTERNAL_MARKET_AUTHORITY_UNAVAILABLE");
   });
 });

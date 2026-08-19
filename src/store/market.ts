@@ -150,19 +150,37 @@ export const useMarket = defineStore("market", () => {
     const externalRequest = ++externalGeneration;
     const operation = (async () => {
       try {
-        const [nexSnapshot, externalSnapshot] = await Promise.all([marketApi.fetch(), marketApi.external()]);
+        const [nexResult, externalResult] = await Promise.allSettled([marketApi.fetch(), marketApi.external()]);
         if (authority !== authorityGeneration || nexRequest !== nexGeneration
             || externalRequest !== externalGeneration) return false;
-        if (!sameAuthority(nexSnapshot, externalSnapshot)) throw new Error("MARKET_AUTHORITY_MISMATCH");
-        marketRunId.value = nexSnapshot.runId;
-        commitNex(nexSnapshot);
+        if (nexResult.status === "rejected" && externalResult.status === "rejected") {
+          throw new Error("MARKET_AUTHORITY_UNAVAILABLE");
+        }
+        if (nexResult.status === "fulfilled" && externalResult.status === "fulfilled"
+            && !sameAuthority(nexResult.value, externalResult.value)) {
+          throw new Error("MARKET_AUTHORITY_MISMATCH");
+        }
+
+        if (nexResult.status === "fulfilled") {
+          marketRunId.value = nexResult.value.runId;
+          commitNex(nexResult.value);
+        } else {
+          marketRunId.value = externalResult.status === "fulfilled" ? externalResult.value.runId : null;
+          clearRemoteState();
+          remoteError.value = "G3_REMOTE_AUTHORITY_UNAVAILABLE";
+        }
+
         clearExternalState();
         externalError.value = null;
-        externalSourceEnvironment.value = externalSnapshot.sourceEnvironment;
-        if (externalSnapshot.availability === "AVAILABLE" && externalSnapshot.quotes.length > 0) {
-          externalQuotes.value = externalSnapshot.quotes;
+        if (externalResult.status === "rejected") {
+          externalError.value = "EXTERNAL_MARKET_AUTHORITY_UNAVAILABLE";
+          return false;
+        }
+        externalSourceEnvironment.value = externalResult.value.sourceEnvironment;
+        if (externalResult.value.availability === "AVAILABLE" && externalResult.value.quotes.length > 0) {
+          externalQuotes.value = externalResult.value.quotes;
           externalReady.value = true;
-          return true;
+          return nexResult.status === "fulfilled";
         }
         externalError.value = "EXTERNAL_MARKET_AUTHORITY_UNAVAILABLE";
         return false;
@@ -185,13 +203,24 @@ export const useMarket = defineStore("market", () => {
   }
 
   if (remoteApiEnabled) {
-    subscribeCurrentCommerceSandboxRun(() => {
+    subscribeCurrentCommerceSandboxRun((scope) => {
       authorityGeneration += 1;
       nexGeneration += 1;
       externalGeneration += 1;
+      // Detach the prior Run's shared flight before mounted home cards retry.
+      // The old promise still settles, but its generation can no longer commit
+      // and its finally block cannot clear a newer flight.
+      syncAllInFlight = null;
       marketRunId.value = null;
+      remoteError.value = null;
+      externalError.value = null;
       clearRemoteState();
       clearExternalState();
+      // The catalogue can establish the Sandbox Run while the first market
+      // request is still in flight. Start the replacement here so mounted
+      // cards cannot remain in an endless loading state waiting for a watch
+      // transition that never occurs (marketRunId was still null).
+      if (scope.runId !== null) void syncAll();
     });
   }
 

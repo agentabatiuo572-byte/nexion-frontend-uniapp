@@ -1,5 +1,5 @@
 <template>
-  <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 12px 14px; position: relative; overflow: hidden" @click="goMarket">
+  <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 12px 14px; position: relative; overflow: hidden" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">
     <view class="grid items-center gap-3" style="grid-template-columns: 1fr 76px">
       <view class="min-w-0">
         <view class="flex items-baseline gap-1.5 font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">
@@ -9,7 +9,7 @@
         <view class="mt-1 flex items-baseline gap-1.5">
           <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.020em; line-height: 1">{{ priceText }}</text>
           <text v-if="ready" class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: tint, fontWeight: 500 }">{{ changeText }}</text>
-          <text v-else class="active:opacity-70" :style="retryStyle" @click.stop="retry">{{ market.remoteError ? t.ui.retry : t.home.networkStatUpdating }}</text>
+          <text v-else class="active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click.stop="retry" @keydown.enter.stop.prevent="retry" @keydown.space.stop.prevent="retry">{{ market.remoteError ? t.ui.retry : t.home.networkStatUpdating }}</text>
         </view>
       </view>
       <view style="height: 36px">
@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, type CSSProperties } from "vue";
+import { computed, onMounted, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
 import HomeSparkline from "./home-sparkline.vue";
@@ -39,7 +39,7 @@ const retryStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", 
 const placeholderStyle: CSSProperties = { height: "2px", marginTop: "17px", borderRadius: "999px", background: "var(--v5-border)" };
 
 function retry() {
-  void market.syncRemote();
+  void market.syncAll();
 }
 
 function goMarket() {
@@ -47,6 +47,10 @@ function goMarket() {
 }
 
 onMounted(() => {
-  if (!market.isMockMode) void market.syncRemote();
+  if (!market.isMockMode) void market.syncAll();
+});
+
+watch(() => market.marketRunId, (next, previous) => {
+  if (!market.isMockMode && previous !== null && next === null) void market.syncAll();
 });
 </script>

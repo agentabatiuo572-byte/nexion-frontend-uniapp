@@ -3,9 +3,11 @@ import { parseAppHomeOverview } from "./app-home-api";
 
 const valid = {
   serverCanonical: true,
+  sourceEnvironment: "PRODUCTION",
+  runId: "",
   generatedAt: "2026-08-15T00:00:00Z",
-  accountScope: "user:42:SANDBOX",
-  source: "nx_app_home_projection",
+  accountScope: "authenticated-account",
+  source: "server:nx_compute_receipt,nx_compute_task,nx_user_device,nx_product,nx_growth_promo_banner",
   earnings: {
     today: { usdt: 1.2, nex: 4, jobCount: 3 }, week: { usdt: 4, nex: 8, jobCount: 9 },
     month: { usdt: 5, nex: 10, jobCount: 12 }, all: { usdt: 6, nex: 11, jobCount: 13 },

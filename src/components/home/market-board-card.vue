@@ -6,9 +6,9 @@
 -->
 <template>
   <view>
-    <view v-if="!remoteApiEnabled" class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goMarket">{{ t.home.marketBoardOpen }} →</text>
+    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text v-if="!remoteApiEnabled" class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">{{ t.home.marketBoardOpen }} →</text>
     </view>
 
     <view v-if="!remoteApiEnabled" style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
@@ -24,8 +24,12 @@
         v-for="(r, i) in ROWS"
         :key="r.name"
         class="grid items-center gap-2 active:opacity-70 transition-opacity"
+        role="link"
+        tabindex="0"
         :style="{ gridTemplateColumns: '36px 1fr 60px 76px 58px', padding: '10px 14px', borderBottom: i < ROWS.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         @click="goEarn"
+        @keydown.enter.stop.prevent="goEarn"
+        @keydown.space.stop.prevent="goEarn"
       >
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand); background: var(--v5-brand-soft); border-radius: 4px; padding: 2px 4px; text-align: center; justify-self: start; font-weight: 500">{{ r.tag }}</text>
         <view class="min-w-0">
@@ -43,11 +47,14 @@
       </view>
     </view>
     <view v-else class="rounded-xl" style="background: var(--v5-surface); padding: 14px">
-      <view v-if="homeMarketRows.length" v-for="row in homeMarketRows" :key="row.code" class="flex items-center justify-between py-1.5">
+      <view v-for="row in homeMarketRows" :key="row.code" class="flex items-center justify-between py-1.5 active:opacity-70" role="link" tabindex="0" @click="goEarn" @keydown.enter.stop.prevent="goEarn" @keydown.space.stop.prevent="goEarn">
         <text class="truncate" style="font-size: 12px; color: var(--v5-ink-2)">{{ row.name ?? row.code }}</text>
         <text class="font-mono-tabular" style="color: var(--v5-ink)">{{ row.price === null ? "—" : `$${row.price}` }} <text style="color: var(--v5-ink-3)">{{ row.deltaPct === null ? "" : `${row.deltaPct >= 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%` }}</text></text>
       </view>
-      <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
+      <view v-if="!homeMarketRows.length" class="flex items-center justify-between" style="min-height: 32px; gap: 12px">
+        <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ marketBoardStatusText }}</text>
+        <text v-if="app.homeTruthStatus === 'error'" class="font-mono-tabular active:opacity-70" style="font-size: 12px; color: var(--v5-brand); font-weight: 600" role="button" tabindex="0" data-home-action="compute-market-retry" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
+      </view>
     </view>
   </view>
 </template>
@@ -57,7 +64,6 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
-import { useMarket } from "@/store/market";
 import { useApp } from "@/store/app";
 import HomeSparkline from "./home-sparkline.vue";
 
@@ -72,14 +78,15 @@ interface MbRow {
 }
 
 const t = useT();
-const market = useMarket();
 const app = useApp();
 const homeMarketRows = computed(() => app.homeTruth?.marketBoard.workloads ?? []);
+const marketBoardStatusText = computed(() => app.homeTruthStatus === "loading" || app.homeTruthStatus === "idle"
+  ? t.value.home.networkStatUpdating
+  : t.value.uiChrome.unavailable);
 const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   if (remoteApiEnabled) {
-    void market.syncRemote();
     return;
   }
   timer = setInterval(() => { tick.value += 1; }, 1600);
@@ -114,5 +121,8 @@ function goMarket() {
 }
 function goEarn() {
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
+}
+function retryHome() {
+  void app.refreshRemoteFleet();
 }
 </script>

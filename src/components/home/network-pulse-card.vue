@@ -24,8 +24,12 @@
           :key="m.k"
           class="grid items-center gap-2"
           :class="m.tap ? 'active:opacity-70' : ''"
+          :role="m.tap ? 'button' : undefined"
+          :tabindex="m.tap ? 0 : undefined"
           :style="{ gridTemplateColumns: '1fr', padding: '12px', borderRight: i < metrics.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
           v-on="m.tap ? { click: m.tap } : {}"
+          @keydown.enter.stop.prevent="activate(m.tap)"
+          @keydown.space.stop.prevent="activate(m.tap)"
         >
           <view class="min-w-0">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.k }}</text>
@@ -44,8 +48,12 @@
             <text
               v-if="m.subTap"
               class="block mt-1 font-mono-tabular truncate active:opacity-70"
+              role="button"
+              tabindex="0"
               :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
               @click.stop="m.subTap()"
+              @keydown.enter.stop.prevent="activate(m.subTap)"
+              @keydown.space.stop.prevent="activate(m.subTap)"
             >{{ m.sub }}</text>
             <text
               v-else
@@ -183,6 +191,10 @@ interface Cell {
   skeleton?: boolean; // 只属占位格:健康格有活数据,刷新期间保持旧值(stale-while-revalidate),不糊骨架
   tap?: () => void;
   subTap?: () => void;
+}
+
+function activate(action?: () => void) {
+  action?.();
 }
 
 /** 配置失败的占位格(规格异常2:骨架→「数据更新中」+ 重试;禁回退写死数字)。 */

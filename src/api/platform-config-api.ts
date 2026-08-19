@@ -10,6 +10,7 @@ import type {
 } from "@/store/config-types";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiMode } from "./runtime-config";
 
 export interface PlatformComputeConfigSnapshot {
   featureFlags: {
@@ -18,6 +19,7 @@ export interface PlatformComputeConfigSnapshot {
     homeWeeklyPromoEnabled: boolean;
   };
   publicStats: PublicStatsConfig;
+  publicStatsAuthority: PlatformPublicStatsAuthority;
   onlineBonus: OnlineBonus;
   computeShare: {
     downloadUrl: string;
@@ -35,6 +37,13 @@ export interface PlatformComputeConfigSnapshot {
   sources: string[];
 }
 
+export interface PlatformPublicStatsAuthority {
+  source: "mock" | "server:nx_config_item,nx_user";
+  sourceEnvironment: "SANDBOX" | "PRODUCTION";
+  runId: string;
+  version: number;
+}
+
 export interface PlatformConfigApi {
   platformConfig(): Promise<PlatformComputeConfigSnapshot>;
 }
@@ -48,7 +57,7 @@ const SHARE_CHANNEL_KEYS = new Set<ShareChannelKey>([
   "zalo", "telegram", "whatsapp", "messenger", "sms", "x", "copy", "poster", "system",
 ]);
 const SHARE_INTENTS = new Set<ShareIntentType>(["web", "scheme", "copy", "poster", "system"]);
-const DOWNLOAD_SOURCES = new Set(["official", "mock", "unavailable"]);
+const DOWNLOAD_SOURCES = new Set(["official", "unavailable"]);
 
 function invalid(message = "E6_PLATFORM_CONFIG_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
@@ -126,11 +135,16 @@ function parsePlatformShareConfig(value: unknown): ShareConfig {
   const appDownload = record(root.appDownload);
   const source = nonEmptyString(appDownload.source);
   if (!DOWNLOAD_SOURCES.has(source)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-  const officialUrl = safeUrl(appDownload.officialUrl, source !== "unavailable", source === "mock");
+  const officialUrl = safeUrl(appDownload.officialUrl, source !== "unavailable", false);
   const version = optionalString(appDownload.version);
   const notes = record(appDownload.releaseNotes);
   const releaseNotes = { zh: optionalString(notes.zh), en: optionalString(notes.en) };
   if (source !== "unavailable" && (!version || !releaseNotes.zh || !releaseNotes.en)) {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  if (source === "unavailable" && (officialUrl || optionalString(appDownload.iosUrl)
+      || optionalString(appDownload.androidUrl) || optionalString(appDownload.apkUrl)
+      || version || releaseNotes.zh || releaseNotes.en)) {
     return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
   return {
@@ -138,9 +152,9 @@ function parsePlatformShareConfig(value: unknown): ShareConfig {
     channels,
     appDownload: {
       officialUrl,
-      iosUrl: safeUrl(appDownload.iosUrl, false, source === "mock"),
-      androidUrl: safeUrl(appDownload.androidUrl, false, source === "mock"),
-      apkUrl: safeUrl(appDownload.apkUrl, false, source === "mock"),
+      iosUrl: safeUrl(appDownload.iosUrl, false, false),
+      androidUrl: safeUrl(appDownload.androidUrl, false, false),
+      apkUrl: safeUrl(appDownload.apkUrl, false, false),
       version,
       releaseNotes,
       source: source as ShareConfig["appDownload"]["source"],
@@ -292,10 +306,39 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
   };
 }
 
-export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfigSnapshot {
+export function parsePlatformPublicStats(value: unknown, mode: ApiMode = "remote"): {
+  config: PublicStatsConfig;
+  authority: PlatformPublicStatsAuthority;
+} {
+  const projection = record(value);
+  const version = finiteNumber(projection.version);
+  const source = optionalString(projection.source);
+  const sourceEnvironment = optionalString(projection.sourceEnvironment);
+  const runId = typeof projection.runId === "string" ? projection.runId.trim() : "";
+  const production = sourceEnvironment === "PRODUCTION"
+    && source === "server:nx_config_item,nx_user" && runId === "";
+  const sandbox = sourceEnvironment === "SANDBOX" && source === "mock"
+    && /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/.test(runId);
+  const expectedAuthority = mode === "remote" ? production : mode === "sandbox" ? sandbox : false;
+  if (projection.serverCanonical !== true || !Number.isInteger(version) || version < 0
+      || !expectedAuthority) {
+    return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
+  }
+  return {
+    config: parsePublicStats(projection),
+    authority: {
+      source: source as PlatformPublicStatsAuthority["source"],
+      sourceEnvironment: sourceEnvironment as PlatformPublicStatsAuthority["sourceEnvironment"],
+      runId,
+      version,
+    },
+  };
+}
+
+export function parsePlatformComputeConfig(value: unknown, mode: ApiMode = "remote"): PlatformComputeConfigSnapshot {
   const root = record(value);
   const featureFlags = record(root.featureFlags);
-  const publicStats = parsePublicStats(root.publicStats);
+  const publicStatsProjection = parsePlatformPublicStats(root.publicStats, mode);
   const onlineBonus = record(root.onlineBonus);
   const compute = record(root.computerCompute);
   const download = record(compute.download);
@@ -338,7 +381,8 @@ export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfi
 
   return {
     featureFlags: experience.featureFlags,
-    publicStats,
+    publicStats: publicStatsProjection.config,
+    publicStatsAuthority: publicStatsProjection.authority,
     onlineBonus: { h5BaseFactor, continuityFullHours },
     computeShare: {
       downloadUrl,
@@ -413,7 +457,7 @@ export function parseReferralRewardConfig(value: unknown): ReferralRewardConfigS
   }
 }
 
-export function createPlatformConfigApi(client: ApiClient): PlatformConfigApi {
+export function createPlatformConfigApi(client: ApiClient, mode: ApiMode = "remote"): PlatformConfigApi {
   return {
     platformConfig: async () => {
       const [computeRaw, referralRaw] = await Promise.all([
@@ -428,7 +472,7 @@ export function createPlatformConfigApi(client: ApiClient): PlatformConfigApi {
           authenticated: false,
         }),
       ]);
-      const compute = parsePlatformComputeConfig(computeRaw);
+      const compute = parsePlatformComputeConfig(computeRaw, mode);
       const referral = parseReferralRewardConfig(referralRaw);
       return {
         ...compute,
