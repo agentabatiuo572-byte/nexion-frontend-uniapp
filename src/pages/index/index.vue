@@ -124,8 +124,13 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
+import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled } from "@/api/runtime";
-import { deriveHomeTaskCards, type HomeTaskCardId } from "@/lib/home-task-carousel";
+import {
+  deriveHomeTaskCards,
+  selectHomeWeeklySource,
+  type HomeTaskCardId,
+} from "@/lib/home-task-carousel";
 
 type TaskCardId = HomeTaskCardId;
 
@@ -144,10 +149,14 @@ const t = useT();
 onShow(() => useGenesisConfig().refresh());
 const locale = useLocaleStore();
 const platformConfig = useConfig();
+const weeklyQuestStore = useWeeklyQuest();
 const instance = getCurrentInstance();
 
 // PC 端更新任务配置后，用户回到首页即可读取最新投影，无需杀掉 App 重开。
-onShow(() => void platformConfig.load());
+onShow(() => {
+  void platformConfig.load();
+  if (remoteApiEnabled) void weeklyQuestStore.refresh();
+});
 
 const taskSlide = ref(0);
 const taskCarouselHeight = ref(TASK_CARD_COLLAPSED_HEIGHT);
@@ -158,10 +167,15 @@ const taskCarouselAnnouncement = ref("");
 let taskTouchStart: TouchPoint | null = null;
 let touchCollapsedExpandedCard = false;
 
+const weeklyCardReady = computed(() => !remoteApiEnabled || selectHomeWeeklySource(
+  [...weeklyQuestStore.tier1Quests, ...weeklyQuestStore.tier2Quests],
+  weeklyQuestStore.snapshot?.promoBanner ?? null,
+) !== null);
 const visibleTaskCards = computed<TaskCardId[]>(() =>
   deriveHomeTaskCards(platformConfig.syncFailed, {
     homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
-    homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
+    homeWeeklyPromoEnabled:
+      platformConfig.isEnabled("homeWeeklyPromoEnabled") && weeklyCardReady.value,
   }),
 );
 

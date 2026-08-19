@@ -2769,7 +2769,8 @@ const visible = computedCallback("visibleTaskCards");
 need(!ts.isBlock(visible.body), "visibleTaskCards must delegate to the tested derivation helper");
 need(compact(visible.body.getText(source)) === compact(`deriveHomeTaskCards(platformConfig.syncFailed, {
   homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
-  homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
+  homeWeeklyPromoEnabled:
+    platformConfig.isEnabled("homeWeeklyPromoEnabled") && weeklyCardReady.value,
 })`), "visibleTaskCards no longer derives exact 0/1/2 state from sync failure + both flags");
 
 const cardinality = computedCallback("hasTaskCarousel");

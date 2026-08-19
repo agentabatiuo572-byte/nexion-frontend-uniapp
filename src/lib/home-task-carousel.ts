@@ -30,7 +30,7 @@ export function selectHomeWeeklySource(
   const weeklyQuests = quests.filter(
     (quest) => quest.layer === "WEEKLY_T1" || quest.layer === "WEEKLY_T2",
   );
-  const quest = weeklyQuests.find((candidate) => candidate.status !== "CLAIMED") ?? weeklyQuests[0];
+  const quest = weeklyQuests.find((candidate) => candidate.status !== "CLAIMED");
   if (quest) return { kind: "quest", quest };
   if (promo?.status === "active") return { kind: "promo", promo };
   return null;

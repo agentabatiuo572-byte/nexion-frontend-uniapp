@@ -10,7 +10,7 @@ export interface FeatureFlags {
   // FEAT-HOME02: read-only server projections from the existing H3 authoring
   // surfaces. They are not a second pair of admin switches:
   // newcomer = H3.dayOne.tasks has at least one active task;
-  // weekly promo = H3.promoBanner.config.status === "active".
+  // weekly card = H3 has an active WEEKLY_T1/T2 mission or an active promo banner.
   homeNewcomerTasksEnabled: boolean;
   homeWeeklyPromoEnabled: boolean;
 }
