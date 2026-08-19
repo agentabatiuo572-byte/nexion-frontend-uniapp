@@ -7,14 +7,20 @@
 // 树没变就秒退;全量(full)不在回合末,而是焊在「合并主线」这个动作上(PLAN/.claude/hooks/verify-fresh-before-merge.mjs)。
 //
 // 判据顺序:
+//   ⓪ 会话作用域(2026-08-19 主人拍板;PLAN CLAUDE.md 不变量「Stop 阻断门必须会话作用域」):本会话在**本树**没有写足迹
+//     (Edit/Write 落在树内 · shell 跑过 git 改内容动词 / pkg.mjs · 写文件手段动过树内 / src)→ 放行,连树指纹都不算 ——
+//     纯问答会话不该替仓库状态背 3 分钟静态门(此前 ②③ 只看仓状态:别的会话 / 一次 pull 动了树,路过的会话就得跑)。
+//     足迹从 stdin 的 transcript_path(主记录 + 子 agent 记录)扫,谓词共用 PLAN/.claude/hooks/lib/session-footprint.mjs;
+//     库不在 / 没给 transcript_path / 判不了 → 按旧行为(宁可多跑不漏跑)。
 //   ① 不是 git 树 / runner 不存在 → 提示后放行(环境不满足 ≠ 代码有问题);
 //   ② 当前树指纹 == .verify-cache/last-run.json 里最近一次绿(任一档)的树 → 秒退,不重跑;
 //   ③ 相对上次记录只改了文档类(不在 src/scripts/配置面)→ 放行并说明(文档改动不触发静态门);
 //   ④ 否则跑 `node scripts/verify-chain.mjs --static`;红 → 只回喂 FAIL 行 + result 行(SCOPED-SKIP 行是噪音,不回喂),exit 2;绿 → exit 0。
 // 语义提醒:static 绿 ≠ 全量绿。宣布 done / 合并前仍须 `npm run verify`(full);合并守卫会查。
+// 自测:node .claude/hooks/test-verify-on-stop.mjs(⓪ 两条 + 判不了兜底)。
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve, join } from "node:path";
 
 const PROJECT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -22,8 +28,22 @@ const RUNNER = join(PROJECT_DIR, "scripts", "verify-chain.mjs");
 const SCOPE = join(PROJECT_DIR, "scripts", "lib", "verify-scope.mjs");
 const LAST = join(PROJECT_DIR, ".verify-cache", "last-run.json");
 const FUNCTIONAL = /^(src\/|scripts\/|package(-lock)?\.json$|tsconfig[^/]*\.json$|vite\.config\.ts$|vitest\.config\.ts$|uno\.config\.ts$|index\.html$|shims-uni\.d\.ts$|\.claude\/hooks\/)/;
+const FOOTPRINT_LIB = process.env.SESSION_FOOTPRINT_LIB || "D:/WORKS/PLAN/.claude/hooks/lib/session-footprint.mjs";
 
 const note = (m) => process.stderr.write(`[verify-on-stop] ${m}\n`);
+
+// ⓪ 本会话在本树有没有写足迹:true / false / null(判不了 → 旧行为)
+async function sessionFootprint() {
+  if (process.stdin.isTTY) return null; // 手动裸跑没有 hook 输入
+  let input = null;
+  try { input = JSON.parse(fs.readFileSync(0, "utf8") || "null"); } catch { return null; }
+  if (!input?.transcript_path) return null;
+  try {
+    const lib = await import(pathToFileURL(FOOTPRINT_LIB).href);
+    return lib.sessionTouched(input.transcript_path, input.session_id, lib.repoPredicate(PROJECT_DIR));
+  } catch { return null; }
+}
+if ((await sessionFootprint()) === false) { note("✓ 本会话没改本树(无写足迹),跳过静态门"); process.exit(0); }
 
 if (!fs.existsSync(RUNNER) || !fs.existsSync(SCOPE)) { note("(提示)本树没有 scripts/verify-chain.mjs,跳过静态门"); process.exit(0); }
 let fp = null;
