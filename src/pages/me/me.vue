@@ -12,10 +12,8 @@
 
   Wrapped in <AppChassis active="me">; entrance via <CardStagger>.
 
-  Secondary settings-row display values are wired to the live ported stores
-  (security 2FA / achievements count / notifications unread / receipts / orders /
-  points), matching the source.
-  Some settings targets are not-yet-ported pages → nav fail:()=>{}.
+  Secondary settings-row display values are wired to authenticated Java
+  projections (security 2FA / notifications unread / receipts / orders).
 
   Account section's "orders" row was relocated here from store.vue's old
   bottom Orders chip (single canonical entry point, not scroll-buried);
@@ -113,7 +111,6 @@ import { useProfile } from "@/store/profile";
 import { useDeposits } from "@/store/deposits";
 import { useOrders } from "@/store/orders";
 import { useLocaleStore } from "@/store/locale";
-import { useNexFaucet } from "@/store/nex-faucet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
@@ -125,13 +122,16 @@ import { useRewardsSeen } from "@/store/rewards-seen";
 import { MAX_DEVICES } from "@/store/device-types";
 import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
+import { useBills } from "@/store/bills";
+import { useMarket } from "@/store/market";
 import { confirm as uiConfirm } from "@/store/ui";
 import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
-import { developmentFundsEnabled, pointsApi } from "@/api/runtime";
-import type { DailySnapshot } from "@/api/points-api";
+import { developmentFundsEnabled } from "@/api/runtime";
 import type { SecurityState } from "@/api/contracts";
-import { countRemoteReceipts, summarizeRemoteAchievements } from "@/lib/remote-me-summary";
+import { countRemoteReceipts } from "@/lib/remote-me-summary";
 import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
+import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
+import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 
 const MIN_WITHDRAWAL_USD = 20;
 
@@ -145,7 +145,6 @@ const profile = useProfile();
 const deposits = useDeposits();
 const orders = useOrders();
 const locale = useLocaleStore();
-const faucet = useNexFaucet();
 const trial = useFreeTrial();
 const security = useSecurity();
 const notifications = useNotifications();
@@ -153,12 +152,12 @@ const voucher = useVoucher();
 const rewardsSeen = useRewardsSeen();
 const vrank = useVRank();
 const theme = useTheme();
+const bills = useBills();
+const market = useMarket();
 const themePickerOpen = ref(false);
-const remoteAchievements = ref<DailySnapshot | null>(null);
 const remoteSecurity = ref<SecurityState | null>(null);
 const remoteOrdersLoading = ref(false);
 const remoteOrdersFailed = ref(false);
-let remoteSummaryRequest = 0;
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
 
@@ -226,14 +225,13 @@ const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_U
 const profileName = computed(() => profile.displayName);
 const remoteReceiptProjectionReady = computed(() => remoteApiEnabled
   && app.remoteFleetStatus === "ready"
-  && (developmentFundsEnabled || deposits?.serverStatus === "ready"));
+  && deposits.serverStatus === "ready");
 const remoteReceiptCount = computed(() => remoteReceiptProjectionReady.value
   ? countRemoteReceipts(deposits?.remoteReceipts ?? [], app.visibleDevices)
   : null);
 const receiptCount = computed(() => remoteApiEnabled ? remoteReceiptCount.value : null);
 const receiptCountMeta = computed(() => receiptCount.value === null ? "—" : String(receiptCount.value));
 const orderCount = computed(() => orders.orders.length);
-const streakDays = computed(() => faucet.signInStreak);
 const localeUpper = computed(() => locale.code.toUpperCase());
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
@@ -274,18 +272,6 @@ const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
 const unreadNotifs = computed(() => notifications.unread);
-const remoteAchievementSummary = computed(() => summarizeRemoteAchievements(remoteAchievements.value));
-const achievementsUnlocked = computed(() => remoteApiEnabled
-  ? remoteAchievementSummary.value?.unlocked ?? null
-  : null);
-const achievementsTotal = computed(() => remoteApiEnabled
-  ? remoteAchievementSummary.value?.total ?? null
-  : null);
-const achievementsValue = computed(() =>
-  achievementsUnlocked.value === null || achievementsTotal.value === null
-    ? "—"
-    : fmt(t.value.me.achievementsRowValue, { n: achievementsUnlocked.value, total: achievementsTotal.value }),
-);
 // My Rewards unread dot — unused valid vouchers keep it lit (state-based)
 // OR reward credits newer than the seen-watermark (cleared on page open).
 const rewardsDot = computed(() => voucher.claimedUnused.length > 0 || rewardsSeen.hasUnseen);
@@ -298,7 +284,6 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: fmt(t.value.me.networkInviteMeta, { nex: config.config.rewards.inviterReward.nexAmount }), tone: "orange" },
       { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "success" },
       { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
-      { key: "proof", label: t.value.headerTitles.meProof, href: "/me/proof", icon: "trust", meta: t.value.headerSubtitles.meProof, tone: "brand" },
     ],
   },
   {
@@ -318,10 +303,8 @@ const quickSections = computed<QuickSection[]>(() => [
     items: [
       { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
       { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: receiptCountMeta.value, tone: "brand" },
-      { key: "achievements", label: t.value.me.achievements, href: "/me/achievements", icon: "trophy", meta: achievementsValue.value, tone: "orange" },
-       { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
-       { key: "repurchase", label: t.value.headerTitles.meWalletRepurchase, href: "/me/wallet-repurchase", icon: "rewind", meta: t.value.repurchase.howItWorksEntry, tone: "success" },
-       { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
+      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+      { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
       { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value === null ? "—" : twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value === null ? "muted" : twoFactorEnabled.value ? "muted" : "orange" },
@@ -345,7 +328,6 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
       { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
-      { key: "terms", label: t.value.terms.navTitle, href: "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme", icon: "book", tone: "brand" },
       { key: "learning", label: t.value.me.learningRow, href: "/learn/courses", icon: "book", tone: "brand" },
       { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
@@ -353,19 +335,9 @@ const quickSections = computed<QuickSection[]>(() => [
   },
 ]);
 
-async function refreshRemoteMeSummary() {
-  if (!remoteApiEnabled) return;
-  const request = ++remoteSummaryRequest;
-  const accountKey = app.accountKey;
-  remoteAchievements.value = null;
-  try {
-    if (!developmentFundsEnabled) void deposits?.refreshRemoteVietQrDeposits();
-    const snapshot = await pointsApi.state();
-    if (request !== remoteSummaryRequest || accountKey !== app.accountKey) return;
-    remoteAchievements.value = snapshot;
-  } catch {
-    if (request === remoteSummaryRequest && accountKey === app.accountKey) remoteAchievements.value = null;
-  }
+async function refreshRemoteFunds() {
+  if (developmentFundsEnabled) await deposits.refreshFundsSandboxDeposits();
+  else await deposits.refreshRemoteVietQrDeposits();
 }
 
 async function refreshRemoteOrders() {
@@ -396,19 +368,35 @@ async function refreshRemoteSecurity() {
   }
 }
 
+async function refreshRemoteTrial() {
+  await trial.refreshRemote(true);
+  await trial.refreshEligibilityRemote();
+}
+
+async function refreshRemoteMe() {
+  if (!remoteApiEnabled) return;
+  await settleRemoteMeLoaders([
+    ["home", () => app.refreshHomeTruth()],
+    ["fleet", () => refreshRemoteFleetAfterCatalog(app.accountKey)],
+    ["funds", refreshRemoteFunds],
+    ["orders", refreshRemoteOrders],
+    ["security", refreshRemoteSecurity],
+    ["notifications", () => notifications.refreshRemote()],
+    ["trial", refreshRemoteTrial],
+    ["vouchers", () => voucher.refreshRemote()],
+    ["rank", () => vrank.refreshCanonicalVRank()],
+    ["genesis", () => genesis.syncRemote()],
+    ["bills", () => bills.refreshServerLedger()],
+    ["market", () => market.syncRemote()],
+    ["config", () => config.load()],
+  ]);
+}
+
 watch(() => app.accountKey, () => {
-  if (remoteApiEnabled) {
-    void refreshRemoteMeSummary();
-    void refreshRemoteSecurity();
-    void refreshRemoteOrders();
-  }
+  if (remoteApiEnabled) void refreshRemoteMe();
 });
 onShow(() => {
-  if (remoteApiEnabled) {
-    void refreshRemoteMeSummary();
-    void refreshRemoteSecurity();
-    void refreshRemoteOrders();
-  }
+  if (remoteApiEnabled) void refreshRemoteMe();
 });
 
 function handleQuickItem(item: QuickItem) {
