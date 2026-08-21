@@ -1444,6 +1444,7 @@ export const en = {
     eligReasonUsed: "This account has already used its free trial",
     eligReasonInProgress: "Your trial is already running — see the trial page",
     eligReasonRisk: "This account can't claim the trial right now — contact support for details",
+    eligReasonQuota: "Today's free trial allocation is gone — please check back tomorrow",
     eligReasonClosed: "The trial offer isn't open right now — check back soon",
     eligReasonUnknown: "We can't confirm trial eligibility from the server. Check your connection and retry",
     // /me/trial five-state page

@@ -44,6 +44,15 @@ const activeState = {
   shadowUsdt: "12.5",
   shadowNex: 20,
   source: "nx_trial_claim + nx_user_wallet",
+  serverCanonical: true,
+  sourceEnvironment: "PRODUCTION",
+  runId: "",
+  provenance: {
+    serverCanonical: true,
+    source: "nx_trial_claim + nx_user_wallet",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+  },
   paymentRail: "NEXION_USDT_WALLET",
   config: {
     trialDays: "3", graceDays: "7", extensionDays: "3", discountRate: "0.15",
@@ -51,7 +60,7 @@ const activeState = {
     highQualityThresholdUSD: "100", trialProductId: "stellarbox-s1", trialPriceUSD: "1299",
     shadowDailyUSD: "38.52", shadowDailyNEX: "65", cooldownDays: "30", phaseOpen: "true",
     autoPushEnabled: "true", autoPushDelayMs: "1500", autoPushCooldownHours: "24",
-    autoPushMaxPerSession: "1",
+    autoPushMaxPerSession: "1", seatsLeftToday: "47",
   },
 };
 
@@ -139,7 +148,7 @@ test("eligible first-time users retain a visible H2 claim entry which opens the 
   const hero = read("src/components/trial-hero-banner.vue");
   const sheet = read("src/components/trial-claim-sheet.vue");
   assert.match(earn, /<TrialHeroBanner class="w-full"/);
-  assert.match(hero, /trial\.status === "none" && trial\.canStart\(\)/);
+  assert.match(hero, /trial\.status === "none"[\s\S]*seatsLeftToday > 0[\s\S]*trial\.canStart\(\)/);
   assert.match(hero, /@click="onClick"/);
   assert.match(hero, /claimSheet\.show\(\)/);
   assert.match(sheet, /await freeTrial\.start\(\)/);
@@ -172,7 +181,7 @@ test("remote free-trial store never persists or locally advances an authoritativ
   assert.match(source, /refreshInFlightAccount === boundKey/);
   assert.match(source, /reason: "unknown"/);
   const configSource = read("src/store/trial-config.ts");
-  assert.match(configSource, /mode !== "mock"/);
+  assert.match(configSource, /const remoteAuthority = true/);
   assert.match(configSource, /function reset\(\) \{\s+if \(remoteAuthority\) return;/);
   assert.match(configSource, /device-trial-standard/);
   assert.match(configSource, /TRIAL_PRODUCT_DEVICE_NAMES/);
