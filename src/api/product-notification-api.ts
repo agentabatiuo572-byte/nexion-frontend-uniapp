@@ -1,7 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export interface ProductNotification {
   serverCanonical: boolean;
@@ -30,14 +29,9 @@ export interface ProductNotificationApi {
   list(): Promise<ProductNotificationList>;
 }
 
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-
 function validScope(sourceEnvironment: unknown, runId: unknown, mode: ApiEnvironment): boolean {
-  if (mode === "dev") {
-    return sourceEnvironment === "SANDBOX" && typeof runId === "string" && RUN_ID.test(runId)
-      && isCurrentCommerceSandboxRun(runId);
-  }
-  return mode === "prod" && sourceEnvironment === "PRODUCTION" && runId === "";
+  return (mode === "dev" || mode === "prod")
+    && sourceEnvironment === "PRODUCTION" && runId === "";
 }
 
 function validNotification(value: unknown, mode: ApiEnvironment): value is ProductNotification {
