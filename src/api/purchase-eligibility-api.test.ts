@@ -1,8 +1,5 @@
-import { afterEach, expect, test } from "vitest";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { expect, test } from "vitest";
 import { createPurchaseEligibilityApi } from "./purchase-eligibility-api";
-
-afterEach(() => setCurrentCommerceSandboxRun(null));
 
 test("reads authenticated server eligibility for the exact product", async () => {
   let request: any;
@@ -26,17 +23,23 @@ test("fails closed on a mismatched or untrusted eligibility response", async () 
   await expect(api.get("stellarbox-pro-v2")).rejects.toThrow("PURCHASE_ELIGIBILITY_RESPONSE_INVALID");
 });
 
-test("accepts only the current run-scoped sandbox eligibility", async () => {
-  setCurrentCommerceSandboxRun("commerce-run-20260817");
+test("development accepts the same Java canonical production eligibility as production", async () => {
+  const response = {
+    productNo: "stellarbox-pro-v2", eligible: true, decisionCode: "ELIGIBLE",
+    evaluatedAt: 1786856400000, source: "nx_admin_device_sku.purchase_gate_json + nx_user",
+    sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true,
+  };
+  const api = createPurchaseEligibilityApi({ request: async () => response } as never, "dev");
+
+  await expect(api.get("stellarbox-pro-v2")).resolves.toMatchObject({ eligible: true });
+});
+
+test("development rejects sandbox eligibility", async () => {
   const response = {
     productNo: "stellarbox-pro-v2", eligible: true, decisionCode: "ELIGIBLE",
     evaluatedAt: 1786856400000, source: "nx_admin_device_sku.purchase_gate_json + nx_user",
     sourceEnvironment: "SANDBOX", runId: "commerce-run-20260817", serverCanonical: true,
   };
   const api = createPurchaseEligibilityApi({ request: async () => response } as never, "dev");
-
-  await expect(api.get("stellarbox-pro-v2")).resolves.toMatchObject({ eligible: true });
-
-  setCurrentCommerceSandboxRun("commerce-run-20260818");
   await expect(api.get("stellarbox-pro-v2")).rejects.toThrow("PURCHASE_ELIGIBILITY_RESPONSE_INVALID");
 });

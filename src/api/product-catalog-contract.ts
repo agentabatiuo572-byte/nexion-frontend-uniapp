@@ -8,8 +8,8 @@ export interface ProductCatalogSnapshot {
   serverCanonical: true;
   revision: string | null;
   products: CatalogProduct[];
-  sourceEnvironment?: "SANDBOX";
-  runId?: string;
+  sourceEnvironment: "PRODUCTION";
+  runId: "";
 }
 
 export class ProductCatalogContractError extends Error {
@@ -24,7 +24,6 @@ const PHASES = new Set<PhaseId>(["P1", "P2", "P3", "P4", "P5", "P6"]);
 const LIFECYCLES = new Set<NonNullable<Product["status"]>>(["active", "legacy"]);
 const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 function invalid(): never {
   throw new ProductCatalogContractError();
@@ -196,19 +195,15 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
   if (source.serverCanonical !== true) return invalid();
   if (source.revision !== null && typeof source.revision !== "string") return invalid();
   if (!Array.isArray(source.products)) return invalid();
-  const sourceEnvironment = source.sourceEnvironment;
-  const runId = source.runId;
-  const isSandbox = sourceEnvironment !== undefined || runId !== undefined;
-  // Mock data is valid only when the caller explicitly identifies a sandbox run.
-  if (catalogSource === "mock" && !isSandbox) return invalid();
-  if (isSandbox && (catalogSource !== "mock" || sourceEnvironment !== "SANDBOX"
-      || typeof runId !== "string" || !RUN_ID.test(runId))) return invalid();
-  if (!isSandbox && catalogSource !== "nx_product") return invalid();
+  if (catalogSource !== "nx_product" || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") {
+    return invalid();
+  }
   return {
     source: catalogSource,
     serverCanonical: true,
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
     revision: source.revision as string | null,
     products: source.products.map(product),
-    ...(isSandbox ? { sourceEnvironment: "SANDBOX" as const, runId: runId as string } : {}),
   };
 }

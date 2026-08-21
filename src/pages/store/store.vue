@@ -12,9 +12,9 @@
 <template>
   <AppChassis active="store">
     <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
-      <StoreHero />
-      <ClusterLadder />
-      <VsPhoneHero />
+      <StoreHero :multiplier="yieldAuthority.multiplier" />
+      <ClusterLadder :authority="yieldAuthority" />
+      <VsPhoneHero :authority="yieldAuthority" />
 
       <!-- Sprint 2 finale — phase + legacy-ownership trade-in window -->
       <TradeinWindowBanner />
@@ -97,9 +97,12 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
+import { useEarnConfig } from "@/store/earn-config";
+import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 
 const t = useT();
 const genesisCfg = useGenesisConfig();
+const earnConfig = useEarnConfig();
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
@@ -126,6 +129,16 @@ const catalogHasProducts = computed(() => {
   const status = productCatalogState.status;
   return status === "ready" && PRODUCTS.length > 0;
 });
+const yieldAuthority = computed(() => buildStoreYieldAuthority(
+  productCatalogState.status === "ready" ? PRODUCTS : [],
+  earnConfig.phoneTiers.value?.tiers ?? [],
+  {
+    source: productCatalogState.source,
+    sourceEnvironment: productCatalogState.sourceEnvironment,
+    runId: productCatalogState.runId,
+    serverCanonical: productCatalogState.serverCanonical,
+  },
+));
 const unlockedProducts = computed(() =>
   (productCatalogState.status === "ready" ? PRODUCTS : []).filter((p) => {
     if (!mounted.value) return false;

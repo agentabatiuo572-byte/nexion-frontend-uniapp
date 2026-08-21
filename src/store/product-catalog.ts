@@ -11,6 +11,9 @@ export const productCatalogState = reactive<{
   status: ProductCatalogStatus;
   error: string;
   source: string;
+  sourceEnvironment: "PRODUCTION" | "";
+  runId: "";
+  serverCanonical: boolean;
   revision: string | null;
 }>({
   // 🔴🔴 mock 模式下必须直接是 "ready",不能是一个只有这里用的 "mock" 状态值 ——
@@ -24,6 +27,9 @@ export const productCatalogState = reactive<{
   status: remoteApiEnabled ? "loading" : "ready",
   error: "",
   source: remoteApiEnabled ? "" : "mock/products",
+  sourceEnvironment: "",
+  runId: "",
+  serverCanonical: false,
   revision: null,
 });
 
@@ -42,6 +48,9 @@ export function prepareProductCatalog(): void {
   productCatalogState.status = "loading";
   productCatalogState.error = "";
   productCatalogState.source = "";
+  productCatalogState.sourceEnvironment = "";
+  productCatalogState.runId = "";
+  productCatalogState.serverCanonical = false;
   productCatalogState.revision = null;
   setCurrentCommerceSandboxRun(null);
 }
@@ -60,8 +69,11 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       replaceProductCatalog(snapshot.products);
       productCatalogState.status = "ready";
       productCatalogState.source = snapshot.source;
+      productCatalogState.sourceEnvironment = snapshot.sourceEnvironment;
+      productCatalogState.runId = snapshot.runId;
+      productCatalogState.serverCanonical = snapshot.serverCanonical;
       productCatalogState.revision = snapshot.revision;
-      setCurrentCommerceSandboxRun(snapshot.sourceEnvironment === "SANDBOX" ? snapshot.runId ?? null : null);
+      setCurrentCommerceSandboxRun(null);
       return true;
     })
     .catch((error: unknown) => {
@@ -70,6 +82,9 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.status = "error";
       productCatalogState.error = error instanceof Error ? error.message : "PRODUCT_CATALOG_UNAVAILABLE";
       productCatalogState.source = "";
+      productCatalogState.sourceEnvironment = "";
+      productCatalogState.runId = "";
+      productCatalogState.serverCanonical = false;
       productCatalogState.revision = null;
       setCurrentCommerceSandboxRun(null);
       return false;
