@@ -1,8 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createProductNotificationApi } from "./product-notification-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
-
-beforeEach(() => setCurrentCommerceSandboxRun(null));
 
 describe("product notification API", () => {
   it("uses account-authenticated server endpoints and parses canonical response", async () => {
@@ -23,27 +20,25 @@ describe("product notification API", () => {
     expect(request).toHaveBeenCalledWith({ method: "POST", path: "/api/store/notifications/stellarbox-pro-v2" });
   });
 
-  it("accepts only a run-scoped server sandbox response in sandbox mode", async () => {
-    setCurrentCommerceSandboxRun("sandbox-run-20260816");
+  it("accepts the Java production-shaped response in development mode", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,
       source: "nx_product",
       subscribed: true,
       revision: "2026-08-16T01:02:03",
       productNo: "stellarbox-pro-v2",
-      sourceEnvironment: "SANDBOX",
-      runId: "sandbox-run-20260816",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
     });
     const api = createProductNotificationApi({ request } as never, "dev");
 
     await expect(api.status("stellarbox-pro-v2")).resolves.toMatchObject({
-      sourceEnvironment: "SANDBOX",
-      runId: "sandbox-run-20260816",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
     });
   });
 
-  it("rejects a syntactically valid response from a previous sandbox run", async () => {
-    setCurrentCommerceSandboxRun("sandbox-run-20260817");
+  it("rejects a sandbox response in development mode", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,
       source: "nx_product",
@@ -60,7 +55,7 @@ describe("product notification API", () => {
     });
   });
 
-  it("rejects a production or malformed scope while running in sandbox", async () => {
+  it("rejects a production response with a non-empty run ID in development mode", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,
       source: "nx_product",
@@ -68,7 +63,7 @@ describe("product notification API", () => {
       revision: "1",
       productNo: "stellarbox-pro-v2",
       sourceEnvironment: "PRODUCTION",
-      runId: "",
+      runId: "unexpected-run",
     });
     const api = createProductNotificationApi({ request } as never, "dev");
 
