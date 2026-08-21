@@ -245,7 +245,7 @@ export const vi: Messages = {
     finishReset: "Cập nhật mật khẩu và đăng nhập",
     resetSuccess: "Đã cập nhật mật khẩu · đã đăng nhập",
     errorInvalidCredentials: "Số điện thoại hoặc mật khẩu không đúng.",
-    serverSessionReloadNotice: "Để bảo vệ tài khoản, vui lòng đăng nhập lại sau khi làm mới trang. Dữ liệu của bạn được lưu an toàn trên máy chủ và sẽ khôi phục sau khi đăng nhập.",
+    serverSessionReloadNotice: "Sau khi làm mới trang, phiên máy chủ sẽ được khôi phục an toàn. Bạn chỉ cần đăng nhập lại khi phiên đã hết hạn.",
   },
   register: {
     title: "Tạo tài khoản",

@@ -1,6 +1,6 @@
 import { isUserSession, type ApiResult, type AuthSessionResponse } from "./contracts";
 import { ApiError, asApiError } from "./errors";
-import type { SessionSnapshot, SessionVault } from "./session-vault";
+import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -11,6 +11,7 @@ export interface HttpRequest {
   body?: unknown;
   timeoutMs: number;
   signal?: AbortSignal;
+  withCredentials?: boolean;
 }
 
 export interface HttpResponse {
@@ -71,6 +72,7 @@ interface ApiClientOptions {
   vault: SessionVault;
   onUnauthorized?: () => void | Promise<void>;
   allowInsecureHttp?: boolean;
+  refreshCredentialMode?: RefreshCredentialMode;
 }
 
 function normalizeBaseUrl(value: string, allowInsecureHttp: boolean): string {
@@ -110,17 +112,17 @@ function authFailure(status: number, code?: number, message = ""): boolean {
   return /^(AUTH_REQUIRED|USER_AUTH_REQUIRED|TOKEN_|USER_REFRESH_TOKEN_|REFRESH_)/.test(message);
 }
 
-function authenticatedSession(value: unknown): value is AuthSessionResponse & {
+function authenticatedSession(value: unknown, credentialMode: RefreshCredentialMode): value is AuthSessionResponse & {
   accessToken: string;
-  refreshToken: string;
 } {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<AuthSessionResponse>;
   return (
     typeof session.accessToken === "string"
     && session.accessToken.length > 0
-    && typeof session.refreshToken === "string"
-    && session.refreshToken.length > 0
+    && (credentialMode === "cookie"
+      ? session.refreshToken === null
+      : typeof session.refreshToken === "string" && session.refreshToken.length > 0)
     && typeof session.tokenType === "string"
     && session.tokenType.toLowerCase() === "bearer"
     && isUserSession(session.user)
@@ -129,6 +131,7 @@ function authenticatedSession(value: unknown): value is AuthSessionResponse & {
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
   const baseUrl = normalizeBaseUrl(options.baseUrl, options.allowInsecureHttp ?? true);
+  const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let refreshInFlight: Promise<SessionSnapshot> | null = null;
 
   async function execute<T>(
@@ -191,16 +194,20 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   async function refreshNow(): Promise<SessionSnapshot> {
     const revision = options.vault.revision();
     const current = options.vault.read();
-    if (!current?.refreshToken) return expireSession(revision);
+    if (!current || (refreshCredentialMode === "token" && !current.refreshToken)) return expireSession(revision);
     try {
       const data = await execute<AuthSessionResponse>({
         url: `${baseUrl}/auth/users/refresh`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: { refreshToken: current.refreshToken },
+        headers: {
+          "Content-Type": "application/json",
+          ...(refreshCredentialMode === "cookie" ? { "X-Nexion-Refresh-Mode": "cookie" } : {}),
+        },
+        ...(refreshCredentialMode === "token" ? { body: { refreshToken: current.refreshToken } } : {}),
         timeoutMs: 12_000,
+        withCredentials: refreshCredentialMode === "cookie",
       });
-      if (!authenticatedSession(data)) {
+      if (!authenticatedSession(data, refreshCredentialMode)) {
         throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
       }
       if (data.user.userId !== current.user.userId) {
@@ -208,9 +215,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       }
       const next: SessionSnapshot = {
         accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
+        refreshToken: refreshCredentialMode === "cookie" ? "" : data.refreshToken as string,
         tokenType: data.tokenType,
         user: data.user,
+        refreshCredentialMode,
       };
       if (!options.vault.saveIfUnchanged(next, revision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
@@ -263,6 +271,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       headers,
       timeoutMs: apiRequest.timeoutMs ?? 12_000,
       signal: apiRequest.signal,
+      withCredentials: refreshCredentialMode === "cookie",
     };
     if (apiRequest.body !== undefined) httpRequest.body = apiRequest.body;
 
@@ -394,6 +403,7 @@ export function createUniHttpTransport(): HttpTransport {
           header: request.headers,
           data: request.body as UniNamespace.RequestOptions["data"],
           timeout: request.timeoutMs,
+          withCredentials: request.withCredentials,
           success: (response) => resolveOnce({
             status: response.statusCode,
             data: response.data,

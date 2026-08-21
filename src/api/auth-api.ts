@@ -1,7 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { isRegistrationReceipt, isUserSession, type AuthSessionResponse, type RegistrationReceipt, type UserSession } from "./contracts";
 import { ApiError, asApiError } from "./errors";
-import type { SessionSnapshot, SessionVault } from "./session-vault";
+import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
 
 export interface PasswordLoginRequest {
   countryCode: string;
@@ -143,23 +143,25 @@ function registrationOtpFromResponse(value: unknown): RegistrationOtpResult {
   return data as RegistrationOtpResult;
 }
 
-function sessionFromResponse(data: AuthSessionResponse): SessionSnapshot | null {
+function sessionFromResponse(data: AuthSessionResponse, refreshCredentialMode: RefreshCredentialMode): SessionSnapshot | null {
   if (
     !data
     || typeof data !== "object"
     || typeof data.accessToken !== "string"
     || data.accessToken.length === 0
-    || typeof data.refreshToken !== "string"
-    || data.refreshToken.length === 0
+    || (refreshCredentialMode === "cookie"
+      ? data.refreshToken !== null
+      : typeof data.refreshToken !== "string" || data.refreshToken.length === 0)
     || typeof data.tokenType !== "string"
     || data.tokenType.toLowerCase() !== "bearer"
     || !isUserSession(data.user)
   ) return null;
   return {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
+    refreshToken: refreshCredentialMode === "cookie" ? "" : data.refreshToken as string,
     tokenType: data.tokenType,
     user: data.user,
+    refreshCredentialMode,
   };
 }
 
@@ -167,6 +169,7 @@ function consumeLoginResponse(
   data: AuthSessionResponse,
   vault: SessionVault,
   expectedRevision: number,
+  refreshCredentialMode: RefreshCredentialMode,
 ): LoginResult {
   if (
     data
@@ -186,7 +189,7 @@ function consumeLoginResponse(
       deliveryHint: data.deliveryHint || "",
     };
   }
-  const session = sessionFromResponse(data);
+  const session = sessionFromResponse(data, refreshCredentialMode);
   if (!session) throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
   const registrationReceipt = data.registrationReceipt ?? null;
   if (registrationReceipt !== null && !isRegistrationReceipt(registrationReceipt)) {
@@ -200,22 +203,30 @@ function consumeLoginResponse(
   return { kind: "authenticated", user: session.user, vaultRevision: expectedRevision + 1, registrationReceipt };
 }
 
-function oauthExchangeFromResponse(value: unknown, vault: SessionVault, expectedRevision: number): OAuthExchangeResult {
+function oauthExchangeFromResponse(
+  value: unknown,
+  vault: SessionVault,
+  expectedRevision: number,
+  refreshCredentialMode: RefreshCredentialMode,
+): OAuthExchangeResult {
   if (!value || typeof value !== "object") {
     throw new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
   }
   const data = value as Record<string, unknown>;
   if (typeof data.accessToken !== "string" || data.accessToken.length === 0
-      || typeof data.refreshToken !== "string" || data.refreshToken.length === 0
+      || (refreshCredentialMode === "cookie"
+        ? data.refreshToken !== null
+        : typeof data.refreshToken !== "string" || data.refreshToken.length === 0)
       || data.tokenType !== "Bearer" || !isUserSession(data.user)
       || data.source !== "mock" || data.sandbox !== true) {
     throw new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
   }
   const session: SessionSnapshot = {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
+    refreshToken: refreshCredentialMode === "cookie" ? "" : data.refreshToken as string,
     tokenType: data.tokenType,
     user: data.user,
+    refreshCredentialMode,
   };
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
@@ -236,12 +247,21 @@ function oauthSandboxChallengeFromResponse(value: unknown): string {
   return data.challengeNo;
 }
 
-export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
+export function createAuthApi(
+  client: ApiClient,
+  vault: SessionVault,
+  options: { refreshCredentialMode?: RefreshCredentialMode } = {},
+): AuthApi {
+  const refreshCredentialMode = options.refreshCredentialMode ?? "token";
+  const cookieHeaders = refreshCredentialMode === "cookie"
+    ? { "X-Nexion-Refresh-Mode": "cookie" }
+    : undefined;
   const revokeRefreshTokenBestEffort = (refreshToken: string) => {
     void client.request({
       path: "/auth/users/logout",
       method: "POST",
-      body: { refreshToken },
+      ...(refreshCredentialMode === "token" ? { body: { refreshToken } } : {}),
+      ...(cookieHeaders ? { headers: cookieHeaders } : {}),
       authenticated: false,
     }).catch(() => {
       // The local vault was already consumed. Server revocation is best-effort.
@@ -271,13 +291,14 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         method: "POST",
         body: request,
         authenticated: false,
+        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
         acceptedResponses: [{
           status: 428,
           code: 428,
           message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED",
         }],
       });
-      return consumeLoginResponse(data, vault, revision);
+      return consumeLoginResponse(data, vault, revision, refreshCredentialMode);
     },
     async sendLoginOtp(request) {
       return loginOtpFromResponse(await client.request<unknown>({
@@ -294,8 +315,9 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         method: "POST",
         body: request,
         authenticated: false,
+        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
       });
-      const result = consumeLoginResponse(data, vault, revision);
+      const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
       if (result.kind !== "authenticated") {
         throw new ApiError({ kind: "protocol", message: "LOGIN_OTP_SESSION_INVALID" });
       }
@@ -333,8 +355,9 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         method: "POST",
         body: request,
         authenticated: false,
+        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
       });
-      return consumeLoginResponse(data, vault, revision);
+      return consumeLoginResponse(data, vault, revision, refreshCredentialMode);
     },
     async sendRegistrationOtp(request) {
       const data = await client.request<unknown>({
@@ -352,8 +375,9 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         method: "POST",
         body: request,
         authenticated: false,
+        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
       });
-      const result = consumeLoginResponse(data, vault, revision);
+      const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
       if (result.kind !== "authenticated") {
         throw new ApiError({ kind: "protocol", message: "REGISTRATION_SESSION_INVALID" });
       }
@@ -379,12 +403,29 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         method: "POST",
         body,
         authenticated: false,
+        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
       });
-      return oauthExchangeFromResponse(data, vault, revision);
+      return oauthExchangeFromResponse(data, vault, revision, refreshCredentialMode);
     },
     async restore() {
-      if (!vault.read()?.refreshToken) return null;
-      return client.refreshSession();
+      if (refreshCredentialMode === "token") {
+        if (!vault.read()?.refreshToken) return null;
+        return client.refreshSession();
+      }
+      const revision = vault.revision();
+      try {
+        const data = await client.request<AuthSessionResponse>({
+          path: "/auth/users/refresh",
+          method: "POST",
+          authenticated: false,
+          headers: cookieHeaders,
+        });
+        const session = sessionFromResponse(data, refreshCredentialMode);
+        if (!session || !vault.saveIfUnchanged(session, revision)) return null;
+        return vault.read();
+      } catch {
+        return null;
+      }
     },
     discardSessionIfCurrent(expectedRevision) {
       discardSessionIfCurrent(expectedRevision);
@@ -396,11 +437,12 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
       const revision = vault.revision();
       const refreshToken = vault.read()?.refreshToken;
       try {
-        if (refreshToken) {
+        if (refreshCredentialMode === "cookie" || refreshToken) {
           await client.request({
             path: "/auth/users/logout",
             method: "POST",
-            body: { refreshToken },
+            ...(refreshCredentialMode === "token" ? { body: { refreshToken } } : {}),
+            ...(cookieHeaders ? { headers: cookieHeaders } : {}),
             authenticated: false,
           });
         }

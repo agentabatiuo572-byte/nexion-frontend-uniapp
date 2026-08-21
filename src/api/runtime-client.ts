@@ -1,6 +1,7 @@
 import { createApiClient, type ApiClient, type HttpTransport } from "./api-client";
 import type { ApiRuntimeConfig } from "./runtime-config";
 import type { SessionVault } from "./session-vault";
+import type { RefreshCredentialMode } from "./session-vault";
 
 export interface RuntimeApiClientOptions {
   config: ApiRuntimeConfig;
@@ -10,6 +11,7 @@ export interface RuntimeApiClientOptions {
   /** Only the local loopback H5 preview may proxy its same-origin HTTP gateway. */
   localPreview?: boolean;
   onUnauthorized?: () => void | Promise<void>;
+  refreshCredentialMode?: RefreshCredentialMode;
 }
 
 function isLoopbackHttpUrl(value: string): boolean {
@@ -35,5 +37,6 @@ export function createRuntimeApiClient(options: RuntimeApiClientOptions): ApiCli
     // preview gateway, which proxies to the isolated acceptance backend.
     allowInsecureHttp: options.development || (options.localPreview === true && isLoopbackHttpUrl(options.config.baseUrl)),
     onUnauthorized: options.onUnauthorized,
+    refreshCredentialMode: options.refreshCredentialMode,
   });
 }

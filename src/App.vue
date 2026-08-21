@@ -38,7 +38,16 @@ import {
   startBehaviorAnalytics,
 } from "@/services/behavior-analytics";
 import { useDeposits } from "@/store/deposits";
-import { apiRuntimeConfig, developmentFundsEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
+import {
+  apiRuntimeConfig,
+  authApi,
+  developmentFundsEnabled,
+  h5RefreshCookieEnabled,
+  remoteApiEnabled,
+  sessionVault,
+  setRemoteUnauthorizedHandler,
+} from "@/api/runtime";
+import { completeSignIn } from "@/auth/complete-sign-in";
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { refreshEarnConfig } from "@/store/earn-config";
@@ -57,6 +66,9 @@ let devBusinessTimeoutRuns = 0;
 let pendingCanonicalRouteRepair = "";
 let pendingCanonicalRouteRepairAt = 0;
 let pendingServerSessionRecovery = false;
+type ServerSessionRestoreState = "idle" | "restoring" | "ready" | "failed";
+let serverSessionRestoreState: ServerSessionRestoreState = h5RefreshCookieEnabled ? "idle" : "ready";
+let serverSessionRestoreInFlight: Promise<boolean> | null = null;
 // Capture the non-secret trace before any startup request can reject and clear
 // its persisted shell. It is consumed on the first recovery redirect.
 let serverAuthenticatedAccountTraceAtBoot = remoteApiEnabled && readServerAuthenticatedAccountTrace();
@@ -495,6 +507,45 @@ function readServerAuthenticatedAccountTrace(): boolean {
   }
 }
 
+function beginServerSessionRestore(): Promise<boolean> {
+  if (!remoteApiEnabled || !h5RefreshCookieEnabled) {
+    serverSessionRestoreState = "ready";
+    return Promise.resolve(true);
+  }
+  if (serverSessionRestoreInFlight) return serverSessionRestoreInFlight;
+  serverSessionRestoreState = "restoring";
+  serverSessionRestoreInFlight = (async () => {
+    const restored = await authApi.restore();
+    if (!restored) {
+      pendingServerSessionRecovery = hasServerAuthenticatedAccountTrace(useAuth());
+      serverSessionRestoreState = "failed";
+      return false;
+    }
+    const route = readCurrentRoute();
+    const protectedRoute = !!route && !isAuthWhitelisted(route);
+    const completed = completeSignIn({
+      identity: `user:${restored.user.userId}`,
+      returnTo: protectedRoute ? `/${route}` : "/pages/index/index",
+      onboardingComplete: true,
+      serverProfile: restored.user,
+      serverSessionRevision: sessionVault.revision(),
+      deferNavigation: protectedRoute,
+    });
+    if (!completed.ok) {
+      pendingServerSessionRecovery = true;
+      serverSessionRestoreState = "failed";
+      return false;
+    }
+    pendingServerSessionRecovery = false;
+    serverAuthenticatedAccountTraceAtBoot = false;
+    serverSessionRestoreState = "ready";
+    return true;
+  })().finally(() => {
+    serverSessionRestoreInFlight = null;
+  });
+  return serverSessionRestoreInFlight;
+}
+
 // Returns true if it redirected (callers bail so they don't act on a route the
 // user is being kicked off of).
 function checkAuthGuard(): boolean {
@@ -506,6 +557,11 @@ function checkAuthGuard(): boolean {
   //    只修 ① 的状态在实景里与不修同果 —— verify 绿 ≠ 渲染 OK 的活例。
   const route = readCurrentRoute();
   if (!route) return false; // no route yet
+  if (remoteApiEnabled && serverSessionRestoreState === "idle") {
+    void beginServerSessionRestore();
+    return false;
+  }
+  if (remoteApiEnabled && serverSessionRestoreState === "restoring") return false;
   if (isAuthWhitelisted(route)) {
     // Once login is visible, consume the recovery latch before any periodic
     // guard retry. Re-launching the same login route resets in-progress input.
@@ -531,9 +587,8 @@ function checkAuthGuard(): boolean {
       return true;
     }
   }
-  // Server modes cannot accept a historical localStorage sign-in as authority.
-  // The runtime vault is deliberately in-memory, so refresh/restart means a
-  // clean sign-in instead of a stale local identity issuing sandbox commands.
+  // A persisted UI shell is never authentication authority. H5 reaches this
+  // branch only after its HttpOnly-cookie restore has failed.
   if (remoteApiEnabled && (!serverSession || auth.accountId !== `user:${serverSession.user.userId}`)) {
     const requiresServerSessionRecovery = !serverSession && hasServerAuthenticatedAccountTrace(auth);
     serverAuthenticatedAccountTraceAtBoot = false;
@@ -1005,7 +1060,11 @@ onLaunch(() => {
     // unauthenticated launch must not turn its expected 401 into a fake catalog
     // failure before the user has even signed in.
     prepareProductCatalog();
-    if (canRefreshRemoteAccount(auth)) void refreshAuthenticatedRemoteFleet();
+    void beginServerSessionRestore();
+    if (canRefreshRemoteAccount(auth)) {
+      void useApp().refreshHomeTruth();
+      void refreshAuthenticatedRemoteFleet();
+    }
   }
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
@@ -1039,7 +1098,10 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  if (canRefreshRemoteAccount(useAuth())) void refreshAuthenticatedRemoteFleet();
+  if (canRefreshRemoteAccount(useAuth())) {
+    void useApp().refreshHomeTruth();
+    void refreshAuthenticatedRemoteFleet();
+  }
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });

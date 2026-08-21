@@ -25,11 +25,14 @@ describe("E3 fleet bootstrap and projection atomicity", () => {
     expect(bootstrap).toContain("return useApp().refreshRemoteFleet()");
   });
 
-  it("commits fleet, assignments and Home only after all responses share the current account scope", () => {
-    expect(appStore).toContain("const [fleet, assignmentState, projection] = await Promise.all([");
+  it("settles fleet and assignments independently without owning the Home projection", () => {
+    expect(appStore).toContain("const [fleetResult, assignmentResult] = await Promise.allSettled([");
     expect(appStore).toContain("if (!remoteAccountEpoch.isCurrent(request)) throw new Error(\"REMOTE_ACCOUNT_CHANGED\");");
-    expect(appStore).toContain("// Atomic projection commit: no visible fleet/home half-state.");
-    expect(appStore).toContain("homeTruth.value = projection;");
+    expect(appStore).toContain("remoteAssignmentStatus.value = \"error\"");
+    const fleetStart = appStore.indexOf("async function refreshRemoteFleet(");
+    const fleetEnd = appStore.indexOf("function bindAccount(", fleetStart);
+    expect(appStore.slice(fleetStart, fleetEnd)).not.toContain("appHomeApi.fetch()");
+    expect(signIn).toContain("void app.refreshHomeTruth();");
   });
 
   it("keeps capacityPct inside the canonical 0..100 interval", () => {

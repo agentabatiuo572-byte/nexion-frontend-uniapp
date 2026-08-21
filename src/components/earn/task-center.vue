@@ -66,7 +66,24 @@
       </view>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ historyHintText }}</text>
     </view>
-    <view v-if="allRecent.length === 0" class="pb-4">
+    <view
+      v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'"
+      class="mb-3 rounded-xl"
+      style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)"
+    >
+      <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.syncFailedTitle }}</text>
+      <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.syncFailedBody }}</text>
+      <view
+        class="inline-flex items-center active:opacity-70"
+        style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)"
+        role="button"
+        tabindex="0"
+        @click="retryAssignments"
+      >
+        <text>{{ t.tradein.errPleaseRetry }}</text>
+      </view>
+    </view>
+    <view v-else-if="allRecent.length === 0" class="pb-4">
       <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
     </view>
     <view v-else class="pb-3 space-y-1.5">
@@ -162,6 +179,10 @@ function goStore() {
 
 function goReceipts() {
   uni.navigateTo({ url: "/pages/me/receipts", fail: () => {} });
+}
+
+function retryAssignments() {
+  void app.refreshRemoteFleet().catch(() => undefined);
 }
 
 function shortTime(ts: number): string {

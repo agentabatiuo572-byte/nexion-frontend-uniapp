@@ -64,6 +64,7 @@ import { createPurchaseEligibilityApi } from "./purchase-eligibility-api";
 import { readApiRuntimeConfig, type ApiEnvironment } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
+import type { RefreshCredentialMode } from "./session-vault";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
@@ -77,6 +78,11 @@ export const fundsServerEnabled = true;
 export const payoutAddressServerEnabled = true;
 export const payoutAddressMockEnabled = false;
 export const sessionVault = createRuntimeSessionVault();
+let refreshCredentialMode: RefreshCredentialMode = "token";
+// #ifdef H5
+refreshCredentialMode = "cookie";
+// #endif
+export const h5RefreshCookieEnabled = refreshCredentialMode === "cookie";
 let unauthorizedHandler: (() => void | Promise<void>) | undefined;
 
 function isLoopbackSameOriginPreview(baseUrl: string): boolean {
@@ -92,10 +98,11 @@ export const apiClient = createRuntimeApiClient({
   development: import.meta.env.DEV,
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
   onUnauthorized: () => unauthorizedHandler?.(),
+  refreshCredentialMode,
 });
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
-export const authApi = createAuthApi(apiClient, sessionVault);
+export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode });
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
 export const productCatalogApi = createProductCatalogApi(apiClient);

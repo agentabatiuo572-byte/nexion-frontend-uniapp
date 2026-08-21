@@ -413,6 +413,10 @@ export const useApp = defineStore("app", () => {
   let homeTruthRefreshInFlight: { key: string; request: Promise<boolean> } | null = null;
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
+  const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const remoteAssignmentError = ref("");
+  let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments } | null = null;
+  let remoteFleetRefreshSequence = 0;
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
   //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
   //   配置非法时回退编译期锚 —— 全局条不许因单个参数坏而冻结(异常3 的「单项坏不拖垮」);
@@ -729,8 +733,8 @@ export const useApp = defineStore("app", () => {
       await refreshRemoteFleet(request);
     } catch (cause) {
       if (remoteAccountEpoch.isCurrent(request)) {
-        remoteFleetStatus.value = "error";
-        remoteFleetError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
+        remoteAssignmentStatus.value = "error";
+        remoteAssignmentError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
       }
     } finally {
       remoteTaskSyncInFlight = false;
@@ -786,24 +790,47 @@ export const useApp = defineStore("app", () => {
   async function refreshRemoteFleet(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const expectedAccountKey = request.accountKey;
-    // Remote H5 deliberately drops credentials on reload. Never turn a Login
-    // page lifecycle hook or a default-account rebind into an authenticated
-    // request: its late unauthorized callback could otherwise clear a newer
-    // session created while that stale request was still settling.
+    let refreshSequence: number | null = null;
+    // H5 deliberately drops its access token on reload and restores it through
+    // the HttpOnly refresh cookie. Never turn a Login page lifecycle hook or a
+    // default-account rebind into an authenticated request: its late
+    // unauthorized callback could otherwise clear a newer restored session.
     try {
       const activeSession = sessionVault.read();
       if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
-      homeTruthStatus.value = "loading";
-      homeTruthError.value = null;
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      refreshSequence = ++remoteFleetRefreshSequence;
       remoteFleetStatus.value = "loading";
       remoteFleetError.value = "";
-      const [fleet, assignmentState, projection] = await Promise.all([
-        deviceE3Api.fleet(), taskAssignmentApi.state(), appHomeApi.fetch(),
+      remoteAssignmentStatus.value = "loading";
+      remoteAssignmentError.value = "";
+      const [fleetResult, assignmentResult] = await Promise.allSettled([
+        deviceE3Api.fleet(), taskAssignmentApi.state(),
       ]);
-      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
+      if (!remoteAccountEpoch.isCurrent(request) || refreshSequence !== remoteFleetRefreshSequence) {
+        throw new Error("REMOTE_FLEET_REQUEST_SUPERSEDED");
+      }
+      if (assignmentResult.status === "rejected") {
+        remoteAssignmentStatus.value = "error";
+        remoteAssignmentError.value = assignmentResult.reason instanceof Error
+          ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
+      } else {
+        remoteAssignmentStatus.value = "ready";
+        lastConfirmedAssignments = { request: { ...request }, state: assignmentResult.value };
+      }
+      if (fleetResult.status === "rejected") throw fleetResult.reason;
+      const fleet = fleetResult.value;
       installCanonicalLifecycleConfig(fleet.capacitySchedule);
-      const nextDevices = applyRemoteAssignments(
-        fleet.devices.map((device) => canonicalDevice(device, fleet.serverNow)), assignmentState);
+      const canonicalDevices = fleet.devices.map((device) => canonicalDevice(device, fleet.serverNow));
+      const confirmedAssignments = assignmentResult.status === "fulfilled"
+        ? assignmentResult.value
+        : lastConfirmedAssignments?.request.accountKey === request.accountKey
+          && lastConfirmedAssignments.request.epoch === request.epoch
+          ? lastConfirmedAssignments.state
+          : null;
+      const nextDevices = confirmedAssignments
+        ? applyRemoteAssignments(canonicalDevices, confirmedAssignments)
+        : canonicalDevices;
       devices.value = nextDevices;
       syncDeviceRuntime(nextDevices, true);
       user.value = {
@@ -816,22 +843,12 @@ export const useApp = defineStore("app", () => {
           earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         }),
       };
-      earnings.value = {
-        today: fleet.realizedTodayUsdt,
-        todayNEX: fleet.realizedTodayNex,
-        thisWeek: 0,
-        thisMonth: 0,
-        total: 0,
-        history: [],
-      };
-      // Atomic projection commit: no visible fleet/home half-state.
-      homeTruth.value = projection;
-      applyHomeEarnings(projection);
-      homeTruthStatus.value = "ready";
       remoteFleetStatus.value = "ready";
       return true;
     } catch (cause) {
-      if (remoteAccountEpoch.isCurrent(request)) {
+      if (remoteAccountEpoch.isCurrent(request)
+        && refreshSequence != null
+        && refreshSequence === remoteFleetRefreshSequence) {
         devices.value = [];
         syncDeviceRuntime([], true);
         user.value = {
@@ -846,9 +863,6 @@ export const useApp = defineStore("app", () => {
         };
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
-        homeTruth.value = null;
-        homeTruthStatus.value = "error";
-        homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
       }
       return false;
     }
@@ -867,6 +881,10 @@ export const useApp = defineStore("app", () => {
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
+      remoteAssignmentStatus.value = "idle";
+      remoteAssignmentError.value = "";
+      lastConfirmedAssignments = null;
+      remoteFleetRefreshSequence += 1;
       homeTruth.value = null;
       homeTruthStatus.value = "idle";
       homeTruthError.value = null;
@@ -2446,7 +2464,7 @@ export const useApp = defineStore("app", () => {
     accountKey, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError,
+    remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
     fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,

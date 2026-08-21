@@ -1,10 +1,13 @@
 import { isUserSession, type UserSession } from "./contracts";
 
+export type RefreshCredentialMode = "token" | "cookie";
+
 export interface SessionSnapshot {
   accessToken: string;
   refreshToken: string;
   tokenType: string;
   user: UserSession;
+  refreshCredentialMode?: RefreshCredentialMode;
 }
 
 interface PersistedSession {
@@ -70,9 +73,11 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
   }
 
   function validateSnapshot(snapshot: SessionSnapshot): void {
+    const credentialMode = snapshot.refreshCredentialMode ?? "token";
     if (
       !snapshot.accessToken
-      || !snapshot.refreshToken
+      || (credentialMode === "token" && !snapshot.refreshToken)
+      || (credentialMode === "cookie" && snapshot.refreshToken !== "")
       || !snapshot.tokenType
       || !isUserSession(snapshot.user)
     ) {
@@ -84,12 +89,16 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
     const next = { ...snapshot, user: { ...snapshot.user } };
     if (storage) {
       try {
-        storage.set({
-          schema: 1,
-          refreshToken: snapshot.refreshToken,
-          tokenType: snapshot.tokenType,
-          user: { ...snapshot.user },
-        } satisfies PersistedSession);
+        if (snapshot.refreshCredentialMode === "cookie") {
+          storage.remove();
+        } else {
+          storage.set({
+            schema: 1,
+            refreshToken: snapshot.refreshToken,
+            tokenType: snapshot.tokenType,
+            user: { ...snapshot.user },
+          } satisfies PersistedSession);
+        }
       } catch (error) {
         current = null;
         revision += 1;
