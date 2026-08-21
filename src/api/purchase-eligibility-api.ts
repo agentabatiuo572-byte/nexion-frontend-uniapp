@@ -1,5 +1,4 @@
 import type { ApiClient } from "./api-client";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
 
 export interface PurchaseEligibilitySnapshot {
@@ -8,7 +7,7 @@ export interface PurchaseEligibilitySnapshot {
   decisionCode: string;
   evaluatedAt: number;
   source: "nx_admin_device_sku.purchase_gate_json + nx_user";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  sourceEnvironment: "PRODUCTION";
   runId: string | null;
   serverCanonical: true;
 }
@@ -16,11 +15,8 @@ export interface PurchaseEligibilitySnapshot {
 function parse(value: unknown, expectedProductNo: string, mode: ApiEnvironment): PurchaseEligibilitySnapshot {
   const row = value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown> : null;
-  const trustedProvenance = mode === "prod"
-    ? row?.sourceEnvironment === "PRODUCTION" && row.runId === null
-    : mode === "dev"
-      ? row?.sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(row.runId)
-      : false;
+  const trustedProvenance = (mode === "dev" || mode === "prod")
+    && row?.sourceEnvironment === "PRODUCTION" && row.runId === null;
   if (!row || row.productNo !== expectedProductNo || typeof row.eligible !== "boolean"
       || typeof row.decisionCode !== "string" || !row.decisionCode
       || typeof row.evaluatedAt !== "number" || !Number.isFinite(row.evaluatedAt)

@@ -10,34 +10,48 @@
       <!-- Your phone -->
       <view>
         <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.store.vsYourPhone }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap" :style="phoneNumStyle">
-          <text>$0.06</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.phone)" :style="phoneNumStyle">
+          <text>{{ storefrontUsd(authority.phone) }}</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
         <!-- 「/天」后缀恒用弱化色(与本卡美元侧同档 ink-4),不跟数字的强调色走 -->
-        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsNexPerDay }}<text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></text>
+        <view class="block mt-1 min-w-0 overflow-hidden font-mono-tabular whitespace-nowrap" :aria-label="phoneNexFullText" style="font-size: 12px; color: var(--v5-brand); font-weight: 500"><text>{{ phoneNexText }}</text><text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></view>
       </view>
       <!-- Arrow + 117× chip -->
       <view class="flex flex-col items-center gap-1 px-1">
         <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3); line-height: 1">→</text>
-        <text class="whitespace-nowrap tabular-nums" :style="chipStyle">{{ t.store.vsMore }}</text>
+        <text class="whitespace-nowrap tabular-nums" :style="chipStyle">{{ multiplierText }}</text>
       </view>
       <!-- S1 -->
       <view class="text-right">
         <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.store.vsPhoneS1 }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap" :style="s1NumStyle">
-          <text>$7.00</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.entry)" :style="s1NumStyle">
+          <text>{{ storefrontUsd(authority.entry) }}</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
-        <text class="block mt-1 font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.store.vsS1NexPerDay }}<text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></text>
+        <view class="block mt-1 min-w-0 overflow-hidden font-mono-tabular whitespace-nowrap" :aria-label="entryNexFullText" style="font-size: 12px; color: var(--v5-brand); font-weight: 500"><text>{{ entryNexText }}</text><text style="color: var(--v5-ink-4)">{{ t.store.vsPerDay }}</text></view>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import type { CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import {
+  storefrontNex,
+  storefrontNexFull,
+  storefrontUsd,
+  storefrontUsdFull,
+  type StoreYieldAuthority,
+} from "@/lib/store-yield-authority";
 
 const t = useT();
+const props = defineProps<{ authority: StoreYieldAuthority }>();
+const authority = computed(() => props.authority);
+const multiplierText = computed(() => t.value.store.vsMore.replace(/\d+×/, props.authority.multiplier === null ? "—×" : `${props.authority.multiplier}×`));
+const phoneNexText = computed(() => props.authority.phone ? `+${storefrontNex(props.authority.phone)} NEX` : "— NEX");
+const entryNexText = computed(() => props.authority.entry ? `+${storefrontNex(props.authority.entry)} NEX` : "— NEX");
+const phoneNexFullText = computed(() => props.authority.phone ? `+${storefrontNexFull(props.authority.phone)}${t.value.store.vsPerDay}` : "— NEX");
+const entryNexFullText = computed(() => props.authority.entry ? `+${storefrontNexFull(props.authority.entry)}${t.value.store.vsPerDay}` : "— NEX");
 
 const rootStyle: CSSProperties = {
   background: "var(--v5-surface)",

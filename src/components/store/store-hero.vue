@@ -11,7 +11,7 @@
     <view aria-hidden :style="auroraStyle" />
     <view class="relative min-w-0">
       <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink)">{{ t.store.heroEyebrow }}</text>
-      <text class="block" :style="titleStyle">{{ t.store.heroTitlePre }} <text style="color: var(--v5-brand-2-ink)">{{ t.store.heroTitleMult }}</text> {{ t.store.heroTitlePost }}</text>
+      <text class="block" :style="titleStyle">{{ t.store.heroTitlePre }} <text style="color: var(--v5-brand-2-ink)">{{ multiplierText }}</text> {{ t.store.heroTitlePost }}</text>
       <text class="block" style="margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); line-height: 1.45">{{ t.store.heroSub }}</text>
     </view>
     <view class="relative">
@@ -35,10 +35,12 @@
 </template>
 
 <script setup lang="ts">
-import type { CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 
 const t = useT();
+const props = defineProps<{ multiplier: number | null }>();
+const multiplierText = computed(() => props.multiplier === null ? "—×" : `${props.multiplier}×`);
 
 const rootStyle: CSSProperties = {
   background: "var(--v5-surface)",

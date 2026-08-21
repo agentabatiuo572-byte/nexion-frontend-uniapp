@@ -12,7 +12,7 @@
         v-for="tier in tiers"
         :key="tier.id"
         class="grid items-center"
-        style="grid-template-columns: 72px 1fr 84px; gap: 10px"
+        style="grid-template-columns: 72px minmax(0, 1fr) minmax(70px, 84px); gap: 10px"
       >
         <view class="whitespace-nowrap truncate" :style="labelStyle(tier)">
           <text>{{ tier.label }}</text>
@@ -25,7 +25,7 @@
         <view class="relative overflow-hidden" style="height: 5px; background: var(--v5-surface-3); border-radius: 2.5px">
           <view class="absolute left-0 top-0 bottom-0" :style="barStyle(tier)" />
         </view>
-        <view class="text-right tabular-nums whitespace-nowrap" :style="yieldStyle(tier)">
+        <view class="text-right tabular-nums whitespace-nowrap overflow-hidden" :aria-label="tier.yFull" :style="yieldStyle(tier)">
           <text>{{ tier.y }}</text>
           <text style="font-size: 12px; color: var(--v5-ink-4); font-weight: 400">{{ t.store.perDay }}</text>
         </view>
@@ -38,13 +38,16 @@
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import SectionHeader from "./section-header.vue";
+import { storefrontUsd, storefrontUsdFull, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
 
 const t = useT();
+const props = defineProps<{ authority: StoreYieldAuthority }>();
 
 interface Tier {
   id: string;
   label: string;
   y: string;
+  yFull: string;
   width: number;
   you?: boolean;
   rack?: boolean;
@@ -52,13 +55,26 @@ interface Tier {
   fillOpacity?: number;
 }
 
-const tiers = computed<Tier[]>(() => [
-  { id: "phone", label: t.value.store.ladderPhone, y: "$0.06", width: 1, you: true },
-  { id: "share", label: t.value.store.ladderShare, y: "$0.19", width: 1, fill: "var(--v5-ink-4)", fillOpacity: 0.25 },
-  { id: "s1", label: t.value.store.ladderS1, y: "$7.00", width: 16, fill: "var(--v5-brand)", fillOpacity: 0.35 },
-  { id: "pro", label: t.value.store.ladderPro, y: "$13.00", width: 29, fill: "var(--v5-brand)", fillOpacity: 0.55 },
-  { id: "rack", label: t.value.store.ladderRack, y: "$45.00", width: 100, fill: "var(--v5-brand)", fillOpacity: 0.75, rack: true },
-]);
+const tiers = computed<Tier[]>(() => props.authority.ladder.map((row: StoreYieldLadderRow) => {
+  const labels = {
+    phone: t.value.store.ladderPhone,
+    share: t.value.store.ladderShare,
+    entry: t.value.store.ladderS1,
+    pro: t.value.store.ladderPro,
+    rack: t.value.store.ladderRack,
+  };
+  return {
+    id: row.id,
+    label: labels[row.id],
+    y: storefrontUsd(row.amount),
+    yFull: storefrontUsdFull(row.amount),
+    width: row.widthPct,
+    you: row.id === "phone",
+    rack: row.id === "rack",
+    fill: row.id === "share" ? "var(--v5-ink-4)" : "var(--v5-brand)",
+    fillOpacity: row.id === "share" ? 0.25 : row.id === "entry" ? 0.35 : row.id === "pro" ? 0.55 : 0.75,
+  };
+}));
 
 const frameStyle: CSSProperties = {
   paddingTop: "2px",

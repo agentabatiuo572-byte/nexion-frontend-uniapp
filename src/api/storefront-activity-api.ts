@@ -1,13 +1,9 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
 
 const PRODUCTION_ACTIVITY_SOURCE = "nx_order/nx_order_item/nx_product";
-const SANDBOX_ACTIVITY_SOURCE = "nx_commerce_sandbox_order/nx_commerce_sandbox_inventory";
 const PRODUCTION_SOCIAL_PROOF_SOURCE = "nx_product/nx_order/nx_order_item";
-const SANDBOX_SOCIAL_PROOF_SOURCE = "nx_commerce_sandbox_catalog/nx_commerce_sandbox_order/nx_commerce_sandbox_inventory";
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 export interface StorefrontActivityItem {
   eventType: "ORDER_PAID";
@@ -17,7 +13,8 @@ export interface StorefrontActivityItem {
 
 export interface StorefrontActivitySnapshot {
   source: string;
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION";
   runId: string;
   items: StorefrontActivityItem[];
   nextCursor: string | null;
@@ -25,7 +22,8 @@ export interface StorefrontActivitySnapshot {
 
 export interface StorefrontSocialProof {
   source: string;
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION";
   runId: string;
   productName: string;
   cumulativeSales: number;
@@ -53,16 +51,17 @@ function nonNegativeInteger(value: unknown, message: string): number {
 }
 
 function provenance(source: Record<string, unknown>, mode: ApiEnvironment, expectedSource: string, message: string) {
-  if (source.source !== expectedSource || typeof source.sourceEnvironment !== "string" || typeof source.runId !== "string") {
+  if (source.serverCanonical !== true || source.source !== expectedSource
+      || typeof source.sourceEnvironment !== "string" || typeof source.runId !== "string") {
     return invalid(message);
   }
-  const production = mode === "prod" && source.sourceEnvironment === "PRODUCTION" && source.runId === "";
-  const sandbox = mode === "dev" && source.sourceEnvironment === "SANDBOX"
-    && RUN_ID.test(source.runId) && isCurrentCommerceSandboxRun(source.runId);
-  if (!production && !sandbox) return invalid(message);
+  const canonical = (mode === "dev" || mode === "prod")
+    && source.sourceEnvironment === "PRODUCTION" && source.runId === "";
+  if (!canonical) return invalid(message);
   return {
     source: expectedSource,
-    sourceEnvironment: source.sourceEnvironment as "PRODUCTION" | "SANDBOX",
+    serverCanonical: true as const,
+    sourceEnvironment: "PRODUCTION" as const,
     runId: source.runId,
   };
 }
@@ -70,8 +69,7 @@ function provenance(source: Record<string, unknown>, mode: ApiEnvironment, expec
 function parseActivity(value: unknown, mode: ApiEnvironment): StorefrontActivitySnapshot {
   const message = "STOREFRONT_ACTIVITY_RESPONSE_INVALID";
   const source = record(value, message);
-  const expectedSource = mode === "dev" ? SANDBOX_ACTIVITY_SOURCE : PRODUCTION_ACTIVITY_SOURCE;
-  const proof = provenance(source, mode, expectedSource, message);
+  const proof = provenance(source, mode, PRODUCTION_ACTIVITY_SOURCE, message);
   if (!Array.isArray(source.items)) return invalid(message);
   const items = source.items.map((raw) => {
     const row = record(raw, message);
@@ -95,8 +93,7 @@ function parseActivity(value: unknown, mode: ApiEnvironment): StorefrontActivity
 function parseSocialProof(value: unknown, mode: ApiEnvironment): StorefrontSocialProof {
   const message = "STOREFRONT_SOCIAL_PROOF_RESPONSE_INVALID";
   const source = record(value, message);
-  const expectedSource = mode === "dev" ? SANDBOX_SOCIAL_PROOF_SOURCE : PRODUCTION_SOCIAL_PROOF_SOURCE;
-  const proof = provenance(source, mode, expectedSource, message);
+  const proof = provenance(source, mode, PRODUCTION_SOCIAL_PROOF_SOURCE, message);
   if (typeof source.productName !== "string"
       || !source.productName.trim() || ![7, 30, 90].includes(source.windowDays as number)) return invalid(message);
   return {
