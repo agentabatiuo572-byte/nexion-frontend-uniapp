@@ -5,10 +5,9 @@
   (last 20 completed across devices). The currently-processing section and the
   Current/History tab switcher were removed per product direction.
 
-  Receipt detail: each completed row has a "view receipt" icon (Proof of Compute)
-  that opens the ported ReceiptModal (components/me/receipt-modal.vue), looked up
-  by task id via useReceipts().byId() — receipts are minted on task completion in
-  store/app.ts (generateReceipt sets receipt.id = task.id).
+  Receipt detail: each completed row and its document icon open the ported
+  ReceiptModal. Formal remote mode resolves receiptNo through the authenticated
+  Java receipt-detail endpoint; prototype mode keeps its local receipt lookup.
 -->
 <template>
   <view class="mx-4 pt-3" style="border-top: 1px solid var(--v5-border)">
@@ -87,15 +86,22 @@
       <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
     </view>
     <view v-else class="pb-3 space-y-1.5">
-      <view v-for="(task, i) in allRecent" :key="i" class="flex items-center justify-between gap-2" style="font-size: 12px">
+      <view
+        v-for="(task, i) in allRecent"
+        :key="i"
+        class="flex items-center justify-between gap-2 active:opacity-80"
+        style="font-size: 12px"
+        :role="canOpenTaskReceipt(task) ? 'button' : undefined"
+        :tabindex="canOpenTaskReceipt(task) ? 0 : undefined"
+        @click.stop="openTaskReceipt(task)"
+        @keydown.enter.stop.prevent="openTaskReceipt(task)"
+        @keydown.space.stop.prevent="openTaskReceipt(task)"
+      >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
         <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
         <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">+${{ task.reward.toFixed(3) }}</text>
         <text class="text-right shrink-0" style="font-size: 12px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
-        <view v-if="remoteApiEnabled && task.receiptNo" class="shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-brand)" :title="task.receiptNo">
-          <text style="font-size: 12px; font-weight: 600">R</text>
-        </view>
-        <view v-else-if="!remoteApiEnabled && receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
+        <view v-if="canOpenTaskReceipt(task)" class="shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
         </view>
         <view v-else class="shrink-0" style="width: 22px; height: 22px" />
@@ -106,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
@@ -115,12 +121,16 @@ import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
+import type { CompletedTask } from "@/store/types";
+import { toast } from "@/store/ui";
 
 const app = useApp();
 const t = useT();
 const receipts = remoteApiEnabled ? null : useReceipts();
-const openReceipt = ref<Receipt | null>(null);
+const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
+let receiptRequestEpoch = 0;
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
 const activeJobsText = computed(() => {
@@ -130,6 +140,42 @@ const activeJobsText = computed(() => {
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);
 }
+
+function canOpenTaskReceipt(task: CompletedTask): boolean {
+  return remoteApiEnabled ? !!task.receiptNo : !!receiptFor(task.id);
+}
+
+async function openTaskReceipt(task: CompletedTask): Promise<void> {
+  if (!remoteApiEnabled) {
+    openReceipt.value = receiptFor(task.id) ?? null;
+    return;
+  }
+  if (!task.receiptNo) return;
+  const requestEpoch = ++receiptRequestEpoch;
+  const expectedAccountKey = app.accountKey;
+  const expectedBindingEpoch = app.accountBindingEpoch;
+  try {
+    const detail = await taskAssignmentApi.receipt(task.receiptNo);
+    if (requestEpoch === receiptRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) openReceipt.value = detail;
+  } catch {
+    if (requestEpoch === receiptRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) {
+      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+    }
+  }
+}
+
+watch(() => app.accountBindingEpoch, () => {
+  receiptRequestEpoch += 1;
+  openReceipt.value = null;
+});
+
+onUnmounted(() => {
+  receiptRequestEpoch += 1;
+});
 
 // Model names are proper nouns (untranslated); the workload half is copy.
 // Resolved from `category` at render — the baked `task.type` string is English.

@@ -391,6 +391,7 @@ export const useApp = defineStore("app", () => {
     : hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexgrid.ai", bootSurface);
   const accountKey = ref(bootSnapshot.accountKey);
   const remoteAccountEpoch = createRemoteAccountEpoch(accountKey.value);
+  const accountBindingEpoch = ref(remoteAccountEpoch.snapshot().epoch);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
   const user = ref<UserState>(remoteApiEnabled ? {
@@ -872,6 +873,7 @@ export const useApp = defineStore("app", () => {
     const key = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(key);
+      accountBindingEpoch.value = remoteAccountEpoch.snapshot().epoch;
       const emptySnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       accountKey.value = emptySnapshot.accountKey;
       entrySurface.value = emptySnapshot.entrySurface;
@@ -2461,7 +2463,7 @@ export const useApp = defineStore("app", () => {
   }
 
   return {
-    accountKey, entrySurface, accountCloudUpdatedAt,
+    accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,

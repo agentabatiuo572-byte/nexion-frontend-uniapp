@@ -73,16 +73,26 @@
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
+import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
 import { useT } from "@/i18n/use-t";
 import { workloadLabel } from "@/lib/workload-label";
 import { toast } from "@/store/ui";
 
-const props = defineProps<{ receipt: Receipt | null }>();
+const props = defineProps<{ receipt: Receipt | CanonicalComputeReceipt | null }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
 // "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
-const isLegacyVerification = computed(() => props.receipt?.category === "KY");
+function isCanonicalComputeReceipt(
+  receipt: Receipt | CanonicalComputeReceipt,
+): receipt is CanonicalComputeReceipt {
+  return "receiptNo" in receipt && "proofHash" in receipt;
+}
+
+const isLegacyVerification = computed(() => {
+  const receipt = props.receipt;
+  return receipt ? !isCanonicalComputeReceipt(receipt) && receipt.category === "KY" : false;
+});
 const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 
 // ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
@@ -196,6 +206,53 @@ function detailRows(d: ReceiptDetails): DescRow[] {
 const sections = computed<DescSection[]>(() => {
   const r = props.receipt;
   if (!r) return [];
+  if (isCanonicalComputeReceipt(r)) {
+    return [
+      {
+        rows: [
+          { k: "receipt_no", v: r.receiptNo, accent: true },
+          { k: "task_no", v: r.taskNo },
+          { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
+          { k: "task_name", v: r.taskName },
+          { k: "model", v: r.model || "—" },
+        ],
+      },
+      {
+        rows: [
+          { k: "client", v: r.client },
+          { k: "status", v: r.earningStatus },
+        ],
+      },
+      {
+        rows: [
+          { k: "device", v: r.deviceName },
+          { k: "device_instance", v: r.deviceInstanceNo },
+          { k: "device_type", v: r.deviceType },
+          ...(r.deviceGpu ? [{ k: "gpu", v: r.deviceGpu }] : []),
+          ...(r.vramTotalGb !== null ? [{ k: "vram", v: `${r.vramTotalGb} GB` }] : []),
+        ],
+      },
+      {
+        rows: [
+          { k: "started_at", v: fmtDate(r.startedAt) },
+          { k: "duration", v: fmtDuration(r.durationSec) },
+          { k: "completed_at", v: fmtDate(r.completedAt) },
+        ],
+      },
+      {
+        rows: [
+          { k: "reward_usdt", v: `+$${r.rewardUsdt.toFixed(6)} USDT`, accent: true, strong: true },
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${r.rewardNex.toFixed(6)} NEX`, accent: true }] : []),
+        ],
+      },
+      {
+        rows: [
+          { k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) },
+          { k: "source", v: `${r.source}/${r.sourceEnvironment}` },
+        ],
+      },
+    ];
+  }
   if (r.category === "KY") {
     return [
       {
