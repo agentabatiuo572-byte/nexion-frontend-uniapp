@@ -31,7 +31,7 @@ function api(overrides: Partial<AuthApi>): AuthApi {
   };
 }
 
-test("successful registration revokes its bootstrap session then calls password login", async () => {
+test("successful registration keeps the single server-issued session without a cookie-clearing login race", async () => {
   const receipt = {
     sponsorCode: "NXAB12CD34EF",
     sponsorDisplayName: "A•••",
@@ -47,22 +47,13 @@ test("successful registration revokes its bootstrap session then calls password 
       vaultRevision: 4,
       registrationReceipt: receipt,
     }),
-    login: vi.fn().mockResolvedValue({
-      kind: "authenticated",
-      user: { userId: 7101, countryCode: "+81", phone: "81987654321", nickname: "New" },
-      vaultRevision: 6,
-    }),
   });
 
   const result = await registerAndLogin(authApi, request, () => true);
 
-  expect(authApi.discardSessionIfCurrent).toHaveBeenCalledWith(4);
-  expect(authApi.login).toHaveBeenCalledWith({
-    countryCode: "+81",
-    phone: "81987654321",
-    password: "NexPass9a",
-  });
-  expect(result).toMatchObject({ kind: "authenticated", vaultRevision: 6, registrationReceipt: receipt });
+  expect(authApi.discardSessionIfCurrent).not.toHaveBeenCalled();
+  expect(authApi.login).not.toHaveBeenCalled();
+  expect(result).toMatchObject({ kind: "authenticated", vaultRevision: 4, registrationReceipt: receipt });
 });
 
 test("unknown registration outcome performs one authoritative password-login recovery", async () => {
@@ -116,13 +107,13 @@ test("a stale registration flow discards only its issued session and does not lo
   expect(result).toEqual({ kind: "stale" });
 });
 
-test("an unexpected login challenge never claims the App as signed in", async () => {
+test("an unexpected recovery-login challenge never claims the App as signed in", async () => {
   const authApi = api({
-    register: vi.fn().mockResolvedValue({
-      kind: "authenticated",
-      user: { userId: 7104, countryCode: "+81", phone: "81987654321", nickname: "Challenge" },
-      vaultRevision: 2,
-    }),
+    register: vi.fn().mockRejectedValue(new ApiError({
+      kind: "network",
+      message: "NETWORK_UNAVAILABLE",
+      retryable: true,
+    })),
     login: vi.fn().mockResolvedValue({
       kind: "challenge",
       user: { userId: 7104, countryCode: "+81", phone: "81987654321", nickname: "Challenge" },

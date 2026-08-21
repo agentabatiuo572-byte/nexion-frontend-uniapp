@@ -233,7 +233,7 @@ export const zh: Messages = {
     finishReset: "更新密码并登录",
     resetSuccess: "密码已更新 · 已登录",
     errorInvalidCredentials: "手机号或密码不正确。",
-    serverSessionReloadNotice: "为保护你的账号，页面刷新后需要重新登录。数据在服务端安全保存，重新登录即可恢复。",
+    serverSessionReloadNotice: "页面刷新后会安全恢复服务端会话；只有会话已失效时才需要重新登录。",
   },
   register: {
     title: "创建账号",

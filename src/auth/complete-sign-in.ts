@@ -168,6 +168,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // attempt settles; firing both in parallel can make a valid first-login
   // wallet response stale and leave every Sandbox badge hidden until reload.
   if (remoteApiEnabled) {
+    void app.refreshHomeTruth();
     void refreshRemoteFleetAfterCatalog(options.identity).finally(() => {
       // authApi persisted this matching Bearer session before completeSignIn.
       // The store still rejects a failed/missing catalog or mismatched account.

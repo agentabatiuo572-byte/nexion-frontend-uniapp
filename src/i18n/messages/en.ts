@@ -250,7 +250,7 @@ export const en = {
     finishReset: "Update password and sign in",
     resetSuccess: "Password updated · signed in",
     errorInvalidCredentials: "Phone number or password is incorrect.",
-    serverSessionReloadNotice: "For your account's protection, sign in again after a page refresh. Your data is safely stored on the server and will be available once you sign in.",
+    serverSessionReloadNotice: "After a page refresh, the server session is restored securely. You only need to sign in again if that session has expired.",
   },
   register: {
     title: "Create account",
