@@ -10,6 +10,7 @@
     :data-copy-key="managedCopy.deliveries[MANAGED_POSITION]?.copyKey ?? 'builtin'"
     :data-copy-version="managedCopy.deliveries[MANAGED_POSITION]?.version ?? 'builtin'"
     :data-experiment-id="managedCopy.deliveries[MANAGED_POSITION]?.experimentId ?? ''"
+    :data-target-device="weeklyCard.targetDevice ?? ''"
     @click="goTarget"
     @keydown.enter.prevent="goTarget"
     @keydown.space.prevent="goTarget"
@@ -36,7 +37,7 @@
           <text class="weekly-quest__multiplier">{{ promoMult === null ? "—" : `${promoMult}×` }}</text>
         </view>
         <view class="weekly-quest__countdown">
-          <text class="weekly-quest__countdown-label">{{ contextLabel }}</text>
+          <text class="weekly-quest__countdown-label">{{ t.home.weeklyQuestEndsIn }}</text>
           <text class="weekly-quest__countdown-value">{{ remainingLabel }}</text>
         </view>
       </view>
@@ -46,15 +47,15 @@
           <text class="weekly-quest__reward-value">+{{ finalRewardText }}</text>
           <text class="weekly-quest__reward-unit">NEX</text>
         </view>
-        <text class="weekly-quest__subtitle">{{ subtitleText }}</text>
-        <view v-if="!weeklyQuest" class="weekly-quest__rate">
+        <text class="weekly-quest__subtitle" :aria-label="subtitleText" :title="subtitleText">{{ subtitleText }}</text>
+        <view class="weekly-quest__rate">
           <text class="weekly-quest__rate-value">${{ targetDailyText }}</text>
           <text class="weekly-quest__rate-unit">/d</text>
         </view>
       </view>
 
       <view class="weekly-quest__cta">
-        <text>{{ weeklyQuest ? t.headerTitles.missions : t.home.weeklyQuestGetNexGridBox }}</text>
+        <text>{{ weeklyCard.action === "missions" ? t.headerTitles.missions : t.home.weeklyQuestGetNexGridBox }}</text>
         <text class="weekly-quest__cta-arrow" aria-hidden="true">→</text>
       </view>
     </view>
@@ -64,17 +65,10 @@
 <script setup lang="ts">
 import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
-import { derivePromoUpgrade } from "@/store/device-types";
-import { deviceNameByKind } from "@/lib/device-copy";
-import { useNow } from "@/composables/use-now";
 import { useContentCopy } from "@/store/content-copy";
-import { useLocaleStore } from "@/store/locale";
 import { refreshCanonicalOrders } from "@/store/order-canonical";
 import { useWeeklyQuest } from "@/store/weekly-quest";
-import { remoteApiEnabled } from "@/api/runtime";
-import { selectHomeWeeklySource } from "@/lib/home-task-carousel";
+import { presentHomeWeeklyCard, selectHomeWeeklySource } from "@/lib/home-task-carousel";
 import { navTo } from "@/lib/route";
 
 const MANAGED_POSITION = "home.conversion-banner";
@@ -83,10 +77,7 @@ const props = withDefaults(defineProps<{ active?: boolean }>(), {
   active: true,
 });
 const t = useT();
-const app = useApp();
-const nowTick = useNow();
 const managedCopy = useContentCopy();
-const locale = useLocaleStore();
 const wq = useWeeklyQuest();
 
 onMounted(() => {
@@ -99,56 +90,29 @@ const weeklySource = computed(() => selectHomeWeeklySource(
   [...wq.tier1Quests, ...wq.tier2Quests],
   wq.snapshot?.promoBanner ?? null,
 ));
-const weeklyQuest = computed(() => weeklySource.value?.kind === "quest" ? weeklySource.value.quest : null);
-const canonicalPromo = computed(() => weeklySource.value?.kind === "promo" ? weeklySource.value.promo : null);
-const promoMult = computed<number | null>(() => {
-  if (!remoteApiEnabled) return 1.5;
-  if (weeklyQuest.value) return wq.multiplier;
-  return canonicalPromo.value?.multiplier ?? null;
-});
-const baseReward = 800;
+const weeklyCard = computed(() => presentHomeWeeklyCard(
+  weeklySource.value,
+  wq.snapshot?.promoBanner ?? null,
+  wq.multiplier,
+));
+const promoMult = computed<number | null>(() => weeklyCard.value.multiplier);
 const finalRewardText = computed(() => {
-  const reward = remoteApiEnabled
-    ? weeklyQuest.value
-      ? Math.round(weeklyQuest.value.rewardNex * (promoMult.value ?? 1))
-      : canonicalPromo.value
-        ? Math.round(canonicalPromo.value.baseReward * canonicalPromo.value.multiplier)
-        : null
-    : Math.round(baseReward * (promoMult.value ?? 1));
+  const reward = weeklyCard.value.rewardNex;
   return reward === null ? "—" : reward.toLocaleString();
 });
 
-const contextLabel = computed(() => weeklyQuest.value ? t.value.headerTitles.missions : t.value.home.weeklyQuestEndsIn);
 const remainingLabel = computed(() => {
-  if (remoteApiEnabled) {
-    if (weeklyQuest.value) return weeklyQuest.value.layer === "WEEKLY_T1" ? "Tier 1" : "Tier 2";
-    if (!canonicalPromo.value) return "—";
-    const days = canonicalPromo.value.countdownDays;
-    const hours = canonicalPromo.value.countdownHours;
-    return `${days}d ${String(hours).padStart(2, "0")}h`;
-  }
-  const remainingMs = (4 * 86400 + 12 * 3600) * 1000 - ((nowTick.value * 1000) % 60_000);
-  const days = Math.floor(remainingMs / 86400_000);
-  const hours = Math.floor((remainingMs % 86400_000) / 3600_000);
+  const days = weeklyCard.value.countdownDays;
+  const hours = weeklyCard.value.countdownHours;
+  if (days === null || hours === null) return "—";
   return `${days}d ${String(hours).padStart(2, "0")}h`;
 });
 
-const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => {
-  if (remoteApiEnabled) {
-    const value = canonicalPromo.value?.targetDaily;
-    return value == null ? "—" : value.toFixed(2);
-  }
-  return promo.value.targetDaily.toFixed(2);
+  const value = weeklyCard.value.targetDaily;
+  return value == null ? "—" : value.toFixed(2);
 });
-const managedCopyText = computed(() => managedCopy.localized(MANAGED_POSITION, locale.code));
-const subtitleText = computed(() =>
-  weeklyQuest.value?.name || managedCopyText.value || (remoteApiEnabled ? (canonicalPromo.value?.targetDevice || "—") : promo.value.multiplier > 0
-    ? fmt(t.value.home.weeklyQuestActivateToClaim, {
-        device: deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
-      })
-    : t.value.home.weeklyQuestAddCapacity),
-);
+const subtitleText = computed(() => weeklyCard.value.subtitle || "—");
 
 const rootStyle: CSSProperties = {
   position: "relative",
@@ -178,17 +142,11 @@ const productStyle: CSSProperties = {
 };
 
 function goTarget() {
-  if (weeklyQuest.value) {
+  if (weeklyCard.value.action === "missions") {
     uni.navigateTo({ url: "/pages/missions/missions", fail: () => {} });
-    return;
+  } else if (weeklyCard.value.action === "store") {
+    navTo("/store");
   }
-  if (remoteApiEnabled) {
-    if (canonicalPromo.value) navTo("/store");
-    return;
-  }
-  const kind = promo.value.targetKind;
-  if (!kind) return;
-  uni.navigateTo({ url: `/pages/store/detail?id=${kind}`, fail: () => {} });
 }
 </script>
 

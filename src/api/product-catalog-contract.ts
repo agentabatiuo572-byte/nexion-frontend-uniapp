@@ -1,11 +1,13 @@
 import type { Product, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
+export type CatalogProduct = Product;
+
 export interface ProductCatalogSnapshot {
   source: string;
   serverCanonical: true;
   revision: string | null;
-  products: Product[];
+  products: CatalogProduct[];
   sourceEnvironment?: "SANDBOX";
   runId?: string;
 }
@@ -80,10 +82,10 @@ export const SPEC_UNAVAILABLE = "unavailable";
  * 🔴 This used to be `nonEmptyString`, i.e. all eight spec fields were mandatory.
  * That was fatal rather than strict: the parser throws for the WHOLE payload, so
  * one absent spec emptied the entire store. And absence is the normal case —
- * `uptime` / `warranty` / `phoneDailyEarn` / `phoneDailyEarnNEX` have no column,
- * no operator input and no PRD entry on the server side at all, while the four
- * that do exist (`gpu` / `vram` / `power` / `datacenter`) are nullable there and
- * the console sends `undefined` for any field an operator leaves blank.
+ * The managed-service fields (`uptime` / `warranty` / `phoneDailyEarn` /
+ * `phoneDailyEarnNEX`) are optional server-owned projections just like the
+ * nullable hardware fields (`gpu` / `vram` / `power` / `datacenter`). The
+ * console sends `undefined` for any field an operator leaves blank.
  * Spec incompleteness already has a graceful, purpose-built channel —
  * `purchaseBlocked` + `purchaseBlockedReason` — so hard-failing here was a second,
  * catastrophic implementation of the same concern.
@@ -144,7 +146,7 @@ function phase(value: unknown): PhaseId | undefined {
   return canonical as PhaseId;
 }
 
-function product(value: unknown): Product {
+function product(value: unknown): CatalogProduct {
   const source = record(value);
   const tier = nonEmptyString(source.tier);
   if (!TIERS.has(tier as Product["tier"])) return invalid();

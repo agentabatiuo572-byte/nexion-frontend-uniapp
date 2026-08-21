@@ -108,11 +108,11 @@ import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
-import { paymentMethodApi, remoteApiEnabled, paymentSandboxEnabled } from "@/api/runtime";
+import { paymentMethodApi, remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();
-const cardBindingAvailable = computed(() => !remoteApiEnabled || paymentSandboxEnabled);
+const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaymentEnabled);
 
 // Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
 // navigation (open-redirect guarded). Initialize from the H5 URL hash query

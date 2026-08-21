@@ -10,8 +10,13 @@ import { toast } from "@/store/ui";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import type { ShareChannelDef } from "@/store/config-types";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, shareEventApi, apiRuntimeConfig } from "@/api/runtime";
 import { useReferralReward } from "@/store/referral-reward";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxRun } from "@/api/order-api";
+import type { ShareEventChannel } from "@/api/share-event-api";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { runShareEventFlight } from "@/lib/share-event-flight";
 
 // §8.1.1 邀请人回报口径:每注册好友 lifetime 贡献估值(展示用)× 阶段倍率。
 // 单一常量源 — invite-earn-card 与渠道面板共用,禁再写局部镜像(F4)。
@@ -28,6 +33,10 @@ export interface ShareEventRecord {
 
 const EVENTS_KEY = "nexgrid-share-events-v1";
 const EVENTS_CAP = 50;
+const SHARE_EVENT_CHANNELS = new Set<ShareEventChannel>([
+  "telegram", "zalo", "whatsapp", "messenger", "sms", "x",
+  "copy", "poster", "system", "code", "link",
+]);
 
 // 单源分享链接:服务端模式只能取 H8 当前用户投影中的邀请码；该投影缺失时
 // 返回空串而不是回退到浏览器 demo 身份。mock 模式仍保持原有本地演示行为。
@@ -141,13 +150,13 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       }
       // #endif
       if (opened) {
-        recordShareEvent(def.key, surface);
+        await recordShareEvent(def.key, surface);
       } else {
         // 异常3:intent 被拦 → 复制降级;复制也失败则禁误报、不计事件(防白耗一次性任务奖励)。
         const ok = await copyText(text);
         if (ok) {
           toast.info(fmt(t.value.share.openFailedCopied, { channel: label }));
-          recordShareEvent(def.key, surface);
+          await recordShareEvent(def.key, surface);
         } else {
           toast.info(t.value.share.copyFailed);
         }
@@ -159,7 +168,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       const ok = await copyText(text);
       if (ok) {
         toast.info(fmt(t.value.share.schemeCopied, { channel: label }));
-        recordShareEvent(def.key, surface);
+        await recordShareEvent(def.key, surface);
       } else {
         toast.info(t.value.share.copyFailed);
       }
@@ -169,7 +178,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       const ok = await copyText(link);
       if (ok) {
         toast.success(t.value.team.inviteLinkCopied);
-        recordShareEvent(def.key, surface);
+        await recordShareEvent(def.key, surface);
       } else {
         toast.info(t.value.share.copyFailed);
       }
@@ -179,7 +188,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       // #ifdef H5
       try {
         await navigator.share({ title: "NexGrid", text, url: link });
-        recordShareEvent(def.key, surface);
+        await recordShareEvent(def.key, surface);
       } catch {
         // 取消与真实失败在此均静默不计事件:取消不该报错;AbortError 与其它
         // 异常无法可靠区分,宁可少计不误报(诊断依赖后端 share.performed 对账)。
@@ -205,13 +214,33 @@ function readEvents(): ShareEventRecord[] {
 // 分享事件:client 追加记录(PROD: POST /api/share/event),并幂等触发首日任务
 // invite_friend——quest store 只记完成,入账 + 账单 + toast 在这里组合
 // (对齐 quest.ts 头注的调用层组合约定)。
-export function recordShareEvent(channel: string, surface: ShareSurface) {
+export async function recordShareEvent(channel: string, surface: ShareSurface): Promise<boolean> {
   if (remoteApiEnabled) {
-    // A client-side share intent is not proof of a server mission completion.
-    // Do not write a local event row that a different session could mistake for
-    // a canonical H8 fact.
-    void useQuest().refreshRemote();
-    return;
+    if (!SHARE_EVENT_CHANNELS.has(channel as ShareEventChannel)) return false;
+    const accountScope = captureAccountScope();
+    const run = captureCommerceSandboxRun();
+    const sourceEnvironment = apiRuntimeConfig.environment === "dev" ? "SANDBOX" : "PRODUCTION";
+    const runId = apiRuntimeConfig.environment === "dev" ? (run.runId ?? "") : "";
+    const current = () => isCurrentAccountScope(accountScope)
+      && (sourceEnvironment === "PRODUCTION" || (!!runId && isCurrentCommerceSandboxRun(runId)));
+    return runShareEventFlight({
+      send: async () => {
+        const eventId = `share-${requireCryptoUuid()}`;
+        await shareEventApi.record({
+          eventId,
+          channel: channel as ShareEventChannel,
+          surface,
+          sourceEnvironment,
+          runId,
+        }, `share-event:${eventId}`);
+      },
+      isCurrent: current,
+      refresh: () => useQuest().refreshRemote(),
+      onFailure: () => {
+        const t = useT();
+        toast.info(t.value.share.eventFailed);
+      },
+    });
   }
   try {
     const next = [...readEvents(), { channel, surface, sharedAt: Date.now() }].slice(-EVENTS_CAP);
@@ -223,16 +252,17 @@ export function recordShareEvent(channel: string, surface: ShareSurface) {
   // 三处漏改)。原来是先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
   // 而 quest 是一次性的,再也拿不到。奖励从静态表就能查到,顺序反得过来。
   const quest = useQuest();
-  if (quest.isComplete("invite_friend")) return;
+  if (quest.isComplete("invite_friend")) return true;
   const task = quest.QUEST_TASKS.find((tk) => tk.id === "invite_friend");
-  if (!task) return;
+  if (!task) return false;
   const t = useT();
   const ref = `QST-invite_friend`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中
   // 同一次任务完成的两腿一次落盘 —— 入账由收据的 amount/symbol 派生,不再单独 credit*。
   const drafts: ReceiptDraft[] = [];
   if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
   if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
-  if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return;
-  if (!useQuest().markComplete("invite_friend").firstTime) return; // 消费失败:重试命中同 ref 不再发
+  if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return false;
+  if (!useQuest().markComplete("invite_friend").firstTime) return false; // 消费失败:重试命中同 ref 不再发
   toast.success(`+${task.nexReward} NEX · +$${task.usdtReward ?? 0}`, t.value.share.questRewardToast);
+  return true;
 }

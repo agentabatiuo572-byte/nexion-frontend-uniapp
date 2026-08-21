@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
-const env = read(".env.acceptance-h5");
-const launcher = read("scripts/start-acceptance-h5.ps1");
+const env = read(".env.development");
+const launcher = read("scripts/start-dev-h5.ps1");
 const orders = read("src/store/orders.ts");
 const checkout = read("src/pages/store/checkout.vue");
 const orderApi = read("src/api/order-api.ts");
@@ -16,11 +16,10 @@ const ordinaryOrderSubmission = checkout.slice(
   checkout.indexOf("// A canonical PENDING_PAYMENT receipt proves only creation"),
 );
 
-assert.match(env, /^VITE_NEXGRID_API_MODE=sandbox$/m);
 assert.match(env, /^VITE_NEXGRID_API_PREVIEW_TARGET=http:\/\/127\.0\.0\.1:8110$/m);
-assert.match(launcher, /VITE_NEXGRID_API_MODE\s*=\s*'sandbox'/);
-assert.match(launcher, /npm\.cmd run dev:h5 -- --mode acceptance-h5/);
-assert.doesNotMatch(launcher, /VITE_NEXGRID_API_MODE\s*=\s*'production'/);
+assert.doesNotMatch(env, /VITE_NEXGRID_API_MODE/);
+assert.doesNotMatch(launcher, /VITE_NEXGRID_API_MODE/);
+assert.match(launcher, /"--mode", "development"/);
 assert.ok(orders.includes("const requestGeneration = ++refreshGeneration")
   && orders.includes("const requestRunScope = captureCommerceSandboxRun()")
   && orders.includes("requestGeneration === refreshGeneration")
@@ -62,4 +61,4 @@ assert.ok(catalogContract.includes('sourceEnvironment?: "SANDBOX"')
   && catalogContract.includes('catalogSource !== "mock"')
   && catalogContract.includes('RUN_ID.test(runId)'),
   "catalog parsing must preserve and validate the sandbox run proof used by checkout");
-console.log("commerce acceptance H5 launcher: PASS");
+console.log("commerce development H5 launcher: PASS");

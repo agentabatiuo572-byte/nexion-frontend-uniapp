@@ -9,6 +9,7 @@ import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
 import { authApi, remoteApiEnabled } from "@/api/runtime";
+import { scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
 
 interface CompleteSignInOptions {
@@ -177,6 +178,10 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // Fetch the new account's server buckets here; a failed request leaves the
   // snapshot unavailable and the withdrawal endpoint still fails closed.
   void refreshEarningsReleaseStatus(options.identity).catch(() => {});
+  // Login completion is a re-ack checkpoint. The helper fences its request to
+  // this exact bearer/account and only redirects when the server says the
+  // published Terms version is unacknowledged.
+  if (remoteApiEnabled) scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index");
   if (options.deferNavigation) return { ok: true };
   if (!auth.onboardingComplete) {
     uni.reLaunch({

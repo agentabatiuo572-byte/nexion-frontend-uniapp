@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiEnvironment } from "./runtime-config";
 
 export type QuestLayer = "DAY_ONE" | "WEEKLY_T1" | "WEEKLY_T2";
 export type QuestStatus = "PENDING" | "COMPLETED" | "CLAIMABLE" | "CLAIMED";
@@ -29,12 +30,18 @@ export interface QuestSnapshot {
   questBonusMultiplier: number;
   rhythmMonth: number;
   source: string;
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
 }
 
 export interface QuestClaimResult {
   questId: string;
   rewardNex: number;
   status: "CLAIMED";
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
 }
 
 export interface QuestApi {
@@ -60,6 +67,12 @@ function number(value: unknown, min = 0, max = Number.POSITIVE_INFINITY): number
 
 function invalid(message = "QUEST_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
+}
+
+function validAuthority(row: Record<string, unknown>, mode: ApiEnvironment): boolean {
+  if (row.serverCanonical !== true) return false;
+  return (mode === "dev" || mode === "prod")
+    && row.sourceEnvironment === "PRODUCTION" && row.runId === "";
 }
 
 function parseQuest(value: unknown): CanonicalQuest {
@@ -107,12 +120,12 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   };
 }
 
-export function parseQuestSnapshot(value: unknown): QuestSnapshot {
+export function parseQuestSnapshot(value: unknown, mode: ApiEnvironment = "prod"): QuestSnapshot {
   const row = record(value);
   const multiplier = number(row?.questBonusMultiplier, 0.1);
   const rhythmMonth = number(row?.rhythmMonth, 1);
   const source = text(row?.source);
-  if (!row || !Array.isArray(row.quests) || multiplier === null
+  if (!row || !validAuthority(row, mode) || !Array.isArray(row.quests) || multiplier === null
       || rhythmMonth === null || !Number.isInteger(rhythmMonth) || !source
       || !source.includes("nx_mission") || !source.includes("nx_user_mission")
       || source.toLowerCase().includes("mock")) {
@@ -127,17 +140,27 @@ export function parseQuestSnapshot(value: unknown): QuestSnapshot {
     questBonusMultiplier: multiplier,
     rhythmMonth,
     source,
+    serverCanonical: true,
+    sourceEnvironment: row.sourceEnvironment as "PRODUCTION" | "SANDBOX",
+    runId: row.runId as string,
   };
 }
 
-export function parseQuestClaim(value: unknown): QuestClaimResult {
+export function parseQuestClaim(value: unknown, mode: ApiEnvironment = "prod"): QuestClaimResult {
   const row = record(value);
   const questId = text(row?.questId);
   const rewardNex = number(row?.rewardNex);
-  if (!row || !questId || rewardNex === null || row.status !== "CLAIMED") {
+  if (!row || !validAuthority(row, mode) || !questId || rewardNex === null || row.status !== "CLAIMED") {
     return invalid("QUEST_CLAIM_RESPONSE_INVALID");
   }
-  return { questId, rewardNex, status: "CLAIMED" };
+  return {
+    questId,
+    rewardNex,
+    status: "CLAIMED",
+    serverCanonical: true,
+    sourceEnvironment: row.sourceEnvironment as "PRODUCTION" | "SANDBOX",
+    runId: row.runId as string,
+  };
 }
 
 function required(value: string, error: string): string {
@@ -146,16 +169,16 @@ function required(value: string, error: string): string {
   return normalized;
 }
 
-export function createQuestApi(client: ApiClient): QuestApi {
+export function createQuestApi(client: ApiClient, mode: ApiEnvironment = "prod"): QuestApi {
   return {
     state: async () => parseQuestSnapshot(await client.request({
       method: "GET",
       path: "/api/quests/state",
-    })),
+    }), mode),
     claim: async (questCode, idempotencyKey) => parseQuestClaim(await client.request({
       method: "POST",
       path: `/api/quests/${encodeURIComponent(required(questCode, "QUEST_CODE_REQUIRED"))}/claim`,
       idempotencyKey: required(idempotencyKey, "QUEST_IDEMPOTENCY_KEY_REQUIRED"),
-    })),
+    }), mode),
   };
 }

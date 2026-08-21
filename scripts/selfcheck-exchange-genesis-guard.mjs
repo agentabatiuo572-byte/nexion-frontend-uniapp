@@ -434,6 +434,14 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     //    这里只补上「无条件被读到」的那两个 ref,不把远端路径拉进本 harness。
     remoteState: { value: null },
     remoteError: { value: null },
+    // The page now freezes the backend acceptance-run scope before either the
+    // remote or explicit local-mock branch. Keep this legacy harness on one
+    // stable sandbox run; cross-run rejection is covered by the order/exchange
+    // authority contract tests.
+    captureCommerceSandboxRun: () => ({ environment: "SANDBOX", runId: "legacy-exchange-guard" }),
+    captureAccountScope: () => ({ accountKey: app.accountKey, epoch: 0 }),
+    remoteScopeCurrent: () => true,
+    toastIfRemoteScopeCurrent: (_scope, _runScope, action) => action(),
     exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
     geoPolicyUserMessage,
     submitting: { value: false },

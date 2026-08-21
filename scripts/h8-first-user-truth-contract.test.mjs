@@ -33,9 +33,10 @@ test("H8 drops malformed or stale-account projections instead of retaining anoth
   const store = read("src/store/referral-reward.ts");
   const accountScope = read("src/lib/account-scope.ts");
 
-  assert.match(store, /let accountEpoch = 0/);
-  assert.match(store, /if \(epoch !== accountEpoch\) return false/);
-  assert.match(store, /accountEpoch \+= 1;[\s\S]*snapshot\.value = null/);
+  assert.match(store, /createRemoteAccountEpoch\(\)/);
+  assert.match(store, /accountScope\.snapshot\(\)[\s\S]*captureCommerceSandboxRun\(\)/);
+  assert.match(store, /accountScope\.isCurrent\(request\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
+  assert.match(store, /accountScope\.bind\(accountKey\);[\s\S]*refreshGeneration \+= 1;[\s\S]*snapshot\.value = null/);
   assert.match(store, /snapshot\.value = null;[\s\S]*error\.value = cause/);
   assert.match(accountScope, /useReferralReward\(\)\.bindAccount\(accountKey\)/);
 });

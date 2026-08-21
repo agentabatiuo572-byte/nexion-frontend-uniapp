@@ -1,5 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiEnvironment } from "./runtime-config";
+import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export type FundsSandboxTopupChannel = "CREGIS_USDT_BEP20" | "VIETQR" | "CARD";
 export type FundsSandboxOrderStatus = "PENDING" | "SETTLED" | "SUBMITTED" | "CONFIRMED" | "FAILED";
@@ -119,15 +121,25 @@ const integer = (value: unknown): number | null => {
   return parsed !== null && Number.isSafeInteger(parsed) ? parsed : null;
 };
 
-function assertSource(row: Record<string, unknown> | null): asserts row is Record<string, unknown> {
-  if (!row || row.source !== "mock" || row.sourceEnvironment !== "SANDBOX") {
-    throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_SOURCE_INVALID" });
+function assertSandboxMode(mode: ApiEnvironment): void {
+  if (mode !== "dev") {
+    throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_MODE_INVALID" });
   }
 }
 
-function wallet(value: unknown): FundsSandboxWallet {
+function assertSource(row: Record<string, unknown> | null, mode: ApiEnvironment, requireRun = false): asserts row is Record<string, unknown> {
+  assertSandboxMode(mode);
+  if (!row || row.source !== "mock" || row.sourceEnvironment !== "SANDBOX") {
+    throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_SOURCE_INVALID" });
+  }
+  if (requireRun && (typeof row.runId !== "string" || !isCurrentCommerceSandboxRun(row.runId))) {
+    throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_RUN_ID_MISMATCH" });
+  }
+}
+
+function wallet(value: unknown, mode: ApiEnvironment): FundsSandboxWallet {
   const row = object(value);
-  assertSource(row);
+  assertSource(row, mode);
   const availableUsdt = amount(row.availableUsdt);
   const reservedUsdt = amount(row.reservedUsdt);
   const version = integer(row.version);
@@ -137,9 +149,9 @@ function wallet(value: unknown): FundsSandboxWallet {
   return { availableUsdt, reservedUsdt, version, source: "mock", sourceEnvironment: "SANDBOX" };
 }
 
-function order(value: unknown): FundsSandboxOrder {
+function order(value: unknown, mode: ApiEnvironment): FundsSandboxOrder {
   const row = object(value);
-  assertSource(row);
+  assertSource(row, mode, true);
   const orderNo = text(row.orderNo);
   const runId = text(row.runId);
   const kind = row.kind;
@@ -172,13 +184,13 @@ function order(value: unknown): FundsSandboxOrder {
     version,
     createdAt,
     settledAt,
-    ...(row.wallet ? { wallet: wallet(row.wallet) } : {}),
+    ...(row.wallet ? { wallet: wallet(row.wallet, mode) } : {}),
   };
 }
 
-function ledger(value: unknown): FundsSandboxLedgerEntry {
+function ledger(value: unknown, mode: ApiEnvironment): FundsSandboxLedgerEntry {
   const row = object(value);
-  assertSource(row);
+  assertSource(row, mode);
   const ledgerNo = text(row.ledgerNo);
   const runId = text(row.runId);
   const orderNo = text(row.orderNo);
@@ -197,9 +209,9 @@ function ledger(value: unknown): FundsSandboxLedgerEntry {
     availableAfter, reservedAfter, source: "mock", sourceEnvironment: "SANDBOX", createdAt };
 }
 
-function withdrawalPolicy(value: unknown): FundsSandboxWithdrawalPolicy {
+function withdrawalPolicy(value: unknown, mode: ApiEnvironment): FundsSandboxWithdrawalPolicy {
   const row = object(value);
-  assertSource(row);
+  assertSource(row, mode);
   const minAmount = amount(row?.minAmount);
   const dailyLimitCount = integer(row?.dailyLimitCount);
   const balanceMaxRatio = amount(row?.balanceMaxRatio);
@@ -249,35 +261,47 @@ function withdrawalPolicy(value: unknown): FundsSandboxWithdrawalPolicy {
   };
 }
 
-function overview(value: unknown): FundsSandboxOverview {
+function overview(value: unknown, mode: ApiEnvironment): FundsSandboxOverview {
   const row = object(value);
-  assertSource(row);
+  assertSource(row, mode, true);
   const runId = text(row.runId);
   if (!runId || row.mode !== "LOCAL_SANDBOX" || !Array.isArray(row.orders) || !Array.isArray(row.ledger)) {
     throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_OVERVIEW_INVALID" });
   }
-  const orders = row.orders.map(order);
-  const entries = row.ledger.map(ledger);
+  const orders = row.orders.map((item) => order(item, mode));
+  const entries = row.ledger.map((item) => ledger(item, mode));
   if (orders.some((item) => item.runId !== runId) || entries.some((item) => item.runId !== runId)) {
     throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_RUN_ID_MISMATCH" });
   }
-  return { runId, wallet: wallet(row.wallet), orders, ledger: entries, withdrawalPolicy: withdrawalPolicy(row.withdrawalPolicy),
+  return { runId, wallet: wallet(row.wallet, mode), orders, ledger: entries, withdrawalPolicy: withdrawalPolicy(row.withdrawalPolicy, mode),
     source: "mock", sourceEnvironment: "SANDBOX", mode: "LOCAL_SANDBOX" };
 }
 
-export function createFundsSandboxApi(client: ApiClient): FundsSandboxApi {
+export function createFundsSandboxApi(client: ApiClient, mode: ApiEnvironment = "prod"): FundsSandboxApi {
   return {
-    overview: async () => overview(await client.request({ method: "GET", path: "/api/app/wallet/sandbox" })),
-    createTopup: async (channel, value, idempotencyKey) => order(await client.request({
-      method: "POST", path: "/api/app/wallet/sandbox/topups", body: { channel, amount: value }, idempotencyKey,
-    })),
-    createWithdrawal: async (value, targetAddress, idempotencyKey) => order(await client.request({
-      method: "POST", path: "/api/app/wallet/sandbox/withdrawals",
-      body: { channel: "CREGIS_USDT_BEP20", amount: value, targetAddress }, idempotencyKey,
-    })),
-    applyCallback: async (orderNo, status, expectedVersion, eventId) => order(await client.request({
-      method: "POST", path: `/api/app/wallet/sandbox/orders/${encodeURIComponent(orderNo)}/callbacks`,
-      body: { eventId, status, expectedVersion },
-    })),
+    overview: async () => {
+      assertSandboxMode(mode);
+      return overview(await client.request({ method: "GET", path: "/api/app/wallet/sandbox" }), mode);
+    },
+    createTopup: async (channel, value, idempotencyKey) => {
+      assertSandboxMode(mode);
+      return order(await client.request({
+        method: "POST", path: "/api/app/wallet/sandbox/topups", body: { channel, amount: value }, idempotencyKey,
+      }), mode);
+    },
+    createWithdrawal: async (value, targetAddress, idempotencyKey) => {
+      assertSandboxMode(mode);
+      return order(await client.request({
+        method: "POST", path: "/api/app/wallet/sandbox/withdrawals",
+        body: { channel: "CREGIS_USDT_BEP20", amount: value, targetAddress }, idempotencyKey,
+      }), mode);
+    },
+    applyCallback: async (orderNo, status, expectedVersion, eventId) => {
+      assertSandboxMode(mode);
+      return order(await client.request({
+        method: "POST", path: `/api/app/wallet/sandbox/orders/${encodeURIComponent(orderNo)}/callbacks`,
+        body: { eventId, status, expectedVersion },
+      }), mode);
+    },
   };
 }

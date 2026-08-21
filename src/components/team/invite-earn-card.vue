@@ -203,7 +203,7 @@ async function copyCode() {
     return;
   }
   copiedCode.value = true;
-  recordShareEvent("code", "team_hero");
+  await recordShareEvent("code", "team_hero");
   setTimeout(() => (copiedCode.value = false), 1500);
 }
 async function copyLink() {
@@ -214,7 +214,7 @@ async function copyLink() {
     return;
   }
   copiedLink.value = true;
-  recordShareEvent("link", "team_hero");
+  await recordShareEvent("link", "team_hero");
   setTimeout(() => (copiedLink.value = false), 1500);
 }
 function openPoster() {

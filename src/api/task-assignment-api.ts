@@ -1,5 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { matchesRuntimeProvenance, type ServerSourceEnvironment } from "./runtime-provenance";
+import type { ApiEnvironment } from "./runtime-config";
 
 export interface CanonicalTaskAssignment {
   taskNo: string;
@@ -18,6 +20,10 @@ export interface CanonicalTaskAssignment {
   receiptNo: string | null;
   proofNonce: string | null;
   proofExpiresAt: number | null;
+  source: "server";
+  sourceEnvironment: ServerSourceEnvironment;
+  runId: string;
+  serverCanonical: true;
 }
 
 export interface TrustedTaskCompletionProof {
@@ -41,7 +47,10 @@ export interface CanonicalTaskDeviceState {
 export interface CanonicalTaskAssignments {
   serverNow: number;
   devices: CanonicalTaskDeviceState[];
-  source: string;
+  source: "server";
+  sourceEnvironment: ServerSourceEnvironment;
+  runId: string;
+  serverCanonical: true;
 }
 
 export interface TaskAssignmentApi {
@@ -88,8 +97,26 @@ function timestamp(value: unknown, optional = false): number | null {
   return invalid();
 }
 
-function task(value: unknown): CanonicalTaskAssignment {
+function provenance(source: Record<string, unknown>, mode: ApiEnvironment): {
+  source: "server";
+  sourceEnvironment: ServerSourceEnvironment;
+  runId: string;
+  serverCanonical: true;
+} {
+  if (source.serverCanonical !== true || !matchesRuntimeProvenance(source, mode, "server")) {
+    return invalid("TASK_ASSIGNMENT_PROVENANCE_INVALID");
+  }
+  return {
+    source: "server",
+    sourceEnvironment: source.sourceEnvironment,
+    runId: source.runId,
+    serverCanonical: true,
+  };
+}
+
+function task(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignment {
   const source = record(value);
+  const proof = provenance(source, mode);
   const taskClass = text(source.taskClass).toUpperCase();
   const status = text(source.status).toUpperCase();
   if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || !/^(CLAIMED|RUNNING|COMPLETED)$/.test(status)) return invalid();
@@ -113,14 +140,15 @@ function task(value: unknown): CanonicalTaskAssignment {
     receiptNo: source.receiptNo == null ? null : text(source.receiptNo),
     proofNonce: source.proofNonce == null ? null : text(source.proofNonce),
     proofExpiresAt: timestamp(source.proofExpiresAt, true),
+    ...proof,
   };
 }
 
-function device(value: unknown): CanonicalTaskDeviceState {
+function device(value: unknown, mode: ApiEnvironment): CanonicalTaskDeviceState {
   const source = record(value);
   if (!Array.isArray(source.recentTasks)) return invalid();
-  const currentTask = source.currentTask == null ? null : task(source.currentTask);
-  const recentTasks = source.recentTasks.map(task);
+  const currentTask = source.currentTask == null ? null : task(source.currentTask, mode);
+  const recentTasks = source.recentTasks.map((entry) => task(entry, mode));
   const deviceId = integer(source.deviceId, 1);
   if (currentTask && currentTask.deviceId !== deviceId) return invalid();
   if (recentTasks.some((entry) => entry.deviceId !== deviceId || entry.status !== "COMPLETED")) return invalid();
@@ -134,12 +162,13 @@ function device(value: unknown): CanonicalTaskDeviceState {
   };
 }
 
-function state(value: unknown): CanonicalTaskAssignments {
+function state(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignments {
   const source = record(value);
+  const proof = provenance(source, mode);
   if (!Array.isArray(source.devices)) return invalid();
-  const devices = source.devices.map(device);
+  const devices = source.devices.map((entry) => device(entry, mode));
   if (new Set(devices.map((entry) => entry.deviceId)).size !== devices.length) return invalid();
-  return { serverNow: timestamp(source.serverNow) as number, devices, source: text(source.source) };
+  return { serverNow: timestamp(source.serverNow) as number, devices, ...proof };
 }
 
 function key(value: string): string {
@@ -148,25 +177,35 @@ function key(value: string): string {
   return normalized;
 }
 
-export function createTaskAssignmentApi(client: ApiClient): TaskAssignmentApi {
+export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
     async state() {
-      return state(await client.request<unknown>({ path: "/api/tasks/assignments" }));
+      return state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
     },
     async claim(deviceId, idempotencyKey) {
+      if (mode === "dev") {
+        throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_CLAIM_DISABLED" });
+      }
       return task(await client.request<unknown>({
         method: "POST",
         path: "/api/tasks/assignments/claim",
         body: { deviceId: integer(deviceId, 1) },
         idempotencyKey: key(idempotencyKey),
-      }));
+      }), mode);
     },
     async complete(taskNo, proof, idempotencyKey) {
       const normalizedTaskNo = text(taskNo);
-      if (!proof || !/^[a-f0-9]{64}$/i.test(text(proof.resultHash))
+      if (mode === "dev") {
+        throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_PROOF_DISABLED" });
+      }
+      const proofMode = proof && text(proof.proofMode).toUpperCase();
+      if (!proof || proofMode !== "PRODUCTION" || !/^[a-f0-9]{64}$/i.test(text(proof.resultHash))
           || !/^[a-f0-9]{64}$/i.test(text(proof.proofNonce))
           || !Number.isSafeInteger(proof.proofTimestamp) || proof.proofTimestamp <= 0
-          || !/^(PRODUCTION|SANDBOX)$/.test(text(proof.proofMode).toUpperCase())) {
+          || !text(proof.executorId) || !text(proof.proofSignature)) {
+        if (proof && proofMode === "SANDBOX") {
+          throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_PRODUCTION_PROOF_REQUIRED" });
+        }
         throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_PROOF_INVALID" });
       }
       return task(await client.request<unknown>({
@@ -174,14 +213,14 @@ export function createTaskAssignmentApi(client: ApiClient): TaskAssignmentApi {
         path: `/api/tasks/assignments/${encodeURIComponent(normalizedTaskNo)}/complete`,
         body: {
           resultHash: proof.resultHash.toLowerCase(),
-          proofMode: proof.proofMode,
+          proofMode: "PRODUCTION",
           executorId: text(proof.executorId),
           proofNonce: proof.proofNonce.toLowerCase(),
           proofTimestamp: proof.proofTimestamp,
           proofSignature: text(proof.proofSignature),
         },
         idempotencyKey: key(idempotencyKey),
-      }));
+      }), mode);
     },
   };
 }

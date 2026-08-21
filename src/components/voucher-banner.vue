@@ -40,7 +40,7 @@ const t = useT();
 const visible = computed(() => voucher.hasClaimableForSurface(props.surface));
 
 function open() {
-  sheet.show();
+  sheet.show(props.surface);
 }
 </script>
 

@@ -22,4 +22,18 @@ describe("team quota API", () => {
     const api = createTeamQuotaApi({ request } as unknown as ApiClient);
     await expect(api.snapshot()).rejects.toMatchObject({ message: "TEAM_QUOTA_RESPONSE_INVALID" });
   });
+
+  it("accepts development quota from the production authority rail", async () => {
+    const request = vi.fn().mockResolvedValue(valid);
+    const api = createTeamQuotaApi({ request } as unknown as ApiClient, "dev");
+
+    await expect(api.snapshot()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
+  });
+
+  it("rejects a non-empty run id instead of exposing quota facts", async () => {
+    const request = vi.fn().mockResolvedValue({ ...valid, runId: "development-run-stale" });
+    const api = createTeamQuotaApi({ request } as unknown as ApiClient, "dev");
+
+    await expect(api.snapshot()).rejects.toMatchObject({ message: "TEAM_QUOTA_RESPONSE_INVALID" });
+  });
 });

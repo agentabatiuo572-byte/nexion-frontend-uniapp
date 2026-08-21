@@ -1,5 +1,15 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { isCurrentCommerceSandboxRun } from "./order-api";
+import type { ApiEnvironment } from "./runtime-config";
+
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
+
+export interface VRankProvenance {
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
+}
 
 export interface CanonicalVRankRow {
   v: number;
@@ -20,11 +30,17 @@ export interface CanonicalVRankRow {
 
 export interface CanonicalVRankLadder {
   source: string;
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
   ranks: CanonicalVRankRow[];
 }
 
 export interface CanonicalVRankState {
   source: string;
+  serverCanonical: true;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
   rankCode: string;
   progress: {
     selfBuyUSD: number;
@@ -95,16 +111,31 @@ function rankRow(value: unknown): CanonicalVRankRow {
   };
 }
 
-function ladder(value: unknown): CanonicalVRankLadder {
+function provenance(source: Record<string, unknown>, mode: ApiEnvironment): VRankProvenance {
+  const sourceEnvironment = source.sourceEnvironment;
+  const runId = source.runId;
+  const expectedEnvironment = mode === "dev" ? "SANDBOX" : "PRODUCTION";
+  if (source.serverCanonical !== true || sourceEnvironment !== expectedEnvironment
+      || typeof runId !== "string"
+      || (sourceEnvironment === "PRODUCTION" && runId !== "")
+      || (sourceEnvironment === "SANDBOX" && (!RUN_ID.test(runId) || !isCurrentCommerceSandboxRun(runId)))) {
+    return invalid();
+  }
+  return { serverCanonical: true, sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX", runId };
+}
+
+function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   const source = record(value);
+  const proof = provenance(source, mode);
   if (!Array.isArray(source.ranks)) return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
   if (ranks.length !== 13 || ranks.some((rank, index) => rank.v !== index)) return invalid();
-  return { source: text(source.source), ranks };
+  return { source: text(source.source), ...proof, ranks };
 }
 
-function current(value: unknown): CanonicalVRankState {
+function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {
   const source = record(value);
+  const proof = provenance(source, mode);
   const progress = record(source.progress);
   const rawCounts = record(progress.vDownlineCounts);
   const counts: Record<string, number> = {};
@@ -116,6 +147,7 @@ function current(value: unknown): CanonicalVRankState {
   if (!/^V(?:[0-9]|1[0-2])$/.test(rankCode)) return invalid();
   return {
     source: text(source.source),
+    ...proof,
     rankCode,
     progress: {
       selfBuyUSD: number(progress.selfBuyUSD),
@@ -126,20 +158,20 @@ function current(value: unknown): CanonicalVRankState {
   };
 }
 
-export function createVRankApi(client: ApiClient): VRankApi {
+export function createVRankApi(client: ApiClient, mode: ApiEnvironment = "prod"): VRankApi {
   return {
     async ladder() {
       return ladder(await client.request<unknown>({
         method: "GET",
         path: "/api/config/v-ranks",
         authenticated: false,
-      }));
+      }), mode);
     },
     async current() {
       return current(await client.request<unknown>({
         method: "GET",
         path: "/api/team/rank",
-      }));
+      }), mode);
     },
   };
 }

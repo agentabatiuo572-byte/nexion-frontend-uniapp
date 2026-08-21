@@ -14,8 +14,8 @@
       <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
       <view
-        v-if="payoutAddressMockEnabled"
-        data-testid="payout-address-mock-source"
+        v-if="payoutAddressMockEnabled || payout.sandboxServer"
+        :data-testid="payout.sandboxServer ? 'payout-address-sandbox-source' : 'payout-address-mock-source'"
         class="mx-4"
         style="margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.08)"
       >

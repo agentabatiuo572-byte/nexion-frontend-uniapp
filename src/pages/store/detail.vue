@@ -262,7 +262,7 @@ import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { productCopy, specRow, type SpecRow } from "@/lib/product-copy";
-import { typicalPhoneDailyUsdt } from "@/mock/phone-tiers";
+import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -358,7 +358,9 @@ const openFaq = ref(0);
 // 「你的手机」是平台手机档位配置里的典型档(Tier 3),对所有商品都是同一个数 —— 它从来
 // 不是商品属性(后端也没有这一列)。0 = 运营配置取不到,此时降级、不许拿旧值或猜测顶上,
 // 否则页面会用一个编出来的基准去宣称倍数。
-const phoneDailyEarnValue = computed(() => typicalPhoneDailyUsdt());
+const phoneDailyEarnValue = computed(() =>
+  getPhoneTierYields().find((row) => row.tier === 3)?.baseRateUsdt ?? 0,
+);
 const speedup = computed(() =>
   product.value && !isShare.value
     && phoneDailyEarnValue.value > 0

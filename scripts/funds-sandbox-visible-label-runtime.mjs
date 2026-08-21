@@ -118,7 +118,7 @@ const serverArgs = npmCli
     : npmArgs;
 const server = spawn(serverCommand, serverArgs, {
   cwd: fileURLToPath(new URL("..", import.meta.url)),
-  env: { ...process.env, VITE_NEXGRID_API_MODE: "sandbox" },
+  env: { ...process.env },
   shell: false,
   stdio: ["ignore", "pipe", "pipe"],
 });

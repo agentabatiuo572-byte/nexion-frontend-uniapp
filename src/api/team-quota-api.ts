@@ -1,5 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiEnvironment } from "./runtime-config";
+import { matchesRuntimeProvenance } from "./runtime-provenance";
 
 export type TeamQuotaEnvironment = "PRODUCTION" | "SANDBOX";
 export interface TeamQuotaFacts { rank: number; directRefs: number; activeDirect: number; teamVolumeUSD: number }
@@ -18,9 +20,10 @@ function row(value: unknown): Record<string, unknown> { if (!value || typeof val
 function text(value: unknown, required = true): string { if (typeof value !== "string" || (required && !value.trim())) return invalid(); return value.trim(); }
 function num(value: unknown, integer = false): number { if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || (integer && !Number.isSafeInteger(value))) return invalid(); return value; }
 
-function parse(value: unknown): TeamQuotaSnapshot {
-  const source = row(value); const environment = source.sourceEnvironment;
-  if (source.source !== "server" || (environment !== "PRODUCTION" && environment !== "SANDBOX")) return invalid();
+function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
+  const source = row(value);
+  if (!matchesRuntimeProvenance(source, mode, "server")) return invalid();
+  const environment = source.sourceEnvironment;
   const runId = text(source.runId, environment === "SANDBOX");
   if (environment === "PRODUCTION" && runId !== "") return invalid();
   const facts = row(source.facts);
@@ -43,6 +46,6 @@ function parse(value: unknown): TeamQuotaSnapshot {
   return { source: "server", sourceEnvironment: environment, runId, generatedAt, facts: parsedFacts, tiers };
 }
 
-export function createTeamQuotaApi(client: ApiClient) {
-  return { snapshot: async (): Promise<TeamQuotaSnapshot> => parse(await client.request({ method: "GET", path: "/api/app/team/quota" })) };
+export function createTeamQuotaApi(client: ApiClient, mode: ApiEnvironment = "prod") {
+  return { snapshot: async (): Promise<TeamQuotaSnapshot> => parse(await client.request({ method: "GET", path: "/api/app/team/quota" }), mode) };
 }

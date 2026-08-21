@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -28,7 +29,8 @@ let counter = 0;
 
 export const useNotifications = defineStore("notifications", () => {
   let boundKey = "default";
-  const items = ref<Notification[]>(hydrate(boundKey));
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
+  const items = ref<Notification[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const unread = ref(items.value.filter((item) => !item.readAt).length);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -55,8 +57,9 @@ export const useNotifications = defineStore("notifications", () => {
     unread.value = page.unread;
     nextCursor.value = page.nextCursor;
   }
-  async function refreshRemote() {
+  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     if (!remoteApiEnabled) return;
+    if (!remoteAccountEpoch.isCurrent(request)) return;
     loading.value = true;
     error.value = null;
     items.value = [];
@@ -64,20 +67,26 @@ export const useNotifications = defineStore("notifications", () => {
     nextCursor.value = null;
     try {
       const page = await notificationApi.page();
+      if (!remoteAccountEpoch.isCurrent(request)) return;
       appendRemote(page, true);
     } catch (cause) {
+      if (!remoteAccountEpoch.isCurrent(request)) return;
       items.value = [];
       unread.value = 0;
       error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
-    } finally { loading.value = false; }
+    } finally {
+      if (remoteAccountEpoch.isCurrent(request)) loading.value = false;
+    }
   }
   async function loadMoreRemote() {
     if (!remoteApiEnabled || !nextCursor.value || loading.value) return;
+    const request = remoteAccountEpoch.snapshot();
     const requestedCursor = nextCursor.value;
     loading.value = true;
     error.value = null;
     try {
       const page = await notificationApi.page(requestedCursor);
+      if (!remoteAccountEpoch.isCurrent(request)) return;
       if (page.nextCursor === requestedCursor) {
         nextCursor.value = null;
         error.value = "NOTIFICATION_PAGE_CURSOR_OVERLAP";
@@ -85,13 +94,27 @@ export const useNotifications = defineStore("notifications", () => {
       }
       appendRemote(page, false);
     }
-    catch (cause) { error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE"; }
-    finally { loading.value = false; }
+    catch (cause) {
+      if (remoteAccountEpoch.isCurrent(request)) error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
+    }
+    finally {
+      if (remoteAccountEpoch.isCurrent(request)) loading.value = false;
+    }
   }
   async function retryRemote() { await refreshRemote(); }
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    if (remoteApiEnabled) { items.value = []; unread.value = 0; void refreshRemote(); return; }
+    remoteAccountEpoch.bind(boundKey);
+    if (remoteApiEnabled) {
+      items.value = [];
+      unread.value = 0;
+      nextCursor.value = null;
+      seenIds.clear();
+      loading.value = false;
+      error.value = null;
+      void refreshRemote(remoteAccountEpoch.snapshot());
+      return;
+    }
     items.value = hydrate(boundKey); recount();
   }
   function push(input: PushInput) {
@@ -101,30 +124,62 @@ export const useNotifications = defineStore("notifications", () => {
     items.value = [{ id, kind: input.kind, priority: input.priority ?? "normal", title: input.title, body: input.body, ctaLabel: input.ctaLabel, ctaHref: input.ctaHref, ts: Date.now(), readAt: null }, ...items.value];
     recount(); persist();
   }
-  async function markRead(id: string) {
+  async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     const item = items.value.find((value) => value.id === id);
     if (!item || item.readAt) return;
-    if (remoteApiEnabled) { await notificationApi.markRead(Number(id)); }
+    if (remoteApiEnabled) {
+      try {
+        await notificationApi.markRead(Number(id));
+      } catch (cause) {
+        if (!remoteAccountEpoch.isCurrent(request)) return;
+        throw cause;
+      }
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+    }
+    if (!remoteAccountEpoch.isCurrent(request)) return;
     items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value); recount(); persist();
   }
   async function markAllRead() {
-    if (remoteApiEnabled) await notificationApi.markAllRead();
+    const request = remoteAccountEpoch.snapshot();
+    if (remoteApiEnabled) {
+      try {
+        await notificationApi.markAllRead();
+      } catch (cause) {
+        if (!remoteAccountEpoch.isCurrent(request)) return;
+        throw cause;
+      }
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+    }
     items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() }); recount(); persist();
   }
   async function clearRead() {
-    if (remoteApiEnabled) await notificationApi.clearRead();
+    const request = remoteAccountEpoch.snapshot();
+    if (remoteApiEnabled) {
+      try {
+        await notificationApi.clearRead();
+      } catch (cause) {
+        if (!remoteAccountEpoch.isCurrent(request)) return;
+        throw cause;
+      }
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+    }
     items.value = items.value.filter((item) => !item.readAt); recount(); persist();
   }
   async function recordRemoteAction(id: string, action: "cta" | "swipe_conversion"): Promise<string | null> {
     if (!remoteApiEnabled) return null;
     const numericId = Number(id);
     if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
+    const request = remoteAccountEpoch.snapshot();
     try {
       const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
-      await markRead(id);
+      if (!remoteAccountEpoch.isCurrent(request)) return null;
+      await markRead(id, request);
+      if (!remoteAccountEpoch.isCurrent(request)) return null;
       return result.route;
     } catch (cause) {
-      await refreshRemote();
+      if (!remoteAccountEpoch.isCurrent(request)) return null;
+      await refreshRemote(request);
+      if (!remoteAccountEpoch.isCurrent(request)) return null;
       error.value = cause instanceof Error ? cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
       return null;
     }

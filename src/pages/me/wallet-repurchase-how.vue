@@ -5,7 +5,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 32px">
+    <HowPublishedContent v-if="remoteApiEnabled" content-key="wallet-repurchase-how" back="/pages/me/wallet-repurchase" />
+    <view v-if="!remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-repurchase" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="lemon" />
@@ -96,6 +97,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import HowPublishedContent from "@/components/how/how-published-content.vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -104,12 +107,13 @@ import HowFaqRow from "@/components/how/how-faq-row.vue";
 import IconRow from "@/components/how/how-icon-row.vue";
 import CalloutBox from "@/components/how/how-callout-box.vue";
 import { useT } from "@/i18n/use-t";
+import { navBack } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.repurchaseHowItWorks);
 
 function goBack() {
-  uni.navigateTo({ url: "/pages/me/wallet-repurchase", fail: () => {} });
+  navBack("/pages/me/wallet-repurchase");
 }
 
 const monoFamily = "var(--font-jet-mono), ui-monospace, monospace";

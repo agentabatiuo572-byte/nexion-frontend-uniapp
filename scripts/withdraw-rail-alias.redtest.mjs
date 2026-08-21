@@ -125,6 +125,8 @@ const TARGETS = [
         "export const remoteApiEnabled = !isMockMode(apiRuntimeConfig);"],
       ['export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";',
         "export const fundsServerEnabled = !isMockMode(apiRuntimeConfig);"],
+      ['export const payoutAddressServerEnabled = apiRuntimeConfig.mode !== "mock";',
+        "export const payoutAddressServerEnabled = !isMockMode(apiRuntimeConfig);"],
     ],
   },
   // ══ 以下四靶钉的是 P-105 重锚时新立的三格 —— 它们落地时**没有任何红测**,

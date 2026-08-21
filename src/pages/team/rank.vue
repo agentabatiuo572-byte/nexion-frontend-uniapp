@@ -5,7 +5,7 @@
   hairline splits the progress zone. 13-rank ladder = single surface container
   (form b, no border), rows hairlined, current row tinted. Sub-page →
   <AppChassis active="team"> w/ in-page back → /team.
-  Reuses v-rank store + nextRankProgress + V_RANKS + useScrollGrowProgress (P-019
+  Reuses v-rank store + nextRankProgress + canonical ladder + useScrollGrowProgress (P-019
   $el-safe). useMemo → computed. lucide → inline <svg>. <Link>→<view @click>.
 -->
 <template>
@@ -18,7 +18,7 @@
              in-card glow dropped; a glow on the page floor would be a floor aura,
              which gets deleted per owner call 2026-07-08). Rules-intro pill rides
              the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
-        <view :style="heroStyle">
+        <view v-if="rankAvailable" :style="heroStyle">
           <view>
             <view class="flex items-center justify-between" style="gap: 8px">
               <text class="block" :style="heroCapStyle">{{ t.rank.currentRank }}</text>
@@ -63,7 +63,7 @@
 
         <!-- 13-rank ladder — single surface container (form b): outer border
              dropped, the fill is the single visual difference; rows hairlined. -->
-        <view class="rounded-2xl overflow-hidden" :style="ladderCardStyle">
+        <view v-if="rankAvailable" class="rounded-2xl overflow-hidden" :style="ladderCardStyle">
           <view
             v-for="(r, idx) in rankDefs"
             :key="r.v"
@@ -93,6 +93,10 @@
             </view>
           </view>
         </view>
+        <view v-else class="rounded-2xl" :style="unavailableStyle" @click="retryRank">
+          <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ t.rank.loadError }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ t.rank.retry }}</text>
+        </view>
       </view>
     </view>
   </AppChassis>
@@ -118,6 +122,7 @@ const { elRef: rankBarRef, inView: rankBarInView } = useScrollGrowProgress();
 
 const myRank = computed(() => vState.myRank);
 const rankDefs = computed(() => vState.ladder);
+const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
   v: vState.myRank, title: "", cnTitle: "", conditions: {}, directBonus: 0,
   unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
@@ -136,6 +141,10 @@ onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.
   if (remoteApiEnabled) void vState.refreshCanonicalVRank();
 });
+
+function retryRank() {
+  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+}
 
 const heroSubText = computed(() => {
   const d = currentDef.value;
@@ -171,6 +180,11 @@ const howEntryStyle: CSSProperties = {
 // De-carded hero: no surface/border/glow — content sits directly on the page
 // floor with a 2px optical inset (leaderboard.vue prize-hero idiom).
 const heroStyle: CSSProperties = { padding: "10px 2px 0" };
+const unavailableStyle: CSSProperties = {
+  padding: "18px",
+  background: "var(--v5-surface)",
+  textAlign: "center",
+};
 // -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
 const progressWrapStyle: CSSProperties = { margin: "16px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const heroCapStyle: CSSProperties = {

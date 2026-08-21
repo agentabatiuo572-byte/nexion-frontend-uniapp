@@ -27,6 +27,19 @@ export const useFx = defineStore("fx", () => {
   const feeVnd = ref(0);
   const feeUsdt = ref(0);
 
+  function resetRemoteState(): void {
+    baseRateVndPerUsdt.value = 0;
+    buySpreadPct.value = 0;
+    lockWindowMin.value = 0;
+    syncedAt.value = null;
+    configReady.value = false;
+    vietQrEnabled.value = false;
+    minDepositUsdt.value = 0;
+    maxDepositUsdt.value = 0;
+    feeVnd.value = 0;
+    feeUsdt.value = 0;
+  }
+
   // 牌价派生不缓存、禁双写(规格 ③):始终从 base + spread 现算,无第二份存储。
   const quoteRate = computed(() => computeQuoteRate(baseRateVndPerUsdt.value, buySpreadPct.value));
 
@@ -70,6 +83,10 @@ export const useFx = defineStore("fx", () => {
         }
       }
     } catch {
+      // Remote and explicit App sandbox payment facts are server-owned.  A
+      // failed config/quote must also evict any prior snapshot so a stale
+      // quote or local-looking numeric default cannot keep the rail usable.
+      if (remoteApiEnabled) resetRemoteState();
       syncFailed.value = true;
       configReady.value = false;
     } finally {

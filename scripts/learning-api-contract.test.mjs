@@ -13,9 +13,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createLearningApi } from "../src/api/learning-api.ts";
+// Keep this file directly runnable with `node --test`: install the same strict
+// TypeScript extension resolver used by the contract registry before loading
+// source modules whose internal imports intentionally omit `.ts`.
+await import("./lib/ts-ext-resolve.mjs");
+const { createLearningApi } = await import("../src/api/learning-api.ts");
+const { setCurrentCommerceSandboxRun } = await import("../src/api/order-api.ts");
+
+const RUN = "run-20260816";
 
 test("fails closed when a quiz response contains a malformed reward amount", async () => {
+  setCurrentCommerceSandboxRun(RUN);
   const api = createLearningApi({
     request: async () => ({
       courseId: "h3-live-20260722",
@@ -27,11 +35,14 @@ test("fails closed when a quiz response contains a malformed reward amount", asy
       // 合法形态是定点字符串(如 "20.000000");给对象就该被判非法而不是勉强解读。
       rewardNex: { amount: 20 },
       attempts: 1,
+      serverCanonical: true,
+      sourceEnvironment: "SANDBOX",
+      runId: RUN,
     }),
-  });
+  }, "sandbox");
 
   await assert.rejects(
-    api.submitQuiz("h3-live-20260722", [0], "learning-quiz:h3-live-20260722:v1"),
+    api.submitQuiz("h3-live-20260722", "v1", [0], "learning-quiz:h3-live-20260722:v1"),
     (err) => {
       assert.equal(err.kind, "protocol");
       assert.equal(err.message, "LEARNING_RESPONSE_INVALID");
@@ -41,6 +52,7 @@ test("fails closed when a quiz response contains a malformed reward amount", asy
 });
 
 test("sends the stable H3 idempotency key outside the request body", async () => {
+  setCurrentCommerceSandboxRun(RUN);
   let request;
   const api = createLearningApi({
     request: async (value) => {
@@ -54,16 +66,19 @@ test("sends the stable H3 idempotency key outside the request body", async () =>
         rewardGranted: true,
         rewardNex: "20.000000",
         attempts: 1,
+        serverCanonical: true,
+        sourceEnvironment: "SANDBOX",
+        runId: RUN,
       };
     },
-  });
+  }, "sandbox");
 
-  await api.submitQuiz("h3-live-20260722", [0], "learning-quiz:h3-live-20260722:v1");
+  await api.submitQuiz("h3-live-20260722", "v1", [0], "learning-quiz:h3-live-20260722:v1");
 
   assert.deepEqual(request, {
     method: "POST",
     path: "/api/content/learning/courses/h3-live-20260722/quiz",
     idempotencyKey: "learning-quiz:h3-live-20260722:v1",
-    body: { answers: [0] },
+    body: { answers: [0], expectedVersion: "v1" },
   });
 });

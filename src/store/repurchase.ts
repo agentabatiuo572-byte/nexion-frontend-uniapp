@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { remoteApiEnabled, repurchaseApi } from "@/api/runtime";
+import { apiRuntimeConfig, remoteApiEnabled, repurchaseApi } from "@/api/runtime";
 import type {
   RepurchaseConfig,
   RepurchaseOrder,
@@ -19,6 +19,7 @@ function message(error: unknown): string {
 }
 
 export const useRepurchase = defineStore("repurchase", () => {
+  const sandboxMarket = apiRuntimeConfig.environment === "dev";
   const config = ref<RepurchaseConfig | null>(null);
   const orders = ref<RepurchaseOrder[]>([]);
   const walletBalanceUsdt = ref(0);
@@ -34,10 +35,20 @@ export const useRepurchase = defineStore("repurchase", () => {
   let commandGeneration = 0;
 
   function apply(snapshot: RepurchaseSnapshot) {
+    const validProvenance = snapshot.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
+      && (sandboxMarket ? typeof snapshot.runId === "string" && snapshot.runId.length > 0 : snapshot.runId === "");
+    if (!validProvenance) throw new Error("G7_RUNTIME_PROVENANCE_INVALID");
     orders.value = snapshot.orders;
     walletBalanceUsdt.value = snapshot.walletBalanceUsdt;
     serverTime.value = snapshot.serverTime;
     error.value = "";
+  }
+
+  function acceptConfig(nextConfig: RepurchaseConfig): RepurchaseConfig {
+    const validProvenance = nextConfig.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
+      && (sandboxMarket ? typeof nextConfig.runId === "string" && nextConfig.runId.length > 0 : nextConfig.runId === "");
+    if (!validProvenance) throw new Error("G7_RUNTIME_PROVENANCE_INVALID");
+    return nextConfig;
   }
 
   async function refresh() {
@@ -58,7 +69,8 @@ export const useRepurchase = defineStore("repurchase", () => {
     loading.value = true;
     error.value = "";
     const configOutcome = repurchaseApi.fetchConfig()
-      .then((nextConfig) => {
+      .then((rawConfig) => {
+        const nextConfig = acceptConfig(rawConfig);
         if (account === accountGeneration && configRequest === configGeneration) {
           config.value = nextConfig;
         }

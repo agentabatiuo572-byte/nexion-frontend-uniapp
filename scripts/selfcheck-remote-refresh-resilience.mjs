@@ -191,7 +191,7 @@ globalThis.uni = {
 // runtime-stub 手写成「remote 开 + 全 API 抛」:这是本门的靶态,与共享 runtimeStub
 // (mock 关)语义相反,不能复用。导出清单仍从磁盘扫,防新 API 掉队。
 // 🔴 布尔旗标禁 Proxy 化(2026-08-14 harness 缺口修复):Proxy 恒 truthy,
-//    `if (fundsSandboxEnabled) return;` 这类守卫在探针里恒早退,缝被静默挡在门外
+//    `if (developmentFundsEnabled) return;` 这类守卫在探针里恒早退,缝被静默挡在门外
 //    (VietQR 缝当初就是这么漏进 UNREACHABLE 登记的)。判据构造性:初始化式**只引用
 //    apiRuntimeConfig / 字面量**的导出 = 配置旗标,把源码表达式原样搬进 stub,
 //    用 stub 的 apiRuntimeConfig 按本轮 mode 求值 —— 与真 runtime.ts 同式同值,
@@ -211,7 +211,7 @@ function throwingRuntimeStub(mode) {
   if (!flagExprs.has("remoteApiEnabled")) throw new Error("旗标搬运判据失效(连 remoteApiEnabled 都没认出)—— 必红");
   // apiRuntimeConfig 本体给靶态值(special 优先于搬运;搬运表达式全都读它求值)。
   // 字段结构 = runtime-config.ts 的 ApiRuntimeConfig 接口;modeExplicit 置 true,
-  // sandbox 轮的 fundsSandboxEnabled 表达式才能按真语义判真。
+  // sandbox 轮的 developmentFundsEnabled 表达式才能按真语义判真。
   const special = {
     apiRuntimeConfig: `export const apiRuntimeConfig = { mode: ${JSON.stringify(mode)}, modeExplicit: true, baseUrl: "http://unreachable.invalid" };`,
     // app#refreshRemoteFleet now correctly refuses a USER read without a
@@ -248,6 +248,7 @@ const rejections = [];
 process.on("unhandledRejection", (err) => { rejections.push(String(err?.message ?? err)); });
 
 async function loadEntry(contents, runtimeStub, mode) {
+  const production = mode === "remote";
   const out = await build({
     stdin: { contents, resolveDir: root, loader: "ts" },
     bundle: true, write: false, format: "esm", platform: "neutral",
@@ -256,8 +257,9 @@ async function loadEntry(contents, runtimeStub, mode) {
     //    define 全部 env 键。三个已知键给靶态值;再兜一个 "import.meta.env": "{}"
     //    (esbuild 最长匹配优先),未来新增的 env 键读到 undefined 而不是崩。
     define: {
-      "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"',
-      "import.meta.env.VITE_NEXGRID_API_MODE": JSON.stringify(mode),
+      "import.meta.env.PROD": JSON.stringify(production),
+      "import.meta.env.DEV": JSON.stringify(!production),
+      "import.meta.env.MODE": JSON.stringify(production ? "production" : "development"),
       "import.meta.env.VITE_NEXGRID_API_BASE_URL": '"http://unreachable.invalid"',
       "import.meta.env.VITE_NEXGRID_API_DEV_BASE_URL": '""',
       "import.meta.env": "{}",
@@ -283,7 +285,7 @@ async function loadEntry(contents, runtimeStub, mode) {
 //    如 joinRemote(eventId))。这类必须**显式登记原因**,不许混在「已触发」里充数;
 //    未登记又没真打 API 的,一律红。判据 = 每条缝的 API 调用计数真的涨了。
 // (2026-08-14 缺口收口:此处原登记 deposits#refreshRemoteVietQrDeposits ——
-//  旧 stub 把 fundsSandboxEnabled 做成 truthy Proxy,该缝首行守卫恒早退。
+//  旧 stub 把 developmentFundsEnabled 做成 truthy Proxy,该缝首行守卫恒早退。
 //  探针两轮化后它在 remote 轮拿到 API 凭据,登记按 stale 断言的红删除。)
 // 在此登记 `"file#fn": "为什么门外触发不到"`;
 // 登记了却其实能触发的(陈旧登记)由下面的 stale 断言顶回来 —— 登记表本身也要被守。
@@ -292,8 +294,8 @@ async function loadEntry(contents, runtimeStub, mode) {
 const UNREACHABLE = {};
 // ── 两轮探针:mode ∈ {remote, sandbox},覆盖取并集 ─────────────────────────────
 // 🔴 为什么两轮而不是把某个旗标钉死:deposits 两条缝是对偶守卫 ——
-//    refreshRemoteVietQrDeposits 首行 `if (fundsSandboxEnabled) return;`,
-//    refreshFundsSandboxDeposits 首行 `if (!fundsSandboxEnabled) return;`。
+//    refreshRemoteVietQrDeposits 首行 `if (developmentFundsEnabled) return;`,
+//    refreshFundsSandboxDeposits 首行 `if (!developmentFundsEnabled) return;`。
 //    钉 false 只是把覆盖缺口从前者挪给后者;真 runtime 里旗标随 mode 走,
 //    探针照两个 mode 各跑一遍,谁在哪个 mode 可达就在哪轮拿 API 调用凭据。
 //    缝的去重集合来自磁盘扫描,与轮数无关 —— 基数台账不因两轮而变。

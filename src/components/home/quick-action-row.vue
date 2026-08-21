@@ -43,16 +43,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useGenesis } from "@/store/genesis";
+import { useQuest } from "@/store/quest";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { remoteApiEnabled, stakingApi } from "@/api/runtime";
+import { highestLiveStakingApyPct } from "./home-staking-rate";
 
 const t = useT();
 const faucet = useNexFaucet();
 const genesis = useGenesis();
+const quest = useQuest();
+const stakingApyPct = ref<number | null>(null);
 // 🔴 首页快捷入口的「剩 N 席」也是名额紧迫文案(独立验收 P2-14):创世页与商城卡都关了,
 //   这里没关,关闭态下首页仍在催「仅剩 153 席」。判据走同一个 composable,不另写。
 // 🔴 阻断说明走 blockText **唯一出口**(独立验收 P1-3):上一版这里写死 `.default`,
@@ -60,10 +65,25 @@ const genesis = useGenesis();
 //   同刻互相矛盾且首页是事实错误。售罄档落 `ctaSoldOut`(blockText 只管三档阻断说明)。
 const { showUrgency: genesisUrgencyOk, blockText: genesisBlockText } = useGenesisSaleGate();
 
+onMounted(async () => {
+  if (!remoteApiEnabled) return;
+  try {
+    stakingApyPct.value = highestLiveStakingApyPct(await stakingApi.fetchStakingPools());
+  } catch {
+    stakingApyPct.value = null;
+  }
+});
+
+const stakingSubtitle = computed(() => {
+  if (!remoteApiEnabled) return t.value.home.quickStakeApy;
+  if (stakingApyPct.value === null) return t.value.home.quickStakeUnavailable;
+  return fmt(t.value.home.quickStakeApyFormat, { n: stakingApyPct.value.toLocaleString() });
+});
+
 const chips = computed(() => [
-  { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: t.value.home.quickStakeApy, tone: "brand" as const },
+  { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: stakingSubtitle.value, tone: "brand" as const },
   { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : (genesisBlockText.value ?? t.value.genesis.ctaSoldOut), tone: "warm" as const },
-  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: t.value.home.quickMissionsActive, tone: "brand" as const },
+  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: fmt(t.value.home.quickMissionsActive, { n: quest.remoteQuests.filter((row) => row.status !== "CLAIMED").length }), tone: "brand" as const },
   { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: fmt(t.value.home.quickDailyStreak, { n: faucet.signInStreak }), tone: "warm" as const },
 ]);
 

@@ -7,6 +7,10 @@
   <AppChassis active="me">
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
+      <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
+        <text>{{ prefs.error }}</text>
+        <text class="block" style="margin-top: 6px;" @click="prefs.refreshRemote()">{{ t.ui.retry }}</text>
+      </view>
 
       <!-- Sound + haptics -->
       <view class="mx-4">

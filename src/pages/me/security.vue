@@ -14,8 +14,14 @@
   <AppChassis active="me">
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
-      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
+      <view v-if="apiRuntimeConfig.environment === 'dev'" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
+      </view>
+      <view v-if="remoteApiEnabled && !remoteSecurity" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
+        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
+        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity">
+          <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
+        </view>
       </view>
 
       <view
@@ -55,13 +61,14 @@
           </view>
         </view>
         <view class="flex items-center" :style="rowBorderedStyle">
-          <view class="grid place-items-center shrink-0" :style="iconBox(twoFactorEnabled ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="twoFactorEnabled ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+          <view class="grid place-items-center shrink-0" :style="iconBox(twoFactorEnabled === true ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="twoFactorEnabled === true ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           </view>
           <view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text>
           </view>
-          <view class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" @click="toggleTwoFactor(!twoFactorEnabled)">
+          <text v-if="twoFactorEnabled === null" :style="unavailableValueStyle">—</text>
+          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" @click="toggleTwoFactor(!twoFactorEnabled)">
             <view :style="toggleThumbStyle" />
           </view>
         </view>
@@ -75,6 +82,9 @@
       <!-- ───── Active sessions ───── -->
       <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
       <view class="mx-4" :style="[cardStyle, groupGap]">
+        <view v-if="remoteApiEnabled && !remoteSecurity" class="flex items-center" :style="rowStyle">
+          <text :style="unavailableValueStyle">—</text>
+        </view>
         <view v-for="(s, i) in sessions" :key="s.id" class="flex items-center" :style="i === 0 ? rowStyle : rowBorderedStyle">
           <view class="grid place-items-center shrink-0" :style="iconBox(s.current ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
             <!-- Smartphone -->
@@ -118,7 +128,7 @@
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionStatus.blockReason ?? deletionStatus.reason ?? t.security.deleteAccountPendingReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionStatus.blockReason ?? deletionStatus.reason ?? t.security.deleteAccountPendingReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
   </AppChassis>
 </template>
@@ -174,10 +184,11 @@ const securityBusy = ref(false);
 const twoFactorPassword = ref("");
 const deletionPassword = ref("");
 const deletionCommandKey = ref("");
-const twoFactorEnabled = computed(() => remoteApiEnabled
-  ? remoteSecurity.value?.twoFactorEnabled === true
+const remoteSecurityLoading = ref(false);
+const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
+  ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
-const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
+const modeLabel = computed(() => t.value.security.developmentModeLabel);
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,
@@ -198,17 +209,20 @@ const next = ref("");
 const confirmPwd = ref("");
 const err = ref("");
 
-const passwordHintLine = computed(() =>
-  t.value.security.passwordHint.replace("{when}", relativeWhen(
+const passwordHintLine = computed(() => {
+  if (remoteApiEnabled && !remoteSecurity.value) return "—";
+  return t.value.security.passwordHint.replace("{when}", relativeWhen(
     remoteApiEnabled
       ? Date.parse(remoteSecurity.value?.passwordChangedAt ?? "")
       : security.passwordChangedAt,
-  )),
-);
+  ));
+});
 
 async function loadRemoteSecurity(): Promise<boolean> {
   const scope = captureAccountScope();
   const accountKey = auth.accountId;
+  remoteSecurityLoading.value = true;
+  remoteSecurity.value = null;
   try {
     const [securityState, accountDeletion] = await Promise.all([
       accountApi.securityOverview(),
@@ -223,6 +237,8 @@ async function loadRemoteSecurity(): Promise<boolean> {
     console.warn("[security] overview load failed:", cause);
     err.value = t.value.security.opFailed;
     return false;
+  } finally {
+    if (isCurrentAccountScope(scope) && auth.accountId === accountKey) remoteSecurityLoading.value = false;
   }
 }
 
@@ -332,6 +348,10 @@ async function submitPasswordChange() {
 
 async function toggleTwoFactor(value: boolean) {
   if (securityBusy.value) return;
+  if (remoteApiEnabled && !remoteSecurity.value) {
+    err.value = t.value.security.opFailed;
+    return;
+  }
   if (!twoFactorPassword.value) {
     err.value = t.value.login.errorInvalidPassword;
     return;
@@ -431,6 +451,10 @@ async function handleDeleteAccount() {
   //   双击会各推一个确认弹窗进队列(confirm 是队列不是单例),确认完第一个立刻露出
   //   第二个一模一样的,极易连着点两次。同文件另外两个操作(改密 / 2FA)都有同款闸。
   if (securityBusy.value) return;
+  if (remoteApiEnabled && !remoteSecurity.value) {
+    toast.error(t.value.security.opFailed);
+    return;
+  }
   if (deletionPending.value) {
     toast.info(t.value.security.deleteAccountPending);
     return;
@@ -530,7 +554,7 @@ async function handleDeleteAccount() {
 }
 
 async function handleCancelAccountDeletion() {
-  if (!remoteApiEnabled || !deletionCanCancel.value || securityBusy.value) return;
+  if (!remoteApiEnabled || !remoteSecurity.value || !deletionCanCancel.value || securityBusy.value) return;
   const ok = await uiConfirm({
     title: t.value.security.cancelDeletionRequest,
     message: t.value.security.cancelDeletionMessage,
@@ -613,6 +637,35 @@ const mockModeBannerTextStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-warning)",
+};
+const remoteSecurityUnavailableStyle: CSSProperties = {
+  marginTop: "10px",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  background: "var(--v5-surface-2)",
+};
+const remoteSecurityUnavailableTextStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
+};
+const remoteSecurityRetryStyle: CSSProperties = {
+  minHeight: "32px",
+  padding: "0 10px",
+  borderRadius: "7px",
+  background: "var(--v5-surface-3)",
+};
+const remoteSecurityRetryTextStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "var(--v5-brand)",
+};
+const unavailableValueStyle: CSSProperties = {
+  marginLeft: "auto",
+  fontFamily: "var(--font-v5)",
+  fontSize: "15px",
+  color: "var(--v5-ink-4)",
 };
 // Section label (de-card spec): 15/600/ink.
 const sectionHeadStyle: CSSProperties = {

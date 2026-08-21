@@ -142,6 +142,64 @@ export function createBehaviorTracker(options: TrackerOptions) {
 
 let acceptanceObservationCredential = "";
 let acceptanceObservationCredentialScope = "";
+let acceptanceObservationModalOpen = false;
+let acceptanceObservationModalToken = 0;
+let acceptanceObservationModalScope = "";
+const acceptanceObservationModalClosedListeners = new Map<
+  (event: { token: number; scope: string }) => void,
+  number
+>();
+const acceptanceObservationModalOpenedListeners = new Set<
+  (event: { token: number; scope: string }) => void
+>();
+
+/** True while the native acceptance credential modal is still on screen. */
+export function isAcceptanceObservationModalOpen(): boolean {
+  return acceptanceObservationModalOpen;
+}
+
+/**
+ * Subscribe to a native modal close. A subscriber that attaches while the
+ * current modal is open receives that modal's close too; already-closed modal
+ * tokens remain fenced out so a late subscriber cannot arm a new account's
+ * voucher popup retry from stale UI work.
+ */
+export function onAcceptanceObservationModalClosed(
+  listener: (event: { token: number; scope: string }) => void,
+): () => void {
+  // Keep the currently open token eligible. The App chassis can mount after
+  // the transport opens the native modal but before the user closes it.
+  const minimumToken = acceptanceObservationModalOpen
+    ? acceptanceObservationModalToken - 1
+    : acceptanceObservationModalToken;
+  acceptanceObservationModalClosedListeners.set(listener, minimumToken);
+  return () => acceptanceObservationModalClosedListeners.delete(listener);
+}
+
+export function onAcceptanceObservationModalOpened(
+  listener: (event: { token: number; scope: string }) => void,
+): () => void {
+  acceptanceObservationModalOpenedListeners.add(listener);
+  // Replay the live modal to late subscribers so scheduler setup cannot miss
+  // the opened edge and subsequently treat the close as an unrelated event.
+  if (acceptanceObservationModalOpen) {
+    try {
+      listener({ token: acceptanceObservationModalToken, scope: acceptanceObservationModalScope });
+    } catch { /* modal arbitration is best effort */ }
+  }
+  return () => acceptanceObservationModalOpenedListeners.delete(listener);
+}
+
+function closeAcceptanceObservationModal(token: number, scope: string): void {
+  if (token !== acceptanceObservationModalToken || !acceptanceObservationModalOpen) return;
+  acceptanceObservationModalOpen = false;
+  const event = { token, scope };
+  for (const [listener, minimumToken] of acceptanceObservationModalClosedListeners) {
+    if (token <= minimumToken) continue;
+    try { listener(event); } catch { /* modal arbitration is best effort */ }
+  }
+  acceptanceObservationModalScope = "";
+}
 
 function rememberAcceptanceObservationCredential(receipt: Awaited<ReturnType<BehaviorTransport["ingest"]>>, scope: string): void {
   if (!scope) return;
@@ -151,13 +209,34 @@ function rememberAcceptanceObservationCredential(receipt: Awaited<ReturnType<Beh
   if (credential === acceptanceObservationCredential && scope === acceptanceObservationCredentialScope) return;
   acceptanceObservationCredential = credential;
   acceptanceObservationCredentialScope = scope;
+  let modalToken = 0;
   try {
     uni.setClipboardData({ data: credential, showToast: false });
     // 只在 mock + SANDBOX 下弹(见上面的早退)。文案是验收工具的工程话,按硬编码中文门的
     // 出路②处理:改英文技术串,**不进 i18n 词典** —— 工程话进词典就成了用户文案契约,
     // 而词典是普通对象、打包摇不掉,会原样进生产包。
-    uni.showModal({ title: "Acceptance observation credential", content: `${credential}\nCopied — paste into the L6 Sandbox observation panel on PC.`, showCancel: false });
+    const token = ++acceptanceObservationModalToken;
+    modalToken = token;
+    acceptanceObservationModalOpen = true;
+    acceptanceObservationModalScope = scope;
+    const openedEvent = { token, scope };
+    for (const listener of acceptanceObservationModalOpenedListeners) {
+      try { listener(openedEvent); } catch { /* modal arbitration is best effort */ }
+    }
+    const close = () => closeAcceptanceObservationModal(token, scope);
+    const result = uni.showModal({
+      title: "Acceptance observation credential",
+      content: `${credential}\nCopied — paste into the L6 Sandbox observation panel on PC.`,
+      showCancel: false,
+      success: close,
+      fail: close,
+      complete: close,
+    }) as unknown;
+    if (result && typeof (result as unknown as { then?: unknown }).then === "function") {
+      void Promise.resolve(result).then(close, close);
+    }
   } catch {
+    if (modalToken) closeAcceptanceObservationModal(modalToken, scope);
     // The receipt remains available through the explicit getter on hosts that
     // cannot show a modal or reach the native clipboard.
   }

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createProofApi } from "./proof-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
 
 const valid = {
   source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, generatedAt: "2026-08-15T00:00:00Z",
@@ -40,13 +39,12 @@ describe("proof API", () => {
       .rejects.toMatchObject({ message: "PROOF_RESPONSE_INVALID" });
   });
 
-  it("accepts a server-authoritative empty sandbox projection without inventing team values", async () => {
-    setCurrentCommerceSandboxRun("run-proof-20260816");
+  it("accepts a server-authoritative empty development projection without inventing team values", async () => {
     const request = vi.fn().mockResolvedValue({
       ...valid,
-      sourceEnvironment: "SANDBOX",
-      runId: "run-proof-20260816",
-      provenance: { ...valid.provenance, environment: "SANDBOX", runId: "run-proof-20260816" },
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      provenance: { ...valid.provenance, environment: "PRODUCTION", runId: "" },
       serverTime: "2026-08-17T05:00:00Z",
       asOf: "2026-08-17",
       earningsTotalUsdt: null,
@@ -57,8 +55,7 @@ describe("proof API", () => {
       team: { totalMembers: null, activeMembers: null },
       availability: { status: "EMPTY", earnings: "UNAVAILABLE", team: "UNAVAILABLE" },
     });
-    const api = createProofApi({ request } as unknown as ApiClient, "sandbox");
+    const api = createProofApi({ request } as unknown as ApiClient, "dev");
     await expect(api.snapshot()).resolves.toMatchObject({ earningsTotalUsdt: null, team: { totalMembers: null } });
-    setCurrentCommerceSandboxRun(null);
   });
 });

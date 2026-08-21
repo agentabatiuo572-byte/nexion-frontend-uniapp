@@ -16,6 +16,6 @@ export async function refreshRemoteFleetAfterCatalog(accountKey: string): Promis
       || accountKey !== `user:${serverSession.user.userId}`) {
     return false;
   }
-  if (apiRuntimeConfig.mode === "sandbox" && !(await refreshProductCatalog())) return false;
+  if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
   return useApp().refreshRemoteFleet();
 }

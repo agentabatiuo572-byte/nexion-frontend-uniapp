@@ -71,7 +71,7 @@
           <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ CHAIN_DEPOSIT_FEE_USDT[activeNet] }} USDT</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ CHAIN_REQUIRED_CONFIRMATIONS[activeNet] }}</text></text></view>
         </view>
-        <view v-if="fundsSandboxEnabled" class="flex items-center" :style="sandboxTopupStyle">
+        <view v-if="developmentFundsEnabled" class="flex items-center" :style="sandboxTopupStyle">
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">Cregis USDT-BEP20 · SANDBOX</text>
             <view class="flex items-center" style="margin-top: 6px; gap: 6px">
@@ -185,7 +185,8 @@ import {
 } from "@/store/deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
 import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
-import { fundsSandboxEnabled } from "@/api/runtime";
+import { developmentFundsEnabled } from "@/api/runtime";
+import { isFundsSandboxStaleRequestError } from "@/lib/funds-sandbox-request-scope";
 
 const t = useT();
 const dep = useDeposits();
@@ -226,7 +227,7 @@ onUnmounted(() => {
 // ── 网络选择(停用 chip 不可选;所选被停用时回落到首个启用网络)──
 const net = ref<ChainDepositChannel>("usdt-trc20");
 function isEnabled(id: ChainDepositChannel): boolean {
-  if (fundsSandboxEnabled) return id === "usdt-bep20";
+  if (developmentFundsEnabled) return id === "usdt-bep20";
   return dep.chainChannelEnabled[id] === true;
 }
 const activeNet = computed<ChainDepositChannel | null>(() => {
@@ -270,7 +271,7 @@ function copyAddr() {
 const sandboxSubmitting = ref(false);
 const sandboxAmount = ref("25");
 async function simulateSandboxTopup() {
-  if (!fundsSandboxEnabled || sandboxSubmitting.value) return;
+  if (!developmentFundsEnabled || sandboxSubmitting.value) return;
   const amount = Number(sandboxAmount.value.trim());
   if (!Number.isFinite(amount) || amount < MIN_DEPOSIT_USDT) {
     toast.info(`${t.value.topupChrome.minDeposit} ${MIN_DEPOSIT_USDT} USDT`);
@@ -282,7 +283,9 @@ async function simulateSandboxTopup() {
     // 工程话,故意不进 i18n 词典(同 :79 的理由:出路②)。
     if (record) toast.success(`SANDBOX: server credited ${amount.toFixed(2)} USDT`);
   } catch (cause) {
-    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);
+    if (!isFundsSandboxStaleRequestError(cause)) {
+      toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);
+    }
   } finally {
     sandboxSubmitting.value = false;
   }

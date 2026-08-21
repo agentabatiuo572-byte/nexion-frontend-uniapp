@@ -31,6 +31,23 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text :style="previewTextStyle">{{ t.genesisHolder.previewModeBanner }}</text>
           </view>
+          <view v-if="remoteApiEnabled" :style="serverFactsEmptyStyle">
+            <text class="block" :style="cardTitleStyle">Server holder facts</text>
+            <text class="block" :style="serverFactStyle">{{ holderFactText }}</text>
+            <view class="grid grid-cols-2" style="gap: 10px; margin-top: 8px">
+              <view>
+                <text class="block" :style="cellLabelStyle">Reserved allocation</text>
+                <text class="block tabular-nums" :style="cellValStyle('var(--v5-ink)')">{{ allocText }}</text>
+              </view>
+              <view>
+                <text class="block" :style="cellLabelStyle">Priority</text>
+                <text class="block" :style="cellValStyle('var(--v5-ink)')">{{ priorityText }}</text>
+              </view>
+            </view>
+            <text class="block" :style="serverFactStyle">{{ holderPolicyText }}</text>
+            <text class="block" :style="serverFactStyle">{{ holderTimingText }}</text>
+            <text class="block" :style="serverFactStyle">{{ holderProvenanceText }}</text>
+          </view>
         </template>
 
         <!-- ══ Holder · 上所前 ══ -->
@@ -54,6 +71,10 @@
               <text>{{ t.genesisHolder.pre.allocLabel }} </text>
               <text class="tabular-nums" style="font-weight: 600; color: var(--v5-brand)">{{ allocText }}</text>
             </view>
+            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderFactText }}</text>
+            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderPolicyText }}</text>
+            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderTimingText }}</text>
+            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderProvenanceText }}</text>
 
             <view class="grid grid-cols-2" :style="heroStatGridStyle">
               <view>
@@ -271,12 +292,65 @@ const notHolderBodyText = computed(() =>
 );
 
 // ── 上所前：额度 + 优先级（mock，backend-replaceable）──
-const allocText = computed(() => remoteApiEnabled
-  ? t.value.genesisHolder.pre.serverVerified
-  : `${genesis.reservedAllocationNEX().toLocaleString()} NEX`);
-const priorityText = computed(() => remoteApiEnabled
-  ? t.value.genesisHolder.pre.serverVerified
-  : (owned.value >= 5 ? "Top 1%" : owned.value >= 2 ? "Top 3%" : "Top 5%"));
+const remoteHolderFact = computed(() => genesis.remoteEligibility);
+const holderFactStale = computed(() => {
+  const fact = remoteHolderFact.value;
+  if (!remoteApiEnabled || !fact) return false;
+  const age = Date.now() - fact.asOf;
+  return age > 15 * 60_000 || age < -5 * 60_000;
+});
+const reasonText = (code: string): string => ({
+  HOLDINGS_CONFIRMED: "Active Genesis holdings confirmed",
+  NO_ACTIVE_HOLDINGS: "No active Genesis holdings",
+  ACCOUNT_AGE_REQUIRED: "Account age requirement not met",
+  COUNTRY_REQUIRED: "Country information is required",
+  GEO_BLOCKED: "This country is not eligible",
+  SALE_POLICY_UNAVAILABLE: "Genesis qualification policy is unavailable",
+  PRESALE_NOT_OPEN: "Genesis sale window is not open",
+  USER_CAP_REACHED: "Genesis holding cap reached",
+  POLICY_CONFIRMED: "Holder policy confirmed",
+  POLICY_NOT_EFFECTIVE: "Holder policy is not effective yet",
+}[code] ?? code.replaceAll("_", " ").toLowerCase());
+const holderFactText = computed(() => {
+  const fact = remoteHolderFact.value;
+  if (!fact) return "Server holder facts unavailable; retry to verify.";
+  if (holderFactStale.value) return "Server holder facts are stale; refresh to verify.";
+  if (fact.holderStatus === "CONFIG_UNAVAILABLE") return "Holder allocation policy is not published; no local estimate is shown.";
+  if (fact.holderStatus === "NOT_EFFECTIVE") return "Holder policy is published but not effective yet; no allocation is confirmed.";
+  if (fact.holderStatus === "NOT_ELIGIBLE") return "You are not currently qualified for the holder allocation.";
+  const reasons = fact.qualificationReasonCodes.map(reasonText).join(" · ");
+  return reasons || (fact.holderStatus === "READY" ? "Holder qualification confirmed by server." : "Holder qualification is not confirmed.");
+});
+const holderPolicyText = computed(() => {
+  const fact = remoteHolderFact.value;
+  if (!fact || holderFactStale.value) return "Policy version: — (server fact unavailable or stale)";
+  return `Policy version: ${fact.policyVersion ?? "not published"}`;
+});
+const holderTimingText = computed(() => {
+  const fact = remoteHolderFact.value;
+  if (!fact || holderFactStale.value) return "Effective / as-of / server time: —";
+  const effective = fact.effectiveAt === null ? "not published" : new Date(fact.effectiveAt).toISOString();
+  return `Effective: ${effective} · As of: ${new Date(fact.asOf).toISOString()} · Server: ${new Date(fact.serverTime).toISOString()}`;
+});
+const holderProvenanceText = computed(() => {
+  const fact = remoteHolderFact.value;
+  if (!fact || holderFactStale.value) return "Provenance: —";
+  return `Provenance: ${fact.provenance.environment} · ${fact.provenance.source} · Run ${fact.provenance.runId}`;
+});
+const allocText = computed(() => {
+  if (!remoteApiEnabled) return `${genesis.reservedAllocationNEX().toLocaleString()} NEX`;
+  const fact = remoteHolderFact.value;
+  if (!fact || holderFactStale.value || fact.holderStatus === "CONFIG_UNAVAILABLE" || fact.holderStatus === "NOT_EFFECTIVE" || fact.holderStatus === "NOT_ELIGIBLE") return "— NEX";
+  return `${(fact.reservedAllocation ?? 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${fact.reservedAllocationUnit}`;
+});
+const priorityText = computed(() => {
+  if (!remoteApiEnabled) return owned.value >= 5 ? "Top 1%" : owned.value >= 2 ? "Top 3%" : "Top 5%";
+  const fact = remoteHolderFact.value;
+  if (!fact || holderFactStale.value || fact.holderStatus === "CONFIG_UNAVAILABLE" || fact.holderStatus === "NOT_EFFECTIVE") return "—";
+  if (fact.holderStatus === "NOT_ELIGIBLE") return "Not qualified";
+  if (fact.priorityTier === "NONE") return "Not qualified";
+  return `${fact.priorityTier.replace("_", " ")} · #${fact.priorityRank ?? "—"}`;
+});
 const poolText = computed(() => fmt(t.value.genesisHolder.pre.pointsPool, { amount: "$250K" }));
 const leaderboard = computed(() => [
   { rank: 1, who: t.value.genesisHolder.pre.pointsYou, pts: String(Math.max(1, owned.value) * 1000), me: true },
@@ -445,6 +519,16 @@ const discStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.5,
+};
+const serverFactStyle: CSSProperties = {
+  marginTop: "8px",
+  fontSize: "11px",
+  color: "var(--v5-ink-4)",
+  lineHeight: 1.45,
+};
+const serverFactsEmptyStyle: CSSProperties = {
+  padding: "12px 2px",
+  borderTop: "1px dashed var(--v5-border-strong)",
 };
 // generic section — de-carded: label + content on the page floor (2px inset)
 const cardStyle: CSSProperties = {

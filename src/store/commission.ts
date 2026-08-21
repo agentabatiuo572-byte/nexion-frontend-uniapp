@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { onScopeDispose, ref } from "vue";
 import { commissionConfigApi, remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
-import type { CanonicalBinaryState } from "@/api/commission-config-api";
+import type { CanonicalBinaryState, CanonicalCommissionConfig } from "@/api/commission-config-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, subscribeCurrentCommerceSandboxRun, type CommerceSandboxRunScope } from "@/api/order-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/commission.ts (zustand persist → Pinia + uni storage).
@@ -23,7 +24,7 @@ export type CommissionKind =
   | "leadership"
   | "genesis";
 
-export type CommissionStatus = "cooling" | "unlocked" | "withdrawn";
+export type CommissionStatus = "cooling" | "unlocked" | "withdrawn" | "simulated";
 
 export interface CommissionEvent {
   id: string;
@@ -38,6 +39,8 @@ export interface CommissionEvent {
   ts: number;
   unlockAt: number;           // 30d 后
   status: CommissionStatus;
+  settlementState?: "SIMULATED" | "CANONICAL";
+  withdrawable?: boolean;
 }
 
 const ONE_DAY = 86400 * 1000;
@@ -161,15 +164,34 @@ export const useCommission = defineStore("commission", () => {
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
   let bindingEpoch = 0;
+  let configRefreshGeneration = 0;
   const events = ref<CommissionEvent[]>(remoteApiEnabled ? [] : hydrate(boundKey));
+  const eventsEvidence = ref<import("@/api/team-insights-api").TeamCommissionSnapshot | null>(null);
+  const config = ref<CanonicalCommissionConfig | null>(null);
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
   const eventsStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const configStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const binaryStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
 
-  type RequestScope = { accountKey: string; epoch: number };
-  const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch });
+  type RequestScope = { accountKey: string; epoch: number; commerceRun: CommerceSandboxRunScope };
+  const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch, commerceRun: captureCommerceSandboxRun() });
   const isCurrentScope = (scope: RequestScope): boolean =>
-    scope.accountKey === boundKey && scope.epoch === bindingEpoch;
+    scope.accountKey === boundKey && scope.epoch === bindingEpoch && isCurrentCommerceSandboxScope(scope.commerceRun);
+
+  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+    if (!remoteApiEnabled) return;
+    // A catalogue environment/RunID change invalidates every remote snapshot;
+    // stale requests are also fenced by isCurrentCommerceSandboxScope().
+    configRefreshGeneration += 1;
+    config.value = null;
+    binarySnapshot.value = null;
+    events.value = [];
+    eventsEvidence.value = null;
+    configStatus.value = "idle";
+    eventsStatus.value = "idle";
+    binaryStatus.value = "idle";
+  });
+  onScopeDispose(unsubscribeCommerceRun);
 
   function persist() {
     if (remoteApiEnabled) return;
@@ -181,15 +203,37 @@ export const useCommission = defineStore("commission", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     bindingEpoch += 1;
     if (remoteApiEnabled) {
+      configRefreshGeneration += 1;
+      config.value = null;
       binarySnapshot.value = null;
       events.value = [];
+      eventsEvidence.value = null;
+      configStatus.value = "idle";
       eventsStatus.value = "idle";
       binaryStatus.value = "idle";
       const scope = requestScope();
-      void Promise.allSettled([refreshCanonicalBinary(scope), refreshCanonicalEvents(scope)]);
+      void Promise.allSettled([refreshCanonicalConfig(scope), refreshCanonicalBinary(scope), refreshCanonicalEvents(scope)]);
       return;
     }
     events.value = hydrate(boundKey);
+  }
+
+  async function refreshCanonicalConfig(scope = requestScope()) {
+    if (!remoteApiEnabled) return;
+    const generation = ++configRefreshGeneration;
+    config.value = null;
+    configStatus.value = "loading";
+    try {
+      const snapshot = await commissionConfigApi.rates();
+      if (generation !== configRefreshGeneration || !isCurrentScope(scope)) return;
+      config.value = snapshot;
+      configStatus.value = "ready";
+    } catch {
+      if (generation === configRefreshGeneration && isCurrentScope(scope)) {
+        config.value = null;
+        configStatus.value = "error";
+      }
+    }
   }
 
   async function refreshCanonicalBinary(scope = requestScope()) {
@@ -207,10 +251,13 @@ export const useCommission = defineStore("commission", () => {
 
   async function refreshCanonicalEvents(scope = requestScope()) {
     if (!remoteApiEnabled) return;
+    events.value = [];
+    eventsEvidence.value = null;
     eventsStatus.value = "loading";
     try {
       const snapshot = await teamInsightsApi.commissions();
       if (!isCurrentScope(scope)) return;
+      eventsEvidence.value = snapshot;
       events.value = snapshot.events;
       eventsStatus.value = "ready";
     } catch {
@@ -245,7 +292,7 @@ export const useCommission = defineStore("commission", () => {
   function withdraw(id: string): boolean {
     if (remoteApiEnabled) return false;
     const e = events.value.find((x) => x.id === id);
-    if (!e || e.status !== "unlocked") return false;
+    if (!e || e.status !== "unlocked" || e.withdrawable === false || e.settlementState === "SIMULATED") return false;
     events.value = events.value.map((x) => (x.id === id ? { ...x, status: "withdrawn" } : x));
     persist();
     return true;
@@ -257,11 +304,16 @@ export const useCommission = defineStore("commission", () => {
   function totalNEXLifetime() {
     return events.value.reduce((s, e) => s + e.amountNEX, 0);
   }
+  /** Pages must use this lookup so remote mode can never fall back to mock rates. */
+  function unilevelRate(layer: number): number {
+    if (remoteApiEnabled) return config.value?.unilevelUsdt[layer] ?? 0;
+    return UNILEVEL_USDT[layer] ?? 0;
+  }
   function unlockedUSDT() {
-    return events.value.filter((e) => e.status === "unlocked").reduce((s, e) => s + e.amountUSDT, 0);
+    return events.value.filter((e) => e.status === "unlocked" && e.withdrawable !== false && e.settlementState !== "SIMULATED").reduce((s, e) => s + e.amountUSDT, 0);
   }
   function unlockedNEX() {
-    return events.value.filter((e) => e.status === "unlocked").reduce((s, e) => s + e.amountNEX, 0);
+    return events.value.filter((e) => e.status === "unlocked" && e.withdrawable !== false && e.settlementState !== "SIMULATED").reduce((s, e) => s + e.amountNEX, 0);
   }
   function coolingUSDT() {
     return events.value.filter((e) => e.status === "cooling").reduce((s, e) => s + e.amountUSDT, 0);
@@ -293,7 +345,8 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, binarySnapshot, eventsStatus, binaryStatus, bindAccount, refreshCanonicalBinary, refreshCanonicalEvents,
+    events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, binaryStatus, bindAccount,
+    refreshCanonicalConfig, refreshCanonicalBinary, refreshCanonicalEvents, unilevelRate,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

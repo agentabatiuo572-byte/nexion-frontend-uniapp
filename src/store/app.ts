@@ -45,7 +45,7 @@ import {
   deviceE3Api,
   appHomeApi,
   fundsSandboxApi,
-  fundsSandboxEnabled,
+  developmentFundsEnabled,
   fundsServerEnabled,
   remoteApiEnabled,
   sessionVault,
@@ -484,7 +484,7 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
-  const fundsSandboxStatus = ref<"idle" | "loading" | "ready" | "error">(fundsSandboxEnabled ? "idle" : "ready");
+  const fundsSandboxStatus = ref<"idle" | "loading" | "ready" | "error">(developmentFundsEnabled ? "idle" : "ready");
   const fundsSandboxError = ref("");
   // It starts absent and is cleared before every read. A surface can therefore
   // never label a stale, missing, malformed, or contradictory response as a
@@ -793,10 +793,13 @@ export const useApp = defineStore("app", () => {
     try {
       const activeSession = sessionVault.read();
       if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
-      const homeRefresh = refreshHomeTruth(request);
+      homeTruthStatus.value = "loading";
+      homeTruthError.value = null;
       remoteFleetStatus.value = "loading";
       remoteFleetError.value = "";
-      const [fleet, assignmentState] = await Promise.all([deviceE3Api.fleet(), taskAssignmentApi.state()]);
+      const [fleet, assignmentState, projection] = await Promise.all([
+        deviceE3Api.fleet(), taskAssignmentApi.state(), appHomeApi.fetch(),
+      ]);
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       installCanonicalLifecycleConfig(fleet.capacitySchedule);
       const nextDevices = applyRemoteAssignments(
@@ -808,7 +811,7 @@ export const useApp = defineStore("app", () => {
         joinedAt: fleet.userJoinedAt,
         nexBalance: fleet.walletNex,
         pendingEarnings: 0,
-        ...(fundsSandboxEnabled ? {} : {
+        ...(developmentFundsEnabled ? {} : {
           usdtBalance: fleet.walletUsdt,
           earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         }),
@@ -821,8 +824,10 @@ export const useApp = defineStore("app", () => {
         total: 0,
         history: [],
       };
-      await homeRefresh;
-      if (homeTruth.value && remoteAccountEpoch.isCurrent(request)) applyHomeEarnings(homeTruth.value);
+      // Atomic projection commit: no visible fleet/home half-state.
+      homeTruth.value = projection;
+      applyHomeEarnings(projection);
+      homeTruthStatus.value = "ready";
       remoteFleetStatus.value = "ready";
       return true;
     } catch (cause) {
@@ -834,13 +839,16 @@ export const useApp = defineStore("app", () => {
           joinedAt: 0,
           nexBalance: 0,
           pendingEarnings: 0,
-          ...(fundsSandboxEnabled ? {} : {
+          ...(developmentFundsEnabled ? {} : {
             usdtBalance: 0,
             earningBuckets: createEarningBuckets(0, 0),
           }),
         };
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+        homeTruth.value = null;
+        homeTruthStatus.value = "error";
+        homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
       }
       return false;
     }
@@ -862,12 +870,13 @@ export const useApp = defineStore("app", () => {
       homeTruth.value = null;
       homeTruthStatus.value = "idle";
       homeTruthError.value = null;
-      fundsSandboxStatus.value = fundsSandboxEnabled ? "idle" : "ready";
+      fundsSandboxStatus.value = developmentFundsEnabled ? "idle" : "ready";
       fundsSandboxError.value = "";
       fundsSandboxEvidence.value = null;
-      void refreshRemoteFleet(); // 自吞降级(resilience 门);error 态由缝内落好
+      // The authenticated catalog/bootstrap helper owns the first fleet read.
+      // A bare account rebind has no authority to fetch a mixed old/new projection.
       void refreshRemoteWithdrawalList(key);
-      if (fundsSandboxEnabled) void refreshFundsSandboxForAccount(key);
+      if (developmentFundsEnabled) void refreshFundsSandboxForAccount(key);
       return;
     }
     const snapshot = hydrateSnapshotEconomics(readAccountSnapshot(key)) ?? createSeedSnapshot(key, rawAccountKey, surface);
@@ -886,7 +895,7 @@ export const useApp = defineStore("app", () => {
 
   /** Rehydrates every historical production withdrawal after login/reload. */
   async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
-    if (!remoteApiEnabled || fundsSandboxEnabled || expectedAccountKey !== accountKey.value) return false;
+    if (!remoteApiEnabled || developmentFundsEnabled || expectedAccountKey !== accountKey.value) return false;
     const request = remoteAccountEpoch.snapshot();
     try {
       const rows = await withdrawalApi.list();
@@ -1504,7 +1513,7 @@ export const useApp = defineStore("app", () => {
     // 且 adoptFundsSandboxWallet 已经把它整体投影进来。这里再扣一次就是双计。
     // 回 true 而不是 false:钱确实动了(在服务端),调用方不该弹「扣款失败」。
     // 与 refundFailedWithdrawals 的 sandbox 闸成对 —— 那条轨扣与退都归服务端。
-    if (fundsSandboxEnabled) return true;
+    if (developmentFundsEnabled) return true;
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
     const key = withdrawalDebitKey(wd.id);
@@ -1972,7 +1981,7 @@ export const useApp = defineStore("app", () => {
   }
 
   async function refreshFundsSandbox(): Promise<void> {
-    if (!fundsSandboxEnabled) {
+    if (!developmentFundsEnabled) {
       fundsSandboxEvidence.value = null;
       return;
     }
@@ -2028,7 +2037,7 @@ export const useApp = defineStore("app", () => {
    */
   function refreshFundsSandboxForAccount(rawAccountKey: string): Promise<boolean> {
     const expectedAccountKey = normalizeAccountKey(rawAccountKey);
-    if (!fundsSandboxEnabled) {
+    if (!developmentFundsEnabled) {
       fundsSandboxEvidence.value = null;
       return Promise.resolve(false);
     }
@@ -2100,7 +2109,7 @@ export const useApp = defineStore("app", () => {
     const acct = accountKey.value;
     // Durable pending mutation keys belong only to the isolated server sandbox.
     // 生产轨的幂等键由调用方传入(见参数头注),不在这里现造。
-    const mutation: FundsMutationIdentity | null = fundsSandboxEnabled ? {
+    const mutation: FundsMutationIdentity | null = developmentFundsEnabled ? {
       accountKey: acct,
       environment: "SANDBOX",
       method: `WITHDRAWAL:${network}`,
@@ -2110,7 +2119,7 @@ export const useApp = defineStore("app", () => {
         targetAddress: address.trim(),
       }),
     } : null;
-    if (fundsSandboxEnabled) {
+    if (developmentFundsEnabled) {
       if (!mutation) throw new Error("FUNDS_SANDBOX_MUTATION_IDENTITY_MISSING");
       const sandboxKey = pendingFundsMutationKey(mutation);
       // A sandbox withdrawal is only possible after the *same* authenticated
@@ -2269,9 +2278,9 @@ export const useApp = defineStore("app", () => {
     // 前面那笔到点了也永远推不动(列表化后这个洞自动消失)。
     const now = mockServerNow();
     const prev = withdrawals.value;
-    // 🔴 远端模式的**真判据**在 advanceArrival 里(必填 ctx):判据留在纯函数里,才有一个
-    // 能 node 直跑的落点(见 remote-authority-simulation.test.mjs)。上面那行
-    // `if (fundsServerEnabled) return []` 是远端线加的第二道同向闸(fundsServerEnabled ≡
+    // 🔴 服务端权威的**真判据**在 advanceArrival 里(必填 ctx):判据留在纯函数里,才有一个
+    // 能 node 直跑的落点。上面那行
+    // `if (fundsServerEnabled) return []` 是第二道同向闸(fundsServerEnabled ≡
     // remoteApiEnabled),行为完全重合,保留它只是为了让「客户端 ETA 永不推进服务端单据」
     // 这件事在函数入口就一眼可见(funds-server-sandbox-contract 也钉了它)。
     const next = prev.map((w) => advanceArrival(w, now, { serverAuthoritative: remoteApiEnabled }) ?? w);
@@ -2303,7 +2312,7 @@ export const useApp = defineStore("app", () => {
    * advanceWithdrawalArrival 同形状,供 App 层按单号结算对应账单行。
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
-    if (!remoteApiEnabled || fundsSandboxEnabled) return [];
+    if (!remoteApiEnabled || developmentFundsEnabled) return [];
     const expectedAccountKey = accountKey.value;
     // List is the durable source of truth; a fresh session may have no local rows
     // at all, so hydrate it before polling in-flight snapshots.
@@ -2416,7 +2425,7 @@ export const useApp = defineStore("app", () => {
   }
 
   async function applyFundsSandboxCallback(orderNo: string, status: "CONFIRMED" | "FAILED"): Promise<boolean> {
-    if (!fundsSandboxEnabled) return false;
+    if (!developmentFundsEnabled) return false;
     const expectedAccountKey = accountKey.value;
     const current = withdrawals.value.find((item) => item.id === orderNo);
     if (!current || current.serverVersion === undefined || current.status !== "submitted") return false;

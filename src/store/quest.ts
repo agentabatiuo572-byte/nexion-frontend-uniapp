@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { reactive, ref } from "vue";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalQuest } from "@/api/quest-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
@@ -101,12 +102,14 @@ export const useQuest = defineStore("quest", () => {
   let claimSequence = 0;
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
+  const remoteQuests = ref<CanonicalQuest[]>([]);
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   function clearRemoteFacts() {
     for (const key of Object.keys(completedMap)) delete completedMap[key];
     for (const key of Object.keys(rewardMap)) delete rewardMap[key];
+    remoteQuests.value = [];
   }
 
   async function refreshRemote(): Promise<boolean> {
@@ -120,6 +123,7 @@ export const useQuest = defineStore("quest", () => {
       const snapshot = await questApi.state();
       if (!isCurrentRequest()) return false;
       clearRemoteFacts();
+      remoteQuests.value = snapshot.quests.map((quest) => ({ ...quest }));
       for (const quest of snapshot.quests) {
         rewardMap[quest.questCode] = quest.rewardNex;
         if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
@@ -171,11 +175,11 @@ export const useQuest = defineStore("quest", () => {
     for (const id of hydrate(boundKey)) completedMap[id] = true;
   }
 
-  function isComplete(id: QuestTaskId): boolean {
+  function isComplete(id: string): boolean {
     return completedMap[id] === true;
   }
 
-  function rewardFor(id: QuestTaskId): number | null {
+  function rewardFor(id: string): number | null {
     return typeof rewardMap[id] === "number" ? rewardMap[id] : null;
   }
 
@@ -218,5 +222,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
+  return { completedMap, remoteQuests, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
 });

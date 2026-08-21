@@ -1,5 +1,4 @@
 import { createApiClient, type ApiClient, type HttpTransport } from "./api-client";
-import { ApiError } from "./errors";
 import type { ApiRuntimeConfig } from "./runtime-config";
 import type { SessionVault } from "./session-vault";
 
@@ -23,25 +22,11 @@ function isLoopbackHttpUrl(value: string): boolean {
   }
 }
 
-function createMockModeApiClient(): ApiClient {
-  const remoteDisabled = () => Promise.reject(new ApiError({
-    kind: "configuration",
-    message: "REMOTE_API_DISABLED_IN_MOCK_MODE",
-  }));
-  return {
-    request: remoteDisabled,
-    upload: remoteDisabled,
-    refreshSession: remoteDisabled,
-  };
-}
-
 /**
- * Remote candidates must be fully configured before boot. Explicit mock builds
- * are self-contained and receive a fail-closed client so no incidental path can
- * use the network or a same-origin fallback.
+ * Both development and production are server-backed. The selected Java profile
+ * owns behavior; this client only chooses the configured HTTP origin.
  */
 export function createRuntimeApiClient(options: RuntimeApiClientOptions): ApiClient {
-  if (options.config.mode === "mock") return createMockModeApiClient();
   return createApiClient({
     baseUrl: options.config.baseUrl,
     transport: options.transport,

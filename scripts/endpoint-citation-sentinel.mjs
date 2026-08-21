@@ -98,6 +98,8 @@ const LEDGER = {
   "POST /api/orders/{orderNo}/pay": "TBD-NAME: 与上一条同一端点、花括号参数写法(后端 commerce sandbox 验收记录 2026-08-16 用 {orderNo});store/pending-checkout.ts 文件头引用为发票的服务端完成腿",
   "GET /api/store/catalog": "PRD §7.1",
   "/api/store/purchase-eligibility": "当前文档: PC 管理端开发落地规格 §3 API E1/E3; PRD v2 §E1/E3（Gen-2 E1 purchaseGate COMPLETE）",
+  "/api/store/notifications": "TBD-NAME: BACKEND AppProductNotificationController 已实现;当前账号商品到货/上架通知订阅列表与创建资源,商城 PRD 路径待同步",
+  "/api/store/notifications/:param": "TBD-NAME: 同上(取消单个商品通知订阅)",
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────
   "GET /api/withdrawals": "PRD §9.4",
@@ -147,7 +149,7 @@ const LEDGER = {
   "GET /api/quests/state": "PRD §9.11c.2(⚠️ PRD 写的是 /api/quests/weekly,实现用 state,已交底 U-16)",
   "POST /api/quests/{questCode}/claim": "TBD-NAME: 周任务按 questCode 原子领取的服务端权威命令;后端已实现,PRD §9.11c.2 待同步资源形状",
   // 2026-08-13 对齐轮补登(逐个回源核实过:5 个在 src/api 下都有真实现,不是笔误也不是虚构)
-  "/api/app/wallet/sandbox": "NOT-PRD: 沙箱资金档的钱包面,PRD 未定义;仅在 fundsSandboxEnabled 档可达",
+  "/api/app/wallet/sandbox": "NOT-PRD: 沙箱资金档的钱包面,PRD 未定义;仅在 developmentFundsEnabled 档可达",
   "/api/orders": "PRD §9.11d(单品下单;组合购尚无整单定价契约,见 bundle.vue 注释)",
   "/api/devices/earnings": "TBD-NAME: 设备收益投影,PRD 未单列章节",
   "/api/product/phase": "BACKEND: AppCanonicalBoundaryController#getProductPhase 已实现;前端 PRD 待同步",
@@ -182,6 +184,7 @@ const LEDGER = {
   "POST /api/devices/deactivate": "PRD §9.11c.1(composer endpoints,PRD 原文标 TBD; candidates)",
   "/api/gate/logout": "NOT-PRD: 退役 prototype 的 Next middleware reviewer-cookie 路由,uni 端已弃用(非 PROD 契约)",
   "GET /api/onboarding/calibrate/result": "PRD §12.2",
+  "/api/onboarding/calibrate": "TBD-NAME: BACKEND OnboardingCalibrationController 已实现;手机/设备校准请求与结果由服务端统一返回,前端 PRD 路径待同步",
   "GET /api/users/me": "PRD §12.2",
 
   // ── social / network / misc ───────────────────────────────────────────
@@ -239,8 +242,12 @@ const LEDGER = {
   "/api/app/compute-share/enrollments/:param": "TBD-NAME: 同上(单条接入申请读回)",
   "/api/app/developer/access-requests": "TBD-NAME: /api/app/* 族,开发者访问申请资源;前端 PRD 待同步",
   "/api/app/developer/access-requests/latest": "TBD-NAME: 同上(当前账号最近申请读回)",
+  "/api/app/developer/api-keys": "TBD-NAME: BACKEND AppDeveloperResourceController 已实现;当前账号 API key 列表/创建资源,前端 PRD 待同步",
+  "/api/app/developer/api-keys/:param": "TBD-NAME: 同上(撤销单个 API key)",
+  "/api/app/developer/webhooks": "TBD-NAME: 同上(当前账号 webhook 列表/创建资源)",
+  "/api/app/developer/webhooks/:param": "TBD-NAME: 同上(轮换密钥/删除单个 webhook)",
   "/api/app/wallet/bills": "TBD-NAME: /api/app/* 族,生产钱包账单权威投影;概念见 PRD §9.3,该路径待同步",
-  "/api/app/wallet/sandbox/topups": "NOT-PRD: /api/app/* 族,沙箱资金档专用;仅 fundsSandboxEnabled 档可达",
+  "/api/app/wallet/sandbox/topups": "NOT-PRD: /api/app/* 族,沙箱资金档专用;仅 developmentFundsEnabled 档可达",
   "/api/app/wallet/sandbox/withdrawals": "NOT-PRD: 同上",
   "/api/app/wallet/sandbox/orders/:param/callbacks": "NOT-PRD: 同上(沙箱回调注入)",
   "/api/app/janus/reports": "NOT-PRD: /api/app/* 族,Janus 双面 demo 专用,前端 PRD 不覆盖该工程",

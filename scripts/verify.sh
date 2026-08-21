@@ -578,8 +578,8 @@ served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | h
 expect_root="$PROJECT_DIR"
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
-elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
-  bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
+elif ! echo "$served_env_head" | grep -q '"MODE": *"development"'; then
+  bad "API-mode preflight: server 非 development 环境 —— 用 npm run test:legacy-suite(自启壳会以 development 起本工作树),否则运行时探针会验错对象"
 elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
 elif [ "$norm_root_selftest" != "ok" ]; then
@@ -587,7 +587,7 @@ elif [ "$norm_root_selftest" != "ok" ]; then
 elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$expect_root")" ]; then
   bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(_norm_tree_path "$served_root") vs $(_norm_tree_path "$expect_root");并发多工作树时会给别人发绿灯)"
 else
-  ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
+  ok "API-mode preflight: development 环境 + 服的就是本工作树($served_root)"
 fi
 fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
@@ -1294,9 +1294,9 @@ if [ "${arsr_pages:-0}" = "1" ] && [ "${arsr_hash:-0}" = "1" ] && [ "${arsr_orh:
 else
   bad "app-route-single-reader(页面栈原语=${arsr_pages} 期望1 · hash=${arsr_hash} 期望1 · 旧双读口=${arsr_orh} 期望0)"
 fi
-# 2026-08-11:advanceArrival 多了第三个必填参数「谁是权威」(远端模式 client 不自推)。
+# 2026-08-11:advanceArrival 多了第三个必填参数「谁是权威」(服务端权威时 client 不自推)。
 # 这条只守「全表扫 + 每笔都过同一个纯函数」,不钉死实参写法;权威闸本身由
-# selfcheck-arrival 第 0 节 + scripts/remote-authority-simulation.test.mjs 行为门守。
+# selfcheck-arrival 第 0 节 + funds-server-sandbox-contract 行为门守。
 sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now,[^)]*\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
@@ -2627,8 +2627,12 @@ platform_stats_anchor() {
     bad "platform-anchor: trust.vue 出现带内容的本地财务数组(披露一律服务端下发,禁另起一组绕过旧字面量禁令)"
     echo "$fin_arrays" | sed 's/^/        /'; fails=1
   fi
-  if ! grep -qE 'QTR_FINANCIALS: \{ metric: string; value: string; delta: string \}\[\] = \[\];' src/pages/trust/trust.vue 2>/dev/null; then
-    bad "platform-anchor: trust.vue QTR_FINANCIALS 不再是声明空数组(本地财务数据禁回流;产品若恢复本地 Q2 须重立镜像判据)"; fails=1
+  if grep -qE 'QTR_FINANCIALS|\w*FINANCIALS\w*' src/pages/trust/trust.vue 2>/dev/null; then
+    bad "platform-anchor: trust.vue 仍保留本地财务数组载体(披露必须只读服务端 trustSectionApi)"; fails=1
+  fi
+  if ! grep -qE 'remoteApiEnabled, trustSectionApi|trustSectionApi, remoteApiEnabled' src/pages/trust/trust.vue 2>/dev/null \
+    || ! grep -qE 'await trustSectionApi\.current\(\)' src/pages/trust/trust.vue 2>/dev/null; then
+    bad "platform-anchor: trust.vue 未以 trustSectionApi.current() 作为唯一披露数据入口"; fails=1
   fi
   if [ "$fails" -eq 0 ]; then ok "platform-stats single anchor (legacy 0 · lib-confined · consumers+health-gate · joiners 1×3 · compat 全零哨兵 · Q2 本地字面量 0)"; fi
 }

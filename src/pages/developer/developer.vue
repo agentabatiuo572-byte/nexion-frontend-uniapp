@@ -97,35 +97,56 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
-          <scroll-view scroll-x :style="snippetWrapStyle">
-            <text class="font-mono-tabular" :style="snippetTextStyle">{{ API_SNIPPET }}</text>
-          </scroll-view>
-          <view class="mt-3 rounded-lg" :style="docsComingStyle">
-            <text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text>
-          </view>
+          <view v-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
+          <template v-else-if="!remoteApiEnabled || docs">
+            <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }} · server-canonical</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ docs.endpoints.length }} endpoints · {{ docs.events.length }} events</text></view>
+            <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
+            <view v-if="!remoteApiEnabled" class="mt-3 rounded-lg" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
+            <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-ink-3)">Events: {{ docs.events.join(" · ") }}</text></view>
+          </template>
         </view>
       </view>
 
       <!-- API keys -->
       <view v-else-if="tab === 'keys'" class="mx-4 mt-3 mb-6">
-        <view class="rounded-2xl text-center" :style="emptyTabStyle">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
-          <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.keysEmpty }}</text>
-          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="tab = 'overview'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
-            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text>
+        <view class="rounded-2xl" :style="formCardStyle">
+          <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
+          <view v-else>
+            <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
+              <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+            </view>
+            <view v-for="item in apiKeys" :key="item.id" class="flex items-center" :style="resourceRowStyle">
+              <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
+              <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
+            </view>
+            <view v-if="!apiKeys.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
+            <input v-model="keyName" :placeholder="t.developer.keyName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-key')" role="button" tabindex="0" @click="createApiKey"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text></view>
+            <view v-if="newKeySecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newKeySecret }}</text></view>
           </view>
         </view>
       </view>
 
       <!-- Webhooks -->
       <view v-else class="mx-4 mt-3 mb-6">
-        <view class="rounded-2xl text-center" :style="emptyTabStyle">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.webhooksEmpty }}</text>
-          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="tab = 'overview'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18" /><path d="m21 12-3-3 3-3" /><path d="M3 12a9 9 0 0 0 9 9" /></svg>
-            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text>
+        <view class="rounded-2xl" :style="formCardStyle">
+          <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
+          <view v-else>
+            <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
+              <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+            </view>
+            <view v-for="item in webhooks" :key="item.id" class="flex items-center" :style="resourceRowStyle">
+              <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
+              <view class="flex" style="gap: 5px"><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `rotate-webhook:${item.id}`)" role="button" tabindex="0" @click="rotateWebhook(item)"><text style="font-size: 12px">{{ t.developer.rotate }}</text></view><view class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `delete-webhook:${item.id}`)" role="button" tabindex="0" @click="deleteWebhook(item.id)"><text style="font-size: 12px">{{ t.developer.delete }}</text></view></view>
+            </view>
+            <view v-if="!webhooks.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
+            <input v-model="webhookName" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookUrl" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookEvents" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-webhook')" role="button" tabindex="0" @click="createWebhook"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text></view>
+            <view v-if="newWebhookSecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
           </view>
         </view>
       </view>
@@ -140,15 +161,26 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { developerAccessApi, remoteApiEnabled } from "@/api/runtime";
+import { developerAccessApi, developerResourcesApi, remoteApiEnabled } from "@/api/runtime";
 import type { DeveloperAccessReceipt } from "@/api/developer-access-api";
+import type { DeveloperApiKey, DeveloperWebhook } from "@/api/developer-resources-api";
 import { useApp } from "@/store/app";
-import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { createDeveloperResourceFenceReader, type DeveloperResourceFence } from "./developer-resource-fence";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
+import { apiClient, expectedApiEnvironment } from "@/api/runtime";
+import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
+import { useLocaleStore } from "@/store/locale";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
 const t = useT();
 const app = useApp();
+const locale = useLocaleStore();
+const docsApi = createDeveloperDocsApi(apiClient, expectedApiEnvironment);
+const docs = ref<DeveloperDocs | null>(null);
+const docsLoadFailed = ref(false);
 const tab = ref<Tab>("overview");
 const company = ref("");
 const email = ref("");
@@ -156,9 +188,22 @@ const useCase = ref("");
 const submitting = ref(false);
 const latestRequest = ref<DeveloperAccessReceipt | null>(null);
 const latestLoadFailed = ref(false);
-const REQUEST_KEY_STORAGE = "nexgrid-developer-access-command-v1";
+const apiKeys = ref<DeveloperApiKey[]>([]);
+const webhooks = ref<DeveloperWebhook[]>([]);
+const resourcesLoading = ref(false);
+const resourcesLoadFailed = ref(false);
+const resourceBusyKeys = ref(new Set<string>());
+const resourceIntentKeys = new Map<string, string>();
+const keyName = ref("");
+const newKeySecret = ref<string | null>(null);
+const webhookName = ref("");
+const webhookUrl = ref("");
+const webhookEvents = ref("order.updated");
+const newWebhookSecret = ref<string | null>(null);
 let requestKey: string | null = null;
 let requestGeneration = 0;
+let resourceGeneration = 0;
+const resourceFenceReader = createDeveloperResourceFenceReader(() => String(app.accountKey), () => resourceGeneration);
 
 const tabOptions = computed(() => [
   { value: "overview" as Tab, label: t.value.developer.apiOverviewTab },
@@ -178,7 +223,7 @@ const PARTNERS = [
   { id: "pd", label: "PagerDuty" },
 ];
 
-const API_SNIPPET = `POST /v1/inference/dispatch HTTP/1.1
+const MOCK_API_SNIPPET = `POST /v1/inference/dispatch HTTP/1.1
 Host: api.nexgrid.ai
 Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx
 Content-Type: application/json
@@ -201,6 +246,10 @@ X-NexGrid-Signature: t=1747432411,v1=2fae...
   "eta_seconds": 4,
   "node": "sg-pool-09"
 }`;
+const docsSnippet = computed(() => {
+  if (remoteApiEnabled) return docs.value ? `${docs.value.example.request}\n\n→ ${docs.value.example.response}` : "";
+  return MOCK_API_SNIPPET;
+});
 
 // API cards — lucide icons inlined as path/rect/ellipse/line arrays.
 interface ApiCardDef {
@@ -241,13 +290,44 @@ const apiCards: ApiCardDef[] = [
   },
 ];
 
-function newRequestKey(): string { return globalThis.crypto?.randomUUID?.() ?? `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-function restoreRequestKey(accountKey: string): string | null {
-  const row = readAccountRow<{ key?: string }>(REQUEST_KEY_STORAGE, accountKey);
-  return typeof row?.key === "string" && row.key.trim() ? row.key.trim() : null;
+function newRequestKey(): string { return `developer-access:${requireCryptoUuid()}`; }
+function resourceBusy(intent: string): boolean { return resourceBusyKeys.value.has(intent); }
+function setResourceBusy(intent: string, busy: boolean): void {
+  const next = new Set(resourceBusyKeys.value);
+  if (busy) next.add(intent); else next.delete(intent);
+  resourceBusyKeys.value = next;
 }
-function persistRequestKey(accountKey: string, key: string | null): void {
-  writeAccountRow(REQUEST_KEY_STORAGE, accountKey, key ? { key } : {});
+function resourceActionStyle(base: CSSProperties, intent: string): CSSProperties {
+  return { ...base, opacity: resourceBusy(intent) ? 0.55 : 1, pointerEvents: resourceBusy(intent) ? "none" : "auto" };
+}
+function resourceKey(intent: string): string {
+  const existing = resourceIntentKeys.get(intent);
+  if (existing) return existing;
+  const key = `developer-resource:${requireCryptoUuid()}`;
+  resourceIntentKeys.set(intent, key);
+  return key;
+}
+function completeResourceIntent(intent: string): void { resourceIntentKeys.delete(intent); }
+function resourceFence(): DeveloperResourceFence { return resourceFenceReader.capture(); }
+function resourceFenceCurrent(fence: DeveloperResourceFence): boolean {
+  const current = resourceFenceReader.isCurrent(fence);
+  // A catalog RunID can change without an account watcher firing. If this is
+  // still the active generation, clear visible resource state immediately;
+  // the response that discovered the stale run must not leave a spinner or
+  // secret from the previous rail behind.
+  if (!current && fence.generation === resourceGeneration) resetResourceScope();
+  return current;
+}
+function resetResourceScope(): void {
+  resourceGeneration += 1;
+  apiKeys.value = [];
+  webhooks.value = [];
+  newKeySecret.value = null;
+  newWebhookSecret.value = null;
+  resourcesLoading.value = false;
+  resourcesLoadFailed.value = false;
+  resourceBusyKeys.value = new Set();
+  resourceIntentKeys.clear();
 }
 async function submitRequest() {
   if (submitting.value) return;
@@ -257,30 +337,35 @@ async function submitRequest() {
   }
   if (remoteApiEnabled) {
     const accountKey = String(app.accountKey);
+    const accountScope = captureAccountScope();
+    const runScope = captureCommerceSandboxRun();
     if (latestRequest.value?.status === "PENDING") {
       toast.info(t.value.developer.pendingExists);
       return;
     }
     const generation = ++requestGeneration;
-    submitting.value = true; requestKey ??= restoreRequestKey(accountKey) ?? newRequestKey();
-    persistRequestKey(accountKey, requestKey);
+    const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
+      && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    submitting.value = true;
     try {
+      requestKey ??= newRequestKey();
       const submitted = await developerAccessApi.submit({ company: company.value.trim(), email: email.value.trim(), useCase: useCase.value.trim() }, requestKey);
-      if (generation !== requestGeneration || accountKey !== String(app.accountKey)) return;
+      if (!current()) { if (generation === requestGeneration) latestRequest.value = null; return; }
       latestRequest.value = submitted;
-      requestKey = null; persistRequestKey(accountKey, null); toast.success(t.value.developer.formSubmittedToast);
+      requestKey = null; toast.success(t.value.developer.formSubmittedToast);
       company.value = ""; email.value = ""; useCase.value = "";
     } catch {
       try {
         const latest = await developerAccessApi.latest();
-        if (generation !== requestGeneration || accountKey !== String(app.accountKey)) return;
-        if (latest && latest.idempotencyKey === requestKey) { latestRequest.value = latest; requestKey = null; persistRequestKey(accountKey, null); toast.success(t.value.developer.formSubmittedToast); }
+        if (!current()) { if (generation === requestGeneration) latestRequest.value = null; return; }
+        if (latest && latest.idempotencyKey === requestKey) { latestRequest.value = latest; requestKey = null; toast.success(t.value.developer.formSubmittedToast); }
         else toast.warn(t.value.developer.requestAccessHint);
       } catch {
-        if (generation === requestGeneration && accountKey === String(app.accountKey)) toast.warn(t.value.developer.requestAccessHint);
+        if (current()) toast.warn(t.value.developer.requestAccessHint);
+        else if (generation === requestGeneration) latestRequest.value = null;
       }
     } finally {
-      if (generation === requestGeneration && accountKey === String(app.accountKey)) submitting.value = false;
+      if (generation === requestGeneration) submitting.value = false;
     }
     return;
   }
@@ -292,24 +377,152 @@ async function submitRequest() {
 function loadLatestRequest() {
   if (!remoteApiEnabled) return;
   const accountKey = String(app.accountKey);
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
   const generation = ++requestGeneration;
+  latestRequest.value = null;
   latestLoadFailed.value = false;
-  requestKey = restoreRequestKey(accountKey);
+  const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
+    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
   void developerAccessApi.latest().then((value) => {
-    if (generation === requestGeneration && accountKey === String(app.accountKey)) {
+    if (current()) {
       latestRequest.value = value;
       latestLoadFailed.value = false;
       if (requestKey && value?.idempotencyKey === requestKey) {
         requestKey = null;
-        persistRequestKey(accountKey, null);
       }
     }
   }).catch(() => {
-    if (generation === requestGeneration && accountKey === String(app.accountKey)) latestLoadFailed.value = true;
+    if (current()) latestLoadFailed.value = true;
+    else if (generation === requestGeneration) { latestRequest.value = null; latestLoadFailed.value = false; }
   });
 }
+async function loadResources(fence = resourceFence()) {
+  if (!remoteApiEnabled || resourceBusy("load") || !resourceFenceCurrent(fence)) return;
+  setResourceBusy("load", true);
+  resourcesLoading.value = true;
+  resourcesLoadFailed.value = false;
+  try {
+    const [keys, hooks] = await Promise.all([developerResourcesApi.listKeys(), developerResourcesApi.listWebhooks()]);
+    if (!resourceFenceCurrent(fence)) return;
+    apiKeys.value = keys;
+    webhooks.value = hooks;
+    resourcesLoadFailed.value = false;
+  } catch {
+    if (resourceFenceCurrent(fence)) resourcesLoadFailed.value = true;
+  } finally {
+    if (resourceFenceCurrent(fence)) {
+      resourcesLoading.value = false;
+      setResourceBusy("load", false);
+    }
+  }
+}
+async function loadDocs() {
+  if (!remoteApiEnabled) return;
+  docsLoadFailed.value = false;
+  try { docs.value = await docsApi.published(locale.code); }
+  catch { docs.value = null; docsLoadFailed.value = true; }
+}
+function retryLoadResources(): void { void loadResources(); }
+async function createApiKey() {
+  if (resourceBusy("create-key")) return;
+  const name = keyName.value.trim();
+  if (!name) return toast.warn(t.value.developer.formRequiredToast);
+  const fence = resourceFence();
+  const intent = `create-key:${name}`;
+  setResourceBusy("create-key", true);
+  try {
+    const value = await developerResourcesApi.createKey(name, resourceKey(intent));
+    if (!resourceFenceCurrent(fence)) return;
+    newKeySecret.value = value.secret ?? null;
+    keyName.value = "";
+    completeResourceIntent(intent);
+    await loadResources(fence);
+  } catch {
+    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
+  } finally {
+    if (resourceFenceCurrent(fence)) setResourceBusy("create-key", false);
+  }
+}
+async function revokeApiKey(id: number) {
+  const intent = `revoke-key:${id}`;
+  if (resourceBusy(intent)) return;
+  const fence = resourceFence();
+  setResourceBusy(intent, true);
+  try {
+    await developerResourcesApi.revokeKey(id, resourceKey(intent));
+    if (!resourceFenceCurrent(fence)) return;
+    completeResourceIntent(intent);
+    await loadResources(fence);
+  } catch {
+    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
+  } finally {
+    if (resourceFenceCurrent(fence)) setResourceBusy(intent, false);
+  }
+}
+async function createWebhook() {
+  const events = webhookEvents.value.split(",").map((value) => value.trim()).filter(Boolean);
+  const name = webhookName.value.trim();
+  const url = webhookUrl.value.trim();
+  if (!name || !url || !events.length) return toast.warn(t.value.developer.formRequiredToast);
+  const intent = `create-webhook:${name}:${url}:${events.join(",")}`;
+  if (resourceBusy("create-webhook")) return;
+  const fence = resourceFence();
+  setResourceBusy("create-webhook", true);
+  try {
+    const value = await developerResourcesApi.createWebhook({ name, url, events }, resourceKey(intent));
+    if (!resourceFenceCurrent(fence)) return;
+    newWebhookSecret.value = value.secret ?? null;
+    webhookName.value = "";
+    webhookUrl.value = "";
+    completeResourceIntent(intent);
+    await loadResources(fence);
+  } catch {
+    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
+  } finally {
+    if (resourceFenceCurrent(fence)) setResourceBusy("create-webhook", false);
+  }
+}
+async function deleteWebhook(id: number) {
+  const intent = `delete-webhook:${id}`;
+  if (resourceBusy(intent)) return;
+  const fence = resourceFence();
+  setResourceBusy(intent, true);
+  try {
+    await developerResourcesApi.deleteWebhook(id, resourceKey(intent));
+    if (!resourceFenceCurrent(fence)) return;
+    completeResourceIntent(intent);
+    await loadResources(fence);
+  } catch {
+    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
+  } finally {
+    if (resourceFenceCurrent(fence)) setResourceBusy(intent, false);
+  }
+}
+async function rotateWebhook(item: DeveloperWebhook) {
+  const intent = `rotate-webhook:${item.id}`;
+  if (resourceBusy(intent)) return;
+  const fence = resourceFence();
+  setResourceBusy(intent, true);
+  try {
+    const value = await developerResourcesApi.updateWebhook(item.id, { name: item.name, url: item.url, events: item.events, rotateSecret: true }, resourceKey(intent));
+    if (!resourceFenceCurrent(fence)) return;
+    newWebhookSecret.value = value.secret ?? null;
+    completeResourceIntent(intent);
+    toast.success(t.value.developer.secretOnce);
+  } catch {
+    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
+  } finally {
+    if (resourceFenceCurrent(fence)) setResourceBusy(intent, false);
+  }
+}
 onMounted(loadLatestRequest);
-onUnmounted(() => { requestGeneration += 1; });
+onMounted(loadResources);
+onMounted(loadDocs);
+onUnmounted(() => {
+  requestGeneration += 1;
+  resetResourceScope();
+});
 watch(() => String(app.accountKey), () => {
   requestGeneration += 1;
   requestKey = null;
@@ -317,7 +530,10 @@ watch(() => String(app.accountKey), () => {
   latestRequest.value = null;
   latestLoadFailed.value = false;
   loadLatestRequest();
+  resetResourceScope();
+  loadResources();
 });
+watch(() => locale.code, () => { void loadDocs(); });
 
 // ── styles ──
 const heroStyle: CSSProperties = {
@@ -445,6 +661,9 @@ const submitBtnStyle: CSSProperties = {
   background: "var(--v5-tech-cyan)",
 };
 const requestStatusStyle: CSSProperties = { padding: "10px 12px", marginBottom: "12px", background: "var(--v5-surface-2)" };
+const resourceRowStyle: CSSProperties = { padding: "12px 0", gap: "10px", borderBottom: "1px solid var(--v5-border)" };
+const dangerBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-warning)", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
+const smallActionBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-tech-cyan)", background: "color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)" };
 const snippetWrapStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
   borderRadius: "8px",

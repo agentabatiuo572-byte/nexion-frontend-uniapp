@@ -28,5 +28,5 @@ test("withdrawal abandon receives a server verdict before the local attempt is r
   const retire = abandon.indexOf("forgetWithdrawAttempt", request);
   assert.ok(request >= 0 && retire > request, "production attempt must be retired only after server readback");
   assert.match(abandon, /result\.state === "COMMITTED"/);
-  assert.match(abandon, /remoteApiEnabled && !fundsSandboxEnabled/);
+  assert.match(abandon, /remoteApiEnabled && !developmentFundsEnabled/);
 });

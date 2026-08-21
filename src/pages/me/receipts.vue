@@ -2,8 +2,9 @@
   Receipts — ported from Nexion-prototype/app/(main)/me/receipts/page.tsx.
   Proof-of-Compute receipt list: horizontally-scrollable category tabs (All / IG
   / VG / LL / FT / EM / SP / KY) with per-tab counts + clear-all destructive
-  action → month-agnostic row list → tap opens the ReceiptModal detail. Reads
-  the existing useReceipts store (already ported) + filterByCategory. clear →
+  action → month-agnostic row list → tap opens the ReceiptModal detail. The
+  local fallback reads useReceipts + filterByCategory; remote mode is server-only.
+  clear →
   confirm() (destructive). Long-press a row copies its signature (uni.
   setClipboardData, P-028). SetPageHeader → SubPageHeader. Wrapped in
   <AppChassis active="me">.
@@ -130,10 +131,10 @@ import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
-import { remoteApiEnabled, fundsSandboxEnabled } from "@/api/runtime";
+import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 import { useApp } from "@/store/app";
-import type { VietQrReceiptSnapshot } from "@/api/payment-api";
+import type { ServerReceiptListItem } from "@/store/deposits";
 import type { CompletedTask } from "@/store/types";
 
 type Tab = "ALL" | ReceiptCategory;
@@ -144,8 +145,10 @@ const PAGE_SIZE = 10;
 const t = useT();
 const app = useApp();
 const depositsStore = useDeposits();
-const remoteReceiptsMode = remoteApiEnabled && !fundsSandboxEnabled;
-const remoteReceiptItems = computed<VietQrReceiptSnapshot[]>(() => depositsStore.remoteReceipts);
+// Remote mode owns the entire receipt surface, including sandbox. Never construct
+// the local store in a remote session: its setup reads account-scoped localStorage.
+const remoteReceiptsMode = remoteApiEnabled;
+const remoteReceiptItems = computed<ServerReceiptListItem[]>(() => depositsStore.remoteReceipts);
 const remoteComputeReceiptItems = computed<CompletedTask[]>(() => remoteApiEnabled
   ? app.visibleDevices.flatMap((device) => device.recentTasks)
     .filter((task) => !!task.receiptNo)
@@ -163,7 +166,9 @@ const visibleReceipts = computed(() => filtered.value.slice(0, visibleCount.valu
 const hasMore = computed(() => visibleCount.value < filtered.value.length);
 
 onMounted(() => {
-  if (remoteReceiptsMode) void depositsStore.refreshRemoteVietQrDeposits();
+  if (!remoteReceiptsMode) return;
+  if (developmentFundsEnabled) void depositsStore.refreshFundsSandboxDeposits();
+  else void depositsStore.refreshRemoteVietQrDeposits();
 });
 
 function loadMoreRemoteReceipts() {

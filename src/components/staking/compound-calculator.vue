@@ -6,7 +6,7 @@
   $el-safe).
 -->
 <template>
-  <view class="relative overflow-hidden" :style="cardStyle">
+  <view v-if="configAvailable" class="relative overflow-hidden" :style="cardStyle">
     <!-- aurora + grid -->
     <view aria-hidden class="gen-anim" :style="auroraStyle" />
     <view aria-hidden :style="gridStyle" />
@@ -73,17 +73,25 @@
       <text class="block" :style="disclaimerStyle">{{ w.disclaimer }}</text>
     </view>
   </view>
+  <view v-else class="relative overflow-hidden" :style="unavailableStyle">
+    <text>{{ t.staking.remoteUnavailableClosed }}</text>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { STAKING_APY, type StakingTerm } from "@/store/staking";
+import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
+import { resolveStakingPool } from "@/lib/staking-canonical";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
 const w = computed(() => t.value.stakingV3.calc);
+const staking = useStaking();
+onMounted(() => {
+  if (!staking.isMockMode) void staking.syncRemote();
+});
 
 const terms: StakingTerm[] = [30, 90, 180, 365];
 const amount = ref("1000");
@@ -91,7 +99,13 @@ const termIdx = ref(2); // default 180d
 
 const term = computed(() => terms[termIdx.value]);
 const amountNum = computed(() => parseFloat(amount.value) || 0);
-const apy = computed(() => STAKING_APY[term.value]);
+const pool = computed(() => resolveStakingPool(
+  { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+  term.value,
+  { apy: STAKING_APY[term.value], penalty: STAKING_PENALTY[term.value], minAmountUsdt: STAKING_MIN[term.value] },
+));
+const configAvailable = computed(() => pool.value !== null);
+const apy = computed(() => pool.value?.apy ?? 0);
 const single = computed(() => amountNum.value * (1 + (apy.value * term.value) / 365));
 const singleProfit = computed(() => single.value - amountNum.value);
 const cycles = computed(() => Math.floor(365 / term.value));
@@ -263,5 +277,12 @@ const disclaimerStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.45,
+};
+const unavailableStyle: CSSProperties = {
+  padding: "18px",
+  borderRadius: "16px",
+  background: "var(--v5-warning-soft)",
+  color: "var(--v5-ink-2)",
+  fontSize: "13px",
 };
 </script>

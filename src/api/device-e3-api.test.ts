@@ -11,6 +11,41 @@ function client(payload: unknown): ApiClient {
 }
 
 describe("device E3 eligibility API", () => {
+  function fleetPayload(capacityPct: number) {
+    return {
+      dailyUsdt: 1,
+      dailyNex: 2,
+      realizedTodayUsdt: 0,
+      realizedTodayNex: 0,
+      walletUsdt: 0,
+      walletNex: 0,
+      userJoinedAt: 1,
+      serverNow: 2,
+      timezone: "Asia/Shanghai",
+      slotCap: 6,
+      source: "server",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      serverCanonical: true,
+      capacitySchedule: { stageEarlyEnd: "3", stageMidEnd: "8", capacityFloorPct: "22", capacitySubsidyDays: "30", capacityBand1DeltaPct: "-4", capacityBand2DeltaPct: "-6", capacityBand3DeltaPct: "-23.7", capacityApplyToPhone: "false", capacityApplyToCloudShare: "false", capacityApplyToPcGpu: "false", capacityApplyToS1: "true", capacityApplyToPro: "true", capacityApplyToProV2: "true", capacityApplyToRackP1: "true", capacityApplyToRackP2: "true" },
+      devices: [{
+        id: 1, rowVersion: 1, instanceNo: "E3-1", name: "Box", deviceType: "BOX", productCode: "STELLARBOX-S1", status: "ACTIVE", pendingDeactivate: false,
+        activatedAt: 1, purchasedAt: 1, dailyUsdt: 1, dailyNex: 1, todayEarningsUsdt: 0, todayEarningsNex: 0,
+        gpuModel: "GPU", vramTotalGb: 1, basePowerW: 1, location: "Local", capacityPct, capacityAgeMonths: 1,
+        capacityConfigKey: "capacityApplyToS1", capacitySubsidized: false, capacitySubsidyDays: 30,
+        actualPaidUsdt: 1, cumulativeOutputUsdt: 0,
+      }],
+    };
+  }
+
+  it.each([[-0.0001, "below zero"], [100.0001, "above one hundred"]] as const)(
+    "rejects E3 capacityPct %s (%s) instead of accepting an impossible projection",
+    async (capacityPct) => {
+      const api = createDeviceE3Api(client(fleetPayload(capacityPct)));
+      await expect(api.fleet()).rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
+    },
+  );
+
   it("requests server eligibility and accepts only a complete server source projection", async () => {
     const request = vi.fn().mockResolvedValue({
       enabled: true,

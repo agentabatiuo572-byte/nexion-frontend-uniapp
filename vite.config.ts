@@ -73,11 +73,27 @@ export default defineConfig(({ mode }) => {
           target: apiPreviewTarget,
           changeOrigin: true,
           headers: apiPreviewHeaders,
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              const authorization = req.headers.authorization;
+              if (typeof authorization === "string" && authorization.trim()) {
+                proxyReq.setHeader("Authorization", authorization);
+              }
+            });
+          },
         },
         "/api": {
           target: apiPreviewTarget,
           changeOrigin: true,
           headers: apiPreviewHeaders,
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              const authorization = req.headers.authorization;
+              if (typeof authorization === "string" && authorization.trim()) {
+                proxyReq.setHeader("Authorization", authorization);
+              }
+            });
+          },
         },
       },
     },

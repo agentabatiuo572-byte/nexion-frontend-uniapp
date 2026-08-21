@@ -34,7 +34,7 @@
         <text
           class="inline-flex items-center gap-1 font-mono-tabular"
           style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan-ink); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
-        >{{ t.home.techStreaming }}</text>
+        >{{ remoteApiEnabled ? t.home.techSettlementSnapshot : t.home.techStreaming }}</text>
       </view>
 
       <view
@@ -47,7 +47,7 @@
       </view>
 
       <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
-      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success-ink)">{{ t.home.techVsYesterday }}</text>
+      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success-ink)">{{ earningsSubtitle }}</text>
     </view>
   </view>
 </template>
@@ -60,6 +60,7 @@ import { useCommission } from "@/store/commission";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
 import { remoteApiEnabled } from "@/api/runtime";
+import { homeEarningsSubtitle } from "./home-real-copy";
 
 const t = useT();
 const app = useApp();
@@ -75,6 +76,24 @@ const todayTotal = computed(() => computeToday.value + teamToday.value + staking
 const remoteToday = computed<number | null>(() => remoteApiEnabled
   ? app.homeTruth?.earnings.today.usdt ?? null
   : null);
+const remoteJobCount = computed<number | null>(() => remoteApiEnabled
+  ? app.homeTruth?.earnings.today.jobCount ?? null
+  : null);
+const remoteTodayVsYesterdayPct = computed<number | null>(() => remoteApiEnabled
+  ? app.homeTruth?.earnings.todayVsYesterdayPct ?? null
+  : null);
+const earningsSubtitle = computed(() => homeEarningsSubtitle(
+  remoteApiEnabled,
+  app.homeTruthStatus,
+  remoteToday.value,
+  remoteJobCount.value,
+  remoteTodayVsYesterdayPct.value,
+  t.value.home.techVsYesterday,
+  t.value.home.techEarningsLoading,
+  t.value.uiChrome.unavailable,
+  t.value.home.techEarningsEmpty,
+  t.value.home.techSettledJobs,
+));
 
 // Mock-only streaming number. Remote mode renders the exact server snapshot or
 // an unavailable placeholder; it never advances a client-side money counter.

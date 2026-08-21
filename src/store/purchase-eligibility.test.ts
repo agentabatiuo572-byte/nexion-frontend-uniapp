@@ -8,6 +8,9 @@ const snapshot = (productNo: string, eligible: boolean) => ({
   decisionCode: eligible ? "ELIGIBLE" : "PURCHASE_GATE_NOT_MET",
   evaluatedAt: 1786856400000,
   source: "nx_admin_device_sku.purchase_gate_json + nx_user" as const,
+  sourceEnvironment: "PRODUCTION" as const,
+  runId: null,
+  serverCanonical: true as const,
 });
 
 test("deduplicates remote eligibility requests and caches only within the account", async () => {

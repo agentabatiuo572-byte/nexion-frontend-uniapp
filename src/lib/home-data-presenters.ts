@@ -1,8 +1,7 @@
-import type { ExternalMarketQuote } from "@/api/market-api";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 import type { Product } from "@/mock/products";
-import { localizedTrustFieldValue, trustFieldValue, trustNumberedRows } from "./trust-fields";
+import { localizedTrustFieldValue } from "./trust-fields";
 
 export interface HomepageProductTrust {
   product: Product;
@@ -12,27 +11,13 @@ export interface HomepageProductTrust {
 }
 
 export interface HomepageTrustSummary {
-  hero: string | null;
-  tvl: string | null;
-  activeNodes: string | null;
-  complianceLabel: string | null;
-  complianceBody: string | null;
-  auditTitle: string | null;
-  auditBody: string | null;
+  chips: string[];
+  reserveProof: string | null;
 }
 
 function certifiedDisplayValue(value: string | undefined): string | null {
   const normalized = value?.trim();
   return normalized && normalized.toLowerCase() !== SPEC_UNAVAILABLE ? normalized : null;
-}
-
-export function selectHomepageExternalQuotes(
-  quotes: readonly ExternalMarketQuote[],
-  limit = 3,
-): ExternalMarketQuote[] {
-  return [...quotes]
-    .sort((left, right) => right.volume24hUsd - left.volume24hUsd)
-    .slice(0, Math.max(0, limit));
 }
 
 export function selectHomepageProductTrust(products: readonly Product[]): HomepageProductTrust | null {
@@ -56,15 +41,11 @@ export function buildHomepageTrustSummary(
 ): HomepageTrustSummary {
   const fields = (key: PublishedTrustSection["sectionKey"]) =>
     sections.find((section) => section.sectionKey === key)?.fields ?? [];
-  const compliance = trustNumberedRows(fields("complianceBadges"), "badge", ["Label", "Body"] as const, locale)[0];
-  const audit = trustNumberedRows(fields("auditsReserves"), "document", ["Primary", "Secondary"] as const, locale)[0];
+  const badges = fields("complianceBadges");
   return {
-    hero: localizedTrustFieldValue(fields("nexNarrative"), "hero", locale),
-    tvl: trustFieldValue(fields("financials"), "tvlOnChain"),
-    activeNodes: trustFieldValue(fields("financials"), "devicesOnlineValue"),
-    complianceLabel: compliance?.Label || null,
-    complianceBody: compliance?.Body || null,
-    auditTitle: audit?.Primary || null,
-    auditBody: audit?.Secondary || null,
+    chips: Array.from({ length: 7 }, (_, index) =>
+      localizedTrustFieldValue(badges, `badge${index + 1}Label`, locale),
+    ).filter((value): value is string => value !== null),
+    reserveProof: localizedTrustFieldValue(fields("auditsReserves"), "homepageProof", locale),
   };
 }

@@ -49,8 +49,8 @@ describe("platform experience config contract", () => {
     })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   });
 
-  it("allows an explicit sandbox mock source but never silently treats it as official", () => {
-    const sandbox = parsePlatformExperienceConfig({
+  it("rejects sandbox mock source instead of treating a text URL as an installer", () => {
+    expect(() => parsePlatformExperienceConfig({
       ...valid,
       share: {
         ...valid.share,
@@ -60,7 +60,19 @@ describe("platform experience config contract", () => {
           source: "mock",
         },
       },
-    });
-    expect(sandbox.share.appDownload.source).toBe("mock");
+    })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    expect(() => parsePlatformExperienceConfig({
+      ...valid,
+      share: {
+        ...valid.share,
+        appDownload: {
+          ...valid.share.appDownload,
+          source: "unavailable",
+          officialUrl: "not-an-apk",
+          version: "",
+          releaseNotes: { zh: "", en: "" },
+        },
+      },
+    })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   });
 });

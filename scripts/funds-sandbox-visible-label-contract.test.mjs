@@ -31,22 +31,24 @@ assert.match(app, /catch \(cause\) \{[\s\S]{0,1000}fundsSandboxEvidence\.value =
 assert.match(app, /fundsSandboxEvidence,/, "the badge must read the store's authoritative evidence");
 assert.match(app, /function refreshFundsSandboxForAccount[\s\S]{0,1600}sessionVault\.read\(\)[\s\S]{0,600}tokenType\.toLowerCase\(\) === "bearer"[\s\S]{0,800}refreshFundsSandbox\(\)/,
   "a sandbox refresh must require the current server Bearer session before it can make the GET");
-assert.match(app, /if \(fundsSandboxEnabled\) void refreshFundsSandboxForAccount\(key\)/,
+assert.match(app, /if \(developmentFundsEnabled\) void refreshFundsSandboxForAccount\(key\)/,
   "every account bind must refresh the newly-bound sandbox facts");
 assert.match(completeSignIn, /app\.refreshFundsSandboxForAccount\(options\.identity\)/,
   "a completed server login must reassert the server wallet read after its Bearer session is saved");
 assert.match(completeSignIn,
   /refreshRemoteFleetAfterCatalog\(options\.identity\)[\s\S]{0,240}\.finally\([\s\S]{0,180}app\.refreshFundsSandboxForAccount\(options\.identity\)/,
   "first login must establish the catalog RunID before the funds authority read");
-assert.match(runtimeConfig, /const modeExplicit = rawMode === "mock" \|\| rawMode === "sandbox" \|\| rawMode === "remote"/,
-  "a missing runtime mode cannot implicitly opt into money sandbox behavior");
-assert.match(runtime, /fundsSandboxEnabled = apiRuntimeConfig\.mode === "sandbox" && apiRuntimeConfig\.modeExplicit/,
-  "only an explicit runtime sandbox can display the server evidence");
+assert.match(runtimeConfig, /export type AppEnvironment = "dev" \| "prod"/,
+  "the App runtime must expose only standard dev/prod environments");
+assert.doesNotMatch(runtimeConfig, /VITE_NEXGRID_API_MODE|modeExplicit/,
+  "a browser variable must not select a sandbox runtime mode");
+assert.match(runtime, /developmentFundsEnabled = apiRuntimeConfig\.environment === "dev"/,
+  "only the development environment can display isolated server evidence");
 
-assert.match(badge, /fundsSandboxEnabled[\s\S]{0,600}fundsSandboxStatus === "ready"[\s\S]{0,600}source === "mock"[\s\S]{0,600}sourceEnvironment === "SANDBOX"[\s\S]{0,600}mode === "LOCAL_SANDBOX"/,
-  "the DOM badge must require both explicit sandbox runtime and validated server evidence");
-assert.match(badge, /Acceptance Sandbox · source=mock · SANDBOX/,
-  "the first-user warning must name the server source and environment");
+assert.match(badge, /developmentFundsEnabled[\s\S]{0,600}fundsSandboxStatus === "ready"[\s\S]{0,600}source === "mock"[\s\S]{0,600}sourceEnvironment === "SANDBOX"[\s\S]{0,600}mode === "LOCAL_SANDBOX"/,
+  "the DOM badge must require both development runtime and validated server evidence");
+assert.match(badge, /Development Funds · source=mock · SANDBOX/,
+  "the first-user warning must name the dev context and preserve backend provenance");
 assert.match(badge, /data-testid="funds-sandbox-badge"/,
   "the visible DOM witness needs a stable selector");
 

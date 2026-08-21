@@ -32,4 +32,45 @@ describe("team unilevel API", () => {
     const api = createTeamInsightsApi({ request } as unknown as ApiClient);
     await expect(api.unilevel("week")).rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
   });
+
+  it("accepts stable server-generated development facts", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      factStatus: "SIMULATED", withdrawable: false, payoutStatus: "NON_WITHDRAWABLE",
+      events: [{ id: "SB-CM-1", kind: "unilevel", sourceUserName: "Sandbox A1", layer: 1,
+        orderId: "SB-ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
+        ts: 1755043200000, unlockAt: 1757635200000, status: "SIMULATED",
+        settlementState: "SIMULATED", withdrawable: false }],
+      generatedAt: "2026-08-13T00:00:00Z",
+    });
+    const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
+
+    await expect(api.commissions()).resolves.toMatchObject({
+      sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
+      factStatus: "SIMULATED", withdrawable: false, events: [{ id: "SB-CM-1", status: "simulated", withdrawable: false }],
+    });
+    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/commissions" });
+  });
+
+  it("rejects team facts without explicit server canonical provenance", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", runId: "",
+      factStatus: "SIMULATED", withdrawable: false, payoutStatus: "NON_WITHDRAWABLE",
+      events: [], generatedAt: "2026-08-13T00:00:00Z",
+    });
+    const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
+
+    await expect(api.commissions()).rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
+  });
+
+  it("rejects sandbox commissions without the non-withdrawable simulated contract", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      events: [], generatedAt: "2026-08-13T00:00:00Z",
+    });
+    const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
+
+    await expect(api.commissions()).rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
+  });
+
 });

@@ -29,7 +29,7 @@
         <view :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/binary-how')">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="button" tabindex="0" @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.binary.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -152,6 +152,7 @@ import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
 import { remoteApiEnabled } from "@/api/runtime";
+import { navTo } from "@/lib/route";
 
 const t = useT();
 const network = useNetwork();
@@ -251,7 +252,7 @@ function wingMembersText(n: number): string {
 }
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 function retryCanonicalData(): void {

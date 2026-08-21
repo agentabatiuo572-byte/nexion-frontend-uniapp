@@ -14,14 +14,15 @@
   softens entering/exiting rows.
 -->
 <template>
-  <view v-if="remoteApiEnabled && remoteProof" class="absolute" :style="rootStyle" :aria-label="remoteProof.productName">
-    <view>
+  <view v-if="remoteApiEnabled" class="absolute" :style="rootStyle" :aria-label="remoteProof?.productName ?? w.unavailableLabel">
+    <view v-if="remoteProof">
       <view v-for="(r, i) in remoteRows" :key="i" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
       </view>
     </view>
+    <text v-else-if="remoteUnavailable" class="truncate" :style="unavailableStyle">{{ w.unavailableLabel }}</text>
   </view>
   <view v-else-if="!remoteApiEnabled" class="absolute" :style="rootStyle" :aria-label="`${w.label} · ${MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID}`">
     <view :style="listStyle">
@@ -42,7 +43,9 @@ import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled, storefrontActivityApi } from "@/api/runtime";
 import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
 import { useApp } from "@/store/app";
+import { productCatalogState } from "@/store/product-catalog";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
 const props = defineProps<{ product: Product }>();
@@ -50,7 +53,10 @@ const t = useT();
 const app = useApp();
 const w = computed(() => t.value.store.liveProof);
 const remoteProof = ref<StorefrontSocialProof | null>(null);
+const remoteUnavailable = ref(false);
 const remoteEpoch = createRemoteAccountEpoch(app.accountKey);
+let remoteMounted = false;
+let remoteRequest = 0;
 
 function hashId(id: string): number {
   let h = 0x811c9dc5;
@@ -82,19 +88,29 @@ const fixtureTick = ref(0);
 const mounted = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
-function clearRemoteProof(): void {
+function clearRemoteProof(unavailable = false): void {
   remoteProof.value = null;
+  remoteUnavailable.value = unavailable;
 }
 
 function loadRemoteProof(request = remoteEpoch.snapshot()): void {
+  const generation = ++remoteRequest;
+  const expectedAccount = String(app.accountKey);
+  const runScope = captureCommerceSandboxRun();
   void storefrontActivityApi.socialProof(props.product.id, 30).then((snapshot) => {
-    if (remoteEpoch.isCurrent(request)) remoteProof.value = snapshot;
+    if (remoteMounted && generation === remoteRequest && remoteEpoch.isCurrent(request)
+        && expectedAccount === String(app.accountKey) && isCurrentCommerceSandboxScope(runScope)) {
+      remoteProof.value = snapshot;
+      remoteUnavailable.value = false;
+    }
   }).catch(() => {
-    if (remoteEpoch.isCurrent(request)) clearRemoteProof();
+    if (remoteMounted && generation === remoteRequest && remoteEpoch.isCurrent(request)
+        && expectedAccount === String(app.accountKey) && isCurrentCommerceSandboxScope(runScope)) clearRemoteProof(true);
   });
 }
 
 onMounted(() => {
+  remoteMounted = true;
   if (remoteApiEnabled) {
     remoteEpoch.bind(app.accountKey);
     clearRemoteProof();
@@ -112,16 +128,27 @@ onMounted(() => {
 watch(() => app.accountKey, (accountKey) => {
   if (!remoteApiEnabled) return;
   remoteEpoch.bind(accountKey);
+  remoteRequest += 1;
   clearRemoteProof();
   loadRemoteProof();
 });
 watch(() => props.product.id, () => {
   if (!remoteApiEnabled) return;
   remoteEpoch.bind(app.accountKey);
+  remoteRequest += 1;
+  clearRemoteProof();
+  loadRemoteProof();
+});
+watch(() => [productCatalogState.status, productCatalogState.source, productCatalogState.revision], () => {
+  if (!remoteApiEnabled || !remoteMounted) return;
+  remoteEpoch.bind(app.accountKey);
+  remoteRequest += 1;
   clearRemoteProof();
   loadRemoteProof();
 });
 onUnmounted(() => {
+  remoteMounted = false;
+  remoteRequest += 1;
   if (timer) clearInterval(timer);
 });
 
@@ -175,6 +202,7 @@ const rowStyle: CSSProperties = {
   whiteSpace: "nowrap",
   overflow: "hidden",
 };
+const unavailableStyle: CSSProperties = { color: "var(--v5-ink-3)", fontSize: "12px" };
 function dotStyle(color: string): CSSProperties {
   return {
     width: "5px",

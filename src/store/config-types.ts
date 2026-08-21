@@ -205,7 +205,7 @@ export interface ShareConfig {
     apkUrl: string;
     version: string;
     releaseNotes: { zh: string; en: string };
-    source: "official" | "mock" | "unavailable";
+    source: "official" | "unavailable";
   };
 }
 

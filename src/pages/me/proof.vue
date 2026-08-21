@@ -4,7 +4,7 @@
   tab-switched → a share card (brand + profile + VBadge + variant hero stat +
   secondary stats + achievement chips + referral code/QR) → native-share CTA →
   6 destination buttons → poster tip. Reads app (user/earnings/devices),
-  profile (displayName), v-rank (myRank + V_RANKS), network (totalMembers),
+  profile (displayName), v-rank (myRank + canonical ladder), network (totalMembers),
   points (streaks). Reuses team/v-badge.vue. navigator.share → uni.share? +
   setClipboardData fallback (P-028). Gradient literals → token color-mix.
   SetPageHeader → SubPageHeader. SSR mounted-guard dropped. Wrapped in
@@ -299,7 +299,7 @@ const onlineDevices = computed(
     : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
 const profileName = computed(() => profile.displayName);
-const myRank = computed(() => remoteApiEnabled && vRank.ladder.length === 0 ? null : vRank.myRank);
+const myRank = computed(() => remoteApiEnabled && !vRank.remoteReady ? null : vRank.myRank);
 const totalMembers = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? null : network.totalMembers);
 const streakFacts = computed(() => proofStreakFacts(
   remoteApiEnabled,

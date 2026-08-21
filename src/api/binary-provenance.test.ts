@@ -32,7 +32,7 @@ describe("binary projection provenance", () => {
   it("accepts only the current explicit Sandbox RunID", async () => {
     setCurrentCommerceSandboxRun("binary-run-20260819");
     const request = vi.fn().mockResolvedValue(payload);
-    const api = createCommissionConfigApi({ request } as unknown as ApiClient, "sandbox");
+    const api = createCommissionConfigApi({ request } as unknown as ApiClient, "dev");
     await expect(api.binary()).resolves.toMatchObject({
       source: "server",
       serverCanonical: true,
@@ -49,7 +49,7 @@ describe("binary projection provenance", () => {
       { ...payload, runId: "binary-run-20260818" },
       { ...payload, sourceEnvironment: "PRODUCTION", runId: null },
     ]) {
-      const api = createCommissionConfigApi({ request: vi.fn().mockResolvedValue(invalid) } as unknown as ApiClient, "sandbox");
+      const api = createCommissionConfigApi({ request: vi.fn().mockResolvedValue(invalid) } as unknown as ApiClient, "dev");
       await expect(api.binary()).rejects.toMatchObject({ message: "COMMISSION_CONFIG_RESPONSE_INVALID" });
     }
   });

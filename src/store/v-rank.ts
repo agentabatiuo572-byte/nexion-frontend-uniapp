@@ -180,6 +180,12 @@ const DEFAULT_V_RANK: VRankData = {
   vDownlineCounts: { 1: 3 }, // 下面有 3 个 V1
 };
 
+type VRankRemoteRequest = RemoteAccountRequest;
+
+function captureVRankRequest(epoch: ReturnType<typeof createRemoteAccountEpoch>): VRankRemoteRequest {
+  return epoch.snapshot();
+}
+
 function hydrate(accountKey: string): VRankData {
   const row = readAccountRow<Partial<VRankData>>(ACCOUNTS_KEY, accountKey);
   if (row && typeof row.myRank === "number") {
@@ -199,6 +205,8 @@ export const useVRank = defineStore("vRank", () => {
   const teamVolumeUSD = ref(init.teamVolumeUSD);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  const remoteReady = ref(!remoteApiEnabled);
+  const remoteError = ref<string | null>(null);
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
   function clearRemoteFacts(): void {
@@ -208,6 +216,7 @@ export const useVRank = defineStore("vRank", () => {
     teamVolumeUSD.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
+    remoteReady.value = false;
   }
 
   function persist() {
@@ -227,7 +236,7 @@ export const useVRank = defineStore("vRank", () => {
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(boundKey);
       clearRemoteFacts();
-      void refreshCanonicalVRank(remoteAccountEpoch.snapshot());
+      void refreshCanonicalVRank(captureVRankRequest(remoteAccountEpoch));
       return;
     }
     const next = hydrate(boundKey);
@@ -238,11 +247,16 @@ export const useVRank = defineStore("vRank", () => {
     vDownlineCounts.value = next.vDownlineCounts;
   }
 
-  async function refreshCanonicalVRank(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
+  async function refreshCanonicalVRank(request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch)) {
     if (!remoteApiEnabled) return;
+    const isCurrent = () => remoteAccountEpoch.isCurrent(request);
+    if (isCurrent()) {
+      remoteReady.value = false;
+      remoteError.value = null;
+    }
     try {
       const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+      if (!isCurrent()) return;
       ladder.value = remoteLadder.ranks.map(canonicalRank);
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
       selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
@@ -251,8 +265,13 @@ export const useVRank = defineStore("vRank", () => {
       vDownlineCounts.value = Object.fromEntries(
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Partial<Record<VRank, number>>;
+      remoteReady.value = true;
+      remoteError.value = null;
     } catch {
-      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
+      if (isCurrent()) {
+        clearRemoteFacts();
+        remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
+      }
     }
   }
 
@@ -270,7 +289,11 @@ export const useVRank = defineStore("vRank", () => {
     persist();
   }
 
-  return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, setMyRank, setProgress, bindAccount, refreshCanonicalVRank };
+  return {
+    myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder,
+    remoteReady, remoteError,
+    setMyRank, setProgress, bindAccount, refreshCanonicalVRank,
+  };
 });
 
 /**
@@ -290,7 +313,7 @@ export type RankGap =
   | { kind: "vDownlines"; n: number; vLevel: number };
 
 /** 计算到下一阶的进度(0-1) */
-export function nextRankProgress(state: VRankData, ladder: VRankDef[] = V_RANKS): {
+export function nextRankProgress(state: VRankData, ladder: VRankDef[] = []): {
   next: VRankDef | null;
   progressPct: number;
   missing: RankGap[];
@@ -365,7 +388,7 @@ const PERK_WEIGHT: Record<PerkUnlock["kind"], number> = {
 
 const TOP_UNLOCKS_CAP = 2; // UI keeps perk line single-line at 414w mobile
 
-export function nextRankGap(state: VRankData, ladder: VRankDef[] = V_RANKS): NextRankGapInfo {
+export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRankGapInfo {
   const current = ladder[state.myRank] ?? EMPTY_V_RANK;
   const next = ladder[state.myRank + 1];
   if (!next) {

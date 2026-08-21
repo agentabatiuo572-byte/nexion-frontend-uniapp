@@ -10,9 +10,12 @@ import {
   GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
   type GenesisTier,
 } from "@/store/genesis-config";
-import { genesisApi, remoteApiEnabled } from "@/api/runtime";
+import { genesisApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { isSettledRejection } from "@/api/errors";
+import { hasGenesisAuthorityForAccount } from "@/lib/genesis-auth-scope";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { classifyRemoteGenesisPurchaseError } from "@/lib/genesis-remote-purchase";
+import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
 import type {
   GenesisAccountState,
   GenesisEmission,
@@ -280,7 +283,7 @@ export const useGenesis = defineStore("genesis", () => {
   // lib/account-scope 的 rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
   const initUser = remoteApiEnabled ? userDefaults() : hydrateUser(boundKey, initGlobal.soldSlots);
-  const totalSlots = ref(TOTAL_SLOTS);
+  const totalSlots = ref(remoteApiEnabled ? 0 : TOTAL_SLOTS);
   const soldSlots = ref(initGlobal.soldSlots);
   const myOwned = ref(initUser.myOwned);
   const ownedTokenIds = ref<number[]>(initUser.ownedTokenIds);
@@ -296,7 +299,7 @@ export const useGenesis = defineStore("genesis", () => {
     floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null,
   });
   const remoteEligibility = ref<GenesisEligibility | null>(null);
-  const remoteHalted = ref(false);
+  const remoteHalted = ref(remoteApiEnabled);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const remoteEmissions = ref<GenesisEmission[]>([]);
   const hasGenesisInvite = ref(false);
@@ -315,7 +318,7 @@ export const useGenesis = defineStore("genesis", () => {
     nexListed.value = state.emissionOpen;
     remoteTransactions.value = [...state.transactions];
     remoteMarketStats.value = state.marketStats;
-    remoteHalted.value = state.marketEnabled !== true;
+    remoteHalted.value = state.halted;
     const listingMap: Record<number, string> = {};
     remoteListings.value = state.listings.map((listing) => {
       const tokenId = tokenIdFor(listing.holdingNo);
@@ -349,7 +352,9 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function clearRemoteFacts(): void {
-    totalSlots.value = TOTAL_SLOTS;
+    // Zero means the remote supply is unknown. Do not render the local 1,000-slot
+    // fallback as if it were a server fact after a failed hydrate.
+    totalSlots.value = 0;
     soldSlots.value = 0;
     nexListed.value = false;
     nexListedAt.value = null;
@@ -368,27 +373,37 @@ export const useGenesis = defineStore("genesis", () => {
     remoteMarketStats.value = { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null };
   }
 
-  async function syncRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+  function remoteScopeCurrent(request: RemoteAccountRequest, runScope: CommerceSandboxRunScope): boolean {
+    return remoteAccountEpoch.isCurrent(request) && isCurrentCommerceSandboxScope(runScope);
+  }
+
+  async function syncRemote(
+    request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
+    runScope: CommerceSandboxRunScope = captureCommerceSandboxRun(),
+  ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
-    // 权威不可达是常态输入,不 reject(resilience 门):保留 hydrate 现值降级。
-    let publicState: GenesisPublicState;
-    try { publicState = await genesisApi.state(); } catch {
-      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
+    // Login/rebind can race with stores that were bootstrapped for the
+    // anonymous/default account. Never let that stale wave reach protected
+    // Genesis endpoints; the API client must not be the first place that
+    // discovers the session is absent or belongs to another account.
+    if (!hasGenesisAuthorityForAccount(sessionVault.read(), boundKey)) {
+      if (remoteScopeCurrent(request, runScope)) clearRemoteFacts();
       return false;
     }
-    if (!remoteAccountEpoch.isCurrent(request)) return false;
-    applyPublicState(publicState);
-    try {
-      const [accountState, eligibility] = await Promise.all([genesisApi.account(), genesisApi.eligibility()]);
-      if (!remoteAccountEpoch.isCurrent(request)) return false;
-      applyAccountState(accountState);
-      remoteEligibility.value = eligibility;
-      remoteHalted.value = remoteHalted.value || eligibility.halted === true;
-    } catch {
-      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
-      return false;
-    }
-    return true;
+    return readGenesisRemoteFacts(genesisApi, {
+      hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
+      isCurrent: () => remoteScopeCurrent(request, runScope),
+      clear: clearRemoteFacts,
+      applyPublicState: (state) => {
+        applyPublicState(state);
+        remoteHalted.value = remoteHalted.value || remoteEligibility.value?.halted === true;
+      },
+      applyAccount: applyAccountState,
+      applyEligibility: (eligibility) => {
+        remoteEligibility.value = eligibility;
+        remoteHalted.value = remoteHalted.value || eligibility.halted === true;
+      },
+    });
   }
 
   function persist() {
@@ -433,10 +448,10 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function remaining() {
-    return TOTAL_SLOTS - soldSlots.value;
+    return Math.max(0, totalSlots.value - soldSlots.value);
   }
   function soldPct() {
-    return soldSlots.value / TOTAL_SLOTS;
+    return totalSlots.value > 0 ? soldSlots.value / totalSlots.value : 0;
   }
 
   // ── 阶梯定价（单源派生，售罄硬跳价；档位读 live config，运营 G4 可配）──
@@ -564,37 +579,27 @@ export const useGenesis = defineStore("genesis", () => {
     //   tickSales)。实测 mock 模式下点购买必然失败,还谎报「市场暂未开放」。
     //   同批迁移的其它 store 都是「守卫 ≥ 远端调用」(app.ts 11/8 · cards 7/1),创世是唯一例外。
     //   机器门:verify.sh 的 `store-unreachable-code` 哨兵钉死 src/store/** 不可达数 = 0。
-    if (remoteApiEnabled) try {
+    if (remoteApiEnabled) {
       const request = remoteAccountEpoch.snapshot();
+      const runScope = captureCommerceSandboxRun();
+      try {
       const beforePrice = unitPriceUSDT.value;
       const state = await genesisApi.purchase(n, purchaseIdempotencyKey(n, tokenIds));
-      if (!remoteAccountEpoch.isCurrent(request)) return { ok: false, cost: 0, reason: "unavailable" };
+      if (!remoteScopeCurrent(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
       applyAccountState(state);
-      if (!await syncRemote(request)) return { ok: false, cost: 0, reason: "unavailable" };
+      if (!await syncRemote(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
       // 成交 = 定局 → 键作废,下一次点购买是新的一笔意图。
       // 🔴 失败路径**不作废**:失败可能是「服务端已成交但回执丢了」,此时保留键,
       //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
       clearPurchaseIntent();
       return { ok: true, cost: n * beforePrice };
-    } catch (err) {
-      await syncRemote(); // 自吞不 reject(resilience 门;z6 审计清死 catch)
-      // 🔴 **够不着服务端 ≠ 服务端说不卖**。原来一律回落成 market-closed,于是任何一次网络
-      //   抖动都被讲成「活动已关闭」—— 用户以为错过了活动,而不是「重试一下」,直接劝退。
-      //   `isSettledRejection` 是全仓统一的那条判据(定义在 api 目录的 errors.ts):只有能证明
-      //   ↑ 刻意不写成带斜杠的路径:接口引用台账哨兵按「斜杠 + api + 斜杠 + 名字」的形状
-      //     认接口路径,一句注释就能让它判红(2026-08-13 实测,连解释这个坑的注释本身
-      //     都因为举了个例子而再次踩中)。注释里提文件名一律只写文件名。
-      //   服务端确实处理并拒绝了,才允许把失败解释成业务结论。
-      if (!isSettledRejection(err)) return { ok: false, cost: 0, reason: "unavailable" };
-      const block = genesisPurchaseBlock({
-        configLoaded: cfg.loaded,
-        marketOpenState: cfg.config.marketOpenState,
-        halted: false,
-        remaining: remaining(),
-        saleStartAt: cfg.config.saleStartAt,
-        now: Date.now(),
-      });
-      return { ok: false, cost: 0, reason: block === "soldOut" ? "sold-out" : "market-closed" };
+      } catch (err) {
+        await syncRemote(request, runScope); // 自吞不 reject(resilience 门;z6 审计清死 catch)
+      // Only explicit server domain codes may become business copy; unknown
+      // remote failures remain unavailable and never borrow local supply facts.
+        const reason = classifyRemoteGenesisPurchaseError(err);
+        return { ok: false, cost: 0, reason };
+      }
     }
 
     // ↓↓ mock 模式(remoteApiEnabled=false)走这里:本仓的 server 同构面,不是遗留死码。
@@ -646,15 +651,16 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
       const target = `${holdingNo}:${askPriceUSDT.toFixed(6)}`;
       const state = await genesisApi.list(holdingNo, askPriceUSDT, stableIntent("list", target));
-      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      if (!remoteScopeCurrent(request, runScope)) return false;
       applyAccountState(state);
       retireIntent("list", target);
-      return syncRemote(request);
-    } catch { await syncRemote(request); return false; }
+      return syncRemote(request, runScope);
+    } catch { await syncRemote(request, runScope); return false; }
     }
 
     // ↓↓ mock 模式走这里(本仓的 server 同构面)。
@@ -693,14 +699,15 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
     try {
       // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
       const state = await genesisApi.cancel(holdingNo, stableIntent("cancel", holdingNo));
-      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      if (!remoteScopeCurrent(request, runScope)) return false;
       applyAccountState(state);
       retireIntent("cancel", holdingNo);
-      return syncRemote(request);
-    } catch { await syncRemote(request); return false; }
+      return syncRemote(request, runScope);
+    } catch { await syncRemote(request, runScope); return false; }
     }
 
     // ↓↓ mock 模式走这里(本仓的 server 同构面)。
@@ -724,16 +731,17 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
       // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)
       const state = await genesisApi.buy(holdingNo, stableIntent("buy", holdingNo));
-      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      if (!remoteScopeCurrent(request, runScope)) return false;
       applyAccountState(state);
       retireIntent("buy", holdingNo);
-      return syncRemote(request);
+      return syncRemote(request, runScope);
     } catch (error) {
-      await syncRemote(request);
+      await syncRemote(request, runScope);
       // Preserve the backend policy/error token for the visible purchase surface.
       // Treating every rejection as "insufficient funds" hides geo-policy and
       // fail-closed responses and makes the user retry an action that cannot pass.

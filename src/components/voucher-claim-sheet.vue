@@ -68,6 +68,7 @@ import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useVoucher } from "@/store/voucher";
 import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, listVouchers, type VoucherDef } from "@/mock/vouchers";
+import { visibleVoucherCatalog } from "@/lib/voucher-sheet-authority";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -82,11 +83,12 @@ const t = useT();
 // Showable = claimable (unclaimed) ∪ claimed-unused (ready to use), in stable
 // catalog order so a card never jumps position when its CTA flips claim→use.
 const vouchers = computed<VoucherDef[]>(() => {
-  const showable = new Set<string>([
-    ...voucher.claimableVouchers.map((v) => v.id),
-    ...voucher.claimedUnused.map((v) => v.id),
-  ]);
-  return (remoteApiEnabled ? voucher.catalog : listVouchers()).filter((v) => showable.has(v.id));
+  return visibleVoucherCatalog(
+    remoteApiEnabled ? voucher.catalog : listVouchers(),
+    voucher.claimableVouchers,
+    voucher.claimedUnused,
+    sheet.surface,
+  );
 });
 
 function pad2(n: number): string {
@@ -127,7 +129,7 @@ function hide() {
 }
 async function onClaim(v: VoucherDef) {
   if (remoteApiEnabled) {
-    if (await voucher.claimRemote(v.id)) toast.success(t.value.voucher.claimedToast);
+    if (await voucher.claimRemote(v.id, sheet.surface)) toast.success(t.value.voucher.claimedToast);
     else toast.error(t.value.authOtp.errorServiceUnavailable);
     return;
   }

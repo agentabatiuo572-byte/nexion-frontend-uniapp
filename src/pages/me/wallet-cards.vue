@@ -82,12 +82,12 @@ import { useCards, brandLabel, type SavedCard } from "@/store/cards";
 import { useNotifications } from "@/store/notifications";
 import { cardUnboundNotification } from "@/mock/card-notifications";
 import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
-import { remoteApiEnabled, paymentSandboxEnabled } from "@/api/runtime";
+import { remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();
 const notifs = useNotifications();
-const cardBindingAvailable = computed(() => !remoteApiEnabled || paymentSandboxEnabled);
+const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaymentEnabled);
 
 const cards = computed(() => cardsStore.cards);
 const defaultTokenId = computed(() => cardsStore.defaultTokenId);

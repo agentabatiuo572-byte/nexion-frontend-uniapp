@@ -23,9 +23,10 @@ test("mock checkout receipts stop in a recoverable error state", async () => {
 test("remote card mutations require authoritative readback before UI success", async () => {
   const cards = await source("src/store/cards.ts");
   const page = await source("src/pages/me/wallet-cards.vue");
-  assert.match(cards, /if \(!\(await refreshRemote\(\)\)\) throw new Error\("PAYMENT_METHOD_READBACK_FAILED"\)/g);
+  assert.match(cards, /const request = remoteAccountEpoch\.snapshot\(\)/g);
+  assert.match(cards, /if \(!\(await refreshRemote\(request\)\)\) throw new Error\("PAYMENT_METHOD_READBACK_FAILED"\)/g);
   assert.match(cards, /const nextCards = remote\.map/);
-  assert.match(cards, /catch \{ return false; \}/);
+  assert.match(cards, /return !remoteAccountEpoch\.isCurrent\(request\)/);
   assert.match(page, /data-testid="wallet-cards-retry"/);
   assert.match(page, /cardsStore\.refreshRemote\(\)/);
   assert.match(page, /await cardsStore\.setDefault\(tokenId\);[\s\S]*toast\.success/);
@@ -50,7 +51,7 @@ test("catalog detail retry and bundle order item count remain visible", async ()
   assert.match(api, /itemCount: number \| null/);
   assert.match(orders, /itemCount: row\.itemCount/);
   assert.match(orderDetail, /order\.itemCount \?\? order\.quantity/);
-  assert.match(bundle, /fundsSandboxEnabled\s*\?\s*t\.value\.bundle\.checkoutSuccessBody/);
+  assert.match(bundle, /developmentFundsEnabled\s*\?\s*t\.value\.bundle\.checkoutSuccessBody/);
   assert.match(bundle, /await orderApi\.list\(\)/);
   assert.match(bundle, /isCanonicalPaidOrder\(readback, created\.orderNo, created\.itemCount\)/);
   const checkout = await source("src/pages/store/checkout.vue");

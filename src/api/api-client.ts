@@ -2,7 +2,7 @@ import { isUserSession, type ApiResult, type AuthSessionResponse } from "./contr
 import { ApiError, asApiError } from "./errors";
 import type { SessionSnapshot, SessionVault } from "./session-vault";
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface HttpRequest {
   url: string;
@@ -40,6 +40,7 @@ export interface ApiRequest {
   authenticated?: boolean;
   idempotencyKey?: string;
   timeoutMs?: number;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
   acceptedResponses?: ReadonlyArray<{
     status: number;
@@ -247,7 +248,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
     }
 
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const headers: Record<string, string> = {
+      ...(apiRequest.headers ?? {}),
+      "Content-Type": "application/json",
+    };
     if (authenticated && session?.accessToken) {
       headers.Authorization = `${session.tokenType || "Bearer"} ${session.accessToken}`;
     }
@@ -386,7 +390,7 @@ export function createUniHttpTransport(): HttpTransport {
         request.signal?.addEventListener("abort", onAbort, { once: true });
         task = uni.request({
           url: request.url,
-          method: request.method,
+          method: request.method as UniNamespace.RequestOptions["method"],
           header: request.headers,
           data: request.body as UniNamespace.RequestOptions["data"],
           timeout: request.timeoutMs,

@@ -41,7 +41,7 @@ export function runtimeStub(root) {
     // 于是「if (fundsServerEnabled) return」这类闸在整个 selfcheck 家族里恒触发,
     // 门测的就不再是 mock 语义(2026-08-12 合并收口实测:withdraw-failpaths 直接崩)。
     fundsServerEnabled: 'export const fundsServerEnabled = false;',
-    fundsSandboxEnabled: 'export const fundsSandboxEnabled = false;',
+    developmentFundsEnabled: 'export const developmentFundsEnabled = false;',
     // Session storage is a local synchronous dependency, not an API client.
     // A truthy async Proxy here creates an unhandled rejected Promise when
     // refresh seams call read() during a remote-mode self-check.

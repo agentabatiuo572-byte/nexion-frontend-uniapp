@@ -108,6 +108,11 @@ function hide() {
 }
 
 function onActivate(d: Device) {
+  if (d.kind === "phone") {
+    sheet.hide();
+    uni.navigateTo({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => {} });
+    return;
+  }
   if (slotsUsed.value >= MAX_DEVICES) {
     toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: MAX_DEVICES }));
     return;

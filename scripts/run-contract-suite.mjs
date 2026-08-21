@@ -30,7 +30,6 @@ const REGISTRY = {
   "hard-block-k6-runtime-contract.test.mjs": { how: "chain" },
   "g-remote-authority-contract.test.mjs": { how: "chain" },
   "g-remote-authority-behavior.test.mjs": { how: "chain" },
-  "remote-authority-simulation.test.mjs": { how: "chain" },
   "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
   "withdraw-idempotency-contract.test.mjs": { how: "chain" },
   "gen2-withdraw-closure-contract.test.mjs": { how: "chain" },
@@ -52,8 +51,12 @@ const REGISTRY = {
   "tradein-remote-authority-contract.test.mjs": { how: "chain" },
   "oauth-sandbox-contract.test.mjs": { how: "chain" },
   "risk-disclosure-sandbox-contract.test.mjs": { how: "chain" },
+  "external-market-removal-contract.test.mjs": { how: "chain" },
+  "frontend-environment-contract.test.mjs": { how: "chain" },
   "remote-external-data-hold-contract.test.mjs": { how: "chain" },
   "withdraw-p0-contract.test.mjs": { how: "chain" },
+  "trust-search-closure-contract.test.mjs": { how: "chain" },
+  "how-content-pages-contract.test.mjs": { how: "chain" },
   "auth-entry-ui-contract.test.mjs": { how: "chain" },
   "identity-device-sandbox-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
@@ -90,7 +93,7 @@ const REGISTRY = {
     why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。2026-08-16 复核补记:拍板的实现(16bddf0)已把 FUNDS_PRODUCTION_WITHDRAWAL_HOLD 从 src 删干净(全仓 0 命中),本门现在是**被测对象已不存在**的死门,单跑必红 —— 不是「能跑但结论相反」。若日后改回 HOLD,连同该常量一起恢复再移回 chain;否则按删除纪律 Move 到 .trash 更干净(留着待主人裁决)。",
   },
   // ── elsewhere:已有入口在跑 ──
-  "acceptance-h5-sandbox-config.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "dev-prod-environment-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "behavior-analytics-active-route-catalog-contract.test.mjs": {
     how: "elsewhere",
     by: "npm run test:cross-repo(NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend;缺仓 → 目录 parity 那条可见 skip,路由归一那条照跑)",
@@ -123,10 +126,7 @@ const REGISTRY = {
   "a11y-activate-behavior.test.mjs": { how: "elsewhere", by: "npm run test:a11y-activate + verify.sh 的 a11y_activate_gate(import .ts 源,需 type stripping)" },
   "learning-submission.test.mjs": { how: "elsewhere", by: "npm run test:learning-contracts(import .ts 源,需 type stripping)" },
   // ── excluded:写清原因 ──
-  "learning-api-contract.test.mjs": {
-    how: "excluded",
-    why: "该旧 Node-ESM 副本无法解析 learning-api.ts 的无扩展名相对导入；等价且更新的 src/api/learning-api-contract.test.ts 已由 npm run test:real-backend-integration 通过 Vitest 执行。",
-  },
+  "learning-api-contract.test.mjs": { how: "chain" },
   "h-remote-authority-contract.test.mjs": {
     how: "excluded",
     why: "旧 H8 断言要求注册页直接调用 authApi.register；当前注册已收口到 completeRemoteRegistration 编排并由更新的 registration 合约覆盖。其余 H3-H7 判据已有 chain/production-boundaries 等价覆盖，待拆除过期 H8 断言后再入链。",

@@ -33,14 +33,14 @@
 <script setup lang="ts">
 type AuthProviderLabel = "Passkey" | "Google" | "Apple" | "Telegram";
 
-const props = withDefaults(defineProps<{ busy?: boolean; sandbox?: boolean }>(), {
+const props = withDefaults(defineProps<{ busy?: boolean; development?: boolean }>(), {
   busy: false,
-  sandbox: false,
+  development: false,
 });
 const emit = defineEmits<{ (event: "select", provider: AuthProviderLabel): void }>();
 
 function ariaLabel(provider: AuthProviderLabel): string {
-  return props.sandbox ? `${provider} Sandbox Mock` : provider;
+  return props.development ? `${provider} Development Mock` : provider;
 }
 
 function activate(provider: AuthProviderLabel) {

@@ -22,7 +22,10 @@
           @click="select(item.code)"
           @keydown="onRowKeydown($event, item.code, index)"
         >
-          <text class="cc-row__name">{{ item.name }}</text>
+          <view class="cc-row__identity">
+            <text class="cc-row__iso">{{ item.iso }}</text>
+            <text class="cc-row__name">{{ item.name }}</text>
+          </view>
           <view class="cc-row__end">
             <text class="cc-row__code">{{ item.code }}</text>
             <view class="cc-row__check">
@@ -38,6 +41,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
+import { SUPPORTED_PHONE_COUNTRIES, type PhoneCountryProfile } from "@/auth/phone-number";
 
 const props = defineProps<{ open: boolean; modelValue: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "select", code: string): void }>();
@@ -86,12 +90,32 @@ function onRowKeydown(e: KeyboardEvent, code: string, index: number) {
   }
 }
 
-const COUNTRIES = computed(() => [
-  { code: "+1", name: t.value.countryCodes.usCanada }, { code: "+44", name: t.value.countryCodes.unitedKingdom }, { code: "+49", name: t.value.countryCodes.germany },
-  { code: "+33", name: t.value.countryCodes.france }, { code: "+34", name: t.value.countryCodes.spain }, { code: "+84", name: t.value.countryCodes.vietnam }, { code: "+86", name: t.value.countryCodes.china }, { code: "+81", name: t.value.countryCodes.japan },
-  { code: "+82", name: t.value.countryCodes.southKorea }, { code: "+55", name: t.value.countryCodes.brazil }, { code: "+62", name: t.value.countryCodes.indonesia },
-  { code: "+63", name: t.value.countryCodes.philippines }, { code: "+66", name: t.value.countryCodes.thailand }, { code: "+971", name: t.value.countryCodes.uae }, { code: "+7", name: t.value.countryCodes.russia },
-]);
+function countryName(iso: PhoneCountryProfile["iso"]): string {
+  switch (iso) {
+    case "VN": return t.value.countryCodes.vietnam;
+    case "US": return t.value.countryCodes.usCanada;
+    case "GB": return t.value.countryCodes.unitedKingdom;
+    case "DE": return t.value.countryCodes.germany;
+    case "FR": return t.value.countryCodes.france;
+    case "ES": return t.value.countryCodes.spain;
+    case "CN": return t.value.countryCodes.china;
+    case "JP": return t.value.countryCodes.japan;
+    case "KR": return t.value.countryCodes.southKorea;
+    case "BR": return t.value.countryCodes.brazil;
+    case "ID": return t.value.countryCodes.indonesia;
+    case "PH": return t.value.countryCodes.philippines;
+    case "TH": return t.value.countryCodes.thailand;
+    case "AE": return t.value.countryCodes.uae;
+    case "RU": return t.value.countryCodes.russia;
+    case "SA": return t.value.countryCodes.saudiArabia;
+  }
+}
+
+const COUNTRIES = computed(() => SUPPORTED_PHONE_COUNTRIES.map((item) => ({
+  iso: item.iso,
+  code: item.dialCode,
+  name: countryName(item.iso),
+})));
 
 function select(code: string) {
   emit("select", code);
@@ -113,6 +137,8 @@ function select(code: string) {
 .cc-row + .cc-row { border-top: 1px solid var(--v5-border); }
 .cc-row--selected { background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .cc-row--selected + .cc-row { border-top-color: transparent; }
+.cc-row__identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.cc-row__iso { flex: 0 0 30px; height: 24px; border-radius: 7px; background: var(--v5-surface-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-v5); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--v5-ink-3); }
 .cc-row__name { font-size: 15px; font-weight: 500; color: var(--v5-ink-2); }
 .cc-row__end { display: flex; align-items: center; gap: 10px; }
 .cc-row__code { min-width: 42px; text-align: right; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--v5-ink-3); }

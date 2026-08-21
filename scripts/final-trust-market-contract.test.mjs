@@ -11,23 +11,17 @@ test("home exposes the server NEX trend with a fail-closed retry", () => {
   const card = read("src/components/home/nex-price-card.vue");
   assert.match(home, /<NexPriceCard/);
   assert.match(card, /market\.remoteReady/);
-  assert.match(card, /market\.syncAll\(\)/);
+  assert.match(card, /market\.syncRemote\(\)/);
   assert.doesNotMatch(card, /Hidden for current stage/);
 });
 
-test("remote external market rows come from the server projection", () => {
+test("NEX market page remains server-backed after comparable tokens retire", () => {
   const page = read("src/pages/market/market.vue");
   const store = read("src/store/market.ts");
-  const row = read("src/components/market/token-row.vue");
-  assert.match(store, /marketApi\.external\(\)/);
-  assert.match(store, /externalQuotes/);
-  assert.match(store, /syncAll/);
-  assert.match(store, /sameAuthority/);
-  assert.match(page, /market\.externalReady/);
-  assert.match(page, /market\.externalQuotes/);
-  assert.match(page, /market\.isMockMode\s*\?\s*TOKENS/);
-  assert.match(row, /if \(n <= 0\) return "—"/);
-  assert.match(row, /var\(--v5-ink-4\)/);
+  assert.match(store, /marketApi\.fetch\(\)/);
+  assert.match(store, /syncRemote/);
+  assert.match(page, /market\.syncRemote\(\)/);
+  assert.doesNotMatch(page, /TokenRow|externalQuotes|CATEGORIES/);
 });
 
 test("product and Trust Center consume published Trust fields", () => {

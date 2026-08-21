@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 // 提现状态回读 **runtime** 门 —— 真页面、真 store、真 action,只桩网络那一层。
 //
-//   node scripts/withdraw-status-mirror-runtime.mjs          # 自己起一台 remote 档 server
-//   BASE_URL=http://127.0.0.1:5263 node scripts/...          # 打已经起好的 remote 档 server
+//   node scripts/withdraw-status-mirror-runtime.mjs          # 自己起一台 production server
+//   BASE_URL=http://127.0.0.1:5263 node scripts/...          # 打已经起好的 production server
 //
 // 🔴 为什么必须是 runtime 门(本包立案的直接原因):
-//   在此之前,全仓守这条链的**唯一**断言是 remote-authority-simulation.test.mjs 里的
+//   在此之前,旧行为门守这条链的**唯一**断言是
 //   `assert.equal(typeof app.refreshRemoteWithdrawals, "function")` —— 它只证「函数存在」。
 //   实测(2026-08-11 红测):把 App.vue 里那行调用换成 `void Promise.resolve([])`,
 //   contract-suite 仍 40 pass / 0 fail。**调用点被摘掉,门全绿,而在途单永远不终结**:
 //   occupiesWithdrawalSlot 恒真 → 换绑入口与下一笔提现被永久拦死,账单行永远停在处理中。
 //   「有生产者」≠「跑得到」,静态判据守不了可达性 —— 这一刀只有真跑一遍才守得住。
 //
-// 🔴 为什么自己起 server:回读只在 **remote 档**存在(mock 档 apiClient 一律 reject,
-//   提现单压根建不出来),而 scripts/verify.sh 的 [2.5] 前置断言**要求 server 是 mock 档**
-//   —— 本门借不了那台。不自带 server 就只能靠人手动起一台 remote 的,那等于这道门不会跑
+// 🔴 为什么自己起 server:本门验证 production 构建,而 scripts/verify.sh 的 [2.5]
+//   前置断言要求 development server —— 本门借不了那台。不自带 server 就只能靠人手动起,
 //   (孤儿门是本仓记过的坑)。起法照 verify-h5-runtime.mjs:随机空闲端口 + 用完杀进程树。
 //
 // ⚠️ 本门**不覆盖**「冻结单收到终态结论」那条边(frozen 与四个终态在合并层同档,
@@ -161,7 +160,8 @@ if (!baseUrl) {
   ].find((candidate) => candidate && fs.existsSync(candidate));
   server = spawn(
     npmCli ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm"),
-    [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    [...(npmCli ? [npmCli] : []), "run", "dev:h5", "--", "--mode", "production",
+      "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     // 🔴 显式 remote:remote 是默认档,但**默认值不是断言**。别的门用 env 把它按成 mock,
     // 谁在同一个 shell 里导出过就会把本门验到错的对象上(本仓记过「验错对象」的假绿)。
     // PREVIEW_TARGET 同理:显式指向本门自带的桩,不吃 .env 里那个 8110 的缺省。
@@ -169,7 +169,6 @@ if (!baseUrl) {
       cwd: root,
       env: {
         ...process.env,
-        VITE_NEXGRID_API_MODE: "remote",
         VITE_NEXGRID_API_PREVIEW_TARGET: `http://127.0.0.1:${apiStubPort}`,
       },
       shell: false,

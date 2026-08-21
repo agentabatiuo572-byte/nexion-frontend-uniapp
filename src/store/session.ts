@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { getDeviceIdentity, _devResetDeviceIdentity } from "@/lib/device-id";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { normalizeAccountKey } from "@/store/account-cloud";
+import { remoteApiEnabled } from "@/api/runtime";
 import { mockServerUuid } from "./mock-id";
 
 /**
@@ -24,6 +25,7 @@ import { mockServerUuid } from "./mock-id";
 const SESSION_REGISTRY_KEY = "nexgrid-account-sessions-v1";
 const LEGACY_ACTIVE_KEY = "nexgrid-active-session-v1";
 const CALIBRATED_KEY = "nexgrid-calibrated-device-v1"; // { [accountKey]: deviceId }
+const DEFERRED_PHONE_ACTIVATION_KEY = "nexgrid-deferred-phone-activation-v1"; // { [accountKey]: deviceId }
 
 export type SessionStatus = "active" | "kicked" | "logged-out";
 export type KickReason = "kicked" | "logged-out" | null;
@@ -82,22 +84,47 @@ function forgetLegacyActiveRecord(): void {
   }
 }
 
-function readCalibratedMap(): Record<string, string> {
+function readDeviceMap(storageKey: string): Record<string, string> {
   try {
-    const m = uni.getStorageSync(CALIBRATED_KEY) as Record<string, string> | "";
-    if (m && typeof m === "object") return m;
+    const m = uni.getStorageSync(storageKey) as Record<string, string> | "";
+    if (m && typeof m === "object") return { ...m };
   } catch {
     // ignore
   }
   return {};
 }
 
-function writeCalibratedMap(m: Record<string, string>): void {
+function writeDeviceMap(storageKey: string, m: Record<string, string>): boolean {
   try {
-    uni.setStorageSync(CALIBRATED_KEY, m);
+    uni.setStorageSync(storageKey, m);
+    return true;
   } catch {
-    // ignore
+    return false;
   }
+}
+
+function readCalibratedMap(): Record<string, string> {
+  return readDeviceMap(CALIBRATED_KEY);
+}
+
+function readDeferredPhoneActivationMap(): Record<string, string> {
+  return readDeviceMap(DEFERRED_PHONE_ACTIVATION_KEY);
+}
+
+/**
+ * The calibrated/deferred markers form one local state machine. Persist both or
+ * restore the old calibrated map so a partial storage failure cannot turn an
+ * explicit deferral into a forced-recalibration loop on the next session guard.
+ */
+function writePhoneActivationMaps(
+  calibrated: Record<string, string>,
+  deferred: Record<string, string>,
+  previousCalibrated: Record<string, string>,
+): boolean {
+  if (!writeDeviceMap(CALIBRATED_KEY, calibrated)) return false;
+  if (writeDeviceMap(DEFERRED_PHONE_ACTIVATION_KEY, deferred)) return true;
+  writeDeviceMap(CALIBRATED_KEY, previousCalibrated);
+  return false;
 }
 
 export function readAccountSessionRecords(accountKey: string): AccountSessionRecord[] {
@@ -257,8 +284,19 @@ export const useSession = defineStore("session", () => {
 
   function validate(): SessionStatus {
     if (!sessionId.value) {
-      status.value = "active";
-      return "active";
+      if (!remoteApiEnabled) {
+        // The standalone mock runtime intentionally boots with its demo
+        // profile before a carrier session is created.
+        status.value = "active";
+        return "active";
+      }
+      // An authenticated route must always have a carrier session. Treat a
+      // missing id as a lost restore rather than silently accepting the page;
+      // otherwise a tab transition can render protected UI in the short
+      // window before the server session has been re-established.
+      status.value = "logged-out";
+      kickedReason.value = "logged-out";
+      return "logged-out";
     }
     const registry = readRegistry();
     const rec = registry.sessions[sessionId.value];
@@ -284,12 +322,54 @@ export const useSession = defineStore("session", () => {
     return "active";
   }
 
-  function markCalibrated(rawAccountKey: string): void {
+  function markCalibrated(rawAccountKey: string): boolean {
     const key = normalizeAccountKey(rawAccountKey);
-    const map = readCalibratedMap();
-    map[key] = deviceId.value;
-    writeCalibratedMap(map);
+    const previousCalibrated = readCalibratedMap();
+    const calibrated = { ...previousCalibrated, [key]: deviceId.value };
+    const deferred = readDeferredPhoneActivationMap();
+    delete deferred[key];
+    if (!writePhoneActivationMaps(calibrated, deferred, previousCalibrated)) return false;
     requiresRecalibration.value = false;
+    bump();
+    return true;
+  }
+
+  function clearCalibrated(rawAccountKey: string): boolean {
+    const key = normalizeAccountKey(rawAccountKey);
+    const previousCalibrated = readCalibratedMap();
+    const calibrated = { ...previousCalibrated };
+    const deferred = readDeferredPhoneActivationMap();
+    delete calibrated[key];
+    delete deferred[key];
+    if (!writePhoneActivationMaps(calibrated, deferred, previousCalibrated)) return false;
+    requiresRecalibration.value = true;
+    bump();
+    return true;
+  }
+
+  function markPhoneActivationDeferred(rawAccountKey: string): boolean {
+    const key = normalizeAccountKey(rawAccountKey);
+    const previousCalibrated = readCalibratedMap();
+    const calibrated = { ...previousCalibrated };
+    const deferred = readDeferredPhoneActivationMap();
+    delete calibrated[key];
+    deferred[key] = deviceId.value;
+    if (!writePhoneActivationMaps(calibrated, deferred, previousCalibrated)) return false;
+    requiresRecalibration.value = false;
+    bump();
+    return true;
+  }
+
+  function isCurrentDeviceCalibrated(rawAccountKey: string): boolean {
+    void sessionRevision.value;
+    const key = normalizeAccountKey(rawAccountKey);
+    return readCalibratedMap()[key] === deviceId.value;
+  }
+
+  function isCurrentDevicePhoneActivationDeferred(rawAccountKey: string): boolean {
+    void sessionRevision.value;
+    const key = normalizeAccountKey(rawAccountKey);
+    return readDeferredPhoneActivationMap()[key] === deviceId.value;
   }
 
   function signOutSession(): void {
@@ -359,7 +439,9 @@ export const useSession = defineStore("session", () => {
   return {
     sessionId, accountKey, deviceId, deviceName, entrySurface, status, kickedReason,
     requiresRecalibration, activeSessions,
-    claim, resumeOrClaim, validate, markCalibrated, signOutSession, revokeSession, revokeAllOtherSessions, kick,
+    claim, resumeOrClaim, validate, markCalibrated, clearCalibrated, markPhoneActivationDeferred,
+    isCurrentDeviceCalibrated, isCurrentDevicePhoneActivationDeferred,
+    signOutSession, revokeSession, revokeAllOtherSessions, kick,
     _devSimulateOtherDeviceLogin, _devRevokeCurrentSession, _devForgetDevice,
   };
 });

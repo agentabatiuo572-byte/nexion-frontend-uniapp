@@ -1,13 +1,13 @@
 <!--
-  DoTheMathCard — ZONE 5 upgrade ROI math (ported from mission-control.tsx
-  DoTheMathCard + MathBar inline). Headline compares the next tier vs the user's
-  current device (colored inline spans rendered via a placeholder-segment split
+  DoTheMathCard — ZONE 5 server-authoritative upgrade ROI math. The Java Home
+  projection selects the user's highest-yield active device and the next
+  purchasable E1 catalog product. Headline segments preserve the 5174 layout
   so word order works in any locale), two rate bars, a 3-stat grid, and a CTA.
   Hidden at top tier (multiplier 0). Grid bg uses the brand token (theme-aware)
   rather than the source's hardcoded light-blue rgba (would leak in dark).
 -->
 <template>
-  <view v-if="promo.multiplier !== 0">
+  <view v-if="calculator" data-home-section="do-the-math">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
     </view>
@@ -52,7 +52,7 @@
           </view>
         </view>
 
-        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity" style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" @click="goStore">
+        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity" style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" role="link" tabindex="0" @click="goStore" @keydown.enter.stop.prevent="goStore" @keydown.space.stop.prevent="goStore">
           <text style="color: var(--v5-brand)">{{ t.home.doMathSeeCta }}</text>
           <text class="font-mono-tabular" style="opacity: 0.8; font-size: 12px; color: var(--v5-brand)">→</text>
         </view>
@@ -66,23 +66,21 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { derivePromoUpgrade } from "@/store/device-types";
-import { deviceNameByKind, deviceNameInline } from "@/lib/device-copy";
+import { deviceNameInline } from "@/lib/device-copy";
 
 const t = useT();
 const app = useApp();
 
-const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-// Headline + "vs {base}" drop this into running copy → sentence-cased form.
-const baseShort = computed(() =>
-  deviceNameInline(t.value, promo.value.baseKind, promo.value.baseName),
-);
-const targetLabel = computed(() =>
-  deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
-);
-const baseWidthPct = computed(() => Math.max(0.4, (promo.value.baseDaily / promo.value.targetDaily) * 100));
-const baseRate = computed(() => `$${promo.value.baseDaily.toFixed(2)} /d`);
-const targetRate = computed(() => `$${promo.value.targetDaily.toFixed(2)} /d`);
+const calculator = computed(() => app.homeTruth?.doTheMath ?? null);
+const baseShort = computed(() => calculator.value
+  ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
+  : "");
+const targetLabel = computed(() => calculator.value?.target.name ?? "");
+const baseWidthPct = computed(() => calculator.value
+  ? Math.max(0.4, (calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt) * 100)
+  : 0.4);
+const baseRate = computed(() => calculator.value ? `$${calculator.value.base.dailyUsdt.toFixed(2)} /d` : "—");
+const targetRate = computed(() => calculator.value ? `$${calculator.value.target.dailyUsdt.toFixed(2)} /d` : "—");
 
 // Render the headline by splitting the i18n template around {target}/{mult}/{base}
 // placeholders → colored segments. Works regardless of per-locale word order.
@@ -90,7 +88,7 @@ const headlineSegs = computed(() => {
   const tpl = t.value.home.doMathHeadline;
   const vars: Record<string, { text: string; color: string }> = {
     target: { text: targetLabel.value, color: "var(--v5-ink)" },
-    mult: { text: `${promo.value.multiplier}×`, color: "var(--v5-success-ink)" },
+    mult: { text: `${calculator.value?.multiplier ?? 0}×`, color: "var(--v5-success-ink)" },
     base: { text: baseShort.value, color: "var(--v5-brand-2-ink)" },
   };
   const segs: { text: string; color?: string }[] = [];
@@ -107,11 +105,11 @@ const headlineSegs = computed(() => {
   return segs;
 });
 
-const stats = computed(() => [
-  { k: t.value.home.doMathDaily, v: `$${promo.value.targetDaily.toFixed(2)}`, tone: "var(--v5-ink)" },
-  { k: t.value.home.doMathPayback, v: `${promo.value.targetPayback} d`, tone: "var(--v5-brand)" },
-  { k: fmt(t.value.home.doMathVs, { base: baseShort.value }), v: `${promo.value.multiplier}×`, tone: "var(--v5-success)" },
-]);
+const stats = computed(() => calculator.value ? [
+  { k: t.value.home.doMathDaily, v: `$${calculator.value.target.dailyUsdt.toFixed(2)}`, tone: "var(--v5-ink)" },
+  { k: t.value.home.doMathPayback, v: `${calculator.value.paybackDays} d`, tone: "var(--v5-brand)" },
+  { k: fmt(t.value.home.doMathVs, { base: baseShort.value }), v: `${calculator.value.multiplier}×`, tone: "var(--v5-success)" },
+] : []);
 
 const gridBgStyle: CSSProperties = {
   position: "absolute",
@@ -124,6 +122,8 @@ const gridBgStyle: CSSProperties = {
 };
 
 function goStore() {
-  uni.navigateTo({ url: `/pages/store/detail?id=${promo.value.targetKind}`, fail: () => {} });
+  const productNo = calculator.value?.target.productNo;
+  if (!productNo) return;
+  uni.navigateTo({ url: `/pages/store/detail?id=${encodeURIComponent(productNo)}`, fail: () => {} });
 }
 </script>

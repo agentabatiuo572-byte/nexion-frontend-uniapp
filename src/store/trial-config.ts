@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { readApiRuntimeConfig } from "@/api/runtime-config";
 import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
 import type { TrialConfigValue } from "@/api/trial-api";
 
@@ -75,7 +74,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
 };
 
 const STORAGE_KEY = "nexgrid-trial-config-v1";
-const remoteAuthority = readApiRuntimeConfig().mode !== "mock";
+const remoteAuthority = true;
 
 function hydrate(): TrialConfig {
   try {

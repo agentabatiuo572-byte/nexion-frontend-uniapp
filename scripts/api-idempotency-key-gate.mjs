@@ -113,6 +113,13 @@ for (const rel of apiFiles) {
       head = head.slice(0, head.lastIndexOf(name));
       name = head.match(/([A-Za-z_$][\w$]*)\s*[:=]?\s*$/)?.[1];
     }
+    // Calls such as `.map(({ idempotencyKey }) => ...)` are callback parameter
+    // lists, not API method declarations. Treating `map` as an idempotent API
+    // method makes every unrelated Array.map call look like a fresh key site.
+    if (name) {
+      const nameAt = head.lastIndexOf(name);
+      if (head.slice(0, nameAt).trimEnd().endsWith(".")) continue;
+    }
     if (name) sigs.set(name, commas);
   }
 }

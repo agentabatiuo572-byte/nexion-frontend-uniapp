@@ -1,5 +1,5 @@
 <template>
-  <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 12px 14px; position: relative; overflow: hidden" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">
+  <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 12px 14px; position: relative; overflow: hidden" role="link" tabindex="0" data-home-action="nex-market-link" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">
     <view class="grid items-center gap-3" style="grid-template-columns: 1fr 76px">
       <view class="min-w-0">
         <view class="flex items-baseline gap-1.5 font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">
@@ -39,7 +39,7 @@ const retryStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", 
 const placeholderStyle: CSSProperties = { height: "2px", marginTop: "17px", borderRadius: "999px", background: "var(--v5-border)" };
 
 function retry() {
-  void market.syncAll();
+  void market.syncRemote();
 }
 
 function goMarket() {
@@ -47,10 +47,10 @@ function goMarket() {
 }
 
 onMounted(() => {
-  if (!market.isMockMode) void market.syncAll();
+  if (!market.isMockMode) void market.syncRemote();
 });
 
 watch(() => market.marketRunId, (next, previous) => {
-  if (!market.isMockMode && previous !== null && next === null) void market.syncAll();
+  if (!market.isMockMode && previous !== null && next === null) void market.syncRemote();
 });
 </script>

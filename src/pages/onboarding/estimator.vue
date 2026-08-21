@@ -13,13 +13,28 @@
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
       <text class="est-title">{{ t.onboarding.estimatorTitleH }}</text>
-      <text class="est-hint">{{ detected ? t.onboarding.estimatorHint : t.onboarding.detecting }}</text>
+      <text class="est-hint">{{ loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting) }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
     <view class="est-reveal">
       <transition name="est-fade" mode="out-in">
-        <view v-if="!detected" key="loading" class="est-loading">
+        <view v-if="loadFailed" key="failed" class="est-loading est-loading--failed">
+          <text class="est-loading__t">{{ t.onboarding.calibrationFailedTitle }}</text>
+          <text class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
+          <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
+          <view class="est-failed__actions">
+            <view class="est-failed__button est-failed__button--primary" role="button" tabindex="0"
+              @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
+              <text>{{ t.onboarding.activationRetry }}</text>
+            </view>
+            <view class="est-failed__button" role="button" tabindex="0"
+              @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+              <text>{{ t.onboarding.activationDefer }}</text>
+            </view>
+          </view>
+        </view>
+        <view v-else-if="!detected" key="loading" class="est-loading">
           <svg class="est-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
@@ -40,7 +55,7 @@
             <text class="est-phone__spec">{{ t.onboarding.mobileNpu }}</text>
           </view>
           <view class="est-phone__rate">
-            <text class="est-phone__rate-v">~$0.06</text>
+            <text class="est-phone__rate-v">{{ phoneRateLabel }}</text>
             <text class="est-phone__rate-u">{{ t.onboarding.perDay }}</text>
           </view>
         </view>
@@ -56,9 +71,9 @@
         </view>
         <view class="cmp__body">
           <text class="cmp__label">{{ t.onboarding.withS1 }}</text>
-          <text class="cmp__sub">{{ multS1 }}× {{ t.onboarding.yourCurrentRate }}</text>
+          <text class="cmp__sub">{{ multS1Label }} {{ t.onboarding.yourCurrentRate }}</text>
         </view>
-        <text class="cmp__val">${{ s1.toFixed(2) }}{{ t.onboarding.perDay }}</text>
+        <text class="cmp__val">{{ s1Label }}{{ t.onboarding.perDay }}</text>
       </view>
       <view class="cmp">
         <view class="cmp__icon">
@@ -66,9 +81,9 @@
         </view>
         <view class="cmp__body">
           <text class="cmp__label">{{ t.onboarding.withPro }}</text>
-          <text class="cmp__sub">~${{ (pro * 30).toFixed(0) }}{{ t.onboarding.perMonth }}</text>
+          <text class="cmp__sub">{{ proMonthlyLabel }}{{ t.onboarding.perMonth }}</text>
         </view>
-        <text class="cmp__val">${{ pro.toFixed(2) }}{{ t.onboarding.perDay }}</text>
+        <text class="cmp__val">{{ proLabel }}{{ t.onboarding.perDay }}</text>
       </view>
     </view>
 
@@ -83,30 +98,111 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
+import { getDeviceId } from "@/lib/device-id";
+import { onboardingCalibrationApi } from "@/api/runtime";
+import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
+import { useApp } from "@/store/app";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { createEstimatorScope, isCurrentEstimatorScope, type EstimatorScope } from "@/lib/estimator-scope";
 
 const t = useT();
+const app = useApp();
 const detected = ref(false);
-
-const PHONE_RATE = 0.06;
-const s1 = 7;
-const pro = 13;
-const multS1 = Math.round(s1 / PHONE_RATE);
+const loadFailed = ref(false);
+const calibration = ref<OnboardingCalibration | null>(null);
+const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
+const phone = comparison("phone");
+const s1 = comparison("s1");
+const pro = comparison("pro");
+const phoneRate = computed(() => calibration.value?.baseRateUsdt ?? phone.value?.dailyUsdt ?? null);
+const phoneRateLabel = computed(() => phoneRate.value === null ? "—" : `~$${phoneRate.value.toFixed(2)}`);
+const s1Label = computed(() => s1.value ? `$${s1.value.dailyUsdt.toFixed(2)}` : "—");
+const proLabel = computed(() => pro.value ? `$${pro.value.dailyUsdt.toFixed(2)}` : "—");
+const proMonthlyLabel = computed(() => pro.value ? `~$${(pro.value.dailyUsdt * 30).toFixed(0)}` : "—");
+const multS1Label = computed(() => phoneRate.value && s1.value ? `${Math.round(s1.value.dailyUsdt / phoneRate.value)}×` : "—");
 
 let timer: ReturnType<typeof setTimeout> | undefined;
-onMounted(() => {
+let mounted = false;
+let accountEpoch = 0;
+let generation = 0;
+let accountWatchKey = String(app.accountKey || "");
+
+function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
+  return {
+    estimator: createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation),
+    remote: captureAccountScope(),
+  };
+}
+
+function isCurrent(scope: { estimator: EstimatorScope; remote: RemoteAccountRequest }): boolean {
+  return mounted && isCurrentEstimatorScope(scope.estimator, createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation))
+    && isCurrentAccountScope(scope.remote);
+}
+
+function loadCalibration() {
+  const scope = scopePair();
+  loadFailed.value = false;
+  void onboardingCalibrationApi.result(getDeviceId()).then((result) => {
+    if (!isCurrent(scope)) return;
+    if (!result.calibrationAvailable || (result.activationStatus !== "CALIBRATED" && result.activationStatus !== "ACTIVE")) {
+      calibration.value = null;
+      detected.value = false;
+      loadFailed.value = true;
+      return;
+    }
+    calibration.value = result;
+    scheduleReveal();
+  }).catch(() => {
+    if (!isCurrent(scope)) return;
+    calibration.value = null;
+    detected.value = false;
+    loadFailed.value = true;
+  });
+}
+
+function retryCalibration() {
+  generation += 1;
+  if (timer) clearTimeout(timer);
+  detected.value = false;
+  calibration.value = null;
+  loadCalibration();
+}
+
+function scheduleReveal() {
+  if (timer) clearTimeout(timer);
+  const scope = scopePair();
   timer = setTimeout(() => {
-    detected.value = true;
+    if (isCurrent(scope)) detected.value = true;
   }, 1200);
+}
+
+watch(() => String(app.accountKey || ""), (next) => {
+  if (next === accountWatchKey) return;
+  accountWatchKey = next;
+  accountEpoch += 1;
+  generation += 1;
+  detected.value = false;
+  loadFailed.value = false;
+  calibration.value = null;
+  loadCalibration();
+});
+
+onMounted(() => {
+  mounted = true;
+  loadCalibration();
 });
 onUnmounted(() => {
   if (timer) clearTimeout(timer);
+  mounted = false;
+  generation += 1;
 });
 
 function goConnect() {
-  if (!detected.value) return;
+  if (!detected.value || !calibration.value?.calibrationAvailable) return;
   uni.reLaunch({ url: "/pages/onboarding/connect", fail: () => {} });
 }
 function leaveEstimator() {
@@ -191,6 +287,40 @@ function leaveEstimator() {
 .est-loading__t {
   font-size: 13px;
   color: var(--v5-ink-3);
+}
+.est-loading--failed {
+  height: auto;
+  min-height: 150px;
+  padding: 16px;
+  flex-direction: column;
+  align-items: stretch;
+}
+.est-failed__hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--v5-ink-3);
+}
+.est-failed__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.est-failed__button {
+  flex: 1;
+  min-height: 42px;
+  border: 1px solid var(--v5-line);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v5-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.est-failed__button--primary {
+  border-color: var(--v5-brand);
+  background: var(--v5-brand);
+  color: var(--v5-on-brand);
 }
 .est-phone {
   position: relative;

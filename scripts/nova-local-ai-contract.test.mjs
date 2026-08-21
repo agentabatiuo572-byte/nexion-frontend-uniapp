@@ -32,6 +32,13 @@ test("local AI contract keeps provider truth and sensitive-data warning visible"
   }
 });
 
+test("Nova outage copy does not blame Ollama when any local service hop can fail", () => {
+  for (const file of ["en", "zh", "vi"]) {
+    const messages = read(`src/i18n/messages/${file}.ts`);
+    assert.doesNotMatch(messages, /localUnavailable:\s*"[^"]*Ollama[^"]*"/i);
+  }
+});
+
 test("human support routes never inherit Nova connection or HOLD state", () => {
   const chat = read("src/pages/support/chat.vue");
 

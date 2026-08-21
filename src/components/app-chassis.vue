@@ -190,12 +190,25 @@ import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
-import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { usePopupArbiter, runPriorityRound, type AutoPushCandidate, type PopupId } from "@/store/popup-arbiter";
 import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
+import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  subscribeCurrentCommerceSandboxRun,
+  type CommerceSandboxRunScope,
+} from "@/api/order-api";
+import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import {
+  isAcceptanceObservationModalOpen,
+  onAcceptanceObservationModalClosed,
+  onAcceptanceObservationModalOpened,
+} from "@/services/behavior-analytics";
 
 const props = defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
@@ -214,6 +227,52 @@ const voucherClaimSheet = useVoucherClaimSheet();
 const pendingCheckout = usePendingCheckout();
 const popupArbiter = usePopupArbiter();
 
+type VoucherPopupRequestScope = {
+  account: RemoteAccountRequest;
+  commerce: CommerceSandboxRunScope;
+};
+
+function captureVoucherPopupScope(): VoucherPopupRequestScope {
+  return { account: captureAccountScope(), commerce: captureCommerceSandboxRun() };
+}
+
+function isCurrentVoucherPopupScope(scope: VoucherPopupRequestScope): boolean {
+  return isCurrentAccountScope(scope.account) && isCurrentCommerceSandboxScope(scope.commerce);
+}
+
+let autoPushMounted = false;
+const voucherPopupScheduler = createVoucherPopupScheduler<VoucherPopupRequestScope>({
+  isHome: () => autoPushMounted && readRoute() === "pages/index/index",
+  isObservationModalOpen: isAcceptanceObservationModalOpen,
+  isBlockingSheetOpen: () => popupArbiter.current !== null || popupArbiter.visitClaimed,
+  sessionShownCount: () => voucherClaimSheet.sessionShownCount,
+  cadence: () => voucher.autoPopupCadence,
+  captureScope: captureVoucherPopupScope,
+  isCurrentScope: isCurrentVoucherPopupScope,
+  tryAutoPush: (options) => {
+    if (!popupArbiter.acquire("voucher-claim")) return false;
+    const opened = voucherClaimSheet.tryAutoPush({ surface: "home", ...options });
+    if (!opened) popupArbiter.release("voucher-claim");
+    else stopAutoPush();
+    return opened;
+  },
+  markPopupSeen: (voucherId) => voucher.markPopupSeen(voucherId),
+});
+let stopObservationOpened: (() => void) | null = null;
+let stopObservationClosed: (() => void) | null = null;
+let stopVoucherRunScope: (() => void) | null = null;
+
+function bindVoucherClaimSheetScope(): void {
+  const account = captureAccountScope();
+  const commerce = captureCommerceSandboxRun();
+  voucherClaimSheet.bindScope({
+    accountKey: account.accountKey,
+    accountEpoch: account.epoch,
+    runId: commerce.runId,
+    runEpoch: commerce.epoch,
+  });
+}
+
 // ── 首页自动弹层编排(主人 2026-08-16 拍板 A1 / B1 / C1)──────────────────────
 // 旧写法是两条各自独立的定时器 + 两两手写 `!对方.open`,优先级只体现为 1300ms 与
 // 1500ms 的延迟之差 —— 那是一段 200ms 的赛跑,不是一条规则。实测出的三条缺陷:
@@ -227,8 +286,8 @@ const popupArbiter = usePopupArbiter();
 //    赢家关掉之后不会再有第二个候选被评,因为表已经停了。
 const SETTLE_RETRY_MS = 300;
 // 资格复算窗口:只在安顿点评一次会重演缺陷 ②(异步目录还没到货)。
-// ponytail: 有界重试,20 × 300ms = 6s;超时就这一趟不弹 —— 比让低优先级顶上去好。
-const SETTLE_MAX_TICKS = 20;
+// 有界重试 205 × 300ms ≈ 61.5s；H7 的长冷却不靠这里轮询，而由权威 nextEligibleAt 调度。
+const SETTLE_MAX_TICKS = 205;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
 let settleRetry: ReturnType<typeof setInterval> | null = null;
 let settleTicks = 0;
@@ -236,20 +295,11 @@ let settleTicks = 0;
 // 顺序**不在这里定**(按 POPUP_PRIORITY 排),这里只声明每个 id 的资格与推送方式。
 const autoPushCandidates: AutoPushCandidate[] = [
   {
-    id: "voucher-claim",
-    eligible: () => voucher.claimableVouchers.some((v) => v.popupEnabled),
-    ready: () => voucher.catalogReady,
-    push: () =>
-      voucherClaimSheet.tryAutoPush({
-        cooldownHours: VOUCHER_POPUP.cooldownHours,
-        maxPerSession: VOUCHER_POPUP.maxPerSession,
-      }),
-  },
-  {
     id: "trial-claim",
-    // 试用的判据全部来自本地 config 与试用状态,无异步依赖,恒就绪。
-    eligible: () => trialConfig.config.autoPushEnabled && freeTrial.canStart(),
-    ready: () => true,
+    // 先等 H7 目录到货；若当前有到点的首页券，由独立权威调度器先拿本次首页名额。
+    eligible: () => voucher.catalogReady && !voucher.autoPopupDueNow
+      && trialConfig.config.autoPushEnabled && freeTrial.canStart(),
+    ready: () => voucher.catalogReady,
     push: () =>
       trialClaimSheet.tryAutoPush({
         cooldownHours: trialConfig.config.autoPushCooldownHours,
@@ -261,7 +311,7 @@ const autoPushCandidates: AutoPushCandidate[] = [
 // 延迟回归本职「让首屏先安顿」,不再兼任优先级。取各候选配置延迟的较大值,
 // 保证每个候选都过了它自己那份 autoPushDelayMs 才被评。
 function settleDelayMs(): number {
-  return Math.max(trialConfig.config.autoPushDelayMs, VOUCHER_POPUP.autoPushDelayMs);
+  return Math.max(trialConfig.config.autoPushDelayMs, voucher.autoPopupCadence?.delayMs ?? 0);
 }
 
 /** 按优先级评一轮。返回 true = 该停表(有人弹出来了,或已离开首页)。 */
@@ -452,6 +502,13 @@ function readRoute(): string {
 }
 const route = ref(readRoute());
 onMounted(() => {
+  autoPushMounted = true;
+  bindVoucherClaimSheetScope();
+  stopVoucherRunScope = subscribeCurrentCommerceSandboxRun(() => {
+    bindVoucherClaimSheetScope();
+    voucherPopupScheduler.cancel();
+    if (readRoute() === "pages/index/index") voucherPopupScheduler.schedule();
+  });
   route.value = readRoute();
   // Fresh mount = fresh landing: start at top and wipe stale memory; only a
   // keep-alive re-activation (back-navigation) restores. H5-only listener —
@@ -473,6 +530,13 @@ onMounted(() => {
   // (ALIGNMENT 红线);路由在**触发时**复检,绝不弹到延迟期间跳过去的别的页上。
   if (isHome.value) {
     popupArbiter.beginHomeVisit();
+    voucherPopupScheduler.schedule();
+    stopObservationOpened = onAcceptanceObservationModalOpened(() => {
+      voucherPopupScheduler.onObservationModalOpened(captureVoucherPopupScope());
+    });
+    stopObservationClosed = onAcceptanceObservationModalClosed(({ token }) => {
+      voucherPopupScheduler.onObservationModalClosed(token);
+    });
     settleTicks = 0;
     settleTimer = setTimeout(() => {
       if (runAutoPushRound()) return;
@@ -484,6 +548,14 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  autoPushMounted = false;
+  voucherPopupScheduler.cancel();
+  stopVoucherRunScope?.();
+  stopVoucherRunScope = null;
+  stopObservationOpened?.();
+  stopObservationOpened = null;
+  stopObservationClosed?.();
+  stopObservationClosed = null;
   const scrollDom = chassisScrollDom();
   if (scrollDom && typeof scrollDom.removeEventListener === "function") {
     scrollDom.removeEventListener("scroll", onChassisScroll);
@@ -491,6 +563,14 @@ onUnmounted(() => {
   if (scrollIdleTimer) { clearTimeout(scrollIdleTimer); scrollIdleTimer = null; }
   stopAutoPush();
 });
+
+watch(
+  () => voucher.autoPopupCadence,
+  () => {
+    if (autoPushMounted) voucherPopupScheduler.schedule();
+  },
+  { deep: true },
+);
 
 const routeTab = computed(() => TAB_ROUTE_KEY[route.value]);
 const showBusinessOverlays = computed(() => !!route.value && !isStaticReviewRoute(route.value));

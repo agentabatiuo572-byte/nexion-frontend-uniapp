@@ -60,7 +60,7 @@
 
       <!-- Bottom row — Notify + queue social proof -->
       <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
-        <view class="flex-1 inline-flex items-center justify-center" :style="notifyBtnStyle" role="button" tabindex="0" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
+        <view class="flex-1 inline-flex items-center justify-center" :style="notifyBtnStyle" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ t.store.lockedNotifyMe }}</text>
         </view>
@@ -74,11 +74,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import { productNotificationApi } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
 import {
   useScrollGrowProgress,
   PROGRESS_GROW_TRANSITION,
@@ -86,6 +90,7 @@ import {
 import { productCopy, specText } from "@/lib/product-copy";
 
 const props = defineProps<{ product: Product }>();
+const app = useApp();
 const t = useT();
 const copy = computed(() => productCopy(t.value, props.product));
 const gpuText = computed(() => specText(t.value, props.product.gpu));
@@ -98,6 +103,10 @@ const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: n
 const PHASE_TO_QUEUE: Record<string, number> = { P3: 1842, P5: 614 };
 
 const detailsOpen = ref(false);
+const notifyBusy = ref(false);
+const serverSubscribed = ref(false);
+let notificationEpoch = 0;
+let notificationMounted = true;
 let lastToggleAt = 0;
 const progress = computed(() =>
   props.product.available === undefined && props.product.unlocksAtPhase
@@ -139,9 +148,77 @@ const stageText = computed(() =>
 
 const { elRef: barRef, inView: barInView } = useScrollGrowProgress();
 
-function handleNotify() {
-  toast.success(fmt(t.value.store.notifyToast, { name: props.product.name }));
+function requestIsCurrent(scope: ReturnType<typeof captureAccountScope>, epoch: number, accountKey: string, runScope: CommerceSandboxRunScope): boolean {
+  return notificationMounted
+    && epoch === notificationEpoch
+    && isCurrentAccountScope(scope)
+    && String(app.accountKey) === accountKey
+    && isCurrentCommerceSandboxScope(runScope);
 }
+
+async function reloadNotificationState(): Promise<void> {
+  const epoch = ++notificationEpoch;
+  const scope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
+  const accountKey = scope.accountKey;
+  const productNo = props.product.id;
+  serverSubscribed.value = false;
+  try {
+    const result = await productNotificationApi.status(productNo);
+    if (!requestIsCurrent(scope, epoch, accountKey, runScope)) return;
+    if (result.serverCanonical && result.productNo === productNo) {
+      serverSubscribed.value = result.subscribed;
+    }
+  } catch {
+    // Status is a best-effort hydration. The CTA remains available and only
+    // a confirmed mutation can move it to the subscribed state.
+  }
+}
+
+async function handleNotify() {
+  if (notifyBusy.value) return;
+  const scope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
+  const accountKey = scope.accountKey;
+  // A mutation also advances the local request epoch so an older GET (or a
+  // previous mutation) cannot overwrite its confirmed state for this account.
+  const epoch = ++notificationEpoch;
+  const productNo = props.product.id;
+  const nextSubscribed = !serverSubscribed.value;
+  notifyBusy.value = true;
+  try {
+    const result = nextSubscribed
+      ? await productNotificationApi.subscribe(productNo)
+      : await productNotificationApi.unsubscribe(productNo);
+    if (!requestIsCurrent(scope, epoch, accountKey, runScope)) return;
+    if (result.serverCanonical && result.productNo === productNo && result.subscribed === nextSubscribed) {
+      serverSubscribed.value = nextSubscribed;
+      if (nextSubscribed) toast.success(fmt(t.value.store.notifyToast, { name: props.product.name }));
+    } else {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+    }
+  } catch {
+    if (!requestIsCurrent(scope, epoch, accountKey, runScope)) return;
+    // A failed request is not a subscription. Keep the CTA available for a
+    // retry and avoid claiming success from stale UI state.
+    toast.error(t.value.authOtp.errorServiceUnavailable);
+  } finally {
+    if (requestIsCurrent(scope, epoch, accountKey, runScope)) notifyBusy.value = false;
+  }
+}
+
+onMounted(() => { void reloadNotificationState(); });
+watch(() => String(app.accountKey), () => {
+  // Account rebinds must clear the prior account's status immediately; the
+  // next GET is fenced by the new account scope/epoch before it may restore it.
+  notifyBusy.value = false;
+  void reloadNotificationState();
+});
+watch(() => props.product.id, () => { void reloadNotificationState(); });
+onUnmounted(() => {
+  notificationMounted = false;
+  notificationEpoch += 1;
+});
 function toggleDetails() {
   const now = Date.now();
   if (now - lastToggleAt < 120) return;

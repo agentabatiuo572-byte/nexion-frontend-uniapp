@@ -8,7 +8,7 @@
   </view></AppChassis>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { learningApi } from "@/api/learning-runtime";
@@ -16,16 +16,58 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
+import { useApp } from "@/store/app";
+import { captureCommerceSandboxRun } from "@/api/order-api";
+import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
 import type { LearningCourse, LearningOverview } from "@/api/learning-api";
 // 存 key 而不是译好的串:译文一旦快照进 ref 就不再跟随语言(uni 复用页面实例时,
 // 上一次访问用的语言会留在错误提示上 —— 实景走查实测:zh 下重试按钮是中文、正文还是英文)。
 type LearningError = "" | "centerOffline" | "centerGeoUnresolved" | "centerUnavailable";
-const t = useT(); const locale = useLocaleStore(); const overview = ref<LearningOverview | null>(null); const loading = ref(true); const error = ref<LearningError>("");
+const t = useT(); const locale = useLocaleStore(); const app = useApp(); const overview = ref<LearningOverview | null>(null); const loading = ref(true); const error = ref<LearningError>("");
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
 const progressLine = computed(() => fmt(t.value.learning.centerProgress, { done: overview.value?.completedCourses ?? 0, total: overview.value?.totalCourses ?? 0, nex: overview.value?.earnedNex ?? 0 }));
 function courseMeta(course: LearningCourse) { return fmt(t.value.learning.courseMeta, { duration: course.duration, nex: course.rewardNex }); }
-async function load() { loading.value = true; overview.value = null; error.value = ""; if (!remoteApiEnabled) { loading.value = false; error.value = "centerOffline"; return; } try { overview.value = await learningApi.courses(language.value); } catch (cause) { error.value = cause instanceof Error && cause.message.includes("GEO_COUNTRY_UNRESOLVED") ? "centerGeoUnresolved" : "centerUnavailable"; } finally { loading.value = false; } }
+let accountEpoch = 0;
+let generation = 0;
+let mounted = false;
+const fenceReader = createLearningPageFenceReader(
+  () => String(app.accountKey),
+  () => accountEpoch,
+  captureCommerceSandboxRun,
+  () => generation,
+  () => mounted,
+);
+function fence(): LearningPageFence { return fenceReader.capture(); }
+function current(scope: LearningPageFence): boolean { return fenceReader.isCurrent(scope); }
+async function load() {
+  const scope = fence();
+  loading.value = true;
+  overview.value = null;
+  error.value = "";
+  if (!remoteApiEnabled) {
+    if (!current(scope)) return;
+    loading.value = false;
+    error.value = "centerOffline";
+    return;
+  }
+  try {
+    const value = await learningApi.courses(language.value);
+    if (current(scope)) overview.value = value;
+  } catch (cause) {
+    if (current(scope)) error.value = cause instanceof Error && cause.message.includes("GEO_COUNTRY_UNRESOLVED") ? "centerGeoUnresolved" : "centerUnavailable";
+  } finally {
+    if (current(scope)) loading.value = false;
+  }
+}
 function open(id: string) { uni.navigateTo({ url: `/pages/learn/course?id=${encodeURIComponent(id)}` }); }
-onMounted(() => { void load(); });
+onMounted(() => { mounted = true; void load(); });
+onUnmounted(() => { mounted = false; generation += 1; });
+watch(() => String(app.accountKey), () => {
+  accountEpoch += 1;
+  generation += 1;
+  overview.value = null;
+  error.value = "";
+  if (mounted) void load();
+});
 </script>

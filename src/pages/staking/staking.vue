@@ -73,14 +73,14 @@
         <view class="flex items-center" :style="secHeaderStyle">
           <text :style="secTitleStyle">{{ t.stakingV3.stakePlans }}</text>
         </view>
-        <view :style="vaultCardStyle">
+        <view v-if="stakingConfigAvailable" :style="vaultCardStyle">
           <VaultRow
             v-for="(term, i) in TERMS"
             :key="term"
             :term="term"
-            :apy="staking.pools.find((pool) => pool.termDays === term)?.apy ?? (staking.isMockMode ? STAKING_APY[term] : 0)"
-            :penalty="staking.pools.find((pool) => pool.termDays === term)?.penalty ?? (staking.isMockMode ? STAKING_PENALTY[term] : 0)"
-            :min="staking.pools.find((pool) => pool.termDays === term)?.minAmountUsdt ?? (staking.isMockMode ? STAKING_MIN[term] : 0)"
+            :apy="poolForTerm(term)?.apy ?? 0"
+            :penalty="poolForTerm(term)?.penalty ?? 0"
+            :min="poolForTerm(term)?.minAmountUsdt ?? 0"
             :blurb="t.stakingV3.blurb[term]"
             :penalty-suffix="t.stakingV3.penaltySuffix"
             :ribbon="RIBBONS[term]"
@@ -88,6 +88,7 @@
             @open="openSheet(term)"
           />
         </view>
+        <view v-else :style="noticeStyle"><text>{{ t.staking.remoteUnavailableClosed }}</text></view>
 
         <!-- CompoundCalculator -->
         <CompoundCalculator />
@@ -145,6 +146,7 @@ import {
   type StakingPosition,
 } from "@/store/staking";
 import { confirm as uiConfirm, toast } from "@/store/ui";
+import { resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
 
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
@@ -157,6 +159,15 @@ const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cya
 }));
 const staking = useStaking();
 const app = useApp(); // 仅用于 reportStuckFunds 取当前资金快照(入待对账队列)
+const stakingConfigAvailable = computed(() => staking.isMockMode || staking.remoteReady);
+
+function poolForTerm(term: StakingTerm) {
+  return resolveStakingPool(
+    { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+    term,
+    { apy: STAKING_APY[term], penalty: STAKING_PENALTY[term], minAmountUsdt: STAKING_MIN[term] },
+  );
+}
 
 const sheetOpen = ref(false);
 const sheetTerm = ref<StakingTerm | null>(null);
@@ -287,7 +298,11 @@ function reportStakingFailure(reason: unknown, fallbackTitle: string) {
 }
 
 async function handleEarlyWithdraw(p: StakingPosition) {
-  const penaltyRate = STAKING_PENALTY[p.termDays];
+  const penaltyRate = resolvePositionPenalty(p, staking.isMockMode, STAKING_PENALTY[p.termDays]);
+  if (penaltyRate === null) {
+    reportStakingFailure(null, t.value.staking.remoteUnavailableClosed);
+    return;
+  }
   const penalty = (p.amountUSDT * penaltyRate).toFixed(2);
   const refund = (p.amountUSDT * (1 - penaltyRate)).toFixed(2);
   const ok = await uiConfirm({

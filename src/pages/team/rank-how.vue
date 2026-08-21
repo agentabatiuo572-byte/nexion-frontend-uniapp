@@ -12,97 +12,151 @@
       <SubPageHeader back="/pages/team/rank" />
 
       <!-- Hero -->
-      <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="violet" />
+      <HowHero
+        :label="remoteApiEnabled ? t.rank.pageTitle : w.heroLabel"
+        :title="remoteApiEnabled ? t.rank.pageTitle : w.heroTitle"
+        :sub="heroSub"
+        accent="violet"
+      />
+
+      <HowSection v-if="remoteApiEnabled" :title="policy?.hero || t.rank.pageTitle" accent="violet">
+        <template #icon>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18" /></svg>
+        </template>
+        <view v-if="policy" style="display: flex; flex-direction: column; gap: 10px">
+          <view v-for="section in policy.sections" :key="section.id" class="rounded-xl" :style="reqCardStyle">
+            <text class="block" :style="reqLabelStyle">{{ section.title }}</text>
+            <text class="block" :style="reqBodyStyle">{{ section.body }}</text>
+          </view>
+          <text class="block" :style="captionStyle">{{ policy.version }} · {{ policy.locale }} · server-canonical</text>
+        </view>
+        <view v-else class="rounded-xl" :style="policyHoldStyle" role="button" tabindex="0" @click="retryPolicy">
+          <text class="block" :style="unavailableTextStyle">{{ policyError || policyHold }}</text>
+          <text class="block" :style="unavailableRetryStyle">{{ t.rank.retry }}</text>
+        </view>
+      </HowSection>
 
       <!-- §1 What is the Rank System -->
-      <HowSection :title="w.s1Title" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.s1Title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         </template>
-        <text class="block" :style="bodyStyle">{{ w.s1Para1 }}</text>
-        <text class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ w.s1Para2 }}</text>
+        <template v-if="!remoteApiEnabled">
+          <text class="block" :style="bodyStyle">{{ w.s1Para1 }}</text>
+          <text class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ w.s1Para2 }}</text>
+        </template>
+        <view v-else class="rounded-xl" :style="policyHoldStyle">
+          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
+        </view>
       </HowSection>
 
       <!-- §2 13 ranks at a glance -->
-      <HowSection :title="w.s2Title" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.s2Title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" /><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" /><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" /></svg>
         </template>
-        <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
+        <text class="block" :style="captionStyle">{{ remoteApiEnabled ? t.rank.canonicalLadder : w.s2Caption }}</text>
         <!-- Ladder — transparent row group on the page floor -->
-        <view style="margin-top: 14px; padding: 0 2px; display: flex; flex-direction: column; gap: 7px">
-          <view v-for="r in V_RANKS" :key="r.v" class="flex items-center" style="gap: 10px">
+        <view v-if="rankHowView === 'canonical-ladder'" style="margin-top: 14px; padding: 0 2px; display: flex; flex-direction: column; gap: 7px">
+          <view v-for="r in rankDefs" :key="r.v" class="flex items-center" style="gap: 10px">
             <VBadgeIcon :v="r.v" :size="22" />
             <text class="font-display tabular-nums" :style="ladderVStyle">V{{ r.v }}</text>
             <text :style="ladderTitleStyle">{{ r.title }}</text>
             <text v-if="isZh" class="truncate" :style="ladderCnStyle">· {{ r.cnTitle }}</text>
+            <text v-if="remoteApiEnabled" class="truncate" :style="ladderConditionStyle">
+              · {{ formatCanonicalRankConditions(r, conditionLabels).join(" · ") }}
+            </text>
           </view>
+        </view>
+        <view v-else class="rounded-xl" :style="unavailableStyle" role="button" tabindex="0" @click="retryRank">
+          <text class="block" :style="unavailableTextStyle">HOLD · {{ t.rank.loadError }}</text>
+          <text class="block" :style="unavailableRetryStyle">{{ t.rank.retry }}</text>
         </view>
       </HowSection>
 
       <!-- §3 How to level up -->
-      <HowSection :title="w.s3Title" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.s3Title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
         </template>
-        <text class="block" :style="{ ...captionStyle, marginBottom: '14px' }">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
-          <view v-for="req in requirements" :key="req.label" class="rounded-xl" :style="reqCardStyle">
-            <text class="block" :style="reqLabelStyle">{{ req.label }}</text>
-            <text class="block" :style="reqBodyStyle">{{ req.body }}</text>
+        <template v-if="!remoteApiEnabled">
+          <text class="block" :style="{ ...captionStyle, marginBottom: '14px' }">{{ w.s3Intro }}</text>
+          <view style="display: flex; flex-direction: column; gap: 10px">
+            <view v-for="req in requirements" :key="req.label" class="rounded-xl" :style="reqCardStyle">
+              <text class="block" :style="reqLabelStyle">{{ req.label }}</text>
+              <text class="block" :style="reqBodyStyle">{{ req.body }}</text>
+            </view>
           </view>
+          <HowCalloutBox :title="'⚠️ ' + w.s3RuleATitle" :body="w.s3RuleABody" tone="amber" />
+          <HowCalloutBox :title="'✓ ' + w.s3RuleBTitle" :body="w.s3RuleBBody" tone="purple" />
+        </template>
+        <view v-else class="rounded-xl" :style="policyHoldStyle">
+          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
         </view>
-        <HowCalloutBox :title="'⚠️ ' + w.s3RuleATitle" :body="w.s3RuleABody" tone="amber" />
-        <HowCalloutBox :title="'✓ ' + w.s3RuleBTitle" :body="w.s3RuleBBody" tone="purple" />
       </HowSection>
 
       <!-- §4 What you unlock -->
-      <HowSection :title="w.s4Title" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.s4Title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="8" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         </template>
-        <text class="block" :style="captionStyle">{{ w.s4Intro }}</text>
-        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
-          <HowIconRow v-for="u in unlocks" :key="u.label" :emoji="u.emoji" :label="u.label" :body="u.body" />
+        <template v-if="!remoteApiEnabled">
+          <text class="block" :style="captionStyle">{{ w.s4Intro }}</text>
+          <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
+            <HowIconRow v-for="u in unlocks" :key="u.label" :emoji="u.emoji" :label="u.label" :body="u.body" />
+          </view>
+        </template>
+        <view v-else class="rounded-xl" :style="policyHoldStyle">
+          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
         </view>
       </HowSection>
 
       <!-- §5 Worked example -->
-      <HowSection :title="w.s5Title" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.s5Title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
         </template>
-        <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
+        <template v-if="!remoteApiEnabled">
+          <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
 
-        <view class="rounded-xl" :style="startCardStyle">
-          <text class="block" :style="startLabelStyle">{{ w.s5StartLabel }}</text>
-          <text class="block" :style="bodyStyle">{{ w.s5StartBody }}</text>
-        </view>
-
-        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px">
-          <HowStepRow v-for="ph in phases" :key="ph.n" :n="ph.n" :title="ph.title" :body="ph.body" accent="violet" />
-        </view>
-
-        <HowCalloutBox :title="'⚡ ' + w.s5TriggerLabel" :body="w.s5TriggerBody" tone="purple" />
-
-        <view class="rounded-xl border" :style="unlockResultCardStyle">
-          <text class="block" :style="unlockResultLabelStyle">🎉 {{ w.s5UnlockLabel }}</text>
-          <view style="display: flex; flex-direction: column; gap: 4px">
-            <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock1 }}</text>
-            <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock2 }}</text>
-            <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock3 }}</text>
-            <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock4 }}</text>
+          <view class="rounded-xl" :style="startCardStyle">
+            <text class="block" :style="startLabelStyle">{{ w.s5StartLabel }}</text>
+            <text class="block" :style="bodyStyle">{{ w.s5StartBody }}</text>
           </view>
+
+          <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px">
+            <HowStepRow v-for="ph in phases" :key="ph.n" :n="ph.n" :title="ph.title" :body="ph.body" accent="violet" />
+          </view>
+
+          <HowCalloutBox :title="'⚡ ' + w.s5TriggerLabel" :body="w.s5TriggerBody" tone="purple" />
+
+          <view class="rounded-xl border" :style="unlockResultCardStyle">
+            <text class="block" :style="unlockResultLabelStyle">🎉 {{ w.s5UnlockLabel }}</text>
+            <view style="display: flex; flex-direction: column; gap: 4px">
+              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock1 }}</text>
+              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock2 }}</text>
+              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock3 }}</text>
+              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock4 }}</text>
+            </view>
+          </view>
+        </template>
+        <view v-else class="rounded-xl" :style="policyHoldStyle">
+          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
         </view>
       </HowSection>
 
       <!-- §6 FAQ -->
-      <HowSection :title="w.faqTitle" accent="violet">
+      <HowSection v-if="!remoteApiEnabled" :title="w.faqTitle" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         </template>
-        <view style="display: flex; flex-direction: column; gap: 10px">
-          <HowFaqRow v-for="faq in faqs" :key="faq.q" :q="faq.q" :a="faq.a" />
+        <template v-if="!remoteApiEnabled">
+          <view style="display: flex; flex-direction: column; gap: 10px">
+            <HowFaqRow v-for="faq in faqs" :key="faq.q" :q="faq.q" :a="faq.a" />
+          </view>
+        </template>
+        <view v-else class="rounded-xl" :style="policyHoldStyle">
+          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
         </view>
       </HowSection>
 
@@ -118,7 +172,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
@@ -131,7 +186,10 @@ import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { navBack } from "@/lib/route";
-import { V_RANKS } from "@/store/v-rank";
+import { useVRank, type VRankDef } from "@/store/v-rank";
+import { apiClient, expectedApiEnvironment, remoteApiEnabled } from "@/api/runtime";
+import { createRankHowPolicyApi, type RankHowPolicy } from "@/api/rank-how-policy-api";
+import { formatCanonicalRankConditions, rankHowPresentation } from "@/lib/v-rank-how-policy";
 
 const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
@@ -139,6 +197,15 @@ const w = computed(() => t.value.rankHowItWorks);
 // 缺它时 en/vi 用户会在 V 级阶梯上读到 13 行中文(独立审计实测)。
 const locale = useLocaleStore();
 const isZh = computed(() => locale.code === "zh");
+const vState = useVRank();
+const rankDefs = computed<VRankDef[]>(() => vState.ladder);
+const rankHowView = computed(() => rankHowPresentation(expectedApiEnvironment, vState.remoteReady));
+const heroSub = computed(() => remoteApiEnabled ? (policy.value?.hero || policyHold.value) : w.value.heroSub);
+const policyHold = computed(() => `HOLD · ${t.value.rank.policyUnavailable}`);
+const policy = ref<RankHowPolicy | null>(null);
+const policyError = ref<string | null>(null);
+const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
+const conditionLabels = computed(() => t.value.rank.cond);
 
 const requirements = computed(() => [
   { label: w.value.req1Label, body: w.value.req1Body },
@@ -167,6 +234,22 @@ function goBack() {
   navBack("/pages/team/rank");
 }
 
+function retryRank() {
+  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+}
+
+async function retryPolicy() {
+  if (!remoteApiEnabled) return;
+  policyError.value = null;
+  try { policy.value = await policyApi.published(locale.code); }
+  catch (error) { policy.value = null; policyError.value = error instanceof Error ? error.message : "RANK_HOW_POLICY_UNAVAILABLE"; }
+}
+
+onShow(() => {
+  if (remoteApiEnabled) { void vState.refreshCanonicalVRank(); void retryPolicy(); }
+});
+watch(() => locale.code, () => { if (remoteApiEnabled) void retryPolicy(); });
+
 // ─── styles ───
 // Section shells / hero / callouts now come from the how/* components; only
 // page-local content styles remain.
@@ -176,6 +259,11 @@ const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)"
 const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px" };
 const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
 const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
+const ladderConditionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", flex: 1 };
+const unavailableStyle: CSSProperties = { marginTop: "14px", padding: "14px", background: "var(--v5-surface-2)" };
+const unavailableTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const unavailableRetryStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-brand)" };
+const policyHoldStyle: CSSProperties = { marginTop: "14px", padding: "14px", background: "var(--v5-surface-2)" };
 
 // Requirement tiles — filled, no border (single visual difference).
 const reqCardStyle: CSSProperties = { background: "var(--v5-surface-2)", padding: "10px 12px" };

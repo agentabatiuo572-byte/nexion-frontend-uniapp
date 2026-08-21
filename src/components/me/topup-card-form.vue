@@ -138,7 +138,7 @@ import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDeposits } from "@/store/deposits";
-import { fundsSandboxEnabled } from "@/api/runtime";
+import { developmentFundsEnabled } from "@/api/runtime";
 import {
   MAX_CARD_DEPOSIT_USDT,
   MIN_CARD_DEPOSIT_USDT,
@@ -273,7 +273,7 @@ async function handleSubmit() {
       await new Promise((r) => setTimeout(r, 2400));
       // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
       // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
-      const rec = fundsSandboxEnabled
+      const rec = developmentFundsEnabled
         ? await deposits.createSandboxTopup("CARD", usdtAmount.value, acct)
         : deposits.submitCardPayment(usdtAmount.value, acct);
       if (!rec) throw new Error(t.value.topupChrome.payDeclinedReason);

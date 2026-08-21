@@ -784,6 +784,14 @@ try {
   await signOutToDefault(frame, fullPhone);
   let loginFrame = await gotoLogin("stale-login");
   await loginFrame.locator(".lg-switch").click();
+  // 登录页也随语言预置国家码；本夹具使用 +1 十位号码，先执行真实的切区号步骤。
+  if ((await loginFrame.locator(".lg-phone__cc-t").innerText()).trim() !== "+1") {
+    await loginFrame.locator(".lg-phone__cc").click();
+    const row = loginFrame.locator(".cc-row", { hasText: "+1" }).first();
+    await row.waitFor({ state: "visible", timeout: 10_000 });
+    await row.click();
+    await waitUntil(async () => (await loginFrame.locator(".lg-phone__cc-t").innerText()).trim() === "+1", "login country code did not switch to +1");
+  }
   await loginFrame.locator(".lg-phone__in input").fill(phoneDigits);
   await loginFrame.locator(".lg-cta").click();
   await loginFrame.locator(".lg-otp").waitFor({ state: "visible", timeout: 10_000 });

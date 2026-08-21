@@ -195,7 +195,7 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { toast } from "@/store/ui";
-import { bundleOrderApi, commercePaymentApi, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { bundleOrderApi, commercePaymentApi, developmentFundsEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
@@ -379,7 +379,7 @@ async function onCheckout() {
     const key = acquireBundleKey(list, accountKey);
     try {
       const created = await bundleOrderApi.create(list.map((item) => item.id), key);
-      if (fundsSandboxEnabled) {
+      if (developmentFundsEnabled) {
         const payment = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
         if (payment.orderNo !== created.orderNo || payment.sourceEnvironment !== "SANDBOX") {
           throw new Error("COMMERCE_PAYMENT_READBACK_INVALID");
@@ -392,7 +392,7 @@ async function onCheckout() {
       retireBundleKey(list, accountKey);
       if (orders.currentAccountKey() !== accountKey) return;
       cart.clear();
-      const successBody = fundsSandboxEnabled
+      const successBody = developmentFundsEnabled
         ? t.value.bundle.checkoutSuccessBody
         : t.value.bundle.checkoutPendingBody;
       toast.success(t.value.bundle.checkoutSuccessTitle,

@@ -91,7 +91,7 @@ try {
     ]);
     const app = appMod.useApp();
     const bills = billsMod.useBills();
-    if (!rt.fundsServerEnabled || rt.fundsSandboxEnabled) {
+    if (!rt.fundsServerEnabled || rt.developmentFundsEnabled) {
       throw new Error("withdraw-bill-runtime requires the remote/server funds rail");
     }
     rt.sessionVault.save({

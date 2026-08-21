@@ -16,7 +16,7 @@ This file provides guidance to Claude Code when working in this repository.
 ## Common commands
 
 ```bash
-VITE_NEXGRID_API_MODE=mock npm run dev:h5     # H5 dev（verify 的合法靶必须是 mock 模式）
+npm run dev:h5 -- --mode development          # H5 开发环境（Java 服务必须显式使用 dev profile）
 npm run dev:mp-weixin     # 微信小程序 dev
 npm run build:h5          # H5 生产构建 → dist/
 npm run type-check        # vue-tsc --noEmit（裸跑）；npm run type-check:cached = 指纹缓存壳（同树重复 1s；变了裸跑 ~35s;--incremental 因假绿禁用，门链都走这个）
@@ -28,7 +28,7 @@ node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 
 🔴 **verify 三档只有 full 算数**（主人 2026-08-17 拍板）：scoped / static 只买内循环速度，结果行与 `.verify-exit.code` 第 2 行都带 `mode=`；宣布 done / 合并主线前必须在最后一次提交之后跑一次 `npm run verify`（工作树干净），合并守卫 `PLAN/.claude/hooks/verify-fresh-before-merge.mjs` 会核 `.verify-cache/last-run.json` 的 full 绿树对象 == 被合分支树。范围由机器算（`node scripts/lib/verify-scope.mjs plan --mode scoped`），改动命中全局不变量清单自动升 full；未声明的门照跑；改 `gates.manifest.json` 后跑 `npm run verify:scope-audit:deep`（scoped vs full 双跑比对）。
 
-runner 各步自起「本树」隔离 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399（`--pool` 可选共享一对，默认关）。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 mock server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 mock 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
+runner 各步自起「本树」隔离 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399（`--pool` 可选共享 development / production 一对，默认关）。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 development server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 development 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
 
 verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有哨兵文件：`.verify-exit.code`（verify.sh）与 `.verify-chain.code` / `.verify-cache/last-run.json`（runner）—— `| tail` 会吞掉真实退出码，**外部判定读文件不读管道**。
 
@@ -47,9 +47,9 @@ verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另�
 
 由此三条判断口径（**推翻此前「mock 驱动高保真原型，无真后端」的旧框架**）：
 
-- **判缺陷以「接上真后端对不对」为准**，不以「mock 档下用户看到什么」为准。收尾汇报也别再用「三个档位用户可见行为一致」这类**拿 mock 当产品面**的措辞。
-- **新代码要让 mock 跑通某条链，首选把服务端行为桩在测试 harness 里，而不是在页面 / store 里新开一条模式分支。** 实例：提现页的风险披露闸在 mock 下会 fail-closed 抛错，主人 2026-08-16 拍板**不给页面加分流**，改由 `scripts/withdraw-bill-runtime.mjs` 桩掉 `risk.checkGate` 模拟「服务端答应了」——页面保持模式无关。
-- **存量的 mock 专用腿是待清的债，不是可扩展的模式**：别在上面加功能。⚠️ 但也**别顺手删** ——`scripts/store-unreachable-code-gate.mjs` 那道门要求「服务端权威化时必须留 `if (remoteApiEnabled)` 守卫」，正是为了防止本地实现变成谁也没执行的死代码；清理要整条链一起清，且由主人点头，不是单点删除。
+- **判缺陷以「接上真后端对不对」为准**，不以临时 mock 数据下用户看到什么为准。前端公开环境只有 dev/prod，业务执行环境以 Java active profile 为权威。
+- **开发验收要跑通某条链时，首选把服务端行为桩在测试 harness 里，而不是在页面 / store 里新开一条环境分支。** 实例：提现页的风险披露闸会 fail-closed 抛错，主人 2026-08-16 拍板**不给页面加分流**，改由 `scripts/withdraw-bill-runtime.mjs` 桩掉 `risk.checkGate` 模拟「服务端答应了」——页面保持环境无关。
+- **存量的客户端本地模拟腿是待清的债，不是可扩展的运行模式**：别在上面加功能。⚠️ 但也**别顺手删** ——`scripts/store-unreachable-code-gate.mjs` 那道门要求「服务端权威化时必须留 `if (remoteApiEnabled)` 守卫」，正是为了防止本地实现变成谁也没执行的死代码；清理要整条链一起清，且由主人点头，不是单点删除。
 
 - **状态**：Pinia setup store（`src/store/`，~46 文件）。全局 `app.ts`/`ui.ts`，业务域各自 store；`locale.ts` 用 uniStorage 持久。
 - **i18n**：`src/i18n/messages/{en,zh}.ts` 镜像 key 树（94 namespace）；`use-t.ts` 的 `useT()` + `format.ts` 的 `fmt()`。**加 key 必两文件同序**；硬编码英文 = regression。

@@ -379,9 +379,10 @@ import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { postReceiptForAccount } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
-import { fundsSandboxEnabled, fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
+import { developmentFundsEnabled, fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
+import { isFundsSandboxStaleRequestError } from "@/lib/funds-sandbox-request-scope";
 import {
   evaluateWithdrawal,
   requestWithdrawalEligibility,
@@ -435,7 +436,7 @@ async function abandonPendingAttempt() {
   if (!confirmed) return;
   abandoningAttempt.value = true;
   try {
-    if (remoteApiEnabled && !fundsSandboxEnabled) {
+    if (remoteApiEnabled && !developmentFundsEnabled) {
       const result = await withdrawalApi.abandonAttempt({
         idempotencyKey: pending.key,
         amount: pending.amount,
@@ -471,7 +472,7 @@ async function abandonPendingAttempt() {
 const sandboxWithdrawalPolicy = computed(() => {
   const evidence = app.fundsSandboxEvidence;
   const policy = evidence?.withdrawalPolicy;
-  return fundsSandboxEnabled
+  return developmentFundsEnabled
     && app.fundsSandboxStatus === "ready"
     && evidence?.source === "mock"
     && evidence.sourceEnvironment === "SANDBOX"
@@ -490,7 +491,7 @@ const sandboxWithdrawalPolicy = computed(() => {
 // The funds sandbox backend supports only its isolated Cregis BEP20 rail.  In
 // production server mode the policy response is the network allow-list; local
 // mock keeps its historical three-network fixture.
-const NETWORKS = computed<{ id: Withdrawal["network"]; label: string }[]>(() => fundsSandboxEnabled ? [{ id: "USDT-BEP20", label: "BEP20" }] :
+const NETWORKS = computed<{ id: Withdrawal["network"]; label: string }[]>(() => developmentFundsEnabled ? [{ id: "USDT-BEP20", label: "BEP20" }] :
   fundsServerEnabled
     ? ALL_NETWORKS.filter((item) => withdrawalPolicy.value?.enabledNetworks.includes(item.id))
     : ALL_NETWORKS);
@@ -500,7 +501,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
   withdrawalPolicyLoading.value = true;
   withdrawalPolicyError.value = "";
   try {
-    if (fundsSandboxEnabled) {
+    if (developmentFundsEnabled) {
       const sandboxPolicy = sandboxWithdrawalPolicy.value;
       if (!sandboxPolicy) throw new Error("FUNDS_SANDBOX_WITHDRAWAL_POLICY_REQUIRED");
       withdrawalPolicy.value = {
@@ -539,7 +540,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
 }
 
 watch(sandboxWithdrawalPolicy, () => {
-  if (fundsSandboxEnabled) void loadWithdrawalPolicy();
+  if (developmentFundsEnabled) void loadWithdrawalPolicy();
 });
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
@@ -550,7 +551,7 @@ watch(sandboxWithdrawalPolicy, () => {
 // 有总余额门(建单**成功之后**的 applyWithdrawalDebit 另有一道扣款闸,那是另一段链)。
 const maxWithdrawable = computed(() => {
   const sandboxPolicy = sandboxWithdrawalPolicy.value;
-  if (fundsSandboxEnabled) {
+  if (developmentFundsEnabled) {
     // The wallet GET is the sandbox balance authority. Do not require the
     // production earnings-release projection (which is intentionally absent
     // from this isolated ledger) and do not show a local fallback on failure.
@@ -667,7 +668,7 @@ const amountNum = computed(() => parseFloat(amount.value) || 0);
 const remoteEligibility = ref<WithdrawalEligibility | null>(null);
 let remoteEligibilityEpoch = 0;
 watch([amountNum, network, boundAddress, () => app.accountKey], async () => {
-  if (!remoteApiEnabled || fundsSandboxEnabled || amountNum.value <= 0 || boundAddress.value.length <= 10) {
+  if (!remoteApiEnabled || developmentFundsEnabled || amountNum.value <= 0 || boundAddress.value.length <= 10) {
     remoteEligibility.value = null;
     return;
   }
@@ -850,7 +851,7 @@ const eligibilityClock = computed(() => {
 });
 const eligibility = computed(() => {
   void eligibilityClock.value; // 建立对「时间边界」的依赖,不参与计算
-  if (remoteApiEnabled && !fundsSandboxEnabled) {
+  if (remoteApiEnabled && !developmentFundsEnabled) {
     return remoteEligibility.value ?? {
       canSubmit: true,
       maxWithdrawableUsdt: maxWithdrawable.value,
@@ -916,7 +917,7 @@ const smallAmountLine = computed(() => withdrawalPolicy.value?.smallAmountThresh
 const remoteSmallLineEligibility = ref<WithdrawalEligibility | null>(null);
 let remoteSmallLineEpoch = 0;
 watch([smallAmountLine, network, boundAddress, () => app.accountKey], async () => {
-  if (!remoteApiEnabled || fundsSandboxEnabled || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
+  if (!remoteApiEnabled || developmentFundsEnabled || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
     remoteSmallLineEligibility.value = null;
     return;
   }
@@ -957,7 +958,7 @@ const fastLaneOn = computed(
  * 直接把小额线代进同一个判定函数问一次,答案是什么就说什么。
  */
 const smallLineDecision = computed(() =>
-  remoteApiEnabled && !fundsSandboxEnabled
+  remoteApiEnabled && !developmentFundsEnabled
     ? remoteSmallLineEligibility.value ?? {
       canSubmit: false,
       maxWithdrawableUsdt: maxWithdrawable.value,
@@ -1391,6 +1392,7 @@ async function handleSubmit() {
     return;
   } catch (err) {
     clearSubmitFreeze();
+    if (isFundsSandboxStaleRequestError(err)) return;
     // 🔴🔴 判决**不在这里做** —— 调 lib/withdraw-failure-triage 的 triageWithdrawFailure。
     //
     // 为什么(2026-08-12 第四轮独立审计实测出来的):上一版把规则写在这个 catch 里,
