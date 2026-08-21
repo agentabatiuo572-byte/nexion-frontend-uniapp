@@ -1,7 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export interface LearningQuestion { questionId: string; question: string; options: string[]; }
 export interface LearningCourse { id: string; title: string; body: string; category: string; format: string; level: string; duration: string; rewardNex: string | number; featured: boolean; version: string; progress: number; completed: boolean; attempts: number; lastScore: number; rewardGranted: boolean; serverCanonical: true; source: string; sourceEnvironment: "SANDBOX" | "PRODUCTION"; runId: string; permanentLabel: string; questions: LearningQuestion[]; }
@@ -21,12 +20,11 @@ function record(value: unknown): Record<string, unknown> { if (!value || typeof 
 function text(value: unknown): string { if (typeof value !== "string" || !value.trim()) return invalid(); return value.trim(); }
 function integer(value: unknown, min = 0): number { const result = Number(value); if (!Number.isSafeInteger(result) || result < min) return invalid(); return result; }
 function reward(value: unknown): string | number { if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value; if (typeof value === "string" && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value.trim())) return value.trim(); return invalid(); }
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/;
 function provenance(row: Record<string, unknown>, mode: ApiEnvironment): boolean {
   if (row.serverCanonical !== true || typeof row.sourceEnvironment !== "string" || typeof row.runId !== "string") return false;
-  if (mode === "prod") return row.sourceEnvironment === "PRODUCTION" && row.runId === "";
-  if (mode === "dev") return row.sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(row.runId);
-  return false;
+  return (mode === "dev" || mode === "prod")
+    && row.sourceEnvironment === "PRODUCTION"
+    && row.runId === "";
 }
 function course(value: unknown, mode: ApiEnvironment): LearningCourse {
   const row = record(value);
@@ -37,20 +35,14 @@ function course(value: unknown, mode: ApiEnvironment): LearningCourse {
   if (progress > 100 || lastScore > 100 || (row.completed && progress !== 100)) return invalid();
   if (!provenance(row, mode)) return invalid();
   const sourceEnvironment = text(row.sourceEnvironment) as "SANDBOX" | "PRODUCTION";
-  const runId = text(row.runId);
+  const runId = row.runId as string;
   const source = text(row.source);
   const permanentLabel = text(row.permanentLabel);
-  const sandbox = sourceEnvironment === "SANDBOX";
-  if (sandbox
-      ? source !== "mock" || runId === null || !RUN_ID.test(runId)
-        || permanentLabel !== "ACCEPTANCE SANDBOX • NON-PRODUCTION"
-      : source !== "provider" || runId !== null || permanentLabel !== "PRODUCTION LEARNING FACTS") return invalid();
-  const expectedSource = mode === "dev" ? "mock" : "provider";
-  if (source !== expectedSource) return invalid();
+  if (source !== "provider" || runId !== "" || permanentLabel !== "PRODUCTION LEARNING FACTS") return invalid();
   return { id: text(row.id), title: text(row.title), body: text(row.body), category: text(row.category), format: text(row.format), level: text(row.level), duration: text(row.duration), rewardNex: reward(row.rewardNex), featured: row.featured, version: text(row.version), progress, completed: row.completed, attempts, lastScore, rewardGranted: row.rewardGranted, serverCanonical: true, source, sourceEnvironment, runId, permanentLabel, questions: row.questions.map((value) => { const item = record(value); if (!Array.isArray(item.options)) return invalid(); return { questionId: text(item.questionId), question: text(item.question), options: item.options.map(text) }; }) };
 }
-function overview(value: unknown, mode: ApiEnvironment): LearningOverview { const row = record(value); if (!Array.isArray(row.courses) || !provenance(row, mode)) return invalid(); return { courses: row.courses.map((value) => course(value, mode)), completedCourses: integer(row.completedCourses), totalCourses: integer(row.totalCourses), earnedNex: reward(row.earnedNex), serverCanonical: true, sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: text(row.runId) }; }
-function result(value: unknown, mode: ApiEnvironment): LearningResult { const row = record(value); if (typeof row.passed !== "boolean" || typeof row.completed !== "boolean" || typeof row.rewardGranted !== "boolean" || !provenance(row, mode)) return invalid(); const score = integer(row.score); if (score > 100 || (row.passed && !row.completed)) return invalid(); return { courseId: text(row.courseId), version: text(row.version), score, passed: row.passed, completed: row.completed, rewardGranted: row.rewardGranted, rewardNex: reward(row.rewardNex), attempts: integer(row.attempts, 1), serverCanonical: true, sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: text(row.runId) }; }
+function overview(value: unknown, mode: ApiEnvironment): LearningOverview { const row = record(value); if (!Array.isArray(row.courses) || !provenance(row, mode)) return invalid(); return { courses: row.courses.map((value) => course(value, mode)), completedCourses: integer(row.completedCourses), totalCourses: integer(row.totalCourses), earnedNex: reward(row.earnedNex), serverCanonical: true, sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: row.runId as string }; }
+function result(value: unknown, mode: ApiEnvironment): LearningResult { const row = record(value); if (typeof row.passed !== "boolean" || typeof row.completed !== "boolean" || typeof row.rewardGranted !== "boolean" || !provenance(row, mode)) return invalid(); const score = integer(row.score); if (score > 100 || (row.passed && !row.completed)) return invalid(); return { courseId: text(row.courseId), version: text(row.version), score, passed: row.passed, completed: row.completed, rewardGranted: row.rewardGranted, rewardNex: reward(row.rewardNex), attempts: integer(row.attempts, 1), serverCanonical: true, sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: row.runId as string }; }
 function receipt(value: unknown, mode: ApiEnvironment): LearningQuizReceipt { const row = record(value); if (typeof row.committed !== "boolean") return invalid(); if (!row.committed && (row.requestHash != null || row.result != null)) return invalid(); return { committed: row.committed, requestHash: row.requestHash == null ? null : text(row.requestHash), result: row.result == null ? null : result(row.result, mode) }; }
 function id(value: string): string { return text(value); }
 function key(value: string): string { const normalized = text(value); if (normalized.length < 8 || normalized.length > 128) return invalid(); return normalized; }

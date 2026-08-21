@@ -325,17 +325,14 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
       const sourceEnvironment = nonEmptyString(payload.sourceEnvironment);
       const rawRunId = payload.runId;
       if (payload.serverCanonical !== true) return invalid();
-      const sandbox = mode === "dev"
-        && source === "mock" && sourceEnvironment === "SANDBOX"
-        && typeof rawRunId === "string" && RUN_ID.test(rawRunId) && rawRunId === currentSandboxRunId;
-      const production = mode === "prod"
+      const production = (mode === "dev" || mode === "prod")
         && source === "server" && sourceEnvironment === "PRODUCTION"
         && (rawRunId === null || rawRunId === undefined);
-      if (!sandbox && !production) return invalid();
+      if (!production) return invalid();
       return {
         source: source as "server" | "mock",
         sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX",
-        runId: sandbox ? rawRunId : null,
+        runId: null,
         serverCanonical: true,
         orders: payload.orders.map(canonicalOrder),
       };

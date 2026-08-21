@@ -9,7 +9,7 @@
 -->
 <template>
   <!-- Active-state row -->
-  <view v-if="isActive" class="block active:opacity-90" :style="activeRowStyle" role="button" tabindex="0" :aria-label="activeTitle" @click="goTrial">
+  <view v-if="isActive" class="block active:opacity-90" :style="activeRowStyle" data-me-action="trial" role="button" tabindex="0" :aria-label="activeTitle" @click="goTrial" @keydown.enter.prevent="goTrial" @keydown.space.prevent="goTrial">
     <view style="flex: 1; min-width: 0">
       <text class="block" style="font-family: var(--font-v5); font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ activeTitle }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; font-family: var(--font-jet-mono), ui-monospace, monospace">{{ t.trial.entryDeviceName }}</text>

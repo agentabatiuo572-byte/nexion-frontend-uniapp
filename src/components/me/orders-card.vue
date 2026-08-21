@@ -18,12 +18,12 @@
       </view>
       <view v-else class="flex items-center justify-between" style="gap: 12px">
         <text class="flex-1 min-w-0" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.empty }}</text>
-        <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="browseBtnStyle" @click="goStore">
+        <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="browseBtnStyle" data-me-action="browse-orders" role="button" tabindex="0" :aria-label="t.orders.browseStore" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <text>{{ t.orders.browseStore }}</text>
         </view>
       </view>
 
-      <view class="flex items-center justify-between active:opacity-70" :style="footerStyle" @click="goOrders">
+      <view class="flex items-center justify-between active:opacity-70" :style="footerStyle" data-me-action="view-all-orders" role="button" tabindex="0" :aria-label="t.me.viewAllOrders" @click="goOrders" @keydown.enter.prevent="goOrders" @keydown.space.prevent="goOrders">
         <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.me.viewAllOrders }}</text>
         <view class="inline-flex items-center gap-0.5">
           <text v-if="orderCount > 0" class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ orderCount }}</text>

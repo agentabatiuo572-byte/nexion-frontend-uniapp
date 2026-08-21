@@ -12,7 +12,7 @@
     <view class="flex-1 min-w-0">
       <text class="block" :style="titleStyle">{{ t.me.withdrawalLocked }}</text>
       <text class="block" :style="bodyStyle">{{ bodyLine }}</text>
-      <view class="inline-flex items-center" :style="linkStyle" @click="goStore">
+      <view class="inline-flex items-center" :style="linkStyle" data-me-action="browse-devices" role="button" tabindex="0" :aria-label="t.me.withdrawalLockedBrowse" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
         <text>{{ t.me.withdrawalLockedBrowse }}</text>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
       </view>

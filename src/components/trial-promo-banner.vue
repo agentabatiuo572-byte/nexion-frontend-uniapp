@@ -10,7 +10,7 @@
   components/me/trial-entry.vue so design tweaks land in one place.
 -->
 <template>
-  <view v-if="visible" class="block active:opacity-90" :style="bannerOuterStyle" role="button" tabindex="0" :aria-label="t.trial.entryBenefitTitle" @click="openClaim">
+  <view v-if="visible" class="block active:opacity-90" :style="bannerOuterStyle" data-me-action="trial-claim" role="button" tabindex="0" :aria-label="t.trial.entryBenefitTitle" @click="openClaim" @keydown.enter.prevent="openClaim" @keydown.space.prevent="openClaim">
     <view class="flex items-center" :style="bannerBodyStyle">
       <!-- Copy — left-aligned -->
       <view style="flex: 1; min-width: 0">

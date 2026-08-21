@@ -17,7 +17,7 @@
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px; margin-bottom: 14px">
           <text class="block" :style="titleStyle">{{ t.me.themePickerTitle }}</text>
-          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" @click="emit('close')">
+          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" data-me-action="theme-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -28,7 +28,13 @@
           :key="opt.mode"
           class="flex items-center active:opacity-80"
           :style="optionStyle(opt.mode)"
+          :data-me-action="`theme:${opt.mode}`"
+          role="button"
+          tabindex="0"
+          :aria-label="opt.label"
           @click="choose(opt.mode)"
+          @keydown.enter.prevent="choose(opt.mode)"
+          @keydown.space.prevent="choose(opt.mode)"
         >
           <view class="grid place-items-center shrink-0" :style="iconChipStyle(opt.mode)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isActive(opt.mode) ? 'var(--v5-brand)' : 'var(--v5-ink-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

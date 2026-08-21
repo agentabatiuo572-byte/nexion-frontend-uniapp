@@ -50,7 +50,7 @@
             <text style="color: var(--v5-ink-3)">{{ nexMarketLabel }}</text>
             <!-- 《07》tap≥44:上一轮只补了按下反馈、漏了热区(实测 109.6×16,独立验收 agent 抓出)。
                  同 section-header 的处理 —— 只向左扩,右边缘不动,不越过父容器。 -->
-            <view class="inline-flex items-center shrink-0 active:opacity-70 transition-opacity" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3); min-height: 44px; padding-left: 16px" @click="goBills">
+            <view class="inline-flex items-center shrink-0 active:opacity-70 transition-opacity" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3); min-height: 44px; padding-left: 16px" data-me-action="wallet-bills" role="button" tabindex="0" :aria-label="t.headerTitles.meWalletBills" @click="goBills" @keydown.enter.prevent="goBills" @keydown.space.prevent="goBills">
               <text>{{ billsThisMonth }} {{ t.me.billsThisMonth }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
@@ -86,7 +86,7 @@
               <text style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-ink-3)">{{ t.me.walletSlotMore }}</text>
             </view>
           </view>
-          <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" @click="goStore">
+          <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" data-me-action="add-device" role="button" tabindex="0" :aria-label="t.me.addDeviceCta" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
             <text>{{ t.me.addDeviceCta }}</text>
           </view>
         </view>
