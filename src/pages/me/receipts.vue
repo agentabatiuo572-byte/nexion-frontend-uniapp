@@ -15,15 +15,25 @@
       <SubPageHeader back="/pages/me/me" :title="t.receipt.title" />
 
       <view v-if="remoteReceiptsMode" style="margin: 0 16px">
-        <EmptyState v-if="remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+        <EmptyState v-if="!remoteComputeReceiptLoading && remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
-          <view v-for="r in remoteComputeReceiptItems" :key="`compute:${r.receiptNo}`" class="flex items-center" :style="rowStyle(0)">
+          <view
+            v-for="r in remoteComputeReceiptItems"
+            :key="`compute:${r.receiptNo}`"
+            class="flex items-center active:opacity-80"
+            :style="rowStyle(0)"
+            role="button"
+            tabindex="0"
+            @click.stop="openRemoteComputeReceipt(r)"
+            @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)"
+            @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
+          >
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
               <text class="block truncate" :style="rowSubStyle">{{ t.receipt.title }} · {{ r.model }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
-              <text class="block tabular-nums" :style="remoteAmountStyle">+${{ r.reward.toFixed(3) }}</text>
+              <text class="block tabular-nums" :style="remoteAmountStyle">+${{ r.rewardUsdt.toFixed(3) }}</text>
               <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
             </view>
           </view>
@@ -39,12 +49,14 @@
           </view>
         </view>
         <view
-          v-if="depositsStore.remoteReceiptNextOffset !== null"
+          v-if="remoteComputeReceiptNextOffset !== null || depositsStore.remoteReceiptNextOffset !== null"
           class="grid place-items-center active:opacity-70"
           style="min-height: 44px; margin: 8px 0 16px"
           role="button"
           tabindex="0"
           @click="loadMoreRemoteReceipts"
+          @keydown.enter.stop.prevent="loadMoreRemoteReceipts"
+          @keydown.space.stop.prevent="loadMoreRemoteReceipts"
         >
           <text :style="rowSubStyle">{{ t.receipt.loadMore }}</text>
         </view>
@@ -112,13 +124,13 @@
 
       <text v-if="!remoteReceiptsMode" class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
 
-      <ReceiptModal v-if="!remoteReceiptsMode" :receipt="open" @close="open = null" />
+      <ReceiptModal :receipt="open" @close="open = null" />
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect, watch, onMounted, type CSSProperties } from "vue";
+import { computed, ref, watchEffect, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -131,11 +143,11 @@ import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
-import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { developmentFundsEnabled, remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useDeposits } from "@/store/deposits";
 import { useApp } from "@/store/app";
 import type { ServerReceiptListItem } from "@/store/deposits";
-import type { CompletedTask } from "@/store/types";
 
 type Tab = "ALL" | ReceiptCategory;
 const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
@@ -149,14 +161,13 @@ const depositsStore = useDeposits();
 // the local store in a remote session: its setup reads account-scoped localStorage.
 const remoteReceiptsMode = remoteApiEnabled;
 const remoteReceiptItems = computed<ServerReceiptListItem[]>(() => depositsStore.remoteReceipts);
-const remoteComputeReceiptItems = computed<CompletedTask[]>(() => remoteApiEnabled
-  ? app.visibleDevices.flatMap((device) => device.recentTasks)
-    .filter((task) => !!task.receiptNo)
-    .sort((a, b) => b.completedAt - a.completedAt)
-  : []);
+const remoteComputeReceiptItems = ref<CanonicalComputeReceiptSummary[]>([]);
+const remoteComputeReceiptNextOffset = ref<number | null>(null);
+const remoteComputeReceiptLoading = ref(remoteReceiptsMode);
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
-const open = ref<Receipt | null>(null);
+const open = ref<Receipt | CanonicalComputeReceipt | null>(null);
+let receiptRequestEpoch = 0;
 const visibleCount = ref(PAGE_SIZE);
 watch(tab, () => { visibleCount.value = PAGE_SIZE; });
 
@@ -171,9 +182,83 @@ onMounted(() => {
   else void depositsStore.refreshRemoteVietQrDeposits();
 });
 
-function loadMoreRemoteReceipts() {
-  void depositsStore.loadMoreRemoteVietQrReceipts();
+let receiptPageRequestEpoch = 0;
+async function loadRemoteComputeReceipts(offset: number, append: boolean): Promise<void> {
+  const requestEpoch = ++receiptPageRequestEpoch;
+  const expectedAccountKey = app.accountKey;
+  const expectedBindingEpoch = app.accountBindingEpoch;
+  remoteComputeReceiptLoading.value = true;
+  try {
+    const page = await taskAssignmentApi.receipts(offset, 20);
+    if (requestEpoch !== receiptPageRequestEpoch
+      || expectedAccountKey !== app.accountKey
+      || expectedBindingEpoch !== app.accountBindingEpoch) return;
+    remoteComputeReceiptItems.value = append
+      ? [...remoteComputeReceiptItems.value, ...page.items]
+      : page.items;
+    remoteComputeReceiptNextOffset.value = page.nextOffset;
+  } catch {
+    if (requestEpoch === receiptPageRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) {
+      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+    }
+  } finally {
+    if (requestEpoch === receiptPageRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) {
+      remoteComputeReceiptLoading.value = false;
+    }
+  }
 }
+
+async function loadMoreRemoteReceipts(): Promise<void> {
+  const requests: Promise<unknown>[] = [];
+  if (remoteComputeReceiptNextOffset.value !== null) {
+    requests.push(loadRemoteComputeReceipts(remoteComputeReceiptNextOffset.value, true));
+  }
+  if (depositsStore.remoteReceiptNextOffset !== null) {
+    requests.push(depositsStore.loadMoreRemoteVietQrReceipts());
+  }
+  await Promise.allSettled(requests);
+}
+
+async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+  const requestEpoch = ++receiptRequestEpoch;
+  const expectedAccountKey = app.accountKey;
+  const expectedBindingEpoch = app.accountBindingEpoch;
+  try {
+    const detail = await taskAssignmentApi.receipt(task.receiptNo);
+    if (requestEpoch === receiptRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) open.value = detail;
+  } catch {
+    if (requestEpoch === receiptRequestEpoch
+      && expectedAccountKey === app.accountKey
+      && expectedBindingEpoch === app.accountBindingEpoch) {
+      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+    }
+  }
+}
+
+watch(
+  () => [app.accountKey, app.accountBindingEpoch] as const,
+  () => {
+    if (!remoteReceiptsMode) return;
+    receiptPageRequestEpoch += 1;
+    receiptRequestEpoch += 1;
+    remoteComputeReceiptItems.value = [];
+    remoteComputeReceiptNextOffset.value = null;
+    open.value = null;
+    void loadRemoteComputeReceipts(0, false);
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  receiptRequestEpoch += 1;
+  receiptPageRequestEpoch += 1;
+});
 
 // Sentinel row (always mounted so the observer attaches from the start —
 // hasMore can flip true later as receipts arrive) sits at the list end;
