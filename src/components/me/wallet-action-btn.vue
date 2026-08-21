@@ -8,7 +8,7 @@
   fail:()=>{} 兜未接入的目标。
 -->
 <template>
-  <view class="flex flex-col items-center text-center active:opacity-90" style="gap: 6px; padding: 6px 2px; min-height: 44px" @click="go">
+  <view class="flex flex-col items-center text-center active:opacity-90" style="gap: 6px; padding: 6px 2px; min-height: 44px" :data-me-action="`wallet:${props.href}`" role="button" tabindex="0" :aria-label="props.label" @click="go" @keydown.enter.prevent="go" @keydown.space.prevent="go">
     <view class="grid place-items-center shrink-0" :style="iconStyle">
       <slot />
     </view>

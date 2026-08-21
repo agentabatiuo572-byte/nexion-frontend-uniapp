@@ -17,8 +17,8 @@ test("fails closed when a quiz response contains a malformed reward amount", asy
       rewardNex: { amount: 20 },
       attempts: 1,
       serverCanonical: true,
-      sourceEnvironment: "SANDBOX",
-      runId: RUN,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
     }),
   } as never);
 
@@ -44,8 +44,8 @@ test("sends the stable quiz key outside the request body and binds the answer to
         rewardNex: "20.000000",
         attempts: 1,
         serverCanonical: true,
-        sourceEnvironment: "SANDBOX",
-        runId: RUN,
+        sourceEnvironment: "PRODUCTION",
+        runId: "",
       };
     },
   } as never, "dev");
@@ -67,11 +67,11 @@ test("binds start and content-only completion to the displayed version", async (
   const course = {
     id: "h3-live-20260722", title: "Course", body: "Body", category: "Basics", format: "Article", level: "Beginner",
     duration: "5 min", rewardNex: "20.000000", featured: true, version: "v1", progress: 1, completed: false,
-    attempts: 0, lastScore: 0, rewardGranted: false, serverCanonical: true, source: "mock", sourceEnvironment: "SANDBOX", runId: RUN, permanentLabel: "ACCEPTANCE SANDBOX • NON-PRODUCTION", questions: [],
+    attempts: 0, lastScore: 0, rewardGranted: false, serverCanonical: true, source: "provider", sourceEnvironment: "PRODUCTION", runId: "", permanentLabel: "PRODUCTION LEARNING FACTS", questions: [],
   };
   const result = {
     courseId: "h3-live-20260722", version: "v1", score: 100, passed: true, completed: true,
-    rewardGranted: true, rewardNex: "20.000000", attempts: 1, serverCanonical: true, sourceEnvironment: "SANDBOX", runId: RUN,
+    rewardGranted: true, rewardNex: "20.000000", attempts: 1, serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
   };
   const api = createLearningApi({ request: async (request: unknown) => {
     requests.push(request);
@@ -87,6 +87,28 @@ test("binds start and content-only completion to the displayed version", async (
     { method: "POST", path: "/api/content/learning/courses/h3-live-20260722/start?language=vi&version=v1" },
     { method: "POST", path: "/api/content/learning/courses/h3-live-20260722/complete?version=v1" },
   ]);
+});
+
+test.each(["dev", "prod"] as const)("%s learning reads Java production-shaped facts without a RunID", async (mode) => {
+  const api = createLearningApi({ request: async () => ({
+    courses: [], completedCourses: 0, totalCourses: 0, earnedNex: "0",
+    serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+  }) } as never, mode);
+
+  await expect(api.courses("zh")).resolves.toMatchObject({
+    courses: [], completedCourses: 0, totalCourses: 0,
+    sourceEnvironment: "PRODUCTION", runId: "",
+  });
+});
+
+test("development learning rejects a sandbox projection", async () => {
+  setCurrentCommerceSandboxRun(RUN);
+  const api = createLearningApi({ request: async () => ({
+    courses: [], completedCourses: 0, totalCourses: 0, earnedNex: "0",
+    serverCanonical: true, sourceEnvironment: "SANDBOX", runId: RUN,
+  }) } as never, "dev");
+
+  await expect(api.courses("zh")).rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" });
 });
 
 test.each([

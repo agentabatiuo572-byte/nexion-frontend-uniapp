@@ -32,17 +32,14 @@ describe("order list provenance", () => {
       .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
   });
 
-  it("sandbox mode requires mock SANDBOX data from the current RunID", async () => {
-    setCurrentCommerceSandboxRun("run-20260817");
-    await expect(api({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260817", serverCanonical: true, orders: [order()] }, "dev").list())
-      .resolves.toMatchObject({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260817", serverCanonical: true });
+  it("development mode accepts the same Java production-shaped order authority", async () => {
     await expect(api({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true, orders: [order()] }, "dev").list())
-      .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
+      .resolves.toMatchObject({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true });
   });
 
-  it("sandbox mode rejects a stale RunID", async () => {
+  it("development mode rejects sandbox data even when its RunID is current", async () => {
     setCurrentCommerceSandboxRun("run-20260817");
-    await expect(api({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816", serverCanonical: true, orders: [order()] }, "dev").list())
+    await expect(api({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260817", serverCanonical: true, orders: [order()] }, "dev").list())
       .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
   });
 

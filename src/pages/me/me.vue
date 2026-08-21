@@ -43,8 +43,13 @@
               :key="item.key"
               class="active:opacity-80"
               :data-quick-key="item.key"
+              role="button"
+              tabindex="0"
+              :aria-label="item.label"
               :style="quickItemStyle"
               @click="handleQuickItem(item)"
+              @keydown.enter.prevent="handleQuickItem(item)"
+              @keydown.space.prevent="handleQuickItem(item)"
             >
               <view :style="quickIconStyle(item.tone)">
                 <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -68,14 +73,14 @@
       </view>
       <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
         <text class="flex-1" style="font-size: 12px; color: var(--v5-danger)">{{ t.orders.refreshFailed }}</text>
-        <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" role="button" tabindex="0" @click="refreshRemoteOrders">
+        <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.orders.retry" @click="refreshRemoteOrders" @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
           <text>{{ t.orders.retry }}</text>
         </view>
       </view>
       <OrdersCard v-if="orderCount > 0" />
 
       <!-- Sign out -->
-      <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signOutStyle" @click="handleSignOut">
+      <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signOutStyle" data-me-action="sign-out" role="button" tabindex="0" :aria-label="t.me.signOut" @click="handleSignOut" @keydown.enter.prevent="handleSignOut" @keydown.space.prevent="handleSignOut">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
         <text style="margin-left: 6px">{{ t.me.signOut }}</text>
       </view>

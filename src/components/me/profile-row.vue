@@ -5,7 +5,7 @@
   Taps through to /me/profile.
 -->
 <template>
-  <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" @click="goProfile">
+  <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" data-me-action="profile" role="button" tabindex="0" :aria-label="t.me.profile" @click="goProfile" @keydown.enter.prevent="goProfile" @keydown.space.prevent="goProfile">
     <view class="grid place-items-center shrink-0" :style="avatarStyle">
       <text :style="avatarTextStyle">{{ initial }}</text>
     </view>
