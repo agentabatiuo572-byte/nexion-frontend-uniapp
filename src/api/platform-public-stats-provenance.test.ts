@@ -25,7 +25,7 @@ const production = {
 
 describe("H9 public stats provenance", () => {
   it("accepts the exact production authority", () => {
-    expect(parsePlatformPublicStats(production, "remote").authority).toEqual({
+    expect(parsePlatformPublicStats(production, "prod").authority).toEqual({
       source: "server:nx_config_item,nx_user",
       sourceEnvironment: "PRODUCTION",
       runId: "",
@@ -33,16 +33,15 @@ describe("H9 public stats provenance", () => {
     });
   });
 
-  it("accepts an explicit Sandbox run projection", () => {
+  it("development consumes the same PC-backed canonical projection", () => {
     expect(parsePlatformPublicStats({
       ...production,
-      source: "mock",
-      sourceEnvironment: "SANDBOX",
-      runId: "home-public-stats-20260819",
-    }, "sandbox").authority).toMatchObject({
-      source: "mock",
-      sourceEnvironment: "SANDBOX",
-      runId: "home-public-stats-20260819",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+    }, "dev").authority).toMatchObject({
+      source: "server:nx_config_item,nx_user",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
     });
   });
 
@@ -52,17 +51,16 @@ describe("H9 public stats provenance", () => {
     { sourceEnvironment: "SANDBOX", source: "mock", runId: "" },
     { sourceEnvironment: "SANDBOX", source: "server:nx_config_item,nx_user", runId: "run-20260819" },
   ])("rejects missing or contradictory authority: $sourceEnvironment/$source", (override) => {
-    expect(() => parsePlatformPublicStats({ ...production, ...override }, "remote")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
+    expect(() => parsePlatformPublicStats({ ...production, ...override }, "prod")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
   });
 
   it("rejects a projection from the opposite runtime environment", () => {
-    expect(() => parsePlatformPublicStats(production, "sandbox")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
+    expect(parsePlatformPublicStats(production, "dev").authority.sourceEnvironment).toBe("PRODUCTION");
     expect(() => parsePlatformPublicStats({
       ...production,
       source: "mock",
       sourceEnvironment: "SANDBOX",
       runId: "home-public-stats-20260819",
-    }, "remote")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
-    expect(() => parsePlatformPublicStats(production, "mock")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
+    }, "dev")).toThrow("H9_PUBLIC_STATS_RESPONSE_INVALID");
   });
 });

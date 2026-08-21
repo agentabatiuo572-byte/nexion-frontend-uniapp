@@ -3,8 +3,9 @@ import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { accountRowRev, readAccountRow, writeAccountRowCas } from "./account-scoped-storage";
 import { mockServerId } from "./mock-id";
-import { stakingApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, stakingApi, remoteApiEnabled } from "@/api/runtime";
 import type { StakingPool } from "@/api/staking-api";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 /**
  * Ported from Nexion-prototype/lib/v3/staking.ts (zustand persist → Pinia + uni storage).
@@ -56,6 +57,7 @@ export interface StakingPosition {
   amountUSDT: number;
   termDays: StakingTerm;
   apy: number;
+  penalty: number;
   startTs: number;
   unlockTs: number;
   status: "pending-lock" | "active" | "matured" | "early-withdrawn" | "claimed" | "slashed" | "refunded";
@@ -72,6 +74,7 @@ function seedPositions(): StakingPosition[] {
       amountUSDT: 500,
       termDays: 90,
       apy: 0.35,
+      penalty: STAKING_PENALTY[90],
       startTs: now - 30 * ONE_DAY,
       unlockTs: now + 60 * ONE_DAY,
       status: "active",
@@ -98,6 +101,7 @@ function hydrate(accountKey: string): StakingSnapshot {
 
 export const useStaking = defineStore("staking", () => {
   const isMockMode = !remoteApiEnabled;
+  const sandboxMarket = apiRuntimeConfig.environment === "dev";
   const pools = ref<StakingPool[]>([]);
   const walletBalanceUsdt = ref(0);
   const remoteError = ref<string | null>(null);
@@ -105,25 +109,35 @@ export const useStaking = defineStore("staking", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   // Remote mode must not expose the prototype position while the authority
   // request is pending. An empty snapshot is the only honest initial state.
   const boot = remoteApiEnabled ? { positions: [], rev: 0 } : hydrate(boundKey);
   let boundRev = boot.rev;
   const positions = ref<StakingPosition[]>(boot.positions);
 
+  function assertSandboxSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
+    const valid = snapshot.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
+      && (sandboxMarket ? typeof snapshot.runId === "string" && snapshot.runId.length > 0 : snapshot.runId === "");
+    if (!valid) throw new Error("G1_RUNTIME_PROVENANCE_INVALID");
+  }
+
   function clearRemoteState() {
     pools.value = [];
     positions.value = [];
     walletBalanceUsdt.value = 0;
+    remoteError.value = null;
     remoteReady.value = false;
   }
 
   function applyRemoteSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
+    assertSandboxSnapshot(snapshot);
     positions.value = snapshot.positions.map((position) => ({
       id: position.id,
       amountUSDT: position.amountUSDT,
       termDays: position.termDays,
       apy: position.apy,
+      penalty: position.penalty,
       startTs: position.startTs,
       unlockTs: position.unlockTs,
       status: position.status,
@@ -134,17 +148,21 @@ export const useStaking = defineStore("staking", () => {
   }
 
   // 权威不可达是常态输入,不 reject(resilience 门);失败信号走返回值/remoteError。
-  async function syncRemote(): Promise<boolean> {
-    if (!remoteApiEnabled) return true;
+  async function syncRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+    if (isMockMode) return true;
+    if (!remoteAccountEpoch.isCurrent(request)) return false;
+    clearRemoteState();
     try {
       const [nextPools, snapshot] = await Promise.all([
         stakingApi.fetchStakingPools(),
         stakingApi.fetchStakingPositions(),
       ]);
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
       pools.value = nextPools;
       applyRemoteSnapshot(snapshot);
       return true;
     } catch {
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
       return false;
@@ -152,17 +170,23 @@ export const useStaking = defineStore("staking", () => {
   }
 
   async function openRemote(tierKey: string, amountUsdt: number, idempotencyKey: string) {
+    const request = remoteAccountEpoch.snapshot();
     // A remote order may only be submitted against the exact, successfully
     // parsed server product snapshot. Never reconstruct a tier or minimum from
     // the mock table after a config/network failure.
-    if (!remoteReady.value) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
+    if (!remoteAccountEpoch.isCurrent(request) || !remoteReady.value) {
+      throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
+    }
     const pool = pools.value.find((row) => row.tierKey === tierKey && row.enabled);
     if (!pool || amountUsdt < pool.minAmountUsdt) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
+    if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
     try {
       const snapshot = await stakingApi.openStakingPosition(tierKey, amountUsdt, idempotencyKey);
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       applyRemoteSnapshot(snapshot);
       return snapshot;
     } catch {
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
       throw new Error(remoteError.value);
@@ -170,11 +194,14 @@ export const useStaking = defineStore("staking", () => {
   }
 
   async function claimRemote(positionNo: string, idempotencyKey: string) {
+    const request = remoteAccountEpoch.snapshot();
     try {
       const snapshot = await stakingApi.claimStakingPosition(positionNo, idempotencyKey);
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       applyRemoteSnapshot(snapshot);
       return snapshot;
     } catch {
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
       throw new Error(remoteError.value);
@@ -182,11 +209,14 @@ export const useStaking = defineStore("staking", () => {
   }
 
   async function earlyWithdrawRemote(positionNo: string, idempotencyKey: string) {
+    const request = remoteAccountEpoch.snapshot();
     try {
       const snapshot = await stakingApi.earlyWithdrawStakingPosition(positionNo, idempotencyKey);
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       applyRemoteSnapshot(snapshot);
       return snapshot;
     } catch {
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
       throw new Error(remoteError.value);
@@ -239,9 +269,10 @@ export const useStaking = defineStore("staking", () => {
   /** 账号切换重绑:装载该账号的持仓行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    if (remoteApiEnabled) {
+    remoteAccountEpoch.bind(boundKey);
+    if (!isMockMode) {
       clearRemoteState();
-      void syncRemote();
+      void syncRemote(remoteAccountEpoch.snapshot());
       return;
     }
     const row = hydrate(boundKey);
@@ -295,6 +326,7 @@ export const useStaking = defineStore("staking", () => {
       amountUSDT: amount,
       termDays,
       apy: STAKING_APY[termDays],
+      penalty: STAKING_PENALTY[termDays],
       startTs: t,
       unlockTs: t + termDays * ONE_DAY,
       status: "active",
@@ -321,7 +353,9 @@ export const useStaking = defineStore("staking", () => {
       const p = current.find((x) => x.id === id);
       // 🔴 前置条件复核跑在磁盘最新状态上:别处已经赎回过的仓位在这里就被挡住,不会二次退款。
       if (!p || p.status !== "active") return null;
-      const penaltyRate = STAKING_PENALTY[p.termDays];
+      // Existing mock rows may predate the persisted penalty field; only the
+      // local mock path may reconstruct that legacy value.
+      const penaltyRate = p.penalty ?? STAKING_PENALTY[p.termDays];
       const penalty = p.amountUSDT * penaltyRate;
       return {
         next: current.map((x) => (x.id === id ? { ...x, status: "early-withdrawn" as const } : x)),

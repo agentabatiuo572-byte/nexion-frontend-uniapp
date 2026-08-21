@@ -153,12 +153,30 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
-import { commercePaymentApi, fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
 
 const id = ref("");
+let detailMounted = true;
+let detailEpoch = 0;
+
+interface DetailRequestScope {
+  pageEpoch: number;
+  orderNo: string;
+}
+
+function captureDetailScope(): DetailRequestScope {
+  return { pageEpoch: detailEpoch, orderNo: id.value };
+}
+
+function isCurrentDetailScope(scope: DetailRequestScope): boolean {
+  return detailMounted
+    && detailEpoch === scope.pageEpoch
+    && id.value === scope.orderNo;
+}
+
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
@@ -167,17 +185,24 @@ const remoteOrderError = ref(false);
 const remoteOrderRefreshing = ref(false);
 async function refreshOrder() {
   if (!remoteApiEnabled || remoteOrderRefreshing.value) return;
+  const scope = captureDetailScope();
   remoteOrderRefreshing.value = true;
   remoteOrderError.value = false;
   try {
     await orders.refreshRemote();
+    if (!isCurrentDetailScope(scope)) return;
   } catch {
+    if (!isCurrentDetailScope(scope)) return;
     remoteOrderError.value = true;
   } finally {
-    remoteOrderRefreshing.value = false;
+    if (isCurrentDetailScope(scope)) remoteOrderRefreshing.value = false;
   }
 }
-onShow(() => { void refreshOrder(); });
+onShow(() => {
+  detailMounted = true;
+  detailEpoch += 1;
+  void refreshOrder();
+});
 
 const order = computed(() => orders.orders.find((o) => o.id === id.value));
 
@@ -210,25 +235,30 @@ const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.valu
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
 const cancellable = computed(() => order.value?.status === "placed");
 const isProvisioning = computed(() => order.value?.status === "provisioning");
-const sandboxPaymentAvailable = computed(() => fundsSandboxEnabled && !remoteOrderError.value && order.value?.status === "placed");
+const sandboxPaymentAvailable = computed(() => developmentFundsEnabled && !remoteOrderError.value && order.value?.status === "placed");
 const sandboxPaying = ref(false);
 
 async function handleSandboxPay() {
   const current = order.value;
-  if (!fundsSandboxEnabled || !current || current.status !== "placed" || sandboxPaying.value) return;
+  if (!developmentFundsEnabled || !current || current.status !== "placed" || sandboxPaying.value) return;
+  const scope = captureDetailScope();
   sandboxPaying.value = true;
   try {
     await commercePaymentApi.confirm(current.id, `h5-order-pay:${current.id}`);
+    if (!isCurrentDetailScope(scope)) return;
     await orders.refreshRemote();
+    if (!isCurrentDetailScope(scope)) return;
     const readBack = orders.orders.find((item) => item.id === current.id);
     if (readBack?.status !== "paid" && readBack?.status !== "provisioning" && readBack?.status !== "activated") {
       throw new Error("ORDER_PAYMENT_READBACK_MISMATCH");
     }
+    if (!isCurrentDetailScope(scope)) return;
     toast.success(t.value.orders.statusPaid);
   } catch {
+    if (!isCurrentDetailScope(scope)) return;
     toast.error(t.value.authOtp.errorServiceUnavailable);
   } finally {
-    sandboxPaying.value = false;
+    if (isCurrentDetailScope(scope)) sandboxPaying.value = false;
   }
 }
 
@@ -305,16 +335,19 @@ function dt(ts: number): string {
 }
 
 async function handleCancel() {
+  const scope = captureDetailScope();
   const ok = await uiConfirm({
     title: t.value.orders.cancelOrder,
     message: t.value.orders.cancelConfirm,
     danger: true,
     icon: "warn",
   });
-  if (ok && order.value) {
+  if (ok && isCurrentDetailScope(scope) && order.value) {
+    const orderNo = order.value.id;
     const cancelled = remoteApiEnabled
-      ? await orders.cancelOrderRemote(order.value.id)
-      : orders.cancelOrder(order.value.id);
+      ? await orders.cancelOrderRemote(orderNo)
+      : orders.cancelOrder(orderNo);
+    if (!isCurrentDetailScope(scope)) return;
     if (cancelled) {
       toast.warn(t.value.orders.cancelDoneToast);
     } else {
@@ -331,6 +364,8 @@ function goEarn() {
 }
 
 function cleanup() {
+  detailMounted = false;
+  detailEpoch += 1;
   if (tickTimer) clearInterval(tickTimer);
 }
 onUnload(() => cleanup());

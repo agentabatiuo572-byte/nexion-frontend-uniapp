@@ -40,7 +40,7 @@
     "api-mode-preflight": {
       "kind": "server",
       "always": true,
-      "$why": "[2.5] mock 模式 + 树身份;有 server 就跑,static 跳"
+      "$why": "[2.5] development 构建环境 + 树身份;有 server 就跑,static 跳"
     },
     "server-health-preflight": {
       "kind": "server",

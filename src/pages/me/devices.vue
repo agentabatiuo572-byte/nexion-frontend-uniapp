@@ -43,6 +43,22 @@
 
         <ComputeShareEntry context="devices" />
 
+        <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
+          <view class="flex items-start" style="gap: 12px">
+            <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
+            </view>
+            <view class="flex-1 min-w-0">
+              <text class="block" :style="phoneActivationTitleStyle">{{ t.myDevices.phoneActivationTitle }}</text>
+              <text class="block" :style="phoneActivationBodyStyle">{{ t.myDevices.phoneActivationBody }}</text>
+              <text class="block" :style="phoneActivationRewardStyle">{{ t.myDevices.phoneActivationRewardGate }}</text>
+            </view>
+          </view>
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation" @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
+            <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
+          </view>
+        </view>
+
         <!-- Trial device — NexGridBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
@@ -163,6 +179,7 @@ import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
@@ -182,6 +199,7 @@ import { refreshProductCatalog } from "@/store/product-catalog";
 
 const t = useT();
 const app = useApp();
+const session = useSession();
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
@@ -200,6 +218,11 @@ const trialActive = computed(() => trial.status === "active" || trial.status ===
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
+const phoneNeedsActivation = computed(() => {
+  const phones = app.visibleDevices.filter((device) => device.kind === "phone");
+  return !phones.some((device) => device.activatedAt !== null)
+    || !session.isCurrentDeviceCalibrated(app.accountKey);
+});
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
@@ -290,6 +313,10 @@ function handleTradein(d: Device) {
 }
 
 async function handleActivate(d: Device) {
+  if (d.kind === "phone") {
+    goPhoneActivation();
+    return;
+  }
   if (slotsFull.value) {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
     return;
@@ -341,6 +368,10 @@ function onSheetWait() {
   app.scheduleDeactivation(d.id);
   toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
+}
+
+function goPhoneActivation() {
+  uni.navigateTo({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => {} });
 }
 
 async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
@@ -632,6 +663,51 @@ const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   fontWeight: 500,
+  color: "var(--v5-on-brand)",
+};
+const phoneActivationCardStyle: CSSProperties = {
+  marginTop: "12px",
+  borderRadius: "16px",
+  border: "1px solid color-mix(in oklab, var(--v5-brand) 35%, var(--v5-border))",
+  background: "color-mix(in oklab, var(--v5-brand) 8%, var(--v5-surface))",
+  padding: "14px",
+};
+const phoneActivationIconStyle: CSSProperties = {
+  width: "40px",
+  height: "40px",
+  borderRadius: "12px",
+  background: "color-mix(in oklab, var(--v5-brand) 13%, var(--v5-surface))",
+};
+const phoneActivationTitleStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+};
+const phoneActivationBodyStyle: CSSProperties = {
+  marginTop: "4px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  lineHeight: 1.5,
+  color: "var(--v5-ink-3)",
+};
+const phoneActivationRewardStyle: CSSProperties = {
+  marginTop: "6px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  lineHeight: 1.5,
+  color: "var(--v5-warning)",
+};
+const phoneActivationCtaStyle: CSSProperties = {
+  marginTop: "12px",
+  minHeight: "44px",
+  borderRadius: "999px",
+  background: "var(--v5-brand)",
+};
+const phoneActivationCtaLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "13px",
+  fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
 </script>

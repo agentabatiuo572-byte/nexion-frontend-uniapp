@@ -13,7 +13,7 @@
   (P-022). Interval re-render keeps monthsOwned / efficiency ticking.
 -->
 <template>
-  <view v-if="degradableDevices.length > 0" class="mx-4">
+  <view v-if="summaries.length > 0" class="mx-4">
     <view class="block relative overflow-hidden rounded-2xl" :style="rootStyle" @click="goDevices">
       <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { getLifecycleSummary, getNetworkMonthlyLoss, isDegradable } from "@/store/device-lifecycle";
+import { getLifecycleSummary, getNetworkMonthlyLoss, hasServerLifecycleProjection, isDegradable } from "@/store/device-lifecycle";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
@@ -70,7 +70,12 @@ onUnmounted(() => {
 
 const degradableDevices = computed(() => app.visibleDevices.filter((d) => isDegradable(d.kind)));
 
-const summaries = computed(() => degradableDevices.value.map((d) => getLifecycleSummary(d, now.value)));
+// In remote mode an absent canonical projection is unavailable, not a signal
+// to run the local age curve. Keep the banner hidden until a fresh projection
+// is present, so account refresh/switch cannot show the previous account's data.
+const summaries = computed(() => degradableDevices.value
+  .filter((device) => device.capacitySource !== "server" || hasServerLifecycleProjection(device))
+  .map((d) => getLifecycleSummary(d, now.value)));
 const avgEfficiency = computed(() => {
   const list = summaries.value;
   if (list.length === 0) return 1;
@@ -91,7 +96,7 @@ const accent = computed(() =>
       : "var(--v5-brand-2)",
 );
 
-const subtitleText = computed(() => fmt(t.value.earn.lifecycleSubtitle, { n: degradableDevices.value.length }));
+const subtitleText = computed(() => fmt(t.value.earn.lifecycleSubtitle, { n: summaries.value.length }));
 const monthsLabel = computed(() => {
   const o = oldest.value;
   if (!o) return "";

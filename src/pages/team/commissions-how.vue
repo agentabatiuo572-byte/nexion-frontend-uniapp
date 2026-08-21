@@ -10,7 +10,8 @@
 -->
 <template>
   <AppChassis active="team">
-    <view class="pb-8" style="color: var(--v5-ink)">
+    <HowPublishedContent v-if="remoteApiEnabled" content-key="team-commissions-how" back="/pages/team/commissions" />
+    <view v-if="!remoteApiEnabled" class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/commissions" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="lemon" />
@@ -129,6 +130,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import HowPublishedContent from "@/components/how/how-published-content.vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";

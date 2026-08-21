@@ -294,7 +294,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
-import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, deviceE3Api, developmentFundsEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
@@ -337,7 +337,7 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
-  if (fundsSandboxEnabled) {
+  if (developmentFundsEnabled) {
     return [{ id: "sandbox-wallet", label: t.value.store.coSandboxWallet,
       hint: t.value.store.coHintSandboxWallet, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 }];
   }
@@ -562,7 +562,7 @@ const voucherMatch = computed(() => {
   if (!p) return null;
   // Canonical E3 submit owns the complete quote and wallet debit. Client-side
   // voucher stacking is not part of that command and therefore fails closed.
-  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || fundsSandboxEnabled)) return null;
+  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || developmentFundsEnabled)) return null;
   return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
@@ -782,7 +782,7 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(fundsSandboxEnabled ? "sandbox-wallet" : "usdt-trc20");
+const payment = ref<string>(developmentFundsEnabled ? "sandbox-wallet" : "usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
@@ -952,7 +952,7 @@ async function goAwaiting() {
   // debit the run-scoped sandbox wallet and issue the durable payment number.
   // Remote/production deliberately remains provider-backed and never falls
   // back to this mock rail.
-  if (fundsSandboxEnabled) {
+  if (developmentFundsEnabled) {
     const orderNo = orderId.value;
     if (!orderNo) {
       step.value = "confirm";
@@ -1029,7 +1029,7 @@ async function onConfirmPay() {
         step.value = "select-payment";
         return;
       }
-      if (fundsSandboxEnabled) {
+      if (developmentFundsEnabled) {
         try {
           const readback = (await orderApi.list()).orders.find((order) => order.orderNo === conversion.orderNo);
           if (!isCurrentAccountScope(confirmationScope)) {
@@ -1385,7 +1385,7 @@ async function submitRemoteOrder(): Promise<void> {
     }
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
     if (!scopeIsCurrent()) return;
-    const sandboxPaidReplay = fundsSandboxEnabled && persisted?.canonicalStatus === "paid"
+    const sandboxPaidReplay = developmentFundsEnabled && persisted?.canonicalStatus === "paid"
       && persisted.paymentStatus.toUpperCase() === "PAID"
       && persisted.orderStatus.toUpperCase() === "PAID";
     if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
@@ -1412,7 +1412,7 @@ async function submitRemoteOrder(): Promise<void> {
     // failure after the server has already committed the order.
     // Retire the durable key only after the server order readback above and
     // account-scoped order refresh both succeeded; unknown outcomes reuse it.
-    if (fundsSandboxEnabled) {
+    if (developmentFundsEnabled) {
       // The user's confirm click is the explicit payment action in
       // local-sandbox. Settlement remains entirely server-side and is accepted
       // only after both the mock provenance receipt and canonical order readback

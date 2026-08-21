@@ -18,7 +18,7 @@ test("App keeps server funds modes authoritative and never finalizes funds in th
   const appStore = read("src/store/app.ts");
   const api = read("src/api/funds-sandbox-api.ts");
   assert.match(runtimeConfig, /"mock"\s*\|\s*"sandbox"\s*\|\s*"remote"/);
-  assert.match(runtime, /fundsSandboxEnabled\s*=\s*apiRuntimeConfig\.mode\s*===\s*["']sandbox["']\s*&&\s*apiRuntimeConfig\.modeExplicit/);
+  assert.match(runtime, /developmentFundsEnabled\s*=\s*apiRuntimeConfig\.environment\s*===\s*["']dev["']/);
   assert.match(api, /sourceEnvironment:\s*["']SANDBOX["']/);
   assert.match(api, /source:\s*["']mock["']/);
   assert.match(api, /Idempotency-Key|idempotencyKey/);
@@ -41,6 +41,6 @@ test("backend withdrawal path keeps sandbox subjects out of real payouts", { ski
   assert.match(productionGuard, /requireProductionWithdrawalSubject\(userId\)/);
   assert.match(withdrawalService, /WITHDRAWAL_PRODUCTION_PROFILE_REQUIRED/);
   assert.match(withdrawalService, /WITHDRAWAL_SANDBOX_USER_FORBIDDEN/);
-  assert.match(withdrawalService, /profiles\.length == 0[\s\S]*"production"\.equals\(profiles\[0\]\)/,
-    "only default or an exact production profile can reach a real withdrawal");
+  assert.match(withdrawalService, /FundsSandboxProfileGuard\.isStrictProductionProfile\(profiles\)/,
+    "only the shared strict production/default profile contract can reach a real withdrawal");
 });

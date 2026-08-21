@@ -1,5 +1,8 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiEnvironment } from "./runtime-config";
+
+type GenesisSourceEnvironment = "PRODUCTION" | "SANDBOX";
 
 export interface GenesisSalePolicy {
   available: boolean;
@@ -15,6 +18,8 @@ export interface GenesisSalePolicy {
 }
 
 export interface GenesisEligibility {
+  sourceEnvironment: GenesisSourceEnvironment;
+  runId: string;
   eligible: boolean;
   reasons: string[];
   ownedCount: number;
@@ -26,6 +31,17 @@ export interface GenesisEligibility {
   mode?: "any-of" | "all-of";
   appliesTo?: "primary" | "both";
   halted?: boolean;
+  holderStatus: "READY" | "NOT_ELIGIBLE" | "CONFIG_UNAVAILABLE" | "NOT_EFFECTIVE";
+  reservedAllocation: number | null;
+  reservedAllocationUnit: "NEX";
+  priorityRank: number | null;
+  priorityTier: "TOP_1" | "TOP_3" | "TOP_5" | "STANDARD" | "NONE";
+  qualificationReasonCodes: string[];
+  policyVersion: string | null;
+  effectiveAt: number | null;
+  asOf: number;
+  serverTime: number;
+  provenance: { source: string; environment: GenesisSourceEnvironment; runId: string };
 }
 
 export interface GenesisSeries {
@@ -83,6 +99,11 @@ export interface GenesisTier {
 }
 
 export interface GenesisPublicState {
+  sourceEnvironment: GenesisSourceEnvironment;
+  runId: string;
+  halted: boolean;
+  revision: string;
+  source: string;
   series: GenesisSeries;
   sale: GenesisSalePolicy;
   marketEnabled: boolean;
@@ -109,6 +130,8 @@ export interface GenesisMarketStats {
 }
 
 export interface GenesisAccountState {
+  sourceEnvironment: GenesisSourceEnvironment;
+  runId: string;
   series: GenesisSeries;
   sale: GenesisSalePolicy;
   marketEnabled: boolean;
@@ -143,6 +166,19 @@ function number(value: unknown, min = 0): number | null {
 function integer(value: unknown, min = 0): number | null {
   const parsed = number(value, min);
   return parsed !== null && Number.isInteger(parsed) ? parsed : null;
+}
+
+export interface GenesisInviteRedeemReceipt {
+  code: string;
+  sourceEnvironment: GenesisSourceEnvironment;
+  runId: string;
+  source: string;
+}
+
+function validAuthority(row: Record<string, unknown> | null, mode: ApiEnvironment): boolean {
+  if (!row || row.serverCanonical !== true) return false;
+  return (mode === "dev" || mode === "prod")
+    && row.sourceEnvironment === "PRODUCTION" && row.runId === "";
 }
 
 function timestamp(value: unknown, nullable = false): number | null {
@@ -193,19 +229,41 @@ function parseSale(value: unknown): GenesisSalePolicy {
   };
 }
 
-function parseEligibility(value: unknown): GenesisEligibility {
+function parseEligibility(value: unknown, mode: ApiEnvironment): GenesisEligibility {
   const row = record(value);
   const ownedCount = integer(row?.ownedCount);
   const maxPerUser = integer(row?.maxPerUser);
   const remainingCap = integer(row?.remainingCap);
   const minAccountAgeDays = integer(row?.minAccountAgeDays);
   const accountAgeDays = integer(row?.accountAgeDays);
-  if (!row || row.serverCanonical !== true || typeof row.eligible !== "boolean"
+  const holderStatus = text(row?.status);
+  const reservedAllocation = row?.reservedAllocation == null ? null : number(row.reservedAllocation);
+  const priorityRank = row?.priorityRank == null ? null : integer(row.priorityRank, 1);
+  const priorityTier = text(row?.priorityTier);
+  const policyVersion = row?.policyVersion == null ? null : text(row.policyVersion);
+  const effectiveAt = row?.effectiveAt == null ? null : timestamp(row.effectiveAt, true);
+  const asOf = timestamp(row?.asOf);
+  const serverTime = timestamp(row?.serverTime);
+  const provenance = record(row?.provenance);
+  if (!row || !validAuthority(row, mode) || typeof row.eligible !== "boolean"
       || typeof row.hasGenesisInvite !== "boolean"
       || !Array.isArray(row.reasons) || !row.reasons.every((reason) => typeof reason === "string")
       || ownedCount === null || maxPerUser === null || remainingCap === null
-      || minAccountAgeDays === null || accountAgeDays === null) return invalid();
+      || minAccountAgeDays === null || accountAgeDays === null
+      || !holderStatus || !["READY", "NOT_ELIGIBLE", "CONFIG_UNAVAILABLE", "NOT_EFFECTIVE"].includes(holderStatus)
+      || (row.reservedAllocation != null && reservedAllocation === null)
+      || (row.priorityRank != null && priorityRank === null)
+      || !["TOP_1", "TOP_3", "TOP_5", "STANDARD", "NONE"].includes(priorityTier ?? "")
+      || (row.policyVersion != null && !policyVersion)
+      || asOf === null || serverTime === null || !provenance
+      || text(provenance.source) === null
+      || provenance.environment !== row.sourceEnvironment || provenance.runId !== row.runId
+      || row.reservedAllocationUnit !== "NEX"
+      || !Array.isArray(row.qualificationReasonCodes)
+      || !row.qualificationReasonCodes.every((reason) => typeof reason === "string" && reason.trim())) return invalid();
   return {
+    sourceEnvironment: row.sourceEnvironment as GenesisSourceEnvironment,
+    runId: row.runId as string,
     eligible: row.eligible,
     reasons: [...row.reasons] as string[],
     ownedCount,
@@ -217,6 +275,17 @@ function parseEligibility(value: unknown): GenesisEligibility {
     mode: row.mode === "all-of" || row.mode === "any-of" ? row.mode : undefined,
     appliesTo: row.appliesTo === "primary" || row.appliesTo === "both" ? row.appliesTo : undefined,
     halted: typeof row.halted === "boolean" ? row.halted : undefined,
+    holderStatus: holderStatus as GenesisEligibility["holderStatus"],
+    reservedAllocation,
+    reservedAllocationUnit: "NEX",
+    priorityRank,
+    priorityTier: priorityTier as GenesisEligibility["priorityTier"],
+    qualificationReasonCodes: row.qualificationReasonCodes.map((reason) => String(reason).trim()),
+    policyVersion,
+    effectiveAt,
+    asOf,
+    serverTime,
+    provenance: { source: text(provenance.source)!, environment: provenance.environment as GenesisSourceEnvironment, runId: provenance.runId as string },
   };
 }
 
@@ -240,7 +309,11 @@ function parseHolding(value: unknown): GenesisHolding {
   const row = record(value);
   const holdingNo = text(row?.holdingNo);
   const seriesCode = text(row?.seriesCode);
-  const acquiredPriceUsdt = number(row?.acquiredPriceUsdt, 0.000001);
+  // Sandbox acceptance fixtures may represent a server-confirmed holding
+  // without a purchase price. Zero is a valid canonical value here; the
+  // holder allocation/eligibility projection remains the authority for the
+  // visible benefit, while negative prices are still rejected by `number`.
+  const acquiredPriceUsdt = number(row?.acquiredPriceUsdt, 0);
   const status = text(row?.status);
   if (!row || !holdingNo || !seriesCode || acquiredPriceUsdt === null
       || (status !== "ACTIVE" && status !== "LISTED")) return invalid();
@@ -306,7 +379,7 @@ function parseTier(value: unknown): GenesisTier {
   return { id, from, to, priceUSDT };
 }
 
-export function parseGenesisPublicState(value: unknown): GenesisPublicState {
+export function parseGenesisPublicState(value: unknown, mode: ApiEnvironment = "prod"): GenesisPublicState {
   const row = record(value);
   const market = record(row?.market);
   const emission = record(row?.emission);
@@ -315,7 +388,10 @@ export function parseGenesisPublicState(value: unknown): GenesisPublicState {
   const marketOpenStateVersion = integer(row?.marketOpenStateVersion);
   const closedNoticeKey = text(row?.closedNoticeKey);
   const tradeBlockedReason = typeof row?.tradeBlockedReason === "string" ? row.tradeBlockedReason : null;
-  if (!row || row.serverCanonical !== true || !market || !emission
+  const revision = text(row?.revision);
+  const source = text(row?.source);
+  if (!row || !validAuthority(row, mode) || !market || !emission
+      || typeof row.halted !== "boolean" || !revision || !source
       || typeof market.enabled !== "boolean" || typeof emission.open !== "boolean"
       || !Array.isArray(row.listings) || !Array.isArray(row.transactions) || !Array.isArray(row.tiers)
       || (marketOpenState !== "open" && marketOpenState !== "closed")
@@ -333,6 +409,11 @@ export function parseGenesisPublicState(value: unknown): GenesisPublicState {
   if (row.catalogAvailable && (!tiers.length || boundary < series.soldSupply)) return invalid();
   if (!row.catalogAvailable && (tiers.length || market.enabled || row.tradeAvailable)) return invalid();
   return {
+    sourceEnvironment: row.sourceEnvironment as GenesisSourceEnvironment,
+    runId: row.runId as string,
+    halted: row.halted,
+    revision,
+    source,
     series,
     sale: parseSale(row.sale),
     marketEnabled: market.enabled,
@@ -351,70 +432,82 @@ export function parseGenesisPublicState(value: unknown): GenesisPublicState {
   };
 }
 
-export function parseGenesisAccountState(value: unknown): GenesisAccountState {
+export function parseGenesisAccountState(value: unknown, mode: ApiEnvironment = "prod"): GenesisAccountState {
   const row = record(value);
   const series = parseSeries(row?.series);
   const sale = parseSale(row?.sale);
   const walletBalanceUsdt = number(row?.walletBalanceUsdt);
-  if (!row || row.serverCanonical !== true || typeof row.marketEnabled !== "boolean"
+  if (!row || !validAuthority(row, mode) || typeof row.marketEnabled !== "boolean"
       || typeof row.emissionOpen !== "boolean" || !Array.isArray(row.holdings)
       || !Array.isArray(row.emissions) || walletBalanceUsdt === null) return invalid();
   return {
+    sourceEnvironment: row.sourceEnvironment as GenesisSourceEnvironment,
+    runId: row.runId as string,
     series,
     sale,
     marketEnabled: row.marketEnabled,
     emissionOpen: row.emissionOpen,
     holdings: row.holdings.map(parseHolding),
     emissions: row.emissions.map(parseEmission),
-    eligibility: parseEligibility(row.eligibility),
+    eligibility: parseEligibility(row.eligibility, mode),
     walletBalanceUsdt,
     billNo: text(row.billNo) ?? undefined,
     receiptId: text(row.receiptId) ?? undefined,
   };
 }
 
-export function createGenesisApi(client: ApiClient) {
+export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod") {
   return {
     state: async () => parseGenesisPublicState(await client.request({
       method: "GET", path: "/api/genesis/state", authenticated: false,
-    })),
+    }), mode),
     account: async () => parseGenesisAccountState(await client.request({
-      method: "GET", path: "/api/genesis/account",
-    })),
+      method: "GET", path: "/api/genesis/account", authenticated: true,
+    }), mode),
     eligibility: async () => parseEligibility(await client.request({
-      method: "GET", path: "/api/genesis/eligibility",
-    })),
+      method: "GET", path: "/api/genesis/eligibility", authenticated: true,
+    }), mode),
     purchase: async (quantity: number, idempotencyKey: string) => parseGenesisAccountState(await client.request({
-      method: "POST", path: "/api/genesis/purchase", idempotencyKey, body: { quantity },
-    })),
+      method: "POST", path: "/api/genesis/purchase", authenticated: true, idempotencyKey, body: { quantity },
+    }), mode),
     list: async (holdingNo: string, askPriceUsdt: number, idempotencyKey: string) =>
       parseGenesisAccountState(await client.request({
         method: "POST",
         path: `/api/genesis/holdings/${encodeURIComponent(holdingNo)}/listing`,
+        authenticated: true,
         idempotencyKey,
         body: { askPriceUsdt },
-      })),
+      }), mode),
     cancel: async (holdingNo: string, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "DELETE",
       path: `/api/genesis/holdings/${encodeURIComponent(holdingNo)}/listing`,
+      authenticated: true,
       idempotencyKey,
-    })),
+    }), mode),
     buy: async (holdingNo: string, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST",
       path: `/api/genesis/listings/${encodeURIComponent(holdingNo)}/buy`,
+      authenticated: true,
       idempotencyKey,
-    })),
+    }), mode),
     redeem: async (code: string) => {
       const normalized = code.trim().toUpperCase();
       const row = record(await client.request({
         method: "POST",
         path: "/api/genesis/invite/redeem",
+        authenticated: true,
         idempotencyKey: `genesis-invite:${normalized}`,
         body: { code: normalized },
       }));
       const redeemedCode = text(row?.code);
-      if (!row || !redeemedCode || row.status !== "used") return invalid();
-      return { code: redeemedCode };
+      const source = text(row?.source);
+      if (!row || !validAuthority(row, mode) || !redeemedCode || !source || row.status !== "used") return invalid();
+      return {
+        code: redeemedCode,
+        sourceEnvironment: row.sourceEnvironment as GenesisSourceEnvironment,
+        runId: row.runId as string,
+        source,
+      } satisfies GenesisInviteRedeemReceipt;
     },
   };
 }

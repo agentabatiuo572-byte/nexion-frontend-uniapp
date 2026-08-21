@@ -7,6 +7,7 @@ import { useDeposits } from "@/store/deposits";
 import { useStaking } from "@/store/staking";
 import { useCommission } from "@/store/commission";
 import { useVoucher } from "@/store/voucher";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useFreeTrial } from "@/store/free-trial";
 import { useExchange } from "@/store/exchange";
 import { useExchangeV3 } from "@/store/exchange-v3";
@@ -22,6 +23,7 @@ import { useGoals } from "@/store/goals";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { useDailyPowerUp } from "@/store/daily-powerup";
 import { useNotifications } from "@/store/notifications";
+import { usePreferences } from "@/store/preferences";
 import { useReceipts } from "@/store/receipts";
 import { useTickets } from "@/store/tickets";
 import { useCart } from "@/store/cart";
@@ -45,6 +47,7 @@ import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useContentCopy } from "@/store/content-copy";
 import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { captureCommerceSandboxRun } from "@/api/order-api";
 
 /** Snapshot the account generation before starting an account-sensitive request. */
 export function captureAccountScope(): RemoteAccountRequest {
@@ -75,6 +78,14 @@ export function isCurrentAccountScope(request: RemoteAccountRequest): boolean {
  */
 export function rebindAccountScopedStores(accountKey: string): void {
   remoteAccountScope.bind(accountKey);
+  const accountScope = remoteAccountScope.snapshot();
+  const commerceScope = captureCommerceSandboxRun();
+  useVoucherClaimSheet().bindScope({
+    accountKey: accountScope.accountKey,
+    accountEpoch: accountScope.epoch,
+    runId: commerceScope.runId,
+    runEpoch: commerceScope.epoch,
+  });
   // Server-authoritative financial buckets are never shared across accounts;
   // the successful sign-in flow refreshes this cleared slot immediately.
   prepareProductCatalog();
@@ -116,6 +127,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useLuckySpin().bindAccount(accountKey);
   useDailyPowerUp().bindAccount(accountKey);
   useNotifications().bindAccount(accountKey);
+  usePreferences().bindAccount(accountKey);
   useReceipts().bindAccount(accountKey);
   useTickets().bindAccount(accountKey);
   useCart().bindAccount(accountKey);

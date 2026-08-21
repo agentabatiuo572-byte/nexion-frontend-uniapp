@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { ApiMode } from "./runtime-config";
+import type { ApiEnvironment } from "./runtime-config";
 
 export const ORDER_STATUSES = [
   "placed",
@@ -288,7 +288,7 @@ function createdOrder(value: unknown): CreatedOrder {
   return parsed;
 }
 
-function cancelledOrder(value: unknown, mode: ApiMode): CancelledOrder {
+function cancelledOrder(value: unknown, mode: ApiEnvironment): CancelledOrder {
   const source = record(value);
   if (typeof source.orderNo !== "string" || !source.orderNo.trim()
       || source.orderStatus !== "CANCELLED" || source.paymentStatus !== "CANCELLED"
@@ -297,11 +297,11 @@ function cancelledOrder(value: unknown, mode: ApiMode): CancelledOrder {
       || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
       || typeof source.runId !== "string"
       || typeof source.idempotent !== "boolean") return invalid();
-  const production = mode === "remote"
+  const production = mode === "prod"
     && source.source === "server"
     && source.sourceEnvironment === "PRODUCTION"
     && source.runId === "";
-  const sandbox = mode === "sandbox"
+  const sandbox = mode === "dev"
     && source.source === "mock"
     && source.sourceEnvironment === "SANDBOX"
     && RUN_ID.test(source.runId)
@@ -313,7 +313,7 @@ function cancelledOrder(value: unknown, mode: ApiMode): CancelledOrder {
     idempotent: source.idempotent };
 }
 
-export function createOrderApi(client: ApiClient, mode: ApiMode = "remote"): OrderApi {
+export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod"): OrderApi {
   return {
     async list(): Promise<CanonicalOrderList> {
       const payload = record(await client.request<unknown>({
@@ -325,10 +325,10 @@ export function createOrderApi(client: ApiClient, mode: ApiMode = "remote"): Ord
       const sourceEnvironment = nonEmptyString(payload.sourceEnvironment);
       const rawRunId = payload.runId;
       if (payload.serverCanonical !== true) return invalid();
-      const sandbox = mode === "sandbox"
+      const sandbox = mode === "dev"
         && source === "mock" && sourceEnvironment === "SANDBOX"
         && typeof rawRunId === "string" && RUN_ID.test(rawRunId) && rawRunId === currentSandboxRunId;
-      const production = mode === "remote"
+      const production = mode === "prod"
         && source === "server" && sourceEnvironment === "PRODUCTION"
         && (rawRunId === null || rawRunId === undefined);
       if (!sandbox && !production) return invalid();

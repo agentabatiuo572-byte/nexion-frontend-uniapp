@@ -65,6 +65,15 @@
       <!-- Active-state row once trial is running -->
       <TrialEntry v-if="trialIsActive" />
 
+      <view v-if="remoteApiEnabled && remoteOrdersLoading" class="mx-0 flex items-center" style="gap: 8px; min-height: 32px" data-me-orders-state="loading">
+        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
+      </view>
+      <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
+        <text class="flex-1" style="font-size: 12px; color: var(--v5-danger)">{{ t.orders.refreshFailed }}</text>
+        <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" role="button" tabindex="0" @click="refreshRemoteOrders">
+          <text>{{ t.orders.retry }}</text>
+        </view>
+      </view>
       <OrdersCard v-if="orderCount > 0" />
 
       <!-- Sign out -->
@@ -82,7 +91,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SectionHeader from "@/components/me/section-header.vue";
@@ -100,7 +110,7 @@ import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
-import { useReceipts } from "@/store/receipts";
+import { useDeposits } from "@/store/deposits";
 import { useOrders } from "@/store/orders";
 import { useLocaleStore } from "@/store/locale";
 import { useNexFaucet } from "@/store/nex-faucet";
@@ -110,15 +120,18 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
 import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
-import { useAchievements } from "@/store/achievements";
 import { useVoucher } from "@/store/voucher";
 import { useRewardsSeen } from "@/store/rewards-seen";
 import { MAX_DEVICES } from "@/store/device-types";
 import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
-import { ACHIEVEMENTS } from "@/mock/achievements";
 import { confirm as uiConfirm } from "@/store/ui";
-import { authApi, remoteApiEnabled } from "@/api/runtime";
+import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
+import { developmentFundsEnabled, pointsApi } from "@/api/runtime";
+import type { DailySnapshot } from "@/api/points-api";
+import type { SecurityState } from "@/api/contracts";
+import { countRemoteReceipts, summarizeRemoteAchievements } from "@/lib/remote-me-summary";
+import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
 
 const MIN_WITHDRAWAL_USD = 20;
 
@@ -127,19 +140,27 @@ const app = useApp();
 const auth = useAuth();
 const session = useSession();
 const profile = useProfile();
-const receipts = useReceipts();
+// These summaries only consume authenticated server projections. Explicit
+// Mock mode therefore shows unavailable instead of loading fixture stores.
+const deposits = useDeposits();
 const orders = useOrders();
 const locale = useLocaleStore();
 const faucet = useNexFaucet();
 const trial = useFreeTrial();
 const security = useSecurity();
 const notifications = useNotifications();
-const achievements = useAchievements();
 const voucher = useVoucher();
 const rewardsSeen = useRewardsSeen();
 const vrank = useVRank();
 const theme = useTheme();
 const themePickerOpen = ref(false);
+const remoteAchievements = ref<DailySnapshot | null>(null);
+const remoteSecurity = ref<SecurityState | null>(null);
+const remoteOrdersLoading = ref(false);
+const remoteOrdersFailed = ref(false);
+let remoteSummaryRequest = 0;
+let remoteSecurityRequest = 0;
+let remoteOrdersRequest = 0;
 
 const iconPaths = {
   network: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 7a4 4 0 1 0 0 .01", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
@@ -203,7 +224,14 @@ interface QuickSection {
 const usdtBalance = computed(() => app.user.usdtBalance);
 const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
 const profileName = computed(() => profile.displayName);
-const receiptCount = computed(() => receipts.receipts.length);
+const remoteReceiptProjectionReady = computed(() => remoteApiEnabled
+  && app.remoteFleetStatus === "ready"
+  && (developmentFundsEnabled || deposits?.serverStatus === "ready"));
+const remoteReceiptCount = computed(() => remoteReceiptProjectionReady.value
+  ? countRemoteReceipts(deposits?.remoteReceipts ?? [], app.visibleDevices)
+  : null);
+const receiptCount = computed(() => remoteApiEnabled ? remoteReceiptCount.value : null);
+const receiptCountMeta = computed(() => receiptCount.value === null ? "—" : String(receiptCount.value));
 const orderCount = computed(() => orders.orders.length);
 const streakDays = computed(() => faucet.signInStreak);
 const localeUpper = computed(() => locale.code.toUpperCase());
@@ -218,7 +246,7 @@ const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { 
 const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
-const rankValue = computed(() => `V${vrank.myRank}`);
+const rankValue = computed(() => remoteApiEnabled && !vrank.remoteReady ? "—" : `V${vrank.myRank}`);
 const themeModeLabel = computed(() =>
   theme.mode === "system"
     ? t.value.me.themeMetaSystem
@@ -242,18 +270,22 @@ const ownsGenesis = computed(() => genesis.myOwned > 0);
 const myGenesisValue = computed(() => fmt(t.value.me.myGenesisNodeValue, { n: String(genesis.myOwned) }));
 
 // ── Secondary display values, wired to the live ported stores (matches source) ──
-const twoFactorEnabled = computed(() => security.twoFactorEnabled);
+const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
+  ? remoteSecurity.value?.twoFactorEnabled ?? null
+  : security.twoFactorEnabled);
 const unreadNotifs = computed(() => notifications.unread);
-const achievementsUnlocked = computed(
-  () => achievements.records.filter((r) => r.unlockedAt > 0).length,
-);
-const achievementsTotal = ACHIEVEMENTS.length;
+const remoteAchievementSummary = computed(() => summarizeRemoteAchievements(remoteAchievements.value));
+const achievementsUnlocked = computed(() => remoteApiEnabled
+  ? remoteAchievementSummary.value?.unlocked ?? null
+  : null);
+const achievementsTotal = computed(() => remoteApiEnabled
+  ? remoteAchievementSummary.value?.total ?? null
+  : null);
 const achievementsValue = computed(() =>
-  fmt(t.value.me.achievementsRowValue, { n: achievementsUnlocked.value, total: achievementsTotal }),
+  achievementsUnlocked.value === null || achievementsTotal.value === null
+    ? "—"
+    : fmt(t.value.me.achievementsRowValue, { n: achievementsUnlocked.value, total: achievementsTotal.value }),
 );
-// Mock urgency — source hardcodes 9 live events (server-driven in the full app).
-const eventsLiveLabel = computed(() => fmt(t.value.me.nLive, { n: "9" }));
-
 // My Rewards unread dot — unused valid vouchers keep it lit (state-based)
 // OR reward credits newer than the seen-watermark (cleared on page open).
 const rewardsDot = computed(() => voucher.claimedUnused.length > 0 || rewardsSeen.hasUnseen);
@@ -266,6 +298,7 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: fmt(t.value.me.networkInviteMeta, { nex: config.config.rewards.inviterReward.nexAmount }), tone: "orange" },
       { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "success" },
       { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
+      { key: "proof", label: t.value.headerTitles.meProof, href: "/me/proof", icon: "trust", meta: t.value.headerSubtitles.meProof, tone: "brand" },
     ],
   },
   {
@@ -284,12 +317,14 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.me.secAccount,
     items: [
       { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
-      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: String(receiptCount.value), tone: "brand" },
-      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
-      { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
+      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: receiptCountMeta.value, tone: "brand" },
+      { key: "achievements", label: t.value.me.achievements, href: "/me/achievements", icon: "trophy", meta: achievementsValue.value, tone: "orange" },
+       { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+       { key: "repurchase", label: t.value.headerTitles.meWalletRepurchase, href: "/me/wallet-repurchase", icon: "rewind", meta: t.value.repurchase.howItWorksEntry, tone: "success" },
+       { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
-      { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
+      { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value === null ? "—" : twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value === null ? "muted" : twoFactorEnabled.value ? "muted" : "orange" },
     ],
   },
   {
@@ -310,12 +345,71 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
       { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
+      { key: "terms", label: t.value.terms.navTitle, href: "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme", icon: "book", tone: "brand" },
       { key: "learning", label: t.value.me.learningRow, href: "/learn/courses", icon: "book", tone: "brand" },
       { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
     ],
   },
 ]);
+
+async function refreshRemoteMeSummary() {
+  if (!remoteApiEnabled) return;
+  const request = ++remoteSummaryRequest;
+  const accountKey = app.accountKey;
+  remoteAchievements.value = null;
+  try {
+    if (!developmentFundsEnabled) void deposits?.refreshRemoteVietQrDeposits();
+    const snapshot = await pointsApi.state();
+    if (request !== remoteSummaryRequest || accountKey !== app.accountKey) return;
+    remoteAchievements.value = snapshot;
+  } catch {
+    if (request === remoteSummaryRequest && accountKey === app.accountKey) remoteAchievements.value = null;
+  }
+}
+
+async function refreshRemoteOrders() {
+  if (!remoteApiEnabled) return;
+  const request = ++remoteOrdersRequest;
+  const accountKey = app.accountKey;
+  await runRemoteOrdersRefresh(
+    () => orders.refreshRemote(),
+    (state) => {
+      if (request !== remoteOrdersRequest || accountKey !== app.accountKey) return;
+      remoteOrdersLoading.value = state.loading;
+      remoteOrdersFailed.value = state.failed;
+    },
+  );
+}
+
+async function refreshRemoteSecurity() {
+  if (!remoteApiEnabled) return;
+  const request = ++remoteSecurityRequest;
+  const accountKey = app.accountKey;
+  remoteSecurity.value = null;
+  try {
+    const snapshot = await accountApi.securityOverview();
+    if (request !== remoteSecurityRequest || accountKey !== app.accountKey) return;
+    remoteSecurity.value = snapshot;
+  } catch {
+    if (request === remoteSecurityRequest && accountKey === app.accountKey) remoteSecurity.value = null;
+  }
+}
+
+watch(() => app.accountKey, () => {
+  if (remoteApiEnabled) {
+    void refreshRemoteMeSummary();
+    void refreshRemoteSecurity();
+    void refreshRemoteOrders();
+  }
+});
+onShow(() => {
+  if (remoteApiEnabled) {
+    void refreshRemoteMeSummary();
+    void refreshRemoteSecurity();
+    void refreshRemoteOrders();
+  }
+});
 
 function handleQuickItem(item: QuickItem) {
   if (item.key === "theme") {

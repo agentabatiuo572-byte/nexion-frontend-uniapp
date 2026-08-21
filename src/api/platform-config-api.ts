@@ -10,7 +10,7 @@ import type {
 } from "@/store/config-types";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { ApiMode } from "./runtime-config";
+import type { ApiEnvironment } from "./runtime-config";
 
 export interface PlatformComputeConfigSnapshot {
   featureFlags: {
@@ -306,7 +306,7 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
   };
 }
 
-export function parsePlatformPublicStats(value: unknown, mode: ApiMode = "remote"): {
+export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = "prod"): {
   config: PublicStatsConfig;
   authority: PlatformPublicStatsAuthority;
 } {
@@ -317,9 +317,7 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiMode = "remote
   const runId = typeof projection.runId === "string" ? projection.runId.trim() : "";
   const production = sourceEnvironment === "PRODUCTION"
     && source === "server:nx_config_item,nx_user" && runId === "";
-  const sandbox = sourceEnvironment === "SANDBOX" && source === "mock"
-    && /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/.test(runId);
-  const expectedAuthority = mode === "remote" ? production : mode === "sandbox" ? sandbox : false;
+  const expectedAuthority = mode === "prod" || mode === "dev" ? production : false;
   if (projection.serverCanonical !== true || !Number.isInteger(version) || version < 0
       || !expectedAuthority) {
     return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
@@ -335,7 +333,7 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiMode = "remote
   };
 }
 
-export function parsePlatformComputeConfig(value: unknown, mode: ApiMode = "remote"): PlatformComputeConfigSnapshot {
+export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment = "prod"): PlatformComputeConfigSnapshot {
   const root = record(value);
   const featureFlags = record(root.featureFlags);
   const publicStatsProjection = parsePlatformPublicStats(root.publicStats, mode);
@@ -457,7 +455,7 @@ export function parseReferralRewardConfig(value: unknown): ReferralRewardConfigS
   }
 }
 
-export function createPlatformConfigApi(client: ApiClient, mode: ApiMode = "remote"): PlatformConfigApi {
+export function createPlatformConfigApi(client: ApiClient, mode: ApiEnvironment = "prod"): PlatformConfigApi {
   return {
     platformConfig: async () => {
       const [computeRaw, referralRaw] = await Promise.all([

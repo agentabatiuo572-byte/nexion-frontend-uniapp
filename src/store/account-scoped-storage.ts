@@ -76,7 +76,8 @@ export function removeAccountScopedPersistentState(rawAccountKey: string): boole
         continue;
       }
 
-      if (tableKey === "nexgrid-calibrated-device-v1" && accountKey in value) {
+      if (["nexgrid-calibrated-device-v1", "nexgrid-deferred-phone-activation-v1"].includes(tableKey)
+          && accountKey in value) {
         const next = { ...value };
         delete next[accountKey];
         uni.setStorageSync(tableKey, next);

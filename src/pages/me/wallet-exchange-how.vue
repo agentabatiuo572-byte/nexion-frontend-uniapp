@@ -5,7 +5,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 32px">
+    <HowPublishedContent v-if="remoteApiEnabled" content-key="wallet-exchange-how" back="/pages/me/wallet-exchange" />
+    <view v-if="!remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="purple" />
@@ -88,6 +89,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import HowPublishedContent from "@/components/how/how-published-content.vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";

@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -107,12 +107,19 @@ function channelMeta(key: ShareChannelKey): ChannelMeta {
   }
 }
 
+const channelBusy = ref(false);
 async function onChannel(c: ShareChannelDef) {
+  if (channelBusy.value) return;
   if (c.intentType === "poster") {
     emit("openPoster");
     return;
   }
-  await activateChannel(c, "share_sheet", channelMeta(c.key).label);
+  channelBusy.value = true;
+  try {
+    await activateChannel(c, "share_sheet", channelMeta(c.key).label);
+  } finally {
+    channelBusy.value = false;
+  }
 }
 </script>
 

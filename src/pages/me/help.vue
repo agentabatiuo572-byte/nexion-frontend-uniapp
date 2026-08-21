@@ -8,7 +8,7 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
       <view class="px-4 flex justify-end" style="padding-bottom: 8px">
-        <view class="flex items-center active:opacity-70" :style="contactLinkStyle" role="button" tabindex="0" :aria-label="w.contactSupport" @click="goSupport">
+        <view class="flex items-center active:opacity-70" :style="contactLinkStyle" role="button" tabindex="0" :aria-label="w.contactSupport" @click="goSupport" @keydown.enter.prevent="goSupport" @keydown.space.prevent="goSupport">
           <text>{{ w.contactSupport }} →</text>
         </view>
       </view>
@@ -83,6 +83,7 @@
             <view v-for="m in bot" :key="m.id" class="flex" :style="{ justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start' }">
               <view :style="bubbleStyle(m.from === 'user')">
                 <text :style="bubbleTextStyle(m.from === 'user')">{{ m.text }}</text>
+                <text v-if="m.meta" class="block" :style="bubbleMetaStyle(m.from === 'user')">{{ m.meta }}</text>
               </view>
             </view>
             <view v-if="thinking" class="flex" style="justify-content: flex-start">
@@ -103,7 +104,7 @@
             @confirm="sendToBot"
           />
           <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
-          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot">
+          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot" @keydown.enter.prevent="sendToBot" @keydown.space.prevent="sendToBot">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>
@@ -119,7 +120,7 @@
             <text class="block" :style="contactTitleStyle">{{ w.contactSupport }}</text>
             <text class="block" :style="contactHintStyle">{{ w.contactHint }}</text>
           </view>
-          <view class="active:opacity-90 transition-opacity" :style="contactCtaStyle" role="button" tabindex="0" :aria-label="w.contactCta" @click="goTicketCreate">
+          <view class="active:opacity-90 transition-opacity" :style="contactCtaStyle" role="button" tabindex="0" :aria-label="w.contactCta" @click="goTicketCreate" @keydown.enter.prevent="goTicketCreate" @keydown.space.prevent="goTicketCreate">
             <text>{{ w.contactCta }}</text>
           </view>
         </view>
@@ -129,21 +130,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { supportApi } from "@/api/runtime";
+import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
+import { asApiError } from "@/api/errors";
+import { buildRemoteHelpRequest, novaHelpSource } from "@/lib/help-bot-remote";
+import { createHelpBotScope, type HelpBotRequest } from "@/lib/help-bot-scope";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { SupportFaq } from "@/domain/support";
 import { useLocaleStore } from "@/store/locale";
+import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.help);
 const locale = useLocaleStore();
+const app = useApp();
 type FaqCategory = "getting-started" | "earnings" | "devices" | "payments" | "technical";
 const faqs = ref<SupportFaq[]>([]);
 
@@ -160,7 +167,10 @@ async function loadFaqs() {
   catch { faqs.value = []; faqLoadError.value = true; }
 }
 
-onShow(() => { void loadFaqs(); });
+onShow(() => {
+  syncBotAccountScope();
+  void loadFaqs();
+});
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -202,11 +212,31 @@ interface BotMessage {
   id: string;
   from: "user" | "bot";
   text: string;
+  meta?: string;
 }
-const bot = ref<BotMessage[]>([{ id: "init", from: "bot", text: w.value.botGreeting }]);
+const helpScope = createHelpBotScope(remoteAccountScope);
+let helpBound: HelpBotRequest = helpScope.capture();
+const bot = ref<BotMessage[]>([]);
+function resetBotTranscript() {
+  helpScope.add({ from: "bot", text: w.value.botGreeting });
+  bot.value = [{ id: "init", from: "bot", text: w.value.botGreeting }];
+}
+resetBotTranscript();
 const botInput = ref("");
 const thinking = ref(false);
 const botScrollTop = ref(0);
+
+function syncBotAccountScope() {
+  const current = helpScope.capture();
+  if (helpScope.isCurrent(helpBound)) return;
+  helpScope.sync();
+  helpBound = current;
+  resetBotTranscript();
+  botInput.value = "";
+  thinking.value = false;
+}
+
+watch(() => String(app.accountKey), syncBotAccountScope);
 
 function bumpScroll() {
   // Nudge scroll-top to jump to the latest message (uni scroll-view).
@@ -215,19 +245,75 @@ function bumpScroll() {
 function onBotInput(e: Event) {
   botInput.value = detailVal(e);
 }
-function sendToBot() {
+async function sendToBot() {
+  syncBotAccountScope();
   const q = botInput.value.trim();
   if (!q) return;
+  if (remoteApiEnabled && thinking.value) return;
+  helpScope.add({ from: "user", text: q });
   bot.value = [...bot.value, { id: `u-${Date.now()}`, from: "user", text: q }];
   botInput.value = "";
   thinking.value = true;
   bumpScroll();
+  if (remoteApiEnabled) {
+    const language = locale.code === "zh" || locale.code === "vi" ? locale.code : "en";
+    const request = helpScope.capture(language);
+    try {
+      const result = await novaAiApi.chat(buildRemoteHelpRequest(
+        q,
+        bot.value.slice(0, -1),
+        request.language,
+      ));
+      if (!helpScope.isCurrent(request)) {
+        syncBotAccountScope();
+        return;
+      }
+      const responseMessage = {
+        from: "bot" as const,
+        text: result.reply,
+        meta: fmt(w.value.remoteSource, { source: novaHelpSource(result), language: request.language.toUpperCase() }),
+      };
+      helpScope.add(responseMessage);
+      bot.value = [...bot.value, {
+        id: `b-${Date.now()}`,
+        ...responseMessage,
+      }];
+    } catch (error) {
+      if (!helpScope.isCurrent(request)) {
+        syncBotAccountScope();
+        return;
+      }
+      const failure = asApiError(error);
+      const errorMessage = {
+        from: "bot" as const,
+        text: w.value.remoteFailed,
+        meta: fmt(w.value.remoteError, { code: failure.message, language: request.language.toUpperCase() }),
+      };
+      helpScope.add(errorMessage);
+      bot.value = [...bot.value, {
+        id: `b-${Date.now()}`,
+        ...errorMessage,
+      }];
+    } finally {
+      thinking.value = false;
+      if (helpScope.isCurrent(request)) bumpScroll();
+    }
+    return;
+  }
+  const localRequest = helpScope.capture("en");
   setTimeout(() => {
+    if (!helpScope.isCurrent(localRequest)) {
+      syncBotAccountScope();
+      thinking.value = false;
+      return;
+    }
     const needle = q.toLowerCase();
     const hit = faqs.value.find((item) => item.question.toLowerCase().includes(needle)
       || item.answer.toLowerCase().includes(needle)
       || needle.split(/\s+/).some((word) => word.length > 3 && `${item.question} ${item.answer}`.toLowerCase().includes(word)));
-    bot.value = [...bot.value, { id: `b-${Date.now()}`, from: "bot", text: hit ? hit.answer : w.value.botUnmatched }];
+    const responseMessage = { from: "bot" as const, text: hit ? hit.answer : w.value.botUnmatched };
+    helpScope.add(responseMessage);
+    bot.value = [...bot.value, { id: `b-${Date.now()}`, ...responseMessage }];
     thinking.value = false;
     bumpScroll();
   }, 900);
@@ -308,6 +394,14 @@ function bubbleTextStyle(isUser: boolean): CSSProperties {
     fontSize: "13px",
     color: isUser ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
     lineHeight: 1.375,
+  };
+}
+function bubbleMetaStyle(isUser: boolean): CSSProperties {
+  return {
+    marginTop: "5px",
+    fontSize: "10px",
+    color: isUser ? "var(--v5-ink-3)" : "var(--v5-ink-4)",
+    lineHeight: 1.35,
   };
 }
 const thinkingStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "8px 12px" };

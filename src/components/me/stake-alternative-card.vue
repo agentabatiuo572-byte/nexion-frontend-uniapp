@@ -6,7 +6,7 @@
   + headline + "Stake for +$delta in {days} days" CTA → /staking.
 -->
 <template>
-  <view class="mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
+  <view v-if="configAvailable" class="mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
     <view aria-hidden :style="washStyle" />
     <view class="relative">
       <view class="flex items-center" :style="labelStyle">
@@ -16,7 +16,7 @@
       <text class="block" style="font-size: 13px; color: var(--v5-ink); line-height: 1.55">{{ headlineText }}</text>
 
       <view class="grid grid-cols-3" style="gap: 8px; margin-top: 14px">
-        <view v-for="tier in tiers" :key="tier.days" class="text-center" :style="tierCellStyle(tier.tone)">
+        <view v-for="tier in displayTiers" :key="tier.days" class="text-center" :style="tierCellStyle(tier.tone)">
           <text class="block font-mono-tabular" :style="tierLabelStyle(tier.tone)">{{ tierLabelText(tier.days) }}</text>
           <text class="block tabular-nums" :style="tierValueStyle">${{ tierValue(tier).toFixed(0) }}</text>
           <text class="block tabular-nums" :style="tierDeltaStyle(tier.tone)">+${{ tierDelta(tier).toFixed(0) }}</text>
@@ -30,38 +30,55 @@
     </view>
     <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
   </view>
+  <view v-else class="mx-4 mt-3" :style="unavailableStyle">
+    <text>{{ t.staking.remoteUnavailableClosed }}</text>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { STAKING_APY } from "@/store/staking";
+import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
+import { resolveStakingPool } from "@/lib/staking-canonical";
 
 const props = defineProps<{ amountNum: number }>();
 const t = useT();
 const w = computed(() => t.value.walletV3.stakeAlt);
+const staking = useStaking();
+onMounted(() => {
+  if (!staking.isMockMode) void staking.syncRemote();
+});
 
 type Tone = "ok" | "warn" | "hot";
 // APY 读质押主表单源(STAKING_APY),不再硬编码镜像 —— 防主表调档后此卡漂移。
 // (核查表「5/12/20」为误报:Round-7 已手动 matched 到 12/35/80,此处进一步焊单源根治。)
-const tiers: Array<{ days: number; apy: number; tone: Tone }> = [
-  { days: 30, apy: STAKING_APY[30], tone: "ok" },
-  { days: 90, apy: STAKING_APY[90], tone: "warn" },
-  { days: 180, apy: STAKING_APY[180], tone: "hot" },
-];
-const peak = tiers[tiers.length - 1];
-const peakValue = computed(() => props.amountNum * (1 + (peak.apy * peak.days) / 365));
+const tiers = computed(() => ([30, 90, 180] as StakingTerm[]).map((days, index) => {
+  const tone: Tone = index === 0 ? "ok" : index === 1 ? "warn" : "hot";
+  const pool = resolveStakingPool(
+    { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+    days,
+    { apy: STAKING_APY[days], penalty: STAKING_PENALTY[days], minAmountUsdt: STAKING_MIN[days] },
+  );
+  return pool ? { days, apy: pool.apy, penalty: pool.penalty, minAmountUsdt: pool.minAmountUsdt, tone } : null;
+}));
+const configAvailable = computed(() => tiers.value.every((tier) => tier !== null));
+const displayTiers = computed(() => tiers.value.filter((tier): tier is NonNullable<typeof tier> => tier !== null));
+const peak = computed(() => displayTiers.value[displayTiers.value.length - 1]);
+const peakValue = computed(() => {
+  const p = peak.value;
+  return p ? props.amountNum * (1 + (p.apy * p.days) / 365) : 0;
+});
 const peakDelta = computed(() => peakValue.value - props.amountNum);
 
 const headlineText = computed(() =>
   fmt(w.value.headline, {
     amount: `$${props.amountNum.toFixed(2)}`,
     peak: `$${peakValue.value.toFixed(2)}`,
-    days: peak.days,
+    days: peak.value?.days ?? 180,
   }),
 );
-const ctaText = computed(() => fmt(w.value.cta, { delta: `$${peakDelta.value.toFixed(0)}`, days: peak.days }));
+const ctaText = computed(() => fmt(w.value.cta, { delta: `$${peakDelta.value.toFixed(0)}`, days: peak.value?.days ?? 180 }));
 function tierLabelText(days: number): string {
   return fmt(w.value.tierLabel, { n: days });
 }
@@ -150,5 +167,12 @@ const ctaStyle: CSSProperties = {
   fontWeight: 500,
   fontSize: "13px",
   letterSpacing: "-0.005em",
+};
+const unavailableStyle: CSSProperties = {
+  padding: "16px",
+  borderRadius: "16px",
+  background: "var(--v5-warning-soft)",
+  color: "var(--v5-ink-2)",
+  fontSize: "13px",
 };
 </script>

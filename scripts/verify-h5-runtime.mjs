@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// H5 运行时门:隔离起服 + 22 场景 / 6 直接探针(默认档),或单探针档:
-//   --server-session-reload-recovery(sandbox 档 server)/ --remote-withdraw(remote 档 server)。
+// H5 运行时门:隔离起服 + 22 场景 / 6 直接探针(development),或单探针档:
+//   --server-session-reload-recovery(development server)/ --remote-withdraw(production server)。
 //
 // 包 ar(2026-08-17)两处扩展,行为不变、只加两个入口:
-//   ① 复用 server:env H5_RUNTIME_REUSE_MOCK_URL / _SANDBOX_URL / _REMOTE_URL 指向 runner 已起的 server 时,
-//      先核身份(本树 + 模式,与 verify.sh [2.5] 同判据),通过才复用;不通过照旧自己起(lib/dev-server-pool.mjs)。
+//   ① 复用 server:env H5_RUNTIME_REUSE_DEV_URL / _PROD_URL 指向 runner 已起的 server 时,
+//      先核身份(本树 + 构建环境,与 verify.sh [2.5] 同判据),通过才复用;不通过照旧自己起(lib/dev-server-pool.mjs)。
 //   ② 子探针缩范围:env H5_RUNTIME_ONLY="a.mjs,b.mjs"(runner 按 gates.manifest h5Probes 算出)→ 只跑列出的探针,
 //      其余按 SCOPED-SKIP 逐个点名;不设该 env = 全跑。两道路由守卫探针仍串行、其余并行(见下方注释)。
 import { spawn } from "node:child_process";
@@ -14,11 +14,11 @@ import { ensureServer } from "./lib/dev-server-pool.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverSessionReloadRecoveryOnly = process.argv.includes("--server-session-reload-recovery");
-// --remote-withdraw:给「提现账单行 runtime」门起一台**远端档**隔离 server(该门要求 fundsServerEnabled 且非 sandbox,
-// mock 靶下必红)。verify.sh 在 REMOTE_BASE_URL 未给时走这条,不再依赖手动多传环境变量(2026-08-17 主人拍板)。
+// --remote-withdraw:给「提现账单行 runtime」门起一台 production 隔离 server。
+// verify.sh 在 REMOTE_BASE_URL 未给时走这条,不再依赖手动多传环境变量(2026-08-17 主人拍板)。
 const remoteWithdrawOnly = process.argv.includes("--remote-withdraw");
-const mode = remoteWithdrawOnly ? "remote" : serverSessionReloadRecoveryOnly ? "sandbox" : "mock";
-const reuseUrl = { mock: process.env.H5_RUNTIME_REUSE_MOCK_URL, sandbox: process.env.H5_RUNTIME_REUSE_SANDBOX_URL, remote: process.env.H5_RUNTIME_REUSE_REMOTE_URL }[mode] || null;
+const environment = remoteWithdrawOnly ? "production" : "development";
+const reuseUrl = environment === "production" ? process.env.H5_RUNTIME_REUSE_PROD_URL : process.env.H5_RUNTIME_REUSE_DEV_URL;
 const onlyList = (process.env.H5_RUNTIME_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
 const only = (script) => !onlyList.length || onlyList.includes(script);
 const skippedProbes = [];
@@ -57,7 +57,7 @@ function skipGate(script) {
 }
 const gate = (script, baseUrl, args) => (only(script) ? runGate(script, baseUrl, args) : skipGate(script));
 
-const server = await ensureServer({ root, mode, reuseUrl, timeoutMs: 45_000, log: (m) => console.log(`h5-runtime: ${m}`) });
+const server = await ensureServer({ root, environment, reuseUrl, timeoutMs: 45_000, log: (m) => console.log(`h5-runtime: ${m}`) });
 const baseUrl = server.baseUrl;
 const port = new URL(baseUrl).port;
 
@@ -94,7 +94,7 @@ try {
   const where = `${server.reused ? "reused" : "isolated"} server ${port}`;
   const scopedNote = onlyList.length ? ` · scoped: ran ${outputs.length - skippedProbes.length}/${outputs.length} probes, SCOPED-SKIP ${skippedProbes.length}` : "";
   console.log(remoteWithdrawOnly
-    ? `withdraw-bill runtime: PASS (${server.reused ? "reused" : "isolated"} remote-mode server ${port})`
+    ? `withdraw-bill runtime: PASS (${server.reused ? "reused" : "isolated"} production server ${port})`
     : serverSessionReloadRecoveryOnly
     ? `H5 server-session reload recovery: PASS (${where}, returning + fresh flows)`
     : `H5 runtime gates: PASS (${where}, 22 scenarios + 6 direct probes${scopedNote})`);

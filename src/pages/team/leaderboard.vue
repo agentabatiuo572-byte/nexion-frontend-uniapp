@@ -171,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -181,6 +181,8 @@ import { LEADERBOARD, PERIOD_PRIZE, PODIUM_PRIZE, MY_RANK, type LeaderPeriod } f
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
 
 const t = useT();
 const app = useApp();
@@ -189,6 +191,7 @@ const period = ref<LeaderPeriod>("week");
 const remoteSnapshot = ref<TeamLeaderboardSnapshot | null>(null);
 const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
 let remoteRequest = 0;
+let mounted = true;
 // One screen's worth per load — reduces initial render + (future) server load.
 const PAGE_SIZE = 20;
 const visibleCount = ref(PAGE_SIZE);
@@ -217,21 +220,28 @@ function loadMore() {
 async function loadRemote() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
   const requestedPeriod = period.value;
   remoteState.value = "loading";
+  remoteSnapshot.value = null;
+  const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
+    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope)
+    && requestedPeriod === period.value;
   try {
     const snapshot = await teamInsightsApi.leaderboard(requestedPeriod);
-    if (request !== remoteRequest || accountKey !== app.accountKey || requestedPeriod !== period.value) return;
+    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
     remoteSnapshot.value = snapshot;
     remoteState.value = "ready";
   } catch {
-    if (request !== remoteRequest || accountKey !== app.accountKey || requestedPeriod !== period.value) return;
+    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
     remoteSnapshot.value = null;
     remoteState.value = "error";
   }
 }
 
 onShow(() => { if (remoteApiEnabled) void loadRemote(); });
+onUnmounted(() => { mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
 
 // Podium display order: #2 (left) / #1 (center, raised) / #3 (right)
 const podiumDisplay = computed(() => {

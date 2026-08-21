@@ -33,7 +33,7 @@
 
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
-      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="rg-mode-badge" data-testid="auth-runtime-label">
+      <view v-if="apiRuntimeConfig.environment === 'dev'" class="rg-mode-badge" data-testid="auth-runtime-label">
         <text class="rg-mode-badge__t">{{ modeLabel }}</text>
       </view>
       <text class="rg-subtitle">
@@ -56,9 +56,9 @@
             <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @confirm="onCta" />
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
-          <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除)
+          <!-- 包 zm T3:仅开发构建,Java dev 后端网络级失联时亮工程横幅(生产构建整段剔除)
                i18n-en-ok: 工程话,指名端口与启动方式,受众是开发者不是用户 -->
-          <view v-if="devBackendDown" class="rg-devbanner"><text class="rg-devbanner__t">Dev build · sandbox API unreachable — start the 8110 backend or run mock mode</text></view>
+          <view v-if="devBackendDown" class="rg-devbanner"><text class="rg-devbanner__t">Development backend unavailable · start the Java dev service on port 8110</text></view>
         </view>
 
         <!-- Step 2: OTP + invite -->
@@ -66,8 +66,8 @@
           <view class="rg-otp">
             <input v-for="(d, i) in code" :key="i" class="rg-otp__in" :class="{ 'rg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onCta()" />
           </view>
-          <view v-if="sandboxOtpEnabled" class="rg-sandbox-otp" data-testid="sandbox-otp-code" role="status">
-            <text class="rg-sandbox-otp__t">{{ fmt(t.authOtp.sandboxCodeHint, { code: sandboxOtpCode }) }}</text>
+          <view v-if="developmentOtpEnabled" class="rg-development-otp" data-testid="development-otp-code" role="status">
+            <text class="rg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
           <view class="rg-resend">
             <text class="rg-resend__change" role="button" tabindex="0" :aria-label="t.register.changeNumber" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.register.changeNumber }}</text>
@@ -139,7 +139,7 @@
       <!-- OAuth (step 1) -->
       <view v-if="step === 1" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
-        <AuthProviderGrid :busy="busy" :sandbox="apiRuntimeConfig.mode === 'sandbox' && apiRuntimeConfig.modeExplicit" @select="startOauth" />
+        <AuthProviderGrid :busy="busy" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
       </view>
 
       <!-- Footer -->
@@ -283,12 +283,11 @@ const phoneFormatMessage = computed(() => {
     ? fmt(t.value.countryCodes.phoneInvalidHint, params)
     : fmt(t.value.countryCodes.phoneExampleHint, params);
 });
-const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
-const sandboxOtpCode = String(import.meta.env.VITE_NEXGRID_SANDBOX_OTP_CODE || "").trim();
-const sandboxOtpEnabled = computed(() =>
-  apiRuntimeConfig.mode === "sandbox"
-  && apiRuntimeConfig.modeExplicit
-  && /^\d{6}$/.test(sandboxOtpCode)
+const modeLabel = computed(() => t.value.security.developmentModeLabel);
+const developmentOtpCode = String(import.meta.env.VITE_NEXGRID_DEV_OTP_CODE || "").trim();
+const developmentOtpEnabled = computed(() =>
+  apiRuntimeConfig.environment === "dev"
+  && /^\d{6}$/.test(developmentOtpCode)
 );
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
@@ -350,8 +349,7 @@ async function startOauth(label: string) {
   try {
     const result = await authApi.oauthExchange({
       provider,
-      mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
-      displayName: `${provider} Sandbox`,
+      displayName: `${provider} User`,
     });
     if (!mounted || flowVersion !== otpFlowVersion) {
       authApi.discardSessionIfCurrent(result.vaultRevision);
@@ -461,7 +459,7 @@ async function requestCode(captchaTicket?: string) {
       verifying.value = false;
       error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
       // 包 zm T3:开发构建里区分「产品坏了」与「本地后端没起」——网络级失败且在 sandbox 档时亮工程横幅。
-      if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.mode === "sandbox";
+      if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev";
     }
     return;
   }
@@ -891,8 +889,8 @@ onUnmounted(() => cleanup());
 .rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
 .rg-step2 { display: flex; flex-direction: column; gap: 20px; }
 .rg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rg-sandbox-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
-.rg-sandbox-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
+.rg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.rg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
 .rg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .rg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
 .rg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }

@@ -63,3 +63,27 @@ test("lists user-scoped VietQR receipts with an opaque offset cursor", async () 
     path: "/api/app/deposits/vietqr/receipts?limit=20&offset=40",
   });
 });
+
+test("accepts production payment config and quote on the development rail", async () => {
+  const production = {
+    serverCanonical: true,
+    source: "nx_vietqr_config",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000, toleranceVnd: 1000,
+      graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0 },
+  };
+  const quote = {
+    serverCanonical: true,
+    source: "nx_finance_fx_quote_config",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+    baseRateVndPerUsdt: 26000, buySpreadPct: 1.5, quoteRateVndPerUsdt: 26390,
+    lockWindowMinutes: 30, version: 7, asOf: "2026-08-15T00:00:00Z",
+  };
+  const api = createPaymentApi({ request: async (request: { path: string }) =>
+    request.path.includes("fx-quote") ? quote : production } as never, "dev");
+
+  await expect(api.config()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
+  await expect(api.fxQuote()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
+});

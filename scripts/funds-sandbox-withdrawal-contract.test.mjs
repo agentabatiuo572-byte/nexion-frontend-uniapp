@@ -26,7 +26,7 @@ assert.match(app, /FUNDS_SANDBOX_INSUFFICIENT_BALANCE/);
 
 assert.match(page, /const sandboxWithdrawalPolicy = computed/);
 assert.match(page, /app\.user\.usdtBalance \* sandboxPolicy\.balanceMaxRatio/);
-const sandboxBranch = page.indexOf("if (fundsSandboxEnabled) {");
+const sandboxBranch = page.indexOf("if (developmentFundsEnabled) {");
 const productionPolicyRead = page.indexOf("withdrawalApi.policy()");
 assert.ok(sandboxBranch >= 0 && productionPolicyRead > sandboxBranch,
   "sandbox policy projection must branch before the production policy request");
@@ -34,6 +34,6 @@ assert.ok(page.slice(sandboxBranch, productionPolicyRead).includes("sandboxWithd
   "the sandbox branch must consume the authenticated sandbox policy");
 assert.ok(page.slice(sandboxBranch, productionPolicyRead).includes("return;"),
   "the sandbox branch must not fall through into production policy loading");
-assert.match(page, /fundsSandboxEnabled \? \[\{ id: "USDT-BEP20", label: "BEP20" \}\]/);
+assert.match(page, /developmentFundsEnabled \? \[\{ id: "USDT-BEP20", label: "BEP20" \}\]/);
 
 console.log("funds sandbox withdrawal contract: PASS");

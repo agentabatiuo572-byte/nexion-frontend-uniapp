@@ -24,10 +24,13 @@ test("OAuth exchange is a server call and the App rejects loose mock provenance"
 test("OAuth sandbox backend keeps the explicit exchange endpoint and strict mock provenance", { skip: backendMissing }, () => {
   const backendController = readBackend("src/main/java/ffdd/opsconsole/auth/web/AppUserAuthController.java");
   const backendService = readBackend("src/main/java/ffdd/opsconsole/auth/application/AppUserOAuthService.java");
+  const backendRequest = readBackend("src/main/java/ffdd/opsconsole/auth/dto/UserOAuthExchangeRequest.java");
   const challengeService = readBackend("src/main/java/ffdd/opsconsole/auth/application/OAuthSandboxChallengeService.java");
   assert.match(backendController, /@PostMapping\("\/oauth\/sandbox\/challenge"\)/);
   assert.match(backendController, /@PostMapping\("\/oauth\/exchange"\)/);
-  assert.match(backendService, /SANDBOX_MOCK/);
+  assert.doesNotMatch(backendService, /request\.mode\(\)|SANDBOX_MOCK/);
+  assert.match(backendService, /UserAuthEnvironment\.resolve\(environment\)/);
+  assert.doesNotMatch(backendRequest, /String mode|String externalSubject/);
   assert.match(backendService, /OAUTH_PROVIDER_NOT_CONFIGURED/);
   assert.match(backendService, /OAUTH_PROVIDER_UNAVAILABLE/);
   assert.match(backendService, /userMapper\.ensureRegisteredUserWallet/);

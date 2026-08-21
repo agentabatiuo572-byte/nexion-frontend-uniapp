@@ -12,6 +12,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useProfile } from "@/store/profile";
+import { homeGreetingName } from "./home-greeting";
 
 const t = useT();
 const profile = useProfile();
@@ -31,8 +32,7 @@ onMounted(() => {
           : t.value.home.greetingEvening;
 });
 
-// 兜底用品牌名是原设计(没设昵称时问候语显示品牌)。"Stellar" 是旧品牌,改名批次漏网 —— 它藏在
-// 兜底值里而不是显示文案里,当时的 grep 没扫到。
-const firstName = computed(() => (profile.displayName || "NexGrid").split(" ")[0]);
-const greetingLine = computed(() => `${greeting.value}, ${firstName.value}`);
+// 登录响应 /api/app/profile 投影的是服务端完整昵称；首页不得擅自按空格截断。
+const nickname = computed(() => homeGreetingName(profile.displayName, "NexGrid"));
+const greetingLine = computed(() => `${greeting.value}, ${nickname.value}`);
 </script>

@@ -181,7 +181,7 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -196,6 +196,7 @@ import { ambassadorApplicationApi, remoteApiEnabled } from "@/api/runtime";
 import type { AmbassadorApplication, AmbassadorApplicationInput } from "@/api/ambassador-application-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
+import { isCurrentAmbassadorAgentFence, type AmbassadorAgentFence } from "@/lib/ambassador-agent-scope";
 
 const t = useT();
 const vrank = useVRank();
@@ -203,7 +204,8 @@ const isZh = computed(() => useLocaleStore().code === "zh");
 const app = useApp();
 
 const myRank = computed(() => vrank.myRank);
-const unlocked = computed(() => vrank.myRank >= 5);
+const rankReady = computed(() => vrank.remoteReady);
+const unlocked = computed(() => rankReady.value && vrank.myRank >= 5);
 
 interface Bucket {
   id: string;
@@ -272,8 +274,23 @@ const latestApplication = ref<AmbassadorApplication>({ applicationId: null, stat
   sourceEnvironment: "PRODUCTION", runId: "" });
 
 const applicationStatusText = computed(() => t.value.agent.applicationStatuses[latestApplication.value.status]);
-const applicationProof = computed(() => latestApplication.value.sourceEnvironment === "SANDBOX"
-  ? `SANDBOX · Run ${latestApplication.value.runId}` : "PRODUCTION · server");
+const applicationProof = computed(() => "PRODUCTION · server");
+
+let agentMounted = true;
+let agentRequestGeneration = 0;
+function captureAgentRequest(): AmbassadorAgentFence {
+  return { accountKey: app.accountKey, generation: agentRequestGeneration };
+}
+function requestIsCurrent(request: AmbassadorAgentFence): boolean {
+  return isCurrentAmbassadorAgentFence(request, {
+    mounted: agentMounted,
+    accountKey: app.accountKey,
+    generation: agentRequestGeneration,
+  });
+}
+function invalidateAgentRequests(): void {
+  agentRequestGeneration += 1;
+}
 
 function onBudgetInput() {
   const n = Math.max(0, parseInt(budgetText.value.replace(/\D/g, "")) || 0);
@@ -281,7 +298,7 @@ function onBudgetInput() {
 }
 
 const lockedSubText = computed(() =>
-  fmt(t.value.agent.lockedSub, { n: vrank.myRank, title: rankTitle(vrank.myRank, isZh.value, vrank.ladder) }),
+  fmt(t.value.agent.lockedSub, { n: rankReady.value ? vrank.myRank : "—", title: rankReady.value ? rankTitle(vrank.myRank, isZh.value, vrank.ladder) : "—" }),
 );
 function hostedByText(c: ApprovedCase): string {
   return fmt(t.value.agent.hostedBy, { name: c.host, attendees: c.attendees });
@@ -301,9 +318,9 @@ function matches(input: AmbassadorApplicationInput, value: AmbassadorApplication
     && value.budgetUsdt === input.budgetUsdt && value.bucket === input.bucket;
 }
 
-async function refreshLatest(expectedAccount = app.accountKey): Promise<AmbassadorApplication> {
+async function refreshLatest(requestScope = captureAgentRequest()): Promise<AmbassadorApplication> {
   const value = await ambassadorApplicationApi.latest();
-  if (app.accountKey === expectedAccount) latestApplication.value = value;
+  if (requestIsCurrent(requestScope)) latestApplication.value = value;
   return value;
 }
 
@@ -325,33 +342,35 @@ async function submit() {
     const input: AmbassadorApplicationInput = { eventDate: date.value, city: city.value.trim(),
       budgetUsdt: budget.value, bucket: selectedBucketId.value };
     const identity = payloadIdentity(input);
-    const expectedAccount = app.accountKey;
-    const key = acquireAmbassadorCommandKey(expectedAccount, identity);
+    const requestScope = captureAgentRequest();
+    const key = acquireAmbassadorCommandKey(requestScope.accountKey, identity);
     submitting.value = true;
     try {
       const result = await ambassadorApplicationApi.submit(input, key);
-      if (app.accountKey !== expectedAccount) return;
+      if (!requestIsCurrent(requestScope)) return;
       latestApplication.value = result;
-      finishAmbassadorCommand(expectedAccount, identity);
+      finishAmbassadorCommand(requestScope.accountKey, identity);
     } catch (error) {
-      if (app.accountKey !== expectedAccount) return;
+      if (!requestIsCurrent(requestScope)) return;
       try {
-        const authoritative = await refreshLatest(expectedAccount);
+        const authoritative = await refreshLatest(requestScope);
+        if (!requestIsCurrent(requestScope)) return;
         if (matches(input, authoritative)) {
-          finishAmbassadorCommand(expectedAccount, identity);
+          finishAmbassadorCommand(requestScope.accountKey, identity);
         } else if (isSettledRejection(error)) {
-          finishAmbassadorCommand(expectedAccount, identity);
+          finishAmbassadorCommand(requestScope.accountKey, identity);
           throw error;
         } else {
           throw error;
         }
       } catch (readError) {
-        if (isSettledRejection(error)) finishAmbassadorCommand(expectedAccount, identity);
+        if (!requestIsCurrent(requestScope)) return;
+        if (isSettledRejection(error)) finishAmbassadorCommand(requestScope.accountKey, identity);
         toast.error(t.value.agent.toastRemoteFailed, readError instanceof Error ? readError.message : String(readError));
         return;
       }
     } finally {
-      submitting.value = false;
+      if (requestIsCurrent(requestScope)) submitting.value = false;
     }
   }
   toast.success(
@@ -368,12 +387,17 @@ async function submit() {
 
 onShow(() => {
   if (remoteApiEnabled) {
-    const expectedAccount = app.accountKey;
+    const requestScope = captureAgentRequest();
     void Promise.all([
-      refreshLatest(expectedAccount).catch(() => undefined),
+      refreshLatest(requestScope).catch(() => undefined),
       vrank.refreshCanonicalVRank(),
     ]);
   }
+});
+
+onUnload(() => {
+  agentMounted = false;
+  invalidateAgentRequests();
 });
 
 function go(url: string) {

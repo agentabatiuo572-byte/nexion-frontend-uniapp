@@ -6,20 +6,20 @@ import { resolveSiblingRepo } from "./lib/sibling-repo.mjs";
 
 const read = (file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 
-test("SMS acceptance code is visible only in an explicit server sandbox", () => {
+test("SMS development code is visible only in the Java-backed dev environment", () => {
   for (const page of ["src/pages/login/login.vue", "src/pages/register/register.vue"]) {
     const source = read(page);
-    assert.match(source, /VITE_NEXGRID_SANDBOX_OTP_CODE/);
-    assert.match(source, /const sandboxOtpEnabled = computed\(\(\) =>[\s\S]*mode === "sandbox"[\s\S]*modeExplicit[\s\S]*\\d\{6\}/);
-    assert.match(source, /v-if="sandboxOtpEnabled"[^>]+data-testid="sandbox-otp-code"/);
-    assert.match(source, /fmt\(t\.authOtp\.sandboxCodeHint, \{ code: sandboxOtpCode \}\)/);
+    assert.match(source, /VITE_NEXGRID_DEV_OTP_CODE/);
+    assert.match(source, /const developmentOtpEnabled = computed\(\(\) =>[\s\S]*environment === "dev"[\s\S]*\\d\{6\}/);
+    assert.match(source, /v-if="developmentOtpEnabled"[^>]+data-testid="development-otp-code"/);
+    assert.match(source, /fmt\(t\.authOtp\.developmentCodeHint, \{ code: developmentOtpCode \}\)/);
   }
   for (const locale of ["zh", "vi", "en"]) {
     const messages = read(`src/i18n/messages/${locale}.ts`);
-    assert.match(messages, /sandboxCodeHint:[^\n]*\{code\}/);
-    assert.doesNotMatch(messages, /sandboxCodeHint:[^\n]*123456/);
+    assert.match(messages, /developmentCodeHint:[^\n]*\{code\}/);
+    assert.doesNotMatch(messages, /developmentCodeHint:[^\n]*123456/);
   }
-  assert.match(read(".env.acceptance-h5"), /^VITE_NEXGRID_SANDBOX_OTP_CODE=123456$/m);
+  assert.match(read(".env.development"), /^VITE_NEXGRID_DEV_OTP_CODE=123456$/m);
 });
 
 test("the Janus native shell can build a resource bundle without pretending it is a signed installer", (t) => {

@@ -234,7 +234,7 @@ let remotePoolMounted = true;
 
 const myRank = computed(() => vrank.myRank);
 // 头衔显示名按语言取(中文界面出中文头衔),拼法收在 lib/v-rank-copy;远端档位未到仍显示 V—
-const myRankDisplay = computed(() => (remoteApiEnabled && vrank.ladder.length === 0 ? "V—" : rankLabel(vrank.myRank, isZh.value, vrank.ladder)));
+const myRankDisplay = computed(() => (remoteApiEnabled && !vrank.remoteReady ? "V—" : rankLabel(vrank.myRank, isZh.value, vrank.ladder)));
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);

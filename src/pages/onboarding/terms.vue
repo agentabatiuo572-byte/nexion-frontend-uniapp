@@ -4,8 +4,8 @@
   scrollable dark surface, own sticky back header (no tab chrome). Content is a
   10-section numbered agreement, fully i18n-driven (terms namespace, en/zh
   mirror), believable real-platform tone (no meta / reverse-education copy).
-  Opened via navigateTo from intro; back = navBack() helper (stack-aware:
-  pops real history, else reLaunch→intro on cold load).
+  Opened via navigateTo from intro, Me, or the post-login terms gate; back is
+  stack-aware and preserves a validated internal return destination.
 -->
 <template>
   <StandalonePageShell class="tos-root" :reserve-bottom="false">
@@ -24,13 +24,14 @@
     <view class="tos-wrap">
       <!-- Hero -->
       <view class="tos-hero">
-        <text class="tos-eyebrow">{{ t.terms.effectiveLabel }}</text>
-        <text class="tos-title">{{ t.terms.heroTitle }}</text>
-        <text class="tos-sub">{{ t.terms.heroSubtitle }}</text>
+        <text class="tos-eyebrow">{{ serverTerms ? `${t.terms.effectiveLabel} · ${serverTerms.version}` : t.terms.effectiveLabel }}</text>
+        <text class="tos-title">{{ serverTerms?.title ?? t.terms.heroTitle }}</text>
+        <text class="tos-sub">{{ serverTerms ? `${serverTerms.summary} · ${serverTerms.effectiveAt}` : t.terms.heroSubtitle }}</text>
       </view>
 
       <!-- Numbered sections -->
-      <view class="tos-sections">
+      <view v-if="loadError" class="tos-fail" role="alert">{{ loadError }}</view>
+      <view v-else-if="loaded" class="tos-sections">
         <view v-for="b in blocks" :key="b.n" class="tos-block">
           <view class="tos-block__head">
             <text class="tos-block__num">{{ pad(b.n) }}</text>
@@ -39,6 +40,7 @@
           <text class="tos-block__body">{{ b.body }}</text>
         </view>
       </view>
+      <view v-else class="tos-fail">{{ t.terms.loading }}</view>
 
       <!-- Risk disclosure cross-link -->
       <view class="tos-risk active:opacity-80" role="link" tabindex="0" @click="goRisk" @keydown.enter.prevent="goRisk" @keydown.space.prevent="goRisk">
@@ -51,22 +53,43 @@
       <text class="tos-footer">{{ t.terms.footer }}</text>
 
       <!-- Acknowledge & return -->
-      <view class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
-        <text class="tos-cta__t">{{ t.terms.gotIt }}</text>
+      <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms" @keydown.space.prevent="confirmTerms">
+        <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : "确认并继续") }}</text>
       </view>
     </view>
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
-import { navBack } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
+import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { useLocaleStore } from "@/store/locale";
+import type { LegalTermsCurrent } from "@/api/legal-terms-api";
+import {
+  buildLegalTermsLoginRoute,
+  buildLegalTermsRoute,
+  sameLegalTermsSession,
+  sameLegalTermsRun,
+  canonicalLegalTermsReturnTo,
+  type LegalTermsSessionFence,
+} from "@/lib/legal-terms-gate";
+import { captureCommerceSandboxRun } from "@/api/order-api";
 
 const t = useT();
+const locale = useLocaleStore();
+const serverTerms = ref<LegalTermsCurrent | null>(null);
+const loadError = ref<string | null>(null);
+const confirming = ref(false);
+const loaded = ref(!remoteApiEnabled);
+const returnTo = ref("/pages/onboarding/intro");
 
 const blocks = computed(() => {
+  if (serverTerms.value) return [...serverTerms.value.sections].sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => ({ n: index + 1, title: section.title, body: section.body }));
+  if (remoteApiEnabled) return [];
   const w = t.value.terms;
   return [
     { n: 1, title: w.s1Title, body: w.s1Body },
@@ -82,18 +105,97 @@ const blocks = computed(() => {
   ];
 });
 
+onLoad((options) => {
+  returnTo.value = canonicalLegalTermsReturnTo(options?.return, "/pages/onboarding/intro");
+});
+onMounted(() => { void loadTerms(); });
+
+function currentSessionFence(): LegalTermsSessionFence | null {
+  const session = sessionVault.read();
+  if (!session?.accessToken) return null;
+  const run = captureCommerceSandboxRun();
+  // The first Terms fetch may race the post-login catalogue bootstrap. Bind
+  // RunID/epoch only after the catalogue has published a concrete RunID;
+  // account/token fencing remains active from the first request.
+  return run.runId
+    ? { accessToken: session.accessToken, userId: session.user.userId, runId: run.runId, runEpoch: run.epoch }
+    : { accessToken: session.accessToken, userId: session.user.userId };
+}
+
+async function loadTerms() {
+  if (!remoteApiEnabled) return;
+  loaded.value = false;
+  loadError.value = null;
+  const requestFence = currentSessionFence();
+  try {
+    const authenticated = !!requestFence;
+    const snapshot = await legalTermsApi.current(locale.code, "GLOBAL", authenticated);
+    if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
+      serverTerms.value = null;
+      loadError.value = "当前登录会话或运行批次已变化，请重新打开条款";
+      return;
+    }
+    if (!sameLegalTermsRun(snapshot, captureCommerceSandboxRun().runId)) {
+      serverTerms.value = null;
+      loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
+      return;
+    }
+    serverTerms.value = snapshot;
+  } catch (cause) {
+    if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
+      serverTerms.value = null;
+      loadError.value = "当前登录会话或运行批次已变化，请重新打开条款";
+      return;
+    }
+    serverTerms.value = null;
+    loadError.value = cause instanceof Error ? cause.message : "法律条款暂不可用，请稍后重试";
+  } finally {
+    loaded.value = true;
+  }
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
 function goBack() {
-  navBack("/pages/onboarding/intro");
+  navBack(returnTo.value);
 }
 function goRisk() {
   uni.navigateTo({
-    url: "/pages/me/risk-disclosure?return=/pages/onboarding/intro",
+    url: `/pages/me/risk-disclosure?return=${encodeURIComponent(returnTo.value)}`,
     fail: () => {},
   });
+}
+async function confirmTerms() {
+  if (!remoteApiEnabled || !serverTerms.value || serverTerms.value.acknowledged) { goBack(); return; }
+  if (!currentSessionFence()) {
+    loadError.value = "请先登录后确认条款";
+    navTo(buildLegalTermsLoginRoute(buildLegalTermsRoute(returnTo.value)));
+    return;
+  }
+    const requestFence = currentSessionFence();
+    const snapshot = serverTerms.value;
+    if (!sameLegalTermsRun(snapshot, captureCommerceSandboxRun().runId)) {
+      loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
+      return;
+    }
+  confirming.value = true;
+  try {
+    const acknowledged = await legalTermsApi.acknowledge(snapshot);
+    if (!sameLegalTermsSession(requestFence, currentSessionFence())
+      || acknowledged.version !== snapshot.version
+      || acknowledged.runId !== snapshot.runId
+      || !sameLegalTermsRun(acknowledged, captureCommerceSandboxRun().runId)) {
+      loadError.value = "登录会话已变化，请重新打开当前条款后再确认";
+      return;
+    }
+    serverTerms.value = acknowledged;
+    if (acknowledged.acknowledged) goBack();
+  } catch (cause) {
+    loadError.value = cause instanceof Error ? cause.message : "条款确认失败";
+  }
+  finally { confirming.value = false; }
 }
 </script>
 
@@ -199,6 +301,13 @@ function goRisk() {
   padding: 2px 18px;
   display: flex;
   flex-direction: column;
+}
+.tos-fail {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  color: var(--v5-danger);
+  background: color-mix(in srgb, var(--v5-danger) 10%, transparent);
 }
 .tos-block {
   padding: 14px 0;

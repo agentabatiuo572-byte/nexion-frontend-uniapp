@@ -1,14 +1,23 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { remoteApiEnabled, voucherApi } from "@/api/runtime";
+import type { CanonicalVoucher, VoucherSnapshot } from "@/api/voucher-api";
+import {
+  captureCommerceSandboxRun,
+  isCurrentCommerceSandboxScope,
+  type CommerceSandboxRunScope,
+} from "@/api/order-api";
 import { mockServerNow } from "./server-time";
 import { createAccountRowCommit } from "./account-scoped-storage";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { remoteClaimable, remoteVoucherPopupPolicy } from "./voucher-home-authority";
 import {
   listVouchers,
   getVoucher,
   isVoucherValid,
   computeVoucherDiscount,
   voucherAppliesToSku,
+  VOUCHER_POPUP,
   type VoucherDef,
 } from "@/mock/vouchers";
 
@@ -27,7 +36,7 @@ import {
  *                  checkout sends `voucherId` in the POST /api/orders body; the
  *                  server validates + marks the voucher redeemed atomically with
  *                  order creation. markUsed() here is the mock's optimistic mirror.
- *   claimed[]    → GET /api/me/vouchers   (self-scoped wallet; an OPERATOR reads a
+ *   claimed[]    → GET /api/vouchers   (self-scoped canonical catalog + grant state; an OPERATOR reads a
  *                  specific user's vouchers via GET /api/users/:id/vouchers — same
  *                  resource, different actor scope; see admin user-ops-store).
  *
@@ -67,7 +76,10 @@ export interface VoucherMatch {
 export const useVoucher = defineStore("voucher", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   const claimed = ref<ClaimRecord[]>([]);
-  const remoteCatalog = ref<VoucherDef[]>([]);
+  const remoteCatalog = ref<CanonicalVoucher[]>([]);
+  const catalogLoadedAt = ref(0);
+  const remoteAccountEpoch = createRemoteAccountEpoch("default");
+  let remoteGeneration = 0;
   /**
    * 目录是否已到货。mock 档目录是同步字面量,恒为 true;remote 档要等 refreshRemote 落地。
    * 🔴 存在的意义:空目录有**两种**含义 —— 「还没拉回来」与「拉回来了确实没有可领券」。
@@ -79,47 +91,46 @@ export const useVoucher = defineStore("voucher", () => {
   function clearRemoteFacts() {
     claimed.value = [];
     remoteCatalog.value = [];
+    catalogLoadedAt.value = 0;
     catalogReady.value = !remoteApiEnabled;
   }
 
-  function toVoucherDef(row: Awaited<ReturnType<typeof voucherApi.state>>["vouchers"][number]): VoucherDef {
-    return {
-      id: row.id,
-      name: row.name,
-      type: row.type,
-      amountUSD: row.amountUSD,
-      percent: row.percent,
-      minPurchaseUSD: row.minPurchaseUSD,
-      maxDiscountUSD: row.maxDiscountUSD,
-      applicableSkus: row.applicableSkus,
-      audience: row.audience,
-      startAt: row.startAt,
-      endAt: row.endAt,
-      claimSurfaces: row.claimSurfaces,
-      popupEnabled: row.popupEnabled,
-      stackWithTrial: row.stackWithTrial,
-      stackWithOthers: row.stackWithOthers,
-      splittable: row.splittable,
-      status: row.status,
-    };
+  function applyRemoteSnapshot(snapshot: VoucherSnapshot) {
+    remoteCatalog.value = snapshot.vouchers;
+    claimed.value = snapshot.vouchers
+      .filter((voucher) => voucher.grantStatus === "AVAILABLE" || voucher.grantStatus === "USED")
+      .map((voucher) => ({
+        id: voucher.id,
+        claimedAt: 0,
+        usedAt: voucher.grantStatus === "USED" ? 0 : null,
+      }));
+    catalogLoadedAt.value = mockServerNow();
+    catalogReady.value = true;
+  }
+
+  function remoteRequestIsCurrent(
+    request: RemoteAccountRequest,
+    runScope: CommerceSandboxRunScope,
+    generation: number,
+  ): boolean {
+    return generation === remoteGeneration
+      && remoteAccountEpoch.isCurrent(request)
+      && isCurrentCommerceSandboxScope(runScope);
   }
 
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
+    const generation = ++remoteGeneration;
     clearRemoteFacts();
     try {
       const snapshot = await voucherApi.state();
-      remoteCatalog.value = snapshot.vouchers.map(toVoucherDef);
-      claimed.value = snapshot.vouchers
-        .filter((voucher) => voucher.grantStatus !== "UNCLAIMED")
-        .map((voucher) => ({
-          id: voucher.id,
-          claimedAt: 0,
-          usedAt: voucher.grantStatus === "USED" ? 0 : null,
-        }));
-      catalogReady.value = true;
+      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
+      applyRemoteSnapshot(snapshot);
       return true;
     } catch {
+      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       clearRemoteFacts();
       // 拉取失败也算「等到头了」:再等下去只会把自动弹层无限期卡住,让位给下一个候选。
       catalogReady.value = true;
@@ -127,12 +138,31 @@ export const useVoucher = defineStore("voucher", () => {
     }
   }
 
-  async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number] = "home"): Promise<boolean> {
+  async function markPopupSeen(id: string): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
+    const generation = ++remoteGeneration;
+    try {
+      const snapshot = await voucherApi.popupSeen(id);
+      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
+      applyRemoteSnapshot(snapshot);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number]): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
+    const runScope = captureCommerceSandboxRun();
+    const generation = ++remoteGeneration;
     try {
       await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
+      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       return refreshRemote();
     } catch {
-      clearRemoteFacts();
+      if (remoteRequestIsCurrent(request, runScope, generation)) clearRemoteFacts();
       return false;
     }
   }
@@ -152,6 +182,8 @@ export const useVoucher = defineStore("voucher", () => {
   /** 账号切换重绑:装载该账号的券包账本。 */
   function bindAccount(rawAccountKey: string) {
     if (remoteApiEnabled) {
+      remoteAccountEpoch.bind(rawAccountKey);
+      remoteGeneration += 1;
       clearRemoteFacts();
       void refreshRemote();
       return;
@@ -177,7 +209,6 @@ export const useVoucher = defineStore("voucher", () => {
    */
   function claim(id: string): { ok: boolean; conflict?: boolean } {
     if (remoteApiEnabled) {
-      void claimRemote(id);
       return { ok: false };
     }
     const def = getVoucher(id);
@@ -229,12 +260,42 @@ export const useVoucher = defineStore("voucher", () => {
   const catalog = computed<VoucherDef[]>(() => remoteApiEnabled ? remoteCatalog.value : listVouchers());
 
   /** Vouchers the user can still CLAIM (active, in-window, not yet claimed). */
-  const claimableVouchers = computed<VoucherDef[]>(() =>
-    catalog.value.filter((d) => isVoucherValid(d) && !isClaimed(d.id)),
-  );
+  const claimableVouchers = computed<VoucherDef[]>(() => remoteApiEnabled
+    ? remoteClaimable(remoteCatalog.value)
+    : catalog.value.filter((d) => isVoucherValid(d) && !isClaimed(d.id)));
+
+  const autoPopupCadence = computed(() => {
+    if (remoteApiEnabled) return remoteVoucherPopupPolicy(remoteCatalog.value, "home");
+    const voucher = claimableVouchers.value.find((candidate) => candidate.popupEnabled);
+    return voucher ? {
+      voucherId: voucher.id,
+      delayMs: VOUCHER_POPUP.autoPushDelayMs,
+      cooldownHours: VOUCHER_POPUP.cooldownHours,
+      maxPerSession: VOUCHER_POPUP.maxPerSession,
+      nextEligibleAt: 0,
+    } : null;
+  });
+
+  const autoPopupDueNow = computed(() => {
+    const cadence = autoPopupCadence.value;
+    return cadence !== null
+      && (cadence.nextEligibleAt === 0 || cadence.nextEligibleAt <= mockServerNow());
+  });
+
+  function popupEvaluationReady(): boolean {
+    if (!catalogReady.value) return false;
+    const cadence = autoPopupCadence.value;
+    if (cadence === null) return true;
+    const now = mockServerNow();
+    return now >= catalogLoadedAt.value + cadence.delayMs
+      && (cadence.nextEligibleAt === 0 || now >= cadence.nextEligibleAt);
+  }
 
   /** Claimed, unused, still-valid vouchers — the user's redeemable wallet. */
   const claimedUnused = computed<VoucherDef[]>(() => {
+    if (remoteApiEnabled) {
+      return remoteCatalog.value.filter((voucher) => voucher.grantStatus === "AVAILABLE" && isVoucherValid(voucher));
+    }
     const out: VoucherDef[] = [];
     for (const c of claimed.value) {
       if (c.usedAt != null) continue;
@@ -247,6 +308,10 @@ export const useVoucher = defineStore("voucher", () => {
   /** Claimed, unused, but now past their validity window — shown as expired in
    *  the My Rewards page. */
   const expiredVouchers = computed<VoucherDef[]>(() => {
+    if (remoteApiEnabled) {
+      return remoteCatalog.value.filter((voucher) => voucher.grantStatus === "EXPIRED"
+        || voucher.grantStatus === "AVAILABLE" && !isVoucherValid(voucher));
+    }
     const out: VoucherDef[] = [];
     for (const c of claimed.value) {
       if (c.usedAt != null) continue;
@@ -294,7 +359,11 @@ export const useVoucher = defineStore("voucher", () => {
     claimRemote,
     markUsed, release,
     refreshRemote,
+    markPopupSeen,
     claimableVouchers,
+    autoPopupCadence,
+    autoPopupDueNow,
+    popupEvaluationReady,
     catalog,
     catalogReady,
     claimedUnused,

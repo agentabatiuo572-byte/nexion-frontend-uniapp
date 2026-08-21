@@ -80,6 +80,9 @@ const validFleet = {
   slotCap: 3,
   capacitySchedule: { capacityBand1DeltaPct: "-3" },
   source: "nx_user_device + nx_compute_receipt + nx_compute_e3_config",
+  sourceEnvironment: "PRODUCTION",
+  runId: "",
+  serverCanonical: true,
   devices: [{
     id: 9,
     rowVersion: 1,

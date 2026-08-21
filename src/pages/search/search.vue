@@ -5,10 +5,8 @@
   user devices, and network members. Real-time filter, grouped results.
 
   Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
-  backHref="/" → SubPageHeader back="/pages/index/index". <Link> → uni.navigateTo
-  with fail:()=>{} so taps to not-yet-ported routes are no-ops, not crashes.
-  Route/FAQ catalog hrefs map to uni page paths; unported ones still listed
-  (faithful catalog) but navigate is a graceful no-op.
+  backHref="/" → SubPageHeader back="/pages/index/index". Search and Nova
+  navigation report a visible recovery action when the target cannot open.
 -->
 <template>
   <AppChassis active="home">
@@ -26,6 +24,14 @@
             :style="inputStyle"
             placeholder-class="nx-search-ph"
           />
+        </view>
+      </view>
+
+      <view v-if="navigationError" class="mx-4 mt-3" :style="navigationErrorStyle" role="alert">
+        <text class="block" :style="navigationErrorTextStyle">{{ t.search.navigationFailed }}</text>
+        <view class="active:opacity-70" :style="navigationRetryStyle" role="button" tabindex="0"
+          @click="retryNavigation" @keydown.enter.prevent="retryNavigation" @keydown.space.prevent="retryNavigation">
+          <text>{{ t.search.retryNavigation }}</text>
         </view>
       </view>
 
@@ -115,8 +121,7 @@ const members = computed(() => network.members);
 const searchableProducts = computed(() => !remoteApiEnabled || productCatalogState.status === "ready" ? PRODUCTS : []);
 
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
-// only the key→href binding stays here. href = uni page path when the page is
-// ported, otherwise a placeholder path that navigate's fail:()=>{} swallows.
+// only the key→href binding stays here.
 type RouteKey = keyof typeof t.value.search.routes;
 type FaqKey = keyof typeof t.value.search.faqEntries;
 
@@ -228,13 +233,30 @@ function groupLabel(g: Group): string {
   return labels[g as keyof typeof labels] ?? g;
 }
 
+const navigationError = ref(false);
+const pendingNavigationUrl = ref("");
+
+function navigateWithFeedback(url: string) {
+  pendingNavigationUrl.value = url;
+  navigationError.value = false;
+  uni.navigateTo({
+    url,
+    success: () => { navigationError.value = false; pendingNavigationUrl.value = ""; },
+    fail: () => { navigationError.value = true; },
+  });
+}
+
 function openHit(h: Hit) {
-  uni.navigateTo({ url: h.href, fail: () => {} });
+  navigateWithFeedback(h.href);
 }
 
 function openNova(query: string) {
   const suffix = query.trim() ? `&prompt=${encodeURIComponent(query.trim())}` : "";
-  uni.navigateTo({ url: `/pages/support/chat?type=ai${suffix}`, fail: () => {} });
+  navigateWithFeedback(`/pages/support/chat?type=ai${suffix}`);
+}
+
+function retryNavigation() {
+  if (pendingNavigationUrl.value) navigateWithFeedback(pendingNavigationUrl.value);
 }
 
 // ── styles ──
@@ -264,6 +286,14 @@ const noResultsStyle: CSSProperties = {
   border: "1px dashed var(--v5-border-strong)",
   background: "transparent",
 };
+const navigationErrorStyle: CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: "12px",
+  border: "1px solid color-mix(in srgb, var(--v5-danger) 45%, var(--v5-border))",
+  background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
+};
+const navigationErrorTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
+const navigationRetryStyle: CSSProperties = { display: "inline-flex", minHeight: "44px", alignItems: "center", color: "var(--v5-brand)", fontSize: "12px", fontWeight: 600 };
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
   paddingLeft: "2px",

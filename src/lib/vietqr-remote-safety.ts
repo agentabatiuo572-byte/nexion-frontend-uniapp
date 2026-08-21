@@ -1,5 +1,3 @@
-import type { VietQrReceiptSnapshot } from "@/api/payment-api";
-
 export interface VietQrTransferStepCopy {
   scan: string;
   manual: (accountNumber: string, amountText: string) => string;
@@ -28,10 +26,10 @@ export function remoteGenerationMatches(
   return expectedAccountKey === currentAccountKey && expectedGeneration === currentGeneration;
 }
 
-export function appendVietQrReceipts(
-  existing: readonly VietQrReceiptSnapshot[],
-  incoming: readonly VietQrReceiptSnapshot[],
-): VietQrReceiptSnapshot[] {
+export function appendVietQrReceipts<T extends { receiptNo: string }>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): T[] {
   const seen = new Set(existing.map((item) => item.receiptNo));
   const appended = incoming.filter((item) => {
     if (seen.has(item.receiptNo)) return false;

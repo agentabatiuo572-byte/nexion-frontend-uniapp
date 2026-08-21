@@ -80,6 +80,7 @@ import { useNexFaucet } from "@/store/nex-faucet";
 import { useDailyPowerUp, type StreakPowerUpId } from "@/store/daily-powerup";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
+import { canonicalPowerUpTarget } from "@/lib/remote-powerup-target";
 
 interface PowerUp {
   id: StreakPowerUpId;
@@ -158,6 +159,10 @@ async function handleClaim(p: PowerUp) {
   if (remoteApiEnabled) {
     if (await powerUp.claimRemote(p.id)) {
       toast.success(fmt(w.value.toastTitle, { name: p.labelText ?? w.value[`${p.key}_label`] }), p.descText ?? w.value.toastBody);
+      // Remote targetPath is the server canonical href. Navigate only after
+      // activation is confirmed; a failed claim remains retryable in the store.
+      const target = canonicalPowerUpTarget(p.href);
+      if (target) uni.navigateTo({ url: target, fail: () => {} });
     } else {
       toast.error(t.value.authOtp.errorServiceUnavailable);
     }

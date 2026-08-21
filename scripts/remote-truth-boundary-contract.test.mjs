@@ -27,12 +27,21 @@ test("remote NEX wallet does not render synthetic mining history", () => {
 });
 
 test("remote trust and storefront surfaces do not expose static endorsements", () => {
-  const trust = read("src/components/trust/nex-anchor-section.vue");
+  const retiredTrustFixture = path.join(root, "src/components/trust/nex-anchor-section.vue");
+  const trust = read("src/pages/trust/trust.vue");
   const homeTrust = read("src/components/home/trust-chip-wall.vue");
   const referral = read("src/pages/ref/code.vue");
   const detail = read("src/pages/store/detail.vue");
-  assert.match(trust, /v-if="!remoteApiEnabled"/);
-  assert.match(homeTrust, /v-if="!remoteApiEnabled"/);
+  assert.equal(fs.existsSync(retiredTrustFixture), false);
+  assert.match(trust, /usePublishedTrust/);
+  assert.match(homeTrust, /summary\.chips/);
+  assert.match(homeTrust, /summary\.reserveProof/);
+  assert.match(homeTrust, /summary\.value\.chips\.length === 7/);
+  assert.match(homeTrust, /v-for="\(chip, index\) in summary\.chips"/);
+  assert.match(homeTrust, /:key="`trust-chip-\$\{index\}`"/);
+  assert.doesNotMatch(homeTrust, /MOCK_CHIPS/);
+  assert.doesNotMatch(homeTrust, /summary\?\.hero/);
+  assert.doesNotMatch(homeTrust, /trustSnapshotTvl/);
   assert.match(referral, /v-if="!remoteApiEnabled"/);
   assert.match(detail, /v-if="!remoteApiEnabled"/);
   assert.match(referral, /remotePreview/);
@@ -63,7 +72,7 @@ test("remote proof and team finance pages expose unavailable instead of zero def
   const binary = read("src/pages/team/binary.vue");
   const unilevel = read("src/pages/team/unilevel.vue");
   assert.match(proof, /remoteError/);
-  assert.match(proof, /remoteApiEnabled && remoteError/);
+  assert.match(proof, /remoteApiEnabled && \(remoteError \|\| !vRank\.remoteReady\)/);
   assert.match(proof, /=== null \? "—"/);
   assert.match(commissions, /commission\.eventsStatus/);
   assert.match(binary, /commission\.binaryStatus/);
@@ -82,4 +91,28 @@ test("remote static partner wall and telemetry/mining/rank defaults are gated", 
   assert.match(wallet, /todayNEX.*number \| null/);
   assert.match(network, /myRankText/);
   assert.match(team, /const extendedCountText[\s\S]*if \(remoteApiEnabled/);
+});
+
+test("server runtimes never hydrate or mutate the legacy local receipt store", () => {
+  const page = read("src/pages/me/receipts.vue");
+  const store = read("src/store/receipts.ts");
+  const deposits = read("src/store/deposits.ts");
+  assert.match(page, /const remoteReceiptsMode = remoteApiEnabled/);
+  assert.doesNotMatch(page, /remoteApiEnabled\s*&&\s*!developmentFundsEnabled/);
+  assert.match(store, /remoteApiEnabled \? \[\] : hydrate\(boundKey\)/);
+  assert.match(store, /if \(remoteApiEnabled\) return false/);
+  assert.match(page, /refreshFundsSandboxDeposits/);
+  assert.match(deposits, /receiptNo: ledger\.ledgerNo/);
+  assert.match(deposits, /entryRole === "TOPUP_CREDIT"/);
+});
+
+test("VietQR limits, availability and fees stay server-configured in sandbox and production", () => {
+  const pane = read("src/components/me/deposit-bank-pane.vue");
+  const fx = read("src/store/fx.ts");
+  assert.match(pane, /remoteApiEnabled \? fx\.minDepositUsdt : MIN_DEPOSIT_USDT/);
+  assert.match(pane, /remoteApiEnabled \? fx\.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT/);
+  assert.match(pane, /remoteApiEnabled \? fx\.vietQrEnabled : dep\.bankRailAvailable/);
+  assert.match(pane, /usdt < minDeposit\.value \|\| usdt > maxDeposit\.value/);
+  assert.match(fx, /paymentApi\.config\(\)/);
+  assert.match(fx, /paymentApi\.fxQuote\(\)/);
 });

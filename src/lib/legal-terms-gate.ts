@@ -1,0 +1,88 @@
+import type { LegalTermsCurrent } from "@/api/legal-terms-api";
+import { safeReturnTo } from "@/routing/safe-return-to";
+
+export const LEGAL_TERMS_ROUTE = "/pages/onboarding/terms";
+export const LOGIN_ROUTE = "/pages/login/login";
+
+export interface LegalTermsSessionFence {
+  accessToken: string;
+  userId: number;
+  /** The server RunID carried by a Terms snapshot, when a request has one. */
+  runId?: string;
+  /** Monotonic sandbox RunID generation; rejects a response across catalog rollover. */
+  runEpoch?: number;
+}
+
+function internalReturnTo(raw: string | null | undefined, fallback: string): string {
+  const safe = safeReturnTo(raw, fallback);
+  return safe.startsWith("/pages/") ? safe : fallback;
+}
+
+/**
+ * Unwrap Terms routes that were carried through login more than once.  The
+ * login page receives its return parameter decoded once, so without this
+ * normalization a Terms gate can redirect to another Terms gate after a
+ * successful acknowledgement instead of the user's original destination.
+ */
+export function canonicalLegalTermsReturnTo(raw: string | null | undefined, fallback: string): string {
+  let current = internalReturnTo(raw, fallback);
+  for (let depth = 0; depth < 4; depth += 1) {
+    const question = current.indexOf("?");
+    const path = question < 0 ? current : current.slice(0, question);
+    if (path !== LEGAL_TERMS_ROUTE) return current;
+    const query = question < 0 ? "" : current.slice(question + 1);
+    const nested = new URLSearchParams(query).get("return");
+    if (!nested) return fallback;
+    const next = internalReturnTo(nested, fallback);
+    if (next === current) return fallback;
+    current = next;
+  }
+  return fallback;
+}
+
+/** Build the only login redirect used by the Terms acknowledgment flow. */
+export function buildLegalTermsLoginRoute(returnTo = LEGAL_TERMS_ROUTE): string {
+  const safe = internalReturnTo(returnTo, LEGAL_TERMS_ROUTE);
+  const canonical = safe === LEGAL_TERMS_ROUTE ? safe : safe.startsWith(`${LEGAL_TERMS_ROUTE}?`)
+    ? buildLegalTermsRoute(safe)
+    : safe;
+  return `${LOGIN_ROUTE}?return=${encodeURIComponent(canonical)}`;
+}
+
+/** Preserve the original internal destination after a required re-ack. */
+export function buildLegalTermsRoute(returnTo = "/pages/index/index"): string {
+  const safe = canonicalLegalTermsReturnTo(returnTo, "/pages/index/index");
+  return `${LEGAL_TERMS_ROUTE}?return=${encodeURIComponent(safe)}`;
+}
+
+export function isLegalTermsAcknowledged(snapshot: LegalTermsCurrent): boolean {
+  return snapshot.source === "server" && snapshot.acknowledged === true;
+}
+
+/**
+ * A first sandbox Terms response may race catalogue bootstrap (no current
+ * RunID yet), but once a RunID is known the response must belong to it.
+ */
+export function sameLegalTermsRun(snapshot: LegalTermsCurrent, currentRunId: string | null): boolean {
+  return snapshot.sourceEnvironment === "PRODUCTION"
+    ? snapshot.runId === ""
+    : currentRunId === null || snapshot.runId === currentRunId;
+}
+
+/** Claim a single re-ack redirect until the account or published version changes. */
+export function claimLegalTermsRedirect(seen: Set<string>, key: string): boolean {
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+}
+
+export function sameLegalTermsSession(
+  expected: LegalTermsSessionFence | null,
+  actual: LegalTermsSessionFence | null,
+): boolean {
+  if (!expected || !actual) return false;
+  return expected.accessToken === actual.accessToken
+    && expected.userId === actual.userId
+    && (expected.runId === undefined || actual.runId === expected.runId)
+    && (expected.runEpoch === undefined || actual.runEpoch === expected.runEpoch);
+}

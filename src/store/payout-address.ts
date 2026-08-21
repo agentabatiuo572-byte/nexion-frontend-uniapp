@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
-import type { PayoutAddressNetwork, PayoutAddressSnapshot } from "@/api/payout-address-api";
+import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import type { PayoutAddressNetwork, PayoutAddressProvenance, PayoutAddressSnapshot } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -10,6 +10,8 @@ import { useApp } from "./app";
 import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -30,9 +32,9 @@ import {
 // 提现地址直管。每网络至多一个当前地址,用户直填 + OTP 确认;存量配对地址由
 // migrateFromPairing 一次性自动迁移(source=migrated,无需重验、无新地址保护期)。
 //
-// server-canonical:PROD = GET /api/payout-addresses + POST(添加)/ PUT(更换,
+// server-canonical:SANDBOX/PROD = GET /api/payout-addresses + POST(添加)/ PUT(更换,
 // 服务端在事务内做 OTP 核验、在途单拦截、频控与冻结落库),本 store 整体被替换;
-// client 只消费快照。按账号作用域存储(规格 ② 异常5:换号不继承)。
+// client 只消费快照。按账号作用域存储仅保留给 mock 演示档。
 // 服务端接口与后端 payout-addresses 资源保持一致。
 
 const ACCOUNTS_KEY = "nexgrid-payout-address-accounts-v1"; // { [accountKey]: PayoutAddressBook }
@@ -66,6 +68,15 @@ function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
     };
   }
   return result;
+}
+
+function runtimeProvenanceValid(provenance: PayoutAddressProvenance): boolean {
+  if (!provenance.serverCanonical) return false;
+  if (apiRuntimeConfig.environment === "dev") {
+    return provenance.source === "mock" && provenance.sourceEnvironment === "SANDBOX"
+      && !!provenance.runId;
+  }
+  return provenance.source === "server" && provenance.sourceEnvironment === "PRODUCTION" && provenance.runId === "";
 }
 
 /** 频控天数(后台 D5 可配;boot 早期 config store 不可用时回落种子同值 7)。 */
@@ -148,9 +159,11 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑。
   // 🔴 地址簿必按账号:设备级存储会让换号继承他人提现地址(资格旁路,规格 ② 异常5)。
   let boundKey = "default";
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   const book = ref<PayoutAddressBook>(payoutAddressServerEnabled ? emptyBook() : hydrate(boundKey));
   const remoteChangeCooldownDays = ref<number | null>(payoutAddressServerEnabled ? null : cooldownDaysNow());
   const remoteEffectiveDelayHours = ref<number | null>(payoutAddressServerEnabled ? null : 24);
+  const remoteProvenance = ref<PayoutAddressProvenance | null>(null);
   let remoteLoadVersion = 0;
 
   function persist(): boolean {
@@ -158,26 +171,55 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
+  type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: CommerceSandboxRunScope };
+
+  function requestScope(): PayoutRemoteRequest {
+    return { ...remoteAccountEpoch.snapshot(), commerceRun: captureCommerceSandboxRun() };
+  }
+
+  function scopeIsCurrent(request: PayoutRemoteRequest): boolean {
+    return remoteAccountEpoch.isCurrent(request) && request.accountKey === boundKey
+      && isCurrentCommerceSandboxScope(request.commerceRun);
+  }
+
+  function scopeChangedError(): Error {
+    return new Error("PAYOUT_ADDRESS_ACCOUNT_SCOPE_CHANGED");
+  }
+
   /** Remote mode is fail-closed: only a validated server snapshot may populate the book.
    *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
   async function refreshRemote(): Promise<boolean> {
     if (!payoutAddressServerEnabled) return true;
     const version = ++remoteLoadVersion;
+    const request = requestScope();
     try {
       const snapshot = await payoutAddressApi.list();
-      if (version !== remoteLoadVersion) return true;
+      if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
+      if (!runtimeProvenanceValid(snapshot)) return false;
       book.value = remoteBook(snapshot);
+      remoteProvenance.value = snapshot;
       remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
       remoteEffectiveDelayHours.value = snapshot.effectiveDelayHours;
       return true;
     } catch {
-      return false;
+      // A stale failure belongs to the previous account/request and must not
+      // surface an error or clear the current account's canonical state.
+      return !scopeIsCurrent(request);
     }
   }
 
   async function sendRemoteOtp() {
     if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
-    return payoutAddressApi.sendOtp();
+    const request = requestScope();
+    try {
+      const challenge = await payoutAddressApi.sendOtp();
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
+      if (!runtimeProvenanceValid(challenge)) throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
+      return challenge;
+    } catch (cause) {
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
+      throw cause;
+    }
   }
 
   async function saveRemoteAddress(input: {
@@ -188,14 +230,23 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     idempotencyKey: string;
   }): Promise<void> {
     if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
+    const request = requestScope();
     if (!isChainAddressValid(input.network, input.address)) throw new Error("PAYOUT_ADDRESS_FORMAT_INVALID");
-    await payoutAddressApi.save({
-      network: TO_SERVER_NETWORK[input.network],
-      address: input.address.trim(),
-      challengeNo: input.challengeNo,
-      code: input.code,
-      idempotencyKey: input.idempotencyKey,
-    });
+    let saved: Awaited<ReturnType<typeof payoutAddressApi.save>>;
+    try {
+      saved = await payoutAddressApi.save({
+        network: TO_SERVER_NETWORK[input.network],
+        address: input.address.trim(),
+        challengeNo: input.challengeNo,
+        code: input.code,
+        idempotencyKey: input.idempotencyKey,
+      });
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
+      if (!runtimeProvenanceValid(saved)) throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
+    } catch (cause) {
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
+      throw cause;
+    }
     // save 是动作路径:服务端已收单但回读失败必须冒给调用方(rebind 页 catch 展示错误)。
     // 🔴 readback 直读服务端,不复用 refreshRemote(z6 审计 P1:并发后台刷新抢 version 会让
     //    superseded→true 造成假成功)。readback 在写之后、单调最新:++version 作废一切
@@ -203,21 +254,28 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     let snapshot: Awaited<ReturnType<typeof payoutAddressApi.list>>;
     try {
       snapshot = await payoutAddressApi.list();
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
     } catch {
+      if (!scopeIsCurrent(request)) throw scopeChangedError();
       throw new Error("PAYOUT_ADDRESS_READBACK_UNAVAILABLE");
     }
     remoteLoadVersion += 1;
+    if (!scopeIsCurrent(request)) throw scopeChangedError();
+    if (!runtimeProvenanceValid(snapshot)) throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
     book.value = remoteBook(snapshot);
+    remoteProvenance.value = snapshot;
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    remoteAccountEpoch.bind(boundKey);
     remoteLoadVersion += 1;
     if (payoutAddressServerEnabled) {
       book.value = emptyBook();
       remoteChangeCooldownDays.value = null;
       remoteEffectiveDelayHours.value = null;
+      remoteProvenance.value = null;
       void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
@@ -353,6 +411,9 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     book,
     changeCooldownDays: computed(() => remoteChangeCooldownDays.value),
     effectiveDelayHours: computed(() => remoteEffectiveDelayHours.value),
+    provenance: computed(() => remoteProvenance.value),
+    sandboxServer: computed(() => remoteProvenance.value?.source === "mock"
+      && remoteProvenance.value.sourceEnvironment === "SANDBOX"),
     hasAnyAddress,
     stateFor,
     currentFor,

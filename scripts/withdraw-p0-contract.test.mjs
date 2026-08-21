@@ -12,7 +12,7 @@ test("withdrawal parser accepts backend strong-review route as manual", () => {
 
 test("remote withdrawal refresh is account-generation safe and does not query production for sandbox", () => {
   const source = read("src/store/app.ts");
-  assert.match(source, /if\s*\(!remoteApiEnabled\s*\|\|\s*fundsSandboxEnabled\)/);
+  assert.match(source, /if\s*\(!remoteApiEnabled\s*\|\|\s*developmentFundsEnabled\)/);
   assert.match(source, /const\s+expectedAccountKey\s*=\s*accountKey\.value/);
   assert.match(source, /expectedAccountKey\s*!==\s*accountKey\.value/);
   assert.match(source, /nexRefundedChanged|remote\.nexRefunded/);

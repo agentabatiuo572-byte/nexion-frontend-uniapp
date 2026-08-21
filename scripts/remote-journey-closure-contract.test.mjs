@@ -12,10 +12,10 @@ test("card binding is unavailable outside explicit sandbox", async () => {
   const runtime = await source("src/api/runtime.ts");
   const list = await source("src/pages/me/wallet-cards.vue");
   const form = await source("src/pages/me/wallet-cards-new.vue");
-  assert.match(runtime, /paymentSandboxEnabled/);
+  assert.match(runtime, /developmentPaymentEnabled/);
   assert.match(list, /cardBindingAvailable/);
   assert.match(form, /cardBindingAvailable/);
-  assert.match(form, /paymentSandboxEnabled/);
+  assert.match(form, /developmentPaymentEnabled/);
 });
 
 test("remote daily, orders, quota and bills expose retryable refresh failures", async () => {

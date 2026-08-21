@@ -65,7 +65,7 @@ test("KYC removal guard catches case and identifier variants without matching st
   assert.equal(containsForbiddenKyc("src/pages/risk/kyc-review.css"), true);
 });
 
-test("production payout-address flow is server-canonical while sandbox uses an explicit local mock", () => {
+test("payout-address is server-canonical in production and sandbox; only demo mock is local", () => {
   const api = fs.readFileSync("src/api/payout-address-api.ts", "utf8");
   const runtime = fs.readFileSync("src/api/runtime.ts", "utf8");
   const store = fs.readFileSync("src/store/payout-address.ts", "utf8");
@@ -74,13 +74,14 @@ test("production payout-address flow is server-canonical while sandbox uses an e
   assert.match(api, /path: "\/api\/payout-addresses"/);
   assert.match(api, /path: "\/api\/payout-addresses\/otp\/send"/);
   assert.match(api, /idempotencyKey: input\.idempotencyKey/);
-  assert.match(runtime, /createPayoutAddressApi\(apiClient\)/);
-  assert.match(runtime, /payoutAddressServerEnabled = apiRuntimeConfig\.mode === "remote"/);
-  assert.match(runtime, /payoutAddressMockEnabled = apiRuntimeConfig\.mode !== "remote"/);
+  assert.match(runtime, /createPayoutAddressApi\(apiClient, apiRuntimeConfig\.mode\)/);
+  assert.match(runtime, /payoutAddressServerEnabled = apiRuntimeConfig\.mode !== "mock"/);
+  assert.match(runtime, /payoutAddressMockEnabled = apiRuntimeConfig\.mode === "mock"/);
   assert.match(store, /payoutAddressServerEnabled \? emptyBook\(\) : hydrate\(boundKey\)/);
   assert.match(store, /await payoutAddressApi\.save/);
   assert.match(page, /await payout\.saveRemoteAddress/);
-  assert.match(page, /data-testid="payout-address-mock-source"/);
-  assert.match(page, /v-if="payoutAddressMockEnabled"/);
+  assert.match(page, /payout-address-mock-source/);
+  assert.match(page, /payout-address-sandbox-source/);
+  assert.match(page, /v-if="payoutAddressMockEnabled \|\| payout\.sandboxServer"/);
   assert.match(page, /t\.addrRebind\.sandboxMockNotice/);
 });

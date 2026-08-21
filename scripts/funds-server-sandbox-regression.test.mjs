@@ -64,12 +64,12 @@ assert.match(app, /function creditRewardBucketOnce[\s\S]{0,220}if \(fundsServerE
   "server mode must reject local reward-bucket credits");
 
 // 🔴 同族改档(理由同上面的「扣与退同档」):这三处是**退款/对账的调用方**。
-// 若它们停在 fundsServerEnabled 而扣款停在 fundsSandboxEnabled,那么普通 remote 轨上
+// 若它们停在 fundsServerEnabled 而扣款停在 developmentFundsEnabled,那么普通 remote 轨上
 // 「本地扣了款」却「对账与退款的驱动整条不跑」—— store 层修好的退款调用方够不到。
 // 沙箱轨才是服务端整体重投影钱包的那条,本地对账在那条轨上才该让位。
-assert.match(shell, /function advanceArrivalAndSettleBill\(\)[\s\S]{0,180}if \(fundsSandboxEnabled\) return/,
+assert.match(shell, /function advanceArrivalAndSettleBill\(\)[\s\S]{0,180}if \(developmentFundsEnabled\) return/,
   "local arrival/bill reconciliation must yield on the same rail as the debit (sandbox), not on every server mode");
-assert.match(shell, /function startArrivalPoll\(\)[\s\S]{0,180}if \(fundsSandboxEnabled\) return/,
+assert.match(shell, /function startArrivalPoll\(\)[\s\S]{0,180}if \(developmentFundsEnabled\) return/,
   "the local finalizer must yield on the sandbox rail only");
 
 assert.match(bills, /fundsServerEnabled \? \[\] : hydrate\(/,
@@ -97,7 +97,7 @@ assert.match(deposits, /async function refreshFundsSandboxDeposits[\s\S]{0,700}e
 assert.doesNotMatch(deposits, /refreshFundsSandboxDeposits\(\)\.catch\(\(\) => undefined\)/,
   "sandbox refresh failures must not be silently converted into local fallback");
 
-assert.match(withdraw, /fundsSandboxEnabled\s*\?\s*\[\{ id: "USDT-BEP20"/,
+assert.match(withdraw, /developmentFundsEnabled\s*\?\s*\[\{ id: "USDT-BEP20"/,
   "sandbox withdrawal UI must expose only the backend-supported BEP20 network");
 assert.match(withdraw, /withdrawalPolicyError/,
   "provider/policy errors must remain visible instead of collapsing to a fake fallback");
@@ -125,7 +125,7 @@ assert.match(mutationKeys, /accountKey[\s\S]{0,120}environment[\s\S]{0,120}metho
   "pending mutation keys must be isolated by account, environment, method and payload");
 assert.match(mutationKeys, /generations[\s\S]{0,2500}getOrCreate[\s\S]{0,1800}finishByOrder/,
   "pending mutation keys must survive retry and rotate only after a bound order reaches terminal authority");
-assert.match(app, /const mutation: FundsMutationIdentity \| null = fundsSandboxEnabled \?[\s\S]{0,900}: null/,
+assert.match(app, /const mutation: FundsMutationIdentity \| null = developmentFundsEnabled \?[\s\S]{0,900}: null/,
   "the durable pending registry must be limited to server sandbox commands");
 // 🔴 生产侧幂等键改由**调用方冻结后传入**,不在 store 内现造(2026-08-12 合并收口)。
 // 原判据要求 store 走 createProductionFundsRequestKey() —— 那个工厂每调一次就新造一把,
@@ -138,7 +138,7 @@ assert.match(app, /const mutation: FundsMutationIdentity \| null = fundsSandboxE
 // 是同一件事的两套实现,内存那条活不过刷新页面,而「请求在途时刷页面」正是要兜的那一刻)。
 // 不变量没变,变的是它落在哪儿,所以**重锚不删门**:改钉「键取自落盘的冻结件」+
 // 「落盘发生在请求发出之前」。钉行为落点,不钉某个变量名。
-assert.match(app, /if \(fundsSandboxEnabled\)[\s\S]{0,300}pendingFundsMutationKey\(mutation\)/,
+assert.match(app, /if \(developmentFundsEnabled\)[\s\S]{0,300}pendingFundsMutationKey\(mutation\)/,
   "the sandbox rail must still key its command off the durable pending registry");
 assert.doesNotMatch(app, /createProductionFundsRequestKey\(\)/,
   "production commands must not mint a fresh idempotency key inside the store (a retry would become a second payout)");

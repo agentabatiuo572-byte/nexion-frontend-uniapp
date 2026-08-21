@@ -215,6 +215,8 @@ import {
   visibleQueuedExchangeOrders,
 } from "@/lib/exchange-cancel";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
@@ -237,17 +239,40 @@ const remoteError = ref<string | null>(null);
 const pendingExchangeMutations = createExchangePendingMutationStore();
 const exchangeCancelStorage = createExchangeCancelStorage();
 const cancellingOrderNo = ref<string | null>(null);
+let exchangeMounted = true;
 
-async function syncRemoteState() {
-  if (!remoteApiEnabled) return;
-  const scope = captureAccountScope();
+function remoteScopeCurrent(scope: ReturnType<typeof captureAccountScope>, runScope: CommerceSandboxRunScope): boolean {
+  return canShowExchangeToast({
+    mounted: exchangeMounted,
+    accountScopeCurrent: isCurrentAccountScope(scope) && app.accountKey === scope.accountKey,
+    runScopeCurrent: isCurrentCommerceSandboxScope(runScope),
+  });
+}
+
+function toastIfRemoteScopeCurrent(
+  scope: ReturnType<typeof captureAccountScope>,
+  runScope: CommerceSandboxRunScope,
+  show: () => void,
+): boolean {
+  if (!remoteScopeCurrent(scope, runScope)) return false;
+  show();
+  return true;
+}
+
+async function syncRemoteState(
+  scope = captureAccountScope(),
+  runScope = captureCommerceSandboxRun(),
+): Promise<boolean> {
+  if (!remoteApiEnabled) return true;
+  if (!remoteScopeCurrent(scope, runScope)) return false;
   try {
     const snapshot = await exchangeApi.fetchState();
-    if (!isCurrentAccountScope(scope) || app.accountKey !== scope.accountKey) return;
+    if (!remoteScopeCurrent(scope, runScope)) return false;
     remoteState.value = snapshot;
     remoteError.value = null;
+    return true;
   } catch {
-    if (!isCurrentAccountScope(scope) || app.accountKey !== scope.accountKey) return;
+    if (!remoteScopeCurrent(scope, runScope)) return false;
     // Failure-close: local balances, rates, queues and history are not a remote fallback.
     remoteState.value = null;
     remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
@@ -257,51 +282,62 @@ async function syncRemoteState() {
 
 async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unknown" | "stale" | "not-cancellable"> {
   if (!remoteApiEnabled) return "unknown";
+  const scope = captureAccountScope();
+  const runScope = captureCommerceSandboxRun();
+  if (!remoteScopeCurrent(scope, runScope)) return "stale";
   const current = remoteState.value?.orders.find((order) => order.exchangeNo === exchangeNo);
   if (!exchangeOrderCanCancel(current)) {
-    toast.info(t.value.exchange.cancelNotAllowed);
+    toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(t.value.exchange.cancelNotAllowed));
     return "not-cancellable";
   }
-  const scope = captureAccountScope();
   const key = acquireExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo);
   cancellingOrderNo.value = exchangeNo;
   try {
     const snapshot = await exchangeApi.cancel(exchangeNo, key);
-    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || !remoteScopeCurrent(scope, runScope)) return "stale";
     remoteState.value = snapshot;
     remoteError.value = null;
     const updated = snapshot.orders.find((order) => order.exchangeNo === exchangeNo);
     if (updated?.status !== "CANCELLED") return "unknown";
     finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
-    toast.success(t.value.exchange.cancelDone, t.value.exchange.cancelDoneBody);
+    toastIfRemoteScopeCurrent(scope, runScope, () => toast.success(
+      t.value.exchange.cancelDone,
+      t.value.exchange.cancelDoneBody,
+    ));
     return "cancelled";
   } catch {
-    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || !remoteScopeCurrent(scope, runScope)) return "stale";
     // A timeout may happen after the server committed. Re-read the current
     // account's authority before telling the user whether retry is needed.
     try {
       const snapshot = await exchangeApi.fetchState();
-      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || !remoteScopeCurrent(scope, runScope)) return "stale";
       remoteState.value = snapshot;
       remoteError.value = null;
       const updated = snapshot.orders.find((order) => order.exchangeNo === exchangeNo);
       if (updated?.status === "CANCELLED") {
         finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
-        toast.success(t.value.exchange.cancelDone, t.value.exchange.cancelDoneBody);
+        toastIfRemoteScopeCurrent(scope, runScope, () => toast.success(
+          t.value.exchange.cancelDone,
+          t.value.exchange.cancelDoneBody,
+        ));
         return "cancelled";
       }
       if (updated && !exchangeOrderCanCancel(updated)) {
         finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
-        toast.info(t.value.exchange.cancelNotAllowed);
+        toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(t.value.exchange.cancelNotAllowed));
         return "not-cancellable";
       }
     } catch {
       // Keep the command key so a later retry is the same idempotent request.
-      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || !remoteScopeCurrent(scope, runScope)) return "stale";
       remoteState.value = null;
       remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
     }
-    toast.error(t.value.exchange.cancelUnknownTitle, t.value.exchange.cancelUnknownBody);
+    toastIfRemoteScopeCurrent(scope, runScope, () => toast.error(
+      t.value.exchange.cancelUnknownTitle,
+      t.value.exchange.cancelUnknownBody,
+    ));
     return "unknown";
   } finally {
     if (cancellingOrderNo.value === exchangeNo) cancellingOrderNo.value = null;
@@ -358,7 +394,11 @@ const secsAgo = ref(0);
 // Roll daily counters on mount.
 onMounted(() => {
   if (remoteApiEnabled) {
-    void syncRemoteState().catch(() => toast.error(t.value.exchange.remoteUnavailableToast));
+    const scope = captureAccountScope();
+    const runScope = captureCommerceSandboxRun();
+    void syncRemoteState(scope, runScope).catch(() => {
+      toastIfRemoteScopeCurrent(scope, runScope, () => toast.error(t.value.exchange.remoteUnavailableToast));
+    });
     return;
   }
   // Explicit mock mode only: local counters and local wallet receipts are never remote success.
@@ -380,6 +420,7 @@ onMounted(() => {
   }, 500);
 });
 onUnmounted(() => {
+  exchangeMounted = false;
   if (rateTimer) clearInterval(rateTimer);
   if (agoTimer) clearInterval(agoTimer);
 });
@@ -392,7 +433,13 @@ const fromBal = computed(() => {
     : (remoteState.value?.wallet.nexAvailable ?? 0);
   return direction.value === "usdt2nex" ? app.user.usdtBalance : app.user.nexBalance;
 });
-const minFrom = computed(() => (direction.value === "usdt2nex" ? 1 : 10));
+// Remote mode consumes the same direction-specific minimums the submit endpoint
+// enforces. No local 1/10 fallback is safe: a config change would otherwise make
+// the visible validation disagree with the server's final gate.
+const minFrom = computed<number | null>(() => remoteApiEnabled
+  ? (remoteState.value?.caps[direction.value === "usdt2nex" ? "minUsdt" : "minNex"] ?? null)
+  : (direction.value === "usdt2nex" ? 1 : 10));
+const remoteMinimumReady = computed(() => !remoteApiEnabled || (remoteState.value !== null && minFrom.value !== null && minFrom.value > 0));
 
 /**
  * 🔴 **账本精度 = 2 位,两个币种都是**:app.ts 的 creditBalance / debitBalance /
@@ -423,8 +470,8 @@ function quoteTo(dir: "usdt2nex" | "nex2usdt", from: number, r: number): number 
 }
 const toAmount = computed(() => quoteTo(direction.value, fromAmount.value, rate.value));
 const overBalance = computed(() => fromAmount.value > fromBal.value);
-const underMin = computed(() => fromAmount.value > 0 && fromAmount.value < minFrom.value);
-const valid = computed(() => fromAmount.value > 0 && !overBalance.value && !underMin.value);
+const underMin = computed(() => fromAmount.value > 0 && minFrom.value !== null && fromAmount.value < minFrom.value);
+const valid = computed(() => remoteMinimumReady.value && fromAmount.value > 0 && !overBalance.value && !underMin.value);
 /**
  * 🔴 提交在途守卫(范式同 wallet-cards-new.vue 的 isBinding:`ref(false)` 挂在
  * **组件实例**上,不用 checkout.vue 那个模块级 `let` —— 模块级变量跨实例共享,
@@ -458,9 +505,16 @@ function flip() {
 
 function onRefresh() {
   if (remoteApiEnabled) {
-    void syncRemoteState()
-      .then(() => toast.info(t.value.exchange.remoteRefreshed))
-      .catch(() => toast.error(t.value.exchange.remoteUnavailableToast));
+    const scope = captureAccountScope();
+    const runScope = captureCommerceSandboxRun();
+    void syncRemoteState(scope, runScope)
+      .then((applied) => {
+        if (!applied) return;
+        toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(t.value.exchange.remoteRefreshed));
+      })
+      .catch(() => {
+        toastIfRemoteScopeCurrent(scope, runScope, () => toast.error(t.value.exchange.remoteUnavailableToast));
+      });
     return;
   }
   exchange.refreshRate();
@@ -470,16 +524,21 @@ function goHowItWorks() {
   uni.navigateTo({ url: "/pages/me/wallet-exchange-how", fail: () => {} });
 }
 
-function notifyRemoteSwapResult(order: ExchangeOrder) {
+function notifyRemoteSwapResult(
+  order: ExchangeOrder,
+  scope: ReturnType<typeof captureAccountScope>,
+  runScope: CommerceSandboxRunScope,
+) {
+  if (!remoteScopeCurrent(scope, runScope)) return;
   if (order.status === "COMPLETED" || order.status === "SUCCESS") {
-    toast.success(t.value.exchange.swapped);
+    toastIfRemoteScopeCurrent(scope, runScope, () => toast.success(t.value.exchange.swapped));
     return;
   }
   if (order.status === "QUEUED") {
-    toast.info(
+    toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(
       t.value.exchange.queuedToastTitle,
       fmt(t.value.exchange.queuedToastBody, { amount: (order.fromAsset === "USDT" ? order.fromAmount : order.toAmount).toFixed(2) }),
-    );
+    ));
     return;
   }
   const reason = {
@@ -488,7 +547,10 @@ function notifyRemoteSwapResult(order: ExchangeOrder) {
     PLATFORM_CAP: t.value.exchange.swapPlatformCapReason,
     GEO_BLOCKED: t.value.exchange.swapGeoBlockedReason,
   }[order.status];
-  toast.error(reason ?? fmt(t.value.exchange.swapNotFilled, { status: order.status }), order.exchangeNo);
+  toastIfRemoteScopeCurrent(scope, runScope, () => toast.error(
+    reason ?? fmt(t.value.exchange.swapNotFilled, { status: order.status }),
+    order.exchangeNo,
+  ));
 }
 
 async function handleConfirm() {
@@ -496,6 +558,8 @@ async function handleConfirm() {
   // 读到的还是第一条 v3.record 之前的计数 —— 两笔都放行,日限直接翻倍。
   if (submitting.value) return;
   if (!valid.value) return;
+  const requestScope = captureAccountScope();
+  const requestRunScope = captureCommerceSandboxRun();
 
   // 🔴 **成交快照冻在第一个 await 之前**(范式同 wallet-withdraw.vue 的 snap)。
   // 方向 / 币种 / 金额 / 到账额 / 汇率 / USD 计值 / 账号 一次冻结;额度门、弹窗文案、
@@ -515,7 +579,6 @@ async function handleConfirm() {
     account: app.accountKey,
     remoteBaseline: remoteState.value,
   };
-
   submitting.value = true;
   // settled 记录「这笔到底成交了没有」—— 下面 catch 里那句资金断言必须跟它走,
   // 不能无条件说「一分没动」。见 catch 处注释。
@@ -529,8 +592,11 @@ async function handleConfirm() {
         confirmLabel: t.value.exchange.confirm,
       });
       if (!ok) return;
-      if (app.accountKey !== snap.account || !snap.remoteBaseline) {
-        toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleContext);
+      if (!remoteScopeCurrent(requestScope, requestRunScope) || app.accountKey !== snap.account || !snap.remoteBaseline) {
+        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+          t.value.exchange.quoteStaleTitle,
+          t.value.exchange.quoteStaleContext,
+        ));
         return;
       }
       const directionCode = snap.direction === "usdt2nex" ? "USDT_TO_NEX" : "NEX_TO_USDT";
@@ -547,15 +613,17 @@ async function handleConfirm() {
         swap: (idempotencyKey) => exchangeApi.swap(directionCode, snap.fromAmount, true, idempotencyKey),
         fetchState: () => exchangeApi.fetchState(),
       });
-      if (app.accountKey !== snap.account) {
-        await syncRemoteState();
-        toast.info(t.value.exchange.accountSwitchedRefreshed);
+      if (!remoteScopeCurrent(requestScope, requestRunScope) || app.accountKey !== snap.account) {
+        const applied = await syncRemoteState(requestScope, requestRunScope).catch(() => false);
+        if (!applied) return;
+        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.info(t.value.exchange.accountSwitchedRefreshed));
         return;
       }
       remoteState.value = result.snapshot;
       remoteError.value = null;
       if (["COMPLETED", "SUCCESS", "QUEUED"].includes(result.order.status)) input.value = "";
-      notifyRemoteSwapResult(result.order as ExchangeOrder);
+      if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
+      notifyRemoteSwapResult(result.order as ExchangeOrder, requestScope, requestRunScope);
       return;
     }
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
@@ -573,20 +641,20 @@ async function handleConfirm() {
           icon: "warn",
           confirmLabel: t.value.exchange.capReachedConfirm,
         });
-        if (queueIt) {
+        if (queueIt && remoteScopeCurrent(requestScope, requestRunScope)) {
           v3.enqueue({ amountUSD: snap.usd, direction: snap.direction });
-          toast.info(
+          toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.info(
             t.value.exchange.queuedToastTitle,
             fmt(t.value.exchange.queuedToastBody, { amount: snap.usd.toFixed(2) }),
-          );
+          ));
         }
         return;
       }
       if (gate.reason === "platform-cap") {
-        toast.error(
+        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
           t.value.exchange.platformExhaustedTitle,
           fmt(t.value.exchange.platformExhaustedBody, { cap: (gate.cap / 1000).toFixed(0) }),
-        );
+        ));
         return;
       }
     }
@@ -599,9 +667,9 @@ async function handleConfirm() {
       icon: "info",
       confirmLabel: t.value.exchange.confirm,
     });
-    if (!ok) return;
+    if (!ok || !remoteScopeCurrent(requestScope, requestRunScope)) return;
 
-    toast.info(t.value.exchange.confirmingToast);
+    toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.info(t.value.exchange.confirmingToast));
     // 结算延迟(MOCK:真实现是兑换提交 endpoint〔TBD;PRD 未定义〕的往返)。写成 await 而不是 setTimeout 回调 ——
     // 回调版的守卫在函数返回时就复位了,等于没守;await 让整条链留在同一个 try/finally 里。
     await new Promise((r) => setTimeout(r, 900));
@@ -611,14 +679,20 @@ async function handleConfirm() {
     //  ① 汇率:拿**当前**汇率按同一个 quoteTo 重算到账额;变了就是漂移。
     //     (反过来用快照汇率复验快照报价,等式恒成立,这道门等于没有。)
     if (quoteTo(snap.direction, snap.fromAmount, rate.value) !== snap.toAmount) {
-      toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleRate);
+      toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+        t.value.exchange.quoteStaleTitle,
+        t.value.exchange.quoteStaleRate,
+      ));
       return;
     }
     //  ② 账号:确认期间换号 → 钱会扣在新账号头上,而弹窗展示的是旧账号的数。
     //  ③ 额度:再问一次同一个门(入参仍是快照金额)。
     //     ⚠️ 这只收口**本标签页**;计数器自身的跨标签页竞态是 exchange-v3.ts 的独立缺陷,不在本次范围。
-    if (app.accountKey !== snap.account || !v3.canExchange(snap.usd).ok) {
-      toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleContext);
+    if (!remoteScopeCurrent(requestScope, requestRunScope) || app.accountKey !== snap.account || !v3.canExchange(snap.usd).ok) {
+      toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+        t.value.exchange.quoteStaleTitle,
+        t.value.exchange.quoteStaleContext,
+      ));
       return;
     }
 
@@ -639,10 +713,10 @@ async function handleConfirm() {
       { type: "swap", amount: snap.toAmount, symbol: snap.toSym, status: "posted", memo: swapMemo, ref: swapRef },
     ]);
     if (posted === "insufficient") {
-      toast.error(
+      toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
         t.value.exchange.insufficientTitle,
         t.value.exchange.insufficientMessage.replace("{sym}", snap.fromSym),
-      );
+      ));
       return;
     }
     if (posted !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
@@ -659,25 +733,31 @@ async function handleConfirm() {
     // Commit to v3 daily counters + lifetime
     v3.record(snap.usd);
 
-    toast.success(
+    toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.success(
       t.value.exchange.swapped,
       t.value.exchange.swappedDetail
         .replace("{from}", snap.fromSym)
         .replace("{fromAmt}", amtLabel(snap.fromAmount))
         .replace("{to}", snap.toSym)
         .replace("{toAmt}", amtLabel(snap.toAmount)),
-    );
+    ));
     input.value = "";
   } catch (err) {
     if (remoteApiEnabled) {
+      if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
       if (err instanceof ExchangeOutcomeUnknownError) {
         if (app.accountKey === snap.account && err.authoritativeState) {
           remoteState.value = err.authoritativeState as ExchangeSnapshot;
-        } else if (app.accountKey !== snap.account) {
-          await syncRemoteState().catch(() => {});
+        } else {
+          const applied = await syncRemoteState(requestScope, requestRunScope).catch(() => false);
+          if (!applied || !remoteScopeCurrent(requestScope, requestRunScope)) return;
         }
+        if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
         remoteError.value = "G2_SWAP_OUTCOME_UNKNOWN";
-        toast.error(t.value.exchange.outcomeUnknownTitle, t.value.exchange.outcomeUnknownBody);
+        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+          t.value.exchange.outcomeUnknownTitle,
+          t.value.exchange.outcomeUnknownBody,
+        ));
         return;
       }
       remoteState.value = null;
@@ -685,9 +765,10 @@ async function handleConfirm() {
       // 这条路径失败的是用户刚提交的**兑换动作**,不是一次数据读取 —— 与 :268/:370 两处
       // 「拉取失败」共用一句「数据取不到,请稍后再试」会让用户以为刷新一下就好,
       // 而实际是这笔兑换没有成交(独立审查判为文案与实际状态不符)。
-      toast.error(t.value.exchange.swapFailed);
+      toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(t.value.exchange.swapFailed));
       return;
     }
+    if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
     // A region refusal surfaces on this path as a rejected submit. Translate it
     // into a toast; anything else is not ours to swallow — rethrow so the
     // existing failure behaviour (and the `finally` unlock below) is unchanged.
@@ -697,7 +778,10 @@ async function handleConfirm() {
     // 「已部分落账后重试」的下游,那时说「一分没动」就是当面撒谎(本仓在
     // wallet-repurchase.vue 已为同形错误踩过一次)。settled 为真即已成交过,
     // 此时只报拒绝原因、不做资金断言。
-    toast.error(geo, settled ? undefined : t.value.geoPolicy.fundsSafeNote);
+    toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+      geo,
+      settled ? undefined : t.value.geoPolicy.fundsSafeNote,
+    ));
   } finally {
     // 所有出口(含取消 / 拒单 / 抛异常)统一解锁 —— 复位点只有一个,不会有分支漏掉。
     submitting.value = false;
@@ -705,7 +789,7 @@ async function handleConfirm() {
 }
 
 // ── derived labels ──
-const minLabel = computed(() => t.value.exchange.minAmount.replace("{n}", String(minFrom.value)).replace("{sym}", fromSym.value));
+const minLabel = computed(() => t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : String(minFrom.value)).replace("{sym}", fromSym.value));
 const fromBalLabel = computed(() => (fromSym.value === "USDT" ? fromBal.value.toFixed(2) : fromBal.value.toLocaleString()));
 const toAmountLabel = computed(() => amtLabel(toAmount.value));
 const rateLabel = computed(() => t.value.exchange.rate.replace("{rate}", rate.value.toFixed(5)));
@@ -713,7 +797,7 @@ const updatedLabel = computed(() => t.value.exchange.rateLastUpdated.replace("{n
 const errorLabel = computed(() =>
   overBalance.value
     ? t.value.exchange.insufficientMessage.replace("{sym}", fromSym.value)
-    : t.value.exchange.minAmount.replace("{n}", String(minFrom.value)).replace("{sym}", fromSym.value),
+    : t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : String(minFrom.value)).replace("{sym}", fromSym.value),
 );
 const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(displayQueue.value.length) }));
 // 历史行同样走 amtLabel:历史与余额对不上,多半就是这里自己又取了一次整。

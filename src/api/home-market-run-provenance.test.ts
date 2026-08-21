@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { describe, expect, it } from "vitest";
 import { parseNexMarketSnapshot } from "./market-api";
 
 const RUN = "home-market-run-20260819";
@@ -17,22 +16,16 @@ const snapshot = {
 };
 
 describe("Home NEX market Run provenance", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
-
-  it("keeps Sandbox market data closed until commerce establishes the exact Run", () => {
-    setCurrentCommerceSandboxRun(null);
-    expect(() => parseNexMarketSnapshot(snapshot, "sandbox")).toThrow("NEX_MARKET_RESPONSE_INVALID");
-
-    setCurrentCommerceSandboxRun(RUN);
-    expect(parseNexMarketSnapshot(snapshot, "sandbox")).toMatchObject({ runId: RUN, currentPrice: 0.125 });
+  it("keeps removed Sandbox market data closed", () => {
+    expect(() => parseNexMarketSnapshot(snapshot, "dev")).toThrow("NEX_MARKET_RESPONSE_INVALID");
   });
 
   it("validates backend DATETIME values without browser-dependent parsing", () => {
-    setCurrentCommerceSandboxRun(RUN);
-    expect(parseNexMarketSnapshot(snapshot, "sandbox").history24h[0]?.sampledAt).toBe("2026-08-19 13:33:00");
+    const canonical = { ...snapshot, source: "G3 weekly_curve + nx_price_index 24h history", sourceEnvironment: "PRODUCTION", runId: "" };
+    expect(parseNexMarketSnapshot(canonical, "dev").history24h[0]?.sampledAt).toBe("2026-08-19 13:33:00");
     expect(() => parseNexMarketSnapshot({
-      ...snapshot,
+      ...canonical,
       history24h: [{ price: 0.125, sampledAt: "2026-02-31 13:33:00" }],
-    }, "sandbox")).toThrow("NEX_MARKET_RESPONSE_INVALID");
+    }, "dev")).toThrow("NEX_MARKET_RESPONSE_INVALID");
   });
 });

@@ -101,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { GENESIS_ELIGIBILITY, useGenesis, type GenesisGateCondition } from "@/store/genesis";
@@ -123,16 +123,24 @@ const { gate } = useGenesisEligibility();
 const inviteInput = ref("");
 /** 拒绝归因(null = 没出错)。四种拒绝各自文案,且都不透露核销者是谁。 */
 const inviteReject = ref<GenesisInviteRejectReason | null>(null);
+let inviteRequestGeneration = 0;
+let sheetMounted = true;
 
 watch(
   () => props.open,
   (o) => {
+    inviteRequestGeneration += 1;
     if (o) {
       inviteInput.value = "";
       inviteReject.value = null;
     }
   },
 );
+
+onUnmounted(() => {
+  sheetMounted = false;
+  inviteRequestGeneration += 1;
+});
 
 const inviteErrorText = computed(() => {
   const el = t.value.genesisEligibility;
@@ -199,19 +207,26 @@ function goFix(key: GenesisGateCondition["key"]) {
 }
 
 async function verifyInvite() {
+  const request = ++inviteRequestGeneration;
+  const accountKey = app.accountKey;
   inviteReject.value = null;
   // per-account 核销(随 account-cloud 快照走,切号不继承 — 审计 P1 修复);
   // 查平台码表 + 三态校验,拒绝带归因 → 四种失败各自文案(规格 FEAT-GEN11 ②)。
   const result = await app.setGenesisInviteCode(inviteInput.value);
+  if (!sheetMounted || !props.open || request !== inviteRequestGeneration
+      || accountKey !== app.accountKey) return;
   if (!result.ok) {
     inviteReject.value = result.reason;
     return;
   }
   await genesis.syncRemote();
+  if (!sheetMounted || !props.open || request !== inviteRequestGeneration
+      || accountKey !== app.accountKey) return;
   toast.success(t.value.genesisEligibility.inviteApplied, "");
 }
 
 function emitClose() {
+  inviteRequestGeneration += 1;
   emit("update:open", false);
 }
 function emitSubscribe() {

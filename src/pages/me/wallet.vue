@@ -131,7 +131,7 @@ import { confirm as uiConfirm } from "@/store/ui";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
-import { fundsSandboxEnabled } from "@/api/runtime";
+import { developmentFundsEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -140,7 +140,7 @@ const cards = useCards();
 const cfg = useConfig();
 
 const configSyncFailed = computed(() => cfg.syncFailed);
-const fundsAuthorityError = computed(() => fundsSandboxEnabled && app.fundsSandboxStatus === "error"
+const fundsAuthorityError = computed(() => developmentFundsEnabled && app.fundsSandboxStatus === "error"
   ? app.fundsSandboxError
   : "");
 

@@ -12,6 +12,9 @@
 // `/pages${href}` prefixing (nova-drawer did) hits non-existent routes and
 // uni's navigateTo silently fails → "点击无跳转". (P-046)
 
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+
 const TAB_ROOT: Record<string, string> = {
   "/": "/pages/index/index",
   "/home": "/pages/index/index",
@@ -46,6 +49,12 @@ export function toUniRoute(href: string): { url: string; tab: boolean } {
  * cold-open ("点返回无反应"). Guard on the real stack depth instead.
  */
 export function navBack(fallbackHref?: string): void {
+  // Back navigation is still navigation: a Home offer may have been opened
+  // just before the current page was pushed. Close only the in-memory sheets
+  // before popping/replacing so their backdrop cannot consume the next tap on
+  // the destination page. Cooldown and server state remain untouched.
+  useTrialClaimSheet().closeTransient();
+  useVoucherClaimSheet().closeTransient();
   let len = 1;
   try { len = getCurrentPages().length; } catch { /* unavailable → treat as cold-open */ }
   if (len > 1) {
@@ -67,6 +76,11 @@ export function navBack(fallbackHref?: string): void {
 
 /** Navigate to a logical-or-uni href, picking reLaunch for tab roots. */
 export function navTo(href: string): void {
+  // A transient Home offer must never remain above the destination page and
+  // steal its first tap. Persistent cooldown state is intentionally untouched;
+  // this only arbitrates the in-memory overlay before navigation.
+  useTrialClaimSheet().closeTransient();
+  useVoucherClaimSheet().closeTransient();
   const { url, tab } = toUniRoute(href);
   if (tab) {
     uni.reLaunch({

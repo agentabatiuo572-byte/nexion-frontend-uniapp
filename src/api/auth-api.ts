@@ -45,12 +45,8 @@ export interface RegistrationRequest extends RegistrationOtpRequest {
 }
 
 export type OAuthProvider = "GOOGLE" | "APPLE" | "PASSKEY" | "TELEGRAM";
-export type OAuthExchangeMode = "SANDBOX_MOCK" | "PROVIDER";
 export interface OAuthExchangeRequest {
   provider: OAuthProvider;
-  mode: OAuthExchangeMode;
-  /** Provider-verified subject/credential placeholder; never used by Sandbox. */
-  externalSubject?: string;
   displayName?: string;
 }
 export interface OAuthExchangeResult {
@@ -365,19 +361,19 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
     },
     async oauthExchange(request) {
       const revision = vault.revision();
-      const body = request.mode === "SANDBOX_MOCK"
-        ? {
-            provider: request.provider,
-            mode: request.mode,
-            displayName: request.displayName,
-            challengeNo: oauthSandboxChallengeFromResponse(await client.request<unknown>({
-              path: "/auth/users/oauth/sandbox/challenge",
-              method: "POST",
-              body: { provider: request.provider },
-              authenticated: false,
-            })),
-          }
-        : request;
+      // The Java profile decides whether the development challenge endpoint is
+      // available. The browser never selects an execution environment or
+      // supplies an unverified provider subject.
+      const body = {
+        provider: request.provider,
+        displayName: request.displayName,
+        challengeNo: oauthSandboxChallengeFromResponse(await client.request<unknown>({
+          path: "/auth/users/oauth/sandbox/challenge",
+          method: "POST",
+          body: { provider: request.provider },
+          authenticated: false,
+        })),
+      };
       const data = await client.request<unknown>({
         path: "/auth/users/oauth/exchange",
         method: "POST",

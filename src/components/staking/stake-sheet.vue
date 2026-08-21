@@ -7,7 +7,7 @@
   postMoneyBill,见 lib/money-receipt.ts),不在 store 里;不裸调资金原语 / 账单写入。
 -->
 <template>
-  <view v-if="open && term !== null">
+  <view v-if="open && term !== null && selectedPool">
     <transition name="nx-sheet-fade">
       <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
     </transition>
@@ -78,6 +78,9 @@
       </view>
     </transition>
   </view>
+  <view v-else-if="open && term !== null" class="nx-staking-sheet-panel" :style="panelStyle">
+    <text class="block" :style="titleStyle">{{ t.staking.remoteUnavailableClosed }}</text>
+  </view>
 </template>
 
 <script setup lang="ts">
@@ -93,6 +96,7 @@ import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { ApiError } from "@/api/errors";
+import { resolveStakingPool } from "@/lib/staking-canonical";
 
 const PRESETS = [100, 500, 1000, 5000];
 const ONE_DAY_MS = 86400 * 1000;
@@ -109,7 +113,18 @@ const amount = ref(0);
 const remotePending = ref(false);
 const remoteIntent = ref<{ fingerprint: string; key: string } | null>(null);
 const remoteGate = createRemoteIntentGate("G1");
-const selectedPool = computed(() => props.term === null ? undefined : staking.pools.find((pool) => pool.termDays === props.term));
+const selectedPool = computed(() => props.term === null ? null : resolveStakingPool(
+  { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+  props.term,
+  props.term === null ? undefined : {
+    apy: STAKING_APY[props.term],
+    penalty: STAKING_PENALTY[props.term],
+    minAmountUsdt: STAKING_MIN[props.term],
+  },
+));
+const apyRate = computed(() => selectedPool.value?.apy ?? 0);
+const penaltyRate = computed(() => selectedPool.value?.penalty ?? 0);
+const minAmount = computed(() => selectedPool.value?.minAmountUsdt ?? 0);
 
 function intentKey(tierKey: string, amountUsdt: number) {
   const fingerprint = `${tierKey}:${amountUsdt.toFixed(2)}`;
@@ -123,7 +138,7 @@ function intentKey(tierKey: string, amountUsdt: number) {
 watch(
   () => [props.open, props.term] as const,
   ([o, term]) => {
-    if (o && term !== null) amount.value = selectedPool.value?.minAmountUsdt ?? STAKING_MIN[term];
+    if (o && term !== null) amount.value = minAmount.value;
   },
 );
 
@@ -131,8 +146,8 @@ const titleText = computed(() => (props.term !== null ? fmt(t.value.stakingV3.sh
 const subtitleText = computed(() =>
   props.term !== null
     ? fmt(t.value.stakingV3.sheet.subtitle, {
-        apy: ((selectedPool.value?.apy ?? STAKING_APY[props.term]) * 100).toFixed(0),
-        penalty: ((selectedPool.value?.penalty ?? STAKING_PENALTY[props.term]) * 100).toFixed(0),
+        apy: (apyRate.value * 100).toFixed(0),
+        penalty: (penaltyRate.value * 100).toFixed(0),
       })
     : "",
 );
@@ -142,20 +157,20 @@ const interestLabel = computed(() =>
 const balanceText = computed(() => (staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt).toFixed(2));
 const principalText = computed(() => amount.value.toFixed(2));
 const interestText = computed(() =>
-  props.term !== null ? (amount.value * (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365)).toFixed(2) : "0.00",
+  props.term !== null ? (amount.value * apyRate.value * (props.term / 365)).toFixed(2) : "0.00",
 );
 const unlockDateText = computed(() =>
   props.term !== null ? new Date(Date.now() + props.term * ONE_DAY_MS).toLocaleDateString(dateLocale()) : "",
 );
 const totalText = computed(() =>
-  props.term !== null ? (amount.value * (1 + (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365))).toFixed(2) : "0.00",
+  props.term !== null ? (amount.value * (1 + apyRate.value * (props.term / 365))).toFixed(2) : "0.00",
 );
 const ctaText = computed(() =>
   props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: amount.value.toFixed(2), n: props.term }) : "",
 );
 const lockedNoticeText = computed(() =>
   props.term !== null
-    ? fmt(t.value.stakingV3.sheet.lockedNotice, { penalty: (STAKING_PENALTY[props.term] * 100).toFixed(0) })
+    ? fmt(t.value.stakingV3.sheet.lockedNotice, { penalty: (penaltyRate.value * 100).toFixed(0) })
     : "",
 );
 
@@ -173,14 +188,16 @@ function emitClose() {
 async function submit() {
   const term = props.term;
   if (term === null) return;
-  const min = selectedPool.value?.minAmountUsdt ?? STAKING_MIN[term];
+  const min = minAmount.value;
   if (amount.value < min) {
     toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min, n: term }));
     return;
   }
   if (!staking.isMockMode) {
     if (remotePending.value) return;
-    const pool = selectedPool.value;
+    const pool = props.term === null
+      ? undefined
+      : staking.pools.find((candidate) => candidate.termDays === props.term);
     if (!pool || !pool.enabled || pool.killed) {
       toast.error(t.value.stakingV3.toast.openFailedTitle);
       return;
@@ -264,7 +281,7 @@ async function submit() {
   }
   toast.success(
     t.value.stakingV3.toast.stakeSuccess,
-    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: STAKING_APY[term] * 100, n: term }),
+    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: apyRate.value * 100, n: term }),
   );
   emitClose();
 }

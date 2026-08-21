@@ -1,8 +1,8 @@
 <!--
   Re-invest Boost (ported from Nexion-prototype/app/(main)/me/wallet/repurchase/page.tsx).
-  Funnels into another buy-in: 90d lock at 35% APY, 1.5× cultivation, Genesis lottery
-  ticket. Cross-store orchestration in handler (postMoneyBill 扣款⊗记账 + stake). framer
-  stagger → CSS nx-step-in. Wrapped in <AppChassis active="me">.
+  Mock mode keeps the isolated demo rail; remote mode renders and submits only
+  server-authoritative repurchase data. Explicit sandbox stays HOLD until its
+  isolated backend route exists. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
@@ -20,10 +20,10 @@
               </view>
               <view>
                 <text class="block" :style="heroTitleStyle">{{ w.hero }}</text>
-                <text class="block" :style="heroPtsStyle">{{ w.benefits.apy }}</text>
+                <text class="block" :style="heroPtsStyle">{{ heroApy }}</text>
               </view>
             </view>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow" @keydown.enter.prevent="goHow" @keydown.space.prevent="goHow">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
               <text style="margin: 0 6px">{{ w.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -38,6 +38,21 @@
           </view>
         </view>
 
+        <view v-if="isSandboxHold" :style="unavailableStyle">
+          <text class="block" :style="unavailableTitleStyle">{{ unavailableTitle }}</text>
+          <text class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
+        </view>
+
+        <view v-else-if="isRemote && !remoteReady" :style="unavailableStyle">
+          <text class="block" :style="unavailableTitleStyle">{{ unavailableTitle }}</text>
+          <text class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
+          <view v-if="repurchase.loading" class="block" :style="unavailableBodyStyle"><text>{{ loadingLabel }}</text></view>
+          <view v-else class="nx-repurchase-submit-cta w-full flex items-center justify-center" :style="retryCtaStyle" role="button" tabindex="0" @click="refreshRemote">
+            <text>{{ retryLabel }}</text>
+          </view>
+        </view>
+
+        <template v-else>
         <!-- amount input -->
         <view :style="cardStyle">
           <text class="block" :style="monoLabelStyle">{{ w.amountLabel }}</text>
@@ -59,7 +74,7 @@
           </view>
           <view style="margin-top: 12px">
             <text :style="balanceLabelStyle">{{ w.balanceLabel }}</text>
-            <text :style="balanceValueStyle"> ${{ user.usdtBalance.toFixed(2) }}</text>
+            <text :style="balanceValueStyle"> ${{ displayBalance.toFixed(2) }}</text>
           </view>
         </view>
 
@@ -68,9 +83,9 @@
           <text class="block" :style="monoLabelStyle">{{ w.after90 }}</text>
           <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
             <Row :label="w.principal" :value="`$${amount.toFixed(2)}`" />
-            <Row :label="w.interest" :value="`+$${projectedYield.toFixed(2)}`" tint="var(--v5-brand)" />
+            <Row :label="w.interest" :value="projectedYield === null ? '—' : `+$${projectedYield.toFixed(2)}`" tint="var(--v5-brand)" />
             <view :style="dividerStyle" />
-            <Row :label="w.unlockable" :value="`$${(amount + projectedYield).toFixed(2)}`" bold />
+            <Row :label="w.unlockable" :value="projectedYield === null ? '—' : `$${(amount + projectedYield).toFixed(2)}`" bold />
           </view>
         </view>
 
@@ -81,13 +96,14 @@
         </view>
 
         <text class="block" :style="lockedNoticeStyle">{{ w.lockedNotice }}</text>
+        </template>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import Row from "@/components/me/repurchase-row.vue";
@@ -98,6 +114,10 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { useStaking } from "@/store/staking";
+import { apiRuntimeConfig } from "@/api/runtime";
+import { useRepurchase } from "@/store/repurchase";
+import { resolveRepurchaseRuntimePolicy } from "@/lib/repurchase-runtime-policy";
+import { navTo } from "@/lib/route";
 
 const PRESETS = [100, 200, 500, 1000];
 
@@ -105,15 +125,47 @@ const t = useT();
 const w = computed(() => t.value.repurchase);
 const app = useApp();
 const staking = useStaking();
+const repurchase = useRepurchase();
+const repurchasePolicy = resolveRepurchaseRuntimePolicy(apiRuntimeConfig.environment);
+const isRemote = computed(() => repurchasePolicy.serverAuthoritative);
+const isSandboxHold = computed(() => repurchasePolicy.unavailable);
+const isMounted = ref(true);
 
 const user = computed(() => app.user);
 const amount = ref<number>(200);
-const presets = PRESETS;
+const amountTouched = ref(false);
+const presets = computed(() => (isRemote.value ? (repurchase.config?.presets ?? []) : PRESETS));
+const displayBalance = computed(() => (isRemote.value ? repurchase.walletBalanceUsdt : user.value.usdtBalance));
+const remoteReady = computed(() => isRemote.value && repurchase.config !== null && !repurchase.error);
 
-const projectedYield = computed(() => amount.value * 0.35 * (90 / 365));
-const canSubmit = computed(() => amount.value > 0 && amount.value <= user.value.usdtBalance);
+const projectedYield = computed<number | null>(() => {
+  if (!isRemote.value) return amount.value * 0.35 * (90 / 365);
+  const config = repurchase.config;
+  return config ? amount.value * (config.apyPct / 100) * (config.lockDays / 365) : null;
+});
+const canSubmit = computed(() => {
+  if (isRemote.value) {
+    const config = repurchase.config;
+    return Boolean(
+      config?.enabled
+      && Number.isFinite(amount.value)
+      && amount.value >= config.minAmountUsdt
+      && amount.value <= repurchase.walletBalanceUsdt,
+    );
+  }
+  return amount.value > 0 && amount.value <= user.value.usdtBalance;
+});
 
 const ctaLabel = computed(() => fmt(w.value.cta, { amount: amount.value.toFixed(2) }));
+const unavailableTitle = computed(() => w.value.unavailableTitle);
+const unavailableBody = computed(() => w.value.unavailableBody);
+const retryLabel = computed(() => w.value.retry);
+const loadingLabel = computed(() => w.value.loading);
+const heroApy = computed(() => {
+  if (!isRemote.value) return w.value.benefits.apy;
+  const config = repurchase.config;
+  return config ? fmt(w.value.benefits.apyCanonical, { apy: config.apyPct, days: config.lockDays }) : "—";
+});
 
 const BENEFIT_SVG = {
   sparkles: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>`,
@@ -122,20 +174,73 @@ const BENEFIT_SVG = {
   diamond: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>`,
 };
 
-const benefitTiles = computed(() => [
-  { icon: BENEFIT_SVG.zap, text: w.value.benefits.apy, tint: "var(--v5-warning)" },
-  { icon: BENEFIT_SVG.check, text: w.value.benefits.cultivation, tint: "var(--v5-tech-cyan)" },
-  { icon: BENEFIT_SVG.diamond, text: w.value.benefits.genesis, tint: "var(--v5-brand-2)" },
-]);
+const benefitTiles = computed(() => {
+  const config = repurchase.config;
+  if (isRemote.value && !config) return [];
+  return [
+    {
+      icon: BENEFIT_SVG.zap,
+      text: isRemote.value
+        ? fmt(w.value.benefits.apyCanonical, { apy: config!.apyPct, days: config!.lockDays })
+        : w.value.benefits.apy,
+      tint: "var(--v5-warning)",
+    },
+    {
+      icon: BENEFIT_SVG.check,
+      text: isRemote.value
+        ? fmt(w.value.benefits.cultivationCanonical, { multiplier: config!.effectiveNurtureMultiplier })
+        : w.value.benefits.cultivation,
+      tint: "var(--v5-tech-cyan)",
+    },
+    {
+      icon: BENEFIT_SVG.diamond,
+      text: isRemote.value
+        ? fmt(w.value.benefits.genesisCanonical, { tickets: config!.ticketPerOrder })
+        : w.value.benefits.genesis,
+      tint: "var(--v5-brand-2)",
+    },
+  ];
+});
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAmount(e: Event) {
+  amountTouched.value = true;
   amount.value = Math.max(0, parseFloat(detailVal(e)) || 0);
 }
 
-function handleRepurchase() {
+async function refreshRemote() {
+  if (!isRemote.value || !isMounted.value) return;
+  await repurchase.refresh();
+  if (!isMounted.value) return;
+  if (!amountTouched.value && repurchase.config) {
+    amount.value = repurchase.config.presets[0] ?? repurchase.config.minAmountUsdt;
+  }
+}
+
+async function handleRepurchase() {
+  if (isRemote.value) {
+    if (!remoteReady.value || !canSubmit.value || !isMounted.value) return;
+    try {
+      await repurchase.open(amount.value);
+      if (!isMounted.value) return;
+      toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: amount.value }));
+      const nextPreset = repurchase.config?.presets?.[0];
+      amount.value = nextPreset ?? repurchase.config?.minAmountUsdt ?? 0;
+    } catch (cause) {
+      if (!isMounted.value) return;
+      const message = cause instanceof Error && cause.message
+        ? cause.message
+        : w.value.unavailableBody;
+      toast.error(w.value.unavailableTitle, message);
+    }
+    return;
+  }
+  if (isSandboxHold.value) {
+    toast.error(unavailableTitle.value, unavailableBody.value);
+    return;
+  }
   if (!canSubmit.value) return;
   const billRef = `REINVEST-${Date.now().toString(36).toUpperCase()}`;
   // Cross-store orchestration in the handler (stores don't import each other).
@@ -202,8 +307,15 @@ function handleRepurchase() {
 }
 
 function goHow() {
-  uni.navigateTo({ url: "/pages/me/wallet-repurchase-how", fail: () => {} });
+  navTo("/pages/me/wallet-repurchase-how");
 }
+
+onMounted(() => {
+  if (isRemote.value) void refreshRemote();
+});
+onUnmounted(() => {
+  isMounted.value = false;
+});
 
 // Secondary nav pill — soft brand-2 tint carries the affordance, no border (chip rule).
 const howLinkStyle: CSSProperties = {
@@ -273,4 +385,8 @@ const ctaStyle = computed<CSSProperties>(() => ({
   boxShadow: canSubmit.value ? "var(--v5-spotlight-brand)" : "none",
 }));
 const lockedNoticeStyle: CSSProperties = { padding: "0 8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const unavailableStyle: CSSProperties = { padding: "16px", borderRadius: "12px", background: "var(--v5-surface-2)" };
+const unavailableTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const unavailableBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const retryCtaStyle: CSSProperties = { marginTop: "12px", height: "44px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "13px", fontWeight: 600 };
 </script>

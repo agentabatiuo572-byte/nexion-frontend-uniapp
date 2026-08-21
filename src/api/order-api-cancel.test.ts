@@ -11,7 +11,7 @@ describe("order cancellation API", () => {
       source: "server", sourceEnvironment: "PRODUCTION", runId: "",
       serverCanonical: true, idempotent: false,
     });
-    const api = createOrderApi({ request } as unknown as ApiClient, "remote");
+    const api = createOrderApi({ request } as unknown as ApiClient, "prod");
     await expect(api.cancel("ORD-1", "cancel-key")).resolves.toMatchObject({
       orderNo: "ORD-1", source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
     });
@@ -26,7 +26,7 @@ describe("order cancellation API", () => {
       source: "server", sourceEnvironment: "PRODUCTION", runId,
       serverCanonical: true, idempotent: false,
     });
-    const api = createOrderApi({ request } as unknown as ApiClient, "remote");
+    const api = createOrderApi({ request } as unknown as ApiClient, "prod");
     await expect(api.cancel("ORD-1", "cancel-key")).rejects.toMatchObject({ kind: "protocol" });
   });
 
@@ -37,7 +37,7 @@ describe("order cancellation API", () => {
       source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816",
       serverCanonical: true, idempotent: true,
     });
-    const api = createOrderApi({ request } as unknown as ApiClient, "sandbox");
+    const api = createOrderApi({ request } as unknown as ApiClient, "dev");
     await expect(api.cancel("ORD-1", "cancel-key")).resolves.toMatchObject({
       source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816", serverCanonical: true,
     });
@@ -50,7 +50,7 @@ describe("order cancellation API", () => {
       source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260815",
       serverCanonical: true, idempotent: false,
     });
-    const api = createOrderApi({ request } as unknown as ApiClient, "sandbox");
+    const api = createOrderApi({ request } as unknown as ApiClient, "dev");
     await expect(api.cancel("ORD-1", "cancel-key")).rejects.toMatchObject({ kind: "protocol" });
   });
 });

@@ -1,0 +1,80 @@
+import { describe, expect, it } from "vitest";
+import type { LegalTermsCurrent } from "@/api/legal-terms-api";
+import {
+  buildLegalTermsLoginRoute,
+  buildLegalTermsRoute,
+  canonicalLegalTermsReturnTo,
+  claimLegalTermsRedirect,
+  sameLegalTermsRun,
+  isLegalTermsAcknowledged,
+  sameLegalTermsSession,
+  type LegalTermsSessionFence,
+} from "./legal-terms-gate";
+
+const acknowledged = (value: boolean): LegalTermsCurrent => ({
+  source: "server",
+  sourceEnvironment: "PRODUCTION",
+  runId: "run-1",
+  requestedLocale: "en",
+  resolvedLocale: "en",
+  requestedJurisdiction: "GLOBAL",
+  resolvedJurisdiction: "GLOBAL",
+  provenance: "exact:en/GLOBAL",
+  version: "v1",
+  effectiveAt: "2026-08-18T00:00:00",
+  title: "Terms",
+  summary: "Summary",
+  sections: [{ key: "acceptance", title: "Acceptance", body: "18+", sortOrder: 1 }],
+  acknowledged: value,
+  acknowledgedAt: value ? "2026-08-18T00:00:01" : null,
+});
+
+describe("legal terms session gate", () => {
+  it("routes unauthenticated users to login with an internal Terms return only", () => {
+    expect(buildLegalTermsLoginRoute("/pages/onboarding/terms")).toBe("/pages/login/login?return=%2Fpages%2Fonboarding%2Fterms");
+    expect(buildLegalTermsLoginRoute("https://evil.example/steal")).toBe("/pages/login/login?return=%2Fpages%2Fonboarding%2Fterms");
+    expect(buildLegalTermsRoute("/pages/me/me")).toBe("/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme");
+  });
+
+  it("flattens a Terms return carried through login so acknowledgement returns to the real destination", () => {
+    const nested = "/pages/onboarding/terms?return=%2Fpages%2Fonboarding%2Fterms%3Freturn%3D%252Fpages%252Fme%252Fme";
+    expect(canonicalLegalTermsReturnTo(nested, "/pages/onboarding/intro")).toBe("/pages/me/me");
+    expect(buildLegalTermsRoute(nested)).toBe("/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme");
+    expect(buildLegalTermsLoginRoute(buildLegalTermsRoute(nested))).toBe("/pages/login/login?return=%2Fpages%2Fonboarding%2Fterms%3Freturn%3D%252Fpages%252Fme%252Fme");
+  });
+
+  it("requires a server snapshot that is not acknowledged", () => {
+    expect(isLegalTermsAcknowledged(acknowledged(false))).toBe(false);
+    expect(isLegalTermsAcknowledged(acknowledged(true))).toBe(true);
+  });
+
+  it("claims one redirect per account/version/return target so onShow refresh cannot loop", () => {
+    const seen = new Set<string>();
+    expect(claimLegalTermsRedirect(seen, "user-7:v1:/pages/me/me")).toBe(true);
+    expect(claimLegalTermsRedirect(seen, "user-7:v1:/pages/me/me")).toBe(false);
+    expect(claimLegalTermsRedirect(seen, "user-7:v2:/pages/me/me")).toBe(true);
+    expect(claimLegalTermsRedirect(seen, "user-8:v1:/pages/me/me")).toBe(true);
+  });
+
+  it("accepts the initial sandbox response before catalog bootstrap, but rejects a known stale RunID", () => {
+    const sandbox = { ...acknowledged(false), sourceEnvironment: "SANDBOX" as const };
+    expect(sameLegalTermsRun(sandbox, null)).toBe(true);
+    expect(sameLegalTermsRun(sandbox, "run-1")).toBe(true);
+    expect(sameLegalTermsRun({ ...sandbox, runId: "run-2" }, "run-1")).toBe(false);
+    expect(sameLegalTermsRun({ ...acknowledged(false), sourceEnvironment: "PRODUCTION", runId: "" }, "run-1")).toBe(true);
+  });
+
+  it("rejects late responses after account or token/run fencing changes", () => {
+    const first: LegalTermsSessionFence = { accessToken: "token-a", userId: 7, runId: "run-1" };
+    expect(sameLegalTermsSession(first, { ...first })).toBe(true);
+    expect(sameLegalTermsSession(first, { ...first, accessToken: "token-b" })).toBe(false);
+    expect(sameLegalTermsSession(first, { ...first, userId: 8 })).toBe(false);
+    expect(sameLegalTermsSession(first, { ...first, runId: "run-2" })).toBe(false);
+    // The first post-login fetch may begin before the sandbox catalogue
+    // publishes its RunID; an absent expected RunID must not reject that
+    // response solely because the catalogue epoch is now known.
+    expect(sameLegalTermsSession({ accessToken: "token-a", userId: 7 }, { ...first, runEpoch: 2 })).toBe(true);
+    expect(sameLegalTermsSession({ ...first, runEpoch: 2 }, { ...first, runEpoch: 3 })).toBe(false);
+    expect(sameLegalTermsSession(first, null)).toBe(false);
+  });
+});

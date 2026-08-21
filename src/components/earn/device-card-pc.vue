@@ -324,7 +324,7 @@ import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
-import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
+import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import type { LockedTeaser } from "@/mock/tasks";
 import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
@@ -545,6 +545,7 @@ function goUnlock() {
 const degradable = computed(() => isDegradable(props.device.kind));
 const lifecycle = computed(() => {
   if (!degradable.value) return null;
+  if (props.device.capacitySource === "server" && !hasServerLifecycleProjection(props.device)) return null;
   const s = getLifecycleSummary(props.device, now.value);
   return s.isDegradable ? s : null;
 });
@@ -565,12 +566,23 @@ function openExplainer() {
   explainer.open();
 }
 const DAY_MS = 86400000;
-// 时钟回拨防护:剩余窗口 clamp 到 [0, SUBSIDY_DAYS](规格 DEV01B 异常3)。
+// Remote uses the server's boolean + configured window. It must not infer the
+// subsidy state from purchasedAt and the browser clock (clock skew can reopen
+// an expired badge). Explicit mock keeps the local countdown for the demo.
 const subsidyRemainMs = computed(() =>
-  degradable.value ? Math.min(SUBSIDY_DAYS * DAY_MS, Math.max(0, props.device.purchasedAt + SUBSIDY_DAYS * DAY_MS - now.value)) : 0,
+  !lifecycle.value
+    ? 0
+    : props.device.capacitySource === "server"
+      ? props.device.capacitySubsidized === true
+        ? (props.device.capacitySubsidyDays ?? 0) * DAY_MS
+        : 0
+      : Math.min(SUBSIDY_DAYS * DAY_MS, Math.max(0, props.device.purchasedAt + SUBSIDY_DAYS * DAY_MS - now.value)),
 );
 const inSubsidy = computed(() => degradable.value && subsidyRemainMs.value > 0);
 const subsidyText = computed(() => {
+  if (props.device.capacitySource === "server" && lifecycle.value) {
+    return fmt(t.value.earn.subsidyBadge, { n: props.device.capacitySubsidyDays ?? 0 });
+  }
   if (subsidyRemainMs.value <= DAY_MS) return t.value.earn.subsidyBadgeLastDay;
   return fmt(t.value.earn.subsidyBadge, { n: Math.ceil(subsidyRemainMs.value / DAY_MS) });
 });

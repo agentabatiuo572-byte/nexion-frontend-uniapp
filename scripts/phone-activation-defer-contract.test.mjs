@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+
+test("failed phone calibration offers retry and activate-later without minting activation", () => {
+  const page = read("src/pages/onboarding/connect.vue");
+  const auth = read("src/store/auth.ts");
+  assert.match(page, /t(?:\.value)?\.onboarding\.activationRetry/);
+  assert.match(page, /t(?:\.value)?\.onboarding\.activationDefer/);
+  assert.match(page, /function deferPhoneActivation\s*\(/);
+  assert.match(page, /auth\.completeOnboarding\(\)/);
+
+  const handler = page.slice(page.indexOf("function deferPhoneActivation"), page.indexOf("function activate", page.indexOf("function deferPhoneActivation")));
+  assert.doesNotMatch(handler, /applyPhoneCalibration|markCalibrated|resumeMining/);
+  assert.match(page, /markPhoneActivationDeferred/);
+  assert.doesNotMatch(page.slice(page.indexOf("async function deferPhoneActivation"), page.indexOf("function leaveConnect")), /clearCalibrated/);
+  assert.match(page, /result\(calibrationIntent\?\.deviceId \|\| getDeviceId\(\)\)/);
+  assert.match(page, /current\.activationStatus !== "DEFERRED"/);
+  assert.match(page, /markAuthAccountOnboardingComplete[\s\S]*\|\| remoteApiEnabled/,
+    "a server-confirmed defer must not be turned back into an onboarding failure by the optional local phone directory");
+  assert.match(auth, /if \(persist\(\) \|\| remoteApiEnabled\) return true/,
+    "server mode must keep the live session onboarded when its non-authoritative local cache cannot be persisted");
+  assert.match(handler, /!localPhoneStateCommitted && !remoteApiEnabled/,
+    "a server-confirmed DEFERRED state must win over local cache write failures without weakening the local mock contract");
+  assert.match(page, /activationBusy\.value = false;[\s\S]*accountEpoch \+= 1/,
+    "an account switch must release the previous account's busy state");
+  assert.ok((handler.match(/acceptCurrentCanonical\(requestScope, /g) ?? []).length >= 3,
+    "result, defer, readback and retry responses must be fenced before another server command or local mutation");
+});
+
+test("deferred activation is a persisted non-active state, not a forced recalibration loop", () => {
+  const session = read("src/store/session.ts");
+  const deferred = session.slice(session.indexOf("function markPhoneActivationDeferred"), session.indexOf("function isCurrentDeviceCalibrated"));
+  assert.match(deferred, /DEFERRED_PHONE_ACTIVATION_KEY|readDeferredPhoneActivationMap/);
+  assert.match(deferred, /requiresRecalibration\.value = false/);
+  assert.doesNotMatch(deferred, /requiresRecalibration\.value = true/);
+
+  const cleanup = read("src/store/account-scoped-storage.ts");
+  assert.match(cleanup, /nexgrid-deferred-phone-activation-v1/);
+});
+
+test("successful activation is confirmed by the server before local compute starts", () => {
+  const page = read("src/pages/onboarding/connect.vue");
+  assert.match(page, /await onboardingCalibrationApi\.activate\(/);
+  assert.ok(page.indexOf("await onboardingCalibrationApi.activate(") < page.indexOf("app.applyPhoneCalibration("));
+});
+
+test("new phone fixture starts inactive and produces no seeded phone reward", () => {
+  const factory = read("src/store/device-types.ts");
+  const phoneSeed = factory.slice(factory.indexOf("const phone = createDevice"), factory.indexOf("const demoKinds"));
+  assert.match(phoneSeed, /phone\.activatedAt = null/);
+  assert.match(phoneSeed, /phone\.todayEarnings = 0/);
+  assert.match(phoneSeed, /phone\.todayEarningsNEX = 0/);
+});
+
+test("device warehouse and slot sheet cannot bypass phone recalibration", () => {
+  const devices = read("src/pages/me/devices.vue");
+  const slotSheet = read("src/components/slot-action-sheet.vue");
+  assert.match(devices, /d\.kind === "phone"/);
+  assert.match(devices, /pages\/onboarding\/connect\?mode=recalibrate/);
+  assert.match(slotSheet, /d\.kind === "phone"/);
+  assert.match(slotSheet, /pages\/onboarding\/connect\?mode=recalibrate/);
+  assert.match(devices, /phoneActivationCta/);
+  assert.match(devices, /!phones\.some\(\(device\) => device\.activatedAt !== null\)/);
+
+  const connect = read("src/pages/onboarding/connect.vue");
+  assert.match(connect, /error\.status !== 404/);
+  assert.match(connect, /intent\.expectedRevision = 0/);
+});
+
+test("all locales explain retry, defer, warehouse recovery and reward consequences", () => {
+  for (const locale of ["zh", "en", "vi"]) {
+    const messages = read(`src/i18n/messages/${locale}.ts`);
+    for (const key of ["activationRetry", "activationDefer", "activationDeferredHint", "activationDeferredToast", "activationRewardGate"]) {
+      assert.match(messages, new RegExp(`${key}:`), `${locale} missing ${key}`);
+    }
+  }
+});

@@ -147,7 +147,7 @@ import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLeadershipPool, V_VOTES, POOL_TOP_N, type LeadershipPayout } from "@/store/leadership-pool";
-import { useVRank, V_RANKS, type VRank } from "@/store/v-rank";
+import { useVRank, type VRank } from "@/store/v-rank";
 import { rankLabel, rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
@@ -202,14 +202,15 @@ const weeklyDescText = computed(() => {
   const n = daysToPayout.value > 0 ? `${daysToPayout.value}${t.value.pool.daysShort}` : `${hoursToPayout.value}${t.value.pool.hoursShort}`;
   return fmt(t.value.pool.weeklyDesc, { n });
 });
-// 领导池解锁档位的头衔标签。🔴 权威源是 `V_RANKS`(与 network-card / rank-how 读 title/cnTitle 同源),
+// 领导池解锁档位的头衔标签由服务端 ladder 投影提供，
 // 不再在模板和脚本里各写一份 "V3 Captain" 字面量 —— 原来两处各一份,改了一处另一处静默错位。
 // 头衔是**数据**不是文案:三语的 pool.requiresV3 句子里嵌的就是这个英文权威值
-//(中文镜像走 V_RANKS.cnTitle,与 cn-title-field 的口径一致)。
+// 中文镜像同样从该 canonical ladder 读取。
 const POOL_UNLOCK_RANK: VRank = 3;
 // 中文界面用中文头衔(主人 2026-08-17 拍板:V3 = 舰长),与 zh 词典里 requiresV3 那句的写法必须一致
 const isZh = computed(() => useLocaleStore().code === "zh");
-const poolUnlockRankLabel = computed(() => rankLabel(POOL_UNLOCK_RANK, isZh.value, vState.ladder));
+const rankReady = computed(() => vState.remoteReady);
+const poolUnlockRankLabel = computed(() => rankReady.value ? rankLabel(POOL_UNLOCK_RANK, isZh.value, vState.ladder) : "—");
 const requiresV3Parts = computed(() => {
   // 🔴 「句子里必然包含这个头衔」是一条无门保护的不变量(独立审计点出):某天单侧改了译文,
   //    split 拿不到第二段,原来会渲染成「整句 + 重复头衔」。取不到就退化成整句 + 不高亮。

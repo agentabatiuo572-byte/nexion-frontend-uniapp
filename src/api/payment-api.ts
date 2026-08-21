@@ -1,5 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ApiEnvironment } from "./runtime-config";
+import { matchesRuntimeProvenance } from "./runtime-provenance";
 
 export interface VietQrPaymentConfig {
   enabled: boolean;
@@ -12,11 +14,18 @@ export interface VietQrPaymentConfig {
   feeUsdt: number;
 }
 
-export interface PaymentConfig {
+interface PaymentProvenance {
+  serverCanonical: true;
+  source: string;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
+}
+
+export interface PaymentConfig extends PaymentProvenance {
   vietQr: VietQrPaymentConfig;
 }
 
-export interface FxQuoteSnapshot {
+export interface FxQuoteSnapshot extends PaymentProvenance {
   baseRateVndPerUsdt: number;
   buySpreadPct: number;
   quoteRateVndPerUsdt: number;
@@ -123,8 +132,26 @@ function date(value: unknown): string | null {
   return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
-function parseConfig(value: unknown): PaymentConfig {
+function parseProvenance(
+  source: Record<string, unknown> | null,
+  mode: ApiEnvironment,
+  expectedSource: string,
+  message: string,
+): PaymentProvenance {
+  if (!source || !matchesRuntimeProvenance(source, mode, expectedSource)) {
+    throw new ApiError({ kind: "protocol", message });
+  }
+  return {
+    serverCanonical: true,
+    source: source.source,
+    sourceEnvironment: source.sourceEnvironment,
+    runId: source.runId,
+  };
+}
+
+function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
   const source = record(value);
+  const proof = parseProvenance(source, mode, "nx_vietqr_config", "PAYMENT_CONFIG_RESPONSE_INVALID");
   const vietQr = record(source?.vietQr);
   const minDepositUsdt = number(vietQr?.minDepositUsdt, { min: 0 });
   const maxDepositUsdt = number(vietQr?.maxDepositUsdt, { min: 0 });
@@ -148,6 +175,7 @@ function parseConfig(value: unknown): PaymentConfig {
     throw new ApiError({ kind: "protocol", message: "PAYMENT_CONFIG_RESPONSE_INVALID" });
   }
   return {
+    ...proof,
     vietQr: {
       enabled: vietQr.enabled,
       minDepositUsdt,
@@ -161,8 +189,9 @@ function parseConfig(value: unknown): PaymentConfig {
   };
 }
 
-function parseFxQuote(value: unknown): FxQuoteSnapshot {
+function parseFxQuote(value: unknown, mode: ApiEnvironment): FxQuoteSnapshot {
   const source = record(value);
+  const proof = parseProvenance(source, mode, "nx_finance_fx_quote_config", "FX_QUOTE_RESPONSE_INVALID");
   const baseRateVndPerUsdt = number(source?.baseRateVndPerUsdt, { min: 1 });
   const buySpreadPct = number(source?.buySpreadPct, { min: 0 });
   const quoteRateVndPerUsdt = number(source?.quoteRateVndPerUsdt, { min: 1 });
@@ -193,6 +222,7 @@ function parseFxQuote(value: unknown): FxQuoteSnapshot {
     throw new ApiError({ kind: "protocol", message: "FX_QUOTE_RESPONSE_INVALID" });
   }
   return {
+    ...proof,
     baseRateVndPerUsdt,
     buySpreadPct,
     quoteRateVndPerUsdt,
@@ -317,16 +347,16 @@ function parseIntentList(value: unknown): VietQrIntentSnapshot[] {
   return source.items.map(parseIntent);
 }
 
-export function createPaymentApi(client: ApiClient): PaymentApi {
+export function createPaymentApi(client: ApiClient, mode: ApiEnvironment = "prod"): PaymentApi {
   return {
     config: async () => parseConfig(await client.request({
       method: "GET",
       path: "/api/app/payments/config",
-    })),
+    }), mode),
     fxQuote: async () => parseFxQuote(await client.request({
       method: "GET",
       path: "/api/app/payments/fx-quote?fiat=VND&asset=USDT",
-    })),
+    }), mode),
     createVietQrIntent: async (usdtAmount, idempotencyKey) =>
       parseIntent(await client.request({
         method: "POST",

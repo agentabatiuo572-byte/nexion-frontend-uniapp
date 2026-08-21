@@ -40,14 +40,14 @@
         <view :style="nexBlockStyle">
           <view class="flex items-center justify-between" style="margin-bottom: 8px">
             <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.uiChrome.nexBalance }}</text>
-            <text :style="nexBadgeStyle">+20.4%</text>
+            <text :style="nexBadgeStyle">{{ nexChangeLabel }}</text>
           </view>
           <view class="flex items-baseline" style="gap: 8px">
             <text class="tabular-nums" :style="nexNumStyle">{{ nexLabel }}</text>
             <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 13px; color: var(--v5-nex); font-weight: 600; letter-spacing: 0.06em">NEX</text>
           </view>
           <view class="flex items-center justify-between" :style="nexSubRowStyle">
-            <text style="color: var(--v5-ink-3)">≈ ${{ nexUsd }} · 1 NEX = $0.171</text>
+            <text style="color: var(--v5-ink-3)">{{ nexMarketLabel }}</text>
             <!-- 《07》tap≥44:上一轮只补了按下反馈、漏了热区(实测 109.6×16,独立验收 agent 抓出)。
                  同 section-header 的处理 —— 只向左扩,右边缘不动,不越过父容器。 -->
             <view class="inline-flex items-center shrink-0 active:opacity-70 transition-opacity" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3); min-height: 44px; padding-left: 16px" @click="goBills">
@@ -102,6 +102,7 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
+import { useMarket } from "@/store/market";
 import { MAX_DEVICES, derivePromoUpgrade } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
@@ -111,6 +112,7 @@ import WalletActionBtn from "@/components/me/wallet-action-btn.vue";
 const t = useT();
 const app = useApp();
 const bills = useBills();
+const market = useMarket();
 
 const buckets = computed(() => ({
   pendingReviewUsdt: earningsReleaseSnapshot.value?.buckets.pending_review
@@ -131,7 +133,17 @@ const pendingLine = computed(() =>
 
 const nex = computed(() => app.user.nexBalance);
 const nexLabel = computed(() => nex.value.toLocaleString());
-const nexUsd = computed(() => (nex.value * 0.171).toFixed(2));
+const marketReady = computed(() => market.isMockMode || market.remoteReady);
+const nexChangeLabel = computed(() => {
+  if (!marketReady.value) return "—";
+  const change = market.change24hPct;
+  return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
+});
+const nexMarketLabel = computed(() => {
+  if (!marketReady.value) return "≈ — · 1 NEX = —";
+  const price = market.nexPriceUSDT;
+  return `≈ $${(nex.value * price).toFixed(2)} · 1 NEX = $${price.toFixed(3)}`;
+});
 
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));

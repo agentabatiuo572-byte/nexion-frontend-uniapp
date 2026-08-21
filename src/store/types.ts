@@ -74,6 +74,15 @@ export interface Device {
   basePower: number; // W
   baseRate: number; // daily USDT (full-efficiency baseline; see lib/store/device-lifecycle.ts for current effective rate)
   baseRateNEX: number; // daily NEX (platform token, §8.1 80% of static yield)
+  /** E3 capacity projection source. Remote rows are display-only server facts;
+   * mock rows intentionally omit this marker and keep the local simulation. */
+  capacitySource?: "server" | "mock";
+  capacityPct?: number | null;
+  capacityAgeMonths?: number | null;
+  capacitySubsidized?: boolean | null;
+  capacitySubsidyDays?: number | null;
+  /** Fleet snapshot clock paired with the server capacity projection. */
+  serverNow?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency
   // degradation curve in lib/store/device-lifecycle.ts. Cloud Share / phone are
   // exempt from degradation (compute is rented or co-located).
@@ -81,7 +90,8 @@ export interface Device {
   // Activation lifecycle (Sprint #146-1): null = purchased but inactive (not consuming a slot,
   // not contributing earnings/quest progress/promo variables);
   // number = epoch ms when user activated this device into one of the 6 slots.
-  // Phone is auto-activated on signup; other devices start inactive and require user opt-in.
+  // Every device, including the phone, stays inactive until the corresponding
+  // server-authoritative activation command succeeds.
   activatedAt: number | null;
   // PRD §6.11 登记锚点: epoch ms of the last earnings settlement. Set on
   // activation (= registration), advanced by app.ts settle() on each accrual.

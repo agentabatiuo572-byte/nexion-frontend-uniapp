@@ -19,11 +19,11 @@
           <view style="flex: 1">
             <text class="block" :style="heroLabelStyle">{{ w.progress }}</text>
             <view class="flex items-baseline" style="gap: 4px">
-              <text :style="heroCountStyle">{{ unlocked }}</text>
-              <text :style="heroTotalStyle">/ {{ total }}</text>
+              <text :style="heroCountStyle">{{ unlocked ?? "—" }}</text>
+              <text :style="heroTotalStyle">/ {{ total === null ? "—" : total }}</text>
             </view>
           </view>
-          <text :style="heroPctStyle">{{ percent }}%</text>
+          <text :style="heroPctStyle">{{ percentLabel }}</text>
         </view>
         <view :style="barTrackStyle">
           <view :style="barFillStyle" />
@@ -248,13 +248,20 @@ const groups = computed(() => {
     .filter((g) => g.list.length > 0);
 });
 
-const unlocked = computed(() => remoteApiEnabled
-  ? remoteGroups.value.flatMap((group) => group.rows).filter((row) => row.status === "CLAIMED" || row.status === "FIRED").length
+const unlocked = computed<number | null>(() => remoteApiEnabled
+  ? remoteSnapshot.value
+    ? remoteGroups.value.flatMap((group) => group.rows).filter((row) => row.status === "CLAIMED" || row.status === "FIRED").length
+    : null
   : ach.records.length);
-const total = computed(() => remoteApiEnabled
-  ? remoteGroups.value.reduce((sum, group) => sum + group.rows.length, 0)
+const total = computed<number | null>(() => remoteApiEnabled
+  ? remoteSnapshot.value
+    ? remoteGroups.value.reduce((sum, group) => sum + group.rows.length, 0)
+    : null
   : ACHIEVEMENTS.length);
-const percent = computed(() => total.value > 0 ? Math.round((unlocked.value / total.value) * 100) : 0);
+const percent = computed<number | null>(() => total.value === null || unlocked.value === null
+  ? null
+  : total.value > 0 ? Math.round((unlocked.value / total.value) * 100) : 0);
+const percentLabel = computed(() => percent.value === null ? "—" : `${percent.value}%`);
 
 async function claimRemote(row: RemoteMilestoneRow) {
   if (!remoteApiEnabled || row.status !== "CLAIMABLE" || remoteBusy.value) return;
@@ -352,7 +359,7 @@ const heroPctStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "2
 const barTrackStyle: CSSProperties = { marginTop: "12px", height: "8px", borderRadius: "999px", background: "var(--v5-surface-2)", overflow: "hidden" };
 const barFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${percent.value}%`,
+  width: percent.value === null ? "0%" : `${percent.value}%`,
   background: "linear-gradient(90deg, var(--v5-warning), var(--v5-brand))",
   transition: "width 700ms ease",
 }));

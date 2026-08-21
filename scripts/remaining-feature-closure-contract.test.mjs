@@ -22,7 +22,7 @@ test("compute enrollment preserves the account-scoped command and rejects late a
   assert.match(page, /storageScope\(accountKey: string\)/);
   assert.match(page, /expectedGeneration !== accountGeneration/);
   assert.match(page, /readPending\(accountKey\) \?\? undefined/);
-  assert.match(page, /fundsSandboxEnabled[\s\S]{0,120}sandboxHold/);
+  assert.match(page, /developmentFundsEnabled[\s\S]{0,120}sandboxHold/);
 });
 
 test("remote team projection never turns errors into zero or local royalty money", async () => {
@@ -125,12 +125,12 @@ test("remote leaderboard, leadership pool, and commission pages use self-scoped 
   assert.match(runtime, /createTeamInsightsApi/);
   assert.match(leaderboard, /teamInsightsApi\.leaderboard/);
   assert.match(leaderboard, /remoteApiEnabled/);
-  assert.match(leaderboard, /accountKey !== app\.accountKey/);
+  assert.match(leaderboard, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
   assert.match(leaderboard, /remoteState !== 'ready'/);
   assert.match(leaderboard, /remoteState\.value = "error"/);
   assert.doesNotMatch(leaderboard, /myRank:\s*remoteSnapshot\.value\?\.myRank \?\? 0/);
   assert.match(pool, /teamInsightsApi\.leadershipPool/);
-  assert.match(pool, /accountKey !== app\.accountKey/);
+  assert.match(pool, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
   assert.match(pool, /remoteState !== 'ready'/);
   assert.match(pool, /remoteState\.value = "error"/);
   assert.match(commission, /teamInsightsApi\.commissions/);
@@ -149,7 +149,7 @@ test("remote unilevel page renders only the server cycle/source/layer/split proj
   assert.match(page, /teamInsightsApi\.unilevel/);
   assert.match(page, /remoteSnapshot\?\.events/);
   assert.match(page, /remoteState === 'error'/);
-  assert.match(page, /accountKey !== app\.accountKey/);
+  assert.match(page, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
   assert.doesNotMatch(page, /remoteApiEnabled[\s\S]{0,220}Math\.log10/);
 });
 

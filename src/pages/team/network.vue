@@ -199,12 +199,11 @@ interface Plotted {
 const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
-const vState = vRank;
 const isZh = computed(() => useLocaleStore().code === "zh");
 
 const members = computed(() => network.members);
 const myRank = computed(() => vRank.myRank);
-const myRankText = computed(() => remoteApiEnabled && vRank.ladder.length === 0 ? "—" : `V${myRank.value}`);
+const myRankText = computed(() => remoteApiEnabled && !vRank.remoteReady ? "—" : `V${myRank.value}`);
 const selected = ref<NetworkMember | null>(null);
 const pulseId = ref<string | null>(null);
 let pulseTimer: ReturnType<typeof setInterval> | null = null;
@@ -257,9 +256,9 @@ const idleSuffixText = computed(() => fmt(t.value.network.idleSuffix, { n: idleC
 function daysJoined(m: NetworkMember): number {
   return Math.floor((Date.now() - m.joinedAt) / 86400000);
 }
-// 头衔显示名收在 lib/v-rank-copy(中文界面用中文头衔;档位表由 store 给,不直读 MOCK-ONLY 的 V_RANKS)
+// 头衔显示名收在 lib/v-rank-copy，档位表只读取 canonical store projection。
 function memberRankTitle(m: NetworkMember): string {
-  return rankTitle(m.vRank, isZh.value, vState.ladder);
+  return rankTitle(m.vRank, isZh.value, vRank.ladder);
 }
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";

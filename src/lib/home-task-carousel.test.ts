@@ -4,6 +4,7 @@ import conversionBannerSource from "../components/home/conversion-banner.vue?raw
 import {
   deriveHomeTaskCards,
   isHomeWeeklyCardReady,
+  presentHomeWeeklyCard,
   selectHomeWeeklySource,
 } from "./home-task-carousel";
 
@@ -88,5 +89,43 @@ describe("home task carousel", () => {
   it("keeps the weekly card independent from the non-authoritative home truth promo", () => {
     expect(conversionBannerSource).not.toContain("homeTruth");
     expect(conversionBannerSource).not.toContain("serverPromo");
+  });
+
+  it("keeps the high-fidelity countdown and daily-rate slots for a real weekly quest", () => {
+    const source = selectHomeWeeklySource([weeklyQuest], pausedPromo);
+
+    expect(presentHomeWeeklyCard(source, pausedPromo, 1)).toEqual({
+      multiplier: 1,
+      rewardNex: 30,
+      countdownDays: 4,
+      countdownHours: 12,
+      subtitle: "Complete a learning course · StellarBox Pro",
+      targetDevice: "StellarBox Pro",
+      targetDaily: 1.5,
+      action: "missions",
+    });
+    expect(conversionBannerSource).not.toContain('v-if="!weeklyQuest"');
+  });
+
+  it("does not invent weekly display metadata when PC H3 has no presentation row", () => {
+    expect(presentHomeWeeklyCard({ kind: "quest", quest: weeklyQuest }, null, 1.2)).toEqual({
+      multiplier: 1.2,
+      rewardNex: 36,
+      countdownDays: null,
+      countdownHours: null,
+      subtitle: "Complete a learning course",
+      targetDevice: null,
+      targetDaily: null,
+      action: "missions",
+    });
+  });
+
+  it("keeps mock-only weekly values out of the formal UniApp component", () => {
+    expect(conversionBannerSource).not.toContain("remoteApiEnabled");
+    expect(conversionBannerSource).not.toContain("derivePromoUpgrade");
+    expect(conversionBannerSource).not.toContain("const baseReward = 800");
+    expect(conversionBannerSource).not.toContain("managedCopyText");
+    expect(conversionBannerSource).toContain(':aria-label="subtitleText"');
+    expect(conversionBannerSource).toContain(':title="subtitleText"');
   });
 });

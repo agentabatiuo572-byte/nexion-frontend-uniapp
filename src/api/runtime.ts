@@ -1,9 +1,9 @@
 import { createAccountApi } from "./account-api";
 import { createUniHttpTransport } from "./api-client";
 import { createAuthApi } from "./auth-api";
-import { createMockAuthApi } from "./mock-auth-api";
 import { createPaymentApi } from "./payment-api";
 import { createProductCatalogApi } from "./product-catalog-api";
+import { createProductNotificationApi } from "./product-notification-api";
 import { createProductPhaseApi } from "./product-phase-api";
 import { createWithdrawalApi } from "./withdrawal-api";
 import { createEarnConfigApi } from "./earn-config-api";
@@ -18,6 +18,7 @@ import { createMarketApi } from "./market-api";
 import { createGenesisApi } from "./genesis-api";
 import { createRepurchaseApi } from "./repurchase-api";
 import { createRiskDisclosureApi } from "./risk-disclosure-api";
+import { createLegalTermsApi } from "./legal-terms-api";
 import { createPayoutAddressApi } from "./payout-address-api";
 import { createPaymentMethodApi } from "./payment-method-api";
 import { createTrialApi } from "./trial-api";
@@ -27,6 +28,7 @@ import { createPointsApi } from "./points-api";
 import { createVoucherApi } from "./voucher-api";
 import { createContentCopyApi } from "./content-copy-api";
 import { createNotificationApi } from "./notification-api";
+import { createNotificationPreferencesApi } from "./notification-preferences-api";
 import { createTrustSectionApi } from "./trust-section-api";
 import { createI18nApi } from "./i18n-api";
 import { createJanusApi } from "./janus-api";
@@ -42,6 +44,7 @@ import { createComputeShareApi } from "./compute-share-api";
 import { createNetworkRegionsApi } from "./network-regions-api";
 import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
+import { createDeveloperResourcesApi } from "./developer-resources-api";
 import { createBundleOrderApi } from "./bundle-order-api";
 import { createCommercePaymentApi } from "./commerce-payment-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
@@ -53,24 +56,26 @@ import { createNetworkRankApi } from "./network-rank-api";
 import { createTeamQuotaApi } from "./team-quota-api";
 import { createProofApi } from "./proof-api";
 import { createAppHomeApi } from "./app-home-api";
+import { createOnboardingCalibrationApi } from "./onboarding-calibration-api";
+import { createShareEventApi } from "./share-event-api";
+import { createGoalsApi } from "./goals-api";
+import { createHowContentApi } from "./how-content-api";
 import { createPurchaseEligibilityApi } from "./purchase-eligibility-api";
-import { readApiRuntimeConfig } from "./runtime-config";
+import { readApiRuntimeConfig, type ApiEnvironment } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
-export const remoteApiEnabled = apiRuntimeConfig.mode !== "mock";
-export const fundsSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
-// Card tokenization/binding is a mock or explicit local-sandbox capability until
-// a real PSP provider is configured. Remote/production must fail closed rather
-// than presenting a form that only creates a mock token.
-export const paymentSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
-export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";
-// Payout addresses are real provider/production data. The isolated App
-// sandbox deliberately uses the account-scoped local implementation instead
-// of calling the production-only resource with a sandbox identity.
-export const payoutAddressServerEnabled = apiRuntimeConfig.mode === "remote";
-export const payoutAddressMockEnabled = apiRuntimeConfig.mode !== "remote";
+export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
+export const remoteApiEnabled = true;
+export const developmentFundsEnabled = apiRuntimeConfig.environment === "dev";
+// Card tokenization/binding is development-only UI until a real PSP is configured.
+// Java remains authoritative and production must fail closed.
+export const developmentPaymentEnabled = apiRuntimeConfig.environment === "dev";
+export const fundsServerEnabled = true;
+// Payout addresses are server-owned in both dev and prod.
+export const payoutAddressServerEnabled = true;
+export const payoutAddressMockEnabled = false;
 export const sessionVault = createRuntimeSessionVault();
 let unauthorizedHandler: (() => void | Promise<void>) | undefined;
 
@@ -88,74 +93,74 @@ export const apiClient = createRuntimeApiClient({
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
   onUnauthorized: () => unauthorizedHandler?.(),
 });
-// mock 档装本地 AuthApi(包 zm T0):服务端权威化后 auth 全链 server-backed,mock 客户端
-// 对一切调用抛 REMOTE_API_DISABLED_IN_MOCK_MODE → 演示档注册/登录死路。本地实现与真实现
-// 逐方法同契约同 vault 语义,sandbox/remote 档零变化。
-export const authApi = apiRuntimeConfig.mode === "mock"
-  ? createMockAuthApi(sessionVault)
-  : createAuthApi(apiClient, sessionVault);
+// Authentication is server-backed in both dev and prod; Java active profile
+// selects the development challenge or production provider flow.
+export const authApi = createAuthApi(apiClient, sessionVault);
 export const accountApi = createAccountApi(apiClient);
-export const paymentApi = createPaymentApi(apiClient);
+export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
 export const productCatalogApi = createProductCatalogApi(apiClient);
+export const productNotificationApi = createProductNotificationApi(apiClient, expectedApiEnvironment);
 export const productPhaseApi = createProductPhaseApi(apiClient);
-export const purchaseEligibilityApi = createPurchaseEligibilityApi(apiClient);
+export const purchaseEligibilityApi = createPurchaseEligibilityApi(apiClient, expectedApiEnvironment);
 export const withdrawalApi = createWithdrawalApi(apiClient);
 export const earnConfigApi = createEarnConfigApi(apiClient);
-export const deviceE3Api = createDeviceE3Api(apiClient);
-export const orderApi = createOrderApi(apiClient, apiRuntimeConfig.mode);
-export const platformConfigApi = createPlatformConfigApi(
-  apiClient,
-  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
-);
-export const vRankApi = createVRankApi(apiClient);
-export const commissionConfigApi = createCommissionConfigApi(
-  apiClient,
-  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
-);
-export const stakingApi = createStakingApi(apiClient);
-export const exchangeApi = createExchangeApi(apiClient);
-export const marketApi = createMarketApi(apiClient, apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote");
-export const genesisApi = createGenesisApi(apiClient);
-export const repurchaseApi = createRepurchaseApi(apiClient);
+export const deviceE3Api = createDeviceE3Api(apiClient, expectedApiEnvironment);
+export const orderApi = createOrderApi(apiClient, expectedApiEnvironment);
+export const platformConfigApi = createPlatformConfigApi(apiClient, expectedApiEnvironment);
+export const vRankApi = createVRankApi(apiClient, expectedApiEnvironment);
+export const commissionConfigApi = createCommissionConfigApi(apiClient, expectedApiEnvironment);
+export const stakingApi = createStakingApi(apiClient, expectedApiEnvironment);
+export const exchangeApi = createExchangeApi(apiClient, expectedApiEnvironment);
+export const marketApi = createMarketApi(apiClient, expectedApiEnvironment);
+export const genesisApi = createGenesisApi(apiClient, expectedApiEnvironment);
+export const repurchaseApi = createRepurchaseApi(apiClient, expectedApiEnvironment);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
-export const payoutAddressApi = createPayoutAddressApi(apiClient);
+export const legalTermsApi = createLegalTermsApi(apiClient);
+export const payoutAddressApi = createPayoutAddressApi(apiClient, expectedApiEnvironment);
 export const paymentMethodApi = createPaymentMethodApi(apiClient);
 export const trialApi = createTrialApi(apiClient);
-export const questApi = createQuestApi(apiClient);
+export const questApi = createQuestApi(apiClient, expectedApiEnvironment);
 export const eventsApi = createEventsApi(apiClient);
-export const pointsApi = createPointsApi(apiClient);
-export const voucherApi = createVoucherApi(apiClient);
+export const pointsApi = createPointsApi(apiClient, expectedApiEnvironment);
+export const voucherApi = createVoucherApi(apiClient, expectedApiEnvironment);
 export const contentCopyApi = createContentCopyApi(apiClient);
 export const notificationApi = createNotificationApi(apiClient);
-export const trustSectionApi = createTrustSectionApi(apiClient, apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote");
+export const notificationPreferencesApi = createNotificationPreferencesApi(apiClient);
+export const trustSectionApi = createTrustSectionApi(apiClient, expectedApiEnvironment);
 export const i18nApi = createI18nApi(apiClient);
 export const janusApi = createJanusApi(apiClient);
 export const behaviorAnalyticsApi = createBehaviorAnalyticsApi(apiClient);
 export const earningsReleaseApi = createEarningsReleaseApi(apiClient);
-export const taskAssignmentApi = createTaskAssignmentApi(apiClient);
-export const fundsSandboxApi = createFundsSandboxApi(apiClient);
-export const referralRewardApi = createReferralRewardApi(apiClient);
+export const taskAssignmentApi = createTaskAssignmentApi(apiClient, expectedApiEnvironment);
+export const fundsSandboxApi = createFundsSandboxApi(apiClient, expectedApiEnvironment);
+export const referralRewardApi = createReferralRewardApi(apiClient, expectedApiEnvironment);
 export const supportApi = createSupportApi(apiClient);
 export const profileApi = createProfileApi(apiClient);
 export const novaAiApi = createNovaAiApi(apiClient);
 export const computeShareApi = createComputeShareApi(apiClient);
 export const networkRegionsApi = createNetworkRegionsApi(apiClient);
-export const teamNetworkApi = createTeamNetworkApi(apiClient);
-export const developerAccessApi = createDeveloperAccessApi(apiClient);
+export const teamNetworkApi = createTeamNetworkApi(apiClient, expectedApiEnvironment);
+export const developerAccessApi = createDeveloperAccessApi(apiClient, expectedApiEnvironment);
+export const developerResourcesApi = createDeveloperResourcesApi(apiClient, expectedApiEnvironment);
 export const bundleOrderApi = createBundleOrderApi(apiClient);
 export const commercePaymentApi = createCommercePaymentApi(apiClient);
-export const ambassadorApplicationApi = createAmbassadorApplicationApi(apiClient);
-export const teamInsightsApi = createTeamInsightsApi(apiClient, apiRuntimeConfig.mode);
-export const walletBillsApi = createWalletBillsApi(apiClient);
-export const storefrontActivityApi = createStorefrontActivityApi(apiClient);
-export const genesisPointsApi = createGenesisPointsApi(apiClient);
-export const networkRankApi = createNetworkRankApi(apiClient);
-export const teamQuotaApi = createTeamQuotaApi(apiClient);
-export const proofApi = createProofApi(apiClient, apiRuntimeConfig.mode);
-export const appHomeApi = createAppHomeApi(
-  apiClient,
-  apiRuntimeConfig.modeExplicit ? apiRuntimeConfig.mode : "remote",
+export const ambassadorApplicationApi = createAmbassadorApplicationApi(
+  apiClient, "PRODUCTION",
 );
+export const teamInsightsApi = createTeamInsightsApi(apiClient, expectedApiEnvironment);
+export const walletBillsApi = createWalletBillsApi(apiClient);
+export const storefrontActivityApi = createStorefrontActivityApi(apiClient, expectedApiEnvironment);
+export const genesisPointsApi = createGenesisPointsApi(apiClient, expectedApiEnvironment);
+export const networkRankApi = createNetworkRankApi(apiClient, expectedApiEnvironment);
+export const teamQuotaApi = createTeamQuotaApi(apiClient, expectedApiEnvironment);
+export const proofApi = createProofApi(apiClient, expectedApiEnvironment);
+export const appHomeApi = createAppHomeApi(apiClient, expectedApiEnvironment);
+export const onboardingCalibrationApi = createOnboardingCalibrationApi(
+  apiClient, "PRODUCTION",
+);
+export const shareEventApi = createShareEventApi(apiClient, expectedApiEnvironment);
+export const goalsApi = createGoalsApi(apiClient, expectedApiEnvironment);
+export const howContentApi = createHowContentApi(apiClient, expectedApiEnvironment);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

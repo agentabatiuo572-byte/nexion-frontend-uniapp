@@ -49,19 +49,33 @@ describe("Trust section API authority", () => {
       serverCanonical: true, source: "mock",
       sourceEnvironment: "SANDBOX", runId: "trust-stale-run-20260818", sections,
     });
-    await expect(createTrustSectionApi({ request } as never, "sandbox").current()).rejects.toMatchObject({
+    await expect(createTrustSectionApi({ request } as never, "dev").current()).rejects.toMatchObject({
       message: "TRUST_SECTION_RESPONSE_INVALID",
     });
   });
 
-  it("accepts a server-owned run-scoped sandbox Trust projection", async () => {
+  it("rejects the removed run-scoped sandbox Trust projection", async () => {
     setCurrentCommerceSandboxRun("trust-current-run-20260819");
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, source: "mock",
       sourceEnvironment: "SANDBOX", runId: "trust-current-run-20260819", sections,
     });
 
-    await expect(createTrustSectionApi({ request } as never, "sandbox").current()).resolves.toEqual(sections);
+    await expect(createTrustSectionApi({ request } as never, "dev").current()).rejects.toMatchObject({
+      message: "TRUST_SECTION_RESPONSE_INVALID",
+    });
+  });
+
+  it("development reads the canonical I4 published snapshot without a sandbox run", async () => {
+    const request = vi.fn().mockResolvedValue({
+      serverCanonical: true,
+      source: "nx_trust_section_version:published",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      sections,
+    });
+
+    await expect(createTrustSectionApi({ request } as never, "dev").current()).resolves.toEqual(sections);
   });
 
   it("rejects sandbox Trust until commerce establishes the current run", async () => {
@@ -70,7 +84,7 @@ describe("Trust section API authority", () => {
       sourceEnvironment: "SANDBOX", runId: "trust-current-run-20260819", sections,
     });
 
-    await expect(createTrustSectionApi({ request } as never, "sandbox").current()).rejects.toMatchObject({
+    await expect(createTrustSectionApi({ request } as never, "dev").current()).rejects.toMatchObject({
       message: "TRUST_SECTION_RESPONSE_INVALID",
     });
   });

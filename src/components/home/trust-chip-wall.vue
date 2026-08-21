@@ -9,7 +9,7 @@
           </svg>
         </view>
         <view>
-          <text class="block" :style="titleStyle">{{ summary?.hero || t.home.trustSnapshotTitle }}</text>
+          <text class="block" :style="titleStyle">{{ t.home.trustSnapshotTitle }}</text>
           <text class="block" :style="subtitleStyle">{{ t.home.trustSnapshotOpen }} ›</text>
         </view>
       </view>
@@ -18,32 +18,13 @@
       </text>
     </view>
 
-    <template v-if="ready && summary">
-      <view class="grid grid-cols-2" style="gap: 8px; margin-top: 12px">
-        <view :style="metricStyle">
-          <text class="block" :style="metricLabelStyle">{{ t.home.trustSnapshotTvl }}</text>
-          <text class="block tabular-nums" :style="metricValueStyle">{{ summary.tvl || '—' }}</text>
-        </view>
-        <view :style="metricStyle">
-          <text class="block" :style="metricLabelStyle">{{ t.home.trustSnapshotNodes }}</text>
-          <text class="block tabular-nums" :style="metricValueStyle">{{ summary.activeNodes || '—' }}</text>
-        </view>
-      </view>
-      <view class="flex flex-wrap" style="gap: 6px; margin-top: 10px">
-        <text v-if="summary.complianceLabel" :style="chipStyle">{{ summary.complianceLabel }}</text>
-        <text v-if="summary.auditTitle" :style="chipStyle">{{ summary.auditTitle }}</text>
-      </view>
-      <text v-if="summary.complianceBody || summary.auditBody" class="block" :style="bodyStyle">
-        {{ summary.complianceBody || summary.auditBody }}
-      </text>
-    </template>
-    <template v-else-if="!remoteApiEnabled">
+    <template v-if="ready">
       <view class="flex flex-wrap" style="gap: 6px; margin-top: 12px">
-        <text v-for="chip in MOCK_CHIPS" :key="chip" :style="chipStyle">{{ chip }}</text>
+        <text v-for="(chip, index) in summary.chips" :key="`trust-chip-${index}`" :style="chipStyle">{{ chip }}</text>
       </view>
-      <text class="block" :style="bodyStyle">{{ t.home.trustReserve }}</text>
+      <text class="block" :style="bodyStyle">{{ summary.reserveProof }}</text>
     </template>
-    <text v-else-if="status === 'error'" class="block" :style="bodyStyle">{{ t.home.trustSnapshotUnavailable }}</text>
+    <text v-else-if="status === 'error' || status === 'ready'" class="block" :style="bodyStyle">{{ t.home.trustSnapshotUnavailable }}</text>
   </view>
 </template>
 
@@ -57,12 +38,11 @@ import { buildHomepageTrustSummary } from "@/lib/home-data-presenters";
 import { useLocaleStore } from "@/store/locale";
 
 const t = useT();
-const MOCK_CHIPS = ["NVIDIA", "Intel", "AMD", "CertiK ✓", "SOC 2", "GDPR", "ISO 27001"];
 const locale = useLocaleStore();
 const { sections, status, refresh } = usePublishedTrust();
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
 const summary = computed(() => buildHomepageTrustSummary(sections.value, language.value));
-const ready = computed(() => status.value === "ready" && Object.values(summary.value).some(Boolean));
+const ready = computed(() => status.value === "ready" && summary.value.chips.length === 7 && summary.value.reserveProof !== null);
 
 function load(force = false) {
   if (remoteApiEnabled) void refresh(force);
@@ -83,9 +63,6 @@ const iconStyle: CSSProperties = { width: "32px", height: "32px", flexShrink: 0,
 const titleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
 const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-brand)" };
 const retryStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
-const metricStyle: CSSProperties = { padding: "10px", borderRadius: "10px", background: "var(--v5-surface-2)" };
-const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-4)" };
-const metricValueStyle: CSSProperties = { marginTop: "4px", fontSize: "16px", fontWeight: 600, color: "var(--v5-ink)" };
 const chipStyle: CSSProperties = { padding: "4px 8px", borderRadius: "999px", fontSize: "11px", color: "var(--v5-ink-2)", background: "var(--v5-surface-2)" };
 const bodyStyle: CSSProperties = { marginTop: "9px", fontSize: "11px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 </script>

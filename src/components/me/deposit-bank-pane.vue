@@ -246,7 +246,7 @@ import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
-import { fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
+import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
 
@@ -274,7 +274,7 @@ const paneView = computed<PaneView>(() => {
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
-  if (remoteApiEnabled && !fundsSandboxEnabled) {
+  if (remoteApiEnabled && !developmentFundsEnabled) {
     // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
     //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
     //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
@@ -310,9 +310,9 @@ const amountNum = computed(() => {
   const n = parseFloat(amount.value);
   return Number.isFinite(n) ? n : 0;
 });
-const minDeposit = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
-const maxDeposit = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
-const bankRailAvailable = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
+const minDeposit = computed(() => remoteApiEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
+const maxDeposit = computed(() => remoteApiEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
+const bankRailAvailable = computed(() => remoteApiEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
 const inRange = computed(() => amountNum.value >= minDeposit.value && amountNum.value <= maxDeposit.value);
 const fxUsable = computed(() => fx.fxAvailable && fx.configReady && bankRailAvailable.value);
 
@@ -344,7 +344,7 @@ const createError = ref("");
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
-  if (creating.value || !fxUsable.value || usdt < MIN_DEPOSIT_USDT || usdt > BANK_MAX_DEPOSIT_USDT) return;
+  if (creating.value || !fxUsable.value || usdt < minDeposit.value || usdt > maxDeposit.value) return;
   creating.value = true;
   createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
@@ -352,7 +352,7 @@ function createOrder(presetUsdt?: number) {
 }
 async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
   await runRecoverableFundsOperation(async () => {
-      const it = fundsSandboxEnabled
+      const it = developmentFundsEnabled
         ? await dep.createSandboxBankIntent(usdt, expectedAccountKey)
         : remoteApiEnabled
           ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
@@ -395,7 +395,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
-  if (remoteApiEnabled && !fundsSandboxEnabled) dep.stopRemoteVietQrPolling();
+  if (remoteApiEnabled && !developmentFundsEnabled) dep.stopRemoteVietQrPolling();
 });
 const countdownText = computed(() => {
   const it = intent.value;

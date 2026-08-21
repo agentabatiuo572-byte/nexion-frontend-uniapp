@@ -1,5 +1,9 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { isCurrentCommerceSandboxRun } from "./order-api";
+import type { ApiEnvironment } from "./runtime-config";
+
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 export interface TeamNetworkMember {
   id: string; name: string; avatarUrl: string | null; vRank: number; layer: 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -9,7 +13,8 @@ export interface TeamNetworkMember {
 export interface TeamNetworkSnapshot {
   totalMembers: number; directMembers: number; activeMembers: number;
   monthVolumeUsdt: number; lifetimeVolumeUsdt: number | null; members: TeamNetworkMember[];
-  source: "server"; generatedAt: string;
+  source: "server"; sourceEnvironment: "PRODUCTION" | "SANDBOX"; runId: string;
+  serverCanonical: true; generatedAt: string;
 }
 export interface TeamNetworkApi { snapshot(): Promise<TeamNetworkSnapshot> }
 
@@ -33,8 +38,20 @@ function member(value: unknown): TeamNetworkMember {
     lifetimeVolumeUsdt: optionalAmount(source.lifetimeVolumeUsdt), status, region: text(source.region, true) };
 }
 
-function snapshot(value: unknown): TeamNetworkSnapshot {
-  const source = row(value); if (source.source !== "server" || !Array.isArray(source.members)) return invalid();
+function provenance(source: Record<string, unknown>, mode: ApiEnvironment): { sourceEnvironment: TeamNetworkSnapshot["sourceEnvironment"]; runId: string } {
+  if (source.source !== "server" || source.serverCanonical !== true
+      || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
+      || typeof source.runId !== "string") return invalid();
+  const production = mode === "prod" && source.sourceEnvironment === "PRODUCTION" && source.runId === "";
+  const sandbox = mode === "dev" && source.sourceEnvironment === "SANDBOX"
+    && RUN_ID.test(source.runId) && isCurrentCommerceSandboxRun(source.runId);
+  if (!production && !sandbox) return invalid();
+  return { sourceEnvironment: source.sourceEnvironment, runId: source.runId };
+}
+
+function snapshot(value: unknown, mode: ApiEnvironment): TeamNetworkSnapshot {
+  const source = row(value); const proof = provenance(source, mode);
+  if (!Array.isArray(source.members)) return invalid();
   const members = source.members.map(member); const totalMembers = count(source.totalMembers);
   const directMembers = count(source.directMembers); const activeMembers = count(source.activeMembers);
   const generatedAt = text(source.generatedAt) as string;
@@ -42,9 +59,10 @@ function snapshot(value: unknown): TeamNetworkSnapshot {
       || activeMembers !== members.filter((item) => item.status === "ACTIVE").length
       || new Set(members.map((item) => item.id)).size !== members.length || !Number.isFinite(Date.parse(generatedAt))) return invalid();
   return { totalMembers, directMembers, activeMembers, monthVolumeUsdt: amount(source.monthVolumeUsdt),
-    lifetimeVolumeUsdt: optionalAmount(source.lifetimeVolumeUsdt), members, source: "server", generatedAt };
+    lifetimeVolumeUsdt: optionalAmount(source.lifetimeVolumeUsdt), members, source: "server", ...proof,
+    serverCanonical: true, generatedAt };
 }
 
-export function createTeamNetworkApi(client: ApiClient): TeamNetworkApi {
-  return { async snapshot() { return snapshot(await client.request<unknown>({ path: "/api/app/team/network" })); } };
+export function createTeamNetworkApi(client: ApiClient, mode: ApiEnvironment = "prod"): TeamNetworkApi {
+  return { async snapshot() { return snapshot(await client.request<unknown>({ path: "/api/app/team/network" }), mode); } };
 }

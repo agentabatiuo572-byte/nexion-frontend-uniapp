@@ -86,9 +86,8 @@
       <DoTheMathCard />
       <EarningsLedgerCard />
 
-      <!-- ZONE 6: server-authoritative NEX trend, external market and workload board -->
+      <!-- ZONE 6: server-authoritative NEX trend and workload board -->
       <NexPriceCard />
-      <ExternalMarketCard />
       <MarketBoardCard />
       <ProductTrustCard />
       <TrustChipWall />
@@ -116,7 +115,6 @@ import NovaCardSlot from "@/components/home/nova-card-slot.vue";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import NexPriceCard from "@/components/home/nex-price-card.vue";
-import ExternalMarketCard from "@/components/home/external-market-card.vue";
 import MarketBoardCard from "@/components/home/market-board-card.vue";
 import ProductTrustCard from "@/components/home/product-trust-card.vue";
 import TrustChipWall from "@/components/home/trust-chip-wall.vue";

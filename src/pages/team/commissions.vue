@@ -21,6 +21,15 @@
           compact
           @cta="commission.refreshCanonicalEvents()"
         />
+        <view
+          v-if="isSandboxCommission"
+          data-testid="team-commission-sandbox-banner"
+          class="rounded-xl"
+          style="padding: 12px; background: color-mix(in srgb, var(--v5-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--v5-warning) 38%, transparent)"
+        >
+          <text class="block" style="font-size: 12px; font-weight: 700; color: var(--v5-warning)">Sandbox · SIMULATED · Not withdrawable</text>
+          <text class="block font-mono-tabular" style="font-size: 11px; margin-top: 4px; color: var(--v5-ink-3)">RunID {{ commission.eventsEvidence?.runId }}</text>
+        </view>
         <template v-if="!remoteApiEnabled || commission.eventsStatus === 'ready'">
         <!-- overview — de-carded: the two headline numbers sit on the page floor.
              Dual-number hero (Withdrawable/Cooling grid) has no single cap to host
@@ -37,7 +46,7 @@
           </view>
           <view class="grid grid-cols-2" style="gap: 12px">
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ t.uiChrome.withdrawable }}</text>
+              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ withdrawableLabel }}</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-brand)')">${{ commission.unlockedUSDT().toFixed(2) }}</text>
               <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ commission.unlockedNEX().toLocaleString() }} NEX</text>
             </view>
@@ -120,6 +129,7 @@
                 <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
                 <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
+                <text v-else-if="e.status === 'simulated' || e.settlementState === 'SIMULATED'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning)', marginTop: '2px' }">SIMULATED · Not withdrawable</text>
               </view>
             </view>
         </view>
@@ -175,6 +185,12 @@ const byKind = computed(() => commission.byKind());
 const filtered = computed(() =>
   filter.value === "all" ? events.value : events.value.filter((e) => e.kind === filter.value),
 );
+
+const isSandboxCommission = computed(() => commission.eventsEvidence?.sourceEnvironment === "SANDBOX"
+  && commission.eventsEvidence.serverCanonical === true
+  && commission.eventsEvidence.factStatus === "SIMULATED"
+  && commission.eventsEvidence.withdrawable === false);
+const withdrawableLabel = computed(() => isSandboxCommission.value ? "SIMULATED · Not withdrawable" : t.value.uiChrome.withdrawable);
 
 const coolingOverviewText = computed(() => {
   const next = events.value

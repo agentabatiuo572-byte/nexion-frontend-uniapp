@@ -72,17 +72,17 @@ let pool = null;
 async function ensurePool() {
   if (pool || mode === "static" || !usePool) return pool;
   const t0 = Date.now();
-  const [mock, remote] = await Promise.all([
-    ensureServer({ root: ROOT, mode: "mock", log: (m) => say(`${C.d}  pool: ${m}${C.n}`) }),
-    ensureServer({ root: ROOT, mode: "remote", log: (m) => say(`${C.d}  pool: ${m}${C.n}`) }),
+  const [development, production] = await Promise.all([
+    ensureServer({ root: ROOT, environment: "development", log: (m) => say(`${C.d}  pool: ${m}${C.n}`) }),
+    ensureServer({ root: ROOT, environment: "production", log: (m) => say(`${C.d}  pool: ${m}${C.n}`) }),
   ]);
-  pool = { mock, remote, bootMs: Date.now() - t0 };
-  say(`${C.d}  pool: mock ${mock.baseUrl} · remote ${remote.baseUrl}(起服 ${(pool.bootMs / 1000).toFixed(1)}s)${C.n}`);
+  pool = { development, production, bootMs: Date.now() - t0 };
+  say(`${C.d}  pool: development ${development.baseUrl} · production ${production.baseUrl}(起服 ${(pool.bootMs / 1000).toFixed(1)}s)${C.n}`);
   return pool;
 }
 const poolEnv = () => pool ? {
-  H5_RUNTIME_REUSE_MOCK_URL: pool.mock.baseUrl, H5_RUNTIME_REUSE_REMOTE_URL: pool.remote.baseUrl,
-  LEGACY_SUITE_REUSE_MOCK_URL: pool.mock.baseUrl, LEGACY_SUITE_REUSE_REMOTE_URL: pool.remote.baseUrl,
+  H5_RUNTIME_REUSE_DEV_URL: pool.development.baseUrl, H5_RUNTIME_REUSE_PROD_URL: pool.production.baseUrl,
+  LEGACY_SUITE_REUSE_DEV_URL: pool.development.baseUrl, LEGACY_SUITE_REUSE_PROD_URL: pool.production.baseUrl,
 } : {};
 
 // ── 单步执行 ─────────────────────────────────────────────────────────────────

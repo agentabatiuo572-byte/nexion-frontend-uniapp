@@ -4,9 +4,8 @@ import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./conf
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
-import { apiRuntimeConfig, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
+import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
-import { captureCommerceSandboxRun, subscribeCurrentCommerceSandboxRun } from "@/api/order-api";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -184,22 +183,9 @@ export const useConfig = defineStore("config", () => {
         return;
       }
       const remote = await platformConfigApi.platformConfig();
-      const expectsSandbox = apiRuntimeConfig.modeExplicit && apiRuntimeConfig.mode === "sandbox";
-      if (expectsSandbox && remote.publicStatsAuthority.sourceEnvironment !== "SANDBOX") {
+      if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
+          || remote.publicStatsAuthority.runId !== "") {
         throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
-      }
-      if (!expectsSandbox && remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION") {
-        throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
-      }
-      if (remote.publicStatsAuthority.sourceEnvironment === "SANDBOX") {
-        const scope = captureCommerceSandboxRun();
-        if (scope.runId === null) {
-          clearRemotePlatformAuthority();
-          return;
-        }
-        if (scope.runId !== remote.publicStatsAuthority.runId) {
-          throw new Error("H9_PUBLIC_STATS_RUN_MISMATCH");
-        }
       }
       config.value = {
         // The server snapshot is authoritative for every field it provides.
@@ -228,26 +214,11 @@ export const useConfig = defineStore("config", () => {
       clearRemotePlatformAuthority();
     } finally {
       loading.value = false;
-      if (reloadAfterCurrentFlight && captureCommerceSandboxRun().runId !== null) {
+      if (reloadAfterCurrentFlight) {
         reloadAfterCurrentFlight = false;
         void load();
       }
     }
-  }
-
-  if (remoteApiEnabled) {
-    subscribeCurrentCommerceSandboxRun((scope) => {
-      if (scope.runId === null) {
-        reloadAfterCurrentFlight = false;
-        clearRemotePlatformAuthority();
-        return;
-      }
-      if (publicStatsAuthority.value?.sourceEnvironment === "SANDBOX"
-          && publicStatsAuthority.value.runId === scope.runId) return;
-      clearRemotePlatformAuthority();
-      if (loading.value) reloadAfterCurrentFlight = true;
-      else void load();
-    });
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。

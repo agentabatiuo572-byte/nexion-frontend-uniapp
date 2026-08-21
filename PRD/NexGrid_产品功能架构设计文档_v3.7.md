@@ -101,7 +101,7 @@ NexGrid 是面向全球非中国市场(北美、欧洲、东南亚、日韩、�
 | 内部 ID | UI 显示(EN / ZH) | 进入条件 | 核心诉求 | 转化目标 |
 |---|---|---|---|---|
 | L0 | Visitor / 访客 | 未注册 | 了解平台 | 点击注册 |
-| L1 | Newbie / 新手 | 已注册,手机算力自动接入 | 看每天能赚多少 | 24h 在线 + 首笔收益 |
+| L1 | Newbie / 新手 | 已注册；手机算力可激活或暂缓 | 看每天能赚多少 | 完成激活 + 24h 在线 + 首笔收益 |
 | L2 | Active / 活跃 | 累计 $5+ 收益 | 稳定获益,尝试提现 | 首次提现成功 |
 | L3 | Upgrade-ready / 升级候选 | 主动查看硬件商城 | 寻求更高收益 | 完成设备购买 |
 | L4 | Owner / 持有者 | 已购 NexGridBox 1+ 台 | 最大化收益 | 复购 / 追加台数 |
@@ -292,7 +292,7 @@ TabBar:active tab 显示背景 chip 高亮。
 
 **注册成功后行为**:
 1. 自动创建 user(persist 到 localStorage)
-2. 自动 `addDevice("phone")` 接入手机算力(进入 Phase 0 多阶段揭示)
+2. 不自动创建可领奖手机设备；进入 Onboarding 后由服务端校准与激活接口完成绑定，失败时可暂缓
 3. H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
 
 **邀请码携带与锁定**(绑定规则详见 §4.3):
@@ -750,7 +750,7 @@ Hero 信息层:
 
 #### 4.7.3 Step 3 — `/onboarding/connect` 算力校准
 
-12 秒"算力校准仪式",3 项并行测试 + 结果展示 + 接单规则告知。3 阶段状态机:
+12 秒"算力校准仪式",3 项并行测试 + 结果展示 + 接单规则告知。正常路径为 3 阶段；检测或绑定失败进入可恢复的 `error` 阶段:
 
 **Phase A · intro(explainer)**
 
@@ -807,20 +807,24 @@ CTA "开始校准 · 12 秒"。
        [激活手机算力 →]
 ```
 
-CTA "激活手机算力 →" 路由到 `/`(Home Dashboard)。激活规则:
+CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home Dashboard)。激活规则:
 
 1. user 进入 L1 阶段(`{ tier: "L1" }`)
-2. phone 设备已在注册时 `addDevice("phone")` + `activatedAt=purchasedAt` 接入,calibration 完成只是"告知"动作,无需额外 server 写入
+2. `POST /api/onboarding/calibrate/activate` 以校准 revision 和幂等键创建/更新 `nx_user_device` 手机设备，并把校准记录与 `user_device_id` 绑定；只有服务端回读 `activationStatus=ACTIVE` 才算激活成功
 3. UI 在 `/me/devices` 显示 phone "在线" 状态(若 `isCharging + isWifiConnected` 满足);否则按中断状态显示「重连中」或「未接单」(见 §12.2 手机算力门槛与任务中断模型)
+4. 校准检测或绑定失败时显示「重试」「暂不激活」两个按钮；重试复用原观测值/幂等指令，暂缓不阻塞注册完成
+5. 暂缓后设备仓库显示重新激活入口；手机未绑定或校准状态不是 `ACTIVE` 时，不得分配任务，也不得写收益、回执或钱包奖励
 
-**真后台对接**(endpoint TBD,候选名):
+**真后台对接**:
 
 | Endpoint | Method | Payload | 用途 |
 |---|---|---|---|
-| `/api/onboarding/calibrate/start` | POST | `{deviceFingerprint}` | 启动 server 端真实跑分 + 网络延迟探测 |
-| `/api/onboarding/calibrate/result` | GET | — | 长轮询 / SSE 拉取分数 + tier + yield baseline |
+| `/api/onboarding/calibrate` | POST | `{deviceId,signals,expectedRevision}` + `Idempotency-Key` | 服务端按观测值确定性派生并保存 score/tier/yield baseline |
+| `/api/onboarding/calibrate/result?deviceId=` | GET | — | 回读该账号、设备与环境下的服务端校准事实 |
+| `/api/onboarding/calibrate/activate` | POST | `{deviceId,expectedRevision}` + `Idempotency-Key` | 原子绑定 canonical 手机设备并发布 `ACTIVE` |
+| `/api/onboarding/calibrate/defer` | POST | `{deviceId,expectedRevision}` + `Idempotency-Key` | 停用已绑定手机并发布 `DEFERRED`；首次检测未落校准行时以 revision 0 持久化无能力数据的 `DEFERRED` |
 
-Mock 阶段两 endpoint 都由 client `setTimeout(12000)` 替代。Server 端真实实现时,Phase A 的"3 项测试"应映射为真后端的 benchmark 算法 + ping target gateway 集合(由后台 admin 维护)。
+12 秒仅保留为呈现仪式；业务结果来自服务端，App 不再用本地 `setTimeout` 生成校准事实。当前浏览器可读取的机型、内存、CPU 核数、屏幕/WebGL、供电与联网状态属于能力观测，不等同于原生 NPU 真机 benchmark；后续接 Janus 真机执行器时可替换信号来源，但不得改变上述激活与奖励门禁。
 
 #### 4.7.4 Locale 自动匹配
 
@@ -1507,7 +1511,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 **档位收益**:手机日产按校准 Tier 派生(单调,见 §13.3)—— Tier 1 $0.04 → Tier 5 $0.095,典型机 Tier 3 = $0.06(锚定营销);NEX 同步 6 → 16。各档值**运营后台可配**(后台 E2「手机算力档位收益」),前端读 backend-replaceable config `mock/phone-tiers.ts`(真后台 `GET /api/config/phone-tiers`),前后台同口径。
 
-**校准仪式**(`/onboarding/connect`,首次 onboarding + 新设备 `?mode=recalibrate` 复用):12 秒三测(NPU 基准 / 网络延迟 / 供电散热)动画,结果(评分 / TOPS / Tier / 预估日产)由 `measureDeviceCapability` 真实派生(非写死),完成后写回手机设备(`applyPhoneCalibration`:更新 baseRate / NPU 文案 / 能力字段 + 重置连续在线加成)。
+**校准仪式**(`/onboarding/connect`,首次 onboarding + 新设备 `?mode=recalibrate` 复用):12 秒三测(NPU 基准 / 网络延迟 / 供电散热)动画；App 只采集观测，评分 / TOPS / Tier / 预估日产由服务端 canonical 配置确定性派生。用户显式激活后才绑定手机设备并重置连续在线加成；失败可重试或暂缓，暂缓不发放手机相关奖励，后续从设备仓库恢复。
 
 ### 6.11 载体分层与收益服务端结算
 
@@ -5014,7 +5018,7 @@ Events 分两大类:
 - `scheduleDeactivation(id)` — **优雅出槽位**:若 `currentTask !== null` 则只设 `pendingDeactivate=true`(等任务完成);若 `currentTask === null` 则立即执行 `deactivateDevice` 等效行为
 - `tick()` 守卫:`activatedAt === null` 的设备不参与 earnings / task 累计;任务完成处理时检查 `pendingDeactivate=true` → 自动执行 deactivate(清零 telemetry + `activatedAt=null`,不再 pickRandomTask)
 
-**初始 seed**:onboarding 完成后,phone 自动 `activatedAt = purchasedAt`(强制激活,无 skip)。用户进 APP 后可在 `/me/devices` 取消激活,使手机进入库存状态。
+**初始设备**:注册与普通 onboarding 完成均不生成本地 phone seed。只有 `POST /api/onboarding/calibrate/activate` 返回 canonical `ACTIVE` 后，服务端才创建/更新并绑定 phone `nx_user_device`；检测或绑定失败可选 `DEFERRED` 完成注册，设备仓库保留重新激活入口，未激活期间不发手机相关奖励。
 
 ### 12.3 Order(useOrders,persist key `nexgrid-orders-v4`)
 

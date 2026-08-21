@@ -3,7 +3,7 @@
   Display name is picked from curated pool candidates via NicknameSheet
   (free-text input + bio + region/timezone all removed 2026-07-15, content
   governance — the page has zero manual input); avatar reroll, tier
-  progress bar, wallet-binding link, save bar (disabled until dirty).
+  tier guidance, wallet-binding link, save bar (disabled until dirty).
 
   Wrapped in <AppChassis active="me">; SubPageHeader (back chevron) scrolls
   with content. The source MechAvatar is replaced with the initial-letter
@@ -77,12 +77,7 @@
         <text :style="tierTitleStyle">{{ t.profile.tierTitle }}</text>
         <text :style="tierLabelStyle">{{ tierLabel }}</text>
       </view>
-      <view :style="tierBarWrapStyle">
-        <view :style="tierTrackStyle">
-          <view :style="tierFillStyle" />
-        </view>
-      </view>
-      <text class="block" :style="tierProgressStyle">{{ tierProgressLine }} · 62%</text>
+      <text class="block" :style="tierProgressStyle">{{ tierProgressLine }}</text>
 
       <!-- Wallet binding -->
       <view class="mx-4 flex items-center active:opacity-90" :style="walletCardStyle" @click="goWallet">
@@ -133,9 +128,12 @@ import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
 import { usePayoutAddress } from "@/store/payout-address";
+import { useQuest } from "@/store/quest";
 import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
 type Tier = (typeof TIERS)[number];
@@ -145,6 +143,7 @@ const app = useApp();
 const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
+const quest = useQuest();
 onMounted(() => {
   // 合并裁决(2026-08-14):取远端那侧(保留 .catch + 收下新增的两个加载调用)。
   //   本地这侧只是把 payout 那行的 .catch 去掉了 —— 理由是缝已自吞、这层是死代码。
@@ -163,6 +162,7 @@ const nicknameSheetOpen = ref(false);
 const avatarUrl = ref("");
 const avatarRevision = ref("");
 const avatarUploading = ref(false);
+const setupProfileQuestPending = ref(false);
 
 const displayName = computed(() => profile.displayName);
 // A remote session's user-id key is internal routing state, never profile copy.
@@ -223,6 +223,17 @@ function onNicknamePick(v: string) {
 async function handleSave() {
   if (isSaving.value) return;
   if (!dirty.value) {
+    if (remoteApiEnabled && setupProfileQuestPending.value) {
+      isSaving.value = true;
+      try {
+        if (await claimSetupProfileQuest(quest)) setupProfileQuestPending.value = false;
+      } finally {
+        isSaving.value = false;
+      }
+      if (setupProfileQuestPending.value) toast.error(t.value.profile.serverMutationFailed);
+      else toast.success(t.value.profile.savedToast);
+      return;
+    }
     saveFeedback.value = t.value.profile.noChangesToast;
     toast.info(t.value.profile.noChangesToast);
     return;
@@ -232,6 +243,16 @@ async function handleSave() {
     const saved = await profile.setDisplayName(name.value);
     if (!saved) return;
     name.value = profile.displayName;
+    if (remoteApiEnabled) {
+      // The quest endpoint is the only completion authority. claimRemote waits
+      // for the server claim and refreshes the canonical quest snapshot; a
+      // failure leaves a retryable pending flag without claiming locally.
+      setupProfileQuestPending.value = !(await claimSetupProfileQuest(quest));
+      if (setupProfileQuestPending.value) {
+        toast.error(t.value.profile.serverMutationFailed);
+        return;
+      }
+    }
     saveFeedback.value = t.value.profile.savedToast;
     toast.success(t.value.profile.savedToast);
   } catch {
@@ -267,7 +288,7 @@ async function handleRegen() {
       avatarUploading.value = true;
       const scope = captureAccountScope();
       const accountKey = auth.accountId;
-      const key = `app-profile:avatar:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+      const key = `app-profile:avatar:${requireCryptoUuid()}`;
       const before = avatarRevision.value;
       try {
         const result = await profileApi.uploadAvatar(filePath, key);
@@ -403,8 +424,8 @@ const readOnlyHoldStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-warning)",
 };
-// De-carded tier: section-label header (title + tier badge) then the bar +
-// progress line on the floor.
+// De-carded tier: section-label header (title + tier badge) then factual
+// next-tier guidance on the floor. No client-invented progress percentage.
 const tierHeaderStyle: CSSProperties = {
   margin: "22px 16px 8px",
   padding: "0 2px",
@@ -416,26 +437,11 @@ const tierTitleStyle: CSSProperties = {
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
 };
-const tierBarWrapStyle: CSSProperties = {
-  margin: "0 16px",
-  padding: "0 2px",
-};
 const tierLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-brand)",
-};
-const tierTrackStyle: CSSProperties = {
-  height: "8px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  overflow: "hidden",
-};
-const tierFillStyle: CSSProperties = {
-  height: "100%",
-  width: "62%",
-  background: "linear-gradient(to right, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 55%, var(--v5-success)))",
 };
 const tierProgressStyle: CSSProperties = {
   margin: "8px 18px 0",

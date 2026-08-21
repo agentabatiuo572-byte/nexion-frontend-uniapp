@@ -16,12 +16,14 @@ dist
 .env
 .env.*
 !.env.example
-!.env.acceptance-h5
+!.env.development
+!.env.production
 
 # tooling / temp artifacts
 .trash/
 .playwright-mcp/
 .playwright-cli/
+artifacts/
 # 🔴 .claude/ 整体不入库,但**质量门本身要跟着代码走版本**(2026-08-11):
 #   verify 的 Stop 门外壳 + 接线以前是本机本树专有,6 棵树各拿一份、改一处要手拷 5 次,
 #   靠手动同步的守卫迟早漂移失效 —— 所以精确豁免这两项。

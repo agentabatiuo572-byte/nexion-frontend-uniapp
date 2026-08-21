@@ -23,7 +23,7 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
-      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="lg-mode-badge" data-testid="auth-runtime-label">
+      <view v-if="apiRuntimeConfig.environment === 'dev'" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
       <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
@@ -64,8 +64,8 @@
           <view class="lg-otp">
             <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
           </view>
-          <view v-if="sandboxOtpEnabled" class="lg-sandbox-otp" data-testid="sandbox-otp-code" role="status">
-            <text class="lg-sandbox-otp__t">{{ fmt(t.authOtp.sandboxCodeHint, { code: sandboxOtpCode }) }}</text>
+          <view v-if="developmentOtpEnabled" class="lg-sandbox-otp" data-testid="development-otp-code" role="status">
+            <text class="lg-sandbox-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
           <view class="lg-resend">
             <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
@@ -110,7 +110,7 @@
       <!-- OAuth (step 1, not reset) -->
       <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
-        <AuthProviderGrid :busy="loading" :sandbox="apiRuntimeConfig.mode === 'sandbox' && apiRuntimeConfig.modeExplicit" @select="startOauth" />
+        <AuthProviderGrid :busy="loading" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
       </view>
 
       <!-- Footer -->
@@ -244,12 +244,11 @@ const titleText = computed(() => {
   if (mode.value === "reset") return t.value.login.resetTitle;
   return t.value.login.title;
 });
-const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
-const sandboxOtpCode = String(import.meta.env.VITE_NEXGRID_SANDBOX_OTP_CODE || "").trim();
-const sandboxOtpEnabled = computed(() =>
-  apiRuntimeConfig.mode === "sandbox"
-  && apiRuntimeConfig.modeExplicit
-  && /^\d{6}$/.test(sandboxOtpCode)
+const modeLabel = computed(() => t.value.security.developmentModeLabel);
+const developmentOtpCode = String(import.meta.env.VITE_NEXGRID_DEV_OTP_CODE || "").trim();
+const developmentOtpEnabled = computed(() =>
+  apiRuntimeConfig.environment === "dev"
+  && /^\d{6}$/.test(developmentOtpCode)
 );
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
@@ -306,8 +305,7 @@ async function startOauth(label: string) {
   try {
     const result = await authApi.oauthExchange({
       provider,
-      mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
-      displayName: `${provider} Sandbox`,
+      displayName: `${provider} User`,
     });
     if (!mounted || flowVersion !== otpFlowVersion) {
       authApi.discardSessionIfCurrent(result.vaultRevision);

@@ -1,11 +1,7 @@
 <!--
   Market — ported from Nexion-prototype/app/(main)/market/page.tsx.
-  Crypto markets tab (Binance/OKX-style): NEX hero (price + 24h + timeframe +
-  kline + buy/sell) → stats grid → exchange listings → category tabs → token
-  list (NEX pinned) → footer note. Sub-page off home → <AppChassis active="home">
-  with an in-page back row (back → home). Reuses market store is NOT needed here
-  (page reads static TOKENS mock for the comparable-token board); NEX hero pulls
-  from the same TOKENS[NEX] seed as the prototype.
+  NEX market page: price + 24h + timeframe + kline + buy/sell → stats grid.
+  The retired third-party comparable-token board is deliberately absent.
   framer SegmentedControl → inline pill row; <Link>→uni.navigateTo; <button>→<view @click>.
 -->
 <template>
@@ -88,146 +84,44 @@
           </view>
         </view>
 
-        <!-- ───────── EXCHANGE LISTINGS ───────── -->
-        <view v-if="market.isMockMode" class="rounded-2xl" :style="cardStyle">
-          <text class="block font-mono-tabular" :style="listLabelStyle">{{ t.marketPage.listings.label }}</text>
-          <text class="block" :style="listExStyle">{{ t.marketPage.listings.exchanges }}</text>
-          <view class="inline-flex items-center" :style="pendingChipStyle">
-            <text :style="{ color: 'var(--v5-warning)' }">⏳ {{ t.marketPage.listings.pending }}</text>
-          </view>
-        </view>
-
-        <template v-if="market.isMockMode || market.externalReady">
-        <!-- ───────── CATEGORY TABS ───────── -->
-        <view class="grid grid-cols-5" :style="catGridStyle">
-          <!-- 《08》§2 nx-press-sm 恒定:选中态原先是空 class,按下零反馈 -->
-          <view
-            v-for="cat in CATEGORIES"
-            :key="cat.id"
-            class="grid place-items-center nx-press-sm"
-            :style="catItemStyle(activeCat === cat.id)"
-            @click="activeCat = cat.id"
-          >
-            <text :style="{ fontSize: '12px', fontWeight: 600, color: activeCat === cat.id ? 'var(--v5-on-brand)' : 'var(--v5-ink-3)' }">{{ cat.label }}</text>
-          </view>
-        </view>
-
-        <!-- ───────── TOKEN LIST ───────── -->
-        <view class="rounded-2xl overflow-hidden" :style="cardFlushStyle">
-          <view class="grid items-center border-b font-mono-tabular" :style="tableHeadStyle">
-            <text></text>
-            <text>{{ t.marketPage.columns.asset }}</text>
-            <text class="text-right">{{ t.marketPage.columns.price }}</text>
-            <text class="text-right">{{ t.marketPage.columns.change }}</text>
-          </view>
-          <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
-          <template v-else>
-            <TokenRow
-              v-for="tk in filtered"
-              :key="tk.symbol"
-              :token="tk"
-              :starred="stars.has(tk.symbol)"
-              @toggle-star="toggleStar(tk.symbol)"
-            />
-          </template>
-        </view>
-
-        <text v-if="!market.isMockMode" class="block text-center" :style="sourceStyle">{{ market.externalSourceEnvironment }} · SERVER</text>
-        <text class="block text-center" :style="noteStyle">{{ t.marketPage.note }}</text>
-        </template>
-        <view v-else data-testid="market-comparables-hold" :style="marketHoldStyle">
-          <text class="block" :style="marketHoldTitleStyle">{{ t.marketPage.comparablesHoldTitle }}</text>
-          <text class="block" :style="marketHoldBodyStyle">{{ t.marketPage.comparablesHoldBody }}</text>
-          <text class="block active:opacity-70" :style="retryMarketStyle" @click="retryMarkets">{{ t.ui.retry }}</text>
-        </view>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
-import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexChart from "@/components/market/nex-chart.vue";
-import TokenRow from "@/components/market/token-row.vue";
 import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
-import {
-  TOKENS, CATEGORIES, TIMEFRAMES,
-  type Token, type TokenCategory, type Timeframe,
-} from "@/mock/tokens";
 
 const t = useT();
 const market = useMarket();
 
-const NEX = TOKENS.find((tk) => tk.symbol === "NEX")!;
-const nex = computed(() => market.isMockMode ? NEX : ({
-  rank: "—",
+type Timeframe = "1H" | "24H" | "7D" | "1M" | "ALL";
+const TIMEFRAMES: Timeframe[] = ["1H", "24H", "7D", "1M", "ALL"];
+const nex = computed(() => ({
+  rank: market.isMockMode ? 247 : "—",
   priceUSD: market.nexPriceUSDT,
   change24h: market.change24hPct,
-  ath: 0,
-  marketCapUSD: market.marketCap,
-  volume24hUSD: market.volume24hUSDT,
-  fdvUSD: 0,
-  circulating: market.circulating,
-  totalSupply: 0,
+  ath: market.isMockMode ? 0.184 : 0,
+  marketCapUSD: market.isMockMode ? market.nexPriceUSDT * 2_850_000_000 : market.marketCap,
+  volume24hUSD: market.isMockMode ? 4_247_891 : market.volume24hUSDT,
+  fdvUSD: market.isMockMode ? market.nexPriceUSDT * 10_000_000_000 : 0,
+  circulating: market.isMockMode ? 2_850_000_000 : market.circulating,
+  totalSupply: market.isMockMode ? 10_000_000_000 : 0,
   spark24h: market.klineHourly,
   spark30d: market.klineDaily,
 }));
 const nexPriceText = computed(() => market.isMockMode || market.remoteReady ? fmtPrice(nex.value.priceUSD) : "—");
-onMounted(() => { if (!market.isMockMode) void market.syncAll(); });
+onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
 
-type CatFilter = TokenCategory | "all" | "watchlist";
-const activeCat = ref<CatFilter>("all");
 const tf = ref<Timeframe>("24H");
 
-// reactive Set replacement — track starred symbols.
-const starState = reactive<Record<string, boolean>>(
-  Object.fromEntries(TOKENS.filter((tk) => tk.starred).map((tk) => [tk.symbol, true])),
-);
-const stars = {
-  has: (sym: string) => starState[sym] === true,
-};
-function toggleStar(sym: string) {
-  starState[sym] = !starState[sym];
-}
-
-const colors: Record<string, string> = {
-  RNDR: "#CF1E4D", TAO: "#FFD23F", AKT: "#FF414C", FIL: "#0090FF", GRT: "#6F4CFF",
-};
-const remoteTokens = computed<Token[]>(() => [...(market.remoteReady ? [{
-  symbol: "NEX", name: "NexGrid", category: "self" as const, color: "#C6FF3A",
-  priceUSD: market.nexPriceUSDT, change24h: market.change24hPct, change7d: 0,
-  volume24hUSD: market.volume24hUSDT, marketCapUSD: market.marketCap, fdvUSD: 0,
-  circulating: market.circulating, totalSupply: 0, spark24h: market.klineHourly,
-  spark30d: market.klineDaily, ath: 0, athDate: "", rank: 0,
-}] : []), ...market.externalQuotes.map((quote) => ({
-  symbol: quote.symbol, name: quote.name, category: quote.category,
-  color: colors[quote.symbol] ?? "var(--v5-brand-2)",
-  priceUSD: quote.priceUsd, change24h: quote.change24hPct, change7d: 0,
-  volume24hUSD: quote.volume24hUsd, marketCapUSD: 0, fdvUSD: 0,
-  circulating: 0, totalSupply: 0, spark24h: quote.sparkline,
-  spark30d: quote.sparkline, ath: 0, athDate: "", rank: 0,
-}))]);
-
-const filtered = computed(() => {
-  let list = market.isMockMode ? TOKENS : remoteTokens.value;
-  if (activeCat.value === "watchlist") {
-    list = list.filter((tk) => starState[tk.symbol] === true);
-  } else if (activeCat.value !== "all") {
-    list = list.filter((tk) => tk.category === activeCat.value || tk.symbol === "NEX");
-  }
-  return [...list].sort((a, b) => {
-    if (a.symbol === "NEX") return -1;
-    if (b.symbol === "NEX") return 1;
-    return b.marketCapUSD - a.marketCapUSD;
-  });
-});
-
 function retryMarkets() {
-  void market.syncAll();
+  void market.syncRemote();
 }
 
 const nexChartData = computed(() =>
@@ -337,16 +231,11 @@ const sellBtnStyle: CSSProperties = {
 };
 const sellTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 
-// De-carded form-b containers (single surface, no border): stats grid, exchange
-// listings, and the token table keep their radius + internal hairline dividers.
+// De-carded form-b stats container (single surface, no border).
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "16px",
   padding: "16px",
-};
-const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
 };
 const statLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const statValueStyle: CSSProperties = {
@@ -361,65 +250,7 @@ const athRowStyle: CSSProperties = {
   borderColor: "var(--v5-border)",
   fontSize: "12px",
 };
-const listLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-};
-const listExStyle: CSSProperties = { marginTop: "8px", fontSize: "13px", color: "var(--v5-ink)" };
-const pendingChipStyle: CSSProperties = {
-  marginTop: "6px",
-  gap: "6px",
-  padding: "4px 8px",
-  borderRadius: "6px",
-  background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)",
-  fontSize: "12px",
-  fontWeight: 600,
-};
-const catGridStyle: CSSProperties = {
-  gap: "4px",
-  padding: "4px",
-  borderRadius: "16px",
-  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
-  background: "var(--v5-surface)",
-};
-function catItemStyle(active: boolean): CSSProperties {
-  return {
-    height: "44px",
-    borderRadius: "12px",
-    background: active ? "var(--v5-brand)" : "transparent",
-    transition: "background 0.2s",
-  };
-}
-const tableHeadStyle: CSSProperties = {
-  gridTemplateColumns: "32px 1fr 76px 72px",
-  padding: "10px 12px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  borderColor: "var(--v5-border)",
-};
-const emptyStyle: CSSProperties = {
-  padding: "24px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.625,
-};
-const noteStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.625,
-  paddingTop: "4px",
-};
-const sourceStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", letterSpacing: "0.08em" };
-const marketHoldStyle: CSSProperties = {
-  padding: "16px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-};
-const marketHoldTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const marketHoldBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", lineHeight: "18px", color: "var(--v5-ink-3)" };
-const retryMarketStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-brand)", fontWeight: 600 };
 </script>
 
 <style scoped>
@@ -427,8 +258,5 @@ const retryMarketStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", c
    tactile press feedback on compositor-friendly transform. */
 .nx-press:active {
   transform: scale(0.98);
-}
-.nx-press-sm:active {
-  transform: scale(0.97);
 }
 </style>

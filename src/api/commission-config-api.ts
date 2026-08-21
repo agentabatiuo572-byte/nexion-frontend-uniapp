@@ -1,12 +1,15 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { ApiMode } from "./runtime-config";
+import type { ApiEnvironment } from "./runtime-config";
 import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export type CommissionSourceEnvironment = "PRODUCTION" | "SANDBOX";
 
 export interface CanonicalCommissionConfig {
   source: string;
+  serverCanonical: true;
+  sourceEnvironment: CommissionSourceEnvironment;
+  runId: string | null;
   unilevelUsdt: Record<number, number>;
   unilevelNex: Record<number, number>;
   partnerThresholds: {
@@ -124,9 +127,16 @@ function parsePartnerThresholds(value: unknown): CanonicalCommissionConfig["part
   return thresholds;
 }
 
-function parse(value: unknown): CanonicalCommissionConfig {
+function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig {
   const source = record(value);
-  if (typeof source.source !== "string" || !source.source.trim() || !Array.isArray(source.unilevel)) return invalid();
+  const sourceEnvironment = typeof source.sourceEnvironment === "string" ? source.sourceEnvironment.trim().toUpperCase() : "";
+  const runId = source.runId;
+  const production = mode === "prod" && source.serverCanonical === true
+    && sourceEnvironment === "PRODUCTION" && runId === null;
+  const sandbox = mode === "dev" && source.serverCanonical === true
+    && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId);
+  if (typeof source.source !== "string" || !source.source.trim() || !Array.isArray(source.unilevel)
+      || (!production && !sandbox)) return invalid();
   const unilevelUsdt: Record<number, number> = {};
   const unilevelNex: Record<number, number> = {};
   for (const raw of source.unilevel) {
@@ -147,6 +157,9 @@ function parse(value: unknown): CanonicalCommissionConfig {
   if (influenceClampMin > influenceClampMax) return invalid();
   return {
     source: source.source.trim(),
+    serverCanonical: true,
+    sourceEnvironment: sourceEnvironment as CommissionSourceEnvironment,
+    runId: sandbox ? runId : null,
     unilevelUsdt,
     unilevelNex,
     partnerThresholds: parsePartnerThresholds(source.partnerTiersJson),
@@ -165,13 +178,13 @@ function binaryStatus(value: unknown): CanonicalBinaryMatch["status"] {
   return invalid();
 }
 
-function parseBinary(value: unknown, mode: ApiMode): CanonicalBinaryState {
+function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState {
   const source = record(value);
   const sourceEnvironment = typeof source.sourceEnvironment === "string" ? source.sourceEnvironment.trim().toUpperCase() : "";
   const runId = source.runId;
-  const production = source.source === "server" && mode === "remote" && source.serverCanonical === true
+  const production = source.source === "server" && mode === "prod" && source.serverCanonical === true
     && sourceEnvironment === "PRODUCTION" && runId === null;
-  const sandbox = source.source === "server" && mode === "sandbox" && source.serverCanonical === true
+  const sandbox = source.source === "server" && mode === "dev" && source.serverCanonical === true
     && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId);
   if (!Array.isArray(source.recentMatches)
       || typeof source.spilloverEnabled !== "boolean"
@@ -228,14 +241,14 @@ function parseBinary(value: unknown, mode: ApiMode): CanonicalBinaryState {
   };
 }
 
-export function createCommissionConfigApi(client: ApiClient, mode: ApiMode = "remote"): CommissionConfigApi {
+export function createCommissionConfigApi(client: ApiClient, mode: ApiEnvironment = "prod"): CommissionConfigApi {
   return {
     async rates() {
       return parse(await client.request<unknown>({
         method: "GET",
         path: "/api/config/commission/rates",
         authenticated: false,
-      }));
+      }), mode);
     },
     async binary() {
       return parseBinary(await client.request<unknown>({

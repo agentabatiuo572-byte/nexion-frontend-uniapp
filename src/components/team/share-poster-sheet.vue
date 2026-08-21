@@ -476,7 +476,7 @@ function saveImage() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 4000);
       toast.success(t.value.share.saved);
-      recordShareEvent("poster", "poster_sheet");
+      await recordShareEvent("poster", "poster_sheet");
     } catch {
       // 异常2:下载受限 → 长按引导
       toast.info(t.value.share.saveLongPress);
@@ -486,9 +486,9 @@ function saveImage() {
   // #ifndef H5
   uni.saveImageToPhotosAlbum({
     filePath: imgSrc.value,
-    success: () => {
+    success: async () => {
       toast.success(t.value.share.saved);
-      recordShareEvent("poster", "poster_sheet");
+      await recordShareEvent("poster", "poster_sheet");
     },
     fail: () => toast.info(t.value.share.saveLongPress),
   });
@@ -500,7 +500,7 @@ async function copyLinkAction() {
   const ok = await copyText(buildShareLink());
   if (ok) {
     toast.success(t.value.team.inviteLinkCopied);
-    recordShareEvent("copy", "poster_sheet");
+    await recordShareEvent("copy", "poster_sheet");
   } else {
     toast.info(t.value.share.copyFailed);
   }

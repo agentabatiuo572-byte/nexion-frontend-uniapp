@@ -38,11 +38,13 @@ import {
   startBehaviorAnalytics,
 } from "@/services/behavior-analytics";
 import { useDeposits } from "@/store/deposits";
-import { fundsSandboxEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
-import { prepareProductCatalog } from "@/store/product-catalog";
+import { apiRuntimeConfig, developmentFundsEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
+import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { refreshEarnConfig } from "@/store/earn-config";
 import { useMarket } from "@/store/market";
+import { shouldClaimQuestOnRoute } from "@/lib/remote-quest-route";
+import { scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -113,7 +115,7 @@ let arrivalTimer: ReturnType<typeof setInterval> | undefined;
  * store 之间不互相 import(P-031),所以这个跨 store 编排放在 App 层。
  */
 function advanceArrivalAndSettleBill() {
-  if (fundsSandboxEnabled) return;
+  if (developmentFundsEnabled) return;
   const app = useApp();
   // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
   // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
@@ -151,7 +153,7 @@ function advanceArrivalAndSettleBill() {
  * 单据是终态、账单行还没跟上,就是待办。这样刷新、换设备、隔一周回来都能自愈,零额外存储。
  */
 function reconcileBills() {
-  if (fundsSandboxEnabled) return;
+  if (developmentFundsEnabled) return;
   const app = useApp();
   const bills = useBills();
   // ⓪ 🔴 单据在、账单缺 → **补写**(z4 R2,两路独立审计各自命中)。
@@ -187,10 +189,10 @@ function reconcileBills() {
   //     别再照 ⓪ 的样子在这里无条件遍历 app.withdrawals 补扣。两条独立证据(都已回源坐实):
   //     ① 那一版的立论前提是错的 —— app.ts applyWithdrawalDebit 头注称「全仓没有余额端点、
   //        余额的唯一持有者就是本 store」,而 refreshRemoteFleet 在
-  //        `remoteApiEnabled && !fundsSandboxEnabled` 时用服务端 `fleet.walletUsdt`
+  //        `remoteApiEnabled && !developmentFundsEnabled` 时用服务端 `fleet.walletUsdt`
   //        **整体覆写** usdtBalance 与 earningBuckets(app.ts:700-723);
   //        按 api/runtime-config.ts,生产无 env→remote、开发无 env→sandbox 但非显式,
-  //        这两档 fundsSandboxEnabled 都是 false —— 正是补扣会跑且真扣本地余额的档。
+  //        这两档 developmentFundsEnabled 都是 false —— 正是补扣会跑且真扣本地余额的档。
   //        ⇒ 服务端值已含这笔则**双扣**;不含则补扣的 −N 被下一拍重投影抹掉、而幂等键已置位
   //        ⇒ **永不重试**。两种都比不修更坏。
   //     ② docs/changes/2026-08-11-z5-out-of-scope-findings.md B 段早已明令:
@@ -234,7 +236,7 @@ function reconcileBills() {
 }
 
 function startArrivalPoll() {
-  if (fundsSandboxEnabled) return;
+  if (developmentFundsEnabled) return;
   stopArrivalPoll();
   arrivalTimer = setInterval(() => {
     if (!ensureBusinessLoopsAllowed()) return;
@@ -466,6 +468,18 @@ function canRefreshRemoteAccount(auth: ReturnType<typeof useAuth>): boolean {
   if (!remoteApiEnabled || !auth.isAuthenticated || !auth.onboardingComplete) return false;
   const serverSession = sessionVault.read();
   return !!serverSession && auth.accountId === `user:${serverSession.user.userId}`;
+}
+
+/**
+ * Sandbox E3 provenance is issued by the authenticated product catalog. Never
+ * start a fleet request against the cleared RunID during cold start/login;
+ * await (and retry) catalog loading first.
+ */
+async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
+  const auth = useAuth();
+  if (!canRefreshRemoteAccount(auth)) return false;
+  if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
+  return useApp().refreshRemoteFleet();
 }
 
 function readServerAuthenticatedAccountTrace(): boolean {
@@ -797,6 +811,9 @@ function checkQuestRoute() {
   const id = questIdForRoute(route);
   if (!id) return;
   if (remoteApiEnabled) {
+    // Profile setup is an explicit save action, not a page visit. The profile
+    // page claims this task only after the server confirms the saved profile.
+    if (!shouldClaimQuestOnRoute(true, id)) return;
     // Visiting a tracked screen is the H3 completion event. The server claim
     // decides eligibility and reward; the client never credits locally.
     if (!useQuest().isComplete(id)) void useQuest().claimRemote(id);
@@ -988,7 +1005,7 @@ onLaunch(() => {
     // unauthenticated launch must not turn its expected 401 into a fake catalog
     // failure before the user has even signed in.
     prepareProductCatalog();
-    if (canRefreshRemoteAccount(auth)) void useApp().refreshRemoteFleet();
+    if (canRefreshRemoteAccount(auth)) void refreshAuthenticatedRemoteFleet();
   }
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
@@ -1011,6 +1028,10 @@ onLaunch(() => {
 });
 onShow(() => {
   attachSessionWatch();
+  const termsGateRoute = readCurrentRoute();
+  if (termsGateRoute && !isAuthWhitelisted(termsGateRoute) && canRefreshRemoteAccount(useAuth())) {
+    scheduleLegalTermsGate(`/${termsGateRoute}`);
+  }
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
   // → onShow 提前收工 → 轮询没启动 → 再无第二枪,登出态照样停在业务页(与修复前同果)。
@@ -1018,7 +1039,7 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  if (canRefreshRemoteAccount(useAuth())) void useApp().refreshRemoteFleet();
+  if (canRefreshRemoteAccount(useAuth())) void refreshAuthenticatedRemoteFleet();
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });

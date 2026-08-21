@@ -111,8 +111,9 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
       capabilityScore: cap?.score,
       capabilityTops: cap?.tops,
       capabilityTier: cap?.tier,
-      // Fresh page load = a fresh continuous mining run → continuity ramps up.
-      miningSince: Date.now(),
+      // Calibration alone is not activation. Continuity starts only after the
+      // authenticated activation command has succeeded.
+      miningSince: null,
     }),
   };
 }
@@ -124,11 +125,11 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
 export function makeInitialDevices(): Device[] {
   const now = Date.now();
   const phone = createDevice("phone", "phone-1");
-  phone.todayEarnings = 0.04; // v3.2: phone tier shows tiny seed earnings
-  phone.todayEarningsNEX = 6.2;
+  phone.todayEarnings = 0;
+  phone.todayEarningsNEX = 0;
   // Phone is the onboarding device — purchased on signup (30d ago = user.joinedAt).
   phone.purchasedAt = now - 30 * ONE_DAY_MS;
-  phone.activatedAt = phone.purchasedAt; // onboarding-seeded phone enters active fleet
+  phone.activatedAt = null;
 
   // Demo seed leaves one free slot for the computer-connect flow.
   const demoKinds: DeviceKind[] = ["cloud-share", "stellarbox-s1", "stellarbox-pro", "stellarrack-p1"];

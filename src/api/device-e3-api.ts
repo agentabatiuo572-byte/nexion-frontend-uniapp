@@ -1,5 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { isCurrentCommerceSandboxRun } from "./order-api";
+import type { ApiEnvironment } from "./runtime-config";
 
 export interface CanonicalE3Device {
   id: number;
@@ -43,6 +45,9 @@ export interface CanonicalE3Fleet {
   devices: CanonicalE3Device[];
   capacitySchedule: Record<string, string>;
   source: string;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
+  serverCanonical: true;
 }
 
 export interface CanonicalTradeinConfig {
@@ -212,6 +217,8 @@ function stringMap(value: unknown): Record<string, string> {
 
 function device(value: unknown): CanonicalE3Device {
   const source = record(value);
+  const capacityPct = number(source.capacityPct);
+  if (capacityPct > 100) return invalid();
   return {
     id: integer(source.id, 1),
     rowVersion: integer(source.rowVersion),
@@ -231,7 +238,7 @@ function device(value: unknown): CanonicalE3Device {
     vramTotalGb: integer(source.vramTotalGb),
     basePowerW: number(source.basePowerW),
     location: string(source.location),
-    capacityPct: number(source.capacityPct),
+    capacityPct,
     capacityAgeMonths: integer(source.capacityAgeMonths),
     capacityConfigKey: string(source.capacityConfigKey),
     capacitySubsidized: boolean(source.capacitySubsidized),
@@ -241,9 +248,16 @@ function device(value: unknown): CanonicalE3Device {
   };
 }
 
-function fleet(value: unknown): CanonicalE3Fleet {
+function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
   const source = record(value);
   if (!Array.isArray(source.devices)) return invalid();
+  const sourceEnvironment = string(source.sourceEnvironment).toUpperCase();
+  const runId = typeof source.runId === "string" ? source.runId.trim() : invalid();
+  const provenanceMatches = source.serverCanonical === true && (
+    (mode === "prod" && sourceEnvironment === "PRODUCTION" && runId === "")
+    || (mode === "dev" && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId))
+  );
+  if (!provenanceMatches) return invalid("E3_FLEET_PROVENANCE_INVALID");
   const devices = source.devices.map(device);
   if (new Set(devices.map((entry) => entry.id)).size !== devices.length) return invalid();
   return {
@@ -260,6 +274,9 @@ function fleet(value: unknown): CanonicalE3Fleet {
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
     source: string(source.source),
+    sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX",
+    runId,
+    serverCanonical: true,
   };
 }
 
@@ -486,10 +503,10 @@ function validTargetNo(value: string): string {
   return normalized;
 }
 
-export function createDeviceE3Api(client: ApiClient): DeviceE3Api {
+export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "prod"): DeviceE3Api {
   return {
     async fleet() {
-      return fleet(await client.request<unknown>({ path: "/api/devices/earnings" }));
+      return fleet(await client.request<unknown>({ path: "/api/devices/earnings" }), mode);
     },
     async tradeinConfig() {
       return config(await client.request<unknown>({ path: "/api/app/trade-in/config" }));

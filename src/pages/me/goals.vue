@@ -1,7 +1,7 @@
 <!--
   Earning goals — ported from Nexion-prototype/app/(main)/me/goals/page.tsx.
-  Set a USDT target + deadline; page recommends a device tier to close the gap,
-  then lists active goals with a scroll-grow progress bar each.
+  Set a USDT target + deadline; remote/sandbox modes ask the server for a
+  catalog-backed recommendation, while mock mode retains the demo fallback.
 
   Wrapped in <AppChassis active="me">; SubPageHeader (back chevron) scrolls
   with content. <input> → uni <input>; per-goal bar extracted to
@@ -58,7 +58,15 @@
       </view>
 
       <!-- Recommendation -->
-      <view v-if="target > 0" class="mx-4" :style="recCardStyle">
+      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="mx-4" :style="recCardStyle">
+        <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
+        <text class="block" :style="recReasonStyle">{{ t.goals.loading }}</text>
+      </view>
+      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
+        <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
+        <text class="block" :style="recReasonStyle">{{ t.goals.serverUnavailable }}</text>
+      </view>
+      <view v-if="target > 0 && (!remoteApiEnabled || goalsStore.recommendation)" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
@@ -77,7 +85,9 @@
       </view>
 
       <!-- Active goals — de-carded: transparent hairline group on the page floor -->
-      <view v-if="goals.length > 0">
+      <view v-if="remoteApiEnabled && goalsStore.status === 'loading'" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.loading }}</text></view>
+      <view v-else-if="remoteApiEnabled && goalsStore.status === 'error'" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.serverUnavailable }}</text></view>
+      <view v-else-if="goals.length > 0">
         <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
         <view :style="goalGroupStyle">
           <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
@@ -105,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
@@ -114,6 +124,7 @@ import { fmt } from "@/i18n/format";
 import { useGoals } from "@/store/goals";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const PRESET_TARGETS = [500, 1000, 5000, 10000];
 const PRESET_DEADLINES_DAYS = [30, 90, 180, 365];
@@ -123,12 +134,19 @@ const t = useT();
 const goalsStore = useGoals();
 const app = useApp();
 
-const lifeTimeEarnings = computed(() => app.earnings.total);
+const lifeTimeEarnings = computed(() => remoteApiEnabled ? goalsStore.lifetimeEarningsUsdt : app.earnings.total);
 const goals = computed(() => goalsStore.goals);
 const target = ref(1000);
 const days = ref(90);
 
 const recommendation = computed(() => {
+  if (remoteApiEnabled && goalsStore.recommendation) {
+    return {
+      tier: goalsStore.recommendation.productName,
+      reason: fmt(t.value.goals.recReasonServer, { daily: goalsStore.recommendation.dailyEarn.toFixed(2) }),
+    };
+  }
+  if (remoteApiEnabled) return { tier: "", reason: "" };
   const perDay = target.value / days.value;
   if (perDay <= 0.19) return { tier: "Cloud Share", reason: t.value.goals.recCloudShare };
   if (perDay <= 7) return { tier: "NexGridBox S1", reason: t.value.goals.recS1 };
@@ -144,7 +162,7 @@ const recPathLine = computed(() =>
     target: target.value.toLocaleString(),
     days: days.value,
     tier: recommendation.value.tier,
-    perDay: (target.value / days.value).toFixed(2),
+    perDay: (goalsStore.recommendation?.requiredDaily ?? target.value / days.value).toFixed(2),
   }),
 );
 
@@ -155,6 +173,19 @@ function onTarget(e: Event) {
   target.value = Math.max(0, parseFloat(detailVal(e)) || 0);
 }
 
+onMounted(() => {
+  if (remoteApiEnabled) {
+    void goalsStore.refresh();
+    void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+  }
+});
+
+watch([target, days], () => {
+  if (remoteApiEnabled && target.value >= 100 && days.value > 0) {
+    void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+  }
+});
+
 function deadlineLine(deadlineMs: number): string {
   const daysLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / ONE_DAY_MS));
   return fmt(t.value.goals.deadlineRow, { n: daysLeft });
@@ -163,19 +194,27 @@ function goalPct(targetUSDT: number): number {
   return Math.min(100, (lifeTimeEarnings.value / targetUSDT) * 100);
 }
 
-function onSave() {
+async function onSave() {
   if (target.value < 100) {
     toast.warn(t.value.goals.minTargetWarn);
     return;
   }
-  goalsStore.setGoal({ targetUSDT: target.value, deadlineMs: Date.now() + days.value * ONE_DAY_MS });
-  toast.success(fmt(t.value.goals.savedToast, { amount: target.value, days: days.value }));
-  target.value = 1000;
-  days.value = 90;
+  try {
+    await goalsStore.setGoal({ targetUSDT: target.value, deadlineMs: Date.now() + days.value * ONE_DAY_MS });
+    toast.success(fmt(t.value.goals.savedToast, { amount: target.value, days: days.value }));
+    target.value = 1000;
+    days.value = 90;
+  } catch (error) {
+    toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);
+  }
 }
 
-function remove(id: string) {
-  goalsStore.remove(id);
+async function remove(id: string) {
+  try {
+    await goalsStore.remove(id);
+  } catch (error) {
+    toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);
+  }
 }
 
 function goStore() {
@@ -380,5 +419,8 @@ const achievedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   color: "var(--v5-brand)",
+};
+const emptyStateStyle: CSSProperties = {
+  marginTop: "20px", padding: "16px", color: "var(--v5-ink-3)", textAlign: "center",
 };
 </script>

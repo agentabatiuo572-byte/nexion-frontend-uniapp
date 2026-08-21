@@ -3,7 +3,7 @@
   三格:注册用户 / 在线设备 / 你的排名 —— 全部由展示配置与真实派生驱动,零写死值。
 -->
 <template>
-  <view>
+  <view data-home-section="network-pulse">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.networkPulseTitle }}</text>
       <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan-ink)">{{ t.home.networkLive }}</text>
