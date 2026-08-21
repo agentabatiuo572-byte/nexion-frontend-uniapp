@@ -1381,6 +1381,7 @@ export const zh: Messages = {
     eligReasonUsed: "该账号已使用过免费试用",
     eligReasonInProgress: "试用正在进行中,去试用页看看",
     eligReasonRisk: "该账号暂时无法领取,请联系客服了解详情",
+    eligReasonQuota: "今日免费名额已领完,请明天再来看看",
     eligReasonClosed: "试用活动暂未开放,晚点再来看看",
     eligReasonUnknown: "暂时无法从服务器确认试用资格,请检查网络后重试",
     // /me/trial 五态页

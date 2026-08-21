@@ -1393,6 +1393,7 @@ export const vi: Messages = {
     eligReasonUsed: "Tài khoản này đã dùng thử miễn phí rồi",
     eligReasonInProgress: "Bạn đang trong thời gian dùng thử — xem tại trang dùng thử",
     eligReasonRisk: "Tài khoản này hiện chưa thể nhận dùng thử — liên hệ hỗ trợ để biết thêm",
+    eligReasonQuota: "Đã hết suất dùng thử miễn phí hôm nay — vui lòng quay lại vào ngày mai",
     eligReasonClosed: "Chương trình dùng thử hiện chưa mở — quay lại sau nhé",
     eligReasonUnknown: "Chưa thể xác nhận điều kiện dùng thử từ máy chủ. Hãy kiểm tra kết nối và thử lại",
     pageTitle: "Dùng thử miễn phí",

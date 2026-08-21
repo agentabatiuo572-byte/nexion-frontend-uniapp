@@ -221,6 +221,7 @@ const ineligibleReasonText = computed(() => {
   if (r === "used") return w.value.eligReasonUsed;
   if (r === "in-progress") return w.value.eligReasonInProgress;
   if (r === "risk") return w.value.eligReasonRisk;
+  if (r === "quota-exhausted") return w.value.eligReasonQuota;
   return w.value.eligReasonClosed;
 });
 

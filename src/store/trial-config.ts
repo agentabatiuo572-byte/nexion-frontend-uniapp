@@ -5,9 +5,8 @@ import type { TrialConfigValue } from "@/api/trial-api";
 
 /**
  * Trial config — "后台可控" parameters surfaced as a store rather than
- * constants. Real platform would back this with a server config + admin UI.
- * Ported from Nexion-prototype/lib/store/trial-config.ts (zustand persist →
- * Pinia + uni storage). MOCK-ONLY.
+ * constants. The formal App reads this from the Java H2 policy authority;
+ * the prototype ancestry is retained only for the local non-authoritative shape.
  */
 export interface TrialConfig {
   /** Free trial duration in days (shadow accrues during this window) */
@@ -28,6 +27,8 @@ export interface TrialConfig {
   /** Shadow accrual rates (S1 baseline per spec §3.1) */
   shadowDailyUSD: number;
   shadowDailyNEX: number;
+  /** Remaining free-trial offers displayed on the Earn hero card. */
+  seatsLeftToday: number;
   /** Whether trial is open in the current product phase */
   phaseOpen: boolean;
   // ── Auto-push controls (claim sheet 弹出策略,后台可控)──
@@ -66,6 +67,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   trialPriceUSD: 649,
   shadowDailyUSD: 7,
   shadowDailyNEX: 40,
+  seatsLeftToday: 0,
   phaseOpen: true,
   autoPushEnabled: true,
   autoPushDelayMs: 1500,
@@ -112,9 +114,9 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       if (!Number.isFinite(value) || value < min) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
       return value;
     };
-    const integer = (key: string, min = 0) => {
+    const integer = (key: string, min = 0, max = Number.MAX_SAFE_INTEGER) => {
       const value = number(key, min);
-      if (!Number.isInteger(value)) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
+      if (!Number.isInteger(value) || value > max) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
       return value;
     };
     const bool = (key: string) => {
@@ -135,6 +137,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
       shadowDailyUSD: number("shadowDailyUSD"),
       shadowDailyNEX: number("shadowDailyNEX"),
+      seatsLeftToday: integer("seatsLeftToday", 0, 1_000_000),
       phaseOpen: bool("phaseOpen"),
       autoPushEnabled: bool("autoPushEnabled"),
       autoPushDelayMs: integer("autoPushDelayMs"),

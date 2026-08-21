@@ -75,7 +75,7 @@
 
       <!-- Bottom strip: scarcity + Claim CTA -->
       <view style="position: relative; z-index: 1; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
-        <view v-if="!remoteApiEnabled" class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-quest-ember-ink); font-weight: 500">
+        <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-quest-ember-ink); font-weight: 500">
           <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-quest-ember); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-quest-ember) 70%, transparent); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
           <text style="color: var(--v5-quest-ember-ink)">{{ trialsLeftText }}</text>
         </view>
@@ -98,7 +98,6 @@ import { computed, ref, watch, type CSSProperties } from "vue";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { remoteApiEnabled } from "@/api/runtime";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
@@ -115,14 +114,16 @@ watch(inView, (v) => {
   if (v) played.value = true;
 });
 
-const visible = computed(() => trial.status === "none" && trial.canStart());
+const visible = computed(() => trial.status === "none"
+  && trialCfg.config.seatsLeftToday > 0
+  && trial.canStart());
 
 const trialDays = computed(() => trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialCfg.config.shadowDailyUSD);
 const est = computed(() => Math.round(trialDays.value * dailyEarn.value));
 const taglineText = computed(() => fmt(t.value.trial.heroTagline, { days: trialDays.value }));
 const earnLabelText = computed(() => fmt(t.value.trial.heroEarnLabel, { days: trialDays.value }));
-const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: 47 }));
+const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: trialCfg.config.seatsLeftToday }));
 const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/d × ${trialDays.value}`);
 
 const COUPON_MASK =

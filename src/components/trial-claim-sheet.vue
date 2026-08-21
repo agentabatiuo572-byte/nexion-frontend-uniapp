@@ -129,6 +129,7 @@ function reasonText(reason: TrialIneligibleReason | undefined): string {
   if (reason === "converted") return w.eligReasonConverted;
   if (reason === "used") return w.eligReasonUsed;
   if (reason === "in-progress") return w.eligReasonInProgress;
+  if (reason === "quota-exhausted") return w.eligReasonQuota;
   if (reason === "risk") return w.eligReasonRisk;
   if (reason === "unknown") return w.eligReasonUnknown;
   return w.eligReasonClosed;
