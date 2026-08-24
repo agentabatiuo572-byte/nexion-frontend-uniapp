@@ -14,11 +14,12 @@
 import { computed } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
+import { resolveAddDeviceRoute } from "./add-device-route";
 
 const app = useApp();
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 
 function go() {
-  uni.navigateTo({ url: `/pages/store/detail?id=${promo.value.targetKind}`, fail: () => {} });
+  uni.navigateTo({ url: resolveAddDeviceRoute(promo.value.targetKind), fail: () => {} });
 }
 </script>
