@@ -27,6 +27,8 @@ export interface CanonicalE3Device {
   capacityConfigKey: string;
   capacitySubsidized: boolean;
   capacitySubsidyDays: number;
+  capacitySubsidyRemainingDays: number;
+  capacitySubsidyEndsAt: number | null;
   actualPaidUsdt: number;
   cumulativeOutputUsdt: number;
 }
@@ -200,6 +202,11 @@ function timestamp(value: unknown): number | null {
   return invalid();
 }
 
+function integerTimestamp(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return integer(value);
+}
+
 function numberArray(value: unknown, length: number): number[] {
   if (!Array.isArray(value) || value.length !== length) return invalid();
   return value.map((entry) => number(entry));
@@ -217,6 +224,7 @@ function stringMap(value: unknown): Record<string, string> {
 
 function device(value: unknown): CanonicalE3Device {
   const source = record(value);
+  if (!Object.prototype.hasOwnProperty.call(source, "capacitySubsidyEndsAt")) return invalid();
   const capacityPct = number(source.capacityPct);
   if (capacityPct > 100) return invalid();
   return {
@@ -243,10 +251,14 @@ function device(value: unknown): CanonicalE3Device {
     capacityConfigKey: string(source.capacityConfigKey),
     capacitySubsidized: boolean(source.capacitySubsidized),
     capacitySubsidyDays: integer(source.capacitySubsidyDays),
+    capacitySubsidyRemainingDays: integer(source.capacitySubsidyRemainingDays),
+    capacitySubsidyEndsAt: integerTimestamp(source.capacitySubsidyEndsAt),
     actualPaidUsdt: number(source.actualPaidUsdt),
     cumulativeOutputUsdt: number(source.cumulativeOutputUsdt),
   };
 }
+
+const SUBSIDY_DAY_MS = 86_400_000;
 
 function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
   const source = record(value);
@@ -258,8 +270,19 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
     || (mode === "dev" && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId))
   );
   if (!provenanceMatches) return invalid("E3_FLEET_PROVENANCE_INVALID");
+  const serverNow = integer(source.serverNow);
   const devices = source.devices.map(device);
   if (new Set(devices.map((entry) => entry.id)).size !== devices.length) return invalid();
+  if (devices.some((entry) => {
+    const canonicalRemainingDays = entry.capacitySubsidyEndsAt !== null
+      && entry.capacitySubsidyEndsAt > serverNow
+      ? Math.ceil((entry.capacitySubsidyEndsAt - serverNow) / SUBSIDY_DAY_MS)
+      : 0;
+    const hasLiveDeadline = canonicalRemainingDays > 0;
+    return entry.capacitySubsidyRemainingDays > entry.capacitySubsidyDays
+      || entry.capacitySubsidyRemainingDays !== canonicalRemainingDays
+      || entry.capacitySubsidized !== hasLiveDeadline;
+  })) return invalid();
   return {
     dailyUsdt: number(source.dailyUsdt),
     dailyNex: number(source.dailyNex),
@@ -268,7 +291,7 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
     walletUsdt: number(source.walletUsdt),
     walletNex: number(source.walletNex),
     userJoinedAt: integer(source.userJoinedAt),
-    serverNow: integer(source.serverNow),
+    serverNow,
     timezone: string(source.timezone),
     slotCap: integer(source.slotCap, 1),
     devices,

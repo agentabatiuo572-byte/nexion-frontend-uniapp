@@ -5,6 +5,7 @@ import type { DeviceKind } from "./types";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned, installCanonicalLifecycleConfig } from "./device-lifecycle";
+import { readMonotonicNowMs } from "../lib/server-deadline-clock";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
@@ -615,7 +616,11 @@ export const useApp = defineStore("app", () => {
     throw new Error("E3_DEVICE_KIND_UNSUPPORTED");
   }
 
-  function canonicalDevice(device: CanonicalE3Device, serverNow: number): Device {
+  function canonicalDevice(
+    device: CanonicalE3Device,
+    serverNow: number,
+    capacitySnapshotReceivedAt: number,
+  ): Device {
     const capacity = Math.max(0, Math.min(1, device.capacityPct / 100));
     const fullDailyUsdt = capacity > 0 ? device.dailyUsdt / capacity : 0;
     const fullDailyNex = capacity > 0 ? device.dailyNex / capacity : 0;
@@ -650,6 +655,15 @@ export const useApp = defineStore("app", () => {
       paidPriceUsdt: device.actualPaidUsdt,
       location: device.location,
       pausedReason: null,
+      capacitySource: "server",
+      capacityPct: device.capacityPct,
+      capacityAgeMonths: device.capacityAgeMonths,
+      capacitySubsidized: device.capacitySubsidized,
+      capacitySubsidyDays: device.capacitySubsidyDays,
+      capacitySubsidyRemainingDays: device.capacitySubsidyRemainingDays,
+      capacitySubsidyEndsAt: device.capacitySubsidyEndsAt,
+      serverNow,
+      capacitySnapshotReceivedAt,
     };
   }
 
@@ -671,9 +685,18 @@ export const useApp = defineStore("app", () => {
     const byDevice = new Map(state.devices.map((entry) => [String(entry.deviceId), entry]));
     return base.map((device) => {
       const authority = byDevice.get(device.id);
-      if (!authority) return { ...device, currentTask: null, recentTasks: [], taskLockUntil: null };
+      if (!authority) {
+        return {
+          ...device,
+          taskServerNow: state.serverNow,
+          currentTask: null,
+          recentTasks: [],
+          taskLockUntil: null,
+        };
+      }
       return {
         ...device,
+        taskServerNow: state.serverNow,
         taskLockUntil: authority.lockUntil,
         currentTask: authority.currentTask ? remoteTask(authority.currentTask, device.location ?? "") : null,
         recentTasks: authority.recentTasks.map((entry) => ({
@@ -822,7 +845,12 @@ export const useApp = defineStore("app", () => {
       if (fleetResult.status === "rejected") throw fleetResult.reason;
       const fleet = fleetResult.value;
       installCanonicalLifecycleConfig(fleet.capacitySchedule);
-      const canonicalDevices = fleet.devices.map((device) => canonicalDevice(device, fleet.serverNow));
+      const capacitySnapshotReceivedAt = readMonotonicNowMs();
+      const canonicalDevices = fleet.devices.map((device) => canonicalDevice(
+        device,
+        fleet.serverNow,
+        capacitySnapshotReceivedAt,
+      ));
       const confirmedAssignments = assignmentResult.status === "fulfilled"
         ? assignmentResult.value
         : lastConfirmedAssignments?.request.accountKey === request.accountKey

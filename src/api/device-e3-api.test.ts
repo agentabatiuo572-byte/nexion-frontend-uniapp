@@ -20,7 +20,7 @@ describe("device E3 eligibility API", () => {
       walletUsdt: 0,
       walletNex: 0,
       userJoinedAt: 1,
-      serverNow: 2,
+      serverNow: 1_800_000_000_000,
       timezone: "Asia/Shanghai",
       slotCap: 6,
       source: "server",
@@ -33,6 +33,7 @@ describe("device E3 eligibility API", () => {
         activatedAt: 1, purchasedAt: 1, dailyUsdt: 1, dailyNex: 1, todayEarningsUsdt: 0, todayEarningsNex: 0,
         gpuModel: "GPU", vramTotalGb: 1, basePowerW: 1, location: "Local", capacityPct, capacityAgeMonths: 1,
         capacityConfigKey: "capacityApplyToS1", capacitySubsidized: false, capacitySubsidyDays: 30,
+        capacitySubsidyRemainingDays: 0, capacitySubsidyEndsAt: 1_702_592_000_000,
         actualPaidUsdt: 1, cumulativeOutputUsdt: 0,
       }],
     };

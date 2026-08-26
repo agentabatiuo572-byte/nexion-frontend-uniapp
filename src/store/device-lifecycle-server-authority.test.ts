@@ -31,6 +31,8 @@ function serverDevice(overrides: Partial<Device> = {}): Device {
     capacityAgeMonths: 5,
     capacitySubsidized: false,
     capacitySubsidyDays: 30,
+    capacitySubsidyRemainingDays: 0,
+    capacitySubsidyEndsAt: 1_702_592_000_000,
     serverNow: 1_800_000_000_000,
     ...overrides,
   };
@@ -60,6 +62,8 @@ describe("E3 server lifecycle projection", () => {
       capacityAgeMonths: undefined,
       capacitySubsidized: undefined,
       capacitySubsidyDays: undefined,
+      capacitySubsidyRemainingDays: undefined,
+      capacitySubsidyEndsAt: undefined,
     });
     expect(hasServerLifecycleProjection(unavailable)).toBe(false);
     expect(getLifecycleSummary(unavailable, 1_700_000_000_000).efficiency).toBe(0);

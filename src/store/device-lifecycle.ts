@@ -163,6 +163,18 @@ export function hasServerLifecycleProjection(device: Device): boolean {
     && typeof device.capacitySubsidized === "boolean"
     && Number.isInteger(device.capacitySubsidyDays)
     && (device.capacitySubsidyDays ?? -1) >= 0
+    && Number.isInteger(device.capacitySubsidyRemainingDays)
+    && (device.capacitySubsidyRemainingDays ?? -1) >= 0
+    && (device.capacitySubsidyRemainingDays ?? 0) <= (device.capacitySubsidyDays ?? -1)
+    && (device.capacitySubsidyEndsAt === null
+      || (typeof device.capacitySubsidyEndsAt === "number"
+        && Number.isFinite(device.capacitySubsidyEndsAt)
+        && device.capacitySubsidyEndsAt >= 0))
+    && (device.capacitySubsidized === true
+      ? (device.capacitySubsidyRemainingDays ?? 0) > 0
+        && typeof device.capacitySubsidyEndsAt === "number"
+        && device.capacitySubsidyEndsAt > (device.serverNow ?? Number.POSITIVE_INFINITY)
+      : (device.capacitySubsidyRemainingDays ?? -1) === 0)
     && typeof device.serverNow === "number"
     && Number.isFinite(device.serverNow)
     && device.serverNow >= 0;
