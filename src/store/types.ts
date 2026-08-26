@@ -81,8 +81,14 @@ export interface Device {
   capacityAgeMonths?: number | null;
   capacitySubsidized?: boolean | null;
   capacitySubsidyDays?: number | null;
+  capacitySubsidyRemainingDays?: number | null;
+  capacitySubsidyEndsAt?: number | null;
   /** Fleet snapshot clock paired with the server capacity projection. */
   serverNow?: number | null;
+  /** Task-state snapshot clock; kept separate so it cannot replace the paired E3 fleet clock. */
+  taskServerNow?: number | null;
+  /** Monotonic receive anchor used to advance the signed server deadline while the card stays open. */
+  capacitySnapshotReceivedAt?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency
   // degradation curve in lib/store/device-lifecycle.ts. Cloud Share / phone are
   // exempt from degradation (compute is rented or co-located).

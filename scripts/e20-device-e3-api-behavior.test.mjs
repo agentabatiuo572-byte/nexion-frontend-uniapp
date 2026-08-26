@@ -107,6 +107,8 @@ const validFleet = {
     capacityConfigKey: "capacityApplyToS1",
     capacitySubsidized: false,
     capacitySubsidyDays: 0,
+    capacitySubsidyRemainingDays: 0,
+    capacitySubsidyEndsAt: 1750000000000,
     actualPaidUsdt: 649,
     cumulativeOutputUsdt: 200,
   }],

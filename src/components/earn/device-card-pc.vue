@@ -318,6 +318,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import {
+  advanceMonotonicHighWater,
+  deadlineRemainingDays,
+  deadlineRemainingMs,
+  projectServerNow,
+  readMonotonicNowMs,
+} from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
@@ -357,10 +364,12 @@ const displayLocation = computed(() => deviceLocation(t.value, props.device));
 
 // 1s re-render so progress + countdown tick.
 const now = ref(Date.now());
+const monotonicNow = ref(readMonotonicNowMs());
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   timer = setInterval(() => {
     now.value = Date.now();
+    monotonicNow.value = advanceMonotonicHighWater(monotonicNow.value, readMonotonicNowMs());
   }, 1000);
 });
 onUnmounted(() => {
@@ -566,22 +575,33 @@ function openExplainer() {
   explainer.open();
 }
 const DAY_MS = 86400000;
-// Remote uses the server's boolean + configured window. It must not infer the
-// subsidy state from purchasedAt and the browser clock (clock skew can reopen
-// an expired badge). Explicit mock keeps the local countdown for the demo.
+// Remote anchors elapsed time to the signed server snapshot and a monotonic
+// receive instant. The high-water clock cannot move backward, so changing the
+// browser wall clock cannot reopen an already expired subsidy window.
+const liveServerNow = computed(() => {
+  const serverNow = props.device.serverNow;
+  const receivedAt = props.device.capacitySnapshotReceivedAt;
+  if (serverNow == null || receivedAt == null) return now.value;
+  return projectServerNow(serverNow, receivedAt, monotonicNow.value);
+});
 const subsidyRemainMs = computed(() =>
   !lifecycle.value
     ? 0
     : props.device.capacitySource === "server"
       ? props.device.capacitySubsidized === true
-        ? (props.device.capacitySubsidyDays ?? 0) * DAY_MS
+        && (props.device.capacitySubsidyRemainingDays ?? 0) > 0
+        && props.device.capacitySubsidyEndsAt != null
+        ? deadlineRemainingMs(props.device.capacitySubsidyEndsAt, liveServerNow.value)
         : 0
       : Math.min(SUBSIDY_DAYS * DAY_MS, Math.max(0, props.device.purchasedAt + SUBSIDY_DAYS * DAY_MS - now.value)),
 );
 const inSubsidy = computed(() => degradable.value && subsidyRemainMs.value > 0);
 const subsidyText = computed(() => {
   if (props.device.capacitySource === "server" && lifecycle.value) {
-    return fmt(t.value.earn.subsidyBadge, { n: props.device.capacitySubsidyDays ?? 0 });
+    const remainingDays = deadlineRemainingDays(subsidyRemainMs.value);
+    return remainingDays <= 1
+      ? t.value.earn.subsidyBadgeLastDay
+      : fmt(t.value.earn.subsidyBadge, { n: remainingDays });
   }
   if (subsidyRemainMs.value <= DAY_MS) return t.value.earn.subsidyBadgeLastDay;
   return fmt(t.value.earn.subsidyBadge, { n: Math.ceil(subsidyRemainMs.value / DAY_MS) });
