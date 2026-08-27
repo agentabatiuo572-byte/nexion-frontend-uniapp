@@ -35,6 +35,15 @@ describe("E3 fleet bootstrap and projection atomicity", () => {
     expect(signIn).toContain("void app.refreshHomeTruth();");
   });
 
+  it("keeps every assignment projection read-only and routes snapshots through the shared cache", () => {
+    const syncStart = appStore.indexOf("async function syncRemoteTaskAssignments(");
+    const syncEnd = appStore.indexOf("function applyHomeEarnings(", syncStart);
+    const syncSource = appStore.slice(syncStart, syncEnd);
+    expect(syncSource).not.toContain("taskAssignmentApi.claim(");
+    expect(syncSource).not.toContain("taskAssignmentApi.complete(");
+    expect(syncSource).toContain("readRemoteTaskAssignments(request)");
+  });
+
   it("keeps capacityPct inside the canonical 0..100 interval", () => {
     expect(e3Api).toContain("if (capacityPct > 100) return invalid();");
   });

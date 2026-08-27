@@ -515,6 +515,8 @@ export const zh: Messages = {
     gpuPower: "功耗",
     vram: "显存",
     currentTask: "当前任务",
+    todayCompleted: "今日已完成",
+    todayRecentCompleted: "今日最近完成",
     taskCenter: "任务中心",
     earningsOverview: "收益概览",
     todayTab: "今日",

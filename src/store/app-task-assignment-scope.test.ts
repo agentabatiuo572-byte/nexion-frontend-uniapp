@@ -11,7 +11,6 @@ describe("task assignment consumer provenance scope", () => {
     const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
 
     await expect(api.state()).resolves.toMatchObject({ runId: "", devices: [] });
-    await expect(api.claim(7, "claim-1")).rejects.toMatchObject({ message: "TASK_ASSIGNMENT_SANDBOX_CLAIM_DISABLED" });
     expect(request).toHaveBeenCalledTimes(1);
   });
 

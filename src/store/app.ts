@@ -62,7 +62,7 @@ import {
   type FundsSandboxWallet,
 } from "@/api/funds-sandbox-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
-import type { CanonicalTaskAssignment, CanonicalTaskAssignments, TrustedTaskCompletionProof } from "@/api/task-assignment-api";
+import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import {
@@ -91,8 +91,6 @@ const ONE_DAY = ONE_DAY_MS;
 // ── module-level tick state (mirrors original module scope) ──
 const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
-let remoteTaskSyncInFlight = false;
-let remoteTaskSyncAfter = 0;
 const REMOTE_TASK_SYNC_MS = 5000;
 
 function normalRandom(mean: number, std: number, min: number, max: number) {
@@ -418,6 +416,17 @@ export const useApp = defineStore("app", () => {
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
   let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments } | null = null;
+  let remoteTaskSyncInFlight = false;
+  let remoteTaskSyncAfter = 0;
+  let taskAssignmentSnapshot: {
+    key: string;
+    receivedAt: number;
+    state: CanonicalTaskAssignments;
+  } | null = null;
+  let taskAssignmentSnapshotInFlight: {
+    key: string;
+    request: Promise<CanonicalTaskAssignments>;
+  } | null = null;
   let remoteFleetRefreshSequence = 0;
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
   //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
@@ -682,6 +691,7 @@ export const useApp = defineStore("app", () => {
   }
 
   function applyRemoteAssignments(base: Device[], state: CanonicalTaskAssignments): Device[] {
+    const taskSnapshotReceivedAt = readMonotonicNowMs();
     const byDevice = new Map(state.devices.map((entry) => [String(entry.deviceId), entry]));
     return base.map((device) => {
       const authority = byDevice.get(device.id);
@@ -689,6 +699,7 @@ export const useApp = defineStore("app", () => {
         return {
           ...device,
           taskServerNow: state.serverNow,
+          taskServerNowReceivedAt: taskSnapshotReceivedAt,
           currentTask: null,
           recentTasks: [],
           taskLockUntil: null,
@@ -697,6 +708,7 @@ export const useApp = defineStore("app", () => {
       return {
         ...device,
         taskServerNow: state.serverNow,
+        taskServerNowReceivedAt: taskSnapshotReceivedAt,
         taskLockUntil: authority.lockUntil,
         currentTask: authority.currentTask ? remoteTask(authority.currentTask, device.location ?? "") : null,
         recentTasks: authority.recentTasks.map((entry) => ({
@@ -708,24 +720,25 @@ export const useApp = defineStore("app", () => {
     });
   }
 
-  async function trustedTaskProof(task: CanonicalTaskAssignment): Promise<TrustedTaskCompletionProof> {
-    const provider = (globalThis as typeof globalThis & {
-      __NEXION_TRUSTED_TASK_PROOF__?: (challenge: {
-        taskNo: string; deviceId: number; proofNonce: string; proofExpiresAt: number;
-      }) => Promise<TrustedTaskCompletionProof>;
-    }).__NEXION_TRUSTED_TASK_PROOF__;
-    if (!provider || !task.proofNonce || !task.proofExpiresAt) {
-      throw new Error("TASK_ASSIGNMENT_TRUSTED_EXECUTOR_UNAVAILABLE");
+  function readRemoteTaskAssignments(request: RemoteAccountRequest): Promise<CanonicalTaskAssignments> {
+    const key = `${request.accountKey}:${request.epoch}`;
+    const now = Date.now();
+    if (taskAssignmentSnapshot?.key === key
+        && now < taskAssignmentSnapshot.receivedAt + REMOTE_TASK_SYNC_MS) {
+      return Promise.resolve(taskAssignmentSnapshot.state);
     }
-    return provider({ taskNo: task.taskNo, deviceId: task.deviceId,
-      proofNonce: task.proofNonce, proofExpiresAt: task.proofExpiresAt });
-  }
-
-  // IDEMPOTENCY-FRESH-OK: 按分钟分桶:同一分钟内重试复用同一把。
-  // ⚠️ 已知上限:超过 60s 再重试就是新键。任务领取/完成走的是服务端权威状态机(claim 已被别人
-  //    领走会被拒),所以窗口内不会重复发奖;真要收紧应改成「按 taskNo 冻结」而不是按时间分桶。
-  function taskMutationKey(scope: string): string {
-    return `e18:${scope}:${Math.floor(Date.now() / 60000)}`;
+    if (taskAssignmentSnapshotInFlight?.key === key) return taskAssignmentSnapshotInFlight.request;
+    const pending = taskAssignmentApi.state().then((state) => {
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
+      taskAssignmentSnapshot = { key, receivedAt: Date.now(), state };
+      return state;
+    });
+    taskAssignmentSnapshotInFlight = { key, request: pending };
+    const clearInFlight = () => {
+      if (taskAssignmentSnapshotInFlight?.request === pending) taskAssignmentSnapshotInFlight = null;
+    };
+    void pending.then(clearInFlight, clearInFlight);
+    return pending;
   }
 
   async function syncRemoteTaskAssignments(): Promise<void> {
@@ -735,26 +748,20 @@ export const useApp = defineStore("app", () => {
     remoteTaskSyncInFlight = true;
     remoteTaskSyncAfter = calledAt + REMOTE_TASK_SYNC_MS;
     try {
-      let state = await taskAssignmentApi.state();
+      const state = await readRemoteTaskAssignments(request);
       // before applying remote task assignments, reject any response from a prior account bind.
       if (!remoteAccountEpoch.isCurrent(request)) return;
       devices.value = applyRemoteAssignments(devices.value, state);
-      for (const device of devices.value) {
-        if (!remoteAccountEpoch.isCurrent(request)) return;
-        const authority = state.devices.find((entry) => String(entry.deviceId) === device.id);
-        if (!authority || device.status !== "online" || device.activatedAt == null) continue;
-        if (authority.currentTask && authority.currentTask.completableAt <= state.serverNow) {
-          const proof = await trustedTaskProof(authority.currentTask);
-          if (!remoteAccountEpoch.isCurrent(request)) return;
-          await taskAssignmentApi.complete(authority.currentTask.taskNo, proof,
-            taskMutationKey(`complete:${authority.currentTask.taskNo}`));
-        } else if (!authority.currentTask && (authority.lockUntil == null || authority.lockUntil <= state.serverNow)) {
-          if (!remoteAccountEpoch.isCurrent(request)) return;
-          await taskAssignmentApi.claim(authority.deviceId, taskMutationKey(`claim:${authority.deviceId}`));
-        }
-      }
-      if (!remoteAccountEpoch.isCurrent(request)) return;
-      await refreshRemoteFleet(request);
+      remoteAssignmentStatus.value = "ready";
+      remoteAssignmentError.value = "";
+      // Dev and production clients are equally read-only. Task creation, completion,
+      // receipts and money mutations are server jobs; the App only refreshes their
+      // task, per-device earnings and Home aggregate projections.
+      await Promise.allSettled([
+        refreshRemoteFleet(request),
+        refreshHomeTruth(request),
+      ]);
+      return;
     } catch (cause) {
       if (remoteAccountEpoch.isCurrent(request)) {
         remoteAssignmentStatus.value = "error";
@@ -829,7 +836,7 @@ export const useApp = defineStore("app", () => {
       remoteAssignmentStatus.value = "loading";
       remoteAssignmentError.value = "";
       const [fleetResult, assignmentResult] = await Promise.allSettled([
-        deviceE3Api.fleet(), taskAssignmentApi.state(),
+        deviceE3Api.fleet(), readRemoteTaskAssignments(request),
       ]);
       if (!remoteAccountEpoch.isCurrent(request) || refreshSequence !== remoteFleetRefreshSequence) {
         throw new Error("REMOTE_FLEET_REQUEST_SUPERSEDED");
@@ -914,6 +921,9 @@ export const useApp = defineStore("app", () => {
       remoteAssignmentStatus.value = "idle";
       remoteAssignmentError.value = "";
       lastConfirmedAssignments = null;
+      taskAssignmentSnapshot = null;
+      taskAssignmentSnapshotInFlight = null;
+      remoteTaskSyncAfter = 0;
       remoteFleetRefreshSequence += 1;
       homeTruth.value = null;
       homeTruthStatus.value = "idle";

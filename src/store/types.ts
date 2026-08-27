@@ -87,6 +87,8 @@ export interface Device {
   serverNow?: number | null;
   /** Task-state snapshot clock; kept separate so it cannot replace the paired E3 fleet clock. */
   taskServerNow?: number | null;
+  /** Monotonic receive anchor paired only with the task-state snapshot clock. */
+  taskServerNowReceivedAt?: number | null;
   /** Monotonic receive anchor used to advance the signed server deadline while the card stays open. */
   capacitySnapshotReceivedAt?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency

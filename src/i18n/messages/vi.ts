@@ -530,6 +530,8 @@ export const vi: Messages = {
     gpuPower: "Công suất",
     vram: "VRAM",
     currentTask: "Tác vụ hiện tại",
+    todayCompleted: "Đã hoàn thành hôm nay",
+    todayRecentCompleted: "Hoàn thành gần đây hôm nay",
     taskCenter: "Trung tâm tác vụ",
     earningsOverview: "Tổng quan thu nhập",
     todayTab: "Hôm nay",
