@@ -59,6 +59,10 @@ export interface Product {
   monthlyPrice?: number;
   installMonths?: number;
   sold: number;
+  /** 服务端商品形态；SHARE 是可交付的数字份额，不占实物设备库存。 */
+  productType?: "DEVICE" | "SHARE";
+  /** FINITE 扣减实际库存；UNLIMITED 成交只累计销量。 */
+  inventoryMode?: "FINITE" | "UNLIMITED";
   stock?: number;
   // ponytail: NOT rendered anywhere today — deliberately left untranslated so we
   // don't carry 72 dead key-pairs across en/zh/vi. If a spec sheet ever renders
@@ -264,6 +268,8 @@ export const PRODUCTS: Product[] = [
     id: "cloud-share",
     name: "Cloud Share",
     tier: "Share",
+    productType: "SHARE",
+    inventoryMode: "UNLIMITED",
     tagline: "No hardware needed — buy a slice of the network.",
     badge: "Low Barrier",
     gpu: "Distributed",

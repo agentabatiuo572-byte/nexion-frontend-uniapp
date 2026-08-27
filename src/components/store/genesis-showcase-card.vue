@@ -61,12 +61,12 @@
         <view v-if="locked" :style="lockRowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <text :style="lockTextStyle">{{ lockedLineText }}</text>
-          <text class="font-mono-tabular tabular-nums nowrap" :style="lockMetStyle">{{ lockedMetText }}</text>
+          <text v-if="lockedMetText" class="font-mono-tabular tabular-nums nowrap" :style="lockMetStyle">{{ lockedMetText }}</text>
         </view>
       </view>
     </view>
 
-    <!-- 内嵌资格 sheet（锁定态点卡打开;输码达标后 CTA → 预售页）-->
+    <!-- 内嵌资格 sheet：锁定态点卡打开；资格只显示服务端新策略。 -->
     <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="goGenesis" />
   </view>
 </template>
@@ -76,10 +76,11 @@ import { ref, computed, type CSSProperties } from "vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesis } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
+import { resolveGenesisEligibilityCardCopy, resolveGenesisPrimaryCta } from "@/lib/genesis-primary-cta";
 
 const t = useT();
 const genesis = useGenesis();
@@ -113,24 +114,26 @@ const eyebrowText = computed(() => fmt(t.value.store.genesisCardEyebrow, { n: ge
 const leftText = computed(() =>
   showUrgency.value ? fmt(t.value.store.genesisCardLeft, { n: genesis.totalSlots - genesis.soldSlots }) : "",
 );
-const lockedLineText = computed(() =>
-  GENESIS_ELIGIBILITY.mode === "all-of" ? t.value.genesisEligibility.cardLockedLineAll : t.value.genesisEligibility.cardLockedLine,
-);
-const lockedMetText = computed(() => {
-  const met = gate.value.conditions.filter((c) => c.met).length;
-  return fmt(t.value.genesisEligibility.cardLockedMet, { met, total: gate.value.conditions.length });
-});
+const lockedCopy = computed(() => resolveGenesisEligibilityCardCopy(gate.value.reasons, {
+  policyRejected: t.value.genesisEligibility.cardLockedLine,
+  policyManaged: t.value.genesisEligibility.cardPolicyManaged,
+  runConflict: t.value.genesisEligibility.reasonRunConflict,
+  serviceUnavailable: t.value.genesisEligibility.reasonServiceUnavailable,
+  policyUnavailable: t.value.genesisEligibility.reasonPolicyUnavailable,
+}));
+const lockedLineText = computed(() => lockedCopy.value.line);
+const lockedMetText = computed(() => lockedCopy.value.meta);
 const ctaText = computed(() => {
   // 🔴 阻断态一律问 `block` 单源(FEAT-GEN10 ④),与创世页同一出口 —— 关闭市场 ≠ 下架,
   //   卡片照常展示(showcaseEnabled 另管),只是不能买。
-  // 三档阻断说明走 blockText 唯一出口(P1-3 收口);售罄档是本卡自己的 CTA 词汇
-  //   (「去二级市场」,与创世页的「已售罄」刻意不同),留在本地。
-  const blocked = blockText.value;
-  if (blocked !== null) return blocked;
-  if (block.value === "soldOut") return t.value.store.genesisCardCtaMarket;
-  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
-  if (locked.value) return t.value.genesisEligibility.cardCtaLocked;
-  return t.value.genesisEligibility.cardCta;
+  // 账号资格只决定点击后进资格 sheet 还是详情页，不再把主售 CTA 改回“查看认购资格”。
+  return resolveGenesisPrimaryCta({
+    block: block.value,
+    blockedText: blockText.value,
+    soldOut: t.value.store.genesisCardCtaMarket,
+    comingSoon: t.value.genesisEligibility.comingSoon,
+    reserve: t.value.genesisEligibility.cardCta,
+  });
 });
 
 function goGenesis() {

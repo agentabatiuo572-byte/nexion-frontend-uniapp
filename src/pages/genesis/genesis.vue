@@ -83,20 +83,21 @@
           <text :style="secTitleStyle">{{ t.genesis.tier.title }}</text>
         </view>
         <view :style="ladderCardStyle">
-          <view v-for="tr in tiers" :key="tr.id" class="flex items-center" :style="tierRowStyle(tr.isCurrent)">
+          <view v-for="tr in tiers" :key="tr.id" class="flex items-center" :style="tierRowStyle(tr.state)">
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 8px">
                 <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
-                <text :style="tr.isCurrent ? tierChipLiveStyle : tierChipSoldStyle">{{ tr.isCurrent ? t.genesis.tier.live : t.genesis.tier.soldOut }}</text>
+                <text v-if="tr.state === 'current'" :style="tierChipLiveStyle">{{ t.genesis.tier.live }}</text>
+                <text v-else-if="tr.state === 'sold'" :style="tierChipSoldStyle">{{ t.genesis.tier.soldOut }}</text>
               </view>
               <!-- 🔴 「还剩 N 席」也是名额紧迫文案,与 hero 那处同一条规则(FEAT-GEN10 ④)。
                    独立验收 P1-4:上次只关了 hero,这里漏了,关闭态实测仍显示「Live · 153 left」。
                    阻断态改显总席位数(中性事实),不显剩余。 -->
-              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
+              <text class="block" :style="tierMetaStyle">{{ tr.state === 'current' && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
             </view>
             <view class="text-right shrink-0">
               <text class="block tabular-nums" :style="tierPriceStyle">${{ tr.priceText }}</text>
-              <text v-if="tr.isCurrent" class="block" :style="tierCurrentStyle">{{ t.genesis.tier.current }}</text>
+              <text v-if="tr.state === 'current'" class="block" :style="tierCurrentStyle">{{ t.genesis.tier.current }}</text>
             </view>
           </view>
           <text class="block" :style="tierPremiumStyle">{{ t.genesis.tier.premium }}</text>
@@ -157,8 +158,8 @@
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">{{ countdownDisplay }}</text>
           </template>
-          <!-- 价格只在**真能买**时露出:阻断态显示价格等于对着买不到的东西报价。 -->
-          <template v-else-if="dockActive && eligible">
+          <!-- 价格跟随主售是否开放；账号资格只决定点击后的分流，不覆盖主售报价。 -->
+          <template v-else-if="dockShowsPrice">
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">${{ priceText }}</text>
           </template>
@@ -171,13 +172,13 @@
 
     <!-- Confirm sheet -->
     <GenesisPurchaseSheet v-model:open="sheetOpen" />
-    <!-- Eligibility sheet(资格门 L2,FEAT-GEN08)-->
+    <!-- 当前服务端认购资格投影。 -->
     <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -188,7 +189,7 @@ import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue"
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY_POLICY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useLocaleStore } from "@/store/locale";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
@@ -196,15 +197,37 @@ import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled } from "@/api/runtime";
+import { deriveGenesisTierRows, type GenesisTierDisplayState } from "@/lib/genesis-tier-display";
+import { resolveGenesisPrimaryCta, showGenesisPrimaryPrice } from "@/lib/genesis-primary-cta";
 
 const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+let refreshInFlight: Promise<void> | null = null;
+
+function refreshGenesisPage(): Promise<void> {
+  if (refreshInFlight) return refreshInFlight;
+  const operation = (async () => {
+    await cfg.refresh();
+    await genesis.syncRemote();
+  })();
+  refreshInFlight = operation;
+  void operation.finally(() => {
+    if (refreshInFlight === operation) refreshInFlight = null;
+  });
+  return operation;
+}
+
+// A direct H5 hash-route load can mount this page without emitting uni-app's
+// page-level onShow hook. Mount must therefore bootstrap the public Genesis
+// projection; onShow remains the refresh path when navigating back later.
+onMounted(() => {
+  void refreshGenesisPage();
+});
 // 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
 //   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
-onShow(async () => {
-  await cfg.refresh();
-  await genesis.syncRemote();
+onShow(() => {
+  void refreshGenesisPage();
 });
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
@@ -259,17 +282,17 @@ function ageText(ts: number): string {
 
 // Dock 文案:**阻断原因来自唯一派生 `block`**(composable),本页不再自排优先级。
 // 顺序由 genesisPurchaseBlock 定:配置未知 > 市场关闭 > 熔断 > 售罄 > 预售;
-// 全部放行后才轮到本页独有的资格门(L2,FEAT-GEN08)。
+// 资格门仍在 openSheet 和服务端执行；主售文案不用账号资格覆盖。
 const dockCtaText = computed(() => {
-  // 三档阻断说明走 blockText 唯一出口(P1-3 收口:此前这段 switch 在 4 处各写一份)。
-  // 售罄 / 预售是本页自己的 CTA 词汇,不属于「阻断说明」,留在本地。
-  const blocked = blockText.value;
-  if (blocked !== null) return blocked;
-  if (block.value === "soldOut") return t.value.genesis.ctaSoldOut;
-  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
-  if (!eligible.value) return t.value.genesisEligibility.dockLocked;
-  return t.value.genesis.ctaReserve;
+  return resolveGenesisPrimaryCta({
+    block: block.value,
+    blockedText: blockText.value,
+    soldOut: t.value.genesis.ctaSoldOut,
+    comingSoon: t.value.genesisEligibility.comingSoon,
+    reserve: t.value.genesis.ctaReserve,
+  });
 });
+const dockShowsPrice = computed(() => showGenesisPrimaryPrice(block.value));
 /** 主按钮是否处于「可购买」外观(金色高光)。任一阻断态都退到中性面 —— 复用原本
  *  只给售罄用的那套中性样式,不另造 disabled 皮。 */
 const dockActive = computed(() => block.value === null);
@@ -297,17 +320,14 @@ const priceText = computed(() => price.value.toLocaleString());
 // 运营增删档(t3/t4…)标签不错位、末档恒为 Final(修 id 硬编码致 label 错位)。
 type TierLabelKey = "wl" | "t1" | "tail";
 const tiers = computed(() =>
-  cfg.config.tiers.map((tier, i, arr) => {
-    const s = sold.value;
-    const isCurrent = s >= tier.from && s < tier.to;
-    const left = Math.max(0, tier.to - Math.max(tier.from, s));
+  deriveGenesisTierRows(cfg.config.tiers, sold.value).map((tier, i, arr) => {
     const labelKey: TierLabelKey = i === 0 ? "wl" : i === arr.length - 1 ? "tail" : "t1";
     return {
       id: tier.id,
       labelKey,
       priceText: tier.priceUSDT.toLocaleString(),
-      isCurrent,
-      left,
+      state: tier.state,
+      left: tier.left,
       seatsTotal: tier.to - tier.from,
     };
   }),
@@ -354,7 +374,7 @@ async function openSheet() {
     toastBlocked();
     return;
   }
-  // 资格门 L2:未达标 → 资格 sheet,不开购买 sheet(FEAT-GEN08)。
+  // 服务端资格未通过 → 展示原因，不打开购买 sheet。
   if (!eligible.value) {
     eligSheetOpen.value = true;
     return;
@@ -363,7 +383,7 @@ async function openSheet() {
   if (gate.value.capReached) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY_POLICY.maxPerUser }),
     );
     return;
   }
@@ -566,12 +586,12 @@ const ladderCardStyle: CSSProperties = {
   padding: "0 2px",
   borderTop: "1px solid var(--v5-border)",
 };
-function tierRowStyle(isCurrent: boolean): CSSProperties {
+function tierRowStyle(state: GenesisTierDisplayState): CSSProperties {
   return {
     gap: "12px",
     padding: "12px 0",
     borderBottom: "1px solid var(--v5-border)",
-    opacity: isCurrent ? 1 : 0.6,
+    opacity: state === "current" ? 1 : state === "sold" ? 0.6 : 0.85,
   };
 }
 const tierNameStyle: CSSProperties = {

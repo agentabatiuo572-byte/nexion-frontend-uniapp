@@ -14,9 +14,22 @@ export interface GenesisRemoteReadScope {
   hasAuthority(): boolean;
   isCurrent(): boolean;
   clear(): void;
+  clearAccount(): void;
+  applyEligibilityError?(reason: GenesisEligibilityReadError): void;
   applyPublicState(state: GenesisPublicState): void;
   applyAccount(state: GenesisAccountState): void;
   applyEligibility(eligibility: GenesisEligibility): void;
+}
+
+export type GenesisEligibilityReadError =
+  | "GENESIS_SANDBOX_USER_RUN_CONFLICT"
+  | "GENESIS_ELIGIBILITY_UNAVAILABLE";
+
+function eligibilityReadError(...errors: unknown[]): GenesisEligibilityReadError {
+  return errors.some((error) => error instanceof Error
+    && error.message === "GENESIS_SANDBOX_USER_RUN_CONFLICT")
+    ? "GENESIS_SANDBOX_USER_RUN_CONFLICT"
+    : "GENESIS_ELIGIBILITY_UNAVAILABLE";
 }
 
 /**
@@ -34,35 +47,60 @@ export async function readGenesisRemoteFacts(
   scope: GenesisRemoteReadScope,
 ): Promise<boolean> {
   if (!scope.hasAuthority()) {
-    if (scope.isCurrent()) scope.clear();
-    return false;
+    // Supply, sale and market state are intentionally public. Anonymous users
+    // may read those facts, but protected account/eligibility endpoints must
+    // remain untouched and any prior account projection must be removed.
+    const publicState = await api.state().catch(() => null);
+    if (!scope.isCurrent()) return false;
+    if (!publicState) {
+      scope.clear();
+      return false;
+    }
+    scope.clearAccount();
+    scope.applyPublicState(publicState);
+    return true;
   }
 
-  // Public state can be unavailable or on a different rollout schema while
-  // account facts remain canonical. Keep the rejection local to this read.
-  const publicState = api.state().catch(() => null);
-
-  let accountState: GenesisAccountState;
-  let eligibility: GenesisEligibility;
-  try {
-    [accountState, eligibility] = await Promise.all([api.account(), api.eligibility()]);
-  } catch {
-    if (scope.isCurrent()) scope.clear();
-    return false;
-  }
+  // Public and protected projections are independent capabilities. A fresh
+  // account can temporarily lack its holder projection, but that must not
+  // erase canonical public supply and make a live sale look sold out.
+  const [publicResult, accountResult, eligibilityResult] = await Promise.allSettled([
+    api.state(),
+    api.account(),
+    api.eligibility(),
+  ]);
 
   if (!scope.isCurrent() || !scope.hasAuthority()) {
     if (scope.isCurrent()) scope.clear();
     return false;
   }
-  scope.applyAccount(accountState);
-  scope.applyEligibility(eligibility);
-
-  const nextPublicState = await publicState;
-  if (!scope.isCurrent() || !scope.hasAuthority()) {
-    if (scope.isCurrent()) scope.clear();
+  const publicAvailable = publicResult.status === "fulfilled";
+  const accountAvailable = accountResult.status === "fulfilled"
+    && eligibilityResult.status === "fulfilled";
+  if (!publicAvailable && !accountAvailable) {
+    scope.clear();
     return false;
   }
-  if (nextPublicState) scope.applyPublicState(nextPublicState);
+  // Commit the public control plane first, then let an authenticated account
+  // projection overlay only its explicitly scoped facts (including the local
+  // SANDBOX supply rail). This keeps a just-confirmed purchase visible without
+  // turning the sandbox count into anonymous/production truth.
+  if (publicAvailable) scope.applyPublicState(publicResult.value);
+  if (accountAvailable) {
+    scope.applyAccount(accountResult.value);
+    scope.applyEligibility(eligibilityResult.value);
+  } else {
+    const protectedReadError = eligibilityReadError(
+      accountResult.status === "rejected" ? accountResult.reason : null,
+      eligibilityResult.status === "rejected" ? eligibilityResult.reason : null,
+    );
+    console.warn("GENESIS_PROTECTED_READ_UNAVAILABLE", {
+      reason: protectedReadError,
+      accountAvailable: accountResult.status === "fulfilled",
+      eligibilityAvailable: eligibilityResult.status === "fulfilled",
+    });
+    scope.clearAccount();
+    scope.applyEligibilityError?.(protectedReadError);
+  }
   return true;
 }

@@ -16,7 +16,6 @@ describe("genesis remote truth contract", () => {
       remainingCap: 2,
       minAccountAgeDays: 30,
       accountAgeDays: 1,
-      hasGenesisInvite: false,
       status: "NOT_ELIGIBLE",
       reservedAllocation: null,
       reservedAllocationUnit: "NEX",
@@ -28,8 +27,6 @@ describe("genesis remote truth contract", () => {
       asOf: "2026-08-17T00:00:00Z",
       serverTime: "2026-08-17T00:00:01Z",
       provenance: { source: "nx_genesis_holding+nx_config_item", environment: "PRODUCTION", runId: "" },
-      mode: "any-of",
-      appliesTo: "both",
       halted: false,
     });
     const api = createGenesisApi({ request } as never);
@@ -124,7 +121,6 @@ describe("genesis remote truth contract", () => {
       remainingCap: 3,
       minAccountAgeDays: 0,
       accountAgeDays: 120,
-      hasGenesisInvite: false,
       reservedAllocation: 251,
       reservedAllocationUnit: "NEX",
       priorityRank: 2,
@@ -135,8 +131,6 @@ describe("genesis remote truth contract", () => {
       serverTime: "2026-08-17T00:00:01Z",
       provenance: { source: "nx_genesis_holding+nx_config_item", environment: "PRODUCTION", runId: "" },
       status: "READY",
-      mode: "any-of",
-      appliesTo: "both",
       halted: false,
     });
     const api = createGenesisApi({ request } as never);
@@ -163,7 +157,7 @@ describe("genesis remote truth contract", () => {
     const eligibility = {
       eligible: true, reasons: ["HOLDINGS_CONFIRMED"], qualificationReasonCodes: ["HOLDINGS_CONFIRMED"],
       ownedCount: 1, maxPerUser: 20, remainingCap: 19, minAccountAgeDays: 0, accountAgeDays: 1,
-      hasGenesisInvite: false, status: "READY", reservedAllocation: 80000.25, reservedAllocationUnit: "NEX",
+      status: "READY", reservedAllocation: 80000.25, reservedAllocationUnit: "NEX",
       priorityRank: 1, priorityTier: "TOP_1", policyVersion: "genesis-holder-v1",
       effectiveAt: "2026-08-17T00:00:00Z", asOf: "2026-08-18T00:00:00Z", serverTime: "2026-08-18T00:00:00Z",
       provenance: { source: "nx_genesis_holding+nx_config_item", environment: "PRODUCTION", runId: "" },
@@ -173,7 +167,7 @@ describe("genesis remote truth contract", () => {
       sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, source: "nx_genesis_holding+nx_config_item",
       series: { seriesCode: "GENESIS-MAIN", name: "Genesis", totalSupply: 1000, soldSupply: 0, remainingSupply: 1000, priceUsdt: 10, royaltyPct: 0, dailyEmissionRatePct: 0 },
       sale: { serverCanonical: true, available: true, eligibilityEnabled: true, maxPerUser: 20, minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 10, open: true },
-      marketEnabled: true, emissionOpen: false, holdings: [holder], emissions: [], walletBalanceUsdt: 1000, eligibility,
+      marketEnabled: true, emissionOpen: false, holdings: [holder], emissions: [], orders: [], walletBalanceUsdt: 1000, eligibility,
     });
     await expect(createGenesisApi({ request } as never, "dev").account()).resolves.toMatchObject({
       holdings: [{ holdingNo: "G4-FIX-1", acquiredPriceUsdt: 0 }],
@@ -181,11 +175,56 @@ describe("genesis remote truth contract", () => {
     });
   });
 
+  it("accepts a server-canonical run-scoped Genesis account only in local development", async () => {
+    const runId = "nexion-local-dev";
+    const eligibility = {
+      eligible: true, reasons: ["NO_ACTIVE_HOLDINGS"],
+      qualificationReasonCodes: ["NO_ACTIVE_HOLDINGS", "POLICY_CONFIRMED"],
+      ownedCount: 0, maxPerUser: 20, remainingCap: 20, minAccountAgeDays: 0, accountAgeDays: 1,
+      halted: false, status: "NOT_ELIGIBLE",
+      reservedAllocation: 0, reservedAllocationUnit: "NEX", priorityRank: 1, priorityTier: "NONE",
+      policyVersion: "genesis-holder-v1", effectiveAt: "2026-08-17T00:00:00Z",
+      asOf: "2026-08-26T00:00:00Z", serverTime: "2026-08-26T00:00:01Z",
+      provenance: { source: "nx_genesis_sandbox_holding+nx_config_item", environment: "SANDBOX", runId },
+      serverCanonical: true, source: "mock", sourceEnvironment: "SANDBOX", runId,
+    };
+    const account = {
+      sourceEnvironment: "SANDBOX", runId, serverCanonical: true, source: "mock",
+      series: { seriesCode: "GENESIS-SANDBOX", name: "Genesis Sandbox", totalSupply: 1000, soldSupply: 0, remainingSupply: 1000, priceUsdt: 10, royaltyPct: 0, dailyEmissionRatePct: 0 },
+      sale: { serverCanonical: true, available: true, eligibilityEnabled: true, maxPerUser: 20, minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 10, open: true },
+      marketEnabled: true, emissionOpen: false, holdings: [], emissions: [], walletBalanceUsdt: 1000,
+      orders: [{ orderNo: "GEN-SBX-1", orderType: "PRIMARY", quantity: 1, unitPriceUsdt: 10,
+        amountUsdt: 10, royaltyUsdt: 0, completedAt: "2026-08-26T00:01:00Z" }],
+      eligibility,
+    };
+
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", runId).account())
+      .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId, eligibility: { eligible: true },
+        orders: [{ orderNo: "GEN-SBX-1", orderType: "PRIMARY", quantity: 1 }] });
+    const { orders: _orders, ...withoutOrders } = account;
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(withoutOrders) } as never, "dev", runId).account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(eligibility) } as never, "dev", runId).eligibility())
+      .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId, eligible: true });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", "another-valid-run").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...account, runId: "" }) } as never, "dev", runId).account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...eligibility, runId: "bad run id" }) } as never, "dev", runId).eligibility())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", "short").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "prod").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+  });
+
   it("rejects malformed holder facts instead of showing a generic verified badge", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", eligible: true,
       reasons: [], ownedCount: 1, maxPerUser: 5, remainingCap: 4,
-      minAccountAgeDays: 0, accountAgeDays: 10, hasGenesisInvite: false,
+      minAccountAgeDays: 0, accountAgeDays: 10,
     });
     await expect(createGenesisApi({ request } as never).eligibility())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
@@ -195,7 +234,7 @@ describe("genesis remote truth contract", () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", eligible: true,
       reasons: [], qualificationReasonCodes: ["HOLDINGS_CONFIRMED"], ownedCount: 1, maxPerUser: 5,
-      remainingCap: 4, minAccountAgeDays: 0, accountAgeDays: 10, hasGenesisInvite: false,
+      remainingCap: 4, minAccountAgeDays: 0, accountAgeDays: 10,
       status: "READY", reservedAllocation: 100, reservedAllocationUnit: "NEX", priorityRank: 1,
       priorityTier: "TOP_1", policyVersion: "v1", effectiveAt: "2026-07-01T00:00:00Z",
       asOf: "2026-08-17T00:00:00Z", serverTime: "2026-08-17T00:00:00Z",
@@ -229,23 +268,4 @@ describe("genesis remote truth contract", () => {
     }, "dev")).toThrow("GENESIS_RESPONSE_INVALID");
   });
 
-  it("requires canonical environment provenance on invite redemption", async () => {
-    const inviteCode = ["NEXGRID", "OG", "1234567890ABCDEF"].join("-");
-    const missingAuthority = createGenesisApi({ request: vi.fn().mockResolvedValue({ code: inviteCode, status: "used" }) } as never);
-    await expect(missingAuthority.redeem(inviteCode)).rejects.toThrow("GENESIS_RESPONSE_INVALID");
-
-    const canonical = createGenesisApi({ request: vi.fn().mockResolvedValue({
-      serverCanonical: true,
-      sourceEnvironment: "PRODUCTION",
-      runId: "",
-      source: "nx_genesis_invite_code",
-      code: inviteCode,
-      status: "used",
-    }) } as never);
-    await expect(canonical.redeem(inviteCode)).resolves.toMatchObject({
-      code: inviteCode,
-      sourceEnvironment: "PRODUCTION",
-      runId: "",
-    });
-  });
 });

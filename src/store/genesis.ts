@@ -77,119 +77,42 @@ export interface EmissionSnapshot {
   monthsSinceListing: number;
 }
 
-/** 认购资格门(稀缺性核心,规格 FEAT-GEN08)。四通道 any-of:累计入金 / 旗舰设备 /
- *  V 等级 / 创世邀请码。server-canonical:真后台由 GET /api/config/genesis 下发,
- *  运营可配 → admin G4 `G.genesis.eligibility.*`;此处为可序列化 mock 镜像,
- *  client 禁止本地改松。 */
-export interface GenesisEligibilityConfig {
+/** 当前创世认购资格策略。生产环境只接受服务端投影；此对象仅供 5174/离线演示镜像。 */
+export interface GenesisEligibilityPolicy {
   enabled: boolean;
-  mode: "any-of" | "all-of";
-  /** 通道1:累计入金 USD(仅 recordDeposit 口径,earnings/兑换不计)。 */
-  minDepositUsdt: number;
-  /** 通道2:旗舰设备(Flagship tier)持有台数,active+inventory 都计。 */
-  flagshipMin: number;
-  /** 通道3:V 等级(V0-V12 序数)。 */
-  vRankMin: number;
-  /** 通道4:创世邀请码通道开关。 */
-  inviteEnabled: boolean;
-  /** 单人累计持有上限(一级认购+二级承接合计)。 */
-  perUserCap: number;
-  /** 资格门适用范围:primary=仅一级认购;both=二级承接同门。 */
-  appliesTo: "primary" | "both";
+  maxPerUser: number;
+  minAccountAgeDays: number;
 }
-export const GENESIS_ELIGIBILITY: GenesisEligibilityConfig = Object.freeze({
+export const GENESIS_ELIGIBILITY_POLICY: GenesisEligibilityPolicy = Object.freeze({
   enabled: true,
-  mode: "any-of",
-  minDepositUsdt: 5000,
-  flagshipMin: 1,
-  vRankMin: 4,
-  inviteEnabled: true,
-  perUserCap: 5,
-  appliesTo: "both",
+  maxPerUser: 5,
+  minAccountAgeDays: 0,
 });
 
-/** 创世邀请码格式(mock 端格式校验;真后台 = server 核销接口,格式仅兜底)。 */
-export const GENESIS_INVITE_PATTERN = /^NEXGRID-OG-[A-Z0-9]{16}$/;
-
-/** 资格求值输入。composable 层从 app / v-rank / genesis 组合(store 不互 import)。 */
-export interface GenesisEligibilityCtx {
-  cumulativeDepositUsdt: number;
-  vRank: number;
-  flagshipCount: number;
-  hasInvite: boolean;
+export interface GenesisEligibilityContext {
+  accountAgeDays: number;
   myOwned: number;
 }
 
-export interface GenesisGateCondition {
-  key: "deposit" | "flagship" | "vrank" | "invite" | "server";
-  met: boolean;
-  current: number;
-  target: number;
-  progressPct: number; // 0-100
-}
-
 export interface GenesisGateResult {
-  /** 资格门总判定(enabled=false 时恒 true)。 */
   eligible: boolean;
-  conditions: GenesisGateCondition[];
-  unmetCount: number;
-  /** 已达单人持有上限(独立于 eligible 的维度)。 */
+  reasons: string[];
   capReached: boolean;
-  /** 还可增持的张数(perUserCap − myOwned,下限 0)。 */
   capRemaining: number;
 }
 
-/** 资格门单源求值 — 商城尊享卡 / 预售 dock / 购买 sheet / 二级承接四处共用。
- *  fail-closed:enabled 脏值按「门开启」处理(`!== false`),宁可多拦不误放。 */
-export function evaluateGenesisEligibility(
-  config: GenesisEligibilityConfig,
-  ctx: GenesisEligibilityCtx,
+/** 新策略的离线镜像求值；生产环境始终以 GET /api/genesis/eligibility 为准。 */
+export function evaluateGenesisSalePolicy(
+  policy: GenesisEligibilityPolicy,
+  ctx: GenesisEligibilityContext,
 ): GenesisGateResult {
-  const pct = (cur: number, target: number) => {
-    if (!Number.isFinite(cur)) return 0; // 脏值(老 persist 注入)按零进度,不渲 NaN
-    // floor 而非 round:$4,999/$5,000 显示 99% 而非「100% 但未达成」的自相矛盾。
-    return target <= 0 ? 100 : Math.min(100, Math.floor((cur / target) * 100));
-  };
-  const conditions: GenesisGateCondition[] = [
-    {
-      key: "deposit",
-      met: ctx.cumulativeDepositUsdt >= config.minDepositUsdt,
-      current: ctx.cumulativeDepositUsdt,
-      target: config.minDepositUsdt,
-      progressPct: pct(ctx.cumulativeDepositUsdt, config.minDepositUsdt),
-    },
-    {
-      key: "flagship",
-      met: ctx.flagshipCount >= config.flagshipMin,
-      current: ctx.flagshipCount,
-      target: config.flagshipMin,
-      progressPct: pct(ctx.flagshipCount, config.flagshipMin),
-    },
-    {
-      key: "vrank",
-      met: ctx.vRank >= config.vRankMin,
-      current: ctx.vRank,
-      target: config.vRankMin,
-      progressPct: pct(ctx.vRank, config.vRankMin),
-    },
-  ];
-  if (config.inviteEnabled) {
-    conditions.push({
-      key: "invite",
-      met: ctx.hasInvite,
-      current: ctx.hasInvite ? 1 : 0,
-      target: 1,
-      progressPct: ctx.hasInvite ? 100 : 0,
-    });
-  }
-  const metCount = conditions.filter((c) => c.met).length;
-  const passed = config.mode === "all-of" ? metCount === conditions.length : metCount > 0;
-  const gateOn = config.enabled !== false; // fail-closed
-  const capRemaining = Math.max(0, config.perUserCap - ctx.myOwned);
+  const ageEligible = Number.isFinite(ctx.accountAgeDays)
+    && ctx.accountAgeDays >= policy.minAccountAgeDays;
+  const eligible = policy.enabled === false || ageEligible;
+  const capRemaining = Math.max(0, policy.maxPerUser - ctx.myOwned);
   return {
-    eligible: gateOn ? passed : true,
-    conditions,
-    unmetCount: conditions.length - metCount,
+    eligible,
+    reasons: eligible ? [] : ["ACCOUNT_AGE_REQUIRED"],
     capReached: capRemaining <= 0,
     capRemaining,
   };
@@ -276,6 +199,52 @@ function remoteDefaults(): GenesisGlobalData {
   return { soldSlots: 0, nexListed: false, nexListedAt: null };
 }
 
+function purchaseIntentScope(accountKey: string, n: number, tokenIds?: number[]): string {
+  return `${accountKey}|purchase|${n}|${(tokenIds ?? []).join(",")}`;
+}
+
+function purchaseSequenceScope(accountKey: string): string {
+  return `${accountKey}|purchase-sequence`;
+}
+
+export function claimGenesisPurchaseIntent(
+  keys: Record<string, string>,
+  accountKey: string,
+  n: number,
+  tokenIds?: number[],
+): { key: string; keys: Record<string, string> } {
+  const pendingScope = purchaseIntentScope(accountKey, n, tokenIds);
+  const pending = keys[pendingScope];
+  if (pending) return { key: pending, keys: { ...keys } };
+
+  const sequenceScope = purchaseSequenceScope(accountKey);
+  const storedSequence = keys[sequenceScope];
+  const sequence = storedSequence && /^\d+$/.test(storedSequence) ? Number(storedSequence) : 0;
+  if (!Number.isSafeInteger(sequence) || sequence >= Number.MAX_SAFE_INTEGER) {
+    throw new Error("GENESIS_PURCHASE_SEQUENCE_INVALID");
+  }
+  const nextSequence = sequence + 1;
+  const sig = `${accountKey}|${n}|${(tokenIds ?? []).join(",")}`;
+  const key = `genesis-purchase:${sig}:${nextSequence}`;
+  return {
+    key,
+    keys: { ...keys, [sequenceScope]: String(nextSequence), [pendingScope]: key },
+  };
+}
+
+export function retireGenesisPurchaseIntent(
+  keys: Record<string, string>,
+  accountKey: string,
+  n: number,
+  tokenIds?: number[],
+): Record<string, string> {
+  const pendingScope = purchaseIntentScope(accountKey, n, tokenIds);
+  if (!(pendingScope in keys)) return { ...keys };
+  const next = { ...keys };
+  delete next[pendingScope];
+  return next;
+}
+
 export const useGenesis = defineStore("genesis", () => {
   const cfg = useGenesisConfig(); // 单向读配置(档位定价);同 free-trial→trial-config 先例
   const initGlobal = remoteApiEnabled ? remoteDefaults() : hydrateGlobal();
@@ -295,14 +264,15 @@ export const useGenesis = defineStore("genesis", () => {
   const listingNoByTokenId = ref<Record<number, string>>({});
   const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
   const remoteTransactions = ref<GenesisPublicState["transactions"]>([]);
+  const remoteOrders = ref<GenesisAccountState["orders"]>([]);
   const remoteMarketStats = ref<GenesisMarketStats>({
     floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null,
   });
   const remoteEligibility = ref<GenesisEligibility | null>(null);
+  const remoteEligibilityError = ref<string | null>(null);
   const remoteHalted = ref(remoteApiEnabled);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const remoteEmissions = ref<GenesisEmission[]>([]);
-  const hasGenesisInvite = ref(false);
   const intentKeys = ref<Record<string, string>>(initUser.idempotencyKeys ?? {});
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
@@ -329,9 +299,14 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function applyAccountState(state: GenesisAccountState): void {
-    totalSlots.value = state.series.totalSupply;
-    soldSlots.value = state.series.soldSupply;
-    nexListed.value = state.emissionOpen;
+    // Account responses may come from the isolated dev Sandbox rail. They are
+    // authoritative for holder/eligibility facts. A run-fenced SANDBOX account
+    // also owns its visible test-rail supply and order history; anonymous and
+    // production public state remain owned by GET /api/genesis/state.
+    if (state.sourceEnvironment === "SANDBOX") {
+      totalSlots.value = state.series.totalSupply;
+      soldSlots.value = state.series.soldSupply;
+    }
     const holdingMap: Record<number, string> = {};
     const ids = state.holdings.map((holding) => {
       const tokenId = tokenIdFor(holding.holdingNo);
@@ -341,34 +316,39 @@ export const useGenesis = defineStore("genesis", () => {
     holdingNoByTokenId.value = holdingMap;
     remoteHoldings.value = [...state.holdings];
     remoteEmissions.value = [...state.emissions];
+    remoteOrders.value = [...state.orders];
     ownedTokenIds.value = ids;
     myOwned.value = ids.length;
-    hasGenesisInvite.value = state.eligibility.hasGenesisInvite;
     remoteEligibility.value = state.eligibility;
-    remoteHalted.value = state.marketEnabled !== true || state.eligibility.halted === true;
+    remoteEligibilityError.value = null;
     myListings.value = state.holdings
       .filter((holding) => holding.status === "LISTED" && holding.listingPriceUsdt !== null)
       .map((holding) => ({ tokenId: tokenIdFor(holding.holdingNo), askPriceUSDT: holding.listingPriceUsdt!, listedAt: holding.listedAt ?? Date.now() }));
   }
 
+  function clearRemoteAccountFacts(): void {
+    remoteHoldings.value = [];
+    remoteEmissions.value = [];
+    remoteOrders.value = [];
+    holdingNoByTokenId.value = {};
+    ownedTokenIds.value = [];
+    myListings.value = [];
+    myOwned.value = 0;
+    remoteEligibility.value = null;
+    remoteEligibilityError.value = null;
+  }
+
   function clearRemoteFacts(): void {
-    // Zero means the remote supply is unknown. Do not render the local 1,000-slot
-    // fallback as if it were a server fact after a failed hydrate.
+    // Zero means the public supply is unknown. Do not render the local 1,000-slot
+    // fallback as if it were a server fact after a failed public-state hydrate.
     totalSlots.value = 0;
     soldSlots.value = 0;
     nexListed.value = false;
     nexListedAt.value = null;
     remoteListings.value = [];
     remoteTransactions.value = [];
-    remoteHoldings.value = [];
-    remoteEmissions.value = [];
-    holdingNoByTokenId.value = {};
     listingNoByTokenId.value = {};
-    ownedTokenIds.value = [];
-    myListings.value = [];
-    myOwned.value = 0;
-    hasGenesisInvite.value = false;
-    remoteEligibility.value = null;
+    clearRemoteAccountFacts();
     remoteHalted.value = true;
     remoteMarketStats.value = { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null };
   }
@@ -382,31 +362,25 @@ export const useGenesis = defineStore("genesis", () => {
     runScope: CommerceSandboxRunScope = captureCommerceSandboxRun(),
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
-    // Login/rebind can race with stores that were bootstrapped for the
-    // anonymous/default account. Never let that stale wave reach protected
-    // Genesis endpoints; the API client must not be the first place that
-    // discovers the session is absent or belongs to another account.
-    if (!hasGenesisAuthorityForAccount(sessionVault.read(), boundKey)) {
-      if (remoteScopeCurrent(request, runScope)) clearRemoteFacts();
-      return false;
-    }
+    // Public supply/market facts are readable without a user session. The
+    // orchestrator independently fences protected account/eligibility reads
+    // by bearer authority and account/RunID epoch.
     return readGenesisRemoteFacts(genesisApi, {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
       isCurrent: () => remoteScopeCurrent(request, runScope),
       clear: clearRemoteFacts,
-      applyPublicState: (state) => {
-        applyPublicState(state);
-        remoteHalted.value = remoteHalted.value || remoteEligibility.value?.halted === true;
-      },
+      clearAccount: clearRemoteAccountFacts,
+      applyEligibilityError: (reason) => { remoteEligibilityError.value = reason; },
+      applyPublicState,
       applyAccount: applyAccountState,
       applyEligibility: (eligibility) => {
         remoteEligibility.value = eligibility;
-        remoteHalted.value = remoteHalted.value || eligibility.halted === true;
+        remoteEligibilityError.value = null;
       },
     });
   }
 
-  function persist() {
+  function persist(): boolean {
     try {
       uni.setStorageSync(STORAGE_KEY, {
         soldSlots: soldSlots.value,
@@ -416,7 +390,7 @@ export const useGenesis = defineStore("genesis", () => {
     } catch {
       // storage unavailable
     }
-    writeAccountRow<GenesisUserData>(ACCOUNTS_KEY, boundKey, {
+    return writeAccountRow<GenesisUserData>(ACCOUNTS_KEY, boundKey, {
       myOwned: myOwned.value,
       ownedTokenIds: ownedTokenIds.value,
       myListings: myListings.value,
@@ -430,7 +404,7 @@ export const useGenesis = defineStore("genesis", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(boundKey);
-      intentKeys.value = {};
+      intentKeys.value = hydrateUser(boundKey, 0).idempotencyKeys ?? {};
       clearRemoteFacts();
       void syncRemote(remoteAccountEpoch.snapshot());
       return;
@@ -500,10 +474,6 @@ export const useGenesis = defineStore("genesis", () => {
     return myOwned.value * GENESIS_EMISSION.nominalPerNodeNEX;
   }
 
-  // 邀请码核销为 per-user 凭证 → 落 app.setGenesisInviteCode(随 account-cloud
-  // 快照按账号走);genesis store 只保留全平台市场态(soldSlots/nexListed),
-  // 设备级存 per-user 凭证会跨账号继承 → 资格门旁路(审计 P1)。
-
   /**
    * 🔴🔴 同一笔创世购买意图的幂等键 —— **跨重试复用,不是每次现造**。
    *
@@ -523,25 +493,23 @@ export const useGenesis = defineStore("genesis", () => {
    * · 价格是**平台状态**不是「用户在要什么」—— 把它放进签名,行情一动键就换,
    *   正好在最不该换键的那一刻换掉(与提现那条 policyVersion 的教训同型)。
    */
-  // 🔴 键体只用**意图本身 + 一个单调序号**,不掺任何活值。
-  //   我第一版拿 myOwned / soldSlots 拼键 —— 那是**会变的市场态**,行情一动键就变,
-  //   等于没修(同一笔意图重试时又成了新键)。序号只在「换了一笔意图」时才 +1。
-  let purchaseIntentSig = "";
-  let purchaseIntentKey = "";
-  let purchaseIntentSeq = 0;
-  function purchaseIdempotencyKey(n: number, tokenIds?: number[]): string {
-    const sig = `${boundKey}|${n}|${(tokenIds ?? []).join(",")}`;
-    if (purchaseIntentSig !== sig || !purchaseIntentKey) {
-      purchaseIntentSig = sig;
-      purchaseIntentSeq += 1;
-      purchaseIntentKey = `genesis-purchase:${sig}:${purchaseIntentSeq}`;
-    }
-    return purchaseIntentKey;
+  // 键体只用账号、购买意图与持久化单调序号。pending 键先落账号行再发请求：
+  // 未知结果跨刷新复用；收到成功回执后只清 pending，保留序号，下一次同数量购买必然换键。
+  function purchaseIdempotencyKey(n: number, tokenIds?: number[]): string | null {
+    const previous = intentKeys.value;
+    const claimed = claimGenesisPurchaseIntent(previous, boundKey, n, tokenIds);
+    intentKeys.value = claimed.keys;
+    if (persist()) return claimed.key;
+    intentKeys.value = previous;
+    return null;
   }
-  /** 成交(或明确失败)后作废:下一次点购买是新的一笔意图。 */
-  function clearPurchaseIntent(): void {
-    purchaseIntentSig = "";
-    purchaseIntentKey = "";
+  /** 成交后作废 pending；序号继续持久化，避免重启后撞上已完成订单。 */
+  function clearPurchaseIntent(n: number, tokenIds?: number[]): boolean {
+    const previous = intentKeys.value;
+    intentKeys.value = retireGenesisPurchaseIntent(previous, boundKey, n, tokenIds);
+    if (persist()) return true;
+    intentKeys.value = previous;
+    return false;
   }
 
   /** Account-scoped stable command key. It survives reloads and is reused when
@@ -572,7 +540,7 @@ export const useGenesis = defineStore("genesis", () => {
   async function purchase(
     n: number,
     tokenIds?: number[],
-  ): Promise<{ ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" | "unavailable" }> {
+  ): Promise<{ ok: boolean; cost: number; walletBalanceUsdt?: number; walletReceiptScope?: RemoteAccountRequest; walletReceiptRunId?: string; reason?: "sold-out" | "cap" | "market-closed" | "unavailable" }> {
     // 🔴🔴 2026-08-13:这道 `if (remoteApiEnabled)` 曾经**漏写**,后果是下面整段本地实现
     //   (mock 的 server 同构面)成了死代码 —— TypeScript 开 allowUnreachableCode:false
     //   直接点名本文件 5 处不可达(purchase / listNode / cancelListing / acquireSecondary /
@@ -584,15 +552,29 @@ export const useGenesis = defineStore("genesis", () => {
       const runScope = captureCommerceSandboxRun();
       try {
       const beforePrice = unitPriceUSDT.value;
-      const state = await genesisApi.purchase(n, purchaseIdempotencyKey(n, tokenIds));
+      const idempotencyKey = purchaseIdempotencyKey(n, tokenIds);
+      if (!idempotencyKey) return { ok: false, cost: 0, reason: "unavailable" };
+      const state = await genesisApi.purchase(n, idempotencyKey);
       if (!remoteScopeCurrent(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
       applyAccountState(state);
-      if (!await syncRemote(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
+      // The mutation receipt is already the authoritative proof that the order
+      // committed. A failed follow-up readback may leave public supply stale,
+      // but must not turn the committed purchase into a visible failure or
+      // suppress the receipt balance/ledger projection. Account/Run scope is
+      // checked again because syncRemote can outlive a session or Run switch.
+      await syncRemote(request, runScope);
+      if (!remoteScopeCurrent(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
       // 成交 = 定局 → 键作废,下一次点购买是新的一笔意图。
       // 🔴 失败路径**不作废**:失败可能是「服务端已成交但回执丢了」,此时保留键,
       //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
-      clearPurchaseIntent();
-      return { ok: true, cost: n * beforePrice };
+      if (!clearPurchaseIntent(n, tokenIds)) return { ok: false, cost: 0, reason: "unavailable" };
+      return {
+        ok: true,
+        cost: n * beforePrice,
+        walletBalanceUsdt: state.walletBalanceUsdt,
+        walletReceiptScope: request,
+        walletReceiptRunId: state.runId,
+      };
       } catch (err) {
         await syncRemote(request, runScope); // 自吞不 reject(resilience 门;z6 审计清死 catch)
       // Only explicit server domain codes may become business copy; unknown
@@ -628,8 +610,8 @@ export const useGenesis = defineStore("genesis", () => {
     }
     const rem = remaining();
     if (n > rem) return { ok: false, cost: 0, reason: "sold-out" };
-    // 单人限购守卫（单源 L4：任何调用方自动继承；运营可配 G4 perUserCap）。
-    if (myOwned.value + n > GENESIS_ELIGIBILITY.perUserCap) return { ok: false, cost: 0, reason: "cap" };
+    // 5174 离线镜像上限；生产认购由服务端配置再次原子校验。
+    if (myOwned.value + n > GENESIS_ELIGIBILITY_POLICY.maxPerUser) return { ok: false, cost: 0, reason: "cap" };
     // 按下单时当前档价结算（跨档时以起始档价，简化：整单同价）。
     const cost = n * unitPriceUSDT.value;
     const requestedIds = tokenIds ?? [];
@@ -721,9 +703,7 @@ export const useGenesis = defineStore("genesis", () => {
    * 二级市场承接:买入一个**已存在**的 token（转让,非铸造）。
    * 🔴 不动 soldSlots（该 token 早已计入一级「已铸」+ 派生档价）、不走售罄门 —— 二级承接
    * 与一级供应无关。已持有该 token 则 no-op 返 false（调用方须退款）。
-   * 🔴 资格门契约（FEAT-GEN08 appliesTo=both）:资格判定需跨 store ctx,由**调用组合层**
-   * 过 useGenesisEligibility 后才可调本 action（现唯一调用方 marketplace.handleBuy 已拦,
-   * verify gen_gate 哨兵护）;新增调用方必须复刻该门。本层只守 perUserCap。
+   * 新资格策略固定覆盖一级与二级交易；生产端在原子成交事务内再次校验。
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   async function acquireSecondary(tokenId: number): Promise<boolean> {
@@ -770,7 +750,7 @@ export const useGenesis = defineStore("genesis", () => {
     if (blocked !== null) return false;
     if (ownedTokenIds.value.includes(tokenId)) return false;
     // 单人限购同样约束二级承接（持有增长的另一唯一入口）。
-    if (myOwned.value + 1 > GENESIS_ELIGIBILITY.perUserCap) return false;
+    if (myOwned.value + 1 > GENESIS_ELIGIBILITY_POLICY.maxPerUser) return false;
     ownedTokenIds.value = [...ownedTokenIds.value, tokenId];
     myOwned.value = myOwned.value + 1;
     persist();
@@ -792,8 +772,8 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, remoteTransactions, remoteMarketStats, remoteEligibility, remoteHalted,
-    remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
+    remoteListings, remoteTransactions, remoteMarketStats, remoteEligibility, remoteEligibilityError, remoteHalted,
+    remoteHoldings, remoteEmissions, remoteOrders, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

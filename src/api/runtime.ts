@@ -68,6 +68,9 @@ import type { RefreshCredentialMode } from "./session-vault";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
+export const expectedGenesisSandboxRunId = import.meta.env.DEV
+  ? String(import.meta.env.VITE_NEXGRID_ACCEPTANCE_RUN_ID ?? "").trim()
+  : "";
 export const remoteApiEnabled = true;
 export const developmentFundsEnabled = apiRuntimeConfig.environment === "dev";
 // Card tokenization/binding is development-only UI until a real PSP is configured.
@@ -119,7 +122,7 @@ export const commissionConfigApi = createCommissionConfigApi(apiClient, expected
 export const stakingApi = createStakingApi(apiClient, expectedApiEnvironment);
 export const exchangeApi = createExchangeApi(apiClient, expectedApiEnvironment);
 export const marketApi = createMarketApi(apiClient, expectedApiEnvironment);
-export const genesisApi = createGenesisApi(apiClient, expectedApiEnvironment);
+export const genesisApi = createGenesisApi(apiClient, expectedApiEnvironment, expectedGenesisSandboxRunId);
 export const repurchaseApi = createRepurchaseApi(apiClient, expectedApiEnvironment);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
 export const legalTermsApi = createLegalTermsApi(apiClient);
