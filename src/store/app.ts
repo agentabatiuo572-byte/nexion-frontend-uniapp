@@ -10,7 +10,6 @@ import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
 import { getCarrier, type Carrier } from "@/lib/carrier";
-import { redeemGenesisInviteCode, type GenesisInviteRedeemResult } from "./genesis-invite";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { publicStatsHealth } from "@/lib/platform-stats";
@@ -48,6 +47,8 @@ import {
   fundsSandboxApi,
   developmentFundsEnabled,
   fundsServerEnabled,
+  expectedApiEnvironment,
+  expectedGenesisSandboxRunId,
   remoteApiEnabled,
   sessionVault,
   taskAssignmentApi,
@@ -189,7 +190,6 @@ function createInitialUser(email = "alex@nexgrid.ai"): UserState {
     tier: "L2",
     joinedAt: Date.now() - 30 * ONE_DAY,
     cumulativeDepositUsdt: 0,
-    genesisInviteCode: null,
     referralCode: "NEXGRID-8K9X",
     usdtBalance,
     nexBalance: 1240,
@@ -275,7 +275,6 @@ function createServerEmptySnapshot(accountKey: string, email: string, entrySurfa
       tier: "L0",
       joinedAt: 0,
       cumulativeDepositUsdt: 0,
-      genesisInviteCode: null,
       referralCode: "",
       usdtBalance: 0,
       nexBalance: 0,
@@ -1867,24 +1866,6 @@ export const useApp = defineStore("app", () => {
     addMoneyApplied(applied);
     return true;
   }
-  /**
-   * 核销创世邀请码(规格 FEAT-GEN11)。per-account:随 account-cloud 快照走,
-   * 切号/新注册不继承(设备级存储会造成资格门跨账号旁路,审计 P1)。
-   *
-   * 由「只跑格式正则」改为查码表 + 三态校验:格式对但从未发放的串一律拒(旧缺陷本体 ——
-   * 任何 NEXGRID-OG-XXXX 都通过、同一码可被无限账号使用)。
-   * 真后台 = POST /api/genesis/invite/redeem(server 事务核销,一码一用由事务保证)。
-   */
-  async function setGenesisInviteCode(raw: string): Promise<GenesisInviteRedeemResult> {
-    const result = await redeemGenesisInviteCode(raw);
-    if (result.ok) {
-      // Display cache only. Eligibility and one-time redemption are enforced by
-      // the server transaction and are rechecked by every Genesis mutation.
-      user.value = { ...user.value, genesisInviteCode: result.code };
-    }
-    return result;
-  }
-
   function recordDeposit(amount: number): boolean {
     if (fundsServerEnabled) return false;
     // Input validation mirrors source: reject NaN/±Infinity/≤0/absurd (>1e9).
@@ -2083,6 +2064,34 @@ export const useApp = defineStore("app", () => {
       }
       throw current ? cause : fundsSandboxStaleRequestError();
     }
+  }
+
+  /** Apply only the authenticated Java payment receipt when fleet readback is temporarily unavailable. */
+  function adoptDevelopmentCommerceWallet(
+    balanceAfterUsdt: number,
+    receiptScope: RemoteAccountRequest,
+  ): boolean {
+    if (!remoteApiEnabled || expectedApiEnvironment !== "dev"
+        || !remoteAccountEpoch.isCurrent(receiptScope)
+        || !Number.isFinite(balanceAfterUsdt) || balanceAfterUsdt < 0) return false;
+    const nextBalance = +balanceAfterUsdt.toFixed(6);
+    const current = withDefaultEarningBuckets(user.value);
+    user.value = {
+      ...current,
+      usdtBalance: nextBalance,
+      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: nextBalance },
+    };
+    return true;
+  }
+
+  /** Genesis receipts additionally require the exact boot-fenced Sandbox RunID. */
+  function adoptDevelopmentGenesisWallet(
+    balanceAfterUsdt: number,
+    receiptScope: RemoteAccountRequest,
+    receiptSandboxRunId: string,
+  ): boolean {
+    if (receiptSandboxRunId !== expectedGenesisSandboxRunId) return false;
+    return adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope);
   }
 
   /**
@@ -2506,11 +2515,11 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
     fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
-    recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
+    recordDeposit, creditRewardBucket, creditRewardBucketOnce,
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,

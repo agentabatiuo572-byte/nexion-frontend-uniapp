@@ -95,7 +95,7 @@
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY_POLICY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
@@ -184,7 +184,7 @@ async function handlePurchase() {
   if (qty.value > gate.value.capRemaining) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY_POLICY.maxPerUser }),
     );
     return;
   }
@@ -235,7 +235,7 @@ async function handlePurchase() {
         if (r.reason === "market-closed") toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
         else if (r.reason === "cap") {
           toast.error(t.value.genesisEligibility.toastCapReached,
-            fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }));
+            fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY_POLICY.maxPerUser }));
         } else toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
         return;
       }
@@ -259,6 +259,16 @@ async function handlePurchase() {
           : [t.value.genesis.purchaseError, t.value.genesis.reduceQty];
       toast.error(copy[0], copy[1]);
       return;
+    }
+    // The Java receipt and App wallet page now share nx_user_wallet as their
+    // authority. Project the confirmed balance immediately; wallet bills will
+    // read the matching nx_wallet_ledger OUT row on entry.
+    if (result.walletBalanceUsdt !== undefined && result.walletReceiptScope && result.walletReceiptRunId) {
+      app.adoptDevelopmentGenesisWallet(
+        result.walletBalanceUsdt,
+        result.walletReceiptScope,
+        result.walletReceiptRunId,
+      );
     }
     toast.success(
       fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),

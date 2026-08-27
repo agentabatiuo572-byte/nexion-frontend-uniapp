@@ -144,7 +144,7 @@
     </view>
 
     <OpenSeaModal v-model:open="openSeaOpen" />
-    <!-- 资格门 sheet(二级同门,FEAT-GEN08;达标 CTA → 预售页)-->
+    <!-- 当前服务端资格 sheet；一级与二级使用同一策略。 -->
     <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
 </template>
@@ -162,7 +162,7 @@ import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue"
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY_POLICY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -269,7 +269,7 @@ async function handleBuy(listing: Listing) {
   if (gate.value.capRemaining < 1) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY_POLICY.maxPerUser }),
     );
     return;
   }
