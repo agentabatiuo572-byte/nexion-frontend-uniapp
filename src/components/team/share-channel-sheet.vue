@@ -3,7 +3,7 @@
   规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE3]。
   渠道表来自 platform config(share.channels,顺序即展示序);intent 分派走
   lib/share.activateChannel(web 直开 / scheme 复制降级 / copy / system),poster
-  项切到海报面板(emit)。配置为空时兜底「复制+海报」两项,面板永不空(异常1)。
+  项切到海报面板(emit)。配置为空时兜底 5174 推荐渠道矩阵,面板永不空(异常1)。
   cancel 为 ghost 弱权重(转化场景 cancel 必弱于渠道,nexgrid-design)。
 -->
 <template>
@@ -56,8 +56,8 @@ const rewardLineText = computed(() => {
   if (remoteApiEnabled) {
     const nex = rewards.snapshot?.inviterRewardNex;
     return nex === undefined
-      ? "Server invitation reward unavailable"
-      : `Server-set reward: ${nex.toLocaleString()} NEX per settled invitation`;
+      ? t.value.team.settlementUnavailable
+      : `${nex.toLocaleString()} NEX · ${t.value.team.serverRewardPerSettlement}`;
   }
   const base = fmt(t.value.share.rewardLine, { usd: dollarReward.value });
   const m = phase.value.inviteBonusMultiplier;
@@ -66,14 +66,35 @@ const rewardLineText = computed(() => {
   return `${base} · ${promo}`;
 });
 
-// 渠道配置空 → 兜底两项,面板永不空(异常1)。
+// 渠道配置空 → 兜底 5174 推荐矩阵,避免真实 App 只剩空壳。金额仍由服务端返回,
+// 这里只补不涉及资金口径的分享 transport；A3 一旦下发配置即完全覆盖该兜底。
+const FALLBACK_TEXT = "Join NexGrid with my invitation: {link}";
 const FALLBACK: ShareChannelDef[] = [
+  { key: "zalo", intentType: "scheme", textTemplate: FALLBACK_TEXT, androidPackage: "com.zing.zalo", iosScheme: "zalo://", enabled: true },
+  { key: "telegram", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://t.me/share/url?url={link}&text={text}", enabled: true },
+  { key: "whatsapp", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://wa.me/?text={text}", enabled: true },
+  { key: "messenger", intentType: "scheme", textTemplate: FALLBACK_TEXT, androidPackage: "com.facebook.orca", iosScheme: "fb-messenger://", enabled: true },
+  { key: "sms", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "sms:?body={text}", enabled: true },
+  { key: "x", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://twitter.com/intent/tweet?text={text}", enabled: true },
   { key: "copy", intentType: "copy", enabled: true },
   { key: "poster", intentType: "poster", enabled: true },
+  { key: "system", intentType: "system", enabled: true },
 ];
+function fallbackVisibleChannels(): ShareChannelDef[] {
+  let list = FALLBACK;
+  // #ifdef H5
+  list = list.filter(
+    (channel) => channel.intentType !== "system" || (typeof navigator !== "undefined" && typeof navigator.share === "function"),
+  );
+  // #endif
+  // #ifndef H5
+  list = list.filter((channel) => channel.intentType !== "system");
+  // #endif
+  return list;
+}
 const channels = computed<ShareChannelDef[]>(() => {
   const list = visibleChannels();
-  return list.length || remoteApiEnabled ? list : FALLBACK;
+  return list.length ? list : fallbackVisibleChannels();
 });
 
 interface ChannelMeta {
@@ -132,7 +153,7 @@ async function onChannel(c: ShareChannelDef) {
 .ss-head__t { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); }
 /* 44×44 点按区(移动端最小触控标准,对齐 tradein-ladder-sheet 既有修法)。 */
 .ss-head__x { width: 44px; height: 44px; border-radius: 9999px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; }
-.ss-reward { margin: 10px 16px 0; border-radius: 12px; background: color-mix(in srgb, var(--v5-brand) 8%, transparent); padding: 10px 12px; }
+.ss-reward { margin: 10px 16px 0; min-height: 65px; box-sizing: border-box; border-radius: 12px; background: color-mix(in srgb, var(--v5-brand) 8%, transparent); padding: 10px 12px; display: flex; align-items: center; }
 .ss-reward__t { font-size: 12px; color: var(--v5-ink-2); line-height: 1.55; text-wrap: pretty; }
 .ss-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 6px; padding: 14px 16px 4px; }
 .ss-ch { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 44px; }
