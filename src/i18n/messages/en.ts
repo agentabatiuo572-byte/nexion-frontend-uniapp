@@ -574,6 +574,8 @@ export const en = {
     gpuPower: "Power",
     vram: "VRAM",
     currentTask: "Current Task",
+    todayCompleted: "Completed today",
+    todayRecentCompleted: "Recent completions today",
     taskCenter: "Task Center",
     earningsOverview: "Earnings Overview",
     todayTab: "Today",

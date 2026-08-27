@@ -223,6 +223,39 @@
       </view>
     </view>
 
+    <!-- Every device has its own canonical task stream. Keep the active task above;
+         this list only mirrors settled task previews returned for this device. -->
+    <view class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
+      <view class="flex items-center justify-between" style="margin-bottom: 8px">
+        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}（{{ deviceTodayCompleted.length }}）</text>
+        <view
+          class="active:opacity-60"
+          style="min-height: 44px; padding-left: 16px; display: flex; align-items: center"
+          role="button"
+          tabindex="0"
+          @click.stop="goTaskHistory"
+          @keydown.enter.stop.prevent="goTaskHistory"
+          @keydown.space.stop.prevent="goTaskHistory"
+        >
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAll }}</text>
+        </view>
+      </view>
+      <view v-if="deviceTodayCompleted.length" class="space-y-1.5">
+        <view
+          v-for="task in deviceTodayCompleted"
+          :key="task.receiptNo ?? task.id"
+          class="flex items-center justify-between gap-2"
+          data-phone-today-task="true"
+          style="min-height: 28px; font-size: 12px"
+        >
+          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
+          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">+${{ task.reward.toFixed(3) }}</text>
+          <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ shanghaiClockTime(task.completedAt) }}</text>
+        </view>
+      </view>
+      <text v-else class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
+    </view>
+
     <!-- Phone: background mode toggles -->
     <view v-if="device.kind === 'phone'" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
@@ -342,6 +375,7 @@ import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
+import { shanghaiClockTime, todayCompletedTasks } from "@/lib/today-completed-tasks";
 
 const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
@@ -390,15 +424,27 @@ const KIND_ICON_PATHS: Record<DeviceKind, string> = {
 const kindIconPath = computed(() => KIND_ICON_PATHS[props.device.kind] ?? KIND_ICON_PATHS.phone);
 
 const task = computed(() => props.device.currentTask);
+// Task progress advances from the server snapshot plus a monotonic receive clock.
+// Browser wall-clock changes therefore cannot fast-forward or rewind task earnings.
+const liveTaskNow = computed(() => {
+  const serverNow = props.device.taskServerNow;
+  const receivedAt = props.device.taskServerNowReceivedAt;
+  if (serverNow == null || receivedAt == null) return now.value;
+  return projectServerNow(serverNow, receivedAt, monotonicNow.value);
+});
+const deviceTodayCompleted = computed(() => todayCompletedTasks(
+  props.device.recentTasks,
+  liveTaskNow.value,
+));
 const taskLockRemainingMinutes = computed(() => {
   const lockUntil = props.device.taskLockUntil ?? 0;
-  return lockUntil > now.value ? Math.max(1, Math.ceil((lockUntil - now.value) / 60000)) : 0;
+  return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
 });
 const reconnecting = computed(() => props.device.kind === "phone" && props.device.interruptedAt != null);
 const elapsedRatio = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return Math.min(1, (now.value - tk.startedAt) / 1000 / tk.totalSec);
+  return Math.min(1, Math.max(0, (liveTaskNow.value - tk.startedAt) / 1000 / tk.totalSec));
 });
 const progressPct = computed(() => Math.round(elapsedRatio.value * 100));
 
@@ -424,7 +470,7 @@ const statusGlow = computed(() => !reconnecting.value && !idleGated.value && dev
 const elapsedRemaining = computed(() => {
   const tk = task.value;
   if (!tk) return "0m 00s";
-  const elapsed = Math.floor((now.value - tk.startedAt) / 1000);
+  const elapsed = Math.floor((liveTaskNow.value - tk.startedAt) / 1000);
   const remaining = Math.max(0, tk.totalSec - elapsed);
   const min = Math.floor(remaining / 60);
   const sec = remaining % 60;
@@ -461,6 +507,9 @@ function toggleCharger() {
 }
 function toggleNetwork() {
   app.setPhoneRuntime(props.device.id, { isWifiConnected: !isOnline.value });
+}
+function goTaskHistory() {
+  uni.navigateTo({ url: "/pages/me/receipts", fail: () => {} });
 }
 
 // ── Phone live hashpower (effective = calibrated capability × condition factors) ──

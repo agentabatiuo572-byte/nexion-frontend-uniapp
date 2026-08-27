@@ -22,6 +22,7 @@ describe("task assignment server receipt projection", () => {
 
     await expect(createTaskAssignmentApi({ request } as unknown as ApiClient, "dev").state())
       .resolves.toMatchObject({
+        serverNow: Date.parse("2026-08-21T08:50:36Z"),
         devices: [{ deviceId: 811, recentTasks: [] }],
         sourceEnvironment: "PRODUCTION",
         runId: "",
@@ -158,56 +159,13 @@ describe("task assignment server receipt projection", () => {
     });
   });
 
-  it("requires claim command responses to carry the same canonical provenance", async () => {
-    const request = vi.fn().mockResolvedValue({
-      taskNo: "CTA-1", deviceId: 7, taskId: "ig-1", taskName: "Image Gen",
-      taskClass: "IG", model: "Flux", client: "Mosaic", status: "RUNNING",
-      rewardUsdt: 0.25, requiredSeconds: 60,
-      startedAt: "2026-08-14T23:58:00Z", completableAt: "2026-08-14T23:59:00Z",
-      completedAt: null, receiptNo: null, proofNonce: "a".repeat(64),
-      proofExpiresAt: "2026-08-15T23:59:00Z",
-      source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
-    });
-    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
-
-    await expect(api.claim(7, "claim-1")).resolves.toMatchObject({
-      source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
-    });
-  });
-
-  it("does not allow development to submit a production proof", async () => {
+  it("exposes only read projections in every client environment", () => {
     const request = vi.fn();
-    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
+    const devApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
+    const prodApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
 
-    await expect(api.complete("CTA-1", {
-      resultHash: "a".repeat(64), proofMode: "PRODUCTION", executorId: "exec-1",
-      proofNonce: "b".repeat(64), proofTimestamp: 1786363200000, proofSignature: "c".repeat(64),
-    }, "complete-1")).rejects.toMatchObject({
-      kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_PROOF_DISABLED",
-    });
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("does not send a claim mutation from the read-only development projection", async () => {
-    const request = vi.fn();
-    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
-
-    await expect(api.claim(7, "claim-1")).rejects.toMatchObject({
-      kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_CLAIM_DISABLED",
-    });
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("requires the complete production proof shape on the production rail", async () => {
-    const request = vi.fn();
-    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
-
-    await expect(api.complete("CTA-1", {
-      resultHash: "a".repeat(64), proofMode: "SANDBOX", executorId: "exec-1",
-      proofNonce: "b".repeat(64), proofTimestamp: 1786363200000, proofSignature: "c".repeat(64),
-    }, "complete-1")).rejects.toMatchObject({
-      kind: "configuration", message: "TASK_ASSIGNMENT_PRODUCTION_PROOF_REQUIRED",
-    });
+    expect(Object.keys(devApi).sort()).toEqual(["receipt", "receipts", "state"]);
+    expect(Object.keys(prodApi).sort()).toEqual(["receipt", "receipts", "state"]);
     expect(request).not.toHaveBeenCalled();
   });
 });

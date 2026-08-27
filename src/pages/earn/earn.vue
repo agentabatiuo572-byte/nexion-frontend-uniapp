@@ -144,7 +144,11 @@ const freeTrial = useFreeTrial();
 // The banner is the first discoverable H2 entry. Do not make a new user wait
 // for the global poll before we know whether the server has made it eligible.
 onShow(() => {
-  if (remoteApiEnabled) void freeTrial.refreshRemote(true);
+  if (remoteApiEnabled) {
+    void freeTrial.refreshRemote(true);
+    void app.refreshRemoteFleet().catch(() => undefined);
+    void app.refreshHomeTruth().catch(() => undefined);
+  }
 });
 
 function retryFleet() { void app.refreshRemoteFleet().catch(() => undefined); }

@@ -26,15 +26,6 @@ export interface CanonicalTaskAssignment {
   serverCanonical: true;
 }
 
-export interface TrustedTaskCompletionProof {
-  resultHash: string;
-  proofMode: "PRODUCTION" | "SANDBOX";
-  executorId: string;
-  proofNonce: string;
-  proofTimestamp: number;
-  proofSignature: string;
-}
-
 export interface CanonicalTaskDeviceState {
   deviceId: number;
   instanceNo: string;
@@ -106,8 +97,6 @@ export interface TaskAssignmentApi {
   state(): Promise<CanonicalTaskAssignments>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
   receipts(offset?: number, limit?: number): Promise<CanonicalComputeReceiptPage>;
-  claim(deviceId: number, idempotencyKey: string): Promise<CanonicalTaskAssignment>;
-  complete(taskNo: string, proof: TrustedTaskCompletionProof, idempotencyKey: string): Promise<CanonicalTaskAssignment>;
 }
 
 function invalid(message = "TASK_ASSIGNMENT_RESPONSE_INVALID"): never {
@@ -142,7 +131,15 @@ function timestamp(value: unknown, optional = false): number | null {
   if (optional && (value === null || value === undefined || value === "")) return null;
   if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
   if (typeof value === "string") {
-    const parsed = Date.parse(value);
+    const normalized = value.trim();
+    // Java serializes the task-assignment boundary as LocalDateTime. Those
+    // values are business-clock facts in Asia/Shanghai, not browser-local
+    // timestamps; parsing them with Date.parse alone shifts the business day
+    // whenever the viewer is outside UTC+08 (for example Japan at UTC+09).
+    const shanghaiLocal = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(normalized);
+    const parsed = Date.parse(shanghaiLocal
+      ? `${normalized.replace(" ", "T")}+08:00`
+      : normalized);
     if (Number.isFinite(parsed)) return parsed;
   }
   return invalid();
@@ -293,12 +290,6 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
   return { items, nextOffset, ...proof };
 }
 
-function key(value: string): string {
-  const normalized = value.trim();
-  if (!normalized) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
-  return normalized;
-}
-
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
     async state() {
@@ -322,46 +313,6 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
       }
       return receiptPage(await client.request<unknown>({
         path: `/api/tasks/receipts?offset=${normalizedOffset}&limit=${normalizedLimit}`,
-      }), mode);
-    },
-    async claim(deviceId, idempotencyKey) {
-      if (mode === "dev") {
-        throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_CLAIM_DISABLED" });
-      }
-      return task(await client.request<unknown>({
-        method: "POST",
-        path: "/api/tasks/assignments/claim",
-        body: { deviceId: integer(deviceId, 1) },
-        idempotencyKey: key(idempotencyKey),
-      }), mode);
-    },
-    async complete(taskNo, proof, idempotencyKey) {
-      const normalizedTaskNo = text(taskNo);
-      if (mode === "dev") {
-        throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_SANDBOX_PROOF_DISABLED" });
-      }
-      const proofMode = proof && text(proof.proofMode).toUpperCase();
-      if (!proof || proofMode !== "PRODUCTION" || !/^[a-f0-9]{64}$/i.test(text(proof.resultHash))
-          || !/^[a-f0-9]{64}$/i.test(text(proof.proofNonce))
-          || !Number.isSafeInteger(proof.proofTimestamp) || proof.proofTimestamp <= 0
-          || !text(proof.executorId) || !text(proof.proofSignature)) {
-        if (proof && proofMode === "SANDBOX") {
-          throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_PRODUCTION_PROOF_REQUIRED" });
-        }
-        throw new ApiError({ kind: "configuration", message: "TASK_ASSIGNMENT_PROOF_INVALID" });
-      }
-      return task(await client.request<unknown>({
-        method: "POST",
-        path: `/api/tasks/assignments/${encodeURIComponent(normalizedTaskNo)}/complete`,
-        body: {
-          resultHash: proof.resultHash.toLowerCase(),
-          proofMode: "PRODUCTION",
-          executorId: text(proof.executorId),
-          proofNonce: proof.proofNonce.toLowerCase(),
-          proofTimestamp: proof.proofTimestamp,
-          proofSignature: text(proof.proofSignature),
-        },
-        idempotencyKey: key(idempotencyKey),
       }), mode);
     },
   };
