@@ -195,6 +195,9 @@ function timestamp(value: unknown, nullable = false): number | null {
   if (value == null && nullable) return null;
   const raw = text(value);
   if (!raw) return nullable ? null : invalid();
+  // API timestamps must identify an instant. A timezone-less LocalDateTime is
+  // ambiguous and made Shanghai rows render one hour early on Tokyo devices.
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)) return invalid();
   const parsed = Date.parse(raw);
   return Number.isFinite(parsed) ? parsed : invalid();
 }

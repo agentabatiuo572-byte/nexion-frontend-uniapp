@@ -201,6 +201,12 @@ describe("genesis remote truth contract", () => {
     await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", runId).account())
       .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId, eligibility: { eligible: true },
         orders: [{ orderNo: "GEN-SBX-1", orderType: "PRIMARY", quantity: 1 }] });
+    const timezoneLessAccount = {
+      ...account,
+      orders: [{ ...account.orders[0], completedAt: "2026-08-26 08:01:00" }],
+    };
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(timezoneLessAccount) } as never, "dev", runId).account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
     const { orders: _orders, ...withoutOrders } = account;
     await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(withoutOrders) } as never, "dev", runId).account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
