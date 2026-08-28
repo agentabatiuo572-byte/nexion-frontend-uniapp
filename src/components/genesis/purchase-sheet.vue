@@ -247,26 +247,41 @@ async function handlePurchase() {
       emitClose();
       return;
     }
+    // The Genesis store and App wallet store have independent epoch counters.
+    // Capture the wallet store's fence before the mutation so its own receipt
+    // validator can project the canonical balance immediately.
+    const walletReceiptScope = app.captureRemoteAccountRequest();
     const result = await genesis.purchase(qty.value);
     if (!result.ok) {
       // 🔴 「够不着服务端」必须和「服务端说不卖」分开讲:混在一起的话,一次网络抖动
       //   会被讲成「活动已关闭」,用户以为错过了活动就走了,而不是重试一下。
       //   store 侧用全仓统一的 isSettledRejection 判这件事,页面只负责选文案。
-      const copy = result.reason === "unavailable"
-        ? [t.value.genesis.purchaseUnavailable, t.value.genesis.purchaseUnavailableSub]
-        : result.reason === "market-closed"
-          ? [sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe]
-          : [t.value.genesis.purchaseError, t.value.genesis.reduceQty];
+      const copy = result.reason === "insufficient-funds"
+        ? [t.value.genesis.purchaseInsufficient, fmt(t.value.genesis.purchaseInsufficientSub, {
+          cost: (qty.value * price.value).toLocaleString(), balance: app.user.usdtBalance.toFixed(2),
+        })]
+        : result.reason === "run-conflict"
+          ? [t.value.genesis.purchaseRunConflict, t.value.genesis.purchaseRunConflictSub]
+          : result.reason === "unavailable"
+            ? [t.value.genesis.purchaseUnavailable, t.value.genesis.purchaseUnavailableSub]
+            : result.reason === "not-eligible"
+              ? [t.value.genesisEligibility.toastIneligible, t.value.genesisEligibility.toastIneligibleSub]
+              : result.reason === "market-closed"
+                ? [sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe]
+                : result.reason === "cap"
+                  ? [t.value.genesisEligibility.toastCapReached,
+                    fmt(t.value.genesisEligibility.toastCapReachedSub, { n: genesis.remoteEligibility?.maxPerUser ?? 0 })]
+                  : [t.value.genesis.tier.soldOut, t.value.genesis.reduceQty];
       toast.error(copy[0], copy[1]);
       return;
     }
     // The Java receipt and App wallet page now share nx_user_wallet as their
     // authority. Project the confirmed balance immediately; wallet bills will
     // read the matching nx_wallet_ledger OUT row on entry.
-    if (result.walletBalanceUsdt !== undefined && result.walletReceiptScope && result.walletReceiptRunId) {
+    if (result.walletBalanceUsdt !== undefined && result.walletReceiptRunId !== undefined) {
       app.adoptDevelopmentGenesisWallet(
         result.walletBalanceUsdt,
-        result.walletReceiptScope,
+        walletReceiptScope,
         result.walletReceiptRunId,
       );
     }

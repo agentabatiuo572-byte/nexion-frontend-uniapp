@@ -16,14 +16,15 @@ describe("Genesis purchase visible wallet projection", () => {
     const purchaseStart = storeSource.indexOf("async function purchase(");
     const localFallback = storeSource.indexOf("// ↓↓ mock 模式", purchaseStart);
     const remotePurchase = storeSource.slice(purchaseStart, localFallback);
-    expect(remotePurchase).toContain("await syncRemote(request, runScope)");
-    expect(remotePurchase).not.toContain(
-      'if (!await syncRemote(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" }',
-    );
+    const receipt = remotePurchase.indexOf("resolveRemoteGenesisPurchase({");
+    expect(receipt).toBeGreaterThan(-1);
+    expect(remotePurchase).toContain("applyReceipt: applyCommittedPurchaseReceipt");
+    expect(remotePurchase).toContain("recoverUnknown: () => syncRemote(request, runScope)");
+    expect(remotePurchase).not.toContain('if (!clearPurchaseIntent(n, tokenIds)) return { ok: false');
   });
 
   it("projects a confirmed dev purchase into the wallet UI immediately", () => {
-    expect(sheetSource).toContain("result.walletReceiptScope");
+    expect(sheetSource).toContain("const walletReceiptScope = app.captureRemoteAccountRequest()");
     expect(sheetSource).toContain("result.walletReceiptRunId");
     expect(sheetSource).toContain("app.adoptDevelopmentGenesisWallet(");
     const purchaseStart = sheetSource.indexOf("const result = await genesis.purchase(qty.value)");
@@ -39,6 +40,11 @@ describe("Genesis purchase visible wallet projection", () => {
     const projectionBody = appStoreSource.slice(projectionStart, projectionEnd);
     expect(projectionBody).toContain("receiptSandboxRunId !== expectedGenesisSandboxRunId");
     expect(projectionBody).toContain("adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope)");
+  });
+
+  it("describes a committed purchase as synchronized money and order facts, not a provisional seat lock", () => {
+    expect(sheetSource).toContain("genesis.purchaseSubtitle");
+    expect(storeSource).toContain("remoteOrders.value = [...state.orders]");
   });
 
   it("fails closed before direct wallet fixtures unless the local database target is explicitly allowed", () => {

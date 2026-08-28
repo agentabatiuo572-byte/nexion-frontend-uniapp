@@ -14,7 +14,7 @@ import { genesisApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { hasGenesisAuthorityForAccount } from "@/lib/genesis-auth-scope";
 import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
-import { classifyRemoteGenesisPurchaseError } from "@/lib/genesis-remote-purchase";
+import { resolveRemoteGenesisPurchase } from "@/lib/genesis-remote-purchase";
 import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
 import type {
   GenesisAccountState,
@@ -326,6 +326,14 @@ export const useGenesis = defineStore("genesis", () => {
       .map((holding) => ({ tokenId: tokenIdFor(holding.holdingNo), askPriceUSDT: holding.listingPriceUsdt!, listedAt: holding.listedAt ?? Date.now() }));
   }
 
+  /** A successful mutation response is the canonical committed receipt. Apply
+   * both its account facts and supply before any later readback can fail. */
+  function applyCommittedPurchaseReceipt(state: GenesisAccountState): void {
+    totalSlots.value = state.series.totalSupply;
+    soldSlots.value = state.series.soldSupply;
+    applyAccountState(state);
+  }
+
   function clearRemoteAccountFacts(): void {
     remoteHoldings.value = [];
     remoteEmissions.value = [];
@@ -540,7 +548,7 @@ export const useGenesis = defineStore("genesis", () => {
   async function purchase(
     n: number,
     tokenIds?: number[],
-  ): Promise<{ ok: boolean; cost: number; walletBalanceUsdt?: number; walletReceiptScope?: RemoteAccountRequest; walletReceiptRunId?: string; reason?: "sold-out" | "cap" | "market-closed" | "unavailable" }> {
+  ): Promise<{ ok: boolean; cost: number; walletBalanceUsdt?: number; walletReceiptRunId?: string; reason?: "sold-out" | "cap" | "not-eligible" | "market-closed" | "insufficient-funds" | "run-conflict" | "unavailable" }> {
     // 🔴🔴 2026-08-13:这道 `if (remoteApiEnabled)` 曾经**漏写**,后果是下面整段本地实现
     //   (mock 的 server 同构面)成了死代码 —— TypeScript 开 allowUnreachableCode:false
     //   直接点名本文件 5 处不可达(purchase / listNode / cancelListing / acquireSecondary /
@@ -550,38 +558,24 @@ export const useGenesis = defineStore("genesis", () => {
     if (remoteApiEnabled) {
       const request = remoteAccountEpoch.snapshot();
       const runScope = captureCommerceSandboxRun();
-      try {
       const beforePrice = unitPriceUSDT.value;
       const idempotencyKey = purchaseIdempotencyKey(n, tokenIds);
       if (!idempotencyKey) return { ok: false, cost: 0, reason: "unavailable" };
-      const state = await genesisApi.purchase(n, idempotencyKey);
-      if (!remoteScopeCurrent(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
-      applyAccountState(state);
-      // The mutation receipt is already the authoritative proof that the order
-      // committed. A failed follow-up readback may leave public supply stale,
-      // but must not turn the committed purchase into a visible failure or
-      // suppress the receipt balance/ledger projection. Account/Run scope is
-      // checked again because syncRemote can outlive a session or Run switch.
-      await syncRemote(request, runScope);
-      if (!remoteScopeCurrent(request, runScope)) return { ok: false, cost: 0, reason: "unavailable" };
-      // 成交 = 定局 → 键作废,下一次点购买是新的一笔意图。
-      // 🔴 失败路径**不作废**:失败可能是「服务端已成交但回执丢了」,此时保留键,
-      //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
-      if (!clearPurchaseIntent(n, tokenIds)) return { ok: false, cost: 0, reason: "unavailable" };
+      const resolution = await resolveRemoteGenesisPurchase({
+        execute: () => genesisApi.purchase(n, idempotencyKey),
+        isCurrent: () => remoteScopeCurrent(request, runScope),
+        applyReceipt: applyCommittedPurchaseReceipt,
+        retireIntent: () => clearPurchaseIntent(n, tokenIds),
+        recoverUnknown: () => syncRemote(request, runScope),
+      });
+      if (!resolution.ok) return { ok: false, cost: 0, reason: resolution.reason };
+      const state = resolution.state;
       return {
         ok: true,
         cost: n * beforePrice,
         walletBalanceUsdt: state.walletBalanceUsdt,
-        walletReceiptScope: request,
         walletReceiptRunId: state.runId,
       };
-      } catch (err) {
-        await syncRemote(request, runScope); // 自吞不 reject(resilience 门;z6 审计清死 catch)
-      // Only explicit server domain codes may become business copy; unknown
-      // remote failures remain unavailable and never borrow local supply facts.
-        const reason = classifyRemoteGenesisPurchaseError(err);
-        return { ok: false, cost: 0, reason };
-      }
     }
 
     // ↓↓ mock 模式(remoteApiEnabled=false)走这里:本仓的 server 同构面,不是遗留死码。

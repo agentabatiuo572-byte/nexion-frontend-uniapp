@@ -2094,6 +2094,11 @@ export const useApp = defineStore("app", () => {
     return adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope);
   }
 
+  /** Capture this store's own account fence for a cross-store mutation receipt. */
+  function captureRemoteAccountRequest(): RemoteAccountRequest {
+    return remoteAccountEpoch.snapshot();
+  }
+
   /**
    * Login and H5 bootstrap call this after binding an account. It is purposely
    * stricter than the API client default: a sandbox read only starts when the
@@ -2515,7 +2520,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
     fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
