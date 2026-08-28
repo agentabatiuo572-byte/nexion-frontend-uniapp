@@ -2227,6 +2227,7 @@ export const vi: Messages = {
     unbindToast: "Đã gỡ liên kết thẻ",
     newTitle: "Liên kết thẻ ngân hàng",
     formCardType: "Thẻ tín dụng / ghi nợ",
+    developmentSimulationBadge: "Mô phỏng phát triển cục bộ · Không phải ngân hàng hoặc nhà cung cấp thanh toán thật · Không phát sinh giao dịch thật",
     formSecurityNote: "256-bit TLS · token hóa PCI DSS Level 1",
     formPanLabel: "Số thẻ",
     formExpiryLabel: "Ngày hết hạn",

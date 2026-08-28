@@ -8,9 +8,9 @@
 -->
 <template>
   <AppChassis active="team">
-    <HowPublishedContent v-if="remoteApiEnabled" content-key="team-unilevel-how" back="/pages/team/unilevel" />
-    <view v-if="!remoteApiEnabled" class="pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/unilevel" />
+    <HowPublishedContent v-if="remoteApiEnabled && !publishedContentUnavailable" content-key="team-unilevel-how" back="/pages/team/unilevel" @unavailable="publishedContentUnavailable = true" />
+    <view v-if="!remoteApiEnabled || publishedContentUnavailable" class="pb-8" style="color: var(--v5-ink)">
+      <SubPageHeader :title="t.headerTitles.teamUnilevel + t.headerTitles.howItWorksSuffix" back="/pages/team/unilevel" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="lemon" />
 
@@ -136,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -150,6 +150,7 @@ import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
 
 const t = useT();
+const publishedContentUnavailable = ref(false);
 const w = computed(() => t.value.unilevelHowItWorks);
 
 const tiers = computed(() => [

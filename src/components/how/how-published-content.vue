@@ -40,6 +40,7 @@ import type { HowContentDocument, HowContentKey, HowContentBlock } from "@/api/h
 import { useLocaleStore } from "@/store/locale";
 
 const props = defineProps<{ contentKey: HowContentKey; back: string }>();
+const emit = defineEmits<{ unavailable: [] }>();
 const locale = useLocaleStore();
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
@@ -53,7 +54,7 @@ function renderBody(block: HowContentBlock): string {
 async function load() {
   loading.value = true; error.value = false;
   try { content.value = await howContentApi.published(props.contentKey, locale.code); }
-  catch { content.value = null; error.value = true; }
+  catch { content.value = null; error.value = true; emit("unavailable"); }
   finally { loading.value = false; }
 }
 onMounted(() => { if (remoteApiEnabled) void load(); else loading.value = false; });

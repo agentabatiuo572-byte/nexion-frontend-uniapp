@@ -114,9 +114,10 @@ import HowCalloutBox from "@/components/how/how-callout-box.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
-import { teamInsightsApi } from "@/api/runtime";
+import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
+import { useLeadershipPool, V_VOTES } from "@/store/leadership-pool";
 import type { VRank } from "@/store/v-rank";
 import { leadershipHowRows } from "@/lib/leadership-pool-remote";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -129,15 +130,26 @@ import {
 const t = useT();
 const w = computed(() => t.value.poolHowItWorks);
 const app = useApp();
+const pool = useLeadershipPool();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
-const remoteState = ref<"loading" | "ready" | "error">("loading");
+const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
 let remoteRequest = 0;
 let mounted = true;
 
 // 周分红占比 = 单人份额(votes / 全网总票),从 store 派生,不再硬编码。高阶单人份额指数递增。
 const voteRows = computed(() => {
   const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  return leadershipHowRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, ranks).map((row) => ({
+  const snapshot = remoteApiEnabled
+    ? remotePool.value ?? { totalVotes: 0, distribution: [] }
+    : {
+        totalVotes: pool.totalVotes(),
+        distribution: ranks.map((v) => ({
+          vRank: v,
+          people: pool.globalVDistribution[v] ?? 0,
+          votes: V_VOTES[v],
+        })),
+      };
+  return leadershipHowRows(snapshot, ranks).map((row) => ({
     r: `V${row.rank}`,
     v: row.votes === null ? "—" : row.votes,
     s: row.sharePct === null ? "—" : `≈ ${row.sharePct.toFixed(2)}%`,
@@ -145,6 +157,7 @@ const voteRows = computed(() => {
 });
 
 async function loadRemotePool() {
+  if (!remoteApiEnabled) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
@@ -169,6 +182,7 @@ watch(() => app.accountKey, () => {
   void loadRemotePool();
 });
 const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+  if (!remoteApiEnabled) return;
   remoteRequest += 1;
   remotePool.value = null;
   remoteState.value = "loading";

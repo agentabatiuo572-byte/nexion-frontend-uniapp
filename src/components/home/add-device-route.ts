@@ -1,5 +1,5 @@
 import { getProduct } from "@/mock/products";
-import type { DeviceKind } from "@/store/device-types";
+import type { DeviceKind } from "@/store/types";
 
 export function resolveAddDeviceRoute(
   targetKind: DeviceKind,
