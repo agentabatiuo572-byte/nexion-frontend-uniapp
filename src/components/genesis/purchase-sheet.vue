@@ -278,11 +278,11 @@ async function handlePurchase() {
     // The Java receipt and App wallet page now share nx_user_wallet as their
     // authority. Project the confirmed balance immediately; wallet bills will
     // read the matching nx_wallet_ledger OUT row on entry.
-    if (result.walletBalanceUsdt !== undefined && result.walletReceiptRunId !== undefined) {
+    if (result.walletBalanceUsdt !== undefined && result.walletReceiptSourceEnvironment !== undefined) {
       app.adoptDevelopmentGenesisWallet(
         result.walletBalanceUsdt,
         walletReceiptScope,
-        result.walletReceiptRunId,
+        result.walletReceiptSourceEnvironment,
       );
     }
     toast.success(

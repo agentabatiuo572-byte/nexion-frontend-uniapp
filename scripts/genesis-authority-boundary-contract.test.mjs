@@ -30,11 +30,11 @@ test("eligibility projection cannot overwrite the public Genesis halt state", ()
   assert.doesNotMatch(syncProjection, /remoteEligibility\.value\?\.halted/);
 });
 
-test("H5 launcher passes one validated dev RunID into the Genesis parser", () => {
+test("standard H5 development startup stays on the canonical Genesis rail", () => {
   const runtime = fs.readFileSync(path.join(root, "src/api/runtime.ts"), "utf8");
   const launcher = fs.readFileSync(path.join(root, "scripts/start-dev-h5.ps1"), "utf8");
-  assert.match(runtime, /VITE_NEXGRID_ACCEPTANCE_RUN_ID/);
-  assert.match(runtime, /createGenesisApi\(apiClient, expectedApiEnvironment, expectedGenesisSandboxRunId\)/);
-  assert.match(launcher, /AcceptanceRunId must contain 8-96 safe characters/);
-  assert.match(launcher, /VITE_NEXGRID_ACCEPTANCE_RUN_ID\s*=\s*\$acceptanceRunIdValue/);
+  assert.doesNotMatch(runtime, /expectedGenesisSandboxRunId/);
+  assert.match(runtime, /createGenesisApi\(apiClient, expectedApiEnvironment\)/);
+  assert.doesNotMatch(launcher, /VITE_NEXGRID_ACCEPTANCE_RUN_ID/);
+  assert.doesNotMatch(launcher, /nexion-local-dev/);
 });

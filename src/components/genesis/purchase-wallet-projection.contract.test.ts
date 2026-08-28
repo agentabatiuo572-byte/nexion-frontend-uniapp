@@ -25,7 +25,7 @@ describe("Genesis purchase visible wallet projection", () => {
 
   it("projects a confirmed dev purchase into the wallet UI immediately", () => {
     expect(sheetSource).toContain("const walletReceiptScope = app.captureRemoteAccountRequest()");
-    expect(sheetSource).toContain("result.walletReceiptRunId");
+    expect(sheetSource).toContain("result.walletReceiptSourceEnvironment");
     expect(sheetSource).toContain("app.adoptDevelopmentGenesisWallet(");
     const purchaseStart = sheetSource.indexOf("const result = await genesis.purchase(qty.value)");
     const successToast = sheetSource.indexOf("toast.success(", purchaseStart);
@@ -34,11 +34,11 @@ describe("Genesis purchase visible wallet projection", () => {
     expect(projection).toBeLessThan(successToast);
   });
 
-  it("rejects a receipt after account epoch or Sandbox RunID changes", () => {
+  it("rejects a canonical receipt after the bound account changes", () => {
     const projectionStart = appStoreSource.indexOf("function adoptDevelopmentGenesisWallet(");
     const projectionEnd = appStoreSource.indexOf("function refreshFundsSandboxForAccount", projectionStart);
     const projectionBody = appStoreSource.slice(projectionStart, projectionEnd);
-    expect(projectionBody).toContain("receiptSandboxRunId !== expectedGenesisSandboxRunId");
+    expect(projectionBody).toContain('receiptSourceEnvironment !== "PRODUCTION"');
     expect(projectionBody).toContain("adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope)");
   });
 
@@ -47,9 +47,12 @@ describe("Genesis purchase visible wallet projection", () => {
     expect(storeSource).toContain("remoteOrders.value = [...state.orders]");
   });
 
-  it("fails closed before direct wallet fixtures unless the local database target is explicitly allowed", () => {
-    expect(liveE2eSource).toContain("NX_GENESIS_ALLOW_DB_WRITE_TARGET");
-    expect(liveE2eSource).toContain("GENESIS_FIXTURE_DB_WRITE_TARGET_NOT_ALLOWED");
-    expect(liveE2eSource).toContain("GENESIS_FIXTURE_DB_HOST_NOT_LOOPBACK");
+  it("keeps the standard development smoke test canonical and read-only", () => {
+    expect(liveE2eSource).toContain('sourceEnvironment, "PRODUCTION"');
+    expect(liveE2eSource).toContain('runId, ""');
+    expect(liveE2eSource).toContain('page.on("request"');
+    expect(liveE2eSource).toContain("businessMutatingRequests: businessMutatingRequests.length");
+    expect(liveE2eSource).not.toContain("sandbox-fixture");
+    expect(liveE2eSource).not.toContain("MYSQL_PWD");
   });
 });

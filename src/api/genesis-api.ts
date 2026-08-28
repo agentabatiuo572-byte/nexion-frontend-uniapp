@@ -2,7 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 
-type GenesisSourceEnvironment = "PRODUCTION" | "SANDBOX";
+export type GenesisSourceEnvironment = "PRODUCTION" | "SANDBOX";
 
 export interface GenesisSalePolicy {
   available: boolean;
@@ -177,11 +177,10 @@ function validAuthority(
   if (!row || row.serverCanonical !== true) return false;
   if ((mode === "dev" || mode === "prod")
       && row.sourceEnvironment === "PRODUCTION" && row.runId === "") return true;
-  // Genesis account and eligibility reads use the isolated server-side market
-  // rail under the local dev profile. Accept that projection only in a dev
-  // bundle and only when it carries the canonical mock marker plus the exact
-  // validated run id injected at startup; production bundles and the public
-  // market snapshot stay production-only.
+  // Standard dev and production-shaped bundles accept only the canonical
+  // business rail above. An explicitly constructed acceptance client may opt
+  // into the isolated server-side Sandbox rail, but only with the exact
+  // validated RunID; normal H5 startup never supplies that opt-in.
   return allowDevelopmentSandbox
     && mode === "dev"
     && row.source === "mock"
