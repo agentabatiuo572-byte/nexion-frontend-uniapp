@@ -49,7 +49,6 @@ import {
   developmentFundsEnabled,
   fundsServerEnabled,
   expectedApiEnvironment,
-  expectedGenesisSandboxRunId,
   remoteApiEnabled,
   sessionVault,
   taskAssignmentApi,
@@ -2085,13 +2084,13 @@ export const useApp = defineStore("app", () => {
     return true;
   }
 
-  /** Genesis receipts additionally require the exact boot-fenced Sandbox RunID. */
+  /** Canonical Genesis receipts must stay on the server-owned business rail. */
   function adoptDevelopmentGenesisWallet(
     balanceAfterUsdt: number,
     receiptScope: RemoteAccountRequest,
-    receiptSandboxRunId: string,
+    receiptSourceEnvironment: "PRODUCTION" | "SANDBOX",
   ): boolean {
-    if (receiptSandboxRunId !== expectedGenesisSandboxRunId) return false;
+    if (receiptSourceEnvironment !== "PRODUCTION") return false;
     return adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope);
   }
 

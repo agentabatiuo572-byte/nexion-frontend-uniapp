@@ -548,7 +548,7 @@ export const useGenesis = defineStore("genesis", () => {
   async function purchase(
     n: number,
     tokenIds?: number[],
-  ): Promise<{ ok: boolean; cost: number; walletBalanceUsdt?: number; walletReceiptRunId?: string; reason?: "sold-out" | "cap" | "not-eligible" | "market-closed" | "insufficient-funds" | "run-conflict" | "unavailable" }> {
+  ): Promise<{ ok: boolean; cost: number; walletBalanceUsdt?: number; walletReceiptSourceEnvironment?: GenesisAccountState["sourceEnvironment"]; reason?: "sold-out" | "cap" | "not-eligible" | "market-closed" | "insufficient-funds" | "run-conflict" | "unavailable" }> {
     // 🔴🔴 2026-08-13:这道 `if (remoteApiEnabled)` 曾经**漏写**,后果是下面整段本地实现
     //   (mock 的 server 同构面)成了死代码 —— TypeScript 开 allowUnreachableCode:false
     //   直接点名本文件 5 处不可达(purchase / listNode / cancelListing / acquireSecondary /
@@ -574,7 +574,7 @@ export const useGenesis = defineStore("genesis", () => {
         ok: true,
         cost: n * beforePrice,
         walletBalanceUsdt: state.walletBalanceUsdt,
-        walletReceiptRunId: state.runId,
+        walletReceiptSourceEnvironment: state.sourceEnvironment,
       };
     }
 
