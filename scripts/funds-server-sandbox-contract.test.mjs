@@ -17,8 +17,11 @@ test("App keeps server funds modes authoritative and never finalizes funds in th
   const runtime = read("src/api/runtime.ts");
   const appStore = read("src/store/app.ts");
   const api = read("src/api/funds-sandbox-api.ts");
-  assert.match(runtimeConfig, /"mock"\s*\|\s*"sandbox"\s*\|\s*"remote"/);
-  assert.match(runtime, /developmentFundsEnabled\s*=\s*apiRuntimeConfig\.environment\s*===\s*["']dev["']/);
+  assert.match(runtimeConfig, /ApiEnvironment\s*=\s*"dev"\s*\|\s*"prod"/);
+  assert.doesNotMatch(runtimeConfig, /VITE_NEXGRID_API_MODE|modeExplicit/,
+    "the browser must not select a sandbox/remote rail");
+  assert.match(runtime, /developmentFundsEnabled\s*=\s*false/,
+    "the formal App must not select the retired client funds sandbox in development");
   assert.match(api, /sourceEnvironment:\s*["']SANDBOX["']/);
   assert.match(api, /source:\s*["']mock["']/);
   assert.match(api, /Idempotency-Key|idempotencyKey/);

@@ -27,7 +27,7 @@ const base = {
   paymentRail: "NEXION_USDT_WALLET",
   config: {
     trialDays: "3", graceDays: "7", discountRate: "0.15", discountCapUSD: "20",
-    trialOffsetCapUSD: "50", trialProductId: "stellarbox-s1", trialPriceUSD: "1299",
+    trialOffsetCapUSD: "50", trialProductId: "stellarbox-s1", trialProductName: "NexGridBox S1", trialPriceUSD: "1299",
     shadowDailyUSD: "38.52", shadowDailyNEX: "65", phaseOpen: true,
     autoPushEnabled: true, autoPushDelayMs: "1500", autoPushCooldownHours: "24",
     autoPushMaxPerSession: "1", seatsLeftToday: "47",

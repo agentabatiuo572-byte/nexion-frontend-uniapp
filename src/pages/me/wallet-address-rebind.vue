@@ -13,15 +13,6 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
-      <view
-        v-if="payoutAddressMockEnabled || payout.sandboxServer"
-        :data-testid="payout.sandboxServer ? 'payout-address-sandbox-source' : 'payout-address-mock-source'"
-        class="mx-4"
-        style="margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.08)"
-      >
-        <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-warning)">{{ t.addrRebind.sandboxMockNotice }}</text>
-      </view>
-
       <!-- ── 网络切换(与提现页同语汇)── -->
       <view class="mx-4" style="padding: 0 2px">
         <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
@@ -225,7 +216,7 @@
 import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { asApiError } from "@/api/errors";
-import { payoutAddressMockEnabled, payoutAddressServerEnabled } from "@/api/runtime";
+import { payoutAddressServerEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";

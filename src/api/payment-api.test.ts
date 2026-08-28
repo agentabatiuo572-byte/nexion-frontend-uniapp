@@ -70,7 +70,8 @@ test("accepts production payment config and quote on the development rail", asyn
     source: "nx_vietqr_config",
     sourceEnvironment: "PRODUCTION",
     runId: "",
-    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000, toleranceVnd: 1000,
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
+      todayRemainingDepositUsdt: 2578.62, todayRemainingVnd: 68050000, toleranceVnd: 1000,
       graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0 },
   };
   const quote = {
@@ -86,4 +87,39 @@ test("accepts production payment config and quote on the development rail", asyn
 
   await expect(api.config()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
   await expect(api.fxQuote()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
+});
+
+test("accepts an operational VietQR rail whose daily capacity is below the minimum", async () => {
+  const response = {
+    serverCanonical: true,
+    source: "nx_vietqr_config",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
+      todayRemainingDepositUsdt: 0.62, todayRemainingVnd: 16580, toleranceVnd: 1000,
+      graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0 },
+  };
+  const api = createPaymentApi({ request: async () => response } as never, "dev");
+
+  await expect(api.config()).resolves.toMatchObject({
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
+      todayRemainingDepositUsdt: 0.62, todayRemainingVnd: 16580 },
+  });
+});
+
+test("fails closed when the server omits today's remaining VietQR capacity", async () => {
+  const response = {
+    serverCanonical: true,
+    source: "nx_vietqr_config",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000, toleranceVnd: 1000,
+      graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0 },
+  };
+  const api = createPaymentApi({ request: async () => response } as never, "dev");
+
+  await expect(api.config()).rejects.toMatchObject({
+    kind: "protocol",
+    message: "PAYMENT_CONFIG_RESPONSE_INVALID",
+  });
 });

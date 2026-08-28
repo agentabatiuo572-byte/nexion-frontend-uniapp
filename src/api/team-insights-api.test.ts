@@ -33,21 +33,20 @@ describe("team unilevel API", () => {
     await expect(api.unilevel("week")).rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
   });
 
-  it("accepts stable server-generated development facts", async () => {
+  it("accepts canonical business settlement facts in development mode", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-      factStatus: "SIMULATED", withdrawable: false, payoutStatus: "NON_WITHDRAWABLE",
-      events: [{ id: "SB-CM-1", kind: "unilevel", sourceUserName: "Sandbox A1", layer: 1,
-        orderId: "SB-ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
-        ts: 1755043200000, unlockAt: 1757635200000, status: "SIMULATED",
-        settlementState: "SIMULATED", withdrawable: false }],
+      events: [{ id: "CM-1", kind: "unilevel", sourceUserName: "Alice", layer: 1,
+        orderId: "ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
+        ts: 1755043200000, unlockAt: 1757635200000, status: "unlocked",
+        settlementState: "CANONICAL", withdrawable: true }],
       generatedAt: "2026-08-13T00:00:00Z",
     });
     const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
 
     await expect(api.commissions()).resolves.toMatchObject({
       sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
-      factStatus: "SIMULATED", withdrawable: false, events: [{ id: "SB-CM-1", status: "simulated", withdrawable: false }],
+      events: [{ id: "CM-1", status: "unlocked", withdrawable: true }],
     });
     expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/commissions" });
   });
@@ -63,10 +62,15 @@ describe("team unilevel API", () => {
     await expect(api.commissions()).rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
   });
 
-  it("rejects sandbox commissions without the non-withdrawable simulated contract", async () => {
+  it("rejects retired simulated settlement facts in development mode", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-      events: [], generatedAt: "2026-08-13T00:00:00Z",
+      factStatus: "SIMULATED", withdrawable: false, payoutStatus: "NON_WITHDRAWABLE",
+      events: [{ id: "SB-CM-1", kind: "unilevel", sourceUserName: "Sandbox A1", layer: 1,
+        orderId: "SB-ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
+        ts: 1755043200000, unlockAt: 1757635200000, status: "SIMULATED",
+        settlementState: "SIMULATED", withdrawable: false }],
+      generatedAt: "2026-08-13T00:00:00Z",
     });
     const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
 

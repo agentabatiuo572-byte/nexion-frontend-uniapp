@@ -28,7 +28,7 @@ test("H9 rank denominator uses the real server user count, not the marketing dis
 test("H9-dependent trust and globe surfaces render unavailable copy instead of a fake zero", () => {
   assert.doesNotMatch(trust, /:value="global\.activeDevices\.toLocaleString\(\)"/);
   assert.match(trust, /const activeDevicesText = computed/);
-  assert.match(trust, /cfg\.syncFailed \|\| !health\.devicesOk/);
+  assert.match(trust, /trustFieldValue\(financialSection\.value\?\.fields \?\? \[\], "devicesOnlineValue"\) \?\? "—"/);
   assert.match(globe, /cfg\.syncFailed \|\| !health\.devicesOk/);
   assert.match(globe, /t\.value\.home\.networkStatUpdating/);
 });

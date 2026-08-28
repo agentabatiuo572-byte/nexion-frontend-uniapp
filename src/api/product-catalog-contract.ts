@@ -24,6 +24,8 @@ const PHASES = new Set<PhaseId>(["P1", "P2", "P3", "P4", "P5", "P6"]);
 const LIFECYCLES = new Set<NonNullable<Product["status"]>>(["active", "legacy"]);
 const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
+const PRODUCT_TYPES = new Set<NonNullable<Product["productType"]>>(["DEVICE", "SHARE"]);
+const INVENTORY_MODES = new Set<NonNullable<Product["inventoryMode"]>>(["FINITE", "UNLIMITED"]);
 
 function invalid(): never {
   throw new ProductCatalogContractError();
@@ -156,6 +158,11 @@ function product(value: unknown): CatalogProduct {
   const purchaseBlocked = source.purchaseBlocked === undefined ? false : booleanValue(source.purchaseBlocked);
   const purchaseBlockedReason = optionalString(source.purchaseBlockedReason);
   if (purchaseBlocked && !purchaseBlockedReason) return invalid();
+  const productType = nonEmptyString(source.productType) as NonNullable<Product["productType"]>;
+  const inventoryMode = nonEmptyString(source.inventoryMode) as NonNullable<Product["inventoryMode"]>;
+  if (!PRODUCT_TYPES.has(productType) || !INVENTORY_MODES.has(inventoryMode)) return invalid();
+  if (inventoryMode === "UNLIMITED" && (productType !== "SHARE" || source.stock != null)) return invalid();
+  if (inventoryMode === "FINITE" && source.stock == null) return invalid();
 
   return {
     id: nonEmptyString(source.id),
@@ -175,6 +182,8 @@ function product(value: unknown): CatalogProduct {
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
+    productType,
+    inventoryMode,
     stock: optionalInteger(source.stock),
     features: [...source.features],
     ai: ai(source.ai),

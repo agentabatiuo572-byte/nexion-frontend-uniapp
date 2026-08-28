@@ -20,7 +20,12 @@
     ref="elRef"
     class="block w-full nx-trial-hero"
     :style="rootStyle"
+    role="button"
+    :tabindex="canClaim ? 0 : -1"
+    :aria-disabled="canClaim ? 'false' : 'true'"
     @click="onClick"
+    @keydown.enter.prevent="onClick"
+    @keydown.space.prevent="onClick"
   >
     <!-- Coupon body — frosted glass purple theme -->
     <view class="nx-trial-hero__body" :style="bodyStyle">
@@ -76,17 +81,17 @@
       <!-- Bottom strip: scarcity + Claim CTA -->
       <view style="position: relative; z-index: 1; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
         <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-quest-ember-ink); font-weight: 500">
-          <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-quest-ember); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-quest-ember) 70%, transparent); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
-          <text style="color: var(--v5-quest-ember-ink)">{{ trialsLeftText }}</text>
+          <view :style="availabilityDotStyle" />
+          <text style="color: var(--v5-quest-ember-ink)">{{ availabilityText }}</text>
         </view>
         <!-- CTA 文字禁折行:uni 的 text 组件自带 white-space,不继承容器的 nowrap,
              必须写在 text 自己身上;flex-shrink:0 保胶囊拿满内容宽(vi 曾折成两行) -->
         <view
           class="inline-flex items-center"
-          style="padding: 8px 14px; border-radius: 999px; background: transparent; color: var(--v5-quest-violet-ink); font-family: var(--font-v5); font-weight: 600; font-size: 13px; border: 1px solid color-mix(in srgb, var(--v5-quest-violet-ink) 45%, transparent); gap: 5px; letter-spacing: -0.005em; white-space: nowrap; flex-shrink: 0"
+          :style="claimCtaStyle"
         >
-          <text style="color: var(--v5-quest-violet-ink); white-space: nowrap">{{ t.trial.heroClaimCta }}</text>
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px; color: var(--v5-quest-violet-ink)">→</text>
+          <text style="white-space: nowrap">{{ claimCtaText }}</text>
+          <text v-if="canClaim" style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px">→</text>
         </view>
       </view>
     </view>
@@ -114,9 +119,12 @@ watch(inView, (v) => {
   if (v) played.value = true;
 });
 
+const eligibility = computed(() => trial.eligibility());
+const canClaim = computed(() => trial.status === "none" && eligibility.value.ok);
+const productUnavailable = computed(() => eligibility.value.reason === "product-unavailable");
 const visible = computed(() => trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0
-  && trial.canStart());
+  && (canClaim.value || productUnavailable.value));
 
 const trialDays = computed(() => trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialCfg.config.shadowDailyUSD);
@@ -124,7 +132,36 @@ const est = computed(() => Math.round(trialDays.value * dailyEarn.value));
 const taglineText = computed(() => fmt(t.value.trial.heroTagline, { days: trialDays.value }));
 const earnLabelText = computed(() => fmt(t.value.trial.heroEarnLabel, { days: trialDays.value }));
 const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: trialCfg.config.seatsLeftToday }));
+const availabilityText = computed(() => productUnavailable.value
+  ? t.value.trial.heroProductUnavailable
+  : trialsLeftText.value);
+const claimCtaText = computed(() => productUnavailable.value
+  ? t.value.store.temporarilyOutOfStock
+  : t.value.trial.heroClaimCta);
 const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/d × ${trialDays.value}`);
+
+const availabilityDotStyle = computed<CSSProperties>(() => ({
+  width: "6px",
+  height: "6px",
+  borderRadius: "50%",
+  background: canClaim.value ? "var(--v5-quest-ember)" : "var(--v5-ink-4)",
+  boxShadow: canClaim.value ? "0 0 6px color-mix(in srgb, var(--v5-quest-ember) 70%, transparent)" : "none",
+  animation: canClaim.value ? "v5-hb-pulse 1.6s ease-in-out infinite" : "none",
+}));
+const claimCtaStyle = computed<CSSProperties>(() => ({
+  padding: "8px 14px",
+  borderRadius: "999px",
+  background: canClaim.value ? "transparent" : "var(--v5-surface-2)",
+  color: canClaim.value ? "var(--v5-quest-violet-ink)" : "var(--v5-ink-4)",
+  fontFamily: "var(--font-v5)",
+  fontWeight: 600,
+  fontSize: "13px",
+  border: canClaim.value ? "1px solid color-mix(in srgb, var(--v5-quest-violet-ink) 45%, transparent)" : "1px solid var(--v5-border)",
+  gap: "5px",
+  letterSpacing: "-0.005em",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+}));
 
 const COUPON_MASK =
   "radial-gradient(circle at 62% 0, transparent 7px, #000 7.5px), " +
@@ -170,6 +207,7 @@ const shimmerStyle = computed<CSSProperties>(() => ({
 }));
 
 function onClick() {
+  if (!canClaim.value) return;
   claimSheet.show();
 }
 </script>

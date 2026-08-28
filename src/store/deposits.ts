@@ -37,6 +37,7 @@ import type { VietQrIntentSnapshot, VietQrIntentStatus } from "@/api/payment-api
 import { isAmbiguousOutcome } from "@/api/errors";
 import {
   appendVietQrReceipts,
+  isPayableVietQrCreateStatus,
   remoteGenerationMatches,
 } from "@/lib/vietqr-remote-safety";
 import {
@@ -1171,24 +1172,42 @@ export const useDeposits = defineStore("deposits", () => {
     if (!remoteApiEnabled) return null;
     if (developmentFundsEnabled || !Number.isFinite(amount) || amount <= 0) return null;
     const expectedAccountKey = serverAccountKey;
+    const expectedGeneration = remoteGeneration;
     if (normalizeAccountKey(rawExpectedAccountKey) !== expectedAccountKey) throw new Error("VIETQR_ACCOUNT_CHANGED");
     const mutation: VietQrCommandIdentity = {
       accountKey: expectedAccountKey,
       action: "CREATE",
       fingerprint: fundsAmountFingerprint(amount),
     };
-    const idempotencyKey = vietQrCommandKey(mutation);
-    try {
-      const snapshot = await paymentApi.createVietQrIntent(amount, idempotencyKey);
-      if (expectedAccountKey !== serverAccountKey) throw new Error("VIETQR_ACCOUNT_CHANGED");
+    for (let createAttempt = 0; createAttempt < 2; createAttempt += 1) {
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        throw new Error("VIETQR_ACCOUNT_CHANGED");
+      }
+      const idempotencyKey = vietQrCommandKey(mutation);
+      let snapshot: VietQrIntentSnapshot;
+      try {
+        snapshot = await paymentApi.createVietQrIntent(amount, idempotencyKey);
+        if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+          throw new Error("VIETQR_ACCOUNT_CHANGED");
+        }
+      } catch (cause) {
+        if (!isAmbiguousOutcome(cause)) finishVietQrCommand(mutation, idempotencyKey);
+        throw cause;
+      }
       bindVietQrIntent(mutation, idempotencyKey, snapshot.intentNo);
+      if (!isPayableVietQrCreateStatus(snapshot.status)) {
+        // A prior unknown response may have left this command unbound locally even though
+        // the server already completed, cancelled or returned its intent. Resolve that
+        // generation, then mint exactly one fresh command for the user's current click.
+        finishVietQrCommand(mutation, idempotencyKey);
+        if (createAttempt === 0) continue;
+        throw new Error("VIETQR_CREATE_REPLAY_NOT_PAYABLE");
+      }
       const intent = remoteVietQrIntent(snapshot);
       intents.value = [intent, ...intents.value.filter((item) => item.intentId !== intent.intentId)];
       return intent;
-    } catch (cause) {
-      if (!isAmbiguousOutcome(cause)) finishVietQrCommand(mutation, idempotencyKey);
-      throw cause;
     }
+    throw new Error("VIETQR_CREATE_RETRY_EXHAUSTED");
   }
 
   async function cancelRemoteBankIntent(intentId: string): Promise<{ ok: boolean; conflict?: boolean }> {

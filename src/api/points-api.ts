@@ -1,6 +1,5 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
 
 export type DailyMilestoneStatus = "LOCKED" | "CLAIMABLE" | "CLAIMED";
@@ -159,17 +158,10 @@ function invalid(message = "DAILY_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
 }
 
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-
-function validAuthority(row: Record<string, unknown>, mode: ApiEnvironment): boolean {
-  if (row.serverCanonical !== true) return false;
-  if (mode === "dev") {
-    return row.sourceEnvironment === "SANDBOX"
-      && typeof row.runId === "string"
-      && RUN_ID.test(row.runId)
-      && isCurrentCommerceSandboxRun(row.runId);
-  }
-  return row.sourceEnvironment === "PRODUCTION" && row.runId === "";
+function validAuthority(row: Record<string, unknown>, _mode: ApiEnvironment): boolean {
+  return row.serverCanonical === true
+    && row.sourceEnvironment === "PRODUCTION"
+    && row.runId === "";
 }
 
 function authority(row: Record<string, unknown> | null, mode: ApiEnvironment, message: string): {

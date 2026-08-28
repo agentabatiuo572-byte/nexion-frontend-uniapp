@@ -72,13 +72,14 @@ import { useApp } from "@/store/app";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
+import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import type { DeviceKind } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 
 const app = useApp();
 const t = useT();
 
-const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
+const activeDevices = computed(() => app.visibleDevices.filter(isActiveSlotDevice));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const realCount = computed(() => activeDevices.value.length);
 

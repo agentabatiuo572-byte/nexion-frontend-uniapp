@@ -18,13 +18,15 @@ test("remote Nova uses the authenticated local-AI backend instead of HOLD or moc
   assert.match(runtime, /export const novaAiApi = createNovaAiApi\(apiClient\)/);
 });
 
-test("local AI contract keeps provider truth and sensitive-data warning visible", () => {
+test("Nova customer contract hides runtime implementation details and keeps the sensitive-data warning visible", () => {
   const api = read("src/api/nova-ai-api.ts");
   const en = read("src/i18n/messages/en.ts");
   const zh = read("src/i18n/messages/zh.ts");
   const vi = read("src/i18n/messages/vi.ts");
-  assert.match(api, /OLLAMA_LOCAL/);
-  assert.match(api, /LOCAL_MACHINE/);
+  assert.doesNotMatch(api, /OLLAMA_LOCAL|LOCAL_MACHINE|provider|model|privacy|sourceEnvironment|serverCanonical/);
+  for (const messages of [en, zh, vi]) {
+    assert.doesNotMatch(messages, /localRole:\s*"[^"]*(?:Gemma|Ollama|local model|本地模型|mô hình cục bộ)[^"]*"/i);
+  }
   assert.match(en, /password[\s\S]{0,120}OTP[\s\S]{0,120}private key/i);
   for (const messages of [en, zh, vi]) {
     assert.match(messages, /localSafetyNotice/);
@@ -32,7 +34,7 @@ test("local AI contract keeps provider truth and sensitive-data warning visible"
   }
 });
 
-test("Nova outage copy does not blame Ollama when any local service hop can fail", () => {
+test("Nova outage copy does not name an implementation provider when any service hop can fail", () => {
   for (const file of ["en", "zh", "vi"]) {
     const messages = read(`src/i18n/messages/${file}.ts`);
     assert.doesNotMatch(messages, /localUnavailable:\s*"[^"]*Ollama[^"]*"/i);

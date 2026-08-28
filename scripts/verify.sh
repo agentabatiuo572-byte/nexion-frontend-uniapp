@@ -2481,16 +2481,13 @@ subpage_header_sticky() {
   else bad "SubPageHeader lost margin-bottom:24px (~55 pages jam header against content)"; fi
 }
 subpage_header_sticky
-# Genesis eligibility gate anti-regression (FEAT-GEN08, added 2026-07-09): the
-# purchase sheet's confirm handler MUST re-verify eligibility (L3, checkout-F4b
-# pattern) and genesis.ts MUST keep the per-user cap guard in BOTH holding-growth
-# entry points — purchase() + acquireSecondary() (L4 single source). If a future
-# edit silently drops either, scarcity gating degrades to cosmetics — fail loud.
+# Genesis current-policy anti-regression: checkout re-verifies the server projection,
+# and the 5174 offline mirror keeps the same maxPerUser guard in both growth paths.
 gen_gate_l3=$(grep -c "gate.value.eligible" src/components/genesis/purchase-sheet.vue 2>/dev/null || echo 0)
-gen_gate_l4=$(grep -c "GENESIS_ELIGIBILITY.perUserCap" src/store/genesis.ts 2>/dev/null || echo 0)
+gen_gate_l4=$(grep -c "GENESIS_ELIGIBILITY_POLICY.maxPerUser" src/store/genesis.ts 2>/dev/null || echo 0)
 gen_gate_sec=$(grep -c "gatesSecondary" src/pages/genesis/marketplace.vue 2>/dev/null || echo 0)
 if [ "$gen_gate_l3" -ge 1 ] && [ "$gen_gate_l4" -ge 2 ] && [ "$gen_gate_sec" -ge 1 ]; then
-  ok "genesis eligibility gate wired (L3 sheet re-verify + L4 cap guard ×$gen_gate_l4 + secondary gate)"
+  ok "genesis current policy wired (server projection re-verify + offline cap guard ×$gen_gate_l4 + secondary gate)"
 else
   bad "genesis eligibility gate missing (L3=$gen_gate_l3 need >=1, L4=$gen_gate_l4 need >=2, sec=$gen_gate_sec need >=1)"
 fi
@@ -3490,25 +3487,6 @@ withdraw_triage_dataflow_gate() {
   fi
 }
 withdraw_triage_dataflow_gate
-
-# ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
-# 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
-# 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表
-# 跑真代码,多个 store 实例 = 多个账号共享一份序列化 storage):
-# ①同一码第二次核销必拒 ②本账号已持码再提另一码必拒且原码不受影响、新码不被吞
-# ③不存在/已作废/已被使用三种归因各自分开且不泄露核销者 ④两账号并发同码只成功一个
-# ⑤已核销是终态、用户侧无任何作废/释放出口 ⑥格式正确但从未发放的码必拒(缺陷本体)
-# ⑦接线门(资格门真按「持有已核销的码」判定 + action 真走码表)⑧落盘失败整笔回滚
-# ⑨五种文案 × 3 语真解析取值、互不相同。
-genesis_invite_gate() {
-  if "$NODE_BIN" scripts/selfcheck-genesis-invite.mjs > /tmp/uniapp-genesis-invite.log 2>&1; then
-    ok "创世邀请码码表核销门 — $(tail -1 /tmp/uniapp-genesis-invite.log)"
-  else
-    bad "创世邀请码码表核销门失败 — node scripts/selfcheck-genesis-invite.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-genesis-invite.log | head -8 | sed 's/^/        /'
-  fi
-}
-genesis_invite_gate
 
 # ── 冲正(回滚)自身门(R5 五项,2026-08-04)——「回滚失败被静默」+「回滚凭空造钱」──
 # R4 根治「资金变更的落盘失败被静默忽略」,R5 在**回滚这一层**发现同型:① stake() 的存储

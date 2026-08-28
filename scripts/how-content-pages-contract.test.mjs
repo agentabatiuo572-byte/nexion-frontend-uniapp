@@ -13,12 +13,12 @@ const cases = {
   "src/pages/team/unilevel-how.vue": "team-unilevel-how",
 };
 
-test("six How-it-works pages are server-authoritative outside explicit mock", () => {
+test("six How-it-works pages use published Java content in the formal runtime", () => {
   for (const [file, key] of Object.entries(cases)) {
     const source = fs.readFileSync(path.join(root, file), "utf8");
     assert.match(source, /HowPublishedContent/);
     assert.match(source, new RegExp(`content-key=\\"${key}\\"`));
-    assert.match(source, /apiRuntimeConfig\.mode !== 'mock'/);
-    assert.match(source, /apiRuntimeConfig\.mode === 'mock'/);
+    assert.match(source, /v-if="remoteApiEnabled"/);
+    assert.doesNotMatch(source, /apiRuntimeConfig\.mode/);
   }
 });

@@ -52,7 +52,7 @@ export type { TrialStatus } from "./trial-boundary";
 /** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error).
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
-export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "unknown";
+export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "unknown";
 
 /** Persisted row shape — single source lives in trial-boundary.ts (resolver 同型)。 */
 type FreeTrialState = TrialRowSnapshot;
@@ -352,7 +352,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       if (!await refreshEligibilityRemote()) return { ok: false, reason: "unknown" };
       const remoteEligibility = eligibility();
       if (!remoteEligibility.ok) return { ok: false, reason: remoteEligibility.reason };
-      const deviceName = resolveTrialDeviceName(useTrialConfig().config.trialProductId);
+      const trialConfig = useTrialConfig().config;
+      const deviceName = resolveTrialDeviceName(trialConfig.trialProductId, trialConfig.trialProductName);
       if (!deviceName) {
         clearRemoteFacts("error", "TRIAL_CONFIG_RESPONSE_INVALID");
         return { ok: false, reason: "unknown" };
@@ -539,6 +540,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       case "TRIAL_COOLDOWN_ACTIVE": return "used";
       case "TRIAL_QUOTA_EXHAUSTED": return "quota-exhausted";
       case "TRIAL_CYCLE_RISK_BLOCKED": return "risk";
+      case "TRIAL_PRODUCT_NOT_AVAILABLE": return "product-unavailable";
       case "TRIAL_PHASE_CLOSED":
       case "TRIAL_KILL_SWITCH_DISABLED": return "phase-closed";
       default: return "unknown";

@@ -1,11 +1,11 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { state } = vi.hoisted(() => ({ state: vi.fn() }));
+const { state, claim } = vi.hoisted(() => ({ state: vi.fn(), claim: vi.fn() }));
 
 vi.mock("@/api/runtime", () => ({
   remoteApiEnabled: true,
-  questApi: { state, claim: vi.fn() },
+  questApi: { state, claim },
 }));
 
 import { useQuest } from "./quest";
@@ -14,6 +14,7 @@ describe("PC-managed H3 quest catalogue", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     state.mockReset();
+    claim.mockReset();
   });
 
   it("keeps the canonical quest rows so the home card can render PC task names and rewards", async () => {
@@ -34,5 +35,130 @@ describe("PC-managed H3 quest catalogue", () => {
         { questCode: "H3_FIRST_ORDER_STARTED", rewardNex: 50 },
         { questCode: "H3_REFERRAL_SETTLED", rewardNex: 200 },
       ]);
+  });
+
+  it("keeps the last confirmed catalogue visible while a background refresh is pending", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" },
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "CLAIMED" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+
+    let resolveRefresh!: (value: { quests: Array<Record<string, unknown>> }) => void;
+    state.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    const refreshing = quest.refreshRemote();
+
+    expect(quest.remoteStatus).toBe("ready");
+    expect(quest.remoteQuests).toHaveLength(2);
+    expect(quest.isComplete("H3_REFERRAL_SETTLED")).toBe(true);
+
+    resolveRefresh({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "CLAIMED" },
+      ],
+    });
+    await expect(refreshing).resolves.toBe(true);
+    expect(quest.remoteQuests).toHaveLength(1);
+    expect(quest.isComplete("H3_FIRST_ORDER_STARTED")).toBe(true);
+  });
+
+  it("keeps the task count when switching to a large module triggers markComplete refresh", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" },
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "PENDING" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+
+    let resolveModuleRefresh!: (value: { quests: Array<Record<string, unknown>> }) => void;
+    state.mockImplementationOnce(() => new Promise((resolve) => { resolveModuleRefresh = resolve; }));
+    quest.markComplete("visit_store");
+
+    expect(state).toHaveBeenCalledTimes(2);
+    expect(quest.remoteStatus).toBe("ready");
+    expect(quest.remoteQuests.filter((row) => row.layer === "DAY_ONE")).toHaveLength(2);
+
+    resolveModuleRefresh({ quests: [] });
+    await vi.waitFor(() => expect(quest.remoteQuests).toHaveLength(0));
+  });
+
+  it("keeps the last confirmed catalogue when a background refresh fails", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" },
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "PENDING" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+    state.mockRejectedValueOnce(new Error("temporary network failure"));
+
+    await expect(quest.refreshRemote()).resolves.toBe(false);
+
+    expect(quest.remoteStatus).toBe("ready");
+    expect(quest.remoteQuests).toHaveLength(2);
+    expect(quest.rewardFor("H3_REFERRAL_SETTLED")).toBe(200);
+  });
+
+  it("commits a refreshed catalogue atomically when the server payload is malformed", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" },
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "PENDING" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+    state.mockResolvedValueOnce({ quests: null });
+
+    await expect(quest.refreshRemote()).resolves.toBe(false);
+
+    expect(quest.remoteStatus).toBe("ready");
+    expect(quest.remoteQuests).toHaveLength(2);
+    expect(quest.rewardFor("H3_FIRST_ORDER_STARTED")).toBe(50);
+  });
+
+  it("does not erase a confirmed catalogue when a route-triggered claim fails", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" },
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "PENDING" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+    claim.mockRejectedValueOnce(new Error("not claimable from route visit"));
+
+    await expect(quest.claimRemote("visit_store")).resolves.toBe(false);
+
+    expect(quest.remoteStatus).toBe("ready");
+    expect(quest.remoteQuests).toHaveLength(2);
+  });
+
+  it("still discards the previous account catalogue when the account binding changes", async () => {
+    state.mockResolvedValueOnce({
+      quests: [
+        { questCode: "H3_REFERRAL_SETTLED", name: "Complete a qualified referral", layer: "DAY_ONE", rewardNex: 200, status: "CLAIMED" },
+      ],
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+
+    let resolveNewAccount!: (value: { quests: Array<Record<string, unknown>> }) => void;
+    state.mockImplementationOnce(() => new Promise((resolve) => { resolveNewAccount = resolve; }));
+    quest.bindAccount("second-account");
+
+    expect(quest.remoteStatus).toBe("loading");
+    expect(quest.remoteQuests).toHaveLength(0);
+    expect(quest.isComplete("H3_REFERRAL_SETTLED")).toBe(false);
+
+    resolveNewAccount({ quests: [] });
+    await vi.waitFor(() => expect(quest.remoteStatus).toBe("ready"));
+    expect(quest.remoteQuests).toHaveLength(0);
   });
 });

@@ -87,12 +87,15 @@ test("remote configuration loads are authoritative and remote writes do not revi
   const accountScope = read("src/lib/account-scope.ts");
   const repurchase = read("src/store/repurchase.ts");
 
-  assert.match(config, /if \(!remoteApiEnabled\) \{[\s\S]*?syncFailed\.value = false[\s\S]*?return;/);
+  const loadBlock = fnBlock(config, "load");
+  assert.doesNotMatch(loadBlock, /if \(!remoteApiEnabled\)/,
+    "formal dev/prod configuration loading must always read the Java authority");
   assert.match(config, /const config = ref<PlatformConfig>\(remoteApiEnabled \? unavailableServerConfig : mockConfig\)/);
   assert.match(config, /rewards:\s*remote\.rewards/);
   assert.match(config, /if \(remoteApiEnabled \|\| IS_PRODUCTION\) return;/);
   assert.match(config, /const remote = await platformConfigApi\.platformConfig\(\);[\s\S]*?config\.value = \{[\s\S]*?featureFlags: \{ \.\.\.config\.value\.featureFlags, \.\.\.remote\.featureFlags \}[\s\S]*?publicStats: remote\.publicStats[\s\S]*?onlineBonus: remote\.onlineBonus[\s\S]*?rewards: remote\.rewards[\s\S]*?computeShare: remote\.computeShare/);
-  assert.match(config, /catch \{[\s\S]*?syncFailed\.value = true/);
+  assert.match(config, /function clearRemotePlatformAuthority\(\)[\s\S]*?syncFailed\.value = true/);
+  assert.match(config, /catch \{[\s\S]*?clearRemotePlatformAuthority\(\)/);
   assert.match(rank, /function setMyRank\(v: VRank\) \{[\s\S]*?if \(remoteApiEnabled\) return;/);
   {
     const block = fnBlock(rank, "bindAccount");

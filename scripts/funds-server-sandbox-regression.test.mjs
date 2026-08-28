@@ -50,7 +50,7 @@ assert.match(walletPage, /fundsAuthorityError[\s\S]{0,250}fundsSandboxError/,
   "wallet refresh failure must remain visible instead of falling back to a local balance");
 assert.match(walletPage, /<FundsSandboxBadge\b/,
   "the successful sandbox wallet balance must stay visibly labelled");
-assert.match(sandboxBadge, /Acceptance Sandbox · source=mock · SANDBOX[\s\S]{0,900}fundsSandboxEvidence/,
+assert.match(sandboxBadge, /Development Funds · source=mock · SANDBOX[\s\S]{0,900}fundsSandboxEvidence/,
   "the label must be derived from the validated server provenance");
 // Remote and explicit sandbox balances are both server-owned. The client may
 // mirror their readbacks, but it must never apply a second local debit/refund.

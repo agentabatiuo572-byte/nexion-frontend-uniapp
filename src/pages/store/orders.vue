@@ -35,7 +35,7 @@
           role="button"
           tabindex="0"
           :aria-label="`${o.productName} ${o.id}`"
-          @click.stop="goDetail(o.id)"
+          @click.stop="goOrder(o)"
         >
           <view class="flex items-start" style="gap: 12px">
             <view class="grid place-items-center shrink-0" :style="iconBoxStyle(o.status)">
@@ -47,6 +47,7 @@
                 <text class="shrink-0" :style="statusChipStyle(o.status)">{{ badge(o.status).label }}</text>
               </view>
               <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
+              <text v-if="o.meta" class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ o.meta }}</text>
               <view class="flex items-center justify-between" style="margin-top: 6px">
                 <text style="font-size: 12px; color: var(--v5-ink-4)">{{ dateText(o.placedAt) }}</text>
                 <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; font-weight: 600; color: var(--v5-ink)">${{ o.total.toLocaleString() }}</text>
@@ -66,7 +67,9 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
-import { useOrders, type OrderStatus } from "@/store/orders";
+import { useOrders, type Order, type OrderStatus } from "@/store/orders";
+import { useGenesis } from "@/store/genesis";
+import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import { onShow } from "@dcloudio/uni-app";
@@ -74,7 +77,13 @@ import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
-const orderList = computed(() => orders.orders);
+const genesis = useGenesis();
+type CommerceOrderListItem = Order & { kind: "commerce"; meta?: string };
+type OrderListItem = CommerceOrderListItem | GenesisOrderListItem;
+const orderList = computed<OrderListItem[]>(() => [
+  ...orders.orders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
+  ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
+].sort((a, b) => b.placedAt - a.placedAt));
 const remoteOrdersError = ref(false);
 const remoteOrdersRefreshing = ref(false);
 async function refreshOrders() {
@@ -82,7 +91,13 @@ async function refreshOrders() {
   remoteOrdersRefreshing.value = true;
   remoteOrdersError.value = false;
   try {
-    await orders.refreshRemote();
+    const [commerceResult, genesisResult] = await Promise.allSettled([
+      orders.refreshRemote(),
+      genesis.syncRemote(),
+    ]);
+    const commerceAvailable = commerceResult.status === "fulfilled";
+    const genesisAvailable = genesisResult.status === "fulfilled" && genesisResult.value;
+    remoteOrdersError.value = !commerceAvailable && !genesisAvailable;
   } catch {
     remoteOrdersError.value = true;
   } finally {
@@ -138,8 +153,8 @@ function dateText(ts: number): string {
 function goStore() {
   navTo("/store");
 }
-function goDetail(id: string) {
-  navTo(`/pages/store/order-detail?id=${id}`);
+function goOrder(order: OrderListItem) {
+  navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${order.id}`);
 }
 
 const remoteErrorStyle: CSSProperties = {

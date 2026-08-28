@@ -672,7 +672,7 @@ function go(tab: { key: string; route: string }) {
   navTo(tab.route);
 }
 function goSearch() {
-  uni.navigateTo({ url: "/pages/search/search", fail: () => {} });
+  navTo("/pages/search/search");
 }
 // Bell → in-place slide-in MessageDrawer (now ported, P-043), matching the
 // prototype. (Was routing to the full /pages/me/notifications page as a stopgap.)

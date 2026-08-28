@@ -81,6 +81,13 @@ export const useProfile = defineStore("profile", () => {
     phoneE164.value = `${identity.countryCode}${identity.phone}`;
   }
 
+  /** Reconcile the mutable profile projection with an authoritative GET. */
+  function projectServerNickname(nickname: string) {
+    if (!remoteApiEnabled) return;
+    const normalized = nickname.trim();
+    if (normalized) displayName.value = normalized;
+  }
+
   async function refreshNicknameCandidates(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const request = remoteAccountEpoch.snapshot();
@@ -127,6 +134,7 @@ export const useProfile = defineStore("profile", () => {
 
   return {
     displayName, avatarSeed, phoneE164, nicknameCandidates,
-    setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity, refreshNicknameCandidates,
+    setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity, projectServerNickname,
+    refreshNicknameCandidates,
   };
 });

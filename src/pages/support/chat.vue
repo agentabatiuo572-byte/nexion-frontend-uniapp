@@ -37,6 +37,9 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
+      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation" @keydown.enter.prevent="onStartNewConversation" @keydown.space.prevent="onStartNewConversation">
+        <text>{{ t.conversations.restartSession }}</text>
+      </view>
       <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket">
         <text>{{ t.conversations.convertTicket }}</text>
       </view>
@@ -53,7 +56,7 @@
       :quick-chips="quickChips"
       :empty-hint="emptyHint"
       :typing="agentTyping"
-      :typing-label="t.conversations.agentTyping"
+      :typing-label="thinkingLabel"
       :reveal-tick="revealTick"
       :closed="isClosedSession"
       :restart-label="isAi && remoteApiEnabled ? t.nova.localRetry : t.conversations.restartSession"
@@ -100,6 +103,15 @@ import type { ConversationType } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { useLocaleStore } from "@/store/locale";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
+import {
+  createLatestAbortableRequest,
+  NOVA_THINKING_CHECKING_MS,
+  NOVA_THINKING_COMPOSING_MS,
+  novaThinkingNow,
+  remainingNovaThinkingMs,
+  type NovaThinkingStage,
+} from "@/lib/nova-thinking";
 
 const t = useT();
 const convStore = useConversations();
@@ -115,7 +127,9 @@ const initialPrompt = ref("");
 const novaProviderHold = ref(false);
 const novaStatusLoading = ref(false);
 const novaAiRequestInFlight = ref(false);
+const novaThinkingStage = ref<NovaThinkingStage>("understanding");
 let novaStatusEpoch = 0;
+const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
 const HUMAN_THREAD_POLL_MS = 5_000;
 let humanThreadPoll: ReturnType<typeof setTimeout> | undefined;
@@ -202,9 +216,19 @@ onLoad((q) => {
 onShow(async () => {
   revealTick.value += 1;
   if (isAi.value) {
-    if (remoteApiEnabled) nova.bindRemoteAccount(app.accountKey);
+    if (remoteApiEnabled) {
+      try {
+        nova.bindRemoteAccount(app.accountKey);
+      } catch {
+        novaProviderHold.value = true;
+        novaStatusLoading.value = false;
+        return;
+      }
+    }
     nova.open(); // mark Nova as being viewed → clears + tracks unread
-    if (remoteApiEnabled) await refreshNovaAvailability();
+    if (remoteApiEnabled) {
+      await Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
+    }
   }
   else if (cid.value) {
     humanThreadVisible = true;
@@ -219,7 +243,10 @@ onShow(async () => {
   }
 });
 onHide(() => {
-  if (isAi.value) nova.close(); // no longer viewing Nova → later pushes accrue unread
+  if (isAi.value) {
+    cancelNovaThinking();
+    nova.close(); // no longer viewing Nova → later pushes accrue unread
+  }
   stopHumanThreadPolling();
 });
 
@@ -251,8 +278,16 @@ function displayAgentName(name: string): string {
 const agentTyping = computed(() =>
   isAi.value ? nova.typing : (cid.value ? convStore.typingIds[cid.value] === true : false),
 );
+const thinkingLabel = computed(() => {
+  if (!isAi.value || !remoteApiEnabled) return t.value.conversations.agentTyping;
+  switch (novaThinkingStage.value) {
+    case "checking": return t.value.nova.thinkingChecking;
+    case "composing": return t.value.nova.thinkingComposing;
+    default: return t.value.nova.thinkingUnderstanding;
+  }
+});
 const headerRole = computed(() => {
-  if (agentTyping.value) return t.value.conversations.agentTyping;
+  if (agentTyping.value) return thinkingLabel.value;
   if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
   if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
   if (isAi.value && remoteApiEnabled) return t.value.nova.localRole;
@@ -363,6 +398,14 @@ async function refreshNovaAvailability() {
   }
 }
 
+async function refreshNovaHistory() {
+  if (!remoteApiEnabled || !isAi.value) return;
+  const accountKey = app.accountKey;
+  const history = await novaAiApi.history();
+  if (accountKey !== app.accountKey || !history.conversationId) return;
+  nova.hydrateRemote(accountKey, history.conversationId, history.messages);
+}
+
 function quickLabel(k: QuickPromptKey): string {
   if (remoteApiEnabled) {
     switch (k) {
@@ -387,13 +430,77 @@ const pendingTimers: ReturnType<typeof setTimeout>[] = [];
 function schedule(fn: () => void, ms: number) {
   pendingTimers.push(setTimeout(fn, ms));
 }
+
+const novaThinkingTimers = new Set<ReturnType<typeof setTimeout>>();
+let pendingNovaThinkingWait: {
+  timer: ReturnType<typeof setTimeout>;
+  resolve: (completed: boolean) => void;
+} | undefined;
+
+function clearNovaThinkingTimers() {
+  novaThinkingTimers.forEach(clearTimeout);
+  novaThinkingTimers.clear();
+}
+
+function scheduleNovaThinkingStage(stage: NovaThinkingStage, ms: number, epoch: number) {
+  const timer = setTimeout(() => {
+    novaThinkingTimers.delete(timer);
+    if (novaRequestControl.isCurrent(epoch)) novaThinkingStage.value = stage;
+  }, ms);
+  novaThinkingTimers.add(timer);
+}
+
+function beginNovaThinking() {
+  clearNovaThinkingTimers();
+  const request = novaRequestControl.begin();
+  novaThinkingStage.value = "understanding";
+  nova.setTyping(true);
+  scheduleNovaThinkingStage("checking", NOVA_THINKING_CHECKING_MS, request.epoch);
+  scheduleNovaThinkingStage("composing", NOVA_THINKING_COMPOSING_MS, request.epoch);
+  return request;
+}
+
+function waitForNovaThinkingDelay(ms: number, epoch: number): Promise<boolean> {
+  if (!novaRequestControl.isCurrent(epoch)) return Promise.resolve(false);
+  if (ms <= 0) return Promise.resolve(true);
+  if (pendingNovaThinkingWait) {
+    clearTimeout(pendingNovaThinkingWait.timer);
+    pendingNovaThinkingWait.resolve(false);
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (pendingNovaThinkingWait?.timer === timer) pendingNovaThinkingWait = undefined;
+      resolve(novaRequestControl.isCurrent(epoch));
+    }, ms);
+    pendingNovaThinkingWait = { timer, resolve };
+  });
+}
+
+function finishNovaThinking(epoch: number) {
+  if (!novaRequestControl.finish(epoch)) return;
+  clearNovaThinkingTimers();
+  nova.setTyping(false);
+}
+
+function cancelNovaThinking() {
+  novaRequestControl.cancel();
+  clearNovaThinkingTimers();
+  if (pendingNovaThinkingWait) {
+    clearTimeout(pendingNovaThinkingWait.timer);
+    pendingNovaThinkingWait.resolve(false);
+    pendingNovaThinkingWait = undefined;
+  }
+  nova.setTyping(false);
+  novaAiRequestInFlight.value = false;
+}
+
 function cleanup() {
   stopHumanThreadPolling();
   pendingTimers.forEach(clearTimeout);
   pendingTimers.length = 0;
   // Cancelled timers would otherwise leave a ghost "typing…" flag on the store
   // (it bleeds into the list preview) — always drop it on the way out.
-  nova.setTyping(false);
+  cancelNovaThinking();
   // Reset Nova's open flag (the AI chat page acted as the "open" view). Without this
   // isOpen stays true forever and every future proactive push would silently zero
   // unread → the bubble would never surface Nova news again after one AI visit.
@@ -438,32 +545,49 @@ async function onSend(text: string, restore?: () => void) {
         return;
       }
       const accountKey = app.accountKey;
-      const history = nova.messages.slice(-10).map((message) => ({
-        role: message.sender === "user" ? "user" as const : "assistant" as const,
-        content: message.text,
-      }));
+      const conversationId = nova.conversationId;
+      if (!conversationId) {
+        restore?.();
+        novaProviderHold.value = true;
+        toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
+        return;
+      }
       nova.sendUser(text);
       nova.markUserRead();
-      nova.setTyping(true);
+      const requestStartedAt = novaThinkingNow();
+      const request = beginNovaThinking();
       novaAiRequestInFlight.value = true;
       try {
         const result = await novaAiApi.chat({
           message: text,
           language: locale.code === "zh" || locale.code === "vi" ? locale.code : "en",
-          history,
-        });
-        if (accountKey !== app.accountKey) return;
+          conversationId,
+          turnId: requireCryptoUuid(),
+        }, request.signal);
+        if (!novaRequestControl.isCurrent(request.epoch)
+            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
+        const delayCompleted = await waitForNovaThinkingDelay(
+          remainingNovaThinkingMs(requestStartedAt, novaThinkingNow()),
+          request.epoch,
+        );
+        if (!delayCompleted || !novaRequestControl.isCurrent(request.epoch)
+            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
         nova.push({ kind: "nova-reply", text: result.reply });
       } catch (error) {
-        if (accountKey !== app.accountKey) return;
+        if (!novaRequestControl.isCurrent(request.epoch)
+            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
         const failure = asApiError(error);
         if (["NOVA_AI_DISABLED", "NOVA_AI_UNAVAILABLE"].includes(failure.message)) novaProviderHold.value = true;
         nova.push({ kind: "nova-reply", text: t.value.nova.localFailed });
         toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
       } finally {
-        if (accountKey === app.accountKey) nova.setTyping(false);
-        else nova.bindRemoteAccount(app.accountKey);
-        novaAiRequestInFlight.value = false;
+        if (novaRequestControl.isCurrent(request.epoch)) {
+          finishNovaThinking(request.epoch);
+          novaAiRequestInFlight.value = false;
+        }
+        if (accountKey !== app.accountKey || conversationId !== nova.conversationId) {
+          nova.bindRemoteAccount(app.accountKey);
+        }
       }
       return;
     }
@@ -526,6 +650,18 @@ function onChip(key: string) {
 
 function onCta(href: string) {
   navTo(href);
+}
+
+function onStartNewConversation() {
+  try {
+    cancelNovaThinking();
+    nova.startNewConversation();
+    initialPrompt.value = "";
+    revealTick.value += 1;
+  } catch {
+    novaProviderHold.value = true;
+    toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
+  }
 }
 
 function goBack() {

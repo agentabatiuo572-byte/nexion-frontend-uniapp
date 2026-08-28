@@ -132,6 +132,7 @@ import { fmt } from "@/i18n/format";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useFreeTrial } from "@/store/free-trial";
 import { remoteApiEnabled } from "@/api/runtime";
+import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -169,7 +170,9 @@ function toggleDevice(id: string) {
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, { n: devices.value.length }));
+const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, {
+  n: devices.value.filter(isActiveSlotDevice).length,
+}));
 
 // ── HERO total earned ──
 const serverPeriod = computed(() => {

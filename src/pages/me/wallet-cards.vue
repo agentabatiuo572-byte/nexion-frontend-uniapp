@@ -2,7 +2,7 @@
   Wallet Cards — ported from Nexion-prototype/app/(main)/me/wallet/cards/page.tsx.
   Saved bank cards list + management. Each card: brand + •••• last4, default
   badge, "Set as default" + "Unbind" actions. Empty state + "Add a new card"
-  CTA + PCI disclaimer. Reads the new useCards store; remove is destructive →
+  CTA + explicit local-simulation disclosure. Reads the new useCards store; remove is destructive →
   confirm() (P: destructive → confirm). Cards are fully decoupled from the
   free trial (FEAT-TRIAL02 异常5): unbinding any card never touches the trial —
   no retention sheet, no trial cancel. SetPageHeader → SubPageHeader.
@@ -12,7 +12,7 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="t.cards.listSubtitle" />
-      <FundsSandboxBadge />
+      <CardSimulationBadge />
 
       <view :style="bodyStyle">
         <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
@@ -42,13 +42,13 @@
             </view>
           </view>
           <view class="flex" :style="cardActionsStyle">
-            <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="setDefault(card.tokenId)">
+            <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" role="button" tabindex="0" data-testid="wallet-card-set-default" @click="setDefault(card.tokenId)" @keydown.enter.prevent="setDefault(card.tokenId)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 <text :style="actionDefaultTextStyle">{{ t.cards.setDefault }}</text>
               </view>
             </view>
-            <view class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="handleRemove(card)">
+            <view class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" role="button" tabindex="0" data-testid="wallet-card-unbind" @click="handleRemove(card)" @keydown.enter.prevent="handleRemove(card)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                 <text :style="actionUnbindTextStyle">{{ t.cards.unbind }}</text>
@@ -81,7 +81,7 @@ import { confirm, toast } from "@/store/ui";
 import { useCards, brandLabel, type SavedCard } from "@/store/cards";
 import { useNotifications } from "@/store/notifications";
 import { cardUnboundNotification } from "@/mock/card-notifications";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
+import CardSimulationBadge from "@/components/me/card-simulation-badge.vue";
 import { remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
 
 const t = useT();

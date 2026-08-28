@@ -14,17 +14,17 @@ test("tab navigation uses the transient-overlay-safe route gate", () => {
   assert.doesNotMatch(chassis, /uni\.reLaunch\(\{ url: tab\.route/);
 });
 
-test("an empty first-user notification surface exposes the repurchase How entry", () => {
+test("an empty first-user notification surface stays honest and does not invent business navigation", () => {
   const drawer = read("src/components/message-drawer.vue");
-  assert.match(drawer, /data-how-entry="wallet-repurchase-how"/);
-  assert.match(drawer, /goRepurchaseHow/);
-  assert.match(drawer, /navTo\("\/pages\/me\/wallet-repurchase-how"\)/);
+  assert.match(drawer, /notifs\.items\.length === 0[\s\S]*t\.value\.notifs\.emptyAllTitle/);
+  assert.doesNotMatch(drawer, /wallet-repurchase-how|goRepurchaseHow/);
 });
 
-test("team keeps both How entries as direct visible navigation targets", () => {
-  const team = read("src/pages/team/team.vue");
-  assert.match(team, /data-how-entry="team-binary-how"[\s\S]*?role="button"[\s\S]*?tabindex="0"[\s\S]*?navTo\('\/pages\/team\/binary-how'\)/);
-  assert.match(team, /data-how-entry="team-unilevel-how"[\s\S]*?role="button"[\s\S]*?tabindex="0"[\s\S]*?navTo\('\/pages\/team\/unilevel-how'\)/);
+test("team detail pages keep both How entries as direct keyboard-accessible targets", () => {
+  const binary = read("src/pages/team/binary.vue");
+  const unilevel = read("src/pages/team/unilevel.vue");
+  assert.match(binary, /role="button" tabindex="0"[\s\S]*@click="go\('\/pages\/team\/binary-how'\)"/);
+  assert.match(unilevel, /role="button" tabindex="0"[\s\S]*@click="go\('\/pages\/team\/unilevel-how'\)"/);
 });
 
 test("back navigation also closes transient overlays before popping the stack", () => {

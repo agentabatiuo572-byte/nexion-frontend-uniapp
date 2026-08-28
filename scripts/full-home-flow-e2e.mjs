@@ -18,6 +18,7 @@ const runId = process.env.NX_FULL_RUN_ID || `full-home-${new Date().toISOString(
 const evidenceDir = path.resolve(process.env.NX_FULL_EVIDENCE_DIR || `D:/workspace/bug-pic/app-home-full-flow-20260824/${runId}`);
 const phone = process.env.NX_FULL_PHONE || `139${String(Date.now() % 100_000_000).padStart(8, "0")}`;
 const password = process.env.NX_FULL_PASSWORD || `Nx!Full${String(Date.now()).slice(-8)}Aa`;
+const reuseExisting = process.env.NX_FULL_REUSE_EXISTING === "1";
 const countryCode = "+86";
 const countryIso = "CN";
 const voucherName = `首页全流程验收券-${Date.now()}`;
@@ -535,12 +536,24 @@ const routeLandingContracts = {
 };
 
 async function clickRoute({ label, locator, route, marker, verify, timeout = 20_000 }) {
-  const frame = await returnHome();
-  const target = locator(frame);
-  await target.scrollIntoViewIfNeeded();
-  await target.waitFor({ state: "visible" });
-  const beforeFailures = appFailures.length;
-  await target.click();
+  let beforeFailures = appFailures.length;
+  let clicked = false;
+  let lastCarrierError;
+  for (let attempt = 0; attempt < 3 && !clicked; attempt += 1) {
+    const frame = await returnHome();
+    const target = locator(frame);
+    beforeFailures = appFailures.length;
+    try {
+      await target.scrollIntoViewIfNeeded();
+      await target.waitFor({ state: "visible" });
+      await target.click();
+      clicked = true;
+    } catch (error) {
+      lastCarrierError = error;
+      if (!/Frame was detached|Execution context was destroyed/i.test(String(error))) throw error;
+    }
+  }
+  assert(clicked, `CLICK_CARRIER_DID_NOT_STABILIZE:${label}:${String(lastCarrierError)}`);
   await waitUntil(() => Promise.resolve(currentAppUrl().includes(`#${route}`)), `CLICK_ROUTE_FAILED:${label}:${route}`, timeout);
   const landing = await waitForAppFrame("body");
   // UniApp updates the hash before Vue finishes mounting the destination page.
@@ -680,7 +693,7 @@ async function testHomeInteractions() {
   }
 
   await clickRoute({ label: "我的设备：管理", locator: (home) => home.getByText(/管理\s*→/).first(), route: "/pages/earn/earn" });
-  await clickRoute({ label: "我的设备：添加设备", locator: (home) => home.locator(".grid.place-items-center.shrink-0").filter({ has: home.locator("svg") }).last(), route: "/pages/store/store" });
+  await clickRoute({ label: "我的设备：添加设备", locator: (home) => home.locator(".grid.place-items-center.shrink-0").filter({ has: home.locator("svg") }).last(), route: "/pages/store/detail" });
   await clickRoute({ label: "在网节点：地图", locator: (home) => home.locator("[data-home-action='on-grid-map']"), route: "/pages/globe/globe" });
   const calculatorHome = await returnHome();
   if (await calculatorHome.locator("[data-home-section='do-the-math'] [role='link']").count() > 0) {
@@ -718,8 +731,8 @@ async function testHomeInteractions() {
   });
   assert(paymentBoundary.cardCount === 0 && paymentBoundary.defaultTokenId === null, `PAYMENT_BOUNDARY_DID_NOT_FAIL_CLOSED:${JSON.stringify(paymentBoundary)}`);
   controlledUiAssertions.push({
-    contract: "payment-method-development-account-boundary",
-    proof: "非配置开发验收账号得到账号隔离的空卡状态，未继承其他账号支付资料",
+    contract: "payment-method-sandbox-account-isolation",
+    proof: "新注册 Sandbox 账号从服务端得到独立空卡状态，可使用本地模拟绑卡且未继承其他账号支付资料",
     result: "PASS",
   });
 
@@ -809,11 +822,6 @@ function controlledResponseContract(entry) {
       && controlledUiAssertions.some((item) => item.contract === "new-account-trial-state-absent" && item.result === "PASS")) {
     return "trial-development-account-boundary-fail-closed";
   }
-  if (entry.method === "GET" && entry.path === "/api/payment-methods" && entry.status === 403
-      && entry.message === "PAYMENT_METHOD_DEVELOPMENT_USER_REQUIRED"
-      && controlledUiAssertions.some((item) => item.contract === "payment-method-development-account-boundary" && item.result === "PASS")) {
-    return "payment-method-development-account-boundary-empty-state";
-  }
   if (entry.method === "POST" && entry.path === "/api/quests/visit_store/claim" && entry.status === 409
       && entry.message === "QUEST_NOT_CLAIMABLE"
       && controlledUiAssertions.some((item) => item.contract === "visit-store-quest-idempotent-state" && item.result === "PASS")) {
@@ -891,9 +899,13 @@ let pcVoucherCreated = false;
 try {
   const backendHealth = await fetch(`${backendBaseUrl}/api/legal/terms/current?country=US&locale=en-US`).then((response) => ({ status: response.status, ok: response.ok }));
   assert(backendHealth.ok, `BACKEND_HEALTH_FAILED:${backendHealth.status}`);
-  await registerNewUser();
-  await logoutInApp();
-  await loginNewUser();
+  if (reuseExisting) {
+    await loginNewUser();
+  } else {
+    await registerNewUser();
+    await logoutInApp();
+    await loginNewUser();
+  }
   await createPcVoucher();
   pcVoucherCreated = true;
   await testVoucherOnHome();
@@ -937,6 +949,7 @@ try {
     runId,
     account: { countryCode, phoneMasked: `${phone.slice(0, 3)}****${phone.slice(-4)}` },
     registrationAndLogin: {
+      reusedExistingAccount: reuseExisting,
       registrationOtpSend: appResponses.some((entry) => entry.path === "/auth/users/register/otp/send" && entry.status === 200),
       registrationCommit: appResponses.some((entry) => entry.path === "/auth/users/register" && entry.status === 200),
       passwordLogin: appResponses.some((entry) => entry.path === "/auth/users/login" && entry.status === 200),

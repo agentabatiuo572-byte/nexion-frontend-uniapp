@@ -85,6 +85,7 @@
         </view>
         <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
         <text v-if="heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ heldLine }}</text>
+        <text v-if="withdrawalRatioLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalRatioLine }}</text>
       </view>
 
       <!-- 🔴 小额免审快车道的正向态:免掉闸时**说出来**。走查实测,此前输 $30 页面一个字都没有,
@@ -371,6 +372,11 @@ import {
 } from "@/lib/withdraw-attempt";
 import { navTo } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
+import {
+  computeWithdrawalMaximum,
+  formatWithdrawalRatioPercent,
+  resolveWithdrawalUseMax,
+} from "@/lib/withdrawal-use-max";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
@@ -549,22 +555,33 @@ watch(sandboxWithdrawalPolicy, () => {
 // 已随 c37e642 的本地扣款链一并移除 —— **提交路径**上客户端不再扣款,超额请求由本
 // computed 的 fail-closed 上限拦 + 服务端 reservation 拒;别再指望 app.ts 的提交函数里
 // 有总余额门(建单**成功之后**的 applyWithdrawalDebit 另有一道扣款闸,那是另一段链)。
-const maxWithdrawable = computed(() => {
+const preRatioWithdrawable = computed(() => {
   const sandboxPolicy = sandboxWithdrawalPolicy.value;
   if (developmentFundsEnabled) {
     // The wallet GET is the sandbox balance authority. Do not require the
     // production earnings-release projection (which is intentionally absent
     // from this isolated ledger) and do not show a local fallback on failure.
-    return sandboxPolicy ? Math.max(0, app.user.usdtBalance * sandboxPolicy.balanceMaxRatio) : 0;
+    return sandboxPolicy ? Math.max(0, app.user.usdtBalance) : 0;
   }
   if (earningsReleaseSnapshot.value?.clusterRestricted) return 0;
   const buckets = earningsReleaseSnapshot.value?.buckets;
   if (!buckets) return 0;
-  const serverWithdrawable = Math.max(0,
-    app.user.usdtBalance - buckets.pending_review - buckets.bonus_locked);
-  return serverWithdrawable * (withdrawalPolicy.value?.balanceMaxRatio ?? 0);
+  return Math.max(0, app.user.usdtBalance - buckets.pending_review - buckets.bonus_locked);
+});
+const maxWithdrawable = computed(() => {
+  const ratio = withdrawalPolicy.value?.balanceMaxRatio ?? 0;
+  return computeWithdrawalMaximum(preRatioWithdrawable.value, ratio);
 });
 const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
+const withdrawalRatioLine = computed(() => {
+  const ratio = withdrawalPolicy.value?.balanceMaxRatio ?? 0;
+  const held = Math.max(0, preRatioWithdrawable.value - maxWithdrawable.value);
+  if (ratio <= 0 || ratio >= 0.999999 || held <= 0.000001) return "";
+  return fmt(t.value.wallet.withdrawalRatioLine, {
+    pct: formatWithdrawalRatioPercent(ratio),
+    held: held.toFixed(2),
+  });
+});
 /**
  * 🔴 日限的两件事实**只从这一个地方取**,文案与闸共用它 —— 说的那个 N 和拦人用的 N
  * 必须字面同源。此前文案取服务端 policy、判定取本地 config.withdrawRules(远端同步
@@ -1102,7 +1119,15 @@ function onAmount(e: Event) {
 }
 function useMax() {
   if (inputsLocked.value) return;
-  amount.value = maxWithdrawable.value.toFixed(2);
+  const decision = resolveWithdrawalUseMax(maxWithdrawable.value, minWithdrawable.value);
+  if (decision.reason === "below-minimum") {
+    toast.info(fmt(t.value.wallet.useMaxBelowMinimum, {
+      max: maxWithdrawable.value.toFixed(2),
+      min: minWithdrawable.value.toFixed(2),
+    }));
+    return;
+  }
+  amount.value = decision.amount ?? "";
 }
 
 function goEarnNex() {

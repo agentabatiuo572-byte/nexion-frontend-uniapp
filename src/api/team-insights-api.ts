@@ -61,12 +61,8 @@ function leaderboard(value: unknown, mode: ApiEnvironment): TeamLeaderboardSnaps
 }
 
 const KINDS=new Set(["unilevel","binary","peer","cultivation","leadership","genesis"]);
-const STATUSES=new Set(["cooling","unlocked","withdrawn","SIMULATED"]);
-function settlement(v: Record<string, unknown>, mode: ApiEnvironment): { settlementState?: "SIMULATED" | "CANONICAL"; withdrawable?: boolean } {
-  if (mode === "dev") {
-    if (v.settlementState !== "SIMULATED" || v.withdrawable !== false) return invalid();
-    return { settlementState: "SIMULATED", withdrawable: false };
-  }
+const STATUSES=new Set(["cooling","unlocked","withdrawn"]);
+function settlement(v: Record<string, unknown>): { settlementState?: "CANONICAL"; withdrawable?: boolean } {
   if (v.settlementState !== undefined && v.settlementState !== "CANONICAL") return invalid();
   if (v.withdrawable !== undefined && typeof v.withdrawable !== "boolean") return invalid();
   return {
@@ -77,14 +73,16 @@ function settlement(v: Record<string, unknown>, mode: ApiEnvironment): { settlem
 function commissions(value: unknown, mode: ApiEnvironment): TeamCommissionSnapshot {
   const source=row(value); const proof=provenance(source, mode);
   if(!Array.isArray(source.events)) return invalid();
-  if (mode === "dev" && (source.factStatus !== "SIMULATED" || source.withdrawable !== false || source.payoutStatus !== "NON_WITHDRAWABLE")) return invalid();
-  const events=source.events.map((item):CommissionEvent=>{const v=row(item);const rawStatus=String(v.status);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId")||!KINDS.has(String(v.kind))||!STATUSES.has(rawStatus)) return invalid();if(mode === "dev" && rawStatus !== "SIMULATED") return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v,mode);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:rawStatus === "SIMULATED" ? "simulated" : rawStatus as CommissionEvent["status"],...state};});
+  if (source.factStatus !== undefined && source.factStatus !== "CANONICAL") return invalid();
+  if (source.withdrawable !== undefined && typeof source.withdrawable !== "boolean") return invalid();
+  if (source.payoutStatus !== undefined && source.payoutStatus !== "CANONICAL") return invalid();
+  const events=source.events.map((item):CommissionEvent=>{const v=row(item);const rawStatus=String(v.status);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId")||!KINDS.has(String(v.kind))||!STATUSES.has(rawStatus)) return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:rawStatus as CommissionEvent["status"],...state};});
   const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();
   return {...proof,events,generatedAt,...(source.factStatus === undefined ? {} : {factStatus: source.factStatus as "SIMULATED" | "CANONICAL"}),...(source.withdrawable === undefined ? {} : {withdrawable: source.withdrawable as boolean}),...(source.payoutStatus === undefined ? {} : {payoutStatus: source.payoutStatus as "NON_WITHDRAWABLE" | "CANONICAL"})};
 }
 
 function split(value: unknown): TeamUnilevelSplit { const source=row(value); return { amountUSDT:num(source.amountUSDT), amountNEX:num(source.amountNEX), count:num(source.count,true) }; }
-function unilevel(value: unknown, mode: ApiEnvironment): TeamUnilevelSnapshot { const source=row(value);const proof=provenance(source, mode);const period=source.period;if(period!=="today"&&period!=="week"&&period!=="month"&&period!=="all")return invalid();if(!Array.isArray(source.events))return invalid();const events=source.events.map((item):TeamUnilevelEvent=>{const v=row(item);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId"))return invalid();const layer=num(v.layer,true);if(layer<1||layer>7)return invalid();const rawStatus=String(v.status);if(!STATUSES.has(rawStatus)||(mode === "dev" && rawStatus !== "SIMULATED"))return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v,mode);return {id:text(v.id),source:text(v.source),sourceUserName:text(v.sourceUserName),cycle:text(v.cycle),layer,orderId:v.orderId===null||v.orderId===undefined?null:text(v.orderId),orderAmountUSD:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),currency:text(v.currency),status:rawStatus === "SIMULATED" ? "simulated" : rawStatus as CommissionEvent["status"],ts,unlockAt,...state};});const rawSplit=row(source.split);const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();return {...proof,period,events,split:{direct:split(rawSplit.direct),extended:split(rawSplit.extended)},generatedAt}; }
+function unilevel(value: unknown, mode: ApiEnvironment): TeamUnilevelSnapshot { const source=row(value);const proof=provenance(source, mode);const period=source.period;if(period!=="today"&&period!=="week"&&period!=="month"&&period!=="all")return invalid();if(!Array.isArray(source.events))return invalid();const events=source.events.map((item):TeamUnilevelEvent=>{const v=row(item);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId"))return invalid();const layer=num(v.layer,true);if(layer<1||layer>7)return invalid();const rawStatus=String(v.status);if(!STATUSES.has(rawStatus))return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v);return {id:text(v.id),source:text(v.source),sourceUserName:text(v.sourceUserName),cycle:text(v.cycle),layer,orderId:v.orderId===null||v.orderId===undefined?null:text(v.orderId),orderAmountUSD:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),currency:text(v.currency),status:rawStatus as CommissionEvent["status"],ts,unlockAt,...state};});const rawSplit=row(source.split);const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();return {...proof,period,events,split:{direct:split(rawSplit.direct),extended:split(rawSplit.extended)},generatedAt}; }
 
 function almostEqual(actual: number, expected: number): boolean {
   return Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 1e-9);

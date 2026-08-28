@@ -53,10 +53,22 @@
               <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ trialOffset.offsetUSD.toFixed(2) }}</text>
             </view>
             <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
-            <view class="w-full flex items-center justify-center active:scale-[0.98] active:opacity-85" :style="buyBtnStyle" role="button" tabindex="0" :aria-label="buyCtaText" @click="goCheckout">
+            <view
+              class="w-full flex items-center justify-center"
+              :class="trialProductUnavailable ? '' : 'active:scale-[0.98] active:opacity-85'"
+              :style="trialProductUnavailable ? buyBtnDisabledStyle : buyBtnStyle"
+              role="button"
+              :tabindex="trialProductUnavailable ? -1 : 0"
+              :aria-label="buyCtaText"
+              :aria-disabled="trialProductUnavailable ? 'true' : 'false'"
+              @click="goCheckout"
+              @keydown.enter.prevent="goCheckout"
+              @keydown.space.prevent="goCheckout"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="margin-left: 6px">{{ buyCtaText }}</text>
+              <text style="margin-left: 6px">{{ trialProductUnavailable ? t.store.temporarilyOutOfStock : buyCtaText }}</text>
             </view>
+            <text v-if="trialProductUnavailable" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
           </view>
 
           <!-- Rules entry -->
@@ -82,10 +94,12 @@
             :class="canStartNow ? 'active:scale-[0.98]' : ''"
             :style="canStartNow ? idleCtaStyle : idleCtaDisabledStyle"
             role="button"
-            tabindex="0"
+            :tabindex="canStartNow ? 0 : -1"
             :aria-label="t.trial.idleCta"
             :aria-disabled="canStartNow ? 'false' : 'true'"
             @click="claim"
+            @keydown.enter.prevent="claim"
+            @keydown.space.prevent="claim"
           >
             <text>{{ t.trial.idleCta }}</text>
           </view>
@@ -100,9 +114,10 @@
           </view>
           <text class="block" :style="idleTitleStyle">{{ t.trial.endedTitle }}</text>
           <text class="block" :style="idleBodyStyle">{{ endedDesc }}</text>
-          <view class="inline-flex items-center justify-center active:scale-[0.98]" :style="idleCtaStyle" role="button" tabindex="0" :aria-label="t.trial.buyCtaPlain" @click="goCheckout">
-            <text>{{ t.trial.buyCtaPlain }}</text>
+          <view class="inline-flex items-center justify-center" :class="trialProductUnavailable ? '' : 'active:scale-[0.98]'" :style="trialProductUnavailable ? idleCtaDisabledStyle : idleCtaStyle" role="button" :tabindex="trialProductUnavailable ? -1 : 0" :aria-label="t.trial.buyCtaPlain" :aria-disabled="trialProductUnavailable ? 'true' : 'false'" @click="goCheckout" @keydown.enter.prevent="goCheckout" @keydown.space.prevent="goCheckout">
+            <text>{{ trialProductUnavailable ? t.store.temporarilyOutOfStock : t.trial.buyCtaPlain }}</text>
           </view>
+          <text v-if="trialProductUnavailable" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
         </view>
 
         <!-- ═══ converted — owned terminal ═══ -->
@@ -153,8 +168,10 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyErrorKind, geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
-import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
+import { useTrialConfig, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
+import { getProduct } from "@/mock/products";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
@@ -169,6 +186,7 @@ const now = ref(Date.now());
 let ticker: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
+  void refreshProductCatalog(true);
   ticker = setInterval(() => {
     now.value = Date.now();
   }, 1000);
@@ -179,6 +197,16 @@ onUnmounted(() => {
 });
 
 const isActiveCycle = computed(() => status.value === "active" || status.value === "grace");
+const trialProductId = computed(() => resolveTrialCheckoutProductId(cfg.value.trialProductId));
+const trialProduct = computed(() => (trialProductId.value ? getProduct(trialProductId.value) : undefined));
+const trialProductUnavailable = computed(() => {
+  if (productCatalogState.status !== "ready") return true;
+  const product = trialProduct.value;
+  if (!product || product.purchaseBlocked === true) return true;
+  return product.productType !== "SHARE"
+    && product.inventoryMode === "FINITE"
+    && (product.stock ?? 0) <= 0;
+});
 const shadowUSD = computed(() => liveShadowUSD(now.value));
 const shadowNEX = computed(() => liveShadowNEX(now.value));
 const remainingMsValue = computed(() => remainingMs(now.value));
@@ -222,6 +250,7 @@ const ineligibleReasonText = computed(() => {
   if (r === "in-progress") return w.value.eligReasonInProgress;
   if (r === "risk") return w.value.eligReasonRisk;
   if (r === "quota-exhausted") return w.value.eligReasonQuota;
+  if (r === "product-unavailable") return t.value.store.trialProductUnavailable;
   return w.value.eligReasonClosed;
 });
 
@@ -240,11 +269,14 @@ function claim() {
   useTrialClaimSheet().show();
 }
 
-// Conversion CTA → checkout. The trial context derives from store state
-// (status ∈ active|grace ∧ product = trialProductId) — no URL marker, so the
-// same link is the plain purchase entry once the trial has ended.
+// Conversion CTA → checkout. Trial pricing still derives from authoritative
+// state (status ∈ active|grace ∧ product = trialProductId); the URL marker only
+// controls safe return copy when the canonical catalogue omits the trial SKU.
 function goCheckout() {
-  navTo(`/pages/store/checkout?product=${cfg.value.trialProductId}`);
+  if (trialProductUnavailable.value) return;
+  const productId = trialProductId.value;
+  if (!productId) return; // applyAuthoritative already rejects unknown policy ids
+  navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
 function goEarn() {
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
@@ -259,6 +291,7 @@ const stoppedRowStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px 
 const creditWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const remainderNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625, textWrap: "pretty" };
 const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
+const buyBtnDisabledStyle: CSSProperties = { ...buyBtnStyle, background: "var(--v5-surface-2)", color: "var(--v5-ink-4)" };
 const rulesEntryStyle: CSSProperties = { minHeight: "44px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 const goEarnStyle: CSSProperties = { width: "100%", height: "44px", borderRadius: "999px", background: "var(--v5-surface-2)", fontSize: "13px", color: "var(--v5-ink-2)" };
 const idleCardStyle: CSSProperties = {

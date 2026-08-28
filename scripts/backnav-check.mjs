@@ -8,6 +8,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 import {
   assertNoRuntimeErrors,
   assertDirectPageCoverage,
@@ -24,6 +25,7 @@ const page = await browser.newPage({ viewport: { width: 414, height: 896 }, colo
 const errors = [];
 page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
+await installFormalProbeSession(page);
 const title = () => page.$eval(".spv-title", (e) => e.textContent.trim()).catch(() => null);
 
 await page.goto(directAppUrl(BASE, routeA), { waitUntil: "networkidle", timeout: 30000 });

@@ -133,6 +133,7 @@ import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
+import { reconcileProfileEdit, saveProfileAndClaimQuest } from "@/lib/profile-save-flow";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
@@ -230,7 +231,10 @@ async function handleSave() {
       } finally {
         isSaving.value = false;
       }
-      if (setupProfileQuestPending.value) toast.error(t.value.profile.serverMutationFailed);
+      // The nickname is already authoritative at this point. A missing or
+      // temporarily unavailable setup-profile reward must never turn the
+      // completed profile mutation into a visible profile-service failure.
+      if (setupProfileQuestPending.value) toast.info(t.value.profile.noChangesToast);
       else toast.success(t.value.profile.savedToast);
       return;
     }
@@ -240,19 +244,15 @@ async function handleSave() {
   }
   isSaving.value = true;
   try {
-    const saved = await profile.setDisplayName(name.value);
-    if (!saved) return;
+    const outcome = remoteApiEnabled
+      ? await saveProfileAndClaimQuest(
+          () => profile.setDisplayName(name.value),
+          () => claimSetupProfileQuest(quest),
+        )
+      : { saved: await profile.setDisplayName(name.value), questPending: false };
+    if (!outcome.saved) return;
     name.value = profile.displayName;
-    if (remoteApiEnabled) {
-      // The quest endpoint is the only completion authority. claimRemote waits
-      // for the server claim and refreshes the canonical quest snapshot; a
-      // failure leaves a retryable pending flag without claiming locally.
-      setupProfileQuestPending.value = !(await claimSetupProfileQuest(quest));
-      if (setupProfileQuestPending.value) {
-        toast.error(t.value.profile.serverMutationFailed);
-        return;
-      }
-    }
+    setupProfileQuestPending.value = outcome.questPending;
     saveFeedback.value = t.value.profile.savedToast;
     toast.success(t.value.profile.savedToast);
   } catch {
@@ -268,6 +268,8 @@ async function loadRemoteProfile() {
   try {
     const projection = await profileApi.profile();
     if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
+    name.value = reconcileProfileEdit(profile.displayName, name.value, projection.nickname);
+    profile.projectServerNickname(projection.nickname);
     avatarUrl.value = projection.avatarUrl;
     avatarRevision.value = projection.avatarRevision;
   } catch {

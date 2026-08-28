@@ -26,14 +26,18 @@ test("App telemetry contract never sends server-owned environment or sampling fi
   assert.match(api, /body: event/);
 });
 
-test("a server-issued Sandbox receipt becomes a visible, copyable opaque PC credential", async () => {
+test("a server-issued Sandbox receipt stays explicit and never interrupts the user", async () => {
   const api = await readFile(new URL("../src/api/behavior-analytics-api.ts", import.meta.url), "utf8");
+  const rememberStart = service.indexOf("function rememberAcceptanceObservationCredential");
+  const rememberEnd = service.indexOf("function clearAcceptanceObservationCredential", rememberStart);
+  const remember = service.slice(rememberStart, rememberEnd);
   assert.match(api, /observationToken/);
   assert.match(api, /sourceEnvironment !== "SANDBOX"/);
   assert.match(service, /rememberAcceptanceObservationCredential/);
-  assert.match(service, /uni\.setClipboardData/);
-  assert.match(service, /uni\.showModal/);
   assert.match(service, /getAcceptanceObservationCredential/);
+  assert.match(service, /copyAcceptanceObservationCredential[\s\S]*?uni\.setClipboardData/);
+  assert.doesNotMatch(remember, /uni\.setClipboardData/);
+  assert.doesNotMatch(remember, /uni\.showModal/);
 });
 
 test("a delayed A receipt cannot project a credential after logout or an A-to-B rotation", () => {

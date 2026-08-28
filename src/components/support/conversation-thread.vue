@@ -60,6 +60,7 @@
               <view />
               <view />
             </view>
+            <text v-if="typingLabel" class="nx-conv-typing-label">{{ typingLabel }}</text>
           </view>
         </view>
       </view>
@@ -324,12 +325,20 @@ const sendStyle = computed<CSSProperties>(() => ({
   color: var(--v5-ink-4);
 }
 .nx-conv-typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
   background: var(--v5-surface-2);
 }
 .nx-conv-typing-dots {
   display: flex;
   gap: 4px;
-  padding: 13px 14px;
+}
+.nx-conv-typing-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--v5-ink-3);
 }
 .nx-conv-typing-dots view {
   width: 6px;

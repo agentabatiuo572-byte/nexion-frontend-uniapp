@@ -97,6 +97,7 @@
             <!-- trust chips -->
             <view class="flex flex-wrap" style="margin-top: 14px; gap: 8px">
               <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} {{ t.store.soldLabel }}</text>
+              <text v-if="stockUnavailable" class="font-mono-tabular" :style="codeChip('amber')">{{ t.store.temporarilyOutOfStock }}</text>
               <text v-if="stockLow" class="font-mono-tabular" :style="codeChip('amber')">🔥 {{ product.stock }} {{ t.store.onlyXLeft }}</text>
             </view>
           </view>
@@ -305,7 +306,10 @@ async function retryCatalog() {
 
 const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
-const isShare = computed(() => product.value?.tier === "Share");
+const isShare = computed(() => product.value?.productType === "SHARE");
+const stockUnavailable = computed(() => !isShare.value
+  && product.value?.inventoryMode === "FINITE"
+  && (product.value.stock ?? 0) <= 0);
 // Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
@@ -316,7 +320,8 @@ const copy = computed(() =>
     : { tagline: "", badge: "", unlocks: "" },
 );
 
-const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
+const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
+  && product.value.purchaseBlockedReason !== "PRODUCT_OUT_OF_STOCK");
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
@@ -456,7 +461,7 @@ const faqs = computed(() => {
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──
 const stockLow = computed(
-  () => !isShare.value && product.value?.stock != null && product.value.stock < 50,
+  () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
 const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
@@ -492,12 +497,33 @@ function toggleFaq(i: number) {
 // → the chassis-mounted <StickyCtaBar> renders it correctly (absolute). Re-syncs as
 // product/qty resolve; cleared on hide/unmount so it never bleeds to the next page.
 const sticky = useStickyCTA();
+const stickyOwner = Symbol("store-detail");
+const stickyPageVisible = ref(true);
+sticky.activate(stickyOwner);
 watch(
-  [product, isShare, isLocked, purchaseUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate],
+  [stickyPageVisible, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate],
   () => {
-    if (!product.value || isLocked.value || purchaseUnavailable.value
-      || (remoteApiEnabled && eligibility.value.status !== "ready")) {
-      sticky.hide();
+    if (!stickyPageVisible.value) {
+      sticky.hide(stickyOwner);
+      return;
+    }
+    if (!product.value || isLocked.value || purchaseUnavailable.value) {
+      sticky.hide(stickyOwner);
+      return;
+    }
+    if (stockUnavailable.value) {
+      sticky.show({
+        href: `/pages/store/detail?id=${product.value.id}`,
+        amount: `$${priceText.value}`,
+        amountSubtext: t.value.store.temporarilyOutOfStock,
+        buttonLabel: t.value.store.temporarilyOutOfStock,
+        disabled: true,
+        showTabBar: false,
+      }, stickyOwner);
+      return;
+    }
+    if (remoteApiEnabled && eligibility.value.status !== "ready") {
+      sticky.hide(stickyOwner);
       return;
     }
     if (remoteApiEnabled && !eligibility.value.eligible) {
@@ -507,7 +533,7 @@ watch(
         amountSubtext: t.value.store.purchaseEligibilityIneligible,
         buttonLabel: t.value.store.purchaseEligibilityIneligible,
         showTabBar: false,
-      });
+      }, stickyOwner);
       return;
     }
     // Purchase gate blocks → CTA routes to /team/quota with locked label, not checkout.
@@ -522,7 +548,7 @@ watch(
           ? t.value.store.gateSoldOut
           : t.value.store.gateLockedCta,
         showTabBar: false,
-      });
+      }, stickyOwner);
       return;
     }
     sticky.show({
@@ -533,12 +559,22 @@ watch(
         : fmt(t.value.store.detCtaPayback, { daily: dailyEarnText.value, payback: paybackLabel.value }),
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
-    });
+    }, stickyOwner);
   },
   { immediate: true },
 );
-onHide(() => sticky.hide());
-onUnmounted(() => sticky.hide());
+onShow(() => {
+  sticky.activate(stickyOwner);
+  stickyPageVisible.value = true;
+});
+onHide(() => {
+  stickyPageVisible.value = false;
+  sticky.hide(stickyOwner);
+});
+onUnmounted(() => {
+  stickyPageVisible.value = false;
+  sticky.hide(stickyOwner);
+});
 
 // ─── styles ───
 const catalogRetryStyle: CSSProperties = {

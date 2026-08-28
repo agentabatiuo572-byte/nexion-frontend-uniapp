@@ -54,11 +54,11 @@ assert.ok(orderApi.includes('const sandboxResponse = source.idSource === "sandbo
   && orderApi.includes('source.sourceEnvironment !== "SANDBOX"')
   && orderApi.includes('RUN_ID.test(sandboxRunId)'),
   "sandbox-created orders require mock/SANDBOX/run-id proof instead of being treated as production server output");
-assert.match(orderApi, /source === "mock" && sourceEnvironment === "SANDBOX"[\s\S]*rawRunId === currentSandboxRunId[\s\S]*source === "server" && sourceEnvironment === "PRODUCTION"/,
-  "order list rejects an unproven sandbox source and keeps production source proof distinct");
-assert.ok(catalogContract.includes('sourceEnvironment?: "SANDBOX"')
-  && catalogContract.includes('runId?: string')
-  && catalogContract.includes('catalogSource !== "mock"')
-  && catalogContract.includes('RUN_ID.test(runId)'),
-  "catalog parsing must preserve and validate the sandbox run proof used by checkout");
+assert.match(orderApi, /const production = \(mode === "dev" \|\| mode === "prod"\)[\s\S]*source === "server" && sourceEnvironment === "PRODUCTION"[\s\S]*rawRunId === null \|\| rawRunId === undefined[\s\S]*if \(!production\) return invalid\(\)/,
+  "development and production order lists accept only Java canonical production provenance with no run id");
+assert.ok(catalogContract.includes('sourceEnvironment: "PRODUCTION"')
+  && catalogContract.includes('runId: ""')
+  && catalogContract.includes('catalogSource !== "nx_product"')
+  && catalogContract.includes('source.runId !== ""'),
+  "catalog parsing must require the Java nx_product production source and an empty run id");
 console.log("commerce development H5 launcher: PASS");

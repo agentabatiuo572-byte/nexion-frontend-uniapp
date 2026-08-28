@@ -9,7 +9,7 @@ import { paymentApi, remoteApiEnabled } from "@/api/runtime";
 // MOCK-ONLY: load() 用种子模拟 GET /api/config/fx(~300ms 延迟)。PROD 切换:
 // seed 段整体删除,改为真实拉取;失败/超时由请求层置 syncFailed = true(对齐
 // config.ts syncFailed 语义:通道置灰禁下单,禁回退写死默认价继续接单)。
-const MOCK_FX_SEED = { baseRateVndPerUsdt: 26_000, buySpreadPct: 1.5, lockWindowMin: 30, minDepositUsdt: 10, maxDepositUsdt: 5000, feeVnd: 0, feeUsdt: 0 };
+const MOCK_FX_SEED = { baseRateVndPerUsdt: 26_000, buySpreadPct: 1.5, lockWindowMin: 30, minDepositUsdt: 10, maxDepositUsdt: 5000, todayRemainingDepositUsdt: 5000, todayRemainingVnd: 131_950_000, feeVnd: 0, feeUsdt: 0 };
 const MOCK_LATENCY_MS = 300;
 
 export const useFx = defineStore("fx", () => {
@@ -24,8 +24,11 @@ export const useFx = defineStore("fx", () => {
   const vietQrEnabled = ref(false);
   const minDepositUsdt = ref(0);
   const maxDepositUsdt = ref(0);
+  const todayRemainingDepositUsdt = ref(0);
+  const todayRemainingVnd = ref(0);
   const feeVnd = ref(0);
   const feeUsdt = ref(0);
+  let inFlightLoad: Promise<void> | null = null;
 
   function resetRemoteState(): void {
     baseRateVndPerUsdt.value = 0;
@@ -36,6 +39,8 @@ export const useFx = defineStore("fx", () => {
     vietQrEnabled.value = false;
     minDepositUsdt.value = 0;
     maxDepositUsdt.value = 0;
+    todayRemainingDepositUsdt.value = 0;
+    todayRemainingVnd.value = 0;
     feeVnd.value = 0;
     feeUsdt.value = 0;
   }
@@ -50,48 +55,56 @@ export const useFx = defineStore("fx", () => {
   );
 
   /** 拉取牌价配置(并发去重)。MOCK 种子;PROD = GET /api/config/fx([D6] 单源)。 */
-  async function load(): Promise<void> {
-    if (loading.value) return;
+  function load(): Promise<void> {
+    if (inFlightLoad) return inFlightLoad;
     loading.value = true;
-    try {
-      if (remoteApiEnabled) {
-        const [config, quote] = await Promise.all([paymentApi.config(), paymentApi.fxQuote()]);
-        if (syncFailed.value) return;
-        baseRateVndPerUsdt.value = quote.baseRateVndPerUsdt;
-        buySpreadPct.value = quote.buySpreadPct;
-        lockWindowMin.value = quote.lockWindowMinutes;
-        vietQrEnabled.value = config.vietQr.enabled;
-        minDepositUsdt.value = config.vietQr.minDepositUsdt;
-        maxDepositUsdt.value = config.vietQr.maxDepositUsdt;
-        feeVnd.value = config.vietQr.feeVnd;
-        feeUsdt.value = config.vietQr.feeUsdt;
-        configReady.value = true;
-        syncedAt.value = Date.now();
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
-        if (!syncFailed.value) {
-          baseRateVndPerUsdt.value = MOCK_FX_SEED.baseRateVndPerUsdt;
-          buySpreadPct.value = MOCK_FX_SEED.buySpreadPct;
-          lockWindowMin.value = MOCK_FX_SEED.lockWindowMin;
-          minDepositUsdt.value = MOCK_FX_SEED.minDepositUsdt;
-          maxDepositUsdt.value = MOCK_FX_SEED.maxDepositUsdt;
-          feeVnd.value = MOCK_FX_SEED.feeVnd;
-          feeUsdt.value = MOCK_FX_SEED.feeUsdt;
-          vietQrEnabled.value = true;
+    inFlightLoad = (async () => {
+      try {
+        if (remoteApiEnabled) {
+          const [config, quote] = await Promise.all([paymentApi.config(), paymentApi.fxQuote()]);
+          if (syncFailed.value) return;
+          baseRateVndPerUsdt.value = quote.baseRateVndPerUsdt;
+          buySpreadPct.value = quote.buySpreadPct;
+          lockWindowMin.value = quote.lockWindowMinutes;
+          vietQrEnabled.value = config.vietQr.enabled;
+          minDepositUsdt.value = config.vietQr.minDepositUsdt;
+          maxDepositUsdt.value = config.vietQr.maxDepositUsdt;
+          todayRemainingDepositUsdt.value = config.vietQr.todayRemainingDepositUsdt;
+          todayRemainingVnd.value = config.vietQr.todayRemainingVnd;
+          feeVnd.value = config.vietQr.feeVnd;
+          feeUsdt.value = config.vietQr.feeUsdt;
           configReady.value = true;
           syncedAt.value = Date.now();
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
+          if (!syncFailed.value) {
+            baseRateVndPerUsdt.value = MOCK_FX_SEED.baseRateVndPerUsdt;
+            buySpreadPct.value = MOCK_FX_SEED.buySpreadPct;
+            lockWindowMin.value = MOCK_FX_SEED.lockWindowMin;
+            minDepositUsdt.value = MOCK_FX_SEED.minDepositUsdt;
+            maxDepositUsdt.value = MOCK_FX_SEED.maxDepositUsdt;
+            todayRemainingDepositUsdt.value = MOCK_FX_SEED.todayRemainingDepositUsdt;
+            todayRemainingVnd.value = MOCK_FX_SEED.todayRemainingVnd;
+            feeVnd.value = MOCK_FX_SEED.feeVnd;
+            feeUsdt.value = MOCK_FX_SEED.feeUsdt;
+            vietQrEnabled.value = true;
+            configReady.value = true;
+            syncedAt.value = Date.now();
+          }
         }
+      } catch {
+        // Remote and explicit App sandbox payment facts are server-owned.  A
+        // failed config/quote must also evict any prior snapshot so a stale
+        // quote or local-looking numeric default cannot keep the rail usable.
+        if (remoteApiEnabled) resetRemoteState();
+        syncFailed.value = true;
+        configReady.value = false;
+      } finally {
+        loading.value = false;
+        inFlightLoad = null;
       }
-    } catch {
-      // Remote and explicit App sandbox payment facts are server-owned.  A
-      // failed config/quote must also evict any prior snapshot so a stale
-      // quote or local-looking numeric default cannot keep the rail usable.
-      if (remoteApiEnabled) resetRemoteState();
-      syncFailed.value = true;
-      configReady.value = false;
-    } finally {
-      loading.value = false;
-    }
+    })();
+    return inFlightLoad;
   }
 
   /** ⚠️ DEV/DEMO-ONLY:注入牌价拉取失败态,演 [FEAT-PAY03] ② 异常1(tester 驱动)。 */
@@ -118,6 +131,8 @@ export const useFx = defineStore("fx", () => {
     vietQrEnabled,
     minDepositUsdt,
     maxDepositUsdt,
+    todayRemainingDepositUsdt,
+    todayRemainingVnd,
     feeVnd,
     feeUsdt,
     quoteRate,

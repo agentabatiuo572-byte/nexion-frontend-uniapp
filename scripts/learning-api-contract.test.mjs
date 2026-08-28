@@ -18,12 +18,8 @@ import test from "node:test";
 // source modules whose internal imports intentionally omit `.ts`.
 await import("./lib/ts-ext-resolve.mjs");
 const { createLearningApi } = await import("../src/api/learning-api.ts");
-const { setCurrentCommerceSandboxRun } = await import("../src/api/order-api.ts");
-
-const RUN = "run-20260816";
 
 test("fails closed when a quiz response contains a malformed reward amount", async () => {
-  setCurrentCommerceSandboxRun(RUN);
   const api = createLearningApi({
     request: async () => ({
       courseId: "h3-live-20260722",
@@ -36,10 +32,10 @@ test("fails closed when a quiz response contains a malformed reward amount", asy
       rewardNex: { amount: 20 },
       attempts: 1,
       serverCanonical: true,
-      sourceEnvironment: "SANDBOX",
-      runId: RUN,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
     }),
-  }, "sandbox");
+  }, "dev");
 
   await assert.rejects(
     api.submitQuiz("h3-live-20260722", "v1", [0], "learning-quiz:h3-live-20260722:v1"),
@@ -52,7 +48,6 @@ test("fails closed when a quiz response contains a malformed reward amount", asy
 });
 
 test("sends the stable H3 idempotency key outside the request body", async () => {
-  setCurrentCommerceSandboxRun(RUN);
   let request;
   const api = createLearningApi({
     request: async (value) => {
@@ -67,11 +62,11 @@ test("sends the stable H3 idempotency key outside the request body", async () =>
         rewardNex: "20.000000",
         attempts: 1,
         serverCanonical: true,
-        sourceEnvironment: "SANDBOX",
-        runId: RUN,
+        sourceEnvironment: "PRODUCTION",
+        runId: "",
       };
     },
-  }, "sandbox");
+  }, "dev");
 
   await api.submitQuiz("h3-live-20260722", "v1", [0], "learning-quiz:h3-live-20260722:v1");
 

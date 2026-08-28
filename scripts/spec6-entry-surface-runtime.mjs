@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 import { scopeRoutes, concurrencyFromEnv } from "./lib/probe-routes.mjs";
 import {
   assertDirectPageCoverage,
@@ -70,6 +71,7 @@ async function checkRoute(browser, route) {
     const consoleErrors = [];
     page.on("pageerror", (error) => pageErrors.push(String(error)));
     page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
+    await installFormalProbeSession(page, { authenticated: false });
     await page.addInitScript((keys) => {
       for (const key of keys) localStorage.removeItem(key);
     }, businessStorageKeys);

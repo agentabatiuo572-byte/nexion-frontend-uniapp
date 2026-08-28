@@ -3803,6 +3803,9 @@ interface TrialConfig {
   | 公售 Tier 1 | 100–549 | 450 | $9,999 |
   | 尾盘档 | 550–999 | 450 | $11,999 |
 
+- **当前认购资格（server-canonical）**：只使用后台 `market.genesis.ops.eligibility.enabled / maxPerUser / minAccountAgeDays` 三项新配置。App 通过 `GET /api/genesis/eligibility` 展示服务端判定与原因；一级认购和二级承接均由服务端在成交事务内复核账户有效性、账户龄、国家/地区、地域限制、销售时间、市场开关、库存与单账户上限，客户端不得自行放宽。
+- **旧/新区别**：旧 FEAT-GEN08 的“累计入金 / 旗舰设备 / V 等级 / 创世邀请码”四项组合规则及其 `mode / appliesTo` 等前端配置已退役，不再展示、不再配置、不再参与判定。设备 SKU 的 E1/E3 购买资格是独立模块，本次不修改。
+
 - 席位 = 创世 OG 身份 + $NEX 协议排放优先权;持有特权:
   - **$NEX 排放优先额度**:上所后按 vesting 曲线释放的优先排放份额(以 $NEX 计价,非每日现金分红)
   - 生态奖励池份额
@@ -3906,7 +3909,7 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
 
 持有人在 Mine tab 把某节点挂单(`listNode(tokenId, askPriceUSDT)`,校验:持有该 token、未重复挂单、价 > 0)或撤单(`cancelListing`,节点回到钱包、可重新设价上架)。挂单进入二级市场挂单池,由其他用户主动承接:
 
-- **主动承接**:买家在二级市场列表点「Buy」承接某挂单(`acquireSecondary(tokenId)`),受资格门(FEAT-GEN08,appliesTo=both)+ 单人限购(`perUserCap`)约束;承接为**转让**(不动一级 `soldSlots` / 档价、不走售罄门),扣买家、转 token。
+- **主动承接**:买家在二级市场列表点「Buy」承接某挂单(`acquireSecondary(tokenId)`),由服务端按与一级认购相同的新资格策略及单账户持有上限复核;承接为**转让**(不动一级 `soldSlots` / 档价、不走售罄门),扣买家、转 token。
 - **卖家侧成交为服务端事件**:真后台在真实买家承接挂单时触发结算(扣 2.5% 网络版税后贷卖家)。客户端**不模拟自动撮合、不持有任何成交赌注**,只反映 canonical 成交结果;卖家挂单在无买家承接时保持挂出、可随时撤单。
 - 2.5% 网络版税(§13.3 `Genesis 二级版税`)在成交时扣除并进入网络金库,卖家实得为净额。
 

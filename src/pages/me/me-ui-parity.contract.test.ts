@@ -60,9 +60,17 @@ describe("Me page 5174 normal-state UI parity", () => {
 
   it("isolates authenticated module refreshes with all-settled semantics", () => {
     expect(source).toContain("settleRemoteMeLoaders");
-    for (const key of ["home", "fleet", "funds", "orders", "security", "notifications", "trial", "vouchers", "rank", "genesis", "bills", "market"]) {
+    for (const key of ["home", "fleet", "funds", "orders", "security", "notifications", "conversations", "trial", "vouchers", "rank", "genesis", "bills", "market"]) {
       expect(source).toContain(`["${key}"`);
     }
+  });
+
+  it("derives the Message Center badge from conversations instead of notification campaigns", () => {
+    expect(source).toContain('import { useConversations } from "@/store/conversations"');
+    expect(source).toContain('import { useNova } from "@/store/nova"');
+    expect(source).toContain("const conversationUnread = computed(() => conversations.totalUnread + nova.unread)");
+    expect(source).toContain('key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: conversationUnread.value > 0 ? String(conversationUnread.value) : undefined');
+    expect(source).not.toContain("const unreadNotifs = computed(() => notifications.unread)");
   });
 
   it("matches the checked-out 5174 Me-page visual baseline when it is available", () => {

@@ -7,7 +7,7 @@ const snapshot = (productNo: string, eligible: boolean) => ({
   eligible,
   decisionCode: eligible ? "ELIGIBLE" : "PURCHASE_GATE_NOT_MET",
   evaluatedAt: 1786856400000,
-  source: "nx_admin_device_sku.purchase_gate_json + nx_user" as const,
+  source: "nx_product + nx_admin_device_sku + nx_user" as const,
   sourceEnvironment: "PRODUCTION" as const,
   runId: null,
   serverCanonical: true as const,

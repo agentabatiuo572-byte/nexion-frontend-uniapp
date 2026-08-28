@@ -1,11 +1,10 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export type PayoutAddressNetwork = "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
-export type PayoutAddressSourceEnvironment = "PRODUCTION" | "SANDBOX";
-export type PayoutAddressSource = "server" | "mock";
+export type PayoutAddressSourceEnvironment = "PRODUCTION";
+export type PayoutAddressSource = "server";
 
 export interface PayoutAddressProvenance {
   source: PayoutAddressSource;
@@ -49,8 +48,6 @@ export interface PayoutAddressApi {
 }
 
 const NETWORKS = new Set<PayoutAddressNetwork>(["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"]);
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/;
-
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? value as Record<string, unknown> : null;
 }
@@ -64,10 +61,9 @@ function provenance(value: unknown, mode: ApiEnvironment): PayoutAddressProvenan
   const source = row?.source;
   const sourceEnvironment = row?.sourceEnvironment;
   const runId = typeof row?.runId === "string" ? row.runId.trim() : null;
-  const sandbox = mode === "dev" && source === "mock" && sourceEnvironment === "SANDBOX"
-    && runId !== null && RUN_ID.test(runId) && isCurrentCommerceSandboxRun(runId);
-  const production = mode === "prod" && source === "server" && sourceEnvironment === "PRODUCTION" && runId === "";
-  if (row?.serverCanonical !== true || (!sandbox && !production)) {
+  const production = (mode === "prod" || mode === "dev")
+    && source === "server" && sourceEnvironment === "PRODUCTION" && runId === "";
+  if (row?.serverCanonical !== true || !production) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_PROVENANCE_INVALID" });
   }
   return {

@@ -3,6 +3,7 @@ import { parseProductCatalogPayload } from "./product-catalog-contract";
 
 const product = {
   id: "sku-1", name: "Box", tier: "Pro", tagline: "managed", badge: null,
+  productType: "DEVICE", inventoryMode: "FINITE",
   gpu: "H100", vram: "80GB", power: "700W", datacenter: "Singapore DC",
   warranty: "36 months", hashRate: null, dailyEarn: 13, dailyEarnNEX: 80,
   price: 1000, sold: 0, stock: 1, features: [], ai: null, status: "active",
@@ -86,6 +87,31 @@ describe("product catalog strict specification contract", () => {
   it("rejects an untagged mock catalog", () => {
     expect(() => parseProductCatalogPayload({ source: "mock", serverCanonical: true, revision: null, products: [product] }))
       .toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
+  });
+
+  it("accepts a Cloud Share with unlimited non-physical inventory", () => {
+    const cloudShare = {
+      ...product,
+      id: "cloud-share",
+      name: "Cloud Share",
+      tier: "Share",
+      productType: "SHARE",
+      inventoryMode: "UNLIMITED",
+      stock: null,
+      gpu: null,
+      vram: null,
+      power: null,
+      datacenter: null,
+    };
+    const parsed = parseProductCatalogPayload({ source: "nx_product", ...proof, serverCanonical: true, revision: null, products: [cloudShare] });
+    expect(parsed.products[0]).toMatchObject({ id: "cloud-share", productType: "SHARE", inventoryMode: "UNLIMITED", stock: undefined });
+  });
+
+  it("rejects unlimited inventory for a physical device", () => {
+    expect(() => parseProductCatalogPayload({
+      source: "nx_product", ...proof, serverCanonical: true, revision: null,
+      products: [{ ...product, inventoryMode: "UNLIMITED", stock: null }],
+    })).toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
   });
 
   it("requires the Java production provenance and rejects sandbox catalogs", () => {

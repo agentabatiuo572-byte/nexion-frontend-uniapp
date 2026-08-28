@@ -54,6 +54,7 @@ const authority = (canStart: boolean, reason?: TrialAuthorityState["eligibilityR
     discountCapUSD: "20",
     trialOffsetCapUSD: "50",
     trialProductId: "stellarbox-s1",
+    trialProductName: "NexGridBox S1",
     trialPriceUSD: "1299",
     shadowDailyUSD: "38.52",
     shadowDailyNEX: "65",

@@ -120,7 +120,12 @@ test("trial conversion posts the product and stable idempotency key and validate
   const client = clientReturning({
     orderNo: "TRC-ABC123", productNo: "stellarbox-s1", amountUsdt: 1200,
     discountUsdt: 99, paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT",
-    sourceEnvironment: "PRODUCTION",
+    source: "nx_trial_claim + nx_order + nx_order_item",
+    serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    provenance: {
+      source: "nx_trial_claim + nx_order + nx_order_item",
+      serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    },
   });
   // 客户端报价是**独立契约字段**(4c32a50 起 convert 签名为 productNo/expectedAmountUsdt/idempotencyKey,
   // 真实调用方 store/free-trial.ts 传 `expectedAmountUsdt ?? null`)。传真值而不是 null,

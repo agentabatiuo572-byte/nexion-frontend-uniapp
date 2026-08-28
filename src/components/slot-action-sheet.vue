@@ -78,6 +78,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { occupiesDeviceSlot } from "@/lib/device-slot-policy";
 
 const sheet = useSlotActionSheet();
 const app = useApp();
@@ -113,7 +114,7 @@ function onActivate(d: Device) {
     uni.navigateTo({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => {} });
     return;
   }
-  if (slotsUsed.value >= MAX_DEVICES) {
+  if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= MAX_DEVICES) {
     toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: MAX_DEVICES }));
     return;
   }

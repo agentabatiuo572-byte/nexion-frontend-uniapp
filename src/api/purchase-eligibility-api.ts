@@ -1,12 +1,14 @@
 import type { ApiClient } from "./api-client";
 import type { ApiEnvironment } from "./runtime-config";
 
+export const PURCHASE_ELIGIBILITY_SOURCE = "nx_product + nx_admin_device_sku + nx_user" as const;
+
 export interface PurchaseEligibilitySnapshot {
   productNo: string;
   eligible: boolean;
   decisionCode: string;
   evaluatedAt: number;
-  source: "nx_admin_device_sku.purchase_gate_json + nx_user";
+  source: typeof PURCHASE_ELIGIBILITY_SOURCE;
   sourceEnvironment: "PRODUCTION";
   runId: string | null;
   serverCanonical: true;
@@ -20,7 +22,7 @@ function parse(value: unknown, expectedProductNo: string, mode: ApiEnvironment):
   if (!row || row.productNo !== expectedProductNo || typeof row.eligible !== "boolean"
       || typeof row.decisionCode !== "string" || !row.decisionCode
       || typeof row.evaluatedAt !== "number" || !Number.isFinite(row.evaluatedAt)
-      || row.source !== "nx_admin_device_sku.purchase_gate_json + nx_user"
+      || row.source !== PURCHASE_ELIGIBILITY_SOURCE
       || row.serverCanonical !== true || !trustedProvenance) {
     throw new Error("PURCHASE_ELIGIBILITY_RESPONSE_INVALID");
   }

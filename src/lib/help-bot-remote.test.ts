@@ -3,31 +3,27 @@ import type { NovaAiChatResponse } from "@/api/nova-ai-api";
 import { buildRemoteHelpRequest, novaHelpSource } from "./help-bot-remote";
 
 describe("remote inline help bot", () => {
-  it("keeps the selected locale and bounded transcript when creating Nova input", () => {
+  it("keeps the selected locale and conversation while excluding client history", () => {
     expect(buildRemoteHelpRequest(
       "  How do I check my order?  ",
-      [
-        { from: "bot", text: "Earlier answer" },
-        { from: "user", text: "Previous question" },
-      ],
       "zh",
+      "6f0b5c55-0ec5-4a31-85eb-1d4531c1e8df",
+      "8c12eaf3-744d-405e-b2fb-64b3d81267be",
     )).toEqual({
       message: "How do I check my order?",
       language: "zh",
-      history: [
-        { role: "assistant", content: "Earlier answer" },
-        { role: "user", content: "Previous question" },
-      ],
+      conversationId: "6f0b5c55-0ec5-4a31-85eb-1d4531c1e8df",
+      turnId: "8c12eaf3-744d-405e-b2fb-64b3d81267be",
     });
   });
 
-  it("makes the authoritative Nova provider and model visible as message source", () => {
+  it("uses a customer-safe source label without runtime implementation details", () => {
     const response: NovaAiChatResponse = {
       reply: "Use My Orders.",
-      provider: "OLLAMA_LOCAL",
-      model: "gemma4-e4b-ctx32k:latest",
+      conversationId: "6f0b5c55-0ec5-4a31-85eb-1d4531c1e8df",
+      turnId: "8c12eaf3-744d-405e-b2fb-64b3d81267be",
     };
 
-    expect(novaHelpSource(response)).toBe("OLLAMA_LOCAL · gemma4-e4b-ctx32k:latest");
+    expect(novaHelpSource(response)).toBe("NexGrid AI");
   });
 });

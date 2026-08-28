@@ -100,6 +100,7 @@ export const useQuest = defineStore("quest", () => {
   let accountEpoch = 0;
   let refreshSequence = 0;
   let claimSequence = 0;
+  let hasRemoteSnapshot = false;
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
   const remoteQuests = ref<CanonicalQuest[]>([]);
@@ -112,28 +113,49 @@ export const useQuest = defineStore("quest", () => {
     remoteQuests.value = [];
   }
 
+  function discardRemoteSnapshot() {
+    hasRemoteSnapshot = false;
+    clearRemoteFacts();
+  }
+
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
-    remoteStatus.value = "loading";
-    clearRemoteFacts();
+    // Background refreshes use stale-while-revalidate semantics: a route or
+    // module switch must not erase the last server-confirmed task catalogue.
+    // Account changes explicitly discard it in bindAccount() below.
+    if (!hasRemoteSnapshot) remoteStatus.value = "loading";
     try {
       const snapshot = await questApi.state();
       if (!isCurrentRequest()) return false;
-      clearRemoteFacts();
-      remoteQuests.value = snapshot.quests.map((quest) => ({ ...quest }));
+      const nextQuests = snapshot.quests.map((quest) => ({ ...quest }));
+      const nextRewards: Record<string, number> = {};
+      const nextCompleted: Record<string, boolean> = {};
       for (const quest of snapshot.quests) {
-        rewardMap[quest.questCode] = quest.rewardNex;
-        if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
+        nextRewards[quest.questCode] = quest.rewardNex;
+        if (quest.status === "CLAIMED") nextCompleted[quest.questCode] = true;
       }
+
+      // Build and validate the complete replacement before touching the
+      // visible snapshot. A malformed response must not partially clear it.
+      clearRemoteFacts();
+      remoteQuests.value = nextQuests;
+      Object.assign(rewardMap, nextRewards);
+      Object.assign(completedMap, nextCompleted);
+      hasRemoteSnapshot = true;
       remoteStatus.value = "ready";
       return true;
     } catch {
-      // Do not leave a previous account's progress visible after an authority
-      // failure. A retry may refill this map only from the server snapshot.
-      if (isCurrentRequest()) { clearRemoteFacts(); remoteStatus.value = "error"; }
+      if (isCurrentRequest()) {
+        if (hasRemoteSnapshot) {
+          remoteStatus.value = "ready";
+        } else {
+          discardRemoteSnapshot();
+          remoteStatus.value = "error";
+        }
+      }
       return false;
     }
   }
@@ -149,7 +171,8 @@ export const useQuest = defineStore("quest", () => {
       if (result.status !== "CLAIMED") return false;
       return refreshRemote();
     } catch {
-      if (isCurrentRequest()) clearRemoteFacts();
+      // A failed route-triggered claim is not evidence that the last confirmed
+      // task snapshot became invalid. Leave the read model untouched.
       return false;
     }
   }
@@ -166,7 +189,7 @@ export const useQuest = defineStore("quest", () => {
     refreshSequence += 1;
     claimSequence += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
-    clearRemoteFacts();
+    discardRemoteSnapshot();
     remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
     if (remoteApiEnabled) {
       void refreshRemote();
@@ -215,7 +238,8 @@ export const useQuest = defineStore("quest", () => {
 
   function reset() {
     if (remoteApiEnabled) {
-      clearRemoteFacts();
+      discardRemoteSnapshot();
+      remoteStatus.value = "idle";
       return;
     }
     for (const k of Object.keys(completedMap)) delete completedMap[k];

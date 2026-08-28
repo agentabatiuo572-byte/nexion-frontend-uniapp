@@ -131,6 +131,7 @@ function reasonText(reason: TrialIneligibleReason | undefined): string {
   if (reason === "in-progress") return w.eligReasonInProgress;
   if (reason === "quota-exhausted") return w.eligReasonQuota;
   if (reason === "risk") return w.eligReasonRisk;
+  if (reason === "product-unavailable") return t.value.store.trialProductUnavailable;
   if (reason === "unknown") return w.eligReasonUnknown;
   return w.eligReasonClosed;
 }

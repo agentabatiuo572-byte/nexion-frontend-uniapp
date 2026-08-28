@@ -1,9 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
-
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 export interface VRankProvenance {
   serverCanonical: true;
@@ -114,14 +111,11 @@ function rankRow(value: unknown): CanonicalVRankRow {
 function provenance(source: Record<string, unknown>, mode: ApiEnvironment): VRankProvenance {
   const sourceEnvironment = source.sourceEnvironment;
   const runId = source.runId;
-  const expectedEnvironment = mode === "dev" ? "SANDBOX" : "PRODUCTION";
-  if (source.serverCanonical !== true || sourceEnvironment !== expectedEnvironment
-      || typeof runId !== "string"
-      || (sourceEnvironment === "PRODUCTION" && runId !== "")
-      || (sourceEnvironment === "SANDBOX" && (!RUN_ID.test(runId) || !isCurrentCommerceSandboxRun(runId)))) {
+  if ((mode !== "dev" && mode !== "prod") || source.serverCanonical !== true
+      || sourceEnvironment !== "PRODUCTION" || runId !== "") {
     return invalid();
   }
-  return { serverCanonical: true, sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX", runId };
+  return { serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "" };
 }
 
 function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {

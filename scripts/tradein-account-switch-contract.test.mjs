@@ -22,7 +22,7 @@ test("a late checkout eligibility or capacity response cannot open account B's s
   const checkout = read("src/pages/store/checkout.vue");
   const intercept = checkout.slice(checkout.indexOf("function fireTradeinIntercept"));
   assert.match(checkout, /const requestScope = captureAccountScope\(\);/);
-  assert.match(checkout, /Promise\.all\(\[[\s\S]{0,260}isCurrentAccountScope\(requestScope\)/);
+  assert.match(checkout, /resolveTradeinCheckoutPreflight\([\s\S]{0,360}isCurrentAccountScope\(requestScope\)/);
   assert.ok(intercept.indexOf("if (!isCurrentAccountScope(requestScope)) return;")
     < intercept.indexOf("tradein.showChoice"));
   assert.ok(intercept.indexOf("if (!isCurrentAccountScope(requestScope)) return;")

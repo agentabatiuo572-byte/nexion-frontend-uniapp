@@ -36,6 +36,12 @@ describe("canonical payment readback", () => {
     expect(isCanonicalPaidOrder(order(), "ORD-1", 2)).toBe(true);
   });
 
+  it("accepts a development payment that completed and activated immediately", () => {
+    expect(isCanonicalPaidOrder(order({
+      canonicalStatus: "activated", orderStatus: "COMPLETED", activationStatus: "ACTIVATED",
+    }), "ORD-1", 2)).toBe(true);
+  });
+
   it("rejects a pending or mismatched order", () => {
     expect(isCanonicalPaidOrder(order({ canonicalStatus: "placed", paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT" }), "ORD-1", 2)).toBe(false);
     expect(isCanonicalPaidOrder(order(), "ORD-2", 2)).toBe(false);

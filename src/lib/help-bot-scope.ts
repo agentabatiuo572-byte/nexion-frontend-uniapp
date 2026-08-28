@@ -1,4 +1,5 @@
 import type { RemoteAccountEpoch, RemoteAccountRequest } from "./remote-account-epoch";
+import { requireCryptoUuid } from "./secure-command-id";
 
 export interface HelpBotMessage {
   from: "user" | "bot";
@@ -8,18 +9,21 @@ export interface HelpBotMessage {
 
 export interface HelpBotRequest extends RemoteAccountRequest {
   language: "en" | "zh" | "vi";
+  conversationId: string;
 }
 
 /** Account/epoch fence and transcript owner for the inline help bot. */
 export function createHelpBotScope(account: RemoteAccountEpoch) {
   let bound = account.snapshot();
   let transcript: HelpBotMessage[] = [];
+  let conversationId = requireCryptoUuid();
 
   function sync(): HelpBotMessage[] {
     const current = account.snapshot();
     if (current.accountKey !== bound.accountKey || current.epoch !== bound.epoch) {
       bound = current;
       transcript = [];
+      conversationId = requireCryptoUuid();
       return [];
     }
     return transcript;
@@ -36,7 +40,7 @@ export function createHelpBotScope(account: RemoteAccountEpoch) {
     sync,
     capture(language: HelpBotRequest["language"] = "en"): HelpBotRequest {
       sync();
-      return { ...account.snapshot(), language };
+      return { ...account.snapshot(), language, conversationId };
     },
     isCurrent(request: HelpBotRequest): boolean {
       return account.isCurrent(request);

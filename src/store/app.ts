@@ -9,6 +9,7 @@ import { readMonotonicNowMs } from "../lib/server-deadline-clock";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
+import { isActiveSlotDevice, occupiesDeviceSlot } from "@/lib/device-slot-policy";
 import { getCarrier, type Carrier } from "@/lib/carrier";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
@@ -514,7 +515,7 @@ export const useApp = defineStore("app", () => {
   // Slot authority must count hidden active pc-gpu devices too. When the PC
   // share flag is off, UI hides those devices, but they still reserve backend
   // capacity; otherwise closing/reopening the flag can push the account past 6.
-  const activeSlotCount = computed(() => devices.value.filter((d) => d.activatedAt !== null).length);
+  const activeSlotCount = computed(() => devices.value.filter(isActiveSlotDevice).length);
   /**
    * FEAT-HOME02 ③ 首页「你的排名」的入参:本账号全部在产设备的**有效算力之和**(TOPS)。
    * 口径与聚合全在 lib/account-hashrate.ts(复用既有单台模型,不新造第二套)。
@@ -1385,7 +1386,7 @@ export const useApp = defineStore("app", () => {
     const device = devices.value.find((d) => d.id === id);
     if (!device || device.activatedAt !== null) return false;
     if (device.kind === "pc-gpu" && !computeShareEnabled.value) return false;
-    if (activeSlotCount.value + reservedSlots >= MAX_DEVICES) return false;
+    if (occupiesDeviceSlot(device.kind) && activeSlotCount.value + reservedSlots >= MAX_DEVICES) return false;
     devices.value = devices.value.map((d) =>
       d.id === id
         ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), onlineHeartbeatAt: null, pendingDeactivate: false }

@@ -18,6 +18,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 import {
   assertNoRuntimeErrors,
   assertDirectPageCoverage,
@@ -43,7 +44,6 @@ const POISONED_TABLE = {
       tier: "L2",
       joinedAt: POISONED_AT - 30 * 86400000,
       cumulativeDepositUsdt: 0,
-      genesisInviteCode: null,
       referralCode: "NEXGRID-8K9X",
       usdtBalance: 24856.56,
       nexBalance: 1240,
@@ -74,6 +74,7 @@ async function check(label, poisonTable) {
   const errors = [];
   page.on("console", collectAppConsoleErrors(errors, BASE));
   page.on("pageerror", (e) => errors.push(String(e)));
+  await installFormalProbeSession(page);
   await page.goto(directAppUrl(BASE, ROUTE), { waitUntil: "networkidle", timeout: 30000 });
   // 绑定闸(App.vue 启动恢复)与首屏渲染都在页内异步,给一拍 settle。
   await page.waitForTimeout(1200);
@@ -86,7 +87,11 @@ async function check(label, poisonTable) {
         bare.push(`<${parent?.tagName?.toLowerCase() ?? "?"} class="${parent?.className ?? ""}">`);
       }
     }
-    return { bareDefaultNodes: bare, hasDemoEmail: (document.body.innerText || "").includes("alex@nexgrid.ai") };
+    const text = document.body.innerText || "";
+    return {
+      bareDefaultNodes: bare,
+      hasServerIdentity: text.includes("Formal Probe") || text.includes("13800000000") || text.includes("+86"),
+    };
   });
   const runtimeIdentity = await collectUniAppRuntimeIdentity(page);
   const routeWitness = await collectDirectPageWitness(page, errors);
@@ -106,8 +111,8 @@ try {
     if (result.bareDefaultNodes.length > 0) {
       throw new Error(`profile-identity ${result.label}: internal account key rendered as bare text at ${result.bareDefaultNodes.join(", ")}`);
     }
-    if (!result.hasDemoEmail) {
-      throw new Error(`profile-identity ${result.label}: identity line does not show the demo contact email`);
+    if (!result.hasServerIdentity) {
+      throw new Error(`profile-identity ${result.label}: identity line does not show the restored server profile`);
     }
   }
   console.log("PROFILE-IDENTITY-CHECK: PASS");

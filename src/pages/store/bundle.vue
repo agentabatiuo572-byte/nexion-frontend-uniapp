@@ -255,7 +255,7 @@ const suggestions = computed(() =>
     ? PRODUCTS.filter(
       (p) =>
         !cart.items.includes(p.id) &&
-        p.tier !== "Share" &&
+        p.productType !== "SHARE" &&
         isProductAvailable(p, phase.value),
     ).slice(0, 3)
     : [],
@@ -381,7 +381,7 @@ async function onCheckout() {
       const created = await bundleOrderApi.create(list.map((item) => item.id), key);
       if (developmentFundsEnabled) {
         const payment = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
-        if (payment.orderNo !== created.orderNo || payment.sourceEnvironment !== "SANDBOX") {
+        if (payment.orderNo !== created.orderNo || payment.sourceEnvironment !== "PRODUCTION") {
           throw new Error("COMMERCE_PAYMENT_READBACK_INVALID");
         }
         const readback = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
