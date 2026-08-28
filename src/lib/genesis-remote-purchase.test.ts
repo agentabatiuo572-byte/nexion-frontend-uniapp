@@ -54,6 +54,31 @@ describe("remote genesis purchase failure classification", () => {
     expect(applyReceipt).not.toHaveBeenCalled();
   });
 
+  it("does not run an unknown-outcome recovery read for an explicit business rejection", async () => {
+    const recoverUnknown = vi.fn(async () => true);
+    const applyReceipt = vi.fn();
+    const retireIntent = vi.fn();
+
+    await expect(resolveRemoteGenesisPurchase({
+      execute: async () => {
+        throw new ApiError({
+          kind: "business",
+          message: "GENESIS_WALLET_INSUFFICIENT",
+          status: 409,
+        });
+      },
+      isCurrent: () => true,
+      applyReceipt,
+      retireIntent,
+      recoverUnknown,
+    })).resolves.toEqual({ ok: false, reason: "insufficient-funds" });
+
+    await Promise.resolve();
+    expect(recoverUnknown).not.toHaveBeenCalled();
+    expect(applyReceipt).not.toHaveBeenCalled();
+    expect(retireIntent).not.toHaveBeenCalled();
+  });
+
   it("fails closed for unknown, network, and conflicting failures", () => {
     expect(classifyRemoteGenesisPurchaseError(new ApiError({ kind: "business", message: "GENESIS_SUPPLY_CONFLICT" }))).toBe("unavailable");
     expect(classifyRemoteGenesisPurchaseError(new Error("offline"))).toBe("unavailable");

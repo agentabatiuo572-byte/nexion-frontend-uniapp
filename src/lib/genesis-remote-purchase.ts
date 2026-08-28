@@ -48,8 +48,11 @@ export async function resolveRemoteGenesisPurchase<T>(operations: {
   try {
     state = await operations.execute();
   } catch (error) {
-    void operations.recoverUnknown().catch(() => undefined);
-    return { ok: false, reason: classifyRemoteGenesisPurchaseError(error) };
+    const reason = classifyRemoteGenesisPurchaseError(error);
+    if (reason === "unavailable") {
+      void operations.recoverUnknown().catch(() => undefined);
+    }
+    return { ok: false, reason };
   }
   if (!operations.isCurrent()) return { ok: false, reason: "unavailable" };
   operations.applyReceipt(state);
