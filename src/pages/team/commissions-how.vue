@@ -10,9 +10,9 @@
 -->
 <template>
   <AppChassis active="team">
-    <HowPublishedContent v-if="remoteApiEnabled" content-key="team-commissions-how" back="/pages/team/commissions" />
-    <view v-if="!remoteApiEnabled" class="pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/commissions" />
+    <HowPublishedContent v-if="remoteApiEnabled && !publishedContentUnavailable" content-key="team-commissions-how" back="/pages/team/commissions" @unavailable="publishedContentUnavailable = true" />
+    <view v-if="!remoteApiEnabled || publishedContentUnavailable" class="pb-8" style="color: var(--v5-ink)">
+      <SubPageHeader :title="t.headerTitles.teamCommissions + t.headerTitles.howItWorksSuffix" back="/pages/team/commissions" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="lemon" />
 
@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -144,6 +144,7 @@ import { navBack } from "@/lib/route";
 import { BINARY_SETTLE_PERIOD } from "@/lib/binary-settlement";
 
 const t = useT();
+const publishedContentUnavailable = ref(false);
 const w = computed(() => t.value.commissionsHowItWorks);
 // 平衡匹配渠道结算周期文案据后台同源配置派生(默认每月),与 /team/binary 口径一致。
 const k2BodyText = computed(() =>

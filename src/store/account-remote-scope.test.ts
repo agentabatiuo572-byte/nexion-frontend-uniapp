@@ -38,6 +38,7 @@ function card(account: string, isDefault = true): PaymentMethodCard {
     version: 1,
     brand: "visa",
     last4: account === "A" ? "1111" : "2222",
+    expiry: "12/30",
     holder: `${account} Holder`,
     status: "BOUND",
     isDefault,
