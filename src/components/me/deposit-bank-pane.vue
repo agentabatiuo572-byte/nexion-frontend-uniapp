@@ -26,6 +26,13 @@
       </view>
 
       <view v-else :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
+        <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
+          <view class="flex-1 min-w-0">
+            <text class="block" :style="warnTextStyle" style="font-weight: 600">{{ t.bankPane.dailyCapacityExhaustedTitle }}</text>
+            <text class="block" :style="warnTextStyle" style="margin-top: 2px">{{ fmt(t.bankPane.dailyCapacityExhaustedBody, { remaining: todayRemainingLabel, min: minLabel }) }}</text>
+          </view>
+        </view>
         <view class="rounded-2xl" :style="amountBoxStyle">
           <view><text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.bankPane.amountLabel }}</text></view>
           <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
@@ -36,7 +43,7 @@
               inputmode="decimal"
               :value="amount"
               placeholder="0.00"
-              :disabled="!fxUsable"
+              :disabled="!fxUsable || dailyCapacityExhausted"
               @input="onAmount"
             />
             <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>
@@ -49,7 +56,7 @@
 
         <view class="flex items-center justify-between" style="margin-top: 10px; padding: 0 4px; gap: 8px">
           <view class="min-w-0"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeNote }}</text></view>
-          <view class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ limitLine }}</text></view>
+          <view class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ todayRemainingLine }}</text></view>
         </view>
 
         <view
@@ -162,7 +169,7 @@
         </view>
         <view><text class="block text-center" :style="stateBodyStyle">{{ fmt(t.bankPane.successLine, { rate: rateText }) }}</text></view>
       </view>
-      <view class="nx-bank-done-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="done">
+      <view class="nx-bank-done-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="finishCreditedFlow">
         <text>{{ t.bankPane.doneCta }}</text>
       </view>
       <view class="nx-bank-bills-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goBills">
@@ -222,7 +229,7 @@
           <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
         </view>
       </view>
-      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="done">
+      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="startNewTopup">
         <text :style="ghostTextStyle">{{ t.bankPane.newTopupCta }}</text>
       </view>
       <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
@@ -238,7 +245,7 @@ import FxRateLine from "@/components/me/fx-rate-line.vue";
 import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { toast, confirm } from "@/store/ui";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
@@ -247,6 +254,7 @@ import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
 import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
 
@@ -312,13 +320,27 @@ const amountNum = computed(() => {
 });
 const minDeposit = computed(() => remoteApiEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
 const maxDeposit = computed(() => remoteApiEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
+const todayRemainingDeposit = computed(() => remoteApiEnabled ? fx.todayRemainingDepositUsdt : BANK_MAX_DEPOSIT_USDT);
 const bankRailAvailable = computed(() => remoteApiEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
-const inRange = computed(() => amountNum.value >= minDeposit.value && amountNum.value <= maxDeposit.value);
 const fxUsable = computed(() => fx.fxAvailable && fx.configReady && bankRailAvailable.value);
+const dailyCapacityExhausted = computed(() =>
+  fxUsable.value && todayRemainingDeposit.value < minDeposit.value,
+);
+const inRange = computed(() =>
+  amountNum.value >= minDeposit.value
+  && amountNum.value <= maxDeposit.value
+  && amountNum.value <= todayRemainingDeposit.value,
+);
 
-const minLabel = computed(() => `$${minDeposit.value}`);
-const maxLabel = computed(() => `$${maxDeposit.value.toLocaleString("en-US")}`);
-const limitLine = computed(() => fmt(t.value.bankPane.limitNote, { min: minLabel.value, max: maxLabel.value }));
+function usdtLabel(value: number): string {
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+const minLabel = computed(() => usdtLabel(minDeposit.value));
+const maxLabel = computed(() => usdtLabel(maxDeposit.value));
+const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
+const todayRemainingLine = computed(() =>
+  fmt(t.value.bankPane.todayRemainingNote, { remaining: todayRemainingLabel.value }),
+);
 const feeNote = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd <= 0) return t.value.bankPane.feeNote;
@@ -327,9 +349,19 @@ const feeNote = computed(() => {
     ? fmt(t.value.bankPane.feeConfiguredVnd, { usdt, vnd: fmtVnd(fx.feeVnd) })
     : fmt(t.value.bankPane.feeConfigured, { usdt });
 });
-const amountError = computed(() =>
-  amount.value !== "" && !inRange.value ? fmt(t.value.bankPane.limitError, { min: minLabel.value, max: maxLabel.value }) : "",
-);
+const amountError = computed(() => {
+  if (amount.value === "" || dailyCapacityExhausted.value) return "";
+  if (amountNum.value < minDeposit.value) {
+    return fmt(t.value.bankPane.minimumLimitExceeded, { min: minLabel.value });
+  }
+  if (amountNum.value > maxDeposit.value) {
+    return fmt(t.value.bankPane.singleLimitExceeded, { max: maxLabel.value });
+  }
+  if (amountNum.value > todayRemainingDeposit.value) {
+    return fmt(t.value.bankPane.dailyCapacityExceeded, { max: todayRemainingLabel.value });
+  }
+  return "";
+});
 // 牌价未返回/不可用 → 占位「—」不显示 0([FEAT-PAY03] ⑤ 空状态)
 const vndPreview = computed(() =>
   fxUsable.value && amountNum.value > 0
@@ -344,14 +376,45 @@ const createError = ref("");
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
-  if (creating.value || !fxUsable.value || usdt < minDeposit.value || usdt > maxDeposit.value) return;
+  if (creating.value || !fxUsable.value || usdt < minDeposit.value
+    || usdt > maxDeposit.value || usdt > todayRemainingDeposit.value) return;
   creating.value = true;
   createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
 async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
+  if (remoteApiEnabled && !developmentFundsEnabled) {
+    // 收款账户的日额度会在另一笔入账后变化；提交前必须重读服务端快照，
+    // 不能拿进入页面时缓存的 5000 上限继续创建一张服务端必拒绝的付款单。
+    await fx.load();
+    if (!fx.fxAvailable || !fx.configReady) {
+      createError.value = t.value.topupChrome.depositOpFailedNote;
+      toast.error(createError.value);
+      creating.value = false;
+      return;
+    }
+    if (!fx.vietQrEnabled) {
+      createError.value = t.value.bankPane.railPaused;
+      toast.error(createError.value);
+      creating.value = false;
+      return;
+    }
+    if (usdt < minDeposit.value || usdt > maxDeposit.value || usdt > todayRemainingDeposit.value) {
+      const reason = usdt < minDeposit.value
+        ? fmt(t.value.bankPane.minimumLimitExceeded, { min: minLabel.value })
+        : usdt > maxDeposit.value
+          ? fmt(t.value.bankPane.singleLimitExceeded, { max: maxLabel.value })
+          : fmt(t.value.bankPane.dailyCapacityExceeded, { max: todayRemainingLabel.value });
+      createError.value = reason;
+      toast.error(reason);
+      creating.value = false;
+      return;
+    }
+  }
+  let approvedBusinessFailureCopy = "";
   await runRecoverableFundsOperation(async () => {
+    try {
       const it = developmentFundsEnabled
         ? await dep.createSandboxBankIntent(usdt, expectedAccountKey)
         : remoteApiEnabled
@@ -359,14 +422,30 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
           : dep.createBankIntent(usdt);
       if (!it) throw new Error(t.value.fx.updating);
       return it;
+    } catch (cause) {
+      // Another payment can consume the last daily capacity after our preflight.
+      // The server remains the final authority; translate this settled 422 into
+      // the same explicit today-limit guidance instead of a generic retry error.
+      if (cause instanceof ApiError && cause.kind === "business"
+        && cause.message === "VIETQR_DAILY_CAPACITY_EXCEEDED") {
+        await fx.load();
+        if (fx.fxAvailable && fx.configReady) {
+          approvedBusinessFailureCopy = fmt(t.value.bankPane.dailyCapacityExceeded, {
+            max: todayRemainingLabel.value,
+          });
+        }
+      }
+      throw cause;
+    }
     }, {
       success: (it) => {
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
       },
       failure: (reason) => {
-        createError.value = reason;
-        toast.error(reason);
+        const userFacingReason = approvedBusinessFailureCopy || reason;
+        createError.value = userFacingReason;
+        toast.error(userFacingReason);
       },
       settled: () => { creating.value = false; },
       // lib 新契约:fallback = 用户面人话(原始 cause 由 lib 进日志)。审计 R3 抓获:此处
@@ -379,7 +458,10 @@ function regen() {
   if (!it) return;
   createOrder(it.usdtAmount);
 }
-function done() {
+function finishCreditedFlow() {
+  navBack("/pages/me/wallet");
+}
+function startNewTopup() {
   viewIntentId.value = null;
   paidPressed.value = false;
 }

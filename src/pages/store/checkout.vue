@@ -285,7 +285,7 @@ import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "@/store/trial-config";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { resolveTrialAt, accruedShadow } from "@/store/trial-boundary";
 import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
@@ -294,11 +294,12 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
-import { commercePaymentApi, deviceE3Api, developmentFundsEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, deviceE3Api, developmentCommercePaymentEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
+import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -337,8 +338,8 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
-  if (developmentFundsEnabled) {
-    return [{ id: "sandbox-wallet", label: t.value.store.coSandboxWallet,
+  if (developmentCommercePaymentEnabled) {
+    return [{ id: "development-wallet", label: t.value.store.coSandboxWallet,
       hint: t.value.store.coHintSandboxWallet, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 }];
   }
   const methods: PaymentMethod[] = [
@@ -377,6 +378,7 @@ function mintDialogOwner(): string {
 }
 
 const productId = ref("stellarbox-s1");
+let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
 const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 
@@ -415,9 +417,10 @@ function purchaseEligibilityFailureCopy(): string {
 
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
+  trialCheckoutSource = o.source === "trial";
   // accept ?product= (canonical) or ?id= (per task spec)
-  if (o.product) productId.value = o.product;
-  else if (o.id) productId.value = o.id;
+  if (o.product) productId.value = resolveTrialCheckoutProductId(o.product) ?? o.product;
+  else if (o.id) productId.value = resolveTrialCheckoutProductId(o.id) ?? o.id;
   resumeSessionId = o.resume || null;
   const [catalogReady] = await Promise.all([
     refreshProductCatalog(true),
@@ -436,13 +439,44 @@ onLoad(async (options) => {
     if (pending.get(resumeSessionId)?.productId === productId.value) toast.warn(t.value.store.pendingResumeBlocked);
     resumeSessionId = null;
   };
-  if (pp?.purchaseBlocked) {
+  // The trial CTA may point at a product whose finite stock has since reached
+  // zero. The canonical catalogue intentionally omits that row. This is not a
+  // hardware-quota decision: pop the transient checkout so Back cannot reveal
+  // an orphaned "product not found" page underneath the quota screen.
+  if (!pp) {
+    dropResumeInvoice();
+    const unavailableCopy = trialCheckoutSource
+      ? t.value.store.trialProductUnavailable
+      : t.value.store.productUnavailable;
+    if (trialCheckoutSource) navBack("/pages/me/trial");
+    else navTo("/store");
+    // Navigation tears down the checkout's native toast layer. Show the reason
+    // on the destination page so the CTA never looks like a silent no-op.
+    setTimeout(() => {
+      uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 });
+    }, 120);
+    return;
+  }
+  if (pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
+    dropResumeInvoice();
+    const unavailableCopy = trialCheckoutSource
+      ? t.value.store.trialProductUnavailable
+      : t.value.store.temporarilyOutOfStock;
+    if (trialCheckoutSource) navBack("/pages/me/trial");
+    else navTo("/store");
+    setTimeout(() => {
+      uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 });
+    }, 120);
+    return;
+  }
+  const trialConversion = trialQuoteAt(mockServerNow()).applied;
+  if (!trialConversion && pp.purchaseBlocked) {
     dropResumeInvoice();
     uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
     navTo("/store");
     return;
   }
-  if (pp && !isProductAvailable(pp, phase.value)) {
+  if (!trialConversion && !isProductAvailable(pp, phase.value)) {
     const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
     const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
       && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
@@ -456,7 +490,7 @@ onLoad(async (options) => {
   // Hard purchase gate (等级门/锁额): refuse checkout for ineligible / sold-out
   // SKUs — deep-link defense (store cards & detail already redirect blocked users
   // to /team/quota). Server re-checks on POST /api/orders (server-canonical).
-  if (!(await refreshPurchaseEligibility())) {
+  if (!trialConversion && !(await refreshPurchaseEligibility())) {
     dropResumeInvoice();
     uni.showToast({
       title: purchaseEligibilityFailureCopy(),
@@ -519,7 +553,8 @@ const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainder
 function trialQuoteAt(now: number): TrialQuote {
   const cfg = trialCfg.value;
   const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
-  if ((r.status !== "active" && r.status !== "grace") || productId.value !== cfg.trialProductId) return NO_TRIAL;
+  const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
+  if ((r.status !== "active" && r.status !== "grace") || !trialProductId || productId.value !== trialProductId) return NO_TRIAL;
   // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
   // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
   const acc = accruedShadow(r, now, cfg);
@@ -562,7 +597,7 @@ const voucherMatch = computed(() => {
   if (!p) return null;
   // Canonical E3 submit owns the complete quote and wallet debit. Client-side
   // voucher stacking is not part of that command and therefore fails closed.
-  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || developmentFundsEnabled)) return null;
+  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || developmentCommercePaymentEnabled)) return null;
   return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
@@ -665,8 +700,9 @@ const expiredVoucherForSku = computed(() => {
 });
 
 // ─── Trade-in intercept (one-shot) ───────────────────────────────────────
-// FEAT-DEV02: every catalog SKU is a real DeviceKind now (v2/P2 included), so
-// all device checkouts intercept. Fire on first mount only: skip when a retire
+// FEAT-DEV02: physical catalog SKUs (v2/P2 included) use the device trade-in
+// capacity preflight. SHARE products are services, not device slots, and must
+// never call the physical-device capacity APIs. Fire on first mount only: skip when a retire
 // context already targets this SKU (arrived from the devices-page flow) →
 // choice (owns ≥1 retirable device) → slot-full replace → normal payment.
 const KNOWN_KINDS: DeviceKind[] = [
@@ -676,7 +712,6 @@ const KNOWN_KINDS: DeviceKind[] = [
   "stellarbox-pro-v2",
   "stellarrack-p1",
   "stellarrack-p2",
-  "cloud-share",
 ];
 let interceptFired = false;
 const remoteCapacityGate = new RemoteCapacityGate();
@@ -710,24 +745,30 @@ function fireTradeinIntercept() {
   // upgrade off an old unit. Normal (non-trial) checkouts intercept as before.
   if (trialConversionMode.value) return;
   const p = getProduct(productId.value);
-  if (!p || !KNOWN_KINDS.includes(p.id as DeviceKind)) return;
+  if (!p) return;
+  if (p.productType === "SHARE") return;
+  if (!KNOWN_KINDS.includes(p.id as DeviceKind)) return;
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
   if (remoteApiEnabled) {
     const requestScope = captureAccountScope();
-    void Promise.all([
+    // Capacity is the mandatory server safety gate; trade-in eligibility is an
+    // optional enhancement. A transient eligibility failure must not reject an
+    // otherwise ordinary purchase, matching the prototype's local flow where
+    // the absence of a trade-in candidate simply continues to payment.
+    void resolveTradeinCheckoutPreflight(
       deviceE3Api.eligibility(kind),
       remoteCapacityGate.resolve(
         () => deviceE3Api.capacityQuote(kind),
         () => {},
         () => isCurrentAccountScope(requestScope),
       ),
-    ]).then(async ([eligibility, quote]) => {
+    ).then(async ({ eligibility, capacity: quote }) => {
       if (!isCurrentAccountScope(requestScope)) return;
-      const sourceIds = eligibility.sources.filter((source) => source.eligible)
-        .map((source) => String(source.sourceDeviceId));
+      const sourceIds = eligibility?.sources.filter((source) => source.eligible)
+        .map((source) => String(source.sourceDeviceId)) ?? [];
       if (quote.decision === "REPLACE_REQUIRED") {
-        if (eligibility.eligible && sourceIds.length > 0) {
+        if (eligibility?.eligible && sourceIds.length > 0) {
           tradein.showChoice(kind, p.price, sourceIds);
         } else {
           tradein.showCanonicalReplace(kind, quote.payableUsdt, quote);
@@ -748,7 +789,7 @@ function fireTradeinIntercept() {
       }
       // CAPACITY_AVAILABLE: server says the checkout is not capped; continue
       // through the ordinary server order path without opening a local sheet.
-      if (eligibility.eligible && sourceIds.length > 0) {
+      if (eligibility?.eligible && sourceIds.length > 0) {
         if (!isCurrentAccountScope(requestScope)) return;
         tradein.showChoice(kind, p.price, sourceIds);
       }
@@ -782,7 +823,7 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(developmentFundsEnabled ? "sandbox-wallet" : "usdt-trc20");
+const payment = ref<string>(developmentCommercePaymentEnabled ? "development-wallet" : "usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
@@ -856,12 +897,13 @@ function retryReceiptWrite() {
 const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const cappedRaw = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
+const targetOccupiesPhysicalSlot = computed(() => product.value?.productType !== "SHARE");
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
-const capped = computed(() =>
-  trialConversionMode.value ? app.activeSlotCount >= MAX_DEVICES : cappedRaw.value,
-);
+const capped = computed(() => targetOccupiesPhysicalSlot.value && (
+  trialConversionMode.value ? app.activeSlotCount >= MAX_DEVICES : cappedRaw.value
+));
 
 // ── derived text ──
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
@@ -952,7 +994,7 @@ async function goAwaiting() {
   // debit the run-scoped sandbox wallet and issue the durable payment number.
   // Remote/production deliberately remains provider-backed and never falls
   // back to this mock rail.
-  if (developmentFundsEnabled) {
+  if (developmentCommercePaymentEnabled) {
     const orderNo = orderId.value;
     if (!orderNo) {
       step.value = "confirm";
@@ -1029,7 +1071,7 @@ async function onConfirmPay() {
         step.value = "select-payment";
         return;
       }
-      if (developmentFundsEnabled) {
+      if (developmentCommercePaymentEnabled) {
         try {
           const readback = (await orderApi.list()).orders.find((order) => order.orderNo === conversion.orderNo);
           if (!isCurrentAccountScope(confirmationScope)) {
@@ -1086,7 +1128,7 @@ function adoptSession(s: PendingCheckoutSession) {
   // (券折扣 / 试用促销与抵扣)**不能原样当扣款算术**(审计 R3 P0:篡改 voucher.discount 成 648
   // 可用 $1 买 $649 设备)。规则 = **逐项取 min(此刻现算值, 发票记录值)**:
   //   · 现算值封顶 → 发票改大没用(扣的不超过现算);
-  //   · 发票值封顶 → 窗内新到的券 / 多累计的试用收益不参与这一单 —— 二维码告诉用户转 X,
+  //   · 发票值封顶 → 窗内新到的券 / 多累计的试用抵扣金不参与这一单 —— 二维码告诉用户转 X,
   //     本单就恰好按 X 成交(支付时刻另有「实扣 = 票面」闸;审计 R4 P1:此前现算值可低于票面,
   //     QR 说转 649 却按 600 入账,差额无账目落点)。
   //   · 现算比发票少(券失效 / 试用结束 / 试用未再挂上)→ 实扣高于票面 → 支付时刻拒单重报价。
@@ -1385,14 +1427,18 @@ async function submitRemoteOrder(): Promise<void> {
     }
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
     if (!scopeIsCurrent()) return;
-    const sandboxPaidReplay = developmentFundsEnabled && persisted?.canonicalStatus === "paid"
+    const developmentSettledReplay = developmentCommercePaymentEnabled
+      && (persisted?.canonicalStatus === "paid" || persisted?.canonicalStatus === "activated")
       && persisted.paymentStatus.toUpperCase() === "PAID"
-      && persisted.orderStatus.toUpperCase() === "PAID";
+      && (persisted.orderStatus.toUpperCase() === "PAID"
+        || persisted.orderStatus.toUpperCase() === "COMPLETED");
     if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
-        || (!sandboxPaidReplay && (persisted.canonicalStatus !== "placed"
+        || (!developmentSettledReplay && (persisted.canonicalStatus !== "placed"
           || persisted.paymentStatus.toUpperCase() !== "PENDING"
           || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"))
-        || persisted.activationStatus.toUpperCase() !== (sandboxPaidReplay ? "WAITING_PROVISIONING" : "WAITING_PAYMENT")
+        || (developmentSettledReplay
+          ? !["WAITING_PROVISIONING", "ACTIVATED"].includes(persisted.activationStatus.toUpperCase())
+          : persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT")
         || created.paymentStatus.toUpperCase() !== "PENDING"
         || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
         || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
@@ -1412,24 +1458,27 @@ async function submitRemoteOrder(): Promise<void> {
     // failure after the server has already committed the order.
     // Retire the durable key only after the server order readback above and
     // account-scoped order refresh both succeeded; unknown outcomes reuse it.
-    if (developmentFundsEnabled) {
-      // The user's confirm click is the explicit payment action in
-      // local-sandbox. Settlement remains entirely server-side and is accepted
-      // only after both the mock provenance receipt and canonical order readback
-      // agree. Production never enters this branch.
+    if (developmentCommercePaymentEnabled) {
+      // The user's confirm click is the explicit local-development payment action.
+      // Settlement remains entirely server-side and advances only after the Java
+      // receipt and canonical order readback agree. Production never enters this branch.
       const paymentReceipt = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
       if (!scopeIsCurrent()) return;
       if (paymentReceipt.orderNo !== created.orderNo) throw new Error("COMMERCE_PAYMENT_ORDER_MISMATCH");
       const paidSnapshot = await orderApi.list();
       if (!scopeIsCurrent()) return;
       const paidOrder = paidSnapshot.orders.find((order) => order.orderNo === created.orderNo);
-      if (!paidOrder || paidOrder.canonicalStatus !== "paid"
+      if (!paidOrder || paidOrder.canonicalStatus !== "activated"
           || paidOrder.paymentStatus.toUpperCase() !== "PAID"
-          || paidOrder.orderStatus.toUpperCase() !== "PAID") {
+          || paidOrder.orderStatus.toUpperCase() !== "COMPLETED"
+          || paidOrder.activationStatus.toUpperCase() !== "ACTIVATED") {
         throw new Error("COMMERCE_PAYMENT_READBACK_MISMATCH");
       }
       await orders.refreshRemote();
       if (!scopeIsCurrent()) return;
+      const walletRefreshed = await app.refreshRemoteFleet();
+      if (!scopeIsCurrent()) return;
+      if (!walletRefreshed) app.adoptDevelopmentCommerceWallet(paymentReceipt.walletBalanceAfterUsdt, submissionScope);
       retireRemoteOrderKey();
       uni.redirectTo({ url: `/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}` });
     } else {
@@ -1648,7 +1697,10 @@ watch(step, async (s) => {
       // 上架节奏门支付时复验(与 onLoad 同谓词):未正式上架 SKU 必须在支付
       // 瞬间仍「携有效抵扣上下文 ∧ 抢先购窗口」——堵住「过门后移除抵扣 →
       // 全价买未上架机」的旁路(对抗审查 F1)。
-      if (!isProductAvailable(p, phase.value)) {
+      // Trial conversion is authorized by /api/trial/convert, not by the
+      // Pro/Rack hardware-quota policy used for a new store purchase. Use the
+      // confirmed quote snapshot here; the live quote is revalidated below.
+      if (!trialQuote.applied && !isProductAvailable(p, phase.value)) {
         const mockEarlyWindow = p.available === undefined && p.unlocksAtPhase
           && ti && tradeInEarlyWindowOk(p.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
         if (!mockEarlyWindow) {
@@ -1665,7 +1717,7 @@ watch(step, async (s) => {
       const purchaseBlockedNow = remoteApiEnabled
         ? remotePurchaseEligibility.value?.eligible !== true
         : purchaseGate.value.blocked;
-      if (purchaseBlockedNow) {
+      if (!trialQuote.applied && purchaseBlockedNow) {
         toast.warn(purchaseEligibilityFailureCopy());
         step.value = "select-payment";
         return;
@@ -1728,7 +1780,7 @@ watch(step, async (s) => {
       // trial and catalogue row, creates the order, and closes the trial. Do
       // not debit local mock money or mint a second local order in this branch.
       if (applyTrial && remoteApiEnabled) {
-        const conversion = await freeTrial.convert(p.id);
+        const conversion = await freeTrial.convert(p.id, chargeTotal);
         if (!conversion.ok) {
           toast.warn(t.value.store.coTrialQuoteChanged);
           step.value = "select-payment";

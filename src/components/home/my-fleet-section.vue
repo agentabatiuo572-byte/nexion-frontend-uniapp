@@ -13,8 +13,8 @@
 
     <!-- Slot rack: icon bays -->
     <view class="flex items-center" style="gap: 9px; margin-bottom: 14px">
-      <DeviceSlot v-for="d in devices" :key="d.id" :device="d" />
-      <AddDeviceRow v-if="devices.length < 6" />
+      <DeviceSlot v-for="d in slotDevices" :key="d.id" :device="d" />
+      <AddDeviceRow v-if="slotDevices.length < 6" />
     </view>
 
     <!-- Device list: status dot · name · today earnings -->
@@ -35,12 +35,16 @@ import { useApp } from "@/store/app";
 import DeviceSlot from "./device-slot.vue";
 import DeviceRow from "./device-row.vue";
 import AddDeviceRow from "./add-device-row.vue";
+import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
 
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, { n: devices.value.length }));
+const slotDevices = computed(() => devices.value.filter(isActiveSlotDevice));
+const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, {
+  n: slotDevices.value.length,
+}));
 
 function goManage() {
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });

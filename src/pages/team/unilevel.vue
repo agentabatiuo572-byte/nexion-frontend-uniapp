@@ -45,16 +45,8 @@
           </view>
         </view>
 
-        <view v-if="remoteApiEnabled && commission.configStatus === 'ready' && remoteState !== 'ready' && commission.config" :style="canonicalRulesStyle">
-          <text class="block" :style="compTitleStyle">F2 canonical rules · server source</text>
-          <text class="block" :style="compSubStyle">{{ commission.config.source }} · {{ commission.config.sourceEnvironment }} · RunID {{ commission.config.runId ?? '—' }}</text>
-          <view class="grid grid-cols-2" style="margin-top: 12px; gap: 8px">
-            <view v-for="layer in canonicalRuleLayers" :key="layer" class="flex items-center justify-between" :style="canonicalRuleRowStyle">
-              <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-2)' }">L{{ layer }}</text>
-              <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">{{ (commission.config.unilevelUsdt[layer] * 100).toFixed(0) }}% · {{ commission.config.unilevelNex[layer] }} NEX/$1</text>
-            </view>
-          </view>
-          <text class="block" :style="canonicalHoldStyle">{{ t.unilevel.serverRewardHold }} · {{ t.network.projectionErrorDesc }}</text>
+        <view v-if="remoteApiEnabled && commission.configStatus === 'ready' && remoteState !== 'ready' && remoteState !== 'error'" class="text-center" style="padding: 24px 20px">
+          <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
         </view>
 
         <view v-if="remoteApiEnabled && remoteState === 'ready' && commission.configStatus === 'ready'" :style="remoteBreakdownStyle">
@@ -358,8 +350,6 @@ const remoteTotalNEX = computed(() => remoteDirect.value.amountNEX + remoteExten
 const canonicalPolicyText = computed(() => commission.config
   ? `${commission.config.coolingDays}d cooling · ×${commission.config.promoMultiplier} promo`
   : "");
-const canonicalRuleLayers = [1, 2, 3, 4, 5, 6, 7] as const;
-
 const filteredMembers = computed<PlottedMember[]>(() => {
   if (filter.value === "all") {
     return [
@@ -435,9 +425,6 @@ const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", displa
 const remoteBreakdownStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-glass-bg)", backdropFilter: "blur(18px) saturate(180%)" };
 const remoteAmountStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
 const remoteSplitNoteStyle: CSSProperties = { marginTop: "14px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const canonicalRulesStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-glass-bg)", backdropFilter: "blur(18px) saturate(180%)" };
-const canonicalRuleRowStyle: CSSProperties = { padding: "8px 10px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-surface-2) 55%, transparent)", fontSize: "12px" };
-const canonicalHoldStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroTierChipStyle = computed<CSSProperties>(() => ({

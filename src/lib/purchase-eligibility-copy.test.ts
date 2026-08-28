@@ -4,7 +4,7 @@ import { resolvePurchaseEligibilityMessage } from "./purchase-eligibility-copy";
 const base = {
   productNo: "stellarbox-pro-v2",
   evaluatedAt: 1786856400000,
-  source: "nx_admin_device_sku.purchase_gate_json + nx_user" as const,
+  source: "nx_product + nx_admin_device_sku + nx_user" as const,
   sourceEnvironment: "PRODUCTION" as const,
   runId: null,
   serverCanonical: true as const,

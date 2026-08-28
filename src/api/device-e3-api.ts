@@ -1,7 +1,9 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
+import { matchesRuntimeProvenance } from "./runtime-provenance";
+
+const E3_FLEET_SOURCE = "nx_user_device + nx_compute_receipt + nx_compute_e3_config";
 
 export interface CanonicalE3Device {
   id: number;
@@ -265,10 +267,8 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
   if (!Array.isArray(source.devices)) return invalid();
   const sourceEnvironment = string(source.sourceEnvironment).toUpperCase();
   const runId = typeof source.runId === "string" ? source.runId.trim() : invalid();
-  const provenanceMatches = source.serverCanonical === true && (
-    (mode === "prod" && sourceEnvironment === "PRODUCTION" && runId === "")
-    || (mode === "dev" && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId))
-  );
+  const provenanceMatches = source.serverCanonical === true
+    && matchesRuntimeProvenance({ ...source, sourceEnvironment, runId }, mode, E3_FLEET_SOURCE);
   if (!provenanceMatches) return invalid("E3_FLEET_PROVENANCE_INVALID");
   const serverNow = integer(source.serverNow);
   const devices = source.devices.map(device);

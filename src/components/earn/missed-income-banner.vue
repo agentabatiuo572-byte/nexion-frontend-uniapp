@@ -5,8 +5,9 @@
   ceiling and cumulative miss since signup. Warning-orange tone (var(--v5-brand-2)),
   separate from the lemon "you earned" semantics. Dual progress bars (phone tiny
   vs S1 ceiling full), the phone bar grows-on-scroll via useScrollGrowProgress
-  (P-019 $el-aware). Hidden while trial active (TrialGhostSlot covers it) or when
-  the user is already top-tier (nothing higher to miss). Taps route to /store.
+  (P-019 $el-aware). A free trial does not hide this comparison: trial credit and
+  missed long-term device income answer different questions. Hidden only when
+  there is no authoritative upgrade comparison. Taps route to /store.
 
   TickerNumber (source) → plain reactive value: the interval re-render already
   ramps the number; uni has no tween component, matching trial-ghost-slot.vue.
@@ -38,7 +39,7 @@
         <view>
           <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-ink-3)">{{ baseLabel }}</text>
-            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ promo.baseDaily.toFixed(2) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ baseDaily.toFixed(2) }}/d</text>
           </view>
           <view ref="elRef" class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
             <view class="h-full rounded-full" :style="phoneBarStyle" />
@@ -47,7 +48,7 @@
         <view>
           <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-brand)">{{ ceilingText }}</text>
-            <text class="tabular-nums" style="color: var(--v5-brand)">${{ promo.targetDaily.toFixed(2) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-brand)">${{ targetDaily.toFixed(2) }}/d</text>
           </view>
           <view class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
             <view class="h-full w-full rounded-full" style="background: color-mix(in srgb, var(--v5-brand) 45%, transparent)" />
@@ -74,8 +75,8 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
+import { remoteApiEnabled } from "@/api/runtime";
 import { deviceNameByKind } from "@/lib/device-copy";
-import { trialReservesSlotNow } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
@@ -87,46 +88,96 @@ const t = useT();
 
 const { elRef, inView } = useScrollGrowProgress();
 
-const now = ref(Date.now());
+const localNow = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
+  if (remoteApiEnabled) return;
   timer = setInterval(() => {
-    now.value = Date.now();
+    localNow.value = Date.now();
   }, 60_000);
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-const trialActive = computed(() => trialReservesSlotNow());
+const promo = computed(() => {
+  if (remoteApiEnabled) {
+    const projection = app.homeTruth?.doTheMath;
+    if (!projection) return null;
+    return {
+      baseKind: projection.base.kind,
+      baseName: projection.base.name,
+      baseDaily: projection.base.dailyUsdt,
+      targetKind: projection.target.kind,
+      targetName: projection.target.name,
+      targetDaily: projection.target.dailyUsdt,
+      multiplier: projection.multiplier,
+      targetPayback: projection.paybackDays,
+      productNo: projection.target.productNo,
+    };
+  }
+  return {
+    ...derivePromoUpgrade(app.visibleDevices),
+    productNo: null,
+  };
+});
+// The formal App uses the Java response timestamp as its clock authority. This
+// avoids browser-time drift and prevents a failed Home request from falling
+// back to locally invented earning values. The prototype keeps its mock ticker.
+const authoritativeNow = computed(() => {
+  if (!remoteApiEnabled) return localNow.value;
+  const generatedAt = app.homeTruth?.generatedAt;
+  if (!generatedAt) return 0;
+  const parsed = Date.parse(generatedAt);
+  return Number.isFinite(parsed) ? parsed : 0;
+});
+const joinedAtValid = computed(() =>
+  Number.isFinite(app.user.joinedAt)
+  && app.user.joinedAt > 0
+  && app.user.joinedAt <= authoritativeNow.value,
+);
 
-// Trial active → TrialGhostSlot already carries device + earnings + buy CTA.
-// Top tier (multiplier 0) → nothing higher to miss. Hide in both cases.
-const show = computed(() => !trialActive.value && promo.value.multiplier !== 0);
+// Trial credit and missed long-term device income are separate concepts, so an
+// active trial must not remove the comparison card. Top tier (multiplier 0) has
+// nothing higher to miss and remains hidden.
+const show = computed(() =>
+  promo.value !== null
+  && authoritativeNow.value > 0
+  && joinedAtValid.value
+  && promo.value.multiplier !== 0,
+);
 
-const gap = computed(() => promo.value.targetDaily - promo.value.baseDaily);
+const baseDaily = computed(() => promo.value?.baseDaily ?? 0);
+const targetDaily = computed(() => promo.value?.targetDaily ?? 0);
+const gap = computed(() => targetDaily.value - baseDaily.value);
 const dayProgress = computed(() => {
-  const todayStart = new Date(now.value).setHours(0, 0, 0, 0);
-  const elapsedHoursToday = (now.value - todayStart) / (60 * 60 * 1000);
+  const todayStart = new Date(authoritativeNow.value).setHours(0, 0, 0, 0);
+  const elapsedHoursToday = (authoritativeNow.value - todayStart) / (60 * 60 * 1000);
   return Math.min(1, elapsedHoursToday / 24);
 });
 const missedToday = computed(() => gap.value * dayProgress.value);
 
-const daysSinceJoin = computed(() =>
-  Math.max(1, Math.floor((now.value - app.user.joinedAt) / ONE_DAY_MS)),
-);
+const daysSinceJoin = computed(() => {
+  if (!joinedAtValid.value) return 0;
+  return Math.max(1, Math.floor((authoritativeNow.value - app.user.joinedAt) / ONE_DAY_MS));
+});
 const cumulativeMissedRounded = computed(() =>
   Math.round(gap.value * daysSinceJoin.value).toLocaleString(),
 );
 
-const phoneWidthPct = computed(() => (promo.value.baseDaily / promo.value.targetDaily) * 100);
+const phoneWidthPct = computed(() =>
+  targetDaily.value > 0 ? (baseDaily.value / targetDaily.value) * 100 : 0,
+);
 
 const baseLabel = computed(() =>
-  deviceNameByKind(t.value, promo.value.baseKind, promo.value.baseName),
+  promo.value
+    ? deviceNameByKind(t.value, promo.value.baseKind, promo.value.baseName)
+    : "—",
 );
 const targetLabel = computed(() =>
-  deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
+  promo.value
+    ? deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName)
+    : "—",
 );
 const vsCeilingText = computed(() => fmt(t.value.earn.vsDeviceCeiling, { name: targetLabel.value }));
 const ceilingText = computed(() => fmt(t.value.earn.deviceCeiling, { name: targetLabel.value }));
@@ -138,7 +189,11 @@ const phoneBarStyle = computed<CSSProperties>(() => ({
 }));
 
 function goStore() {
-  uni.navigateTo({ url: "/pages/store/store", fail: () => {} });
+  const productNo = promo.value?.productNo;
+  const url = remoteApiEnabled && productNo
+    ? `/pages/store/detail?id=${encodeURIComponent(productNo)}`
+    : "/pages/store/store";
+  uni.navigateTo({ url, fail: () => {} });
 }
 
 const rootStyle: CSSProperties = {

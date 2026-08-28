@@ -711,7 +711,7 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
     postMoneyBill: buildPostMoneyBill(app, bills, toast),
     toast,
     emitClose: () => closes.push(1),
-    GENESIS_ELIGIBILITY: { perUserCap: 5 },
+    GENESIS_ELIGIBILITY_POLICY: { maxPerUser: 5 },
   };
   return { env, app, minted, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
 }

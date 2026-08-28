@@ -33,3 +33,28 @@ test("risk disclosure and withdrawal pages consume the remote policy contract", 
   assert.match(withdraw, /withdrawalApi\.policy\(\)/);
   assert.match(withdraw, /smallAmountThresholdUsd/);
 });
+
+test("risk disclosure keeps the two-step gate usable across H5 and App webviews", () => {
+  const disclosure = read("src/pages/me/risk-disclosure.vue");
+
+  // `scrolltolower` is the uni-app native path. The sentinel observer is the
+  // H5/iOS-chassis fallback required by PRD 11.4a and P-019; either path may
+  // mark the document as read, but neither may tick the acknowledgement.
+  assert.match(disclosure, /@scrolltolower="onScrollToLower"/);
+  assert.match(disclosure, /ref="sentinelRef"/);
+  assert.match(disclosure, /new IntersectionObserver/);
+  assert.match(disclosure, /\$el\s+instanceof\s+Element/);
+  assert.match(disclosure, /observer\?\.disconnect\(\)/);
+  assert.match(disclosure, /if\s*\(!disclosure\.value\)\s*return/);
+  assert.match(disclosure, /async\s+function\s+reload\(\)[\s\S]*scrolledToBottom\.value\s*=\s*false[\s\S]*checked\.value\s*=\s*false[\s\S]*startBottomObserver\(\)/);
+
+  // The legal acknowledgement remains a deliberate second action. The CTA
+  // must not silently no-op when one of the two prerequisites is missing.
+  assert.match(disclosure, /scrolledToBottom\.value\s*&&\s*checked\.value/);
+  assert.match(disclosure, /if\s*\(!scrolledToBottom\.value\)/);
+  assert.match(disclosure, /if\s*\(!checked\.value\)/);
+  assert.match(disclosure, /@keydown\.enter\.prevent="toggleCheck"/);
+  assert.match(disclosure, /@keydown\.space\.prevent="toggleCheck"/);
+  assert.match(disclosure, /@keydown\.enter\.prevent="onAccept"/);
+  assert.match(disclosure, /@keydown\.space\.prevent="onAccept"/);
+});

@@ -37,8 +37,9 @@ test("OPS-E-19 remote device cards preserve server-realized earnings", () => {
   const app = read("src/store/app.ts");
   assert.match(app, /todayEarnings: device\.todayEarningsUsdt/);
   assert.match(app, /todayEarningsNEX: device\.todayEarningsNex/);
-  assert.match(app, /today: fleet\.realizedTodayUsdt/);
-  assert.match(app, /todayNEX: fleet\.realizedTodayNex/);
+  assert.match(app, /function applyHomeEarnings\(projection: AppHomeOverview\)/);
+  assert.match(app, /today: range\.today\.usdt \?\? 0/);
+  assert.match(app, /todayNEX: range\.today\.nex \?\? 0/);
 });
 
 test("OPS-E-20 remote trade-in uses canonical quote, submit, and order readback", () => {

@@ -7,7 +7,7 @@ test("reads authenticated server eligibility for the exact product", async () =>
     request = value;
     return {
       productNo: "stellarbox-pro-v2", eligible: false, decisionCode: "PURCHASE_GATE_NOT_MET",
-      evaluatedAt: 1786856400000, source: "nx_admin_device_sku.purchase_gate_json + nx_user",
+      evaluatedAt: 1786856400000, source: "nx_product + nx_admin_device_sku + nx_user",
       sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true,
     };
   }} as never);
@@ -26,7 +26,7 @@ test("fails closed on a mismatched or untrusted eligibility response", async () 
 test("development accepts the same Java canonical production eligibility as production", async () => {
   const response = {
     productNo: "stellarbox-pro-v2", eligible: true, decisionCode: "ELIGIBLE",
-    evaluatedAt: 1786856400000, source: "nx_admin_device_sku.purchase_gate_json + nx_user",
+    evaluatedAt: 1786856400000, source: "nx_product + nx_admin_device_sku + nx_user",
     sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true,
   };
   const api = createPurchaseEligibilityApi({ request: async () => response } as never, "dev");
@@ -37,7 +37,7 @@ test("development accepts the same Java canonical production eligibility as prod
 test("development rejects sandbox eligibility", async () => {
   const response = {
     productNo: "stellarbox-pro-v2", eligible: true, decisionCode: "ELIGIBLE",
-    evaluatedAt: 1786856400000, source: "nx_admin_device_sku.purchase_gate_json + nx_user",
+    evaluatedAt: 1786856400000, source: "nx_product + nx_admin_device_sku + nx_user",
     sourceEnvironment: "SANDBOX", runId: "commerce-run-20260817", serverCanonical: true,
   };
   const api = createPurchaseEligibilityApi({ request: async () => response } as never, "dev");

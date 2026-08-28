@@ -1,7 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export type CommissionSourceEnvironment = "PRODUCTION" | "SANDBOX";
 
@@ -131,12 +130,10 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
   const source = record(value);
   const sourceEnvironment = typeof source.sourceEnvironment === "string" ? source.sourceEnvironment.trim().toUpperCase() : "";
   const runId = source.runId;
-  const production = mode === "prod" && source.serverCanonical === true
+  const production = (mode === "dev" || mode === "prod") && source.serverCanonical === true
     && sourceEnvironment === "PRODUCTION" && runId === null;
-  const sandbox = mode === "dev" && source.serverCanonical === true
-    && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId);
   if (typeof source.source !== "string" || !source.source.trim() || !Array.isArray(source.unilevel)
-      || (!production && !sandbox)) return invalid();
+      || !production) return invalid();
   const unilevelUsdt: Record<number, number> = {};
   const unilevelNex: Record<number, number> = {};
   for (const raw of source.unilevel) {
@@ -159,7 +156,7 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
     source: source.source.trim(),
     serverCanonical: true,
     sourceEnvironment: sourceEnvironment as CommissionSourceEnvironment,
-    runId: sandbox ? runId : null,
+    runId: null,
     unilevelUsdt,
     unilevelNex,
     partnerThresholds: parsePartnerThresholds(source.partnerTiersJson),
@@ -182,15 +179,14 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
   const source = record(value);
   const sourceEnvironment = typeof source.sourceEnvironment === "string" ? source.sourceEnvironment.trim().toUpperCase() : "";
   const runId = source.runId;
-  const production = source.source === "server" && mode === "prod" && source.serverCanonical === true
+  const production = source.source === "server" && (mode === "dev" || mode === "prod")
+    && source.serverCanonical === true
     && sourceEnvironment === "PRODUCTION" && runId === null;
-  const sandbox = source.source === "server" && mode === "dev" && source.serverCanonical === true
-    && sourceEnvironment === "SANDBOX" && isCurrentCommerceSandboxRun(runId);
   if (!Array.isArray(source.recentMatches)
       || typeof source.spilloverEnabled !== "boolean"
       || typeof source.paused !== "boolean"
       || typeof source.blockedReason !== "string"
-      || (!production && !sandbox)) return invalid();
+      || !production) return invalid();
   const settlePeriod = text(source.settlePeriod) as CanonicalBinarySettlePeriod;
   const residualPolicy = text(source.residualPolicy) as CanonicalBinaryResidualPolicy;
   if (!["daily", "weekly", "monthly"].includes(settlePeriod)
@@ -219,7 +215,7 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
     source: text(source.source),
     serverCanonical: true,
     sourceEnvironment: sourceEnvironment as CommissionSourceEnvironment,
-    runId: sandbox ? runId as string : null,
+    runId: null,
     asOfDate: isoDate(source.asOfDate),
     trackA,
     trackB,

@@ -187,7 +187,7 @@ describe("payout address remote account scope", () => {
     expect(store.currentFor("usdt-trc20")?.address).toBe(row("B").address);
   });
 
-  it("drops a late snapshot after the sandbox run changes", async () => {
+  it("rejects a sandbox-shaped payout snapshot in formal dev", async () => {
     remote.apiRuntimeConfig.environment = "dev";
     const listA = deferred<PayoutAddressSnapshot>();
     remote.payoutAddressApi.list.mockReturnValueOnce(listA.promise);
@@ -197,7 +197,7 @@ describe("payout address remote account scope", () => {
     listA.resolve({
       ...snapshot("A"), source: "mock", sourceEnvironment: "SANDBOX", runId: "sandbox-run-1",
       addresses: [{ ...row("A"), source: "mock", sourceEnvironment: "SANDBOX", runId: "sandbox-run-1" }],
-    });
+    } as unknown as PayoutAddressSnapshot);
     await flush();
     expect(store.currentFor("usdt-trc20")?.address).toBeUndefined();
   });

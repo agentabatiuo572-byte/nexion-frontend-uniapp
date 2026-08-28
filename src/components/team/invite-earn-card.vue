@@ -16,15 +16,6 @@
     <!-- 24px grid overlay -->
     <view aria-hidden="true" :style="gridStyle" />
 
-    <view
-      v-if="isAuthoritativeSandbox"
-      data-testid="h8-sandbox-banner"
-      class="relative flex items-center"
-      :style="sandboxBannerStyle"
-    >
-      <text>{{ t.team.sandboxBanner }} · RunID {{ sandboxRunId }}</text>
-    </view>
-
     <!-- Top label row -->
     <view class="relative flex items-center justify-between" style="z-index: 1; font-size: 12px">
       <text :style="{ color: 'var(--v5-brand)', fontWeight: 500 }">💰 {{ t.team.earnForEachFriend }}</text>
@@ -140,12 +131,6 @@ import { fmt } from "@/i18n/format";
 const t = useT();
 const app = useApp();
 const rewards = useReferralReward();
-const isAuthoritativeSandbox = computed(() =>
-  rewards.snapshot?.source === "mock"
-  && rewards.snapshot?.sourceEnvironment === "SANDBOX",
-);
-const sandboxRunId = computed(() => rewards.snapshot?.runId ?? "—");
-
 interface TickerItem {
   name: string;
   action: string;
@@ -255,16 +240,6 @@ const gridStyle: CSSProperties = {
   backgroundSize: "24px 24px",
   pointerEvents: "none",
   zIndex: 0,
-};
-const sandboxBannerStyle: CSSProperties = {
-  zIndex: 1,
-  marginBottom: "10px",
-  padding: "7px 10px",
-  borderRadius: "10px",
-  background: "color-mix(in srgb, var(--v5-warning) 12%, var(--v5-surface))",
-  color: "var(--v5-warning-ink)",
-  fontSize: "12px",
-  fontWeight: 700,
 };
 const promoChipStyle: CSSProperties = {
   marginTop: "8px",

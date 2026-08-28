@@ -10,9 +10,8 @@ import { toast } from "@/store/ui";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import type { ShareChannelDef } from "@/store/config-types";
-import { remoteApiEnabled, shareEventApi, apiRuntimeConfig } from "@/api/runtime";
+import { remoteApiEnabled, shareEventApi } from "@/api/runtime";
 import { useReferralReward } from "@/store/referral-reward";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxRun } from "@/api/order-api";
 import type { ShareEventChannel } from "@/api/share-event-api";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -218,11 +217,9 @@ export async function recordShareEvent(channel: string, surface: ShareSurface): 
   if (remoteApiEnabled) {
     if (!SHARE_EVENT_CHANNELS.has(channel as ShareEventChannel)) return false;
     const accountScope = captureAccountScope();
-    const run = captureCommerceSandboxRun();
-    const sourceEnvironment = apiRuntimeConfig.environment === "dev" ? "SANDBOX" : "PRODUCTION";
-    const runId = apiRuntimeConfig.environment === "dev" ? (run.runId ?? "") : "";
-    const current = () => isCurrentAccountScope(accountScope)
-      && (sourceEnvironment === "PRODUCTION" || (!!runId && isCurrentCommerceSandboxRun(runId)));
+    const sourceEnvironment = "PRODUCTION" as const;
+    const runId = "";
+    const current = () => isCurrentAccountScope(accountScope);
     return runShareEventFlight({
       send: async () => {
         const eventId = `share-${requireCryptoUuid()}`;

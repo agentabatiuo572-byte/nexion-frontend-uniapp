@@ -29,7 +29,16 @@
         <text v-if="cta.amountSubtext" class="scb-subtext" :style="subtextStyle">{{ cta.amountSubtext }}</text>
       </view>
 
-      <view class="scb-cta" :style="ctaStyle" @click="onTap">
+      <view
+        class="scb-cta"
+        :style="ctaStyle"
+        role="button"
+        :tabindex="cta.disabled ? -1 : 0"
+        :aria-disabled="cta.disabled ? 'true' : 'false'"
+        @click="onTap"
+        @keydown.enter.prevent="onTap"
+        @keydown.space.prevent="onTap"
+      >
         <text class="scb-cta-t">{{ cta.buttonLabel }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -71,8 +80,8 @@ const subtextStyle = computed<CSSProperties>(() => ({ color: subColor.value }));
 const ctaStyle = computed<CSSProperties>(() => ({ background: accentColor.value }));
 
 function onTap() {
+  if (!cta.value || cta.value.disabled) return;
   uni.vibrateShort({ fail: () => {} });
-  if (!cta.value) return;
   uni.navigateTo({ url: cta.value.href, fail: () => {} });
 }
 </script>
@@ -144,6 +153,13 @@ function onTap() {
 }
 .scb-cta:active {
   opacity: 0.85;
+}
+.scb-cta[aria-disabled="true"] {
+  background: var(--v5-surface-2) !important;
+  opacity: 1;
+}
+.scb-cta[aria-disabled="true"] .scb-cta-t {
+  color: var(--v5-ink-4);
 }
 .scb-cta-t {
   font-family: var(--font-v5);

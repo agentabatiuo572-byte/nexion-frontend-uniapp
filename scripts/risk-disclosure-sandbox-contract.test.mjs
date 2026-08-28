@@ -21,7 +21,7 @@ test("risk disclosure backend exposes explicit provenance and only local-sandbox
   const service = readBackend("application/AppRiskDisclosureService.java");
   const view = readBackend("domain/AppRiskDisclosureView.java");
   const initializer = readBackend("application/RiskDisclosureLocalSandboxInitializer.java");
-  assert.match(service, /getActiveProfiles\(\)[\s\S]*length == 1[\s\S]*local-sandbox/);
+  assert.match(service, /environment\.acceptsProfiles\(Profiles\.of\("local-sandbox"\)\)/);
   assert.match(service, /localSandbox \? "SANDBOX"/);
   assert.match(service, /localSandbox \? "mock"/);
   assert.match(initializer, /@Profile\("local-sandbox"\)/);

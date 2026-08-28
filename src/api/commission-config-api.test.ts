@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
-import { setCurrentCommerceSandboxRun } from "./order-api";
 import { createCommissionConfigApi } from "./commission-config-api";
 
 const RUN = "commission-run-20260817";
@@ -30,8 +29,6 @@ function payload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-afterEach(() => setCurrentCommerceSandboxRun(null));
-
 describe("commission config provenance and protocol", () => {
   it("accepts canonical production rates and exposes every F2 field", async () => {
     const api = createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload()) } as unknown as ApiClient, "prod");
@@ -41,14 +38,11 @@ describe("commission config provenance and protocol", () => {
     });
   });
 
-  it("accepts sandbox rates only for the current RunID and rejects production on sandbox", async () => {
-    setCurrentCommerceSandboxRun(RUN);
-    const api = createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload({
-      source: "nx_commission_rule + nx_config_item", sourceEnvironment: "SANDBOX", runId: RUN,
-    })) } as unknown as ApiClient, "dev");
-    await expect(api.rates()).resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId: RUN });
-    await expect(createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload({ sourceEnvironment: "SANDBOX", runId: OTHER_RUN })) } as unknown as ApiClient, "dev").rates()).rejects.toMatchObject({ kind: "protocol" });
-    await expect(createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload()) } as unknown as ApiClient, "dev").rates()).rejects.toMatchObject({ kind: "protocol" });
+  it("accepts Java canonical production rates in development and rejects retired sandbox proofs", async () => {
+    const api = createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload()) } as unknown as ApiClient, "dev");
+    await expect(api.rates()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: null });
+    await expect(createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload({ sourceEnvironment: "SANDBOX", runId: RUN })) } as unknown as ApiClient, "dev").rates()).rejects.toMatchObject({ kind: "protocol" });
+    await expect(createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload({ runId: OTHER_RUN })) } as unknown as ApiClient, "dev").rates()).rejects.toMatchObject({ kind: "protocol" });
   });
 
   it("rejects malformed or non-canonical responses instead of applying local defaults", async () => {

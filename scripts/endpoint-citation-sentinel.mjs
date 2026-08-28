@@ -71,7 +71,6 @@ const LEDGER = {
   // ── genesis ───────────────────────────────────────────────────────────
   "POST /api/genesis/secondary/fulfill": "PRD §10.2.4",
   "GET /api/genesis/eligibility": "PRD §10.1.1",
-  "POST /api/genesis/invite/redeem": "PRD §10.1.1(核销次数规则待主人定)",
 
   // ── staking ───────────────────────────────────────────────────────────
   // 注:`POST /api/staking/open` 曾在 stake-sheet.vue 被引用,2026-08-04 并发的

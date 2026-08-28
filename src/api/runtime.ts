@@ -72,7 +72,14 @@ export const expectedGenesisSandboxRunId = import.meta.env.DEV
   ? String(import.meta.env.VITE_NEXGRID_ACCEPTANCE_RUN_ID ?? "").trim()
   : "";
 export const remoteApiEnabled = true;
-export const developmentFundsEnabled = apiRuntimeConfig.environment === "dev";
+// The formal App never selects a browser-side funds sandbox. Development keeps
+// using the Java service's canonical, production-shaped contract; only payment
+// execution itself may be simulated by that server.
+export const developmentFundsEnabled = false;
+// Only the checkout command is simulated in local development. This does not
+// re-enable the retired browser funds sandbox; Java still owns payment,
+// fulfillment, idempotency and the sandbox-account boundary.
+export const developmentCommercePaymentEnabled = apiRuntimeConfig.environment === "dev";
 // Card tokenization/binding is development-only UI until a real PSP is configured.
 // Java remains authoritative and production must fail closed.
 export const developmentPaymentEnabled = apiRuntimeConfig.environment === "dev";

@@ -140,6 +140,7 @@ import { fmt } from "@/i18n/format";
 import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { buildRemoteHelpRequest, novaHelpSource } from "@/lib/help-bot-remote";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { createHelpBotScope, type HelpBotRequest } from "@/lib/help-bot-scope";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { SupportFaq } from "@/domain/support";
@@ -261,8 +262,9 @@ async function sendToBot() {
     try {
       const result = await novaAiApi.chat(buildRemoteHelpRequest(
         q,
-        bot.value.slice(0, -1),
         request.language,
+        request.conversationId,
+        requireCryptoUuid(),
       ));
       if (!helpScope.isCurrent(request)) {
         syncBotAccountScope();

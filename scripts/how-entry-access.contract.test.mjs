@@ -6,17 +6,16 @@ import path from "node:path";
 const root = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
-test("team How entries stay visible while projections are unavailable", () => {
-  const source = read("src/pages/team/team.vue");
-  assert.match(source, /data-how-entry="team-binary-how"/);
-  assert.match(source, /data-how-entry="team-unilevel-how"/);
-  assert.match(source, /navTo\(['"]\/pages\/team\/binary-how['"]\)/);
-  assert.match(source, /navTo\(['"]\/pages\/team\/unilevel-how['"]\)/);
+test("team detail pages expose the same How entries as the high-fidelity hierarchy", () => {
+  const binary = read("src/pages/team/binary.vue");
+  const unilevel = read("src/pages/team/unilevel.vue");
+  assert.match(binary, /role="button" tabindex="0"[\s\S]*go\('\/pages\/team\/binary-how'\)/);
+  assert.match(unilevel, /role="button" tabindex="0"[\s\S]*go\('\/pages\/team\/unilevel-how'\)/);
 });
-test("Me exposes the repurchase parent for first-user discovery", () => {
-  const source = read("src/pages/me/me.vue");
-  assert.match(source, /href: \"\/me\/wallet-repurchase\"/);
-  assert.match(source, /meWalletRepurchase/);
+test("the repurchase parent exposes its How page without inventing an extra Me row", () => {
+  const source = read("src/pages/me/wallet-repurchase.vue");
+  assert.match(source, /role="button" tabindex="0"[\s\S]*@click="goHow"/);
+  assert.match(source, /navTo\("\/pages\/me\/wallet-repurchase-how"\)/);
 });
 
 test("logical navigation closes transient offer sheets before routing", () => {

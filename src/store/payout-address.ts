@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
 import type { PayoutAddressNetwork, PayoutAddressProvenance, PayoutAddressSnapshot } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -71,12 +71,10 @@ function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
 }
 
 function runtimeProvenanceValid(provenance: PayoutAddressProvenance): boolean {
-  if (!provenance.serverCanonical) return false;
-  if (apiRuntimeConfig.environment === "dev") {
-    return provenance.source === "mock" && provenance.sourceEnvironment === "SANDBOX"
-      && !!provenance.runId;
-  }
-  return provenance.source === "server" && provenance.sourceEnvironment === "PRODUCTION" && provenance.runId === "";
+  return provenance.serverCanonical
+    && provenance.source === "server"
+    && provenance.sourceEnvironment === "PRODUCTION"
+    && provenance.runId === "";
 }
 
 /** 频控天数(后台 D5 可配;boot 早期 config store 不可用时回落种子同值 7)。 */
@@ -412,8 +410,6 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     changeCooldownDays: computed(() => remoteChangeCooldownDays.value),
     effectiveDelayHours: computed(() => remoteEffectiveDelayHours.value),
     provenance: computed(() => remoteProvenance.value),
-    sandboxServer: computed(() => remoteProvenance.value?.source === "mock"
-      && remoteProvenance.value.sourceEnvironment === "SANDBOX"),
     hasAnyAddress,
     stateFor,
     currentFor,

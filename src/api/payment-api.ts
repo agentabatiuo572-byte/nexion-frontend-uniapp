@@ -7,6 +7,8 @@ export interface VietQrPaymentConfig {
   enabled: boolean;
   minDepositUsdt: number;
   maxDepositUsdt: number;
+  todayRemainingDepositUsdt: number;
+  todayRemainingVnd: number;
   toleranceVnd: number;
   graceMinutes: number;
   version: number;
@@ -155,6 +157,8 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
   const vietQr = record(source?.vietQr);
   const minDepositUsdt = number(vietQr?.minDepositUsdt, { min: 0 });
   const maxDepositUsdt = number(vietQr?.maxDepositUsdt, { min: 0 });
+  const todayRemainingDepositUsdt = number(vietQr?.todayRemainingDepositUsdt, { min: 0 });
+  const todayRemainingVnd = number(vietQr?.todayRemainingVnd, { min: 0 });
   const toleranceVnd = number(vietQr?.toleranceVnd, { min: 0 });
   const graceMinutes = number(vietQr?.graceMinutes, { min: 0, integer: true });
   const version = number(vietQr?.version, { min: 0, integer: true });
@@ -166,6 +170,8 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
     || minDepositUsdt === null
     || maxDepositUsdt === null
     || maxDepositUsdt < minDepositUsdt
+    || todayRemainingDepositUsdt === null
+    || todayRemainingVnd === null
     || toleranceVnd === null
     || graceMinutes === null
     || version === null
@@ -180,6 +186,8 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
       enabled: vietQr.enabled,
       minDepositUsdt,
       maxDepositUsdt,
+      todayRemainingDepositUsdt,
+      todayRemainingVnd,
       toleranceVnd,
       graceMinutes,
       version,

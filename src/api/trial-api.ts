@@ -2,7 +2,7 @@ import type { ApiClient } from "./api-client";
 import type { TrialStatus } from "../store/trial-boundary";
 
 export type TrialEligibilityReason =
-  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "unknown";
+  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "unknown";
 export type TrialConfigValue = string | boolean;
 
 export interface TrialAuthorityState {
@@ -72,7 +72,7 @@ const SERVER_STATES = new Set([
   "ELIGIBLE", "ACTIVE", "GRACE", "EXTENDED", "REDEEMED", "FAILED", "CANCELLED",
 ]);
 const REASONS = new Set([
-  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "unknown",
+  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "product-unavailable", "unknown",
 ]);
 
 function invalid(): never {

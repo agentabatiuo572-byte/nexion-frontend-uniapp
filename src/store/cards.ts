@@ -78,7 +78,7 @@ export const useCards = defineStore("cards", () => {
     try {
       const remote = await paymentMethodApi.list();
       if (!remoteAccountEpoch.isCurrent(request)) return true;
-      const nextCards = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status, version: card.version }));
+      const nextCards = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: card.expiry, holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status, version: card.version }));
       const nextDefaultTokenId = remote.find((card) => card.isDefault)?.tokenId ?? null;
       cards.value = nextCards;
       defaultTokenId.value = nextDefaultTokenId;

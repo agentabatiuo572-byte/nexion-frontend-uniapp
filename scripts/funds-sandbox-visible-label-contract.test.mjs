@@ -38,12 +38,12 @@ assert.match(completeSignIn, /app\.refreshFundsSandboxForAccount\(options\.ident
 assert.match(completeSignIn,
   /refreshRemoteFleetAfterCatalog\(options\.identity\)[\s\S]{0,240}\.finally\([\s\S]{0,180}app\.refreshFundsSandboxForAccount\(options\.identity\)/,
   "first login must establish the catalog RunID before the funds authority read");
-assert.match(runtimeConfig, /export type AppEnvironment = "dev" \| "prod"/,
+assert.match(runtimeConfig, /export type ApiEnvironment = "dev" \| "prod"/,
   "the App runtime must expose only standard dev/prod environments");
 assert.doesNotMatch(runtimeConfig, /VITE_NEXGRID_API_MODE|modeExplicit/,
   "a browser variable must not select a sandbox runtime mode");
-assert.match(runtime, /developmentFundsEnabled = apiRuntimeConfig\.environment === "dev"/,
-  "only the development environment can display isolated server evidence");
+assert.match(runtime, /developmentFundsEnabled = false/,
+  "the formal App must never display the retired funds sandbox rail");
 
 assert.match(badge, /developmentFundsEnabled[\s\S]{0,600}fundsSandboxStatus === "ready"[\s\S]{0,600}source === "mock"[\s\S]{0,600}sourceEnvironment === "SANDBOX"[\s\S]{0,600}mode === "LOCAL_SANDBOX"/,
   "the DOM badge must require both development runtime and validated server evidence");

@@ -1,10 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
-import { setCurrentCommerceSandboxRun } from "./order-api";
 import { createReferralRewardApi } from "./referral-reward-api";
 
 const RUN = "catalog-run-20260816";
-const OTHER_RUN = "catalog-run-20260817";
 const productionFacts = ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"];
 const sandboxFacts = ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"];
 
@@ -19,8 +17,6 @@ function snapshot(sourceEnvironment: "PRODUCTION" | "SANDBOX", runId: string | n
   };
 }
 
-afterEach(() => setCurrentCommerceSandboxRun(null));
-
 describe("referral reward provenance", () => {
   it("accepts production ledger facts only on the production rail", async () => {
     const request = vi.fn().mockResolvedValue(snapshot("PRODUCTION", null));
@@ -28,15 +24,13 @@ describe("referral reward provenance", () => {
     await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", RUN)) } as unknown as ApiClient, "prod").snapshot()).rejects.toMatchObject({ kind: "protocol" });
   });
 
-  it("accepts sandbox mock facts only when they match the current catalog RunID", async () => {
-    setCurrentCommerceSandboxRun(RUN);
-    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", RUN)) } as unknown as ApiClient, "dev").snapshot()).resolves.toMatchObject({ source: "mock", sourceEnvironment: "SANDBOX", runId: RUN });
-    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", OTHER_RUN)) } as unknown as ApiClient, "dev").snapshot()).rejects.toMatchObject({ kind: "protocol" });
+  it("accepts canonical ledger facts on the development rail", async () => {
+    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("PRODUCTION", null)) } as unknown as ApiClient, "dev").snapshot())
+      .resolves.toMatchObject({ source: "ledger", sourceEnvironment: "PRODUCTION", runId: null });
   });
 
   it("rejects mock or unscoped facts on every non-matching rail", async () => {
-    setCurrentCommerceSandboxRun(RUN);
     await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("PRODUCTION", null, "mock")) } as unknown as ApiClient, "prod").snapshot()).rejects.toMatchObject({ kind: "protocol" });
-    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", null)) } as unknown as ApiClient, "dev").snapshot()).rejects.toMatchObject({ kind: "protocol" });
+    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", RUN)) } as unknown as ApiClient, "dev").snapshot()).rejects.toMatchObject({ kind: "protocol" });
   });
 });

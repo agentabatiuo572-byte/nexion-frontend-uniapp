@@ -26,6 +26,10 @@ export function remoteGenerationMatches(
   return expectedAccountKey === currentAccountKey && expectedGeneration === currentGeneration;
 }
 
+export function isPayableVietQrCreateStatus(status: string): boolean {
+  return status === "awaiting_payment";
+}
+
 export function appendVietQrReceipts<T extends { receiptNo: string }>(
   existing: readonly T[],
   incoming: readonly T[],

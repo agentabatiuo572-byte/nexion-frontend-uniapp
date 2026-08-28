@@ -119,7 +119,7 @@
               :key="d.id"
               :device="d"
               :active="false"
-              :disabled="slotsFull"
+              :disabled="slotsFull && occupiesDeviceSlot(d.kind)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
@@ -130,7 +130,7 @@
               @ladder="ladderDevice = d"
             />
           </view>
-          <view v-if="slotsFull" class="flex items-center" :style="slotsFullWarnStyle">
+          <view v-if="slotsFull && inactiveDevices.some((d) => occupiesDeviceSlot(d.kind))" class="flex items-center" :style="slotsFullWarnStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
           </view>
@@ -196,6 +196,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { isProductAvailable } from "@/store/product-availability";
 import { refreshProductCatalog } from "@/store/product-catalog";
+import { occupiesDeviceSlot } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
@@ -317,7 +318,7 @@ async function handleActivate(d: Device) {
     goPhoneActivation();
     return;
   }
-  if (slotsFull.value) {
+  if (occupiesDeviceSlot(d.kind) && slotsFull.value) {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
     return;
   }

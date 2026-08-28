@@ -1,7 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export interface ReferralRewardLedgerItem {
   settlementNo: string;
@@ -52,14 +51,10 @@ function count(value: unknown, max = Number.MAX_SAFE_INTEGER): number | null {
 }
 
 function matchesRuntimeProvenance(row: Record<string, unknown>, mode: ApiEnvironment): boolean {
-  if (mode === "prod") {
+  if (mode === "prod" || mode === "dev") {
     return row.source === "ledger" && row.sourceEnvironment === "PRODUCTION" && row.runId === null;
   }
-  return mode === "dev"
-    && row.source === "mock"
-    && row.sourceEnvironment === "SANDBOX"
-    && typeof row.runId === "string"
-    && isCurrentCommerceSandboxRun(row.runId);
+  return false;
 }
 
 export function parseReferralRewardSnapshot(value: unknown, mode: ApiEnvironment = "prod"): ReferralRewardSnapshot {

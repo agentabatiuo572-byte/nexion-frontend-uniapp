@@ -38,6 +38,10 @@ const SERVED_PLATFORM = {
   },
   publicStats: {
     version: 7,
+    serverCanonical: true,
+    source: "server:nx_config_item,nx_user",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
     realUserCount: 214_000,
     values: {
       fleetDevices: 31_337,

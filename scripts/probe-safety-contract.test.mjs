@@ -222,8 +222,8 @@ test("auth guard probe asserts expected outcomes including traversal normalizati
     staticReviewSameDocumentTraversal1: witness("/pages/earn/earn"),
     staticReviewSameDocumentTraversal2: witness("/pages/earn/earn"),
     staticReviewSameDocumentTraversal3: witness("/pages/earn/earn"),
-    excessiveEncodingFailsClosed: witness("/pages/onboarding/intro"),
-    aboveRootTraversalFailsClosed: witness("/pages/onboarding/intro"),
+    excessiveEncodingFailsClosed: witness("/"),
+    aboveRootTraversalFailsClosed: witness("/"),
   };
   assert.doesNotThrow(() => assertAuthGuardRoutes(passing));
   assert.throws(

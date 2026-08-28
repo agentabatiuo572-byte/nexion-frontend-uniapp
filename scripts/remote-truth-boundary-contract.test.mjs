@@ -62,7 +62,8 @@ test("remote onboarding and trial surfaces fail closed on local business constan
   assert.match(quest, /quest\.remoteStatus/);
   assert.match(quest, /rewardText/);
   assert.doesNotMatch(quest, /18 \* 3600_000/);
-  assert.match(trial, /v-if="!remoteApiEnabled"/);
+  assert.match(trial, /const visible = computed\(\(\) => trial\.status === "none"/);
+  assert.match(trial, /trialCfg\.config\.seatsLeftToday > 0/);
   assert.doesNotMatch(trial, /const trialsLeft = 47/);
 });
 
@@ -72,7 +73,8 @@ test("remote proof and team finance pages expose unavailable instead of zero def
   const binary = read("src/pages/team/binary.vue");
   const unilevel = read("src/pages/team/unilevel.vue");
   assert.match(proof, /remoteError/);
-  assert.match(proof, /remoteApiEnabled && \(remoteError \|\| !vRank\.remoteReady\)/);
+  assert.match(proof, /remoteApiEnabled && remoteError/);
+  assert.match(proof, /remoteApiEnabled && !vRank\.remoteReady \? null/);
   assert.match(proof, /=== null \? "—"/);
   assert.match(commissions, /commission\.eventsStatus/);
   assert.match(binary, /commission\.binaryStatus/);

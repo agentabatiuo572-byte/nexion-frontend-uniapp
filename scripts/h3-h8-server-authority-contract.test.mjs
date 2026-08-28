@@ -29,8 +29,8 @@ test("H8 card consumes isolated server ledger facts and has an honest empty stat
   // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
   assert.match(read("src/i18n/messages/vi.ts"), /noSettledRewards:/, "vi.ts 缺 noSettledRewards");
   assert.match(api, /\/api\/app\/referral-rewards\?limit=/);
-  assert.match(api, /row\.source === "ledger" && row\.sourceEnvironment === "PRODUCTION"/);
-  assert.match(api, /row\.source === "mock"[\s\S]*row\.sourceEnvironment === "SANDBOX"[\s\S]*isCurrentCommerceSandboxRun\(row\.runId\)/);
+  assert.match(api, /mode === "prod" \|\| mode === "dev"[\s\S]*row\.source === "ledger" && row\.sourceEnvironment === "PRODUCTION" && row\.runId === null/);
+  assert.doesNotMatch(api, /isCurrentCommerceSandboxRun/);
   for (const fact of ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"]) {
     assert.match(api, new RegExp(fact));
   }

@@ -9,7 +9,34 @@ const read = (file) => readFileSync(resolve(root, file), "utf8");
 test("remote checkout gets trade-in sources from server eligibility", () => {
   const source = read("src/pages/store/checkout.vue");
   assert.match(source, /deviceE3Api\.eligibility\(kind\)/);
-  assert.match(source, /eligibility\.sources\.filter\(\(source\) => source\.eligible\)/);
+  assert.match(source, /eligibility\?\.sources\.filter\(\(source\) => source\.eligible\)/);
+});
+
+test("ordinary remote checkout is not rejected when optional trade-in eligibility fails", () => {
+  const source = read("src/pages/store/checkout.vue");
+  const preflight = read("src/domain/tradein-checkout-preflight.ts");
+  const intercept = source.slice(
+    source.indexOf("function fireTradeinIntercept"),
+    source.indexOf("// Sticky chassis nav header"),
+  );
+  assert.match(intercept, /resolveTradeinCheckoutPreflight\(/);
+  assert.match(preflight, /Promise\.allSettled\(/);
+  assert.match(preflight, /eligibilityResult\.status === "fulfilled"/);
+  assert.match(preflight, /capacityResult\.status !== "fulfilled"[\s\S]*throw capacityResult\.reason/);
+  assert.doesNotMatch(intercept, /Promise\.all\(\[/);
+});
+
+test("share checkout never enters the physical-device trade-in capacity preflight", () => {
+  const source = read("src/pages/store/checkout.vue");
+  const intercept = source.slice(
+    source.indexOf("function fireTradeinIntercept"),
+    source.indexOf("// Sticky chassis nav header"),
+  );
+  const shareGuard = intercept.indexOf('if (p.productType === "SHARE") return;');
+  const capacityRequest = intercept.indexOf("deviceE3Api.capacityQuote(kind)");
+
+  assert.ok(shareGuard >= 0, "SHARE checkout must have an explicit trade-in preflight bypass");
+  assert.ok(shareGuard < capacityRequest, "SHARE bypass must run before the capacity request");
 });
 
 test("remote trade-in sheet revalidates eligibility and never previews local credit", () => {

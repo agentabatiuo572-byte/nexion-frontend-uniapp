@@ -65,7 +65,7 @@ test("KYC removal guard catches case and identifier variants without matching st
   assert.equal(containsForbiddenKyc("src/pages/risk/kyc-review.css"), true);
 });
 
-test("payout-address is server-canonical in production and sandbox; only demo mock is local", () => {
+test("payout-address is Java-server canonical in both formal dev and prod", () => {
   const api = fs.readFileSync("src/api/payout-address-api.ts", "utf8");
   const runtime = fs.readFileSync("src/api/runtime.ts", "utf8");
   const store = fs.readFileSync("src/store/payout-address.ts", "utf8");
@@ -74,14 +74,14 @@ test("payout-address is server-canonical in production and sandbox; only demo mo
   assert.match(api, /path: "\/api\/payout-addresses"/);
   assert.match(api, /path: "\/api\/payout-addresses\/otp\/send"/);
   assert.match(api, /idempotencyKey: input\.idempotencyKey/);
-  assert.match(runtime, /createPayoutAddressApi\(apiClient, apiRuntimeConfig\.mode\)/);
-  assert.match(runtime, /payoutAddressServerEnabled = apiRuntimeConfig\.mode !== "mock"/);
-  assert.match(runtime, /payoutAddressMockEnabled = apiRuntimeConfig\.mode === "mock"/);
+  assert.match(runtime, /createPayoutAddressApi\(apiClient, expectedApiEnvironment\)/);
+  assert.match(runtime, /payoutAddressServerEnabled = true/);
+  assert.match(runtime, /payoutAddressMockEnabled = false/);
+  assert.match(api, /mode === "prod" \|\| mode === "dev"/);
+  assert.doesNotMatch(api, /isCurrentCommerceSandboxRun|sourceEnvironment === "SANDBOX"/);
   assert.match(store, /payoutAddressServerEnabled \? emptyBook\(\) : hydrate\(boundKey\)/);
+  assert.doesNotMatch(store, /apiRuntimeConfig\.environment === "dev"[\s\S]{0,180}sourceEnvironment === "SANDBOX"/);
   assert.match(store, /await payoutAddressApi\.save/);
   assert.match(page, /await payout\.saveRemoteAddress/);
-  assert.match(page, /payout-address-mock-source/);
-  assert.match(page, /payout-address-sandbox-source/);
-  assert.match(page, /v-if="payoutAddressMockEnabled \|\| payout\.sandboxServer"/);
-  assert.match(page, /t\.addrRebind\.sandboxMockNotice/);
+  assert.doesNotMatch(page, /payout-address-mock-source|payout-address-sandbox-source|sandboxMockNotice/);
 });

@@ -23,7 +23,7 @@ describe("device E3 eligibility API", () => {
       serverNow: 1_800_000_000_000,
       timezone: "Asia/Shanghai",
       slotCap: 6,
-      source: "server",
+      source: "nx_user_device + nx_compute_receipt + nx_compute_e3_config",
       sourceEnvironment: "PRODUCTION",
       runId: "",
       serverCanonical: true,
@@ -46,6 +46,86 @@ describe("device E3 eligibility API", () => {
       await expect(api.fleet()).rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
     },
   );
+
+  it("accepts the Java canonical fleet in development mode", async () => {
+    const api = createDeviceE3Api(client(fleetPayload(66.5)), "dev");
+
+    await expect(api.fleet()).resolves.toMatchObject({
+      source: "nx_user_device + nx_compute_receipt + nx_compute_e3_config",
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      serverCanonical: true,
+      devices: [{ instanceNo: "E3-1", capacityPct: 66.5 }],
+    });
+  });
+
+  it("preserves the server-authored subsidy deadline and true remaining days", async () => {
+    const payload = fleetPayload(100);
+    payload.devices[0] = {
+      ...payload.devices[0],
+      capacitySubsidized: true,
+      capacitySubsidyRemainingDays: 29,
+      capacitySubsidyEndsAt: payload.serverNow + 28 * 86_400_000 + 23 * 3_600_000,
+    };
+
+    await expect(createDeviceE3Api(client(payload), "dev").fleet()).resolves.toMatchObject({
+      devices: [{
+        capacitySubsidized: true,
+        capacitySubsidyDays: 30,
+        capacitySubsidyRemainingDays: 29,
+        capacitySubsidyEndsAt: payload.devices[0].capacitySubsidyEndsAt,
+      }],
+    });
+  });
+
+  it("rejects a remote fleet that omits or contradicts the server countdown", async () => {
+    const missing = fleetPayload(100) as ReturnType<typeof fleetPayload> & {
+      devices: Array<Record<string, unknown>>;
+    };
+    delete (missing.devices[0] as { capacitySubsidyRemainingDays?: unknown })
+      .capacitySubsidyRemainingDays;
+    await expect(createDeviceE3Api(client(missing), "dev").fleet())
+      .rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
+
+    const contradictory = fleetPayload(100);
+    contradictory.devices[0] = {
+      ...contradictory.devices[0],
+      capacitySubsidized: false,
+      capacitySubsidyRemainingDays: 9,
+      capacitySubsidyEndsAt: contradictory.serverNow + 9 * 86_400_000,
+    };
+    await expect(createDeviceE3Api(client(contradictory), "dev").fleet())
+      .rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
+
+    const dishonestRemainingDays = fleetPayload(100);
+    dishonestRemainingDays.devices[0] = {
+      ...dishonestRemainingDays.devices[0],
+      capacitySubsidized: true,
+      capacitySubsidyRemainingDays: 29,
+      capacitySubsidyEndsAt: dishonestRemainingDays.serverNow + 3_600_000,
+    };
+    await expect(createDeviceE3Api(client(dishonestRemainingDays), "dev").fleet())
+      .rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
+
+    const fractionalDeadline = fleetPayload(100);
+    fractionalDeadline.devices[0] = {
+      ...fractionalDeadline.devices[0],
+      capacitySubsidyEndsAt: fractionalDeadline.serverNow + 3_600_000.5,
+    };
+    await expect(createDeviceE3Api(client(fractionalDeadline), "dev").fleet())
+      .rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
+  });
+
+  it("rejects a retired sandbox fleet in development mode", async () => {
+    const payload = {
+      ...fleetPayload(66.5),
+      sourceEnvironment: "SANDBOX",
+      runId: "development-run",
+    };
+    const api = createDeviceE3Api(client(payload), "dev");
+
+    await expect(api.fleet()).rejects.toMatchObject({ message: "E3_FLEET_PROVENANCE_INVALID" });
+  });
 
   it("requests server eligibility and accepts only a complete server source projection", async () => {
     const request = vi.fn().mockResolvedValue({

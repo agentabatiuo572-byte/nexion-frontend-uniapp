@@ -22,6 +22,8 @@ export interface TrialConfig {
   trialOffsetCapUSD: number;
   /** Trial product id selected by the authoritative product policy. */
   trialProductId: TrialProductId;
+  /** Server-owned E1 display name for the selected product. */
+  trialProductName: string;
   /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
   /** Shadow accrual rates (S1 baseline per spec §3.1) */
@@ -48,13 +50,36 @@ export const TRIAL_PRODUCT_DEVICE_NAMES = {
   "device-trial-standard": "NexGridBox S1",
 } as const;
 
-export type TrialProductId = keyof typeof TRIAL_PRODUCT_DEVICE_NAMES;
+export type TrialProductId = string;
 
-export function resolveTrialDeviceName(productId: unknown): string | null {
+/**
+ * H2 historically stores `device-trial-standard` as a policy alias, while the
+ * commerce catalog and `/api/trial/convert` use the real SKU `stellarbox-s1`.
+ * Keep that translation explicit so an alias can never be sent to checkout as
+ * a dangling product id.
+ */
+const TRIAL_CHECKOUT_PRODUCT_IDS: Record<string, string> = {
+  "stellarbox-s1": "stellarbox-s1",
+  "device-trial-standard": "stellarbox-s1",
+};
+
+export function resolveTrialCheckoutProductId(productId: unknown): string | null {
   if (typeof productId !== "string") return null;
-  return Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, productId)
-    ? TRIAL_PRODUCT_DEVICE_NAMES[productId as TrialProductId]
-    : null;
+  const normalized = productId.trim();
+  if (!/^[A-Za-z0-9._-]{2,64}$/.test(normalized)) return null;
+  return TRIAL_CHECKOUT_PRODUCT_IDS[normalized] ?? normalized;
+}
+
+export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
+  const productNo = resolveTrialCheckoutProductId(productId);
+  if (!productNo) return null;
+  const rawProductId = typeof productId === "string" ? productId.trim() : "";
+  if (Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, rawProductId)) {
+    return TRIAL_PRODUCT_DEVICE_NAMES[rawProductId as keyof typeof TRIAL_PRODUCT_DEVICE_NAMES];
+  }
+  if (typeof serverName !== "string") return null;
+  const normalizedName = serverName.trim();
+  return normalizedName && normalizedName.length <= 128 ? normalizedName : null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
@@ -64,6 +89,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   discountCapUSD: 20,
   trialOffsetCapUSD: 50,
   trialProductId: "stellarbox-s1",
+  trialProductName: "NexGridBox S1",
   trialPriceUSD: 649,
   shadowDailyUSD: 7,
   shadowDailyNEX: 40,
@@ -123,8 +149,9 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       return parseTrialBooleanConfig(raw[key]);
     };
     const discountRate = number("discountRate");
-    const trialProductId = raw.trialProductId as TrialProductId;
-    if (discountRate > 100 || !resolveTrialDeviceName(trialProductId)) {
+    const trialProductId = String(raw.trialProductId ?? "").trim();
+    const trialProductName = String(raw.trialProductName ?? "").trim();
+    if (discountRate > 100 || !resolveTrialDeviceName(trialProductId, trialProductName)) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {
@@ -134,6 +161,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       discountCapUSD: number("discountCapUSD"),
       trialOffsetCapUSD: number("trialOffsetCapUSD"),
       trialProductId,
+      trialProductName,
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
       shadowDailyUSD: number("shadowDailyUSD"),
       shadowDailyNEX: number("shadowDailyNEX"),

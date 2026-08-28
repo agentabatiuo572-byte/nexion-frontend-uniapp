@@ -63,7 +63,7 @@
       </template>
 
       <!-- 尊享席位 — Genesis 独立金融 SKU 入口(升级阶梯压轴;规格 FEAT-GEN07,
-           非设备目录成员,经济模型在 store/genesis.ts,资格门 FEAT-GEN08)。
+           非设备目录成员,经济模型与当前服务端资格投影在 store/genesis.ts)。
            showcaseEnabled 运营开关(FEAT-GEN09):关=整区隐藏,预售页/二级不受影响。-->
       <view v-if="genesisCfg.config.showcaseEnabled">
         <SectionHeader :title="t.store.secGenesis" />

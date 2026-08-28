@@ -15,7 +15,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 test("G1 remote mode consumes the server staking authority and fails closed", () => {
   const source = read("src/store/staking.ts");
   assert.match(source, /import\s*\{[^}]*stakingApi[^}]*remoteApiEnabled[^}]*\}\s*from\s*["']@\/api\/runtime["']/);
-  assert.match(source, /async function syncRemote\(/);
+  assert.match(source, /async function syncRemote\([\s\S]{0,160}\): Promise<boolean>/);
   assert.match(source, /function clearRemoteState\(/);
   assert.match(source, /stakingApi\.fetchStakingPools\(\)/);
   assert.match(source, /stakingApi\.fetchStakingPositions\(\)/);
@@ -85,7 +85,7 @@ test("G1 remote mutations use instance pending locks, stable keys and authority 
 test("G3 remote mode uses only the canonical market snapshot and clears stale facts", () => {
   const source = read("src/store/market.ts");
   assert.match(source, /import\s*\{[^}]*marketApi[^}]*remoteApiEnabled[^}]*\}\s*from\s*["']@\/api\/runtime["']/);
-  assert.match(source, /async function syncRemote\(/);
+  assert.match(source, /function syncRemote\(\): Promise<boolean>/);
   assert.match(source, /await marketApi\.fetch\(\)/);
   assert.match(source, /function clearRemoteState\(/);
   assert.match(source, /catch \{[\s\S]*clearRemoteState\(\)/);

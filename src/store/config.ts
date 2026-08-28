@@ -125,7 +125,6 @@ export const useConfig = defineStore("config", () => {
   // PROD: GET /api/config/platform 失败/超时时由请求层置位。
   // 配置重拉的合成延迟(mock)。对齐 refresh.ts 的 REFRESH_LATENCY_MS 量级 ——
   // 必须 > 0 且够长到能画出一帧骨架,否则加载态是死 UI。
-  const CONFIG_LOAD_LATENCY_MS = 600;
 
   const syncFailed = ref(true);
 
@@ -177,11 +176,6 @@ export const useConfig = defineStore("config", () => {
     }
     loading.value = true;
     try {
-      if (!remoteApiEnabled) {
-        await new Promise<void>((resolve) => setTimeout(resolve, CONFIG_LOAD_LATENCY_MS));
-        syncFailed.value = false;
-        return;
-      }
       const remote = await platformConfigApi.platformConfig();
       if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
           || remote.publicStatsAuthority.runId !== "") {

@@ -2,7 +2,7 @@
 //
 // 🔴 why 单源:c37e642 给 earning-release.ts 加了一条 `import { shallowRef } from "vue"`,
 // 5 份手抄 vue-stub 只有 money-receipt 被同步补了 shallowRef —— 其余 4 个脚本
-// (money-cas / genesis-invite / money-rollback / claim-idempotency)esbuild bundle 期
+// (money-cas / money-rollback / claim-idempotency)esbuild bundle 期
 // 硬崩、0 断言执行,资金门形同虚设(2026-08-10 z1 判决包立案)。
 // stub 台账是判据的一部分,散抄必漂移;两种方言与 runtime 导出面都只在本文件维护。
 import { readFileSync } from "node:fs";

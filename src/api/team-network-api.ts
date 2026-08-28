@@ -1,9 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
-
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 export interface TeamNetworkMember {
   id: string; name: string; avatarUrl: string | null; vRank: number; layer: 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -42,10 +39,7 @@ function provenance(source: Record<string, unknown>, mode: ApiEnvironment): { so
   if (source.source !== "server" || source.serverCanonical !== true
       || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
       || typeof source.runId !== "string") return invalid();
-  const production = mode === "prod" && source.sourceEnvironment === "PRODUCTION" && source.runId === "";
-  const sandbox = mode === "dev" && source.sourceEnvironment === "SANDBOX"
-    && RUN_ID.test(source.runId) && isCurrentCommerceSandboxRun(source.runId);
-  if (!production && !sandbox) return invalid();
+  if ((mode !== "prod" && mode !== "dev") || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") return invalid();
   return { sourceEnvironment: source.sourceEnvironment, runId: source.runId };
 }
 

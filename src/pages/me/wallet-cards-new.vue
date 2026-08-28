@@ -5,8 +5,8 @@
   default" toggle. On submit: validate, derive brand + last4, persist via
   useCards.add() (PAN/CVV NEVER stored), navigate back to the cards list.
 
-  Cards serve MALL PAYMENT only — the free trial is cardless (FEAT-TRIAL02
-  spec ⑦: the claim flow never routes here and no trial disclosure renders).
+  Development cards only exercise the server-owned bind/default/unbind lifecycle;
+  they are not offered as a checkout rail. The free trial remains cardless.
   useSearchParams → onLoad(query). safeReturnTo → inline relative-path guard
   (open-redirect defense). <input type=checkbox> → custom tap toggle (uni).
   router.push(returnTo) → uni.redirectTo. Wrapped in <AppChassis active="me">.
@@ -15,7 +15,7 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-cards" :title="t.cards.newTitle" />
-      <FundsSandboxBadge />
+      <CardSimulationBadge />
 
       <view :style="bodyStyle">
         <!-- Form card -->
@@ -34,8 +34,8 @@
             <text v-if="brand !== 'unknown'" class="font-mono-tabular shrink-0" :style="brandChipStyle">{{ brandLabel(brand) }}</text>
           </view>
 
-          <!-- 卡号/有效期/CVV 归 <HostedCardVault>(收单方托管,本页拿不到明文);
-               持卡人姓名是账单信息不是卡数据,照旧由本页收。 -->
+          <!-- 开发态卡号/有效期/CVV 归 <HostedCardVault> 页面内存管理；
+               持卡人姓名是展示信息，照旧由本页收。 -->
           <HostedCardVault ref="vaultRef" @change="onCardChange">
           <view :style="formFieldsStyle">
             <view>
@@ -102,7 +102,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useCards, brandLabel } from "@/store/cards";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
+import CardSimulationBadge from "@/components/me/card-simulation-badge.vue";
 import type { CardBrand } from "@/store/cards-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
@@ -144,8 +144,8 @@ function safeReturnTo(raw: string | undefined, fallback: string): string {
   return fallback;
 }
 
-// 🔴 卡号 / 有效期 / CVV 不在本页 —— 归 <HostedCardVault>,本页只收到 ready 与
-// brand,绑定时经 tokenize() 拿 token + 后四位 + 有效期落库。
+// 开发态卡号 / CVV 只在 <HostedCardVault> 的页面内存中用于生成模拟 token，
+// 本页只收到 ready 与 brand；绑定命令仅发送 token、后四位与有效期等非明文字段。
 const vaultRef = ref<InstanceType<typeof HostedCardVault> | null>(null);
 const cardReady = ref(false);
 const brand = ref<CardBrand>("unknown");
@@ -176,9 +176,9 @@ const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.for
 
 async function handleBind() {
   if (!cardBindingAvailable.value || !canSubmit.value) return;
-  // 明文由 <HostedCardVault> 交给收单方换 token(真实现 = SDK createToken)。
-  // 本页拿到的是 token / 后四位 / 卡组织 / 有效期四样,连同本页自己收的持卡人姓名
-  // 共五个字段落库 —— 卡号与 CVV 不在其中,明文无从写入(SavedCard 根本没这两个字段)。
+  // 当前开发态由 <HostedCardVault> 在浏览器内存中生成模拟 token；没有真实 PSP。
+  // 本页拿到 token / 后四位 / 卡组织 / 有效期，再加持卡人姓名发送给 Java。
+  // 卡号与 CVV 不在请求或 SavedCard 模型中，不会发送到后端或写入数据库。
   const card = vaultRef.value?.tokenize();
   if (!card) return;
   isBinding.value = true;
@@ -187,7 +187,7 @@ async function handleBind() {
     // projects the subsequent authoritative GET and never persists this card.
     try {
       const bound = await paymentMethodApi.bind({ providerToken: card.token, source: card.source, brand: card.brand, last4: card.last4,
-        holder: holder.value.trim().toUpperCase(), makeDefault: setAsDefault.value,
+        expiry: card.expiry, holder: holder.value.trim().toUpperCase(), makeDefault: setAsDefault.value,
         idempotencyKey: `h3-card-bind:${card.token}` });
       if (!await cardsStore.refreshRemote()) throw new Error("CARD_BIND_READBACK_FAILED");
       const readBack = cardsStore.cards.find((item) => item.tokenId === bound.tokenId

@@ -7,6 +7,7 @@ vi.mock("@/api/runtime", () => ({
 
 const {
   createBehaviorTracker,
+  getAcceptanceObservationCredential,
   isAcceptanceObservationModalOpen,
   onAcceptanceObservationModalOpened,
   onAcceptanceObservationModalClosed,
@@ -21,16 +22,11 @@ beforeEach(() => {
   };
 });
 
-test("credential modal exposes one close event for voucher arbitration", async () => {
-  let resolveModal: (() => void) | undefined;
-  let modalOptions: { complete?: () => void } | undefined;
-  (globalThis as unknown as { uni: { setClipboardData: () => void; showModal: (options: typeof modalOptions) => Promise<void> } }).uni.showModal = vi.fn((options) => {
-    modalOptions = options;
-    return new Promise<void>((resolve) => { resolveModal = resolve; });
-  });
-
+test("sandbox credential stays available without interrupting the user", async () => {
   const closed = vi.fn();
   const opened = vi.fn();
+  const unsubscribeOpened = onAcceptanceObservationModalOpened(opened);
+  const unsubscribeClosed = onAcceptanceObservationModalClosed(closed);
   const tracker = createBehaviorTracker({
     transport: {
       ingest: async () => ({
@@ -54,21 +50,13 @@ test("credential modal exposes one close event for voucher arbitration", async (
 
   tracker.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
   await tracker.flush();
-  expect(isAcceptanceObservationModalOpen()).toBe(true);
 
-  // The App chassis may subscribe after the analytics transport has opened
-  // the native modal. Late subscribers must still receive the current modal
-  // lifecycle so voucher arbitration cannot lose its one-shot retry.
-  const unsubscribeOpened = onAcceptanceObservationModalOpened(opened);
-  const unsubscribe = onAcceptanceObservationModalClosed(closed);
-  expect(opened).toHaveBeenCalledWith(expect.objectContaining({ scope: "user:a", token: expect.any(Number) }));
-
-  modalOptions?.complete?.();
-  resolveModal?.();
-  await Promise.resolve();
-  expect(closed).toHaveBeenCalledOnce();
-  expect(closed).toHaveBeenCalledWith(expect.objectContaining({ scope: "user:a", token: expect.any(Number) }));
+  expect(getAcceptanceObservationCredential()).toBe(`h5.20260818.${token}`);
+  expect(uni.setClipboardData).not.toHaveBeenCalled();
+  expect(uni.showModal).not.toHaveBeenCalled();
+  expect(opened).not.toHaveBeenCalled();
+  expect(closed).not.toHaveBeenCalled();
   expect(isAcceptanceObservationModalOpen()).toBe(false);
-  unsubscribe();
   unsubscribeOpened();
+  unsubscribeClosed();
 });

@@ -120,6 +120,8 @@ import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
+import { useConversations } from "@/store/conversations";
+import { useNova } from "@/store/nova";
 import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
 import { useVoucher } from "@/store/voucher";
@@ -153,6 +155,8 @@ const locale = useLocaleStore();
 const trial = useFreeTrial();
 const security = useSecurity();
 const notifications = useNotifications();
+const conversations = useConversations();
+const nova = useNova();
 const voucher = useVoucher();
 const rewardsSeen = useRewardsSeen();
 const vrank = useVRank();
@@ -276,7 +280,9 @@ const myGenesisValue = computed(() => fmt(t.value.me.myGenesisNodeValue, { n: St
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
-const unreadNotifs = computed(() => notifications.unread);
+// “消息中心”打开的是客服/顾问/Nova 会话，不是顶部铃铛的运营通知流。
+// 两套角标必须分别跟随各自页面的数据源，避免通知 Campaign 数量冒充会话未读数。
+const conversationUnread = computed(() => conversations.totalUnread + nova.unread);
 // My Rewards unread dot — unused valid vouchers keep it lit (state-based)
 // OR reward credits newer than the seen-watermark (cleared on page open).
 const rewardsDot = computed(() => voucher.claimedUnused.length > 0 || rewardsSeen.hasUnseen);
@@ -328,7 +334,7 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "help",
     title: t.value.me.secHelp,
     items: [
-      { key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: unreadNotifs.value > 0 ? String(unreadNotifs.value) : undefined, tone: "purple" },
+      { key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: conversationUnread.value > 0 ? String(conversationUnread.value) : undefined, tone: "purple" },
       { key: "support", label: t.value.me.liveSupportRow, href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
@@ -387,6 +393,7 @@ async function refreshRemoteMe() {
     ["orders", refreshRemoteOrders],
     ["security", refreshRemoteSecurity],
     ["notifications", () => notifications.refreshRemote()],
+    ["conversations", () => conversations.refresh()],
     ["trial", refreshRemoteTrial],
     ["vouchers", () => voucher.refreshRemote()],
     ["rank", () => vrank.refreshCanonicalVRank()],

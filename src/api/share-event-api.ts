@@ -1,6 +1,5 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 import type { ApiEnvironment } from "./runtime-config";
 
 export type ShareEventChannel = "telegram" | "zalo" | "whatsapp" | "messenger" | "sms" | "x" | "copy" | "poster" | "system" | "code" | "link";
@@ -25,8 +24,6 @@ export interface ShareEventResult {
   runId: string;
 }
 
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-
 function invalid(message = "SHARE_EVENT_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
 }
@@ -47,10 +44,8 @@ function parse(value: unknown, mode: ApiEnvironment, expectedEventId: string): S
   if (!eventId || eventId !== expectedEventId || !questCode || !source
       || row.serverCanonical !== true || typeof row.replay !== "boolean"
       || !["COMPLETED", "CLAIMABLE", "CLAIMED"].includes(status)
-      || !["PRODUCTION", "SANDBOX"].includes(sourceEnvironment)
-      || (mode === "prod" && (sourceEnvironment !== "PRODUCTION" || runId !== ""))
-      || (mode === "dev" && (sourceEnvironment !== "SANDBOX" || !runId || !RUN_ID.test(runId)
-        || !isCurrentCommerceSandboxRun(runId)))) return invalid();
+      || !["dev", "prod"].includes(mode)
+      || sourceEnvironment !== "PRODUCTION" || runId !== "") return invalid();
   return { eventId, questCode, status, replay: row.replay, serverCanonical: true,
     source, sourceEnvironment, runId };
 }

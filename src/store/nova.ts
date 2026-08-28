@@ -1,14 +1,15 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 
 /**
  * Ported from Nexion-prototype/lib/store/nova.ts (zustand → Pinia).
  * Nova · in-app AI compute advisor (design doc §6.8). Remote replies come from the
  * authenticated local-AI backend; explicit mock builds retain the deterministic templates.
- * The store holds the chat transcript, an unread
+ * The store holds the currently rendered chat transcript, while authenticated
+ * remote history is restored from the Java-owned durable conversation table.
  * counter, and the open flag. Auto-push triggers (driven from the app layer) call
  * `push()` to enqueue proactive Nova messages tied to mock simulator events.
- * Non-persisted (session transcript).
  *
  * Live human-agent handoff USED to morph this store in-place (mode/agentName). That
  * is now superseded by the conversation center's dedicated "support" category
@@ -56,13 +57,36 @@ export const useNova = defineStore("nova", () => {
   const typing = ref(false);
   // throttle keys → last fire timestamp (prevents same auto-push firing too often).
   const cooldowns = ref<Record<string, number>>({});
+  const conversationId = ref("");
   let boundRemoteAccount = "";
 
   function bindRemoteAccount(accountKey: string) {
     const normalized = accountKey.trim();
-    if (boundRemoteAccount === normalized) return;
-    reset();
+    if (boundRemoteAccount === normalized && conversationId.value) return;
+    const nextConversationId = requireCryptoUuid();
+    clearTranscript();
     boundRemoteAccount = normalized;
+    conversationId.value = nextConversationId;
+  }
+
+  function hydrateRemote(
+    accountKey: string,
+    remoteConversationId: string,
+    remoteMessages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>,
+  ) {
+    const normalized = accountKey.trim();
+    if (!normalized || normalized !== boundRemoteAccount) return;
+    conversationId.value = remoteConversationId;
+    messages.value = remoteMessages.map((message) => ({
+      id: message.id,
+      sender: message.sender,
+      kind: message.sender === "user" ? "user-text" : "nova-reply",
+      status: message.sender === "user" ? "read" : undefined,
+      text: message.text,
+      ts: message.ts,
+    }));
+    unread.value = 0;
+    typing.value = false;
   }
 
   function open() {
@@ -113,15 +137,27 @@ export const useNova = defineStore("nova", () => {
     typing.value = on;
   }
 
-  function reset() {
+  function clearTranscript() {
     messages.value = [];
     unread.value = 0;
     cooldowns.value = {};
     typing.value = false;
   }
 
+  function startNewConversation() {
+    const nextConversationId = requireCryptoUuid();
+    clearTranscript();
+    conversationId.value = nextConversationId;
+  }
+
+  function reset() {
+    clearTranscript();
+    conversationId.value = "";
+  }
+
   return {
-    messages, unread, isOpen, typing, cooldowns,
-    open, close, push, sendUser, markUserRead, setTyping, reset, bindRemoteAccount,
+    messages, unread, isOpen, typing, cooldowns, conversationId,
+    open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
+    bindRemoteAccount, hydrateRemote,
   };
 });
