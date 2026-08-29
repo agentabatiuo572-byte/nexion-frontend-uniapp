@@ -41,7 +41,6 @@ import { useDeposits } from "@/store/deposits";
 import {
   apiRuntimeConfig,
   authApi,
-  developmentFundsEnabled,
   h5RefreshCookieEnabled,
   remoteApiEnabled,
   sessionVault,
@@ -127,7 +126,6 @@ let arrivalTimer: ReturnType<typeof setInterval> | undefined;
  * store 之间不互相 import(P-031),所以这个跨 store 编排放在 App 层。
  */
 function advanceArrivalAndSettleBill() {
-  if (developmentFundsEnabled) return;
   const app = useApp();
   // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
   // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
@@ -165,7 +163,6 @@ function advanceArrivalAndSettleBill() {
  * 单据是终态、账单行还没跟上,就是待办。这样刷新、换设备、隔一周回来都能自愈,零额外存储。
  */
 function reconcileBills() {
-  if (developmentFundsEnabled) return;
   const app = useApp();
   const bills = useBills();
   // ⓪ 🔴 单据在、账单缺 → **补写**(z4 R2,两路独立审计各自命中)。
@@ -201,10 +198,9 @@ function reconcileBills() {
   //     别再照 ⓪ 的样子在这里无条件遍历 app.withdrawals 补扣。两条独立证据(都已回源坐实):
   //     ① 那一版的立论前提是错的 —— app.ts applyWithdrawalDebit 头注称「全仓没有余额端点、
   //        余额的唯一持有者就是本 store」,而 refreshRemoteFleet 在
-  //        `remoteApiEnabled && !developmentFundsEnabled` 时用服务端 `fleet.walletUsdt`
+  //        remote 模式下用服务端 `fleet.walletUsdt`
   //        **整体覆写** usdtBalance 与 earningBuckets(app.ts:700-723);
-  //        按 api/runtime-config.ts,生产无 env→remote、开发无 env→sandbox 但非显式,
-  //        这两档 developmentFundsEnabled 都是 false —— 正是补扣会跑且真扣本地余额的档。
+  //        开发与生产都服从这一服务端权威余额。
   //        ⇒ 服务端值已含这笔则**双扣**;不含则补扣的 −N 被下一拍重投影抹掉、而幂等键已置位
   //        ⇒ **永不重试**。两种都比不修更坏。
   //     ② docs/changes/2026-08-11-z5-out-of-scope-findings.md B 段早已明令:
@@ -248,7 +244,6 @@ function reconcileBills() {
 }
 
 function startArrivalPoll() {
-  if (developmentFundsEnabled) return;
   stopArrivalPoll();
   arrivalTimer = setInterval(() => {
     if (!ensureBusinessLoopsAllowed()) return;

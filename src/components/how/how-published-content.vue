@@ -12,16 +12,18 @@
       </view>
     </view>
     <view v-else-if="content" class="pb-8">
-      <HowHero :label="content.contentKey" :title="content.blocks[0]?.title ?? content.contentKey" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
-      <HowSection v-for="(block, index) in content.blocks.slice(1)" :key="block.id" :title="block.title" :accent="index % 2 ? 'purple' : 'lemon'">
-        <text class="block" :style="bodyStyle">{{ renderBody(block) }}</text>
-        <view v-if="block.items?.length" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
-          <view v-for="item in block.items" :key="item" style="display: flex; gap: 8px">
-            <text style="color: var(--v5-brand);">•</text><text :style="bodyStyle">{{ item }}</text>
+      <HowHero :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? content.contentKey" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
+      <template v-for="(block, index) in content.blocks.slice(1)" :key="block.id">
+        <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="index % 2 ? 'purple' : 'lemon'">
+          <text class="block" :style="bodyStyle">{{ renderBody(block) }}</text>
+          <view v-if="block.items?.length" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
+            <view v-for="item in block.items" :key="item" style="display: flex; gap: 8px">
+              <text style="color: var(--v5-brand);">•</text><text :style="bodyStyle">{{ item }}</text>
+            </view>
           </view>
-        </view>
-        <HowCalloutBox v-if="block.kind === 'callout'" :title="block.title" :body="renderBody(block)" tone="purple" />
-      </HowSection>
+        </HowSection>
+        <HowCalloutBox v-else class="mx-4" :title="block.title" :body="renderBody(block)" tone="purple" />
+      </template>
       <view class="mx-4" style="margin-top: 24px; padding: 10px 12px; border-radius: 10px; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 11px;">
         <text>服务端发布版本 {{ content.version }} · {{ content.locale }} · canonical 同源</text>
       </view>
@@ -38,14 +40,27 @@ import HowCalloutBox from "@/components/how/how-callout-box.vue";
 import { howContentApi, remoteApiEnabled } from "@/api/runtime";
 import type { HowContentDocument, HowContentKey, HowContentBlock } from "@/api/how-content-api";
 import { useLocaleStore } from "@/store/locale";
+import { useT } from "@/i18n/use-t";
 
 const props = defineProps<{ contentKey: HowContentKey; back: string }>();
 const emit = defineEmits<{ unavailable: [] }>();
 const locale = useLocaleStore();
+const t = useT();
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
 const error = ref(false);
 const bodyStyle = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+
+function heroLabel(contentKey: HowContentKey): string {
+  switch (contentKey) {
+    case "wallet-exchange-how": return t.value.exchangeHowItWorks.heroLabel;
+    case "wallet-repurchase-how": return t.value.repurchaseHowItWorks.heroLabel;
+    case "genesis-how": return t.value.genesisHowItWorks.heroLabel;
+    case "team-binary-how": return t.value.binaryHowItWorks.heroLabel;
+    case "team-commissions-how": return t.value.commissionsHowItWorks.heroLabel;
+    case "team-unilevel-how": return t.value.unilevelHowItWorks.heroLabel;
+  }
+}
 
 function renderBody(block: HowContentBlock): string {
   if (block.kind !== "ruleRef" || !block.ref) return block.body;

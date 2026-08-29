@@ -8,8 +8,8 @@ const source = (import.meta.glob("./live-social-proof.vue", {
 
 describe("LiveSocialProof server scope", () => {
   it("fences remote responses to account and the current commerce run", () => {
-    expect(source).toContain("captureCommerceSandboxRun");
-    expect(source).toContain("isCurrentCommerceSandboxScope(runScope)");
+    expect(source).toContain("captureRuntimeRevision");
+    expect(source).toContain("isCurrentRuntimeRevision(runScope)");
     expect(source).toContain("remoteMounted && generation === remoteRequest");
     expect(source).toContain("expectedAccount === String(app.accountKey)");
     expect(source).toContain("productCatalogState.status");

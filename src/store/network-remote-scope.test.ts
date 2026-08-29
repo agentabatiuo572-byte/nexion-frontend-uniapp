@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 import { ApiError } from "@/api/errors";
 
 const remote = vi.hoisted(() => ({
@@ -24,7 +24,7 @@ const snapshot = (id: string) => ({
 beforeEach(() => {
   setActivePinia(createPinia());
   remote.teamNetworkApi.snapshot.mockReset();
-  setCurrentCommerceSandboxRun("TEAM-RUN-20260816");
+  advanceRuntimeRevision("TEAM-RUN-20260816");
 });
 
 describe("team network remote scope", () => {
@@ -36,7 +36,7 @@ describe("team network remote scope", () => {
     const store = useNetwork();
     const request = store.refreshCanonicalNetwork();
 
-    setCurrentCommerceSandboxRun("TEAM-RUN-20260817");
+    advanceRuntimeRevision("TEAM-RUN-20260817");
     resolve(snapshot("run-a-member"));
 
     await expect(request).resolves.toBe(false);

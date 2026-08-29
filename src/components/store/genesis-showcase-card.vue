@@ -117,7 +117,6 @@ const leftText = computed(() =>
 const lockedCopy = computed(() => resolveGenesisEligibilityCardCopy(gate.value.reasons, {
   policyRejected: t.value.genesisEligibility.cardLockedLine,
   policyManaged: t.value.genesisEligibility.cardPolicyManaged,
-  runConflict: t.value.genesisEligibility.reasonRunConflict,
   serviceUnavailable: t.value.genesisEligibility.reasonServiceUnavailable,
   policyUnavailable: t.value.genesisEligibility.reasonPolicyUnavailable,
 }));

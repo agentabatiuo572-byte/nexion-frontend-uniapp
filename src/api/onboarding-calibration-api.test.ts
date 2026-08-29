@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commitOnboardingSandboxRun, parseOnboardingCalibration, createOnboardingCalibrationApi, type CalibrationRequestSignals, type CalibrationSignals } from "./onboarding-calibration-api";
-import { captureCommerceSandboxRun, setCurrentCommerceSandboxRun } from "./order-api";
+import { parseOnboardingCalibration, createOnboardingCalibrationApi, type CalibrationRequestSignals, type CalibrationSignals } from "./onboarding-calibration-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 const valid = {
   userId: 9,
@@ -24,35 +24,15 @@ const valid = {
 };
 
 describe("onboarding calibration API", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
+  afterEach(() => advanceRuntimeRevision(null));
 
   it("accepts only a server-canonical capability projection", () => {
     expect(parseOnboardingCalibration(valid, "PRODUCTION")).toMatchObject({ source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", tier: 3, tops: 28.3 });
   });
 
-  it("keeps sandbox results fenced to the current catalog run", () => {
-    setCurrentCommerceSandboxRun("sandbox-run-20260816");
-    const sandbox = { ...valid, sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260816" };
-    expect(parseOnboardingCalibration(sandbox, "SANDBOX").runId).toBe("sandbox-run-20260816");
-    expect(() => parseOnboardingCalibration({ ...sandbox, runId: "sandbox-run-stale" }, "SANDBOX")).toThrow();
-  });
-
-  it("lets the current page commit the sandbox run only after its account scope is still current", async () => {
-    setCurrentCommerceSandboxRun(null);
-    const sandbox = { ...valid, sourceEnvironment: "SANDBOX", runId: "phone-activation-e2e-20260817" };
-    const request = vi.fn().mockResolvedValue(sandbox);
-    const api = createOnboardingCalibrationApi({ request } as never, "SANDBOX");
-
-    const result = await api.calibrate("device-a", valid.signals, 0, "calibration-key");
-    expect(result).toMatchObject({ runId: "phone-activation-e2e-20260817" });
-    expect(captureCommerceSandboxRun().runId).toBeNull();
-    expect(commitOnboardingSandboxRun(result)).toBe(true);
-    expect(captureCommerceSandboxRun().runId).toBe("phone-activation-e2e-20260817");
-  });
-
   it("rejects an environment/run mismatch", () => {
     expect(() => parseOnboardingCalibration({ ...valid, runId: "stale" }, "PRODUCTION")).toThrow();
-    expect(() => parseOnboardingCalibration(valid, "SANDBOX")).toThrow();
+    expect(() => parseOnboardingCalibration({ ...valid, sourceEnvironment: "SANDBOX", runId: "retired" })).toThrow();
   });
 
   it("rejects a client/mock projection or out-of-range raw signal", () => {

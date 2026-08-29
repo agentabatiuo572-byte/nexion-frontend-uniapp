@@ -54,7 +54,7 @@ export interface AppHomeEarningsLedgerRow {
 }
 
 export interface AppHomeOverview {
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  sourceEnvironment: "PRODUCTION";
   runId: string;
   generatedAt: string;
   accountScope: string;
@@ -65,7 +65,7 @@ export interface AppHomeOverview {
     month: AppHomePeriod;
     all: AppHomePeriod;
   };
-  earningsLedgerMode: "SETTLED" | "SANDBOX_QUOTE_EXAMPLES";
+  earningsLedgerMode: "SETTLED";
   earningsLedger: AppHomeEarningsLedgerRow[];
   marketBoard: { workloads: AppHomeWorkload[]; deviceRankings: AppHomeDeviceRanking[] };
   doTheMath: AppHomeDoTheMath | null;
@@ -196,8 +196,7 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   if (!generatedAt || !production
       || accountScope !== APP_HOME_ACCOUNT_SCOPE
       || row.serverCanonical !== true || !e || !market || !onboarding || !grid
-      || !["SETTLED", "SANDBOX_QUOTE_EXAMPLES"].includes(String(ledgerMode))
-      || (production && ledgerMode !== "SETTLED")
+      || ledgerMode !== "SETTLED"
       || !isRow(e.today) || !isRow(e.week) || !isRow(e.month) || !isRow(e.all)
       || (e.todayVsYesterdayPct !== null && todayVsYesterdayPct === null)
       || !Array.isArray(row.earningsLedger) || row.earningsLedger.length > 20
@@ -223,8 +222,7 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   if ((onboarding.cumulativePaidUsdt != null && onboardingPaid === null) || (onboarding.activeDevices != null && onboardingDevices === null)
       || (grid.activeDevices != null && activeDevices === null) || (grid.activeJobs != null && activeJobs === null) || (grid.perSecUsdt != null && perSecUsdt === null)) return invalid();
   const earningsLedger = row.earningsLedger.map(ledgerRow);
-  if ((ledgerMode === "SETTLED" && earningsLedger.some((entry) => entry.synthetic))
-      || (ledgerMode === "SANDBOX_QUOTE_EXAMPLES" && earningsLedger.some((entry) => !entry.synthetic))) return invalid();
+  if (earningsLedger.some((entry) => entry.synthetic)) return invalid();
   return {
     sourceEnvironment: row.sourceEnvironment as AppHomeOverview["sourceEnvironment"],
     runId: row.runId as string, generatedAt, accountScope,

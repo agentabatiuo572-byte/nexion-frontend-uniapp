@@ -98,7 +98,6 @@ function reasonText(reason: string): string {
     PRESALE_NOT_OPEN: copy.reasonPresaleClosed,
     USER_CAP_REACHED: copy.reasonCapReached,
     MARKET_DISABLED: copy.reasonMarketDisabled,
-    GENESIS_SANDBOX_USER_RUN_CONFLICT: copy.reasonRunConflict,
     GENESIS_ELIGIBILITY_UNAVAILABLE: copy.reasonServiceUnavailable,
   };
   return byCode[reason] ?? copy.reasonUnavailable;

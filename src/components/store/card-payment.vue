@@ -8,7 +8,6 @@
 -->
 <template>
   <view class="rounded-2xl border overflow-hidden" :style="cardStyle">
-    <FundsSandboxBadge />
     <!-- Header -->
     <view class="flex items-center border-b" :style="headerStyle">
       <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
@@ -114,7 +113,6 @@ import type { SavedCard } from "@/store/cards";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 
 const props = defineProps<{ amount: number }>();
 const emit = defineEmits<{ complete: []; cancel: [] }>();

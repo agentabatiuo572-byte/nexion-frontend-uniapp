@@ -40,7 +40,7 @@ export const useTickets = defineStore("tickets", () => {
   async function preparePendingRun(): Promise<void> {
     const accountKey = accountKeyValue;
     const epoch = accountEpoch;
-    const runId = await supportApi.acceptanceRunId();
+    const runId = await supportApi.authorityRevision();
     if (epoch !== accountEpoch || accountKey !== accountKeyValue) return;
     if (runId === pendingRunId) return;
     pendingRunId = runId;
@@ -62,7 +62,7 @@ export const useTickets = defineStore("tickets", () => {
     const startingRunId = pendingRunId;
     const startingPending = pendingKeys;
     const startingInFlight = inFlight;
-    const runId = await supportApi.acceptanceRunId();
+    const runId = await supportApi.authorityRevision();
     if (epoch !== accountEpoch || accountKey !== accountKeyValue || startingRunId !== pendingRunId
       || startingPending !== pendingKeys || startingInFlight !== inFlight) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     if (runId !== pendingRunId) {

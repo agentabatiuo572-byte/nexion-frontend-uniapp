@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { defineStore } from "pinia";
 import { referralRewardApi, remoteApiEnabled } from "@/api/runtime";
 import type { ReferralRewardSnapshot } from "@/api/referral-reward-api";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 export const useReferralReward = defineStore("referralReward", () => {
@@ -19,7 +19,7 @@ export const useReferralReward = defineStore("referralReward", () => {
       return false;
     }
     const request: RemoteAccountRequest = accountScope.snapshot();
-    const runScope: CommerceSandboxRunScope = captureCommerceSandboxRun();
+    const runScope: RuntimeRevisionScope = captureRuntimeRevision();
     const generation = ++refreshGeneration;
     snapshot.value = null;
     loading.value = true;
@@ -29,12 +29,12 @@ export const useReferralReward = defineStore("referralReward", () => {
     //   改成「成功才清」:重试期间错误态原样留着,请求回来才翻页;失败由 catch 覆写。
     try {
       const next = await referralRewardApi.snapshot(limit);
-      if (generation !== refreshGeneration || !accountScope.isCurrent(request) || !isCurrentCommerceSandboxScope(runScope)) return false;
+      if (generation !== refreshGeneration || !accountScope.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return false;
       snapshot.value = next;
       error.value = null;
       return true;
     } catch (cause) {
-      if (generation === refreshGeneration && accountScope.isCurrent(request) && isCurrentCommerceSandboxScope(runScope)) {
+      if (generation === refreshGeneration && accountScope.isCurrent(request) && isCurrentRuntimeRevision(runScope)) {
         snapshot.value = null;
         error.value = cause instanceof Error ? cause.message : "REFERRAL_REWARD_LOAD_FAILED";
       } else if (generation === refreshGeneration) {

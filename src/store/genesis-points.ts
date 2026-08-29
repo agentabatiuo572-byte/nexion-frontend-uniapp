@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { genesisPointsApi, remoteApiEnabled } from "@/api/runtime";
 import type { GenesisPointsProjection } from "@/api/genesis-points-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 export const useGenesisPoints = defineStore("genesisPoints", () => {
   let boundKey = "default";
@@ -19,12 +19,12 @@ export const useGenesisPoints = defineStore("genesisPoints", () => {
     projection.value = null;
     status.value = remoteApiEnabled ? "idle" : "ready";
   }
-  function isCurrent(request: RemoteAccountRequest, runScope: CommerceSandboxRunScope): boolean {
-    return epoch.isCurrent(request) && isCurrentCommerceSandboxScope(runScope);
+  function isCurrent(request: RemoteAccountRequest, runScope: RuntimeRevisionScope): boolean {
+    return epoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
   }
   async function refresh(
     request: RemoteAccountRequest = epoch.snapshot(),
-    runScope: CommerceSandboxRunScope = captureCommerceSandboxRun(),
+    runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const generation = ++refreshGeneration;

@@ -77,7 +77,7 @@ import {
   canonicalLegalTermsReturnTo,
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
-import { captureCommerceSandboxRun } from "@/api/order-api";
+import { captureRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -113,13 +113,8 @@ onMounted(() => { void loadTerms(); });
 function currentSessionFence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
   if (!session?.accessToken) return null;
-  const run = captureCommerceSandboxRun();
-  // The first Terms fetch may race the post-login catalogue bootstrap. Bind
-  // RunID/epoch only after the catalogue has published a concrete RunID;
-  // account/token fencing remains active from the first request.
-  return run.runId
-    ? { accessToken: session.accessToken, userId: session.user.userId, runId: run.runId, runEpoch: run.epoch }
-    : { accessToken: session.accessToken, userId: session.user.userId };
+  const revision = captureRuntimeRevision();
+  return { accessToken: session.accessToken, userId: session.user.userId, runEpoch: revision.epoch };
 }
 
 async function loadTerms() {
@@ -135,7 +130,7 @@ async function loadTerms() {
       loadError.value = "当前登录会话或运行批次已变化，请重新打开条款";
       return;
     }
-    if (!sameLegalTermsRun(snapshot, captureCommerceSandboxRun().runId)) {
+    if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
       serverTerms.value = null;
       loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
       return;
@@ -176,7 +171,7 @@ async function confirmTerms() {
   }
     const requestFence = currentSessionFence();
     const snapshot = serverTerms.value;
-    if (!sameLegalTermsRun(snapshot, captureCommerceSandboxRun().runId)) {
+    if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
       loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
       return;
     }
@@ -186,7 +181,7 @@ async function confirmTerms() {
     if (!sameLegalTermsSession(requestFence, currentSessionFence())
       || acknowledged.version !== snapshot.version
       || acknowledged.runId !== snapshot.runId
-      || !sameLegalTermsRun(acknowledged, captureCommerceSandboxRun().runId)) {
+      || !sameLegalTermsRun(acknowledged, captureRuntimeRevision().runId)) {
       loadError.value = "登录会话已变化，请重新打开当前条款后再确认";
       return;
     }

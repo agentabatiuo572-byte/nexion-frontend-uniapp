@@ -8,7 +8,7 @@ export interface ReferralRewardLedgerItem {
   ledgerStatus: "SUCCESS";
   balanceAfter: number;
   releaseBucket: "withdrawable" | "pending_review" | "bonus_locked";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  sourceEnvironment: "PRODUCTION";
   settledAt: string;
 }
 
@@ -22,15 +22,14 @@ export interface ReferralRewardSnapshot {
   walletNexAvailable: number;
   recentRewards: ReferralRewardLedgerItem[];
   limit: number;
-  source: "ledger" | "mock";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  source: "ledger";
+  sourceEnvironment: "PRODUCTION";
   runId: string | null;
   factSources: string[];
   refreshedAt: string;
 }
 
 const PRODUCTION_FACTS = ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"];
-const SANDBOX_FACTS = ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"];
 
 function invalid(message = "REFERRAL_REWARD_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
@@ -81,8 +80,7 @@ export function parseReferralRewardSnapshot(value: unknown, mode: ApiEnvironment
       || facts.some((fact) => !fact)
       || !matchesRuntimeProvenance(row, mode)
       || !rawRecentRewards) return invalid();
-  const requiredFacts = sourceEnvironment === "SANDBOX" ? SANDBOX_FACTS : PRODUCTION_FACTS;
-  if (!requiredFacts.every((fact) => facts.includes(fact))) return invalid();
+  if (!PRODUCTION_FACTS.every((fact) => facts.includes(fact))) return invalid();
   const recentRewards = rawRecentRewards.map((item) => {
     const entry = record(item);
     const settlementNo = text(entry?.settlementNo);

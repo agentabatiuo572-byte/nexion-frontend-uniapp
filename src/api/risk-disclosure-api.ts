@@ -12,8 +12,8 @@ export interface RiskDisclosureChapter {
 }
 
 export interface RiskDisclosureCurrent {
-  source: "server" | "mock";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  source: "server";
+  sourceEnvironment: "PRODUCTION";
   jurisdiction: string;
   jurisdictionName: string;
   version: string;
@@ -77,10 +77,7 @@ function current(value: unknown): RiskDisclosureCurrent {
   const row = record(value);
   const source = row?.source;
   const sourceEnvironment = row?.sourceEnvironment;
-  if ((source !== "server" && source !== "mock")
-      || (sourceEnvironment !== "PRODUCTION" && sourceEnvironment !== "SANDBOX")
-      || (source === "mock" && sourceEnvironment !== "SANDBOX")
-      || (source === "server" && sourceEnvironment !== "PRODUCTION")) return invalid();
+  if (source !== "server" || sourceEnvironment !== "PRODUCTION") return invalid();
   const minimumReadingSeconds = Number(row?.minimumReadingSeconds);
   if (!row || typeof row.acknowledged !== "boolean"
       || !Array.isArray(row.chapters) || row.chapters.length !== 7

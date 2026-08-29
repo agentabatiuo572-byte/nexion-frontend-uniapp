@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createNetworkRankApi } from "./network-rank-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
-afterEach(() => setCurrentCommerceSandboxRun(null));
+afterEach(() => advanceRuntimeRevision(null));
 
 describe("network rank api", () => {
   it("accepts a server rank with an explicitly unavailable 24h delta", async () => {
@@ -43,7 +43,7 @@ describe("network rank api", () => {
   });
 
   it("rejects the removed run-scoped sandbox rank", async () => {
-    setCurrentCommerceSandboxRun("rank-run-20260819");
+    advanceRuntimeRevision("rank-run-20260819");
     const request = vi.fn().mockResolvedValue({
       source: "nx_user_device", sourceEnvironment: "SANDBOX", runId: "rank-run-20260819",
       serverCanonical: true, currentRank: null, rankChange24h: null, snapshotAvailable: false,
@@ -65,11 +65,11 @@ describe("network rank api", () => {
   });
 
   it("rejects a late sandbox response after the catalogue switches RunID", async () => {
-    setCurrentCommerceSandboxRun("rank-run-20260819");
+    advanceRuntimeRevision("rank-run-20260819");
     let release!: (value: unknown) => void;
     const request = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     const pending = createNetworkRankApi({ request } as never, "dev").snapshot();
-    setCurrentCommerceSandboxRun("rank-run-20260820");
+    advanceRuntimeRevision("rank-run-20260820");
     release({
       source: "nx_user_device", sourceEnvironment: "SANDBOX", runId: "rank-run-20260819",
       serverCanonical: true, currentRank: 4, rankChange24h: null, snapshotAvailable: false,

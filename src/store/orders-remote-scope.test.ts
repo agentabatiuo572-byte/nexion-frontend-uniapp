@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type { CanonicalOrder, CanonicalOrderList } from "@/api/order-api";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -65,7 +65,7 @@ function list(account: string): CanonicalOrderList {
 
 beforeEach(() => {
   setActivePinia(createPinia());
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
   remote.orderApi.list.mockReset();
   remote.orderApi.cancel.mockReset();
 });
@@ -156,14 +156,14 @@ describe("orders remote account and commerce run scope", () => {
   });
 
   it("drops a cancel response after the sandbox catalog run changes", async () => {
-    setCurrentCommerceSandboxRun("run-20260816");
+    advanceRuntimeRevision("run-20260816");
     const cancel = deferred<unknown>();
     remote.orderApi.cancel.mockReturnValue(cancel.promise);
     const store = useOrders();
     store.bindAccount("A");
     const pending = store.cancelOrderRemote("ORD-A");
 
-    setCurrentCommerceSandboxRun("run-20260817");
+    advanceRuntimeRevision("run-20260817");
     cancel.resolve({});
     await expect(pending).resolves.toBe(false);
 

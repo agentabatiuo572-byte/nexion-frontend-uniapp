@@ -168,7 +168,7 @@ import { useApp } from "@/store/app";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { createDeveloperResourceFenceReader, type DeveloperResourceFence } from "./developer-resource-fence";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
@@ -338,14 +338,14 @@ async function submitRequest() {
   if (remoteApiEnabled) {
     const accountKey = String(app.accountKey);
     const accountScope = captureAccountScope();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     if (latestRequest.value?.status === "PENDING") {
       toast.info(t.value.developer.pendingExists);
       return;
     }
     const generation = ++requestGeneration;
     const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
-      && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+      && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
     submitting.value = true;
     try {
       requestKey ??= newRequestKey();
@@ -378,12 +378,12 @@ function loadLatestRequest() {
   if (!remoteApiEnabled) return;
   const accountKey = String(app.accountKey);
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   const generation = ++requestGeneration;
   latestRequest.value = null;
   latestLoadFailed.value = false;
   const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   void developerAccessApi.latest().then((value) => {
     if (current()) {
       latestRequest.value = value;

@@ -122,9 +122,9 @@ import type { VRank } from "@/store/v-rank";
 import { leadershipHowRows } from "@/lib/leadership-pool-remote";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 const t = useT();
@@ -161,11 +161,11 @@ async function loadRemotePool() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   remoteState.value = "loading";
   remotePool.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
     if (!current()) { if (request === remoteRequest) { remotePool.value = null; remoteState.value = "error"; } return; }
@@ -181,7 +181,7 @@ async function loadRemotePool() {
 watch(() => app.accountKey, () => {
   void loadRemotePool();
 });
-const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled) return;
   remoteRequest += 1;
   remotePool.value = null;

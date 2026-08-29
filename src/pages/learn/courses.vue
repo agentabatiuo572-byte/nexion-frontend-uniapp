@@ -17,7 +17,7 @@ import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
-import { captureCommerceSandboxRun } from "@/api/order-api";
+import { captureRuntimeRevision } from "@/api/order-api";
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
 import type { LearningCourse, LearningOverview } from "@/api/learning-api";
 // 存 key 而不是译好的串:译文一旦快照进 ref 就不再跟随语言(uni 复用页面实例时,
@@ -34,7 +34,7 @@ let mounted = false;
 const fenceReader = createLearningPageFenceReader(
   () => String(app.accountKey),
   () => accountEpoch,
-  captureCommerceSandboxRun,
+  captureRuntimeRevision,
   () => generation,
   () => mounted,
 );

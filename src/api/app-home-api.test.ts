@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createAppHomeApi } from "./app-home-api";
 import { parseAppHomeOverview } from "./app-home-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 const valid = {
   serverCanonical: true,
@@ -32,7 +32,7 @@ const valid = {
 };
 
 describe("parseAppHomeOverview", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
+  afterEach(() => advanceRuntimeRevision(null));
   it("accepts a complete server projection", () => {
     expect(parseAppHomeOverview(valid).earnings.week.jobCount).toBe(9);
     expect(parseAppHomeOverview(valid).earnings.todayVsYesterdayPct).toBe(5.2);
@@ -53,7 +53,7 @@ describe("parseAppHomeOverview", () => {
   });
 
   it("rejects the removed sandbox quote projection", () => {
-    setCurrentCommerceSandboxRun("home-run-20260819");
+    advanceRuntimeRevision("home-run-20260819");
     const sandbox = {
       ...valid,
       sourceEnvironment: "SANDBOX",
@@ -73,7 +73,7 @@ describe("parseAppHomeOverview", () => {
   });
 
   it("does not revive a Sandbox projection even when an old run is selected", () => {
-    setCurrentCommerceSandboxRun("home-run-20260819");
+    advanceRuntimeRevision("home-run-20260819");
     const sandbox = {
       ...valid,
       sourceEnvironment: "SANDBOX",
@@ -84,12 +84,12 @@ describe("parseAppHomeOverview", () => {
       earningsLedger: [{ ...valid.earningsLedger[0], synthetic: true }],
     };
     expect(() => parseAppHomeOverview(sandbox, "dev")).toThrow("APP_HOME_OVERVIEW_INVALID");
-    setCurrentCommerceSandboxRun("home-run-20260820");
+    advanceRuntimeRevision("home-run-20260820");
     expect(() => parseAppHomeOverview(sandbox, "dev")).toThrow("APP_HOME_OVERVIEW_INVALID");
   });
 
   it("rejects a fetched Sandbox projection", async () => {
-    setCurrentCommerceSandboxRun("home-run-20260819");
+    advanceRuntimeRevision("home-run-20260819");
     const payload = {
       ...valid,
       sourceEnvironment: "SANDBOX",

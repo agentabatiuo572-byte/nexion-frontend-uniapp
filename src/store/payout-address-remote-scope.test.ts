@@ -21,8 +21,8 @@ vi.mock("./account-scoped-storage", () => ({
 vi.mock("./risk-identity", () => ({ recordWithdrawAddressUse: vi.fn() }));
 vi.mock("@/lib/money-receipt", () => ({ postMoneyBillsOnce: vi.fn(() => "ok") }));
 vi.mock("@/api/order-api", () => ({
-  captureCommerceSandboxRun: vi.fn(() => ({ runId: null, epoch: 0 })),
-  isCurrentCommerceSandboxScope: vi.fn(() => remote.sandboxRunCurrent),
+  captureRuntimeRevision: vi.fn(() => ({ runId: null, epoch: 0 })),
+  isCurrentRuntimeRevision: vi.fn(() => remote.sandboxRunCurrent),
 }));
 
 const { usePayoutAddress } = await import("./payout-address");

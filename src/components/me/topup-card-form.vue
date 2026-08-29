@@ -16,7 +16,6 @@
        把状态放 vault 的原因。vault 渲染 <slot/> 零 DOM,space-y-3 的子元素间距不受影响。 -->
   <HostedCardVault ref="vaultRef" @change="onCardChange">
   <view class="mx-4 space-y-3">
-    <FundsSandboxBadge />
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
       <text class="font-mono-tabular" style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
@@ -134,11 +133,9 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDeposits } from "@/store/deposits";
-import { developmentFundsEnabled } from "@/api/runtime";
 import {
   MAX_CARD_DEPOSIT_USDT,
   MIN_CARD_DEPOSIT_USDT,
@@ -273,9 +270,7 @@ async function handleSubmit() {
       await new Promise((r) => setTimeout(r, 2400));
       // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
       // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
-      const rec = developmentFundsEnabled
-        ? await deposits.createSandboxTopup("CARD", usdtAmount.value, acct)
-        : deposits.submitCardPayment(usdtAmount.value, acct);
+      const rec = deposits.submitCardPayment(usdtAmount.value, acct);
       if (!rec) throw new Error(t.value.topupChrome.payDeclinedReason);
       return rec;
     }, {

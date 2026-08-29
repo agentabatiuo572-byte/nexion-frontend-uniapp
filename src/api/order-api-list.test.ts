@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
-import { createOrderApi, setCurrentCommerceSandboxRun } from "./order-api";
+import { createOrderApi, advanceRuntimeRevision } from "./order-api";
 
 function order() {
   return {
@@ -18,7 +18,7 @@ function api(payload: unknown, mode: "prod" | "dev") {
   return createOrderApi({ request: vi.fn().mockResolvedValue(payload) } as unknown as ApiClient, mode);
 }
 
-afterEach(() => setCurrentCommerceSandboxRun(null));
+afterEach(() => advanceRuntimeRevision(null));
 
 describe("order list provenance", () => {
   it("remote mode accepts only server production data", async () => {
@@ -27,7 +27,7 @@ describe("order list provenance", () => {
   });
 
   it("remote mode rejects sandbox/mock data", async () => {
-    setCurrentCommerceSandboxRun("run-20260817");
+    advanceRuntimeRevision("run-20260817");
     await expect(api({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260817", serverCanonical: true, orders: [order()] }, "prod").list())
       .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
   });
@@ -38,7 +38,7 @@ describe("order list provenance", () => {
   });
 
   it("development mode rejects sandbox data even when its RunID is current", async () => {
-    setCurrentCommerceSandboxRun("run-20260817");
+    advanceRuntimeRevision("run-20260817");
     await expect(api({ source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260817", serverCanonical: true, orders: [order()] }, "dev").list())
       .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
   });

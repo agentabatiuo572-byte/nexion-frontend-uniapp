@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { setCurrentCommerceSandboxRun, captureCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision, captureRuntimeRevision } from "@/api/order-api";
 import { createLearningPageFenceReader } from "./learning-page-fence";
 
 describe("learning page async fence", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
+  afterEach(() => advanceRuntimeRevision(null));
 
   it("drops late responses after account, run, generation, or mount changes", () => {
     let account = "user-a";
     let epoch = 1;
     let generation = 1;
     let mounted = true;
-    setCurrentCommerceSandboxRun("run-20260816");
+    advanceRuntimeRevision("run-20260816");
     const reader = createLearningPageFenceReader(
       () => account,
       () => epoch,
-      () => captureCommerceSandboxRun(),
+      () => captureRuntimeRevision(),
       () => generation,
       () => mounted,
     );
@@ -32,7 +32,7 @@ describe("learning page async fence", () => {
     mounted = false;
     expect(reader.isCurrent(scope)).toBe(false);
     mounted = true;
-    setCurrentCommerceSandboxRun("run-20260817");
+    advanceRuntimeRevision("run-20260817");
     expect(reader.isCurrent(scope)).toBe(false);
   });
 });

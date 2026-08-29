@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
-import { createOrderApi, setCurrentCommerceSandboxRun } from "./order-api";
+import { createOrderApi, advanceRuntimeRevision } from "./order-api";
 
 describe("order cancellation API", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
+  afterEach(() => advanceRuntimeRevision(null));
 
   it("sends the authenticated idempotent cancel command and parses server state", async () => {
     const request = vi.fn().mockResolvedValue({
@@ -31,7 +31,7 @@ describe("order cancellation API", () => {
   });
 
   it("accepts only the current catalog run for sandbox cancellation", async () => {
-    setCurrentCommerceSandboxRun("run-20260816");
+    advanceRuntimeRevision("run-20260816");
     const request = vi.fn().mockResolvedValue({
       orderNo: "ORD-1", orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
       source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816",
@@ -44,7 +44,7 @@ describe("order cancellation API", () => {
   });
 
   it("rejects a sandbox cancellation from a different catalog run", async () => {
-    setCurrentCommerceSandboxRun("run-20260816");
+    advanceRuntimeRevision("run-20260816");
     const request = vi.fn().mockResolvedValue({
       orderNo: "ORD-1", orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
       source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260815",

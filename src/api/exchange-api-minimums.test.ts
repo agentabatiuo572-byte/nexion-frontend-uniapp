@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createExchangeApi } from "./exchange-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 const caps = {
   asset: "NEX",
@@ -26,7 +26,7 @@ function client(response: unknown): ApiClient {
 }
 
 describe("exchange server minimums", () => {
-  beforeEach(() => setCurrentCommerceSandboxRun(null));
+  beforeEach(() => advanceRuntimeRevision(null));
   it("reads direction-specific minimums from the canonical caps response", async () => {
     await expect(createExchangeApi(client(caps)).fetchCaps()).resolves.toMatchObject({ minUsdt: 3, minNex: 42 });
   });
@@ -37,7 +37,7 @@ describe("exchange server minimums", () => {
   });
 
   it("rejects a sandbox caps response from a previous run", async () => {
-    setCurrentCommerceSandboxRun("sandbox-run-2");
+    advanceRuntimeRevision("sandbox-run-2");
     const sandbox = { ...caps, sourceEnvironment: "SANDBOX", runId: "sandbox-run-1", swapEnabled: false };
     await expect(createExchangeApi(client(sandbox), "dev").fetchCaps())
       .rejects.toMatchObject({ message: "EXCHANGE_CAPS_RESPONSE_INVALID" });

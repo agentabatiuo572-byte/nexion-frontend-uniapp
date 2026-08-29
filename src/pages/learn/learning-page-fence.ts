@@ -1,16 +1,16 @@
-import { isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 export interface LearningPageFence {
   accountKey: string;
   accountEpoch: number;
-  runScope: CommerceSandboxRunScope;
+  runScope: RuntimeRevisionScope;
   generation: number;
 }
 
 export function createLearningPageFenceReader(
   getAccountKey: () => string,
   getAccountEpoch: () => number,
-  getRunScope: () => CommerceSandboxRunScope,
+  getRunScope: () => RuntimeRevisionScope,
   getGeneration: () => number,
   isMounted: () => boolean,
 ) {
@@ -28,7 +28,7 @@ export function createLearningPageFenceReader(
         && scope.accountKey === getAccountKey()
         && scope.accountEpoch === getAccountEpoch()
         && scope.generation === getGeneration()
-        && isCurrentCommerceSandboxScope(scope.runScope);
+        && isCurrentRuntimeRevision(scope.runScope);
     },
   };
 }

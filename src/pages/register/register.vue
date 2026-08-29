@@ -330,7 +330,7 @@ function oauthProvider(label: string): OAuthProvider | null {
 function oauthError(cause: unknown, provider: OAuthProvider): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
-      || code === "OAUTH_SANDBOX_ONLY") {
+      ) {
     return `${fmt(t.value.register.oauthUnavailableTitle, { provider })}: ${t.value.register.oauthUnavailableBody}`;
   }
   return t.value.authOtp.errorServiceUnavailable;
@@ -458,7 +458,7 @@ async function requestCode(captchaTicket?: string) {
       if (!mounted || flowVersion !== otpFlowVersion) return;
       verifying.value = false;
       error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
-      // 包 zm T3:开发构建里区分「产品坏了」与「本地后端没起」——网络级失败且在 sandbox 档时亮工程横幅。
+      // 开发构建里区分「产品坏了」与「本地后端没起」——网络级失败时亮工程横幅。
       if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev";
     }
     return;
@@ -523,7 +523,7 @@ function isCurrentRemoteRegistrationAttempt(context: RemoteRegistrationAttemptCo
 function registrationErrorText(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH") {
-    return t.value.register.sandboxSponsorEnvironmentMismatch;
+    return t.value.register.sponsorEnvironmentMismatch;
   }
   return geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
 }

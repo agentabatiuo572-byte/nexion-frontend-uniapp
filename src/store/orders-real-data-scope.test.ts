@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type { CanonicalOrder, CanonicalOrderList } from "@/api/order-api";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -34,7 +34,7 @@ function list(label: string): CanonicalOrderList {
 
 beforeEach(() => {
   setActivePinia(createPinia());
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
   remote.orderApi.list.mockReset();
   remote.orderApi.cancel.mockReset();
 });
@@ -69,15 +69,15 @@ describe("orders consume only the current request scope", () => {
     expect(store.orders).toEqual([]);
   });
 
-  it("drops a late response after the commerce RunID changes", async () => {
-    setCurrentCommerceSandboxRun("run-20260816");
+  it("drops a late response after the runtime revision changes", async () => {
+    advanceRuntimeRevision("run-20260816");
     const stale = deferred<CanonicalOrderList>();
     remote.orderApi.list.mockReturnValue(stale.promise);
     const store = useOrders();
     store.bindAccount("A");
     const pending = store.refreshRemote();
-    setCurrentCommerceSandboxRun("run-20260817");
-    stale.resolve({ ...list("old"), source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816" });
+    advanceRuntimeRevision("run-20260817");
+    stale.resolve(list("old"));
     await pending;
     expect(store.orders).toEqual([]);
   });

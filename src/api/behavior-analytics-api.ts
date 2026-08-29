@@ -37,10 +37,6 @@ export type BehaviorReceipt = {
   backfilled?: boolean;
   sampledIn?: boolean;
   eventId?: string;
-  source?: "mock";
-  sourceEnvironment?: "SANDBOX";
-  runId?: string;
-  observationToken?: string;
 };
 
 export interface BehaviorAnalyticsApi {
@@ -52,7 +48,6 @@ const ROUTE = /^\/pages\/[a-z0-9-]+\/[a-z0-9-]+$/;
 const ELEMENT = /^[a-z][a-z0-9_-]{0,63}$/;
 const LOCALE = /^(?:und|[a-z]{2}(?:-[A-Z]{2})?)$/;
 const ZONES = new Set<BehaviorZone>(["TOP", "MAIN_CTA", "CONTENT", "BOTTOM"]);
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const PAGE_EVENT_FIELDS = new Set(["clientEventId", "eventName", "sessionId", "route", "dwellMs", "clientTs", "deviceType", "locale"]);
 const CLICK_EVENT_FIELDS = new Set(["clientEventId", "eventName", "sessionId", "route", "xNorm", "yNorm", "zone", "elementId", "clientTs", "deviceType", "locale"]);
 
@@ -89,8 +84,6 @@ function receipt(value: unknown): BehaviorReceipt {
     return invalid("L6_INGEST_RESPONSE_INVALID");
   }
   const row = value as Record<string, unknown>;
-  const isSandboxReceipt = row.source === "mock" || row.sourceEnvironment === "SANDBOX"
-    || row.runId !== undefined || row.observationToken !== undefined;
   if (
     typeof row.accepted !== "boolean"
     || typeof row.duplicate !== "boolean"
@@ -99,11 +92,8 @@ function receipt(value: unknown): BehaviorReceipt {
     || (row.eventId !== undefined && (typeof row.eventId !== "string" || !row.eventId))
     || (row.accepted && (row.duplicate || (row.sampledIn !== false && typeof row.eventId !== "string")))
     || (!row.accepted && !row.duplicate)
-    || (isSandboxReceipt && (
-      row.source !== "mock" || row.sourceEnvironment !== "SANDBOX"
-      || typeof row.runId !== "string" || !RUN_ID.test(row.runId)
-      || typeof row.observationToken !== "string" || !/^[a-f0-9]{64}$/.test(row.observationToken)
-    ))
+    || row.source !== undefined || row.sourceEnvironment !== undefined
+    || row.runId !== undefined || row.observationToken !== undefined
   ) return invalid("L6_INGEST_RESPONSE_INVALID");
   return {
     accepted: row.accepted,
@@ -111,12 +101,6 @@ function receipt(value: unknown): BehaviorReceipt {
     ...(row.backfilled === undefined ? {} : { backfilled: row.backfilled }),
     ...(row.sampledIn === undefined ? {} : { sampledIn: row.sampledIn }),
     ...(row.eventId === undefined ? {} : { eventId: row.eventId }),
-    ...(isSandboxReceipt ? {
-      source: "mock" as const,
-      sourceEnvironment: "SANDBOX" as const,
-      runId: row.runId as string,
-      observationToken: row.observationToken as string,
-    } : {}),
   };
 }
 

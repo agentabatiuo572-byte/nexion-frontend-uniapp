@@ -52,8 +52,8 @@ export interface OAuthExchangeRequest {
 export interface OAuthExchangeResult {
   user: UserSession;
   vaultRevision: number;
-  source: "mock";
-  sandbox: true;
+  source: "development" | "provider";
+  sandbox: false;
 }
 
 export type LoginResult =
@@ -218,7 +218,7 @@ function oauthExchangeFromResponse(
         ? data.refreshToken !== null
         : typeof data.refreshToken !== "string" || data.refreshToken.length === 0)
       || data.tokenType !== "Bearer" || !isUserSession(data.user)
-      || data.source !== "mock" || data.sandbox !== true) {
+      || (data.source !== "development" && data.source !== "provider") || data.sandbox !== false) {
     throw new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
   }
   const session: SessionSnapshot = {
@@ -231,18 +231,23 @@ function oauthExchangeFromResponse(
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
   }
-  return { user: data.user, vaultRevision: expectedRevision + 1, source: "mock", sandbox: true };
+  return {
+    user: data.user,
+    vaultRevision: expectedRevision + 1,
+    source: data.source as "development" | "provider",
+    sandbox: false,
+  };
 }
 
-function oauthSandboxChallengeFromResponse(value: unknown): string {
+function oauthDevelopmentChallengeFromResponse(value: unknown): string {
   if (!value || typeof value !== "object") {
-    throw new ApiError({ kind: "protocol", message: "OAUTH_SANDBOX_CHALLENGE_INVALID" });
+    throw new ApiError({ kind: "protocol", message: "OAUTH_DEVELOPMENT_CHALLENGE_INVALID" });
   }
   const data = value as Record<string, unknown>;
   if (typeof data.challengeNo !== "string" || !/^OAUTH-[a-f0-9]{32}$/.test(data.challengeNo)
       || !Number.isSafeInteger(data.expiresInSec) || Number(data.expiresInSec) < 1
       || Number(data.expiresInSec) > 600) {
-    throw new ApiError({ kind: "protocol", message: "OAUTH_SANDBOX_CHALLENGE_INVALID" });
+    throw new ApiError({ kind: "protocol", message: "OAUTH_DEVELOPMENT_CHALLENGE_INVALID" });
   }
   return data.challengeNo;
 }
@@ -385,18 +390,20 @@ export function createAuthApi(
     },
     async oauthExchange(request) {
       const revision = vault.revision();
-      // The Java profile decides whether the development challenge endpoint is
-      // available. The browser never selects an execution environment or
-      // supplies an unverified provider subject.
-      const body = {
-        provider: request.provider,
-        displayName: request.displayName,
-        challengeNo: oauthSandboxChallengeFromResponse(await client.request<unknown>({
-          path: "/auth/users/oauth/sandbox/challenge",
+      // Only the local development Passkey uses a server-issued one-time
+      // challenge. Real providers go directly to their configured adapter.
+      const challengeNo = request.provider === "PASSKEY"
+        ? oauthDevelopmentChallengeFromResponse(await client.request<unknown>({
+          path: "/auth/users/oauth/development/passkey/challenge",
           method: "POST",
           body: { provider: request.provider },
           authenticated: false,
-        })),
+        }))
+        : undefined;
+      const body = {
+        provider: request.provider,
+        displayName: request.displayName,
+        ...(challengeNo ? { challengeNo } : {}),
       };
       const data = await client.request<unknown>({
         path: "/auth/users/oauth/exchange",

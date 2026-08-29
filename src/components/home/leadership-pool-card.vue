@@ -45,9 +45,9 @@ import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 const t = useT();
@@ -74,11 +74,11 @@ async function loadRemotePool() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   remotePool.value = null;
   remoteState.value = "loading";
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
     if (!current()) return;
@@ -92,7 +92,7 @@ async function loadRemotePool() {
 }
 
 watch(() => app.accountKey, () => { void loadRemotePool(); });
-const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => {
   remoteRequest += 1;
   remotePool.value = null;
   remoteState.value = "loading";

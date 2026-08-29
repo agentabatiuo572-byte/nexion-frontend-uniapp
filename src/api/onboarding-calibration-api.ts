@@ -1,8 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxRun, setCurrentCommerceSandboxRun } from "./order-api";
 
-export type OnboardingCalibrationEnvironment = "PRODUCTION" | "SANDBOX";
+export type OnboardingCalibrationEnvironment = "PRODUCTION";
 export type PhoneActivationStatus = "CALIBRATED" | "ACTIVE" | "DEFERRED";
 
 export interface CalibrationSignals {
@@ -132,35 +131,18 @@ function signals(value: unknown): CalibrationSignals {
   };
 }
 
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-
-export function commitOnboardingSandboxRun(result: OnboardingCalibration): boolean {
-  if (result.sourceEnvironment !== "SANDBOX") return true;
-  // Parsing a response must never mutate shared sandbox scope. The page first
-  // proves that the response still belongs to its mounted account/request and
-  // only then commits the first authenticated RunID without an await gap.
-  if (captureCommerceSandboxRun().runId === null) setCurrentCommerceSandboxRun(result.runId);
-  return isCurrentCommerceSandboxRun(result.runId);
-}
-
 export function parseOnboardingCalibration(
   value: unknown,
   expectedEnvironment?: OnboardingCalibrationEnvironment,
-  allowUnestablishedSandboxRun = false,
 ): OnboardingCalibration {
   const row = record(value);
   if (row.serverCanonical !== true || row.source !== "server") return invalid();
   const sourceEnvironment = row.sourceEnvironment;
   const runId = row.runId;
-  if ((sourceEnvironment !== "PRODUCTION" && sourceEnvironment !== "SANDBOX")
+  if (sourceEnvironment !== "PRODUCTION"
       || (expectedEnvironment !== undefined && sourceEnvironment !== expectedEnvironment)
       || typeof runId !== "string"
-      || (sourceEnvironment === "PRODUCTION" && runId !== "")
-      || (sourceEnvironment === "SANDBOX" && (
-        !RUN_ID.test(runId)
-        || (!isCurrentCommerceSandboxRun(runId)
-          && !(allowUnestablishedSandboxRun && captureCommerceSandboxRun().runId === null))
-      ))) return invalid();
+      || runId !== "") return invalid();
   if (row.activationStatus !== "CALIBRATED" && row.activationStatus !== "ACTIVE" && row.activationStatus !== "DEFERRED") return invalid();
   if (typeof row.calibrationAvailable !== "boolean") return invalid();
   const comparisonConfig = Array.isArray(row.comparisonConfig) ? row.comparisonConfig.map((entry) => {
@@ -212,14 +194,14 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
         method: "POST", path: "/api/onboarding/calibrate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision, signals: rawSignals },
       });
-      return parseOnboardingCalibration(response, environment, true);
+      return parseOnboardingCalibration(response, environment);
     },
     async result(deviceId) {
       const normalizedDeviceId = text(deviceId);
       const response = await client.request({
         method: "GET", path: `/api/onboarding/calibrate/result?deviceId=${encodeURIComponent(normalizedDeviceId)}`,
       });
-      return parseOnboardingCalibration(response, environment, true);
+      return parseOnboardingCalibration(response, environment);
     },
     async activate(deviceId, expectedRevision, idempotencyKey) {
       const normalizedDeviceId = text(deviceId);
@@ -230,7 +212,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
         method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });
-      return parseOnboardingCalibration(response, environment, true);
+      return parseOnboardingCalibration(response, environment);
     },
     async defer(deviceId, expectedRevision, idempotencyKey) {
       const normalizedDeviceId = text(deviceId);
@@ -241,7 +223,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
         method: "POST", path: "/api/onboarding/calibrate/defer", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });
-      return parseOnboardingCalibration(response, environment, true);
+      return parseOnboardingCalibration(response, environment);
     },
   };
 }

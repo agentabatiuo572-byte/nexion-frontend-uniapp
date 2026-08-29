@@ -3,9 +3,9 @@ import { ref, computed } from "vue";
 import { remoteApiEnabled, voucherApi } from "@/api/runtime";
 import type { CanonicalVoucher, VoucherSnapshot } from "@/api/voucher-api";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  type CommerceSandboxRunScope,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  type RuntimeRevisionScope,
 } from "@/api/order-api";
 import { mockServerNow } from "./server-time";
 import { createAccountRowCommit } from "./account-scoped-storage";
@@ -110,18 +110,18 @@ export const useVoucher = defineStore("voucher", () => {
 
   function remoteRequestIsCurrent(
     request: RemoteAccountRequest,
-    runScope: CommerceSandboxRunScope,
+    runScope: RuntimeRevisionScope,
     generation: number,
   ): boolean {
     return generation === remoteGeneration
       && remoteAccountEpoch.isCurrent(request)
-      && isCurrentCommerceSandboxScope(runScope);
+      && isCurrentRuntimeRevision(runScope);
   }
 
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
     clearRemoteFacts();
     try {
@@ -141,7 +141,7 @@ export const useVoucher = defineStore("voucher", () => {
   async function markPopupSeen(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
     try {
       const snapshot = await voucherApi.popupSeen(id);
@@ -155,7 +155,7 @@ export const useVoucher = defineStore("voucher", () => {
 
   async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number]): Promise<boolean> {
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
     try {
       await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);

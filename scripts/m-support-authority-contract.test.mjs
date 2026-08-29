@@ -116,16 +116,14 @@ test("a late full-list read merges monotonically instead of restoring an older v
   }
 });
 
-test("acceptance support is server-proven, isolated, and late lifecycle work cannot restart polling", async () => {
+test("canonical support uses the development authority and late lifecycle work cannot restart polling", async () => {
   const [api, chat] = await Promise.all([
     read("src/api/support-api.ts"),
     read("src/pages/support/chat.vue"),
   ]);
-  assert.match(api, /\/api\/app\/support\/acceptance\/projection/);
-  assert.match(api, /v\.source !== "mock"/);
-  assert.match(api, /v\.sourceEnvironment !== "SANDBOX"/);
-  assert.match(api, /v\.strictProfile !== true/);
-  assert.match(api, /runId: v\.runId\.trim\(\)/);
+  assert.match(api, /const supportRoot = "\/api\/app\/support"/);
+  assert.match(api, /authorityRevision: async \(\) => "canonical-v1"/);
+  assert.doesNotMatch(api, /support\/acceptance|sourceEnvironment !== "SANDBOX"/);
   assert.match(api, /supportPath\(`\/commands\//);
   assert.match(chat, /humanThreadEpoch/);
   assert.match(chat, /humanThreadVisible/);
@@ -231,7 +229,7 @@ test("unknown support commands persist opaque account-scoped slots and reconcile
     assert.match(source, /localStorage/);
     assert.match(source, /support-pending-commands/);
     assert.match(source, /bindAccount\(accountKey: string\)/);
-    assert.match(source, /acceptanceRunId\(\)/);
+    assert.match(source, /authorityRevision\(\)/);
     assert.match(source, /:\$\{runId\}:/);
     assert.match(source, /opaqueIntentSlot/);
     assert.match(source, /crypto\.subtle\.digest\("SHA-256"/);
@@ -252,15 +250,15 @@ test("account switches retain opaque unknown commands for the original account a
     assert.match(source, /pendingKeys = new Map\(\);[\s\S]*?preparePendingRun\(\)\.then\(reconcilePending\)/);
     assert.doesNotMatch(source, /localStorage\.removeItem\(pendingStorageKey/);
   }
-  assert.match(api, /supportRoot = undefined;/);
-  assert.match(api, /\.catch\(\(cause: unknown\) => \{[\s\S]*?supportRoot = undefined;/);
+  assert.match(api, /const supportRoot = "\/api\/app\/support";/);
+  assert.doesNotMatch(api, /support\/acceptance/);
 });
 
-test("a deferred acceptance proof cannot send an old account command with the new account token", async () => {
+test("a deferred authority revision cannot send an old account command with the new account token", async () => {
   const [tickets, conversations] = await Promise.all([read("src/store/tickets.ts"), read("src/store/conversations.ts")]);
   for (const source of [tickets, conversations]) {
     assert.match(source, /const accountKey = accountKeyValue;\s*const epoch = accountEpoch;\s*const startingRunId = pendingRunId;/);
-    assert.match(source, /const runId = await supportApi\.acceptanceRunId\(\);/);
+    assert.match(source, /const runId = await supportApi\.authorityRevision\(\);/);
     assert.match(source, /startingRunId !== pendingRunId[\s\S]*?throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\)/);
     assert.match(source, /const scope = await commandScope\(\);[\s\S]*?if \(!scopeIsCurrent\(scope\)\) throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\);[\s\S]*?const promise = action\(key\);/);
     assert.match(source, /persistPending\(scope\.accountKey, scope\.runId, scope\.pending\)/);

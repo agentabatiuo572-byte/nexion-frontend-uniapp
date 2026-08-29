@@ -12,7 +12,7 @@ const remote = vi.hoisted(() => ({
 vi.mock("@/api/runtime", () => remote);
 
 const { useVoucher } = await import("./voucher");
-const { setCurrentCommerceSandboxRun } = await import("@/api/order-api");
+const { advanceRuntimeRevision } = await import("@/api/order-api");
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
 });
 
 describe("voucher remote account scope", () => {
@@ -173,14 +173,14 @@ describe("voucher remote account scope", () => {
   });
 
   it("drops a catalog when the sandbox RunID changes", async () => {
-    setCurrentCommerceSandboxRun("voucher-run-a");
+    advanceRuntimeRevision("voucher-run-a");
     const store = await createStore();
     const stale = deferred<ReturnType<typeof snapshot>>();
     remote.voucherApi.state.mockReturnValueOnce(stale.promise)
       .mockResolvedValue({ vouchers: [], source: "test" });
     const pending = store.refreshRemote();
 
-    setCurrentCommerceSandboxRun("voucher-run-b");
+    advanceRuntimeRevision("voucher-run-b");
     await flush();
     expect(store.catalog).toEqual([]);
 

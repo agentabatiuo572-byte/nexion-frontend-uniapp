@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 import type { CanonicalCommissionConfig } from "@/api/commission-config-api";
 
 const remote = vi.hoisted(() => ({
@@ -35,7 +35,7 @@ beforeEach(() => {
   remote.commissionConfigApi.rates.mockReset();
   remote.commissionConfigApi.binary.mockResolvedValue({});
   remote.teamInsightsApi.commissions.mockResolvedValue({ events: [] });
-  setCurrentCommerceSandboxRun("commission-run-20260817");
+  advanceRuntimeRevision("commission-run-20260817");
 });
 
 describe("commission config remote scope", () => {
@@ -52,7 +52,7 @@ describe("commission config remote scope", () => {
     const store = useCommission();
     store.bindAccount("a");
     await vi.waitFor(() => expect(store.configStatus).toBe("ready"));
-    setCurrentCommerceSandboxRun("commission-run-20260818");
+    advanceRuntimeRevision("commission-run-20260818");
     expect(store.config).toBeNull();
     expect(store.configStatus).toBe("idle");
     remote.commissionConfigApi.rates.mockRejectedValueOnce(new Error("CONFIG_UNAVAILABLE"));

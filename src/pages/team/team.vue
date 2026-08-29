@@ -214,9 +214,9 @@ import { useReferralReward } from "@/store/referral-reward";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 const t = useT();
@@ -352,12 +352,12 @@ async function refreshRemotePool() {
   const request = ++remotePoolRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   remotePoolState.value = "loading";
   remotePool.value = null;
   const current = () => remotePoolMounted && request === remotePoolRequest
     && accountKey === app.accountKey && isCurrentAccountScope(accountScope)
-    && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
     if (!current()) return;
@@ -370,7 +370,7 @@ async function refreshRemotePool() {
   }
 }
 watch(() => app.accountKey, () => { if (remoteApiEnabled) { remotePool.value = null; void refreshRemotePool(); } });
-const unsubscribeRemotePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled || !remotePoolMounted) return;
   remotePoolRequest += 1;
   remotePool.value = null;

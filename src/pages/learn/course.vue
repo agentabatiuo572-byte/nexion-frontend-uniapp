@@ -18,7 +18,7 @@ import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
-import { captureCommerceSandboxRun } from "@/api/order-api";
+import { captureRuntimeRevision } from "@/api/order-api";
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
 import type { LearningCourse, LearningResult } from "@/api/learning-api";
 // 存 key 不存译文:译好的串快照进 ref 后不再跟随语言(见 courses.vue 同处注释)。
@@ -39,7 +39,7 @@ let mounted = false;
 const fenceReader = createLearningPageFenceReader(
   () => String(app.accountKey),
   () => accountEpoch,
-  captureCommerceSandboxRun,
+  captureRuntimeRevision,
   () => generation,
   () => mounted,
 );

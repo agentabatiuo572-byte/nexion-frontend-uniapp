@@ -9,7 +9,6 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FundsSandboxBadge />
     <FxRateLine />
     <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
       <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError }}</text>
@@ -242,7 +241,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
@@ -253,7 +251,7 @@ import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
-import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
@@ -282,7 +280,7 @@ const paneView = computed<PaneView>(() => {
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
-  if (remoteApiEnabled && !developmentFundsEnabled) {
+  if (remoteApiEnabled) {
     // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
     //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
     //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
@@ -384,7 +382,7 @@ function createOrder(presetUsdt?: number) {
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
 async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
-  if (remoteApiEnabled && !developmentFundsEnabled) {
+  if (remoteApiEnabled) {
     // 收款账户的日额度会在另一笔入账后变化；提交前必须重读服务端快照，
     // 不能拿进入页面时缓存的 5000 上限继续创建一张服务端必拒绝的付款单。
     await fx.load();
@@ -415,11 +413,9 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
   let approvedBusinessFailureCopy = "";
   await runRecoverableFundsOperation(async () => {
     try {
-      const it = developmentFundsEnabled
-        ? await dep.createSandboxBankIntent(usdt, expectedAccountKey)
-        : remoteApiEnabled
-          ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
-          : dep.createBankIntent(usdt);
+      const it = remoteApiEnabled
+        ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
+        : dep.createBankIntent(usdt);
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     } catch (cause) {
@@ -477,7 +473,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
-  if (remoteApiEnabled && !developmentFundsEnabled) dep.stopRemoteVietQrPolling();
+  if (remoteApiEnabled) dep.stopRemoteVietQrPolling();
 });
 const countdownText = computed(() => {
   const it = intent.value;

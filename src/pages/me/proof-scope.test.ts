@@ -13,8 +13,8 @@ describe("Proof remote snapshot scope", () => {
   });
 
   it("fences late account/run responses and invalidates the page lifecycle", () => {
-    expect(source).toMatch(/captureCommerceSandboxRun/);
-    expect(source).toMatch(/isCurrentCommerceSandboxScope/);
+    expect(source).toMatch(/captureRuntimeRevision/);
+    expect(source).toMatch(/isCurrentRuntimeRevision/);
     expect(source).toMatch(/remoteMounted && request === remoteRequest/);
     expect(source).toMatch(/onUnload\(invalidateRemoteProof\)/);
     expect(source).toMatch(/onUnmounted\(invalidateRemoteProof\)/);

@@ -1,9 +1,9 @@
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 export interface DeveloperResourceFence {
   accountKey: string;
   generation: number;
-  runScope: CommerceSandboxRunScope;
+  runScope: RuntimeRevisionScope;
 }
 
 export interface DeveloperResourceFenceReader {
@@ -19,12 +19,12 @@ export interface DeveloperResourceFenceReader {
 export function createDeveloperResourceFenceReader(
   getAccountKey: () => string,
   getGeneration: () => number,
-  getRunScope: () => CommerceSandboxRunScope = captureCommerceSandboxRun,
+  getRunScope: () => RuntimeRevisionScope = captureRuntimeRevision,
 ): DeveloperResourceFenceReader {
   return {
     capture: () => ({ accountKey: getAccountKey(), generation: getGeneration(), runScope: getRunScope() }),
     isCurrent: (fence) => fence.accountKey === getAccountKey()
       && fence.generation === getGeneration()
-      && isCurrentCommerceSandboxScope(fence.runScope),
+      && isCurrentRuntimeRevision(fence.runScope),
   };
 }

@@ -7,9 +7,7 @@ export const LOGIN_ROUTE = "/pages/login/login";
 export interface LegalTermsSessionFence {
   accessToken: string;
   userId: number;
-  /** The server RunID carried by a Terms snapshot, when a request has one. */
-  runId?: string;
-  /** Monotonic sandbox RunID generation; rejects a response across catalog rollover. */
+  /** Monotonic runtime generation; rejects a response across catalog rollover. */
   runEpoch?: number;
 }
 
@@ -59,14 +57,9 @@ export function isLegalTermsAcknowledged(snapshot: LegalTermsCurrent): boolean {
   return snapshot.source === "server" && snapshot.acknowledged === true;
 }
 
-/**
- * A first sandbox Terms response may race catalogue bootstrap (no current
- * RunID yet), but once a RunID is known the response must belong to it.
- */
-export function sameLegalTermsRun(snapshot: LegalTermsCurrent, currentRunId: string | null): boolean {
-  return snapshot.sourceEnvironment === "PRODUCTION"
-    ? snapshot.runId === ""
-    : currentRunId === null || snapshot.runId === currentRunId;
+/** Only canonical development/production Terms facts are accepted. */
+export function sameLegalTermsRun(snapshot: LegalTermsCurrent, _runtimeRunId?: null): boolean {
+  return snapshot.sourceEnvironment === "PRODUCTION" && snapshot.runId === "";
 }
 
 /** Claim a single re-ack redirect until the account or published version changes. */
@@ -83,6 +76,5 @@ export function sameLegalTermsSession(
   if (!expected || !actual) return false;
   return expected.accessToken === actual.accessToken
     && expected.userId === actual.userId
-    && (expected.runId === undefined || actual.runId === expected.runId)
     && (expected.runEpoch === undefined || actual.runEpoch === expected.runEpoch);
 }

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createGenesisApi, parseGenesisPublicState } from "./genesis-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 describe("genesis remote truth contract", () => {
-  beforeEach(() => setCurrentCommerceSandboxRun(null));
+  beforeEach(() => advanceRuntimeRevision(null));
   it("reads eligibility from the dedicated server endpoint", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,
@@ -175,7 +175,7 @@ describe("genesis remote truth contract", () => {
     });
   });
 
-  it("accepts a server-canonical run-scoped Genesis account only in local development", async () => {
+  it("rejects retired isolated Genesis accounts after migration", async () => {
     const runId = "nexion-local-dev";
     const eligibility = {
       eligible: true, reasons: ["NO_ACTIVE_HOLDINGS"],
@@ -198,29 +198,24 @@ describe("genesis remote truth contract", () => {
       eligibility,
     };
 
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", runId).account())
-      .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId, eligibility: { eligible: true },
-        orders: [{ orderNo: "GEN-SBX-1", orderType: "PRIMARY", quantity: 1 }] });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
     const timezoneLessAccount = {
       ...account,
       orders: [{ ...account.orders[0], completedAt: "2026-08-26 08:01:00" }],
     };
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(timezoneLessAccount) } as never, "dev", runId).account())
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(timezoneLessAccount) } as never, "dev").account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
     const { orders: _orders, ...withoutOrders } = account;
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(withoutOrders) } as never, "dev", runId).account())
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(withoutOrders) } as never, "dev").account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(eligibility) } as never, "dev", runId).eligibility())
-      .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId, eligible: true });
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(eligibility) } as never, "dev").eligibility())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
     await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev").account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", "another-valid-run").account())
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...account, runId: "" }) } as never, "dev").account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...account, runId: "" }) } as never, "dev", runId).account())
-      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...eligibility, runId: "bad run id" }) } as never, "dev", runId).eligibility())
-      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
-    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "dev", "short").account())
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...eligibility, runId: "bad run id" }) } as never, "dev").eligibility())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
     await expect(createGenesisApi({ request: vi.fn().mockResolvedValue(account) } as never, "prod").account())
       .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
@@ -255,7 +250,7 @@ describe("genesis remote truth contract", () => {
   });
 
   it("rejects a sandbox HOLD projection from a previous run", () => {
-    setCurrentCommerceSandboxRun("sandbox-run-2");
+    advanceRuntimeRevision("sandbox-run-2");
     expect(() => parseGenesisPublicState({
       serverCanonical: true,
       halted: true,
@@ -266,8 +261,8 @@ describe("genesis remote truth contract", () => {
       series: { seriesCode: "GENESIS-SANDBOX-HOLD", name: "Genesis Sandbox (HOLD)", totalSupply: 0, soldSupply: 0, remainingSupply: 0, priceUsdt: 1, royaltyPct: 0, dailyEmissionRatePct: 0 },
       market: { enabled: false }, emission: { open: false }, listings: [], transactions: [],
       tiers: [], tiersVersion: 1, marketOpenState: "closed", marketOpenStateVersion: 1,
-      closedNoticeKey: "GENESIS_SANDBOX_HOLD", catalogAvailable: false, tradeAvailable: false,
-      tradeBlockedReason: "GENESIS_SANDBOX_HOLD", sale: {
+      closedNoticeKey: "GENESIS_MARKET_HOLD", catalogAvailable: false, tradeAvailable: false,
+      tradeBlockedReason: "GENESIS_MARKET_HOLD", sale: {
         serverCanonical: true, available: false, eligibilityEnabled: true, maxPerUser: 0,
         minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 1, open: false,
       }, marketStats: { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null },

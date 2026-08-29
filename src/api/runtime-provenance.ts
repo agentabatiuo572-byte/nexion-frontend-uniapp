@@ -1,6 +1,6 @@
 import type { ApiEnvironment } from "./runtime-config";
 
-export type ServerSourceEnvironment = "PRODUCTION" | "SANDBOX";
+export type ServerSourceEnvironment = "PRODUCTION";
 
 /**
  * Development and production both consume backend-canonical data. The build

@@ -82,7 +82,7 @@ import { toast } from "@/store/ui";
 import { productNotificationApi } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import {
   useScrollGrowProgress,
   PROGRESS_GROW_TRANSITION,
@@ -148,18 +148,18 @@ const stageText = computed(() =>
 
 const { elRef: barRef, inView: barInView } = useScrollGrowProgress();
 
-function requestIsCurrent(scope: ReturnType<typeof captureAccountScope>, epoch: number, accountKey: string, runScope: CommerceSandboxRunScope): boolean {
+function requestIsCurrent(scope: ReturnType<typeof captureAccountScope>, epoch: number, accountKey: string, runScope: RuntimeRevisionScope): boolean {
   return notificationMounted
     && epoch === notificationEpoch
     && isCurrentAccountScope(scope)
     && String(app.accountKey) === accountKey
-    && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentRuntimeRevision(runScope);
 }
 
 async function reloadNotificationState(): Promise<void> {
   const epoch = ++notificationEpoch;
   const scope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   const accountKey = scope.accountKey;
   const productNo = props.product.id;
   serverSubscribed.value = false;
@@ -178,7 +178,7 @@ async function reloadNotificationState(): Promise<void> {
 async function handleNotify() {
   if (notifyBusy.value) return;
   const scope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   const accountKey = scope.accountKey;
   // A mutation also advances the local request epoch so an older GET (or a
   // previous mutation) cannot overwrite its confirmed state for this account.

@@ -47,7 +47,7 @@ import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useContentCopy } from "@/store/content-copy";
 import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureCommerceSandboxRun } from "@/api/order-api";
+import { captureRuntimeRevision } from "@/api/order-api";
 
 /** Snapshot the account generation before starting an account-sensitive request. */
 export function captureAccountScope(): RemoteAccountRequest {
@@ -79,7 +79,7 @@ export function isCurrentAccountScope(request: RemoteAccountRequest): boolean {
 export function rebindAccountScopedStores(accountKey: string): void {
   remoteAccountScope.bind(accountKey);
   const accountScope = remoteAccountScope.snapshot();
-  const commerceScope = captureCommerceSandboxRun();
+  const commerceScope = captureRuntimeRevision();
   useVoucherClaimSheet().bindScope({
     accountKey: accountScope.accountKey,
     accountEpoch: accountScope.epoch,

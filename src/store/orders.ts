@@ -22,9 +22,9 @@ import { createAccountRowCommit } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 /** Server status is rendered verbatim in remote mode; no terminal outcome is collapsed into cancellation. */
@@ -137,7 +137,7 @@ export const useOrders = defineStore("orders", () => {
   let refreshGeneration = 0;
   const orders = ref<Order[]>([]);
 
-  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
     refreshGeneration += 1;
     orders.value = [];
@@ -212,10 +212,10 @@ export const useOrders = defineStore("orders", () => {
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestGeneration = ++refreshGeneration;
-    const requestRunScope = captureCommerceSandboxRun();
+    const requestRunScope = captureRuntimeRevision();
     const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
       && requestGeneration === refreshGeneration
-      && isCurrentCommerceSandboxScope(requestRunScope);
+      && isCurrentRuntimeRevision(requestRunScope);
     try {
       const canonical = await orderApi.list();
       if (!isCurrent()) return;
@@ -230,9 +230,9 @@ export const useOrders = defineStore("orders", () => {
     if (!remoteApiEnabled) return cancelOrder(id);
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
-    const requestRunScope = captureCommerceSandboxRun();
+    const requestRunScope = captureRuntimeRevision();
     const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
-      && isCurrentCommerceSandboxScope(requestRunScope);
+      && isCurrentRuntimeRevision(requestRunScope);
     try {
       await orderApi.cancel(id, `order-cancel:${id}`);
       if (!isCurrent()) return false;

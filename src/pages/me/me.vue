@@ -133,7 +133,6 @@ import { useBills } from "@/store/bills";
 import { useMarket } from "@/store/market";
 import { confirm as uiConfirm } from "@/store/ui";
 import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
-import { developmentFundsEnabled } from "@/api/runtime";
 import type { SecurityState } from "@/api/contracts";
 import { countRemoteReceipts } from "@/lib/remote-me-summary";
 import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
@@ -347,8 +346,7 @@ const quickSections = computed<QuickSection[]>(() => [
 ]);
 
 async function refreshRemoteFunds() {
-  if (developmentFundsEnabled) await deposits.refreshFundsSandboxDeposits();
-  else await deposits.refreshRemoteVietQrDeposits();
+  await deposits.refreshRemoteVietQrDeposits();
 }
 
 async function refreshRemoteOrders() {

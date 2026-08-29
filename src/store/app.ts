@@ -45,8 +45,6 @@ import {
 import {
   deviceE3Api,
   appHomeApi,
-  fundsSandboxApi,
-  developmentFundsEnabled,
   fundsServerEnabled,
   expectedApiEnvironment,
   remoteApiEnabled,
@@ -56,29 +54,10 @@ import {
 } from "@/api/runtime";
 import type { AppHomeOverview } from "@/api/app-home-api";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
-import {
-  sandboxEvidenceFromOverview,
-  type FundsSandboxEvidence,
-  type FundsSandboxOrder,
-  type FundsSandboxWallet,
-} from "@/api/funds-sandbox-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import {
-  bindPendingFundsMutationOrder,
-  finishPendingFundsMutationByOrder,
-  fundsAmountFingerprint,
-  pendingFundsMutationKey,
-  type FundsMutationIdentity,
-} from "@/lib/funds-mutation-key";
-import {
-  captureFundsSandboxRequestScope,
-  fundsSandboxStaleRequestError,
-  isCurrentFundsSandboxRequestScope,
-  isFundsSandboxStaleRequestError,
-} from "@/lib/funds-sandbox-request-scope";
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
@@ -498,13 +477,6 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
-  const fundsSandboxStatus = ref<"idle" | "loading" | "ready" | "error">(developmentFundsEnabled ? "idle" : "ready");
-  const fundsSandboxError = ref("");
-  // It starts absent and is cleared before every read. A surface can therefore
-  // never label a stale, missing, malformed, or contradictory response as a
-  // sandbox success.
-  const fundsSandboxEvidence = ref<FundsSandboxEvidence | null>(null);
-  let fundsSandboxBootstrapInFlight: { accountKey: string; request: Promise<boolean> } | null = null;
   // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
   const slotDevices = computed(() =>
@@ -873,10 +845,8 @@ export const useApp = defineStore("app", () => {
         joinedAt: fleet.userJoinedAt,
         nexBalance: fleet.walletNex,
         pendingEarnings: 0,
-        ...(developmentFundsEnabled ? {} : {
-          usdtBalance: fleet.walletUsdt,
-          earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
-        }),
+        usdtBalance: fleet.walletUsdt,
+        earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
       };
       remoteFleetStatus.value = "ready";
       return true;
@@ -891,10 +861,8 @@ export const useApp = defineStore("app", () => {
           joinedAt: 0,
           nexBalance: 0,
           pendingEarnings: 0,
-          ...(developmentFundsEnabled ? {} : {
-            usdtBalance: 0,
-            earningBuckets: createEarningBuckets(0, 0),
-          }),
+          usdtBalance: 0,
+          earningBuckets: createEarningBuckets(0, 0),
         };
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
@@ -927,13 +895,9 @@ export const useApp = defineStore("app", () => {
       homeTruth.value = null;
       homeTruthStatus.value = "idle";
       homeTruthError.value = null;
-      fundsSandboxStatus.value = developmentFundsEnabled ? "idle" : "ready";
-      fundsSandboxError.value = "";
-      fundsSandboxEvidence.value = null;
       // The authenticated catalog/bootstrap helper owns the first fleet read.
       // A bare account rebind has no authority to fetch a mixed old/new projection.
       void refreshRemoteWithdrawalList(key);
-      if (developmentFundsEnabled) void refreshFundsSandboxForAccount(key);
       return;
     }
     const snapshot = hydrateSnapshotEconomics(readAccountSnapshot(key)) ?? createSeedSnapshot(key, rawAccountKey, surface);
@@ -952,7 +916,7 @@ export const useApp = defineStore("app", () => {
 
   /** Rehydrates every historical production withdrawal after login/reload. */
   async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
-    if (!remoteApiEnabled || developmentFundsEnabled || expectedAccountKey !== accountKey.value) return false;
+    if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return false;
     const request = remoteAccountEpoch.snapshot();
     try {
       const rows = await withdrawalApi.list();
@@ -1486,8 +1450,7 @@ export const useApp = defineStore("app", () => {
   }
 
   function refundFailedWithdrawals(): string[] {
-    // Production and explicit sandbox withdrawals are both server-owned. Their
-    // debit/refund facts arrive through authoritative readback; applying a local
+    // Server-backed withdrawals own their debit/refund facts. Applying a local
     // reversal would mint a second refund in the client projection.
     if (fundsServerEnabled) return [];
     const FAILED: Withdrawal["status"][] = ["review-rejected", "address-invalid", "tx-failed", "refunded"];
@@ -1563,14 +1526,8 @@ export const useApp = defineStore("app", () => {
    * PRODUCTION:整个函数消失 —— 扣款由 `POST /api/withdrawals` 同事务完成,client 只读回执。
    */
   function applyWithdrawalDebit(wd: Withdrawal): boolean {
-    // Production withdrawals are already debited atomically by the server;
-    // this local projection is sandbox/mock-only defense in depth.
+    // Server-backed withdrawals are already debited atomically.
     if (remoteApiEnabled) return false;
-    // 🔴 sandbox 轨的钱包由服务端持有:建单响应里的 `order.wallet` 已经是**扣完之后**的余额,
-    // 且 adoptFundsSandboxWallet 已经把它整体投影进来。这里再扣一次就是双计。
-    // 回 true 而不是 false:钱确实动了(在服务端),调用方不该弹「扣款失败」。
-    // 与 refundFailedWithdrawals 的 sandbox 闸成对 —— 那条轨扣与退都归服务端。
-    if (developmentFundsEnabled) return true;
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
     const key = withdrawalDebitKey(wd.id);
@@ -1971,99 +1928,10 @@ export const useApp = defineStore("app", () => {
     return true;
   }
 
-  // D5: create the withdrawal exclusively through the real backend transaction.
-  function adoptFundsSandboxWallet(wallet: FundsSandboxWallet): void {
-    const current = withDefaultEarningBuckets(user.value);
-    user.value = {
-      ...current,
-      usdtBalance: wallet.availableUsdt,
-      earningBuckets: {
-        ...current.earningBuckets,
-        withdrawableUsdt: wallet.availableUsdt,
-        policyVersion: "funds-sandbox-v1",
-        lastBucketedAt: Date.now(),
-      },
-    };
-  }
-
   /** Server auth is the only source for this display identity in remote modes. */
   function projectServerIdentity(identity: UserSession) {
     if (!remoteApiEnabled) return;
     user.value = { ...user.value, email: `${identity.countryCode}${identity.phone}` };
-  }
-
-  function canonicalFundsSandboxWithdrawal(order: FundsSandboxOrder, fallback?: Withdrawal): Withdrawal {
-    if (order.kind !== "WITHDRAWAL" || !order.targetAddress) throw new Error("FUNDS_SANDBOX_ORDER_INVALID");
-    const submittedAt = Date.parse(order.createdAt);
-    const status: Withdrawal["status"] = order.status === "CONFIRMED"
-      ? "confirmed"
-      : order.status === "FAILED"
-        ? "tx-failed"
-        : "submitted";
-    return {
-      id: order.orderNo,
-      amount: order.amount,
-      network: "USDT-BEP20",
-      address: order.targetAddress,
-      fee: fallback?.fee ?? { networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: 0 },
-      status,
-      riskRoute: fallback?.riskRoute ?? "pass",
-      riskReasons: fallback?.riskReasons ?? [],
-      submittedAt,
-      // Informational only. Server modes are guarded from ETA-based finalization below.
-      estimatedCompletion: submittedAt,
-      ...(order.settledAt && status === "confirmed" ? { confirmedAt: Date.parse(order.settledAt) } : {}),
-      serverVersion: order.version,
-      source: "mock",
-      sourceEnvironment: "SANDBOX",
-    };
-  }
-
-  async function refreshFundsSandbox(): Promise<void> {
-    if (!developmentFundsEnabled) {
-      fundsSandboxEvidence.value = null;
-      return;
-    }
-    const request = remoteAccountEpoch.snapshot();
-    const expectedAccountKey = accountKey.value;
-    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, request.epoch);
-    fundsSandboxStatus.value = "loading";
-    fundsSandboxError.value = "";
-    fundsSandboxEvidence.value = null;
-    try {
-      const overview = await fundsSandboxApi.overview();
-      if (expectedAccountKey !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-      if (!remoteAccountEpoch.isCurrent(request)
-          || !isCurrentFundsSandboxRequestScope(expectedScope, accountKey.value, remoteAccountEpoch.snapshot().epoch)) {
-        throw fundsSandboxStaleRequestError();
-      }
-      adoptFundsSandboxWallet(overview.wallet);
-      const existing = new Map(withdrawals.value.map((item) => [item.id, item]));
-      withdrawals.value = overview.orders
-        .filter((item) => item.kind === "WITHDRAWAL")
-        .map((item) => canonicalFundsSandboxWithdrawal(item, existing.get(item.orderNo)));
-      overview.orders
-        .filter((item) => item.kind === "WITHDRAWAL" && (item.status === "CONFIRMED" || item.status === "FAILED"))
-        .forEach((item) => finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", item.orderNo));
-      fundsSandboxEvidence.value = sandboxEvidenceFromOverview(overview);
-      fundsSandboxStatus.value = "ready";
-    } catch (cause) {
-      const current = remoteAccountEpoch.isCurrent(request)
-        && isCurrentFundsSandboxRequestScope(expectedScope, accountKey.value, remoteAccountEpoch.snapshot().epoch);
-      if (current && !isFundsSandboxStaleRequestError(cause)) {
-        const current = withDefaultEarningBuckets(user.value);
-        user.value = {
-          ...current,
-          usdtBalance: 0,
-          earningBuckets: { ...current.earningBuckets, withdrawableUsdt: 0 },
-        };
-        withdrawals.value = [];
-        fundsSandboxStatus.value = "error";
-        fundsSandboxError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_REFRESH_FAILED";
-        fundsSandboxEvidence.value = null;
-      }
-      throw current ? cause : fundsSandboxStaleRequestError();
-    }
   }
 
   /** Apply only the authenticated Java payment receipt when fleet readback is temporarily unavailable. */
@@ -2088,7 +1956,7 @@ export const useApp = defineStore("app", () => {
   function adoptDevelopmentGenesisWallet(
     balanceAfterUsdt: number,
     receiptScope: RemoteAccountRequest,
-    receiptSourceEnvironment: "PRODUCTION" | "SANDBOX",
+    receiptSourceEnvironment: "PRODUCTION",
   ): boolean {
     if (receiptSourceEnvironment !== "PRODUCTION") return false;
     return adoptDevelopmentCommerceWallet(balanceAfterUsdt, receiptScope);
@@ -2097,52 +1965,6 @@ export const useApp = defineStore("app", () => {
   /** Capture this store's own account fence for a cross-store mutation receipt. */
   function captureRemoteAccountRequest(): RemoteAccountRequest {
     return remoteAccountEpoch.snapshot();
-  }
-
-  /**
-   * Login and H5 bootstrap call this after binding an account. It is purposely
-   * stricter than the API client default: a sandbox read only starts when the
-   * current server session belongs to that account and carries a Bearer token.
-   * This prevents a fresh context from briefly presenting local/zero money as
-   * a successful sandbox while its authenticated wallet authority was never
-   * actually queried.
-   */
-  function refreshFundsSandboxForAccount(rawAccountKey: string): Promise<boolean> {
-    const expectedAccountKey = normalizeAccountKey(rawAccountKey);
-    if (!developmentFundsEnabled) {
-      fundsSandboxEvidence.value = null;
-      return Promise.resolve(false);
-    }
-    if (fundsSandboxBootstrapInFlight?.accountKey === expectedAccountKey) {
-      return fundsSandboxBootstrapInFlight.request;
-    }
-    const request = (async () => {
-      const session = sessionVault.read();
-      const sessionMatchesAccount = !!session
-        && session.accessToken.trim().length > 0
-        && session.tokenType.toLowerCase() === "bearer"
-        && `user:${session.user.userId}` === expectedAccountKey;
-      if (!sessionMatchesAccount || expectedAccountKey !== accountKey.value) {
-        if (expectedAccountKey === accountKey.value) {
-          fundsSandboxStatus.value = "error";
-          fundsSandboxError.value = "FUNDS_SANDBOX_BEARER_SESSION_REQUIRED";
-          fundsSandboxEvidence.value = null;
-        }
-        return false;
-      }
-      try {
-        await refreshFundsSandbox();
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-    const slot = { accountKey: expectedAccountKey, request };
-    fundsSandboxBootstrapInFlight = slot;
-    void request.finally(() => {
-      if (fundsSandboxBootstrapInFlight === slot) fundsSandboxBootstrapInFlight = null;
-    });
-    return request;
   }
 
   async function submitWithdrawal(
@@ -2179,68 +2001,6 @@ export const useApp = defineStore("app", () => {
     // 有扣款无单据,追踪页深链「查无此单」。
     // 页面侧的账单行早已钉死 `snap.account`,只钉一半反而更糟:账与单分家,对账永远配不上。
     const acct = accountKey.value;
-    // Durable pending mutation keys belong only to the isolated server sandbox.
-    // 生产轨的幂等键由调用方传入(见参数头注),不在这里现造。
-    const mutation: FundsMutationIdentity | null = developmentFundsEnabled ? {
-      accountKey: acct,
-      environment: "SANDBOX",
-      method: `WITHDRAWAL:${network}`,
-      fingerprint: JSON.stringify({
-        channel: "CREGIS_USDT_BEP20",
-        amount: fundsAmountFingerprint(amount),
-        targetAddress: address.trim(),
-      }),
-    } : null;
-    if (developmentFundsEnabled) {
-      if (!mutation) throw new Error("FUNDS_SANDBOX_MUTATION_IDENTITY_MISSING");
-      const sandboxKey = pendingFundsMutationKey(mutation);
-      // A sandbox withdrawal is only possible after the *same* authenticated
-      // wallet read supplied an explicit isolated policy. Never borrow a
-      // production D5/J1 rule, a local seed, or a stale wallet value here.
-      const sandboxPolicy = fundsSandboxEvidence.value?.withdrawalPolicy;
-      if (!sandboxPolicy
-          || fundsSandboxStatus.value !== "ready"
-          || fundsSandboxEvidence.value?.source !== "mock"
-          || fundsSandboxEvidence.value?.sourceEnvironment !== "SANDBOX"
-          || fundsSandboxEvidence.value?.mode !== "LOCAL_SANDBOX") {
-        throw new Error("FUNDS_SANDBOX_WITHDRAWAL_POLICY_REQUIRED");
-      }
-      if (network !== sandboxPolicy.network
-          || sandboxPolicy.channel !== "CREGIS_USDT_BEP20"
-          || sandboxPolicy.withdrawalEnabled !== true
-          || sandboxPolicy.enabledNetworks.length !== 1
-          || sandboxPolicy.enabledNetworks[0] !== network) {
-        throw new Error("FUNDS_SANDBOX_WITHDRAWAL_CHANNEL_DISABLED");
-      }
-      const sandboxAvailable = user.value.usdtBalance * sandboxPolicy.balanceMaxRatio;
-      if (amount < sandboxPolicy.minAmount || amount > sandboxAvailable) {
-        throw new Error("FUNDS_SANDBOX_INSUFFICIENT_BALANCE");
-      }
-      const order = await fundsSandboxApi.createWithdrawal(amount, address, sandboxKey);
-      if (acct !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-      if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
-      bindPendingFundsMutationOrder(mutation, sandboxKey, order.orderNo);
-      adoptFundsSandboxWallet(order.wallet);
-      const canonical = canonicalFundsSandboxWithdrawal(order, {
-        id: order.orderNo,
-        amount,
-        network,
-        address,
-        fee,
-        status: "submitted",
-        riskRoute,
-        riskReasons,
-        fastLaneApplied,
-        waivedGates,
-        submittedAt: Date.parse(order.createdAt),
-        estimatedCompletion: Date.parse(order.createdAt),
-      });
-      withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
-      if (order.status === "CONFIRMED" || order.status === "FAILED") {
-        finishPendingFundsMutationByOrder(acct, "SANDBOX", order.orderNo);
-      }
-      return canonical;
-    }
     // D5 real boundary: the backend re-prices the request under policyVersion and
     // commits wallet reservation, optional NEX burn, order and ledgers atomically.
     // The local store only mirrors the returned order for rendering; it never
@@ -2354,7 +2114,7 @@ export const useApp = defineStore("app", () => {
     // 能 node 直跑的落点。上面那行
     // `if (fundsServerEnabled) return []` 是第二道同向闸(fundsServerEnabled ≡
     // remoteApiEnabled),行为完全重合,保留它只是为了让「客户端 ETA 永不推进服务端单据」
-    // 这件事在函数入口就一眼可见(funds-server-sandbox-contract 也钉了它)。
+    // 这件事在函数入口就一眼可见。
     const next = prev.map((w) => advanceArrival(w, now, { serverAuthoritative: remoteApiEnabled }) ?? w);
     const advancedIds = next.filter((w, i) => w !== prev[i]).map((w) => w.id);
     if (!advancedIds.length) return [];
@@ -2384,7 +2144,7 @@ export const useApp = defineStore("app", () => {
    * advanceWithdrawalArrival 同形状,供 App 层按单号结算对应账单行。
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
-    if (!remoteApiEnabled || developmentFundsEnabled) return [];
+    if (!remoteApiEnabled) return [];
     const expectedAccountKey = accountKey.value;
     // List is the durable source of truth; a fresh session may have no local rows
     // at all, so hydrate it before polling in-flight snapshots.
@@ -2496,37 +2256,18 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
   }
 
-  async function applyFundsSandboxCallback(orderNo: string, status: "CONFIRMED" | "FAILED"): Promise<boolean> {
-    if (!developmentFundsEnabled) return false;
-    const expectedAccountKey = accountKey.value;
-    const current = withdrawals.value.find((item) => item.id === orderNo);
-    if (!current || current.serverVersion === undefined || current.status !== "submitted") return false;
-    const eventId = `SBX-APP-${orderNo}-${status}`;
-    const order = await fundsSandboxApi.applyCallback(orderNo, status, current.serverVersion, eventId);
-    if (expectedAccountKey !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-    if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
-    adoptFundsSandboxWallet(order.wallet);
-    const canonical = canonicalFundsSandboxWithdrawal(order, current);
-    withdrawals.value = withdrawals.value.map((item) => item.id === orderNo ? canonical : item);
-    if (order.status === "CONFIRMED" || order.status === "FAILED") {
-      finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", orderNo);
-    }
-    return true;
-  }
-
   return {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
-    fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
-    applyFundsSandboxCallback, refundFailedWithdrawals,
+    refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, discardSpawnedDevice, retireDevice, restoreDevice, patchDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };

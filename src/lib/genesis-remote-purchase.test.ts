@@ -84,16 +84,13 @@ describe("remote genesis purchase failure classification", () => {
     expect(classifyRemoteGenesisPurchaseError(new Error("offline"))).toBe("unavailable");
   });
 
-  it("never reports a connected server's balance, cap, or RunID rejection as a network outage", () => {
+  it("never reports a connected server's balance or cap rejection as a network outage", () => {
     expect(classifyRemoteGenesisPurchaseError(new ApiError({
       kind: "business", message: "GENESIS_WALLET_INSUFFICIENT", status: 409,
     }))).toBe("insufficient-funds");
     expect(classifyRemoteGenesisPurchaseError(new ApiError({
       kind: "business", message: "GENESIS_USER_CAP_REACHED", status: 409,
     }))).toBe("cap");
-    expect(classifyRemoteGenesisPurchaseError(new ApiError({
-      kind: "business", message: "GENESIS_SANDBOX_USER_RUN_CONFLICT", status: 409,
-    }))).toBe("run-conflict");
     for (const message of ["GENESIS_ACCOUNT_AGE_REQUIRED", "GENESIS_COUNTRY_REQUIRED", "GENESIS_GEO_BLOCKED"]) {
       expect(classifyRemoteGenesisPurchaseError(new ApiError({ kind: "business", message, status: 403 }))).toBe("not-eligible");
     }

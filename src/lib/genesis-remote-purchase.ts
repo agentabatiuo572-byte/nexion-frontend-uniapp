@@ -6,7 +6,6 @@ export type RemoteGenesisPurchaseFailure =
   | "insufficient-funds"
   | "cap"
   | "not-eligible"
-  | "run-conflict"
   | "unavailable";
 
 /** Map only explicit backend domain outcomes; every unknown remote failure is unavailable. */
@@ -18,9 +17,7 @@ export function classifyRemoteGenesisPurchaseError(error: unknown): RemoteGenesi
     || error.message === "GENESIS_COUNTRY_REQUIRED"
     || error.message === "GENESIS_GEO_BLOCKED"
     || error.message === "GENESIS_PRODUCTION_USER_REQUIRED"
-    || error.message === "GENESIS_SANDBOX_USER_REQUIRED"
   )) return "not-eligible";
-  if (error instanceof ApiError && error.message === "GENESIS_SANDBOX_USER_RUN_CONFLICT") return "run-conflict";
   if (error instanceof ApiError && error.message === "GENESIS_SOLD_OUT") return "sold-out";
   if (error instanceof ApiError && (
     error.message === "GENESIS_MARKET_PAUSED"

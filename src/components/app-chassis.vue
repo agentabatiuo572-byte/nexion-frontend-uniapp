@@ -198,10 +198,10 @@ import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory"
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
-  type CommerceSandboxRunScope,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
+  type RuntimeRevisionScope,
 } from "@/api/order-api";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import {
@@ -229,15 +229,15 @@ const popupArbiter = usePopupArbiter();
 
 type VoucherPopupRequestScope = {
   account: RemoteAccountRequest;
-  commerce: CommerceSandboxRunScope;
+  commerce: RuntimeRevisionScope;
 };
 
 function captureVoucherPopupScope(): VoucherPopupRequestScope {
-  return { account: captureAccountScope(), commerce: captureCommerceSandboxRun() };
+  return { account: captureAccountScope(), commerce: captureRuntimeRevision() };
 }
 
 function isCurrentVoucherPopupScope(scope: VoucherPopupRequestScope): boolean {
-  return isCurrentAccountScope(scope.account) && isCurrentCommerceSandboxScope(scope.commerce);
+  return isCurrentAccountScope(scope.account) && isCurrentRuntimeRevision(scope.commerce);
 }
 
 let autoPushMounted = false;
@@ -264,7 +264,7 @@ let stopVoucherRunScope: (() => void) | null = null;
 
 function bindVoucherClaimSheetScope(): void {
   const account = captureAccountScope();
-  const commerce = captureCommerceSandboxRun();
+  const commerce = captureRuntimeRevision();
   voucherClaimSheet.bindScope({
     accountKey: account.accountKey,
     accountEpoch: account.epoch,
@@ -504,7 +504,7 @@ const route = ref(readRoute());
 onMounted(() => {
   autoPushMounted = true;
   bindVoucherClaimSheetScope();
-  stopVoucherRunScope = subscribeCurrentCommerceSandboxRun(() => {
+  stopVoucherRunScope = subscribeRuntimeRevision(() => {
     bindVoucherClaimSheetScope();
     voucherPopupScheduler.cancel();
     if (readRoute() === "pages/index/index") voucherPopupScheduler.schedule();

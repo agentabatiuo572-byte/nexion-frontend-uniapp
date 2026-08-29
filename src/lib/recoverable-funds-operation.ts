@@ -1,5 +1,3 @@
-import { isFundsSandboxStaleRequestError } from "./funds-sandbox-request-scope";
-
 export interface RecoverableFundsHandlers<T> {
   success(value: T): void | Promise<void>;
   failure(reason: string): void | Promise<void>;
@@ -28,10 +26,11 @@ export async function runRecoverableFundsOperation<T>(
     await handlers.success(value);
     return value;
   } catch (cause) {
-    // A response from another account/catalog run is not a business failure.
+    // A response from another account/runtime generation is not a business failure.
     // It is deliberately silent: showing an error/toast for a request that no
     // longer belongs to this screen would make a late old-run result visible.
-    if (!isFundsSandboxStaleRequestError(cause)) {
+    const message = cause instanceof Error ? cause.message : "";
+    if (message !== "VIETQR_ACCOUNT_CHANGED" && message !== "WALLET_BILLS_REQUEST_SUPERSEDED") {
       await handlers.failure(failureReason(cause, fallback));
     }
     return null;

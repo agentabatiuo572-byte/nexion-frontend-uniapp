@@ -46,7 +46,7 @@
     "test:earnings-accrual": "node --experimental-strip-types --test scripts/earnings-accrual-contract.test.mjs",
     "test:business-loop-liveness": "node scripts/selfcheck-business-loop-liveness.mjs",
     "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",
-    "test:production-boundaries": "node --test scripts/dev-prod-environment-contract.test.mjs scripts/funds-mutation-key-behavior.test.mjs scripts/funds-recoverable-operation-behavior.test.mjs scripts/funds-sandbox-ledger-behavior.test.mjs scripts/funds-sandbox-visible-label-contract.test.mjs scripts/funds-sandbox-withdrawal-contract.test.mjs scripts/funds-server-sandbox-regression.test.mjs scripts/h8-first-user-truth-contract.test.mjs scripts/h8-sandbox-referral-bill-contract.test.mjs scripts/janus-h5-executor-hold-contract.test.mjs scripts/kl-sandbox-executor-contract.test.mjs",
+    "test:production-boundaries": "node --test scripts/dev-prod-environment-contract.test.mjs scripts/funds-recoverable-operation-behavior.test.mjs scripts/h8-first-user-truth-contract.test.mjs scripts/janus-h5-executor-hold-contract.test.mjs scripts/sandbox-retirement.contract.test.mjs",
     "test:prod-artifact": "node scripts/verify-production-artifact.mjs",
     "test:real-backend-integration": "node --test scripts/server-auth-config-authority-contract.test.mjs scripts/behavior-analytics-auth-lifecycle-contract.test.mjs scripts/m-support-authority-contract.test.mjs scripts/e20-device-e3-api-behavior.test.mjs scripts/nova-local-ai-contract.test.mjs && vitest run",
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
@@ -61,7 +61,7 @@
     "verify:scope-audit:deep": "node scripts/verify-scope-audit.mjs --deep",
     "test:learning-contracts": "node --experimental-strip-types --test scripts/learning-submission.test.mjs",
     "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs",
-    "test:cross-repo": "node --test scripts/funds-run-scoped-isolation-contract.test.mjs scripts/funds-server-sandbox-contract.test.mjs scripts/h8-run-scoped-referral-projection-contract.test.mjs scripts/behavior-analytics-active-route-catalog-contract.test.mjs && node scripts/cross-repo-skip.redtest.mjs",
+    "test:cross-repo": "node --test scripts/h8-run-scoped-referral-projection-contract.test.mjs scripts/behavior-analytics-active-route-catalog-contract.test.mjs && node scripts/cross-repo-skip.redtest.mjs",
     "test:quest-tripwire": "node scripts/quest-genesis-tripwire-runtime.mjs",
     "test:withdraw-status-mirror": "node scripts/withdraw-status-mirror-runtime.mjs",
     "test:legacy-suite": "node scripts/run-legacy-suite.mjs"
