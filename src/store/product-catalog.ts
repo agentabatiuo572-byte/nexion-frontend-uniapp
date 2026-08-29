@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 import { productCatalogApi, remoteApiEnabled } from "@/api/runtime";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
 
 // "mock" 变体已删:它曾是 mock 模式的初值,而全仓消费方只认 "ready" —— 留着这个变体
@@ -52,7 +52,7 @@ export function prepareProductCatalog(): void {
   productCatalogState.runId = "";
   productCatalogState.serverCanonical = false;
   productCatalogState.revision = null;
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
 }
 
 export function refreshProductCatalog(force = false): Promise<boolean> {
@@ -73,7 +73,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.runId = snapshot.runId;
       productCatalogState.serverCanonical = snapshot.serverCanonical;
       productCatalogState.revision = snapshot.revision;
-      setCurrentCommerceSandboxRun(null);
+      advanceRuntimeRevision(null);
       return true;
     })
     .catch((error: unknown) => {
@@ -86,7 +86,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.runId = "";
       productCatalogState.serverCanonical = false;
       productCatalogState.revision = null;
-      setCurrentCommerceSandboxRun(null);
+      advanceRuntimeRevision(null);
       return false;
     })
     .finally(() => {

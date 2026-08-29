@@ -294,8 +294,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
-import { commercePaymentApi, deviceE3Api, developmentCommercePaymentEnabled, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
-import { isCanonicalPaidOrder } from "@/api/order-readback";
+import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
@@ -338,10 +337,6 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
-  if (developmentCommercePaymentEnabled) {
-    return [{ id: "development-wallet", label: t.value.store.coSandboxWallet,
-      hint: t.value.store.coHintSandboxWallet, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 }];
-  }
   const methods: PaymentMethod[] = [
     { id: "usdt-trc20", label: "USDT (TRC20)", hint: t.value.store.coHintTrc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
     { id: "usdt-bep20", label: "USDT (BEP20)", hint: t.value.store.coHintBep20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
@@ -597,7 +592,7 @@ const voucherMatch = computed(() => {
   if (!p) return null;
   // Canonical E3 submit owns the complete quote and wallet debit. Client-side
   // voucher stacking is not part of that command and therefore fails closed.
-  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || developmentCommercePaymentEnabled)) return null;
+  if (remoteApiEnabled && tradein.appliedTradein?.canonicalQuote) return null;
   return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
@@ -823,7 +818,7 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(developmentCommercePaymentEnabled ? "development-wallet" : "usdt-trc20");
+const payment = ref<string>("usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
@@ -990,29 +985,6 @@ async function goAwaiting() {
     goConfirm();
     return;
   }
-  // Explicit local-sandbox payment is a server command: only the backend may
-  // debit the run-scoped sandbox wallet and issue the durable payment number.
-  // Remote/production deliberately remains provider-backed and never falls
-  // back to this mock rail.
-  if (developmentCommercePaymentEnabled) {
-    const orderNo = orderId.value;
-    if (!orderNo) {
-      step.value = "confirm";
-      toast.warn(t.value.tradein.errPurchaseFailed);
-      return;
-    }
-    try {
-      const account = auth.accountId;
-      const receipt = await commercePaymentApi.confirm(orderNo, `payment:${orderNo}`);
-      if (account !== auth.accountId || receipt.orderNo !== orderNo) return;
-      step.value = "awaiting";
-      restartRemoteOrderPolling();
-    } catch {
-      step.value = "confirm";
-      toast.warn(t.value.tradein.errPurchaseFailed);
-    }
-    return;
-  }
   step.value = "awaiting";
 }
 
@@ -1044,9 +1016,8 @@ async function onConfirmPay() {
   quotedTradeIn = appliedTradeinView.value ? { deviceId: appliedTradeinView.value.device.id } : null;
   if (remoteApiEnabled) {
     // Trial conversion is already a backend transaction (trial lock + wallet
-    // debit + order creation). It must run before the ordinary order path;
-    // otherwise an explicit local-sandbox session would create a second,
-    // permanently pending order and never close the trial.
+    // debit + order creation). It must run before the ordinary order path so
+    // the checkout cannot create a second, permanently pending order.
     if (trialQuote.applied) {
       const confirmationScope = captureAccountScope();
       const p = product.value;
@@ -1070,26 +1041,6 @@ async function onConfirmPay() {
         toast.warn(t.value.store.coTrialQuoteChanged);
         step.value = "select-payment";
         return;
-      }
-      if (developmentCommercePaymentEnabled) {
-        try {
-          const readback = (await orderApi.list()).orders.find((order) => order.orderNo === conversion.orderNo);
-          if (!isCurrentAccountScope(confirmationScope)) {
-            confirming = false;
-            return;
-          }
-          if (!isCanonicalPaidOrder(readback, conversion.orderNo)) {
-            confirming = false;
-            toast.warn(t.value.tradein.errPleaseRetry);
-            step.value = "select-payment";
-            return;
-          }
-        } catch {
-          confirming = false;
-          toast.warn(t.value.tradein.errPleaseRetry);
-          step.value = "select-payment";
-          return;
-        }
       }
       orderId.value = conversion.orderNo;
       // Replace checkout with the canonical order URL. A browser refresh now
@@ -1427,18 +1378,11 @@ async function submitRemoteOrder(): Promise<void> {
     }
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
     if (!scopeIsCurrent()) return;
-    const developmentSettledReplay = developmentCommercePaymentEnabled
-      && (persisted?.canonicalStatus === "paid" || persisted?.canonicalStatus === "activated")
-      && persisted.paymentStatus.toUpperCase() === "PAID"
-      && (persisted.orderStatus.toUpperCase() === "PAID"
-        || persisted.orderStatus.toUpperCase() === "COMPLETED");
     if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
-        || (!developmentSettledReplay && (persisted.canonicalStatus !== "placed"
+        || (persisted.canonicalStatus !== "placed"
           || persisted.paymentStatus.toUpperCase() !== "PENDING"
-          || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"))
-        || (developmentSettledReplay
-          ? !["WAITING_PROVISIONING", "ACTIVATED"].includes(persisted.activationStatus.toUpperCase())
-          : persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT")
+          || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT")
+        || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
         || created.paymentStatus.toUpperCase() !== "PENDING"
         || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
         || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
@@ -1458,35 +1402,10 @@ async function submitRemoteOrder(): Promise<void> {
     // failure after the server has already committed the order.
     // Retire the durable key only after the server order readback above and
     // account-scoped order refresh both succeeded; unknown outcomes reuse it.
-    if (developmentCommercePaymentEnabled) {
-      // The user's confirm click is the explicit local-development payment action.
-      // Settlement remains entirely server-side and advances only after the Java
-      // receipt and canonical order readback agree. Production never enters this branch.
-      const paymentReceipt = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
-      if (!scopeIsCurrent()) return;
-      if (paymentReceipt.orderNo !== created.orderNo) throw new Error("COMMERCE_PAYMENT_ORDER_MISMATCH");
-      const paidSnapshot = await orderApi.list();
-      if (!scopeIsCurrent()) return;
-      const paidOrder = paidSnapshot.orders.find((order) => order.orderNo === created.orderNo);
-      if (!paidOrder || paidOrder.canonicalStatus !== "activated"
-          || paidOrder.paymentStatus.toUpperCase() !== "PAID"
-          || paidOrder.orderStatus.toUpperCase() !== "COMPLETED"
-          || paidOrder.activationStatus.toUpperCase() !== "ACTIVATED") {
-        throw new Error("COMMERCE_PAYMENT_READBACK_MISMATCH");
-      }
-      await orders.refreshRemote();
-      if (!scopeIsCurrent()) return;
-      const walletRefreshed = await app.refreshRemoteFleet();
-      if (!scopeIsCurrent()) return;
-      if (!walletRefreshed) app.adoptDevelopmentCommerceWallet(paymentReceipt.walletBalanceAfterUsdt, submissionScope);
-      retireRemoteOrderKey();
-      uni.redirectTo({ url: `/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}` });
-    } else {
-      // A canonical PENDING_PAYMENT receipt proves only creation. It is not
-      // provisioning or activation; wait for a real provider callback/readback.
-      retireRemoteOrderKey();
-      step.value = "awaiting";
-    }
+    // A canonical PENDING_PAYMENT receipt proves only creation. It is not
+    // provisioning or activation; wait for a real provider callback/readback.
+    retireRemoteOrderKey();
+    step.value = "awaiting";
   } catch (error) {
     if (!scopeIsCurrent()) return;
     // Keep only outcome-unknown errors: transport, malformed response, 5xx and

@@ -8,7 +8,6 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FundsSandboxBadge />
     <!-- ── 加载骨架(chip 行 / QR 区 / 入口区,匹配真实形状)── -->
     <view v-if="phase === 'loading'">
       <view class="flex" style="gap: 8px">
@@ -70,29 +69,6 @@
           <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text :style="metaValStyle">${{ MIN_DEPOSIT_USDT }}</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ CHAIN_DEPOSIT_FEE_USDT[activeNet] }} USDT</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ CHAIN_REQUIRED_CONFIRMATIONS[activeNet] }}</text></text></view>
-        </view>
-        <view v-if="developmentFundsEnabled" class="flex items-center" :style="sandboxTopupStyle">
-          <view class="flex-1 min-w-0">
-            <text class="block" :style="warnTextStyle">Cregis USDT-BEP20 · SANDBOX</text>
-            <view class="flex items-center" style="margin-top: 6px; gap: 6px">
-              <input
-                v-model="sandboxAmount"
-                class="font-mono-tabular flex-1 min-w-0"
-                :style="sandboxAmountInputStyle"
-                type="text"
-                inputmode="decimal"
-                :disabled="sandboxSubmitting"
-                aria-label="Sandbox USDT top-up amount"
-              />
-              <text style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
-            </view>
-          </view>
-          <view class="grid place-items-center active:opacity-80" :style="sandboxSubmitStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
-            <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):进词典就成了
-                 用户文案契约,词典打包摇不掉会原样进生产包。本门只判中文,这行英文不撞门 —— 别收进词典。
-                 i18n-en-ok: 沙箱直充按钮的工程话,仅验收沙箱档可见 -->
-            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "Credit" }}</text>
-          </view>
         </view>
       </view>
 
@@ -172,7 +148,6 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
-import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useDeposits } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -184,9 +159,6 @@ import {
   mulberry32,
 } from "@/store/deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
-import { developmentFundsEnabled } from "@/api/runtime";
-import { isFundsSandboxStaleRequestError } from "@/lib/funds-sandbox-request-scope";
 
 const t = useT();
 const dep = useDeposits();
@@ -227,7 +199,6 @@ onUnmounted(() => {
 // ── 网络选择(停用 chip 不可选;所选被停用时回落到首个启用网络)──
 const net = ref<ChainDepositChannel>("usdt-trc20");
 function isEnabled(id: ChainDepositChannel): boolean {
-  if (developmentFundsEnabled) return id === "usdt-bep20";
   return dep.chainChannelEnabled[id] === true;
 }
 const activeNet = computed<ChainDepositChannel | null>(() => {
@@ -266,29 +237,6 @@ function copyAddr() {
     },
     fail: () => {},
   });
-}
-
-const sandboxSubmitting = ref(false);
-const sandboxAmount = ref("25");
-async function simulateSandboxTopup() {
-  if (!developmentFundsEnabled || sandboxSubmitting.value) return;
-  const amount = Number(sandboxAmount.value.trim());
-  if (!Number.isFinite(amount) || amount < MIN_DEPOSIT_USDT) {
-    toast.info(`${t.value.topupChrome.minDeposit} ${MIN_DEPOSIT_USDT} USDT`);
-    return;
-  }
-  sandboxSubmitting.value = true;
-  try {
-    const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", amount, dep.currentAccountKey());
-    // 工程话,故意不进 i18n 词典(同 :79 的理由:出路②)。
-    if (record) toast.success(`SANDBOX: server credited ${amount.toFixed(2)} USDT`);
-  } catch (cause) {
-    if (!isFundsSandboxStaleRequestError(cause)) {
-      toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);
-    }
-  } finally {
-    sandboxSubmitting.value = false;
-  }
 }
 
 // ── QR 点阵:21×21 确定性伪随机 + 三角定位块,seed = 专属地址 → 切网络图案随之变。
@@ -488,25 +436,6 @@ const warnTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-warning)",
   lineHeight: 1.45,
-};
-const sandboxTopupStyle: CSSProperties = {
-  ...warnlineStyle,
-  gap: "12px",
-};
-const sandboxAmountInputStyle: CSSProperties = {
-  height: "34px",
-  padding: "0 10px",
-  borderRadius: "8px",
-  background: "var(--v5-surface)",
-  color: "var(--v5-ink)",
-  fontSize: "13px",
-};
-const sandboxSubmitStyle: CSSProperties = {
-  minWidth: "64px",
-  height: "44px",
-  padding: "0 10px",
-  borderRadius: "10px",
-  background: "var(--v5-surface-3)",
 };
 const linkRowStyle: CSSProperties = {
   minHeight: "48px",

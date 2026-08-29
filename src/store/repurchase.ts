@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { apiRuntimeConfig, remoteApiEnabled, repurchaseApi } from "@/api/runtime";
+import { remoteApiEnabled, repurchaseApi } from "@/api/runtime";
 import type {
   RepurchaseConfig,
   RepurchaseOrder,
@@ -19,7 +19,6 @@ function message(error: unknown): string {
 }
 
 export const useRepurchase = defineStore("repurchase", () => {
-  const sandboxMarket = apiRuntimeConfig.environment === "dev";
   const config = ref<RepurchaseConfig | null>(null);
   const orders = ref<RepurchaseOrder[]>([]);
   const walletBalanceUsdt = ref(0);
@@ -35,8 +34,7 @@ export const useRepurchase = defineStore("repurchase", () => {
   let commandGeneration = 0;
 
   function apply(snapshot: RepurchaseSnapshot) {
-    const validProvenance = snapshot.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
-      && (sandboxMarket ? typeof snapshot.runId === "string" && snapshot.runId.length > 0 : snapshot.runId === "");
+    const validProvenance = snapshot.sourceEnvironment === "PRODUCTION" && snapshot.runId === "";
     if (!validProvenance) throw new Error("G7_RUNTIME_PROVENANCE_INVALID");
     orders.value = snapshot.orders;
     walletBalanceUsdt.value = snapshot.walletBalanceUsdt;
@@ -45,8 +43,7 @@ export const useRepurchase = defineStore("repurchase", () => {
   }
 
   function acceptConfig(nextConfig: RepurchaseConfig): RepurchaseConfig {
-    const validProvenance = nextConfig.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
-      && (sandboxMarket ? typeof nextConfig.runId === "string" && nextConfig.runId.length > 0 : nextConfig.runId === "");
+    const validProvenance = nextConfig.sourceEnvironment === "PRODUCTION" && nextConfig.runId === "";
     if (!validProvenance) throw new Error("G7_RUNTIME_PROVENANCE_INVALID");
     return nextConfig;
   }
@@ -137,9 +134,9 @@ export const useRepurchase = defineStore("repurchase", () => {
       apply(snapshot);
       return snapshot;
     } catch (cause) {
-      if (account === accountGeneration && request === commandGeneration) {
-        error.value = message(cause);
-      }
+      // A rejected money command does not invalidate the last canonical config
+      // and order snapshot. The page can show the command error in a toast and
+      // remain usable; only refresh/read failures put the whole screen in HOLD.
       throw cause;
     } finally {
       if (account === accountGeneration && request === commandGeneration) {

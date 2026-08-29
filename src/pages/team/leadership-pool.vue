@@ -156,9 +156,9 @@ import { useApp } from "@/store/app";
 import { leadershipMainRows } from "@/lib/leadership-pool-main";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 const t = useT();
@@ -274,11 +274,11 @@ async function loadRemotePool() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   remoteState.value = "loading";
   remotePool.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
     if (!current()) return;
@@ -296,7 +296,7 @@ watch(() => app.accountKey, () => {
   remotePool.value = null;
   void loadRemotePool();
 });
-const unsubscribePoolRun = subscribeCurrentCommerceSandboxRun(() => {
+const unsubscribePoolRun = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled || !mounted) return;
   remoteRequest += 1;
   remotePool.value = null;

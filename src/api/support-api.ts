@@ -10,7 +10,7 @@ export type SupportCommandResult =
   | { kind: "conversation"; conversation: Conversation }
   | { kind: "conversation-ticket"; conversation: Conversation; ticket: Ticket };
 export interface SupportApi {
-  acceptanceRunId(): Promise<string>;
+  authorityRevision(): Promise<string>;
   tickets(): Promise<Page<Ticket>>;
   ticket(id: string): Promise<Ticket>;
   createTicket(input: TicketInput, key: string): Promise<Ticket>;
@@ -97,26 +97,8 @@ function parseFaq(value: unknown): SupportFaq {
 }
 
 export function createSupportApi(client: ApiClient): SupportApi {
-  let supportRoot: Promise<{ path: string; runId: string }> | undefined;
-  async function rootPath(): Promise<{ path: string; runId: string }> {
-    if (!supportRoot) supportRoot = client.request({ method: "GET", path: "/api/app/support/acceptance/projection" })
-      .then((proof) => {
-        const v = row(proof);
-        if (!v || v.source !== "mock" || v.sourceEnvironment !== "SANDBOX" || v.strictProfile !== true || typeof v.runId !== "string" || !v.runId.trim()) {
-          invalid("SUPPORT_ACCEPTANCE_PROOF_INVALID");
-        }
-        return { path: "/api/app/support/acceptance", runId: v.runId.trim() };
-      })
-      .catch((cause: unknown) => {
-        const error = cause instanceof ApiError ? cause : null;
-        // A missing acceptance-only controller is the sole production fallback.
-        if (error?.status === 404) return { path: "/api/app/support", runId: "production" };
-        supportRoot = undefined;
-        throw cause;
-      });
-    return supportRoot;
-  }
-  async function supportPath(path: string): Promise<string> { return `${(await rootPath()).path}${path}`; }
+  const supportRoot = "/api/app/support";
+  async function supportPath(path: string): Promise<string> { return `${supportRoot}${path}`; }
   function parseCommandResult(value: unknown): SupportCommandResult | null {
     if (value == null) return null;
     const v = row(value); const type = text(v?.resultType)?.toLowerCase();
@@ -152,7 +134,7 @@ export function createSupportApi(client: ApiClient): SupportApi {
     return { items, total };
   }
   return {
-    acceptanceRunId: async () => (await rootPath()).runId,
+    authorityRevision: async () => "canonical-v1",
     tickets: allTickets,
     ticket: async id => parseTicketDetail(await client.request({ method: "GET", path: await supportPath(`/tickets/${pathId(id)}`) })),
     createTicket: async (input, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath("/tickets"), idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim(), clientMessageId: key } })),

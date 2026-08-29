@@ -14,7 +14,7 @@ import {
 const acknowledged = (value: boolean): LegalTermsCurrent => ({
   source: "server",
   sourceEnvironment: "PRODUCTION",
-  runId: "run-1",
+  runId: "",
   requestedLocale: "en",
   resolvedLocale: "en",
   requestedJurisdiction: "GLOBAL",
@@ -56,24 +56,17 @@ describe("legal terms session gate", () => {
     expect(claimLegalTermsRedirect(seen, "user-8:v1:/pages/me/me")).toBe(true);
   });
 
-  it("accepts the initial sandbox response before catalog bootstrap, but rejects a known stale RunID", () => {
-    const sandbox = { ...acknowledged(false), sourceEnvironment: "SANDBOX" as const };
-    expect(sameLegalTermsRun(sandbox, null)).toBe(true);
-    expect(sameLegalTermsRun(sandbox, "run-1")).toBe(true);
-    expect(sameLegalTermsRun({ ...sandbox, runId: "run-2" }, "run-1")).toBe(false);
-    expect(sameLegalTermsRun({ ...acknowledged(false), sourceEnvironment: "PRODUCTION", runId: "" }, "run-1")).toBe(true);
+  it("accepts only canonical production-provenance terms", () => {
+    const retired = { ...acknowledged(false), sourceEnvironment: "SANDBOX", runId: "retired" };
+    expect(sameLegalTermsRun(retired as unknown as LegalTermsCurrent)).toBe(false);
+    expect(sameLegalTermsRun({ ...acknowledged(false), sourceEnvironment: "PRODUCTION", runId: "" })).toBe(true);
   });
 
-  it("rejects late responses after account or token/run fencing changes", () => {
-    const first: LegalTermsSessionFence = { accessToken: "token-a", userId: 7, runId: "run-1" };
+  it("rejects late responses after account, token, or runtime revision changes", () => {
+    const first: LegalTermsSessionFence = { accessToken: "token-a", userId: 7, runEpoch: 1 };
     expect(sameLegalTermsSession(first, { ...first })).toBe(true);
     expect(sameLegalTermsSession(first, { ...first, accessToken: "token-b" })).toBe(false);
     expect(sameLegalTermsSession(first, { ...first, userId: 8 })).toBe(false);
-    expect(sameLegalTermsSession(first, { ...first, runId: "run-2" })).toBe(false);
-    // The first post-login fetch may begin before the sandbox catalogue
-    // publishes its RunID; an absent expected RunID must not reject that
-    // response solely because the catalogue epoch is now known.
-    expect(sameLegalTermsSession({ accessToken: "token-a", userId: 7 }, { ...first, runEpoch: 2 })).toBe(true);
     expect(sameLegalTermsSession({ ...first, runEpoch: 2 }, { ...first, runEpoch: 3 })).toBe(false);
     expect(sameLegalTermsSession(first, null)).toBe(false);
   });

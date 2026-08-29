@@ -36,8 +36,8 @@ describe("locked product notification account-scope contract", () => {
   });
 
   it("captures the commerce run scope and fences late status/mutation writes", () => {
-    expect(source).toContain("captureCommerceSandboxRun");
-    expect(source).toContain("isCurrentCommerceSandboxScope");
+    expect(source).toContain("captureRuntimeRevision");
+    expect(source).toContain("isCurrentRuntimeRevision");
     expect(source.match(/runScope/g)?.length).toBeGreaterThanOrEqual(4);
   });
 });

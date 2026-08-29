@@ -146,7 +146,7 @@ import { getDeviceId } from "@/lib/device-id";
 import { collectDeviceSignals } from "@/lib/device-signals";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
-import { commitOnboardingSandboxRun, type CalibrationRequestSignals, type OnboardingCalibration } from "@/api/onboarding-calibration-api";
+import type { CalibrationRequestSignals, OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { ApiError } from "@/api/errors";
 import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 
@@ -185,7 +185,7 @@ function scopeIsCurrent(scope: OnboardingCalibrationScope): boolean {
   return mounted && isCurrentOnboardingCalibrationScope(scope, currentScope());
 }
 function acceptCurrentCanonical(scope: OnboardingCalibrationScope, result: OnboardingCalibration): boolean {
-  return scopeIsCurrent(scope) && commitOnboardingSandboxRun(result);
+  return scopeIsCurrent(scope) && result.sourceEnvironment === "PRODUCTION" && result.runId === "";
 }
 const authenticatedAccountKey = computed(() => auth.isAuthenticated ? accountKey() : "");
 watch(authenticatedAccountKey, (next, previous) => {

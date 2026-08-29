@@ -11,11 +11,9 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
-      <FundsSandboxBadge />
 
-      <!-- Remote production: only VietQR has a real server authority. Explicit
-           Sandbox exposes the isolated simulated chain/bank/card rails below. -->
-      <DepositBankPane v-if="remoteApiEnabled && !developmentFundsEnabled" />
+      <!-- Remote runtime: VietQR is the server-authoritative funding rail. -->
+      <DepositBankPane v-if="remoteApiEnabled" />
 
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
       <view v-else class="flex" :style="segWrapStyle">
@@ -32,7 +30,7 @@
         </view>
       </view>
 
-      <template v-if="!remoteApiEnabled || developmentFundsEnabled">
+      <template v-if="!remoteApiEnabled">
         <!-- USDT 链上通道段 -->
         <DepositUsdtPane v-if="seg === 'crypto'" />
 
@@ -50,18 +48,17 @@
 import { ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
-import { developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
 const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
-const seg = ref<Seg>(remoteApiEnabled && !developmentFundsEnabled ? "bank" : "crypto");
+const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 function segLabel(id: Seg): string {
   const tc = t.value.topupChrome;
   if (id === "crypto") return tc.segUsdt;

@@ -80,7 +80,6 @@ export function createBehaviorTracker(options: TrackerOptions) {
       // this tracker epoch after await before it may project any credential.
       if (queuedEpoch !== epoch) return;
       if (options.enabled && !options.enabled()) return;
-      if (receipt) rememberAcceptanceObservationCredential(receipt, options.credentialScope || "");
     });
     pending.add(task);
     void task.finally(() => pending.delete(task));
@@ -140,10 +139,8 @@ export function createBehaviorTracker(options: TrackerOptions) {
   return { show, hide, tap, flush, discard };
 }
 
-let acceptanceObservationCredential = "";
-let acceptanceObservationCredentialScope = "";
-
-/** Compatibility hook: acceptance credentials are no longer shown in a native modal. */
+/** Compatibility hooks retained for the chassis while the retired observation
+ * panel is removed from its next layout pass. They never hold a credential. */
 export function isAcceptanceObservationModalOpen(): boolean {
   return false;
 }
@@ -160,29 +157,17 @@ export function onAcceptanceObservationModalOpened(
   return () => undefined;
 }
 
-function rememberAcceptanceObservationCredential(receipt: Awaited<ReturnType<BehaviorTransport["ingest"]>>, scope: string): void {
-  if (!scope) return;
-  if (receipt.source !== "mock" || receipt.sourceEnvironment !== "SANDBOX"
-    || !receipt.runId || !receipt.observationToken) return;
-  const credential = `${receipt.runId}.${receipt.observationToken}`;
-  if (credential === acceptanceObservationCredential && scope === acceptanceObservationCredentialScope) return;
-  acceptanceObservationCredential = credential;
-  acceptanceObservationCredentialScope = scope;
-}
-
 function clearAcceptanceObservationCredential(): void {
-  acceptanceObservationCredential = "";
-  acceptanceObservationCredentialScope = "";
+  // no-op: the retired environment no longer issues observation credentials
 }
 
 /** H5 acceptance can display or copy this opaque server-issued PC query credential. */
 export function getAcceptanceObservationCredential(): string {
-  return acceptanceObservationCredential;
+  return "";
 }
 
 export function copyAcceptanceObservationCredential(): void {
-  if (!acceptanceObservationCredential) return;
-  try { uni.setClipboardData({ data: acceptanceObservationCredential, showToast: true }); } catch { /* no-op */ }
+  return;
 }
 
 type BehaviorTracker = ReturnType<typeof createBehaviorTracker>;

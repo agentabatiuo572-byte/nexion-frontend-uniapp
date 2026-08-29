@@ -46,8 +46,8 @@ export interface CanonicalOrder {
 }
 
 export interface CanonicalOrderList {
-  source: "server" | "mock";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  source: "server";
+  sourceEnvironment: "PRODUCTION";
   runId: string | null;
   serverCanonical?: true;
   orders: CanonicalOrder[];
@@ -62,10 +62,7 @@ export interface CreatedOrder {
   voucherRedemption: { voucherId: string; grantId: string; status: "REDEEMED"; discountUsdt: number } | null;
   paymentStatus: string;
   orderStatus: string;
-  idSource: "server" | "sandbox-server";
-  source?: "mock";
-  sourceEnvironment?: "SANDBOX";
-  runId?: string;
+  idSource: "server";
 }
 
 export interface CancelledOrder {
@@ -73,8 +70,8 @@ export interface CancelledOrder {
   orderStatus: "CANCELLED";
   paymentStatus: "CANCELLED";
   serverCanonical: true;
-  source: "server" | "mock";
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  source: "server";
+  sourceEnvironment: "PRODUCTION";
   runId: string;
   idempotent: boolean;
 }
@@ -93,49 +90,37 @@ export interface OrderApi {
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-let currentSandboxRunId: string | null = null;
-let currentSandboxRunEpoch = 0;
-const sandboxRunListeners = new Set<(scope: CommerceSandboxRunScope) => void>();
+let currentRuntimeRevision = 0;
+const runtimeRevisionListeners = new Set<(scope: RuntimeRevisionScope) => void>();
 
-export interface CommerceSandboxRunScope {
-  runId: string | null;
+export interface RuntimeRevisionScope {
+  runId: null;
   epoch: number;
 }
 
-/** The catalogue is the current run-scoped commerce proof for checkout. */
-export function setCurrentCommerceSandboxRun(runId: string | null): void {
-  const nextRunId = runId !== null && RUN_ID.test(runId) ? runId : null;
-  if (nextRunId !== currentSandboxRunId) {
-    currentSandboxRunEpoch += 1;
-    currentSandboxRunId = nextRunId;
-    const scope = captureCommerceSandboxRun();
-    sandboxRunListeners.forEach((listener) => listener(scope));
-    return;
-  }
-  currentSandboxRunId = nextRunId;
+/** Invalidate responses captured before a catalogue or account refresh. */
+export function advanceRuntimeRevision(_reason?: unknown): void {
+  currentRuntimeRevision += 1;
+  const scope = captureRuntimeRevision();
+  runtimeRevisionListeners.forEach((listener) => listener(scope));
 }
 
-/** Notify account-scoped stores when the product catalogue selects a new run. */
-export function subscribeCurrentCommerceSandboxRun(
-  listener: (scope: CommerceSandboxRunScope) => void,
+/** Notify account-scoped stores after a canonical runtime revision changes. */
+export function subscribeRuntimeRevision(
+  listener: (scope: RuntimeRevisionScope) => void,
 ): () => void {
-  sandboxRunListeners.add(listener);
-  return () => sandboxRunListeners.delete(listener);
+  runtimeRevisionListeners.add(listener);
+  return () => runtimeRevisionListeners.delete(listener);
 }
 
-export function isCurrentCommerceSandboxRun(runId: unknown): runId is string {
-  return typeof runId === "string" && RUN_ID.test(runId) && runId === currentSandboxRunId;
+/** Capture the current canonical runtime revision before a request. */
+export function captureRuntimeRevision(): RuntimeRevisionScope {
+  return { runId: null, epoch: currentRuntimeRevision };
 }
 
-/** Capture both the selected sandbox RunID and its generation before a request. */
-export function captureCommerceSandboxRun(): CommerceSandboxRunScope {
-  return { runId: currentSandboxRunId, epoch: currentSandboxRunEpoch };
-}
-
-/** Reject a response after the catalog/runtime moved to another environment or RunID. */
-export function isCurrentCommerceSandboxScope(scope: CommerceSandboxRunScope): boolean {
-  return scope.epoch === currentSandboxRunEpoch && scope.runId === currentSandboxRunId;
+/** Reject a response after the catalogue or account runtime moved on. */
+export function isCurrentRuntimeRevision(scope: RuntimeRevisionScope): boolean {
+  return scope.epoch === currentRuntimeRevision;
 }
 
 function invalid(): never {
@@ -255,12 +240,10 @@ function canonicalOrder(value: unknown): CanonicalOrder {
 
 function createdOrder(value: unknown): CreatedOrder {
   const source = record(value);
-  const sandboxRunId = typeof source.runId === "string" ? source.runId : "";
-  const sandboxResponse = source.idSource === "sandbox-server";
-  if (source.idSource !== "server" && !sandboxResponse) return invalid();
-  if (sandboxResponse && (source.source !== "mock" || source.sourceEnvironment !== "SANDBOX"
-      || !RUN_ID.test(sandboxRunId) || sandboxRunId !== currentSandboxRunId)) return invalid();
-  if (!sandboxResponse && (source.source !== undefined || source.sourceEnvironment !== undefined || source.runId !== undefined)) return invalid();
+  if (source.idSource !== "server"
+      || source.source !== undefined
+      || source.sourceEnvironment !== undefined
+      || source.runId !== undefined) return invalid();
   const rawRedemption = source.voucherRedemption;
   const redemption = rawRedemption === null || rawRedemption === undefined ? null : record(rawRedemption);
   const voucherRedemption = redemption === null ? null : {
@@ -278,8 +261,7 @@ function createdOrder(value: unknown): CreatedOrder {
     voucherRedemption,
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
-    idSource: source.idSource as "server" | "sandbox-server",
-    ...(sandboxResponse ? { source: "mock" as const, sourceEnvironment: "SANDBOX" as const, runId: sandboxRunId } : {}),
+    idSource: "server",
   };
   if (parsed.paymentStatus.toUpperCase() !== "PENDING"
       || parsed.orderStatus.toUpperCase() !== "PENDING_PAYMENT") {
@@ -288,28 +270,18 @@ function createdOrder(value: unknown): CreatedOrder {
   return parsed;
 }
 
-function cancelledOrder(value: unknown, mode: ApiEnvironment): CancelledOrder {
+function cancelledOrder(value: unknown): CancelledOrder {
   const source = record(value);
   if (typeof source.orderNo !== "string" || !source.orderNo.trim()
       || source.orderStatus !== "CANCELLED" || source.paymentStatus !== "CANCELLED"
       || typeof source.serverCanonical !== "boolean" || source.serverCanonical !== true
-      || (source.source !== "server" && source.source !== "mock")
-      || (source.sourceEnvironment !== "PRODUCTION" && source.sourceEnvironment !== "SANDBOX")
-      || typeof source.runId !== "string"
+      || source.source !== "server"
+      || source.sourceEnvironment !== "PRODUCTION"
+      || source.runId !== ""
       || typeof source.idempotent !== "boolean") return invalid();
-  const production = mode === "prod"
-    && source.source === "server"
-    && source.sourceEnvironment === "PRODUCTION"
-    && source.runId === "";
-  const sandbox = mode === "dev"
-    && source.source === "mock"
-    && source.sourceEnvironment === "SANDBOX"
-    && RUN_ID.test(source.runId)
-    && isCurrentCommerceSandboxRun(source.runId);
-  if (!production && !sandbox) return invalid();
   return { orderNo: source.orderNo.trim(), orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
-    serverCanonical: true, source: production ? "server" : "mock",
-    sourceEnvironment: production ? "PRODUCTION" : "SANDBOX", runId: production ? "" : source.runId,
+    serverCanonical: true, source: "server",
+    sourceEnvironment: "PRODUCTION", runId: "",
     idempotent: source.idempotent };
 }
 
@@ -330,8 +302,8 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         && (rawRunId === null || rawRunId === undefined);
       if (!production) return invalid();
       return {
-        source: source as "server" | "mock",
-        sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX",
+        source: "server",
+        sourceEnvironment: "PRODUCTION",
         runId: null,
         serverCanonical: true,
         orders: payload.orders.map(canonicalOrder),
@@ -363,7 +335,7 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         method: "POST",
         path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
         idempotencyKey,
-      }), mode);
+      }));
     },
   };
 }

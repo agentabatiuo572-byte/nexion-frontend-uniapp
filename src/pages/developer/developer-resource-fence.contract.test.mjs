@@ -6,8 +6,8 @@ const source = await readFile(new URL("./developer.vue", import.meta.url), "utf8
 const fenceSource = await readFile(new URL("./developer-resource-fence.ts", import.meta.url), "utf8");
 
 test("developer resource operations all capture and validate the account fence", () => {
-  assert.match(fenceSource, /captureCommerceSandboxRun/);
-  assert.match(fenceSource, /isCurrentCommerceSandboxScope/);
+  assert.match(fenceSource, /captureRuntimeRevision/);
+  assert.match(fenceSource, /isCurrentRuntimeRevision/);
   assert.match(source, /let resourceGeneration = 0/);
   assert.match(source, /resetResourceScope\(\);/);
   assert.match(source, /if \(!resourceFenceCurrent\(fence\)\) return;/);

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createGoalsApi } from "./goals-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
-beforeEach(() => setCurrentCommerceSandboxRun(null));
+beforeEach(() => advanceRuntimeRevision(null));
 
 describe("goals API", () => {
   it("uses authenticated server CRUD and preserves canonical progress", async () => {
@@ -36,7 +36,7 @@ describe("goals API", () => {
   });
 
   it("accepts only current run-scoped server recommendations in sandbox", async () => {
-    setCurrentCommerceSandboxRun("sandbox-run-20260817");
+    advanceRuntimeRevision("sandbox-run-20260817");
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, source: "mock", sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260817",
       productNo: "sandbox-sku", productName: "Sandbox SKU", dailyEarn: 1, price: 99,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTrustSectionApi } from "./trust-section-api";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 const keys = ["financials", "leadership", "nexNarrative", "complianceBadges", "auditsReserves", "listings"] as const;
 const sections = keys.map((sectionKey) => ({
@@ -12,7 +12,7 @@ const sections = keys.map((sectionKey) => ({
 }));
 
 describe("Trust section API authority", () => {
-  afterEach(() => setCurrentCommerceSandboxRun(null));
+  afterEach(() => advanceRuntimeRevision(null));
 
   it("accepts only the canonical published Trust projection", async () => {
     const request = vi.fn().mockResolvedValue({
@@ -44,7 +44,7 @@ describe("Trust section API authority", () => {
   });
 
   it("rejects a stale sandbox Trust snapshot after commerce selects a run", async () => {
-    setCurrentCommerceSandboxRun("trust-current-run-20260819");
+    advanceRuntimeRevision("trust-current-run-20260819");
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, source: "mock",
       sourceEnvironment: "SANDBOX", runId: "trust-stale-run-20260818", sections,
@@ -55,7 +55,7 @@ describe("Trust section API authority", () => {
   });
 
   it("rejects the removed run-scoped sandbox Trust projection", async () => {
-    setCurrentCommerceSandboxRun("trust-current-run-20260819");
+    advanceRuntimeRevision("trust-current-run-20260819");
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, source: "mock",
       sourceEnvironment: "SANDBOX", runId: "trust-current-run-20260819", sections,

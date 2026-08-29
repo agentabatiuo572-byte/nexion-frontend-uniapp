@@ -4,18 +4,8 @@ import { mockServerId } from "./mock-id";
 import { mockServerNow } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { fundsSandboxApi, developmentFundsEnabled, fundsServerEnabled, referralRewardApi, walletBillsApi } from "@/api/runtime";
-import type { FundsSandboxLedgerEntry } from "@/api/funds-sandbox-api";
+import { fundsServerEnabled, walletBillsApi } from "@/api/runtime";
 import type { WalletBillRow } from "@/api/wallet-bills-api";
-import { projectFundsSandboxLedger } from "./funds-sandbox-ledger";
-import { projectReferralRewardBills } from "./referral-reward-bills";
-import {
-  captureFundsSandboxRequestScope,
-  fundsSandboxStaleRequestError,
-  isCurrentFundsSandboxRequestScope,
-  isFundsSandboxStaleRequestError,
-  type FundsSandboxRequestScope,
-} from "@/lib/funds-sandbox-request-scope";
 
 // Ported from Nexion-prototype/lib/store/bills.ts (zustand → Pinia).
 // MOCK-ONLY: 30-day history fabricated client-side; production replaces seed
@@ -50,9 +40,6 @@ export interface Bill {
   network?: "TRC20" | "ERC20" | "BEP20";
   balanceAfter?: number;
   reservedAfter?: number;
-  source?: "mock";
-  sourceEnvironment?: "SANDBOX";
-  entryRole?: string;
 }
 
 /**
@@ -193,63 +180,13 @@ export const useBills = defineStore("bills", () => {
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
   const bills = ref<Bill[]>(fundsServerEnabled ? [] : hydrate(boundKey));
-  const serverStatus = ref<"idle" | "loading" | "ready" | "error">(developmentFundsEnabled ? "idle" : "ready");
+  const serverStatus = ref<"idle" | "loading" | "ready" | "error">("ready");
   const serverError = ref("");
   let requestGeneration = 0;
 
   function persist(): boolean {
     if (fundsServerEnabled) return false;
     return writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
-  }
-
-  /** Replace, never merge: server projections are the complete authoritative view. */
-  function adoptFundsSandboxLedger(
-    expectedAccountKey: string,
-    sourceEnvironment: "SANDBOX",
-    entries: FundsSandboxLedgerEntry[],
-    referralBills: Bill[] = [],
-    expectedScope?: FundsSandboxRequestScope,
-  ): boolean {
-    if (!developmentFundsEnabled || sourceEnvironment !== "SANDBOX"
-        || normalizeAccountKey(expectedAccountKey) !== boundKey
-        || (expectedScope && !isCurrentFundsSandboxRequestScope(expectedScope, boundKey, requestGeneration))) return false;
-    bills.value = recomputeBalance([...projectFundsSandboxLedger(entries), ...referralBills]);
-    serverStatus.value = "ready";
-    serverError.value = "";
-    return true;
-  }
-
-  async function refreshFundsSandboxLedger(): Promise<void> {
-    if (!developmentFundsEnabled) {
-      if (fundsServerEnabled) return refreshProductionLedger();
-      return;
-    }
-    const expectedAccountKey = boundKey;
-    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, requestGeneration);
-    serverStatus.value = "loading";
-    serverError.value = "";
-    try {
-      const [overview, referralSnapshot] = await Promise.all([
-        fundsSandboxApi.overview(),
-        referralRewardApi.snapshot(),
-      ]);
-      if (expectedAccountKey !== boundKey) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-      if (!isCurrentFundsSandboxRequestScope(expectedScope, boundKey, requestGeneration)) {
-        throw fundsSandboxStaleRequestError();
-      }
-      const referralBills = projectReferralRewardBills(referralSnapshot);
-      if (!adoptFundsSandboxLedger(expectedAccountKey, overview.sourceEnvironment, overview.ledger, referralBills, expectedScope)) {
-        throw fundsSandboxStaleRequestError();
-      }
-    } catch (cause) {
-      if (isCurrentFundsSandboxRequestScope(expectedScope, boundKey, requestGeneration)
-          && !isFundsSandboxStaleRequestError(cause)) {
-        bills.value = [];
-        serverStatus.value = "error";
-        serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
-      }
-      // 权威不可达是常态输入,不 reject(resilience 门);页面横幅走 serverError 双源。
-    }
   }
 
   function productionBill(row: WalletBillRow): Bill {
@@ -282,7 +219,7 @@ export const useBills = defineStore("bills", () => {
 
   async function refreshProductionLedger(): Promise<void> {
     const expectedAccountKey = boundKey;
-    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, requestGeneration);
+    const expectedGeneration = requestGeneration;
     serverStatus.value = "loading";
     serverError.value = "";
     try {
@@ -295,14 +232,13 @@ export const useBills = defineStore("bills", () => {
         nextPage = snapshot.nextPage;
         page = nextPage ?? page;
       }
-      if (!isCurrentFundsSandboxRequestScope(expectedScope, boundKey, requestGeneration)) {
-        throw fundsSandboxStaleRequestError();
+      if (expectedAccountKey !== boundKey || expectedGeneration !== requestGeneration) {
+        throw new Error("WALLET_BILLS_REQUEST_SUPERSEDED");
       }
       bills.value = recomputeBalance(pages.map(productionBill));
       serverStatus.value = "ready";
     } catch (cause) {
-      if (isCurrentFundsSandboxRequestScope(expectedScope, boundKey, requestGeneration)
-          && !isFundsSandboxStaleRequestError(cause)) {
+      if (expectedAccountKey === boundKey && expectedGeneration === requestGeneration) {
         bills.value = [];
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
@@ -313,7 +249,7 @@ export const useBills = defineStore("bills", () => {
 
   async function refreshServerLedger(): Promise<void> {
     if (!fundsServerEnabled) return;
-    return developmentFundsEnabled ? refreshFundsSandboxLedger() : refreshProductionLedger();
+    return refreshProductionLedger();
   }
 
   /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
@@ -328,7 +264,7 @@ export const useBills = defineStore("bills", () => {
       serverError.value = "";
       void refreshServerLedger().catch((cause) => {
         if (expectedAccountKey === boundKey && expectedGeneration === requestGeneration
-            && !isFundsSandboxStaleRequestError(cause) && !serverError.value) {
+            && !serverError.value) {
           serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
         }
       });
@@ -376,7 +312,7 @@ export const useBills = defineStore("bills", () => {
     atMs?: number,
   ): Bill[] | null {
     // 🔴 服务端账本档下一条都不写(远端线焊在 addForAccount 上的同一道闸,本地线把它改名成了多腿版)。
-    // 分录归服务端在同一事务里写,client 只消费投影(adoptFundsSandboxLedger);这里再写一条就是伪造账本。
+    // 分录归服务端在同一事务里写,client 只消费权威投影;这里再写一条就是伪造账本。
     // 代价说清楚:提现提交后的本地补写因此只在 mock 档生效(runtime 门 withdraw-bill-runtime 正是跑在 mock),
     // 服务端档下那两条分录得由服务端账本给出。
     if (fundsServerEnabled) return null;
@@ -518,6 +454,6 @@ export const useBills = defineStore("bills", () => {
   return {
     bills, serverStatus, serverError,
     add, addMany, addManyForAccountOnce, addOnce, seed, settleByRef, bindAccount,
-    adoptFundsSandboxLedger, refreshFundsSandboxLedger, refreshServerLedger,
+    refreshServerLedger,
   };
 });

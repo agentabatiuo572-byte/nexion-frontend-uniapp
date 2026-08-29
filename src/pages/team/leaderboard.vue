@@ -182,7 +182,7 @@ import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const app = useApp();
@@ -221,12 +221,12 @@ async function loadRemote() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   const requestedPeriod = period.value;
   remoteState.value = "loading";
   remoteSnapshot.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope)
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope)
     && requestedPeriod === period.value;
   try {
     const snapshot = await teamInsightsApi.leaderboard(requestedPeriod);

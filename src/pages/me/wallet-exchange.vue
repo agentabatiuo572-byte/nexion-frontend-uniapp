@@ -215,7 +215,7 @@ import {
   visibleQueuedExchangeOrders,
 } from "@/lib/exchange-cancel";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
@@ -241,17 +241,17 @@ const exchangeCancelStorage = createExchangeCancelStorage();
 const cancellingOrderNo = ref<string | null>(null);
 let exchangeMounted = true;
 
-function remoteScopeCurrent(scope: ReturnType<typeof captureAccountScope>, runScope: CommerceSandboxRunScope): boolean {
+function remoteScopeCurrent(scope: ReturnType<typeof captureAccountScope>, runScope: RuntimeRevisionScope): boolean {
   return canShowExchangeToast({
     mounted: exchangeMounted,
     accountScopeCurrent: isCurrentAccountScope(scope) && app.accountKey === scope.accountKey,
-    runScopeCurrent: isCurrentCommerceSandboxScope(runScope),
+    runScopeCurrent: isCurrentRuntimeRevision(runScope),
   });
 }
 
 function toastIfRemoteScopeCurrent(
   scope: ReturnType<typeof captureAccountScope>,
-  runScope: CommerceSandboxRunScope,
+  runScope: RuntimeRevisionScope,
   show: () => void,
 ): boolean {
   if (!remoteScopeCurrent(scope, runScope)) return false;
@@ -261,7 +261,7 @@ function toastIfRemoteScopeCurrent(
 
 async function syncRemoteState(
   scope = captureAccountScope(),
-  runScope = captureCommerceSandboxRun(),
+  runScope = captureRuntimeRevision(),
 ): Promise<boolean> {
   if (!remoteApiEnabled) return true;
   if (!remoteScopeCurrent(scope, runScope)) return false;
@@ -283,7 +283,7 @@ async function syncRemoteState(
 async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unknown" | "stale" | "not-cancellable"> {
   if (!remoteApiEnabled) return "unknown";
   const scope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   if (!remoteScopeCurrent(scope, runScope)) return "stale";
   const current = remoteState.value?.orders.find((order) => order.exchangeNo === exchangeNo);
   if (!exchangeOrderCanCancel(current)) {
@@ -395,7 +395,7 @@ const secsAgo = ref(0);
 onMounted(() => {
   if (remoteApiEnabled) {
     const scope = captureAccountScope();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     void syncRemoteState(scope, runScope).catch(() => {
       toastIfRemoteScopeCurrent(scope, runScope, () => toast.error(t.value.exchange.remoteUnavailableToast));
     });
@@ -506,7 +506,7 @@ function flip() {
 function onRefresh() {
   if (remoteApiEnabled) {
     const scope = captureAccountScope();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     void syncRemoteState(scope, runScope)
       .then((applied) => {
         if (!applied) return;
@@ -527,7 +527,7 @@ function goHowItWorks() {
 function notifyRemoteSwapResult(
   order: ExchangeOrder,
   scope: ReturnType<typeof captureAccountScope>,
-  runScope: CommerceSandboxRunScope,
+  runScope: RuntimeRevisionScope,
 ) {
   if (!remoteScopeCurrent(scope, runScope)) return;
   if (order.status === "COMPLETED" || order.status === "SUCCESS") {
@@ -559,7 +559,7 @@ async function handleConfirm() {
   if (submitting.value) return;
   if (!valid.value) return;
   const requestScope = captureAccountScope();
-  const requestRunScope = captureCommerceSandboxRun();
+  const requestRunScope = captureRuntimeRevision();
 
   // 🔴 **成交快照冻在第一个 await 之前**(范式同 wallet-withdraw.vue 的 snap)。
   // 方向 / 币种 / 金额 / 到账额 / 汇率 / USD 计值 / 账号 一次冻结;额度门、弹窗文案、

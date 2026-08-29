@@ -13,7 +13,7 @@ import {
 import { genesisApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { hasGenesisAuthorityForAccount } from "@/lib/genesis-auth-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { resolveRemoteGenesisPurchase } from "@/lib/genesis-remote-purchase";
 import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
 import type {
@@ -299,14 +299,8 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function applyAccountState(state: GenesisAccountState): void {
-    // Account responses may come from the isolated dev Sandbox rail. They are
-    // authoritative for holder/eligibility facts. A run-fenced SANDBOX account
-    // also owns its visible test-rail supply and order history; anonymous and
-    // production public state remain owned by GET /api/genesis/state.
-    if (state.sourceEnvironment === "SANDBOX") {
-      totalSlots.value = state.series.totalSupply;
-      soldSlots.value = state.series.soldSupply;
-    }
+    // Account responses are canonical development/production facts. Supply is
+    // still owned by GET /api/genesis/state; account reads cannot replace it.
     const holdingMap: Record<number, string> = {};
     const ids = state.holdings.map((holding) => {
       const tokenId = tokenIdFor(holding.holdingNo);
@@ -361,13 +355,13 @@ export const useGenesis = defineStore("genesis", () => {
     remoteMarketStats.value = { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null };
   }
 
-  function remoteScopeCurrent(request: RemoteAccountRequest, runScope: CommerceSandboxRunScope): boolean {
-    return remoteAccountEpoch.isCurrent(request) && isCurrentCommerceSandboxScope(runScope);
+  function remoteScopeCurrent(request: RemoteAccountRequest, runScope: RuntimeRevisionScope): boolean {
+    return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
   }
 
   async function syncRemote(
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
-    runScope: CommerceSandboxRunScope = captureCommerceSandboxRun(),
+    runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     // Public supply/market facts are readable without a user session. The
@@ -557,7 +551,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   机器门:verify.sh 的 `store-unreachable-code` 哨兵钉死 src/store/** 不可达数 = 0。
     if (remoteApiEnabled) {
       const request = remoteAccountEpoch.snapshot();
-      const runScope = captureCommerceSandboxRun();
+      const runScope = captureRuntimeRevision();
       const beforePrice = unitPriceUSDT.value;
       const idempotencyKey = purchaseIdempotencyKey(n, tokenIds);
       if (!idempotencyKey) return { ok: false, cost: 0, reason: "unavailable" };
@@ -627,7 +621,7 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
       const target = `${holdingNo}:${askPriceUSDT.toFixed(6)}`;
@@ -675,7 +669,7 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     try {
       // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
       const state = await genesisApi.cancel(holdingNo, stableIntent("cancel", holdingNo));
@@ -705,7 +699,7 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
-    const runScope = captureCommerceSandboxRun();
+    const runScope = captureRuntimeRevision();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
       // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)

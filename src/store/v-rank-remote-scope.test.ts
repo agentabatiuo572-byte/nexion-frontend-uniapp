@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 import type { VRankData, VRankDef } from "./v-rank";
 
 const remote = vi.hoisted(() => ({
@@ -14,7 +14,7 @@ const { useVRank, nextRankGap, nextRankProgress } = await import("./v-rank");
 
 beforeEach(() => {
   setActivePinia(createPinia());
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
   remote.vRankApi.ladder.mockReset();
   remote.vRankApi.current.mockReset();
 });

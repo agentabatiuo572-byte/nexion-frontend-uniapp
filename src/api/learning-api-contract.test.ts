@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { createLearningApi } from "./learning-api";
 import type { ApiError } from "./errors";
-import { setCurrentCommerceSandboxRun } from "./order-api";
+import { advanceRuntimeRevision } from "./order-api";
 
 const RUN = "run-20260816";
 
@@ -50,7 +50,7 @@ test("sends the stable quiz key outside the request body and binds the answer to
     },
   } as never, "dev");
 
-  setCurrentCommerceSandboxRun(RUN);
+  advanceRuntimeRevision(RUN);
 
   await api.submitQuiz("h3-live-20260722", "v1", [0], "learning-quiz:h3-live-20260722:v1");
 
@@ -78,7 +78,7 @@ test("binds start and content-only completion to the displayed version", async (
     return requests.length === 1 ? course : result;
   } } as never, "dev");
 
-  setCurrentCommerceSandboxRun(RUN);
+  advanceRuntimeRevision(RUN);
 
   await api.start("h3-live-20260722", "vi", "v1");
   await api.complete("h3-live-20260722", "v1");
@@ -102,7 +102,7 @@ test.each(["dev", "prod"] as const)("%s learning reads Java production-shaped fa
 });
 
 test("development learning rejects a sandbox projection", async () => {
-  setCurrentCommerceSandboxRun(RUN);
+  advanceRuntimeRevision(RUN);
   const api = createLearningApi({ request: async () => ({
     courses: [], completedCourses: 0, totalCourses: 0, earnedNex: "0",
     serverCanonical: true, sourceEnvironment: "SANDBOX", runId: RUN,
@@ -129,14 +129,14 @@ test.each([
 });
 
 test("rejects a sandbox learning response from a stale commerce run", async () => {
-  setCurrentCommerceSandboxRun(RUN);
+  advanceRuntimeRevision(RUN);
   const api = createLearningApi({ request: async () => ({
     id: "course-1", title: "Course", body: "Body", category: "Basics", format: "Article", level: "Beginner",
     duration: "5 min", rewardNex: "1.0", featured: false, version: "v1", progress: 0, completed: false,
     attempts: 0, lastScore: 0, rewardGranted: false, serverCanonical: true, source: "mock",
     sourceEnvironment: "SANDBOX", runId: RUN, permanentLabel: "ACCEPTANCE SANDBOX • NON-PRODUCTION", questions: [],
   }) } as never, "dev");
-  setCurrentCommerceSandboxRun("run-20260817");
+  advanceRuntimeRevision("run-20260817");
   await expect(api.course("course-1", "en")).rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" } satisfies Partial<ApiError>);
-  setCurrentCommerceSandboxRun(null);
+  advanceRuntimeRevision(null);
 });

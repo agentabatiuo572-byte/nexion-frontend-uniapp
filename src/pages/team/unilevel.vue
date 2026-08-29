@@ -235,7 +235,7 @@ import type { TeamUnilevelSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { navTo } from "@/lib/route";
 
 type RateTierId = "standard" | "verified" | "elite" | "diamond";
@@ -286,11 +286,11 @@ async function loadRemote() {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   remoteState.value = "loading";
   remoteSnapshot.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
-    && isCurrentAccountScope(accountScope) && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.unilevel("month");
     if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }

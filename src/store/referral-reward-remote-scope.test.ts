@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { setCurrentCommerceSandboxRun } from "@/api/order-api";
+import { advanceRuntimeRevision } from "@/api/order-api";
 import type { ReferralRewardSnapshot } from "@/api/referral-reward-api";
 
 const remote = vi.hoisted(() => ({
@@ -23,8 +23,8 @@ function snapshot(account: string): ReferralRewardSnapshot {
   return {
     referralCode: `REF-${account}`, inviterRewardNex: 10, invitedCount: 1, pendingCount: 0, settledCount: 1,
     lifetimeInviterNex: 10, walletNexAvailable: 20, recentRewards: [], limit: 10,
-    source: "mock", sourceEnvironment: "SANDBOX", runId: "catalog-run-20260816",
-    factSources: ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"],
+    source: "ledger", sourceEnvironment: "PRODUCTION", runId: null,
+    factSources: ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"],
     refreshedAt: "2026-08-16T00:00:00Z",
   };
 }
@@ -32,7 +32,7 @@ function snapshot(account: string): ReferralRewardSnapshot {
 beforeEach(() => {
   setActivePinia(createPinia());
   remote.referralRewardApi.snapshot.mockReset();
-  setCurrentCommerceSandboxRun("catalog-run-20260816");
+  advanceRuntimeRevision("catalog-run-20260816");
 });
 
 describe("referral reward remote scope", () => {
@@ -42,7 +42,7 @@ describe("referral reward remote scope", () => {
     const store = useReferralReward();
     const request = store.refresh();
 
-    setCurrentCommerceSandboxRun("catalog-run-20260817");
+    advanceRuntimeRevision("catalog-run-20260817");
     pending.resolve(snapshot("old-run"));
 
     await expect(request).resolves.toBe(false);
@@ -56,7 +56,7 @@ describe("referral reward remote scope", () => {
     const store = useReferralReward();
     const request = store.refresh();
 
-    setCurrentCommerceSandboxRun("catalog-run-20260817");
+    advanceRuntimeRevision("catalog-run-20260817");
     pending.reject(new Error("OLD_RUN_FAILURE"));
 
     await expect(request).resolves.toBe(false);

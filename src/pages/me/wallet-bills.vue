@@ -15,7 +15,6 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.bills.title" />
-      <FundsSandboxBadge />
 
       <!-- Tabs -->
       <view class="flex" :style="segWrapStyle">
@@ -99,7 +98,6 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
@@ -123,7 +121,7 @@ async function refreshLedger() {
   try {
     await billsStore.refreshServerLedger();
   } catch (cause) {
-    refreshError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+    refreshError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
   } finally {
     ledgerRefreshing.value = false;
   }

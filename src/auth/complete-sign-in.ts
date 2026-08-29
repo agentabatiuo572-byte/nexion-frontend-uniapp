@@ -162,18 +162,11 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     app.projectServerIdentity(options.serverProfile);
     useProfile().projectServerIdentity(options.serverProfile);
   }
-  // App.onShow is not guaranteed after an H5 reLaunch. Complete the fleet
-  // bootstrap here as well. The catalog is the RunID authority for every
-  // isolated sandbox store, so the wallet read must start only after that
-  // attempt settles; firing both in parallel can make a valid first-login
-  // wallet response stale and leave every Sandbox badge hidden until reload.
+  // App.onShow is not guaranteed after an H5 reLaunch. Complete the canonical
+  // catalogue/fleet bootstrap here as well.
   if (remoteApiEnabled) {
     void app.refreshHomeTruth();
-    void refreshRemoteFleetAfterCatalog(options.identity).finally(() => {
-      // authApi persisted this matching Bearer session before completeSignIn.
-      // The store still rejects a failed/missing catalog or mismatched account.
-      void app.refreshFundsSandboxForAccount(options.identity);
-    });
+    void refreshRemoteFleetAfterCatalog(options.identity);
   }
   // reLaunch does not reliably emit App.onShow in an existing H5 document.
   // Fetch the new account's server buckets here; a failed request leaves the

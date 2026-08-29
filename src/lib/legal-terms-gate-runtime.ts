@@ -1,6 +1,6 @@
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
-import { captureCommerceSandboxRun } from "@/api/order-api";
+import { captureRuntimeRevision } from "@/api/order-api";
 import {
   buildLegalTermsRoute,
   claimLegalTermsRedirect,
@@ -18,13 +18,8 @@ const redirectedKeys = new Set<string>();
 function fence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
   if (!session?.accessToken) return null;
-  const run = captureCommerceSandboxRun();
-  // Login can start the Terms request before the sandbox catalogue publishes
-  // its RunID. Do not bind that initial request to the pre-catalog epoch; once
-  // a RunID exists, later requests are fenced to that exact generation.
-  return run.runId
-    ? { accessToken: session.accessToken, userId: session.user.userId, runId: run.runId, runEpoch: run.epoch }
-    : { accessToken: session.accessToken, userId: session.user.userId };
+  const revision = captureRuntimeRevision();
+  return { accessToken: session.accessToken, userId: session.user.userId, runEpoch: revision.epoch };
 }
 
 /**
@@ -47,7 +42,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
   const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
     .then((snapshot) => {
       if (!sameLegalTermsSession(requestFence, fence())) return;
-      if (!sameLegalTermsRun(snapshot, captureCommerceSandboxRun().runId)) return;
+      if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
         const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${returnTo}`;
         if (claimLegalTermsRedirect(redirectedKeys, redirectKey)) {

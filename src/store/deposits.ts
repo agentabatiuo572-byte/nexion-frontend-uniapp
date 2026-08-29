@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { fundsSandboxApi, developmentFundsEnabled, fundsServerEnabled, paymentApi, remoteApiEnabled } from "@/api/runtime";
+import { fundsServerEnabled, paymentApi, remoteApiEnabled } from "@/api/runtime";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { normalizeAccountKey } from "./account-cloud";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
@@ -32,7 +32,6 @@ import {
   type BankReceiveAccount,
 } from "./deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord } from "./types";
-import type { FundsSandboxLedgerEntry, FundsSandboxOrder, FundsSandboxTopupChannel } from "@/api/funds-sandbox-api";
 import type { VietQrIntentSnapshot, VietQrIntentStatus } from "@/api/payment-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 import {
@@ -41,20 +40,6 @@ import {
   remoteGenerationMatches,
 } from "@/lib/vietqr-remote-safety";
 import {
-  captureFundsSandboxRequestScope,
-  fundsSandboxStaleRequestError,
-  isCurrentFundsSandboxRequestScope,
-  isFundsSandboxStaleRequestError,
-} from "@/lib/funds-sandbox-request-scope";
-import {
-  bindPendingFundsMutationOrder,
-  finishPendingFundsMutation,
-  finishPendingFundsMutationByOrder,
-  fundsAmountFingerprint,
-  pendingFundsMutationKey,
-  type FundsMutationIdentity,
-} from "@/lib/funds-mutation-key";
-import {
   bindVietQrIntent,
   finishVietQrCommand,
   finishVietQrCommandByIntent,
@@ -62,7 +47,7 @@ import {
   type VietQrCommandIdentity,
 } from "@/lib/vietqr-command-key";
 
-/** Receipt-list fields that are proven by either the VietQR service or the isolated server sandbox ledger. */
+/** Receipt-list fields proven by the canonical VietQR service. */
 export interface ServerReceiptListItem {
   receiptNo: string;
   intentNo: string;
@@ -136,7 +121,7 @@ export const useDeposits = defineStore("deposits", () => {
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import 的编排收口)。
   const records = ref<DepositRecord[]>([]);
   const intents = ref<DepositIntent[]>([]);
-  const serverStatus = ref<"idle" | "loading" | "ready" | "error">(developmentFundsEnabled ? "idle" : "ready");
+  const serverStatus = ref<"idle" | "loading" | "ready" | "error">("ready");
   const serverError = ref("");
   const remoteReceipts = ref<ServerReceiptListItem[]>([]);
   const remoteReceiptNextOffset = ref<number | null>(null);
@@ -222,10 +207,7 @@ export const useDeposits = defineStore("deposits", () => {
       intents.value = [];
       remoteReceipts.value = [];
       remoteReceiptNextOffset.value = null;
-      // 🔴 合并裁决(2026-08-14):取远端那侧。
-      //   本地这侧写的是「developmentFundsEnabled 为假 ⇒ 状态 error + FUNDS_DEPOSIT_PROVIDER_NOT_CONFIGURED」,
-      //   前提是「非沙箱就没有入金 provider」。远端这笔正好把这个前提推翻了 ——
-      //   新增 refreshRemoteVietQrDeposits 作为非沙箱侧的真 provider。前提没了,那条报错就是错的。
+      // 开发与生产统一读取服务端 VietQR provider。
       serverStatus.value = "idle";
       serverError.value = "";
       // 🔴 两支**各自显式调用**,不要经局部变量转发。
@@ -237,8 +219,7 @@ export const useDeposits = defineStore("deposits", () => {
       //   serverStatus / serverError 上。挂了也永远打不到,是死代码 ——
       //   (合并时我一度把远端那半 .catch 原样粘了回来,而它在本地这侧前一天刚被删掉,
       //    理由正是「缝内已自吞」;独立审计逐行比对两个父提交后指出来的。)
-      if (developmentFundsEnabled) void refreshFundsSandboxDeposits();
-      else void refreshRemoteVietQrDeposits();
+      void refreshRemoteVietQrDeposits();
       if (remotePollingActive) startRemoteVietQrPolling();
       return;
     }
@@ -884,158 +865,6 @@ export const useDeposits = defineStore("deposits", () => {
     return rec;
   }
 
-  function sandboxChannel(channel: FundsSandboxTopupChannel): DepositChannel {
-    if (channel === "VIETQR") return "bank-vietqr";
-    if (channel === "CARD") return "card-intl";
-    return "usdt-bep20";
-  }
-
-  function sandboxRecord(order: FundsSandboxOrder): DepositRecord {
-    const channel = sandboxChannel(order.channel);
-    const createdAt = Date.parse(order.createdAt);
-    const credited = order.status === "SETTLED";
-    return {
-      depositId: order.orderNo,
-      channel,
-      grossAmountUsdt: order.amount,
-      feeUsdt: 0,
-      creditedUsdt: order.amount,
-      status: credited ? "credited" : "detected",
-      createdAt,
-      ...(credited && order.settledAt ? { creditedAt: Date.parse(order.settledAt) } : {}),
-      ...(channel === "usdt-bep20" ? {
-        address: depositAddress("usdt-bep20"),
-        txHash: order.orderNo,
-        confirmations: credited ? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"] : 0,
-        requiredConfirmations: CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"],
-      } : {}),
-      ...(channel === "card-intl" ? { authCode: order.orderNo } : {}),
-    };
-  }
-
-  function sandboxIntent(order: FundsSandboxOrder): DepositIntent {
-    const fxRate = useFx().quoteRate;
-    const createdAt = Date.parse(order.createdAt);
-    return {
-      intentId: order.orderNo,
-      usdtAmount: order.amount,
-      fxRate,
-      vndAmount: vndForUsdt(order.amount, fxRate),
-      memoCode: `SBX-${order.orderNo.slice(-6)}`,
-      bankAccount: pickBankAccount(intents.value.length, bankAccounts.value) ?? BANK_RECEIVE_ACCOUNTS[0],
-      status: order.status === "SETTLED" ? "credited" : "awaiting_payment",
-      createdAt,
-      expireAt: createdAt + 30 * ONE_MINUTE_MS,
-      ...(order.settledAt ? { matchedAt: Date.parse(order.settledAt) } : {}),
-    };
-  }
-
-  async function refreshFundsSandboxDeposits(): Promise<void> {
-    if (!remoteApiEnabled) return;
-    if (!developmentFundsEnabled) return;
-    const expectedAccountKey = serverAccountKey;
-    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, remoteGeneration);
-    serverStatus.value = "loading";
-    serverError.value = "";
-    try {
-      const overview = await fundsSandboxApi.overview();
-      if (expectedAccountKey !== serverAccountKey) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-      if (!isCurrentFundsSandboxRequestScope(expectedScope, serverAccountKey, remoteGeneration)) {
-        throw fundsSandboxStaleRequestError();
-      }
-      const topups = overview.orders.filter((order) => order.kind === "TOPUP");
-      records.value = topups.map(sandboxRecord);
-      intents.value = topups.filter((order) => order.channel === "VIETQR").map(sandboxIntent);
-      const creditByOrder = new Map<string, FundsSandboxLedgerEntry>(overview.ledger
-        .filter((entry) => entry.entryRole === "TOPUP_CREDIT" && entry.direction === "IN")
-        .map((entry) => [entry.orderNo, entry]));
-      remoteReceipts.value = topups
-        .filter((order) => order.channel === "VIETQR" && order.status === "SETTLED")
-        .flatMap((order) => {
-          const ledger = creditByOrder.get(order.orderNo);
-          return ledger ? [{
-            receiptNo: ledger.ledgerNo,
-            intentNo: order.orderNo,
-            viewType: "SANDBOX_SERVER_LEDGER",
-            status: "credited",
-            creditedUsdt: order.amount,
-            createdAt: ledger.createdAt,
-          }] : [];
-        });
-      remoteReceiptNextOffset.value = null;
-      topups.filter((order) => order.status === "SETTLED" || order.status === "FAILED")
-        .forEach((order) => finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", order.orderNo));
-      serverStatus.value = "ready";
-    } catch (cause) {
-      if (isCurrentFundsSandboxRequestScope(expectedScope, serverAccountKey, remoteGeneration)
-          && !isFundsSandboxStaleRequestError(cause)) {
-        records.value = [];
-        intents.value = [];
-        serverStatus.value = "error";
-        serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
-      }
-      // 权威不可达是常态输入,不 reject(resilience 门);serverError/serverStatus 即降级态。
-    }
-  }
-
-  async function createSandboxTopup(
-    channel: FundsSandboxTopupChannel,
-    amount: number,
-    rawExpectedAccountKey: string,
-  ): Promise<DepositRecord | null> {
-    if (!remoteApiEnabled) return null;
-    if (!developmentFundsEnabled || !Number.isFinite(amount) || amount <= 0) return null;
-    const expectedAccountKey = serverAccountKey;
-    if (normalizeAccountKey(rawExpectedAccountKey) !== expectedAccountKey) {
-      throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-    }
-    const mutation: FundsMutationIdentity = {
-      accountKey: expectedAccountKey,
-      environment: "SANDBOX",
-      method: `TOPUP:${channel}`,
-      fingerprint: JSON.stringify({ channel, amount: fundsAmountFingerprint(amount) }),
-    };
-    const idempotencyKey = pendingFundsMutationKey(mutation);
-    const expectedScope = captureFundsSandboxRequestScope(expectedAccountKey, remoteGeneration);
-    let order: FundsSandboxOrder;
-    try {
-      order = await fundsSandboxApi.createTopup(channel, amount, idempotencyKey);
-    } catch (cause) {
-      if (!isCurrentFundsSandboxRequestScope(expectedScope, serverAccountKey, remoteGeneration)) {
-        throw fundsSandboxStaleRequestError();
-      }
-      throw cause;
-    }
-    if (expectedAccountKey !== serverAccountKey) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
-    if (!isCurrentFundsSandboxRequestScope(expectedScope, serverAccountKey, remoteGeneration)) {
-      throw fundsSandboxStaleRequestError();
-    }
-    if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
-    // Refresh the wallet authority while the response still belongs to this
-    // account/run. Only after that await succeeds do we expose the new order;
-    // a catalog/account switch during reconciliation therefore writes nothing.
-    await useApp().refreshFundsSandbox();
-    if (!isCurrentFundsSandboxRequestScope(expectedScope, serverAccountKey, remoteGeneration)) {
-      throw fundsSandboxStaleRequestError();
-    }
-    bindPendingFundsMutationOrder(mutation, idempotencyKey, order.orderNo);
-    const record = sandboxRecord(order);
-    records.value = [record, ...records.value.filter((item) => item.depositId !== record.depositId)];
-    if (channel === "VIETQR") {
-      const intent = sandboxIntent(order);
-      intents.value = [intent, ...intents.value.filter((item) => item.intentId !== intent.intentId)];
-    }
-    if (order.status === "SETTLED" || order.status === "FAILED") {
-      finishPendingFundsMutation(mutation, idempotencyKey);
-    }
-    return record;
-  }
-
-  async function createSandboxBankIntent(amount: number, expectedAccountKey: string): Promise<DepositIntent | null> {
-    const record = await createSandboxTopup("VIETQR", amount, expectedAccountKey);
-    return record ? intents.value.find((item) => item.intentId === record.depositId) ?? null : null;
-  }
-
   function remoteIntentStatus(status: VietQrIntentStatus): DepositIntent["status"] {
     if (status === "credited") return "credited";
     if (status === "expired") return "expired";
@@ -1082,7 +911,6 @@ export const useDeposits = defineStore("deposits", () => {
 
   async function refreshRemoteVietQrDeposits(): Promise<void> {
     if (!remoteApiEnabled) return;
-    if (developmentFundsEnabled) return;
     if (remoteRefreshInFlight) return;
     remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
@@ -1113,7 +941,7 @@ export const useDeposits = defineStore("deposits", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
       }
-      // 🔴 与上面 refreshFundsSandboxDeposits 同规矩:权威不可达是常态输入,**不 reject**。
+      // 权威不可达是常态输入,**不 reject**。
       //   原来这里 `throw cause`,靠每个调用点各写一个 .catch 撑着 —— 而那正是
       //   docs/changes/2026-08-13-remote-refresh-resilience.md 明确否决的做法:
       //   每新增一个裸 void 调用点就漏一个,漏了就是生产环境的 unhandled rejection。
@@ -1124,7 +952,7 @@ export const useDeposits = defineStore("deposits", () => {
   }
 
   async function loadMoreRemoteVietQrReceipts(): Promise<void> {
-    if (!remoteApiEnabled || developmentFundsEnabled || remoteRefreshInFlight) return;
+    if (!remoteApiEnabled || remoteRefreshInFlight) return;
     const offset = remoteReceiptNextOffset.value;
     if (offset === null) return;
     remoteRefreshInFlight = true;
@@ -1151,7 +979,7 @@ export const useDeposits = defineStore("deposits", () => {
   }
 
   function startRemoteVietQrPolling(): void {
-    if (!remoteApiEnabled || developmentFundsEnabled) return;
+    if (!remoteApiEnabled) return;
     remotePollingActive = true;
     if (remotePollTimer) return;
     const generation = remoteGeneration;
@@ -1170,14 +998,14 @@ export const useDeposits = defineStore("deposits", () => {
 
   async function createRemoteBankIntent(amount: number, rawExpectedAccountKey: string): Promise<DepositIntent | null> {
     if (!remoteApiEnabled) return null;
-    if (developmentFundsEnabled || !Number.isFinite(amount) || amount <= 0) return null;
+    if (!Number.isFinite(amount) || amount <= 0) return null;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
     if (normalizeAccountKey(rawExpectedAccountKey) !== expectedAccountKey) throw new Error("VIETQR_ACCOUNT_CHANGED");
     const mutation: VietQrCommandIdentity = {
       accountKey: expectedAccountKey,
       action: "CREATE",
-      fingerprint: fundsAmountFingerprint(amount),
+      fingerprint: amount.toFixed(6),
     };
     for (let createAttempt = 0; createAttempt < 2; createAttempt += 1) {
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
@@ -1212,7 +1040,6 @@ export const useDeposits = defineStore("deposits", () => {
 
   async function cancelRemoteBankIntent(intentId: string): Promise<{ ok: boolean; conflict?: boolean }> {
     if (!remoteApiEnabled) return { ok: false };
-    if (developmentFundsEnabled) return { ok: false };
     const current = intents.value.find((item) => item.intentId === intentId);
     if (!current || current.status !== "awaiting_payment") return { ok: false, conflict: true };
     const expectedAccountKey = serverAccountKey;
@@ -1263,7 +1090,6 @@ export const useDeposits = defineStore("deposits", () => {
       resolveBankMismatch: _devResolveBankMismatch,
       resolveLateBankTransfer: _devResolveLateBankTransfer,
       setBankAccountEnabled: _devSetBankAccountEnabled,
-      sandboxTopup: (amount: number) => createSandboxTopup("CREGIS_USDT_BEP20", amount, currentAccountKey()),
     };
   }
 
@@ -1285,13 +1111,10 @@ export const useDeposits = defineStore("deposits", () => {
     createBankIntent,
     cancelBankIntent,
     submitCardPayment,
-    refreshFundsSandboxDeposits,
     refreshRemoteVietQrDeposits,
     loadMoreRemoteVietQrReceipts,
     startRemoteVietQrPolling,
     stopRemoteVietQrPolling,
-    createSandboxTopup,
-    createSandboxBankIntent,
     createRemoteBankIntent,
     cancelRemoteBankIntent,
     _devSimulateIncomingTransfer,

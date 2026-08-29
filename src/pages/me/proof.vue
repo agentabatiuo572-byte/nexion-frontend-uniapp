@@ -217,9 +217,9 @@ import type { ProofSnapshot } from "@/api/proof-api";
 import { proofStreakFacts } from "@/lib/proof-streak";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 type Variant = "earnings" | "streak" | "network";
@@ -257,11 +257,11 @@ async function refreshRemoteProof() {
   remoteError.value = false;
   const expectedAccount = app.accountKey;
   const accountScope = captureAccountScope();
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   const current = () => remoteMounted && request === remoteRequest
     && expectedAccount === app.accountKey
     && isCurrentAccountScope(accountScope)
-    && isCurrentCommerceSandboxScope(runScope);
+    && isCurrentRuntimeRevision(runScope);
   try {
     const value = await proofApi.snapshot();
     if (current()) remoteSnapshot.value = value;
@@ -277,7 +277,7 @@ watch(() => String(app.accountKey), () => {
   remoteError.value = false;
   void refreshRemoteProof();
 });
-const unsubscribeProofRun = subscribeCurrentCommerceSandboxRun(() => {
+const unsubscribeProofRun = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled || !remoteMounted) return;
   clearRemoteProof();
   void refreshRemoteProof();

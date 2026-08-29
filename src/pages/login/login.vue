@@ -64,8 +64,8 @@
           <view class="lg-otp">
             <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
           </view>
-          <view v-if="developmentOtpEnabled" class="lg-sandbox-otp" data-testid="development-otp-code" role="status">
-            <text class="lg-sandbox-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
+          <view v-if="developmentOtpEnabled" class="lg-development-otp" data-testid="development-otp-code" role="status">
+            <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
           <view class="lg-resend">
             <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
@@ -149,6 +149,7 @@ import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
 import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
+import { resolveRemoteLoginErrorKind } from "@/lib/remote-login-error";
 
 const t = useT();
 
@@ -286,7 +287,7 @@ function oauthProvider(label: string): OAuthProvider | null {
 function oauthError(cause: unknown, provider: OAuthProvider): string {
   const code = cause instanceof ApiError ? cause.message : "";
   if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
-      || code === "OAUTH_SANDBOX_ONLY") {
+      ) {
     return `${fmt(t.value.login.oauthUnavailableTitle, { provider })}: ${t.value.login.oauthUnavailableBody}`;
   }
   return remoteLoginError(cause);
@@ -544,11 +545,19 @@ function goSendCode() {
 }
 function remoteLoginError(error: unknown): string {
   const code = error instanceof ApiError ? error.message : "";
-  return geoText(code)
-    ?? (code === "USER_INVALID_CREDENTIALS" ? t.value.login.errorInvalidCredentials
-      : code === "USER_TWO_FACTOR_CHALLENGE_INVALID" || code === "OTP_CODE_INVALID"
-        ? t.value.security.twoFactorCodeInvalid
-        : t.value.authOtp.errorServiceUnavailable);
+  const geoMessage = geoText(code);
+  if (geoMessage) return geoMessage;
+  switch (resolveRemoteLoginErrorKind(code)) {
+    case "invalidCredentials": return t.value.login.errorInvalidCredentials;
+    case "invalidPhone": return t.value.login.errorInvalidPhone;
+    case "otpInvalid": return t.value.login.errorRemoteOtpInvalid;
+    case "twoFactorInvalid": return t.value.security.twoFactorCodeInvalid;
+    case "temporarilyLocked": return t.value.login.errorTemporarilyLocked;
+    case "accountBlocked": return t.value.login.errorAccountBlocked;
+    case "passwordResetRequired": return t.value.login.errorPasswordResetRequired;
+    case "signInStateChanged": return t.value.login.errorSignInStateChanged;
+    default: return t.value.authOtp.errorServiceUnavailable;
+  }
 }
 
 async function signInWithPassword() {
@@ -829,8 +838,8 @@ onUnmounted(() => cleanup());
 .lg-forgot-row { display: flex; justify-content: flex-end; }
 .lg-forgot { font-size: 13px; color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
 .lg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.lg-sandbox-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
-.lg-sandbox-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
+.lg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.lg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
 .lg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .lg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
 .lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }

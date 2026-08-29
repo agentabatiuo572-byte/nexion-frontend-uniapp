@@ -4,7 +4,7 @@ import { commissionConfigApi, remoteApiEnabled, teamInsightsApi } from "@/api/ru
 import type { CanonicalBinaryState, CanonicalCommissionConfig } from "@/api/commission-config-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, subscribeCurrentCommerceSandboxRun, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/commission.ts (zustand persist → Pinia + uni storage).
@@ -173,15 +173,15 @@ export const useCommission = defineStore("commission", () => {
   const configStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const binaryStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
 
-  type RequestScope = { accountKey: string; epoch: number; commerceRun: CommerceSandboxRunScope };
-  const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch, commerceRun: captureCommerceSandboxRun() });
+  type RequestScope = { accountKey: string; epoch: number; commerceRun: RuntimeRevisionScope };
+  const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch, commerceRun: captureRuntimeRevision() });
   const isCurrentScope = (scope: RequestScope): boolean =>
-    scope.accountKey === boundKey && scope.epoch === bindingEpoch && isCurrentCommerceSandboxScope(scope.commerceRun);
+    scope.accountKey === boundKey && scope.epoch === bindingEpoch && isCurrentRuntimeRevision(scope.commerceRun);
 
-  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
     // A catalogue environment/RunID change invalidates every remote snapshot;
-    // stale requests are also fenced by isCurrentCommerceSandboxScope().
+    // stale requests are also fenced by isCurrentRuntimeRevision().
     configRefreshGeneration += 1;
     config.value = null;
     binarySnapshot.value = null;

@@ -86,4 +86,18 @@ describe("repurchase remote authority", () => {
     expect(store.walletBalanceUsdt).toBe(0);
     expect(remote.repurchaseApi.open).not.toHaveBeenCalled();
   });
+
+  it("keeps the last canonical screen usable when a command is rejected", async () => {
+    remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(snapshot);
+    remote.repurchaseApi.open.mockRejectedValue(new Error("DISCLOSURE_REQUIRED"));
+    const store = useRepurchase();
+
+    await store.refresh();
+    await expect(store.open(200)).rejects.toThrow("DISCLOSURE_REQUIRED");
+
+    expect(store.config).toEqual(config);
+    expect(store.walletBalanceUsdt).toBe(500);
+    expect(store.error).toBe("");
+  });
 });

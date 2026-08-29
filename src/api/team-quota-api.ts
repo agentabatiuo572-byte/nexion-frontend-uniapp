@@ -3,7 +3,7 @@ import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
 
-export type TeamQuotaEnvironment = "PRODUCTION" | "SANDBOX";
+export type TeamQuotaEnvironment = "PRODUCTION";
 export interface TeamQuotaFacts { rank: number; directRefs: number; activeDirect: number; teamVolumeUSD: number }
 export interface TeamQuotaCondition { kind: "rank" | "directRefs" | "teamVolume"; required: number; current: number }
 export interface TeamQuotaTier {
@@ -24,8 +24,8 @@ function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
   const source = row(value);
   if (!matchesRuntimeProvenance(source, mode, "server")) return invalid();
   const environment = source.sourceEnvironment;
-  const runId = text(source.runId, environment === "SANDBOX");
-  if (environment === "PRODUCTION" && runId !== "") return invalid();
+  const runId = text(source.runId, false);
+  if (runId !== "") return invalid();
   const facts = row(source.facts);
   const parsedFacts = { rank: num(facts.rank, true), directRefs: num(facts.directRefs, true), activeDirect: num(facts.activeDirect, true), teamVolumeUSD: num(facts.teamVolumeUSD) };
   if (!Array.isArray(source.tiers)) return invalid();

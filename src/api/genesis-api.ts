@@ -2,7 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 
-export type GenesisSourceEnvironment = "PRODUCTION" | "SANDBOX";
+export type GenesisSourceEnvironment = "PRODUCTION";
 
 export interface GenesisSalePolicy {
   available: boolean;
@@ -166,28 +166,12 @@ function integer(value: unknown, min = 0): number | null {
   return parsed !== null && Number.isInteger(parsed) ? parsed : null;
 }
 
-const LOCAL_ACCEPTANCE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
-
 function validAuthority(
   row: Record<string, unknown> | null,
-  mode: ApiEnvironment,
-  allowDevelopmentSandbox = false,
-  expectedSandboxRunId = "",
+  _mode: ApiEnvironment,
 ): boolean {
-  if (!row || row.serverCanonical !== true) return false;
-  if ((mode === "dev" || mode === "prod")
-      && row.sourceEnvironment === "PRODUCTION" && row.runId === "") return true;
-  // Standard dev and production-shaped bundles accept only the canonical
-  // business rail above. An explicitly constructed acceptance client may opt
-  // into the isolated server-side Sandbox rail, but only with the exact
-  // validated RunID; normal H5 startup never supplies that opt-in.
-  return allowDevelopmentSandbox
-    && mode === "dev"
-    && row.source === "mock"
-    && row.sourceEnvironment === "SANDBOX"
-    && typeof row.runId === "string"
-    && LOCAL_ACCEPTANCE_RUN_ID.test(expectedSandboxRunId)
-    && row.runId === expectedSandboxRunId;
+  return Boolean(row && row.serverCanonical === true
+    && row.sourceEnvironment === "PRODUCTION" && row.runId === "");
 }
 
 function timestamp(value: unknown, nullable = false): number | null {
@@ -241,7 +225,7 @@ function parseSale(value: unknown): GenesisSalePolicy {
   };
 }
 
-function parseEligibility(value: unknown, mode: ApiEnvironment, expectedSandboxRunId = ""): GenesisEligibility {
+function parseEligibility(value: unknown, mode: ApiEnvironment): GenesisEligibility {
   const row = record(value);
   const ownedCount = integer(row?.ownedCount);
   const maxPerUser = integer(row?.maxPerUser);
@@ -257,7 +241,7 @@ function parseEligibility(value: unknown, mode: ApiEnvironment, expectedSandboxR
   const asOf = timestamp(row?.asOf);
   const serverTime = timestamp(row?.serverTime);
   const provenance = record(row?.provenance);
-  if (!row || !validAuthority(row, mode, true, expectedSandboxRunId) || typeof row.eligible !== "boolean"
+  if (!row || !validAuthority(row, mode) || typeof row.eligible !== "boolean"
       || !Array.isArray(row.reasons) || !row.reasons.every((reason) => typeof reason === "string")
       || ownedCount === null || maxPerUser === null || remainingCap === null
       || minAccountAgeDays === null || accountAgeDays === null
@@ -443,14 +427,13 @@ export function parseGenesisPublicState(value: unknown, mode: ApiEnvironment = "
 export function parseGenesisAccountState(
   value: unknown,
   mode: ApiEnvironment = "prod",
-  expectedSandboxRunId = "",
 ): GenesisAccountState {
   const row = record(value);
   const series = parseSeries(row?.series);
   const sale = parseSale(row?.sale);
   const walletBalanceUsdt = number(row?.walletBalanceUsdt);
   const orders = row?.orders;
-  if (!row || !validAuthority(row, mode, true, expectedSandboxRunId) || typeof row.marketEnabled !== "boolean"
+  if (!row || !validAuthority(row, mode) || typeof row.marketEnabled !== "boolean"
       || typeof row.emissionOpen !== "boolean" || !Array.isArray(row.holdings)
       || !Array.isArray(row.emissions) || !Array.isArray(orders) || walletBalanceUsdt === null) return invalid();
   return {
@@ -463,27 +446,27 @@ export function parseGenesisAccountState(
     holdings: row.holdings.map(parseHolding),
     emissions: row.emissions.map(parseEmission),
     orders: orders.map(parseTransaction),
-    eligibility: parseEligibility(row.eligibility, mode, expectedSandboxRunId),
+    eligibility: parseEligibility(row.eligibility, mode),
     walletBalanceUsdt,
     billNo: text(row.billNo) ?? undefined,
     receiptId: text(row.receiptId) ?? undefined,
   };
 }
 
-export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod", expectedSandboxRunId = "") {
+export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod") {
   return {
     state: async () => parseGenesisPublicState(await client.request({
       method: "GET", path: "/api/genesis/state", authenticated: false,
     }), mode),
     account: async () => parseGenesisAccountState(await client.request({
       method: "GET", path: "/api/genesis/account", authenticated: true,
-    }), mode, expectedSandboxRunId),
+    }), mode),
     eligibility: async () => parseEligibility(await client.request({
       method: "GET", path: "/api/genesis/eligibility", authenticated: true,
-    }), mode, expectedSandboxRunId),
+    }), mode),
     purchase: async (quantity: number, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST", path: "/api/genesis/purchase", authenticated: true, idempotencyKey, body: { quantity },
-    }), mode, expectedSandboxRunId),
+    }), mode),
     list: async (holdingNo: string, askPriceUsdt: number, idempotencyKey: string) =>
       parseGenesisAccountState(await client.request({
         method: "POST",
@@ -491,18 +474,18 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
         authenticated: true,
         idempotencyKey,
         body: { askPriceUsdt },
-      }), mode, expectedSandboxRunId),
+      }), mode),
     cancel: async (holdingNo: string, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "DELETE",
       path: `/api/genesis/holdings/${encodeURIComponent(holdingNo)}/listing`,
       authenticated: true,
       idempotencyKey,
-    }), mode, expectedSandboxRunId),
+    }), mode),
     buy: async (holdingNo: string, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST",
       path: `/api/genesis/listings/${encodeURIComponent(holdingNo)}/buy`,
       authenticated: true,
       idempotencyKey,
-    }), mode, expectedSandboxRunId),
+    }), mode),
   };
 }

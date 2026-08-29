@@ -61,6 +61,7 @@
             <input
               :value="String(amount)"
               type="digit"
+              :disabled="confirming || repurchase.submitting"
               :style="amountInputStyle"
               @input="onAmount"
             />
@@ -68,7 +69,7 @@
           </view>
           <view class="grid grid-cols-4" style="gap: 8px; margin-top: 12px">
             <!-- 反馈恒定:选中档原是空 class,按下零反馈 -->
-            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" role="button" tabindex="0" @click="amount = p">
+            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" role="button" tabindex="0" @click="selectPreset(p)">
               <text>${{ p }}</text>
             </view>
           </view>
@@ -110,7 +111,7 @@ import Row from "@/components/me/repurchase-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { toast } from "@/store/ui";
+import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { useStaking } from "@/store/staking";
@@ -134,6 +135,7 @@ const isMounted = ref(true);
 const user = computed(() => app.user);
 const amount = ref<number>(200);
 const amountTouched = ref(false);
+const confirming = ref(false);
 const presets = computed(() => (isRemote.value ? (repurchase.config?.presets ?? []) : PRESETS));
 const displayBalance = computed(() => (isRemote.value ? repurchase.walletBalanceUsdt : user.value.usdtBalance));
 const remoteReady = computed(() => isRemote.value && repurchase.config !== null && !repurchase.error);
@@ -148,6 +150,8 @@ const canSubmit = computed(() => {
     const config = repurchase.config;
     return Boolean(
       config?.enabled
+      && !confirming.value
+      && !repurchase.submitting
       && Number.isFinite(amount.value)
       && amount.value >= config.minAmountUsdt
       && amount.value <= repurchase.walletBalanceUsdt,
@@ -206,8 +210,15 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAmount(e: Event) {
+  if (confirming.value || repurchase.submitting) return;
   amountTouched.value = true;
   amount.value = Math.max(0, parseFloat(detailVal(e)) || 0);
+}
+
+function selectPreset(preset: number) {
+  if (confirming.value || repurchase.submitting) return;
+  amountTouched.value = true;
+  amount.value = preset;
 }
 
 async function refreshRemote() {
@@ -222,10 +233,31 @@ async function refreshRemote() {
 async function handleRepurchase() {
   if (isRemote.value) {
     if (!remoteReady.value || !canSubmit.value || !isMounted.value) return;
+    confirming.value = true;
+    const quoteAmount = amount.value;
+    let confirmed = false;
     try {
-      await repurchase.open(amount.value);
+      const config = repurchase.config;
+      confirmed = await uiConfirm({
+        title: w.value.confirmTitle,
+        message: fmt(w.value.confirmMessage, {
+          amount: quoteAmount.toFixed(2),
+          days: config?.lockDays ?? 0,
+          penalty: config?.earlyPenaltyPct ?? 0,
+        }),
+        confirmLabel: w.value.confirmLabel,
+        cancelLabel: w.value.cancelLabel,
+        icon: "warn",
+        owner: "wallet-repurchase",
+      });
+    } finally {
+      confirming.value = false;
+    }
+    if (!confirmed || !isMounted.value) return;
+    try {
+      await repurchase.open(quoteAmount);
       if (!isMounted.value) return;
-      toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: amount.value }));
+      toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: quoteAmount }));
       const nextPreset = repurchase.config?.presets?.[0];
       amount.value = nextPreset ?? repurchase.config?.minAmountUsdt ?? 0;
     } catch (cause) {

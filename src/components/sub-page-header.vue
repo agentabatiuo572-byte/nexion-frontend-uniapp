@@ -53,7 +53,7 @@ import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications } from "@/store/notifications";
 import { useT } from "@/i18n/use-t";
-import { resolveHeaderTitleText } from "@/lib/header-title";
+import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
@@ -72,6 +72,10 @@ const rowH = computed(() => (props.subtitle ? 56 : 44));
 // as app-chassis.vue). Used to derive a route-based title when none is passed.
 function readRoute(): string {
   try {
+    if (typeof window !== "undefined") {
+      const visibleH5Route = routeFromH5Hash(window.location.hash);
+      if (visibleH5Route) return visibleH5Route;
+    }
     const ps = getCurrentPages();
     return ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
   } catch {

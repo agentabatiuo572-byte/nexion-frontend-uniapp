@@ -4,13 +4,13 @@ import { createSessionVault } from "./session-vault";
 
 const response = (overrides: Record<string, unknown> = {}) => ({
   accessToken: "access", refreshToken: "refresh", tokenType: "Bearer",
-  user: { userId: 8101, countryCode: "+1", phone: "900123456789", nickname: "Google Sandbox" },
-  source: "mock", sandbox: true, ...overrides,
+  user: { userId: 8101, countryCode: "+86", phone: "18708173775", nickname: "Development User" },
+  source: "development", sandbox: false, ...overrides,
 });
 
 const challenge = { challengeNo: "OAUTH-11111111111111111111111111111111", expiresInSec: 300 };
 
-test("OAuth exchange consumes a server-issued one-time Sandbox challenge", async () => {
+test("development Passkey consumes a server-issued canonical development challenge", async () => {
   const requests: any[] = [];
   const api = createAuthApi({
     request: async (value: any) => {
@@ -20,40 +20,41 @@ test("OAuth exchange consumes a server-issued one-time Sandbox challenge", async
   } as never, createSessionVault());
 
   await expect(api.oauthExchange({
-    provider: "GOOGLE",
-  })).resolves.toMatchObject({ source: "mock", sandbox: true, user: { userId: 8101 } });
+    provider: "PASSKEY",
+  })).resolves.toMatchObject({ source: "development", sandbox: false, user: { userId: 8101 } });
   expect(requests[0]).toMatchObject({
-    path: "/auth/users/oauth/sandbox/challenge", method: "POST", authenticated: false,
-    body: { provider: "GOOGLE" },
+    path: "/auth/users/oauth/development/passkey/challenge", method: "POST", authenticated: false,
+    body: { provider: "PASSKEY" },
   });
   expect(requests[1]).toMatchObject({
     path: "/auth/users/oauth/exchange", method: "POST", authenticated: false,
-    body: { provider: "GOOGLE", challengeNo: challenge.challengeNo },
+    body: { provider: "PASSKEY", challengeNo: challenge.challengeNo },
   });
   expect(requests[1].body).not.toHaveProperty("externalSubject");
 });
 
-test.each(["PASSKEY", "TELEGRAM"] as const)("%s lets the backend profile own the exchange environment", async (provider) => {
+test.each(["GOOGLE", "APPLE", "TELEGRAM"] as const)("%s goes directly to the configured provider exchange", async (provider) => {
   const requests: any[] = [];
   const api = createAuthApi({ request: async (value: any) => {
     requests.push(value);
-    return value.path.endsWith("/challenge") ? challenge : response();
+    return response({ source: "provider" });
   } } as never,
     createSessionVault());
 
   await expect(api.oauthExchange({
     provider,
-  })).resolves.toMatchObject({ source: "mock", sandbox: true });
+  })).resolves.toMatchObject({ source: "provider", sandbox: false });
+  expect(requests).toHaveLength(1);
   expect(requests[0].body.provider).toBe(provider);
-  expect(requests[1].body.provider).toBe(provider);
+  expect(requests[0].body).not.toHaveProperty("challengeNo");
 });
 
-test("OAuth exchange rejects a response that attempts to masquerade as a provider session", async () => {
+test("OAuth exchange rejects a response that attempts to masquerade as a Sandbox session", async () => {
   const api = createAuthApi({ request: async (request: any) => request.path.endsWith("/challenge")
     ? challenge
-    : response({ source: "provider", sandbox: false }) } as never, createSessionVault());
+    : response({ source: "mock", sandbox: true }) } as never, createSessionVault());
   await expect(api.oauthExchange({
-    provider: "APPLE",
+    provider: "PASSKEY",
   })).rejects.toThrow("OAUTH_RESPONSE_INVALID");
 });
 
@@ -66,7 +67,7 @@ test("a late OAuth response cannot overwrite a newer session epoch", async () =>
     ? challenge
     : new Promise((done) => { resolve = done; markExchangeStarted?.(); }) } as never, vault);
   const pending = api.oauthExchange({
-    provider: "GOOGLE",
+    provider: "PASSKEY",
   });
   await exchangeStarted;
   vault.save({

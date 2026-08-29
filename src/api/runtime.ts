@@ -35,7 +35,6 @@ import { createJanusApi } from "./janus-api";
 import { createBehaviorAnalyticsApi } from "./behavior-analytics-api";
 import { createEarningsReleaseApi } from "./earnings-release-api";
 import { createTaskAssignmentApi } from "./task-assignment-api";
-import { createFundsSandboxApi } from "./funds-sandbox-api";
 import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
 import { createProfileApi } from "./profile-api";
@@ -46,7 +45,6 @@ import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
 import { createDeveloperResourcesApi } from "./developer-resources-api";
 import { createBundleOrderApi } from "./bundle-order-api";
-import { createCommercePaymentApi } from "./commerce-payment-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
 import { createTeamInsightsApi } from "./team-insights-api";
 import { createWalletBillsApi } from "./wallet-bills-api";
@@ -69,17 +67,10 @@ import type { RefreshCredentialMode } from "./session-vault";
 export const apiRuntimeConfig = readApiRuntimeConfig();
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
 export const remoteApiEnabled = true;
-// The formal App never selects a browser-side funds sandbox. Development keeps
-// using the Java service's canonical, production-shaped contract; only payment
-// execution itself may be simulated by that server.
-export const developmentFundsEnabled = false;
-// Only the checkout command is simulated in local development. This does not
-// re-enable the retired browser funds sandbox; Java still owns payment,
-// fulfillment, idempotency and the sandbox-account boundary.
-export const developmentCommercePaymentEnabled = apiRuntimeConfig.environment === "dev";
-// Card tokenization/binding is development-only UI until a real PSP is configured.
-// Java remains authoritative and production must fail closed.
-export const developmentPaymentEnabled = apiRuntimeConfig.environment === "dev";
+// The formal App uses the Java service's canonical development contract in
+// both dev and prod builds. No browser-side Sandbox rail remains deployable.
+// Provider-backed card controls stay hidden until a real provider is enabled.
+export const developmentPaymentEnabled = false;
 export const fundsServerEnabled = true;
 // Payout addresses are server-owned in both dev and prod.
 export const payoutAddressServerEnabled = true;
@@ -146,7 +137,6 @@ export const janusApi = createJanusApi(apiClient);
 export const behaviorAnalyticsApi = createBehaviorAnalyticsApi(apiClient);
 export const earningsReleaseApi = createEarningsReleaseApi(apiClient);
 export const taskAssignmentApi = createTaskAssignmentApi(apiClient, expectedApiEnvironment);
-export const fundsSandboxApi = createFundsSandboxApi(apiClient, expectedApiEnvironment);
 export const referralRewardApi = createReferralRewardApi(apiClient, expectedApiEnvironment);
 export const supportApi = createSupportApi(apiClient);
 export const profileApi = createProfileApi(apiClient);
@@ -157,7 +147,6 @@ export const teamNetworkApi = createTeamNetworkApi(apiClient, expectedApiEnviron
 export const developerAccessApi = createDeveloperAccessApi(apiClient, expectedApiEnvironment);
 export const developerResourcesApi = createDeveloperResourcesApi(apiClient, expectedApiEnvironment);
 export const bundleOrderApi = createBundleOrderApi(apiClient);
-export const commercePaymentApi = createCommercePaymentApi(apiClient);
 export const ambassadorApplicationApi = createAmbassadorApplicationApi(
   apiClient, "PRODUCTION",
 );

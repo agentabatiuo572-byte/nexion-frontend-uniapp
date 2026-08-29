@@ -1,7 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export interface Goal {
   id: number;
@@ -24,7 +23,7 @@ export interface GoalList {
 export interface GoalRecommendation {
   serverCanonical: true;
   source: string;
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  sourceEnvironment: "PRODUCTION";
   runId: string;
   productNo: string;
   productName: string;
@@ -68,9 +67,8 @@ function validList(value: unknown): value is GoalList {
 }
 
 function validScope(row: Partial<GoalRecommendation>, mode: ApiEnvironment): boolean {
-  if (mode === "dev") return row.sourceEnvironment === "SANDBOX"
-    && typeof row.runId === "string" && isCurrentCommerceSandboxRun(row.runId);
-  return mode === "prod" && row.sourceEnvironment === "PRODUCTION" && row.runId === "";
+  return (mode === "dev" || mode === "prod")
+    && row.sourceEnvironment === "PRODUCTION" && row.runId === "";
 }
 
 function validRecommendation(value: unknown, mode: ApiEnvironment): value is GoalRecommendation {

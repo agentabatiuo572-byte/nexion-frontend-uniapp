@@ -22,7 +22,7 @@ export interface VoucherPopupCadence {
   nextEligibleAt: number;
   popupEligible: boolean;
   source: string;
-  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  sourceEnvironment: "PRODUCTION";
   runId: string;
 }
 
@@ -39,18 +39,18 @@ export function parseVoucherCadence(value: unknown, fence?: { environment?: "dev
   const popupEligible = bool(row?.popupEligible);
   if (enabled === null || delayMs === null || delayMs > 60000 || cooldownHours === null || cooldownHours > 720
       || maxPerSession === null || maxPerSession > 10 || nextEligibleAt === null || !source
-      || !["PRODUCTION", "SANDBOX"].includes(sourceEnvironment ?? "") || runId === null || popupEligible === null) invalid("VOUCHER_CADENCE_INVALID");
+      || sourceEnvironment !== "PRODUCTION" || runId === null || popupEligible === null) invalid("VOUCHER_CADENCE_INVALID");
   // dev/prod are Java deployment profiles. The formal App never selects a
   // sandbox rail; both consume the production-shaped canonical projection.
   if (fence?.environment && (sourceEnvironment !== "PRODUCTION" || runId !== "")) invalid("VOUCHER_CADENCE_SCOPE_MISMATCH");
-  return { enabled, delayMs, cooldownHours, maxPerSession, nextEligibleAt, popupEligible, source, sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX", runId };
+  return { enabled, delayMs, cooldownHours, maxPerSession, nextEligibleAt, popupEligible, source, sourceEnvironment: "PRODUCTION", runId };
 }
 
 export interface VoucherSnapshot {
   vouchers: CanonicalVoucher[];
   source: string;
   serverCanonical: true;
-  provenance: { source: string; sourceEnvironment: "PRODUCTION" | "SANDBOX"; runId: string };
+  provenance: { source: string; sourceEnvironment: "PRODUCTION"; runId: string };
 }
 
 export interface VoucherClaimResult {
@@ -128,7 +128,7 @@ function required(value: string, error: string): string {
   return normalized;
 }
 
-function parseVoucher(value: unknown, provenance?: { source: string; sourceEnvironment: "PRODUCTION" | "SANDBOX"; runId: string }): CanonicalVoucher {
+function parseVoucher(value: unknown, provenance?: { source: string; sourceEnvironment: "PRODUCTION"; runId: string }): CanonicalVoucher {
   const row = record(value);
   const id = text(row?.voucherId ?? row?.id);
   const name = text(row?.voucherName ?? row?.name);
@@ -217,9 +217,8 @@ function parseSnapshot(value: unknown, fence?: { environment?: "dev" | "prod"; r
       const pSource = text(provenanceRow.source);
       const env = text(provenanceRow.sourceEnvironment)?.toUpperCase();
       const runId = typeof provenanceRow.runId === "string" ? provenanceRow.runId.trim() : null;
-      if (pSource !== "nx_growth_voucher" || runId === null || !["PRODUCTION", "SANDBOX"].includes(env ?? "")
-          || env === "SANDBOX" && !runId) return invalid("VOUCHER_PROVENANCE_INVALID");
-      return { source: pSource, sourceEnvironment: env as "PRODUCTION" | "SANDBOX", runId };
+      if (pSource !== "nx_growth_voucher" || runId === null || env !== "PRODUCTION" || runId !== "") return invalid("VOUCHER_PROVENANCE_INVALID");
+      return { source: pSource, sourceEnvironment: "PRODUCTION" as const, runId };
     })();
   const vouchers = row.vouchers.map((item) => parseVoucher(item, provenance));
   parseVoucherCadence({ enabled: true, delayMs: 0, cooldownHours: 0, maxPerSession: 1,

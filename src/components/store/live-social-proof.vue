@@ -45,7 +45,7 @@ import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
 import { useApp } from "@/store/app";
 import { productCatalogState } from "@/store/product-catalog";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
 const props = defineProps<{ product: Product }>();
@@ -96,16 +96,16 @@ function clearRemoteProof(unavailable = false): void {
 function loadRemoteProof(request = remoteEpoch.snapshot()): void {
   const generation = ++remoteRequest;
   const expectedAccount = String(app.accountKey);
-  const runScope = captureCommerceSandboxRun();
+  const runScope = captureRuntimeRevision();
   void storefrontActivityApi.socialProof(props.product.id, 30).then((snapshot) => {
     if (remoteMounted && generation === remoteRequest && remoteEpoch.isCurrent(request)
-        && expectedAccount === String(app.accountKey) && isCurrentCommerceSandboxScope(runScope)) {
+        && expectedAccount === String(app.accountKey) && isCurrentRuntimeRevision(runScope)) {
       remoteProof.value = snapshot;
       remoteUnavailable.value = false;
     }
   }).catch(() => {
     if (remoteMounted && generation === remoteRequest && remoteEpoch.isCurrent(request)
-        && expectedAccount === String(app.accountKey) && isCurrentCommerceSandboxScope(runScope)) clearRemoteProof(true);
+        && expectedAccount === String(app.accountKey) && isCurrentRuntimeRevision(runScope)) clearRemoteProof(true);
   });
 }
 

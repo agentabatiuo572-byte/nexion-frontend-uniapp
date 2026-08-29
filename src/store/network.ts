@@ -3,9 +3,9 @@ import { onScopeDispose, ref } from "vue";
 import type { VRank } from "./v-rank";
 import { remoteApiEnabled, teamNetworkApi } from "@/api/runtime";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
 } from "@/api/order-api";
 
 /**
@@ -149,7 +149,7 @@ export const useNetwork = defineStore("network", () => {
     remoteStatus.value = "idle";
   }
 
-  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun(() => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
     clearRemoteNetwork();
     void refreshCanonicalNetwork();
@@ -160,8 +160,8 @@ export const useNetwork = defineStore("network", () => {
     if (!remoteApiEnabled) return true;
     const epoch = accountEpoch;
     const request = ++refreshSequence;
-    const runScope = captureCommerceSandboxRun();
-    const current = () => epoch === accountEpoch && request === refreshSequence && isCurrentCommerceSandboxScope(runScope);
+    const runScope = captureRuntimeRevision();
+    const current = () => epoch === accountEpoch && request === refreshSequence && isCurrentRuntimeRevision(runScope);
     remoteStatus.value = "loading";
     try {
       const snapshot = await teamNetworkApi.snapshot();

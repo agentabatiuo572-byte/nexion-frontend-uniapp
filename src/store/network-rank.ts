@@ -4,10 +4,10 @@ import { networkRankApi, remoteApiEnabled } from "@/api/runtime";
 import type { NetworkRankSnapshot } from "@/api/network-rank-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import {
-  captureCommerceSandboxRun,
-  isCurrentCommerceSandboxScope,
-  subscribeCurrentCommerceSandboxRun,
-  type CommerceSandboxRunScope,
+  captureRuntimeRevision,
+  isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
+  type RuntimeRevisionScope,
 } from "@/api/order-api";
 
 export const useNetworkRank = defineStore("networkRank", () => {
@@ -15,7 +15,7 @@ export const useNetworkRank = defineStore("networkRank", () => {
   let boundKey = "default";
   const epoch = createRemoteAccountEpoch(boundKey);
   let lastSuccessAt = 0;
-  let lastSuccessRun: CommerceSandboxRunScope | null = null;
+  let lastSuccessRun: RuntimeRevisionScope | null = null;
   let requestGeneration = 0;
   let refreshInFlight: { key: string; request: Promise<boolean> } | null = null;
   const snapshot = ref<NetworkRankSnapshot | null>(null);
@@ -36,17 +36,17 @@ export const useNetworkRank = defineStore("networkRank", () => {
   function refresh(request: RemoteAccountRequest = epoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return Promise.resolve(true);
     if (!epoch.isCurrent(request)) return Promise.resolve(false);
-    const runScope = captureCommerceSandboxRun();
-    if (!isCurrentCommerceSandboxScope(runScope)) return Promise.resolve(false);
+    const runScope = captureRuntimeRevision();
+    if (!isCurrentRuntimeRevision(runScope)) return Promise.resolve(false);
     if (snapshot.value !== null && status.value === "ready"
-      && lastSuccessRun !== null && isCurrentCommerceSandboxScope(lastSuccessRun)
+      && lastSuccessRun !== null && isCurrentRuntimeRevision(lastSuccessRun)
       && Date.now() - lastSuccessAt < HEALTHY_SNAPSHOT_MS) {
       return Promise.resolve(true);
     }
     const generation = requestGeneration;
     const current = () => generation === requestGeneration
       && epoch.isCurrent(request)
-      && isCurrentCommerceSandboxScope(runScope);
+      && isCurrentRuntimeRevision(runScope);
     const key = `${request.accountKey}:${request.epoch}:${runScope.epoch}:${runScope.runId ?? "production"}`;
     if (refreshInFlight?.key === key) return refreshInFlight.request;
     const pending = (async () => {
@@ -70,7 +70,7 @@ export const useNetworkRank = defineStore("networkRank", () => {
     });
     return pending;
   }
-  const unsubscribeCommerceRun = subscribeCurrentCommerceSandboxRun((scope) => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision((scope) => {
     if (!remoteApiEnabled) return;
     invalidate();
     if (scope.runId !== null) void refresh();

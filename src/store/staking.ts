@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { accountRowRev, readAccountRow, writeAccountRowCas } from "./account-scoped-storage";
 import { mockServerId } from "./mock-id";
-import { apiRuntimeConfig, stakingApi, remoteApiEnabled } from "@/api/runtime";
+import { stakingApi, remoteApiEnabled } from "@/api/runtime";
 import type { StakingPool } from "@/api/staking-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
@@ -101,7 +101,6 @@ function hydrate(accountKey: string): StakingSnapshot {
 
 export const useStaking = defineStore("staking", () => {
   const isMockMode = !remoteApiEnabled;
-  const sandboxMarket = apiRuntimeConfig.environment === "dev";
   const pools = ref<StakingPool[]>([]);
   const walletBalanceUsdt = ref(0);
   const remoteError = ref<string | null>(null);
@@ -116,9 +115,8 @@ export const useStaking = defineStore("staking", () => {
   let boundRev = boot.rev;
   const positions = ref<StakingPosition[]>(boot.positions);
 
-  function assertSandboxSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
-    const valid = snapshot.sourceEnvironment === (sandboxMarket ? "SANDBOX" : "PRODUCTION")
-      && (sandboxMarket ? typeof snapshot.runId === "string" && snapshot.runId.length > 0 : snapshot.runId === "");
+  function assertCanonicalSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
+    const valid = snapshot.sourceEnvironment === "PRODUCTION" && snapshot.runId === "";
     if (!valid) throw new Error("G1_RUNTIME_PROVENANCE_INVALID");
   }
 
@@ -131,7 +129,7 @@ export const useStaking = defineStore("staking", () => {
   }
 
   function applyRemoteSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
-    assertSandboxSnapshot(snapshot);
+    assertCanonicalSnapshot(snapshot);
     positions.value = snapshot.positions.map((position) => ({
       id: position.id,
       amountUSDT: position.amountUSDT,

@@ -54,8 +54,8 @@ export interface WithdrawalPolicy {
   enabledNetworks: SupportedWithdrawalNetwork[];
   currentPhase: string;
   currentMonth: number;
-  gateSource: "J1" | "FUNDS_SANDBOX";
-  source: "D5+H1" | "FUNDS_SANDBOX";
+  gateSource: "J1";
+  source: "D5+H1";
 }
 
 /** 单据状态镜像 —— GET /api/withdrawals/:id (PRD §9.11f 的按 id 读单通式)。 */

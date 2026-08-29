@@ -143,7 +143,7 @@ import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
-import { developmentFundsEnabled, remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useDeposits } from "@/store/deposits";
 import { useApp } from "@/store/app";
@@ -157,7 +157,7 @@ const PAGE_SIZE = 10;
 const t = useT();
 const app = useApp();
 const depositsStore = useDeposits();
-// Remote mode owns the entire receipt surface, including sandbox. Never construct
+// Remote mode owns the entire receipt surface. Never construct
 // the local store in a remote session: its setup reads account-scoped localStorage.
 const remoteReceiptsMode = remoteApiEnabled;
 const remoteReceiptItems = computed<ServerReceiptListItem[]>(() => depositsStore.remoteReceipts);
@@ -178,8 +178,7 @@ const hasMore = computed(() => visibleCount.value < filtered.value.length);
 
 onMounted(() => {
   if (!remoteReceiptsMode) return;
-  if (developmentFundsEnabled) void depositsStore.refreshFundsSandboxDeposits();
-  else void depositsStore.refreshRemoteVietQrDeposits();
+  void depositsStore.refreshRemoteVietQrDeposits();
 });
 
 let receiptPageRequestEpoch = 0;

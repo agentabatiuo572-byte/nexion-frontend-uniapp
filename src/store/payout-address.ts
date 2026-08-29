@@ -11,7 +11,7 @@ import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureCommerceSandboxRun, isCurrentCommerceSandboxScope, type CommerceSandboxRunScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -169,15 +169,15 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
-  type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: CommerceSandboxRunScope };
+  type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: RuntimeRevisionScope };
 
   function requestScope(): PayoutRemoteRequest {
-    return { ...remoteAccountEpoch.snapshot(), commerceRun: captureCommerceSandboxRun() };
+    return { ...remoteAccountEpoch.snapshot(), commerceRun: captureRuntimeRevision() };
   }
 
   function scopeIsCurrent(request: PayoutRemoteRequest): boolean {
     return remoteAccountEpoch.isCurrent(request) && request.accountKey === boundKey
-      && isCurrentCommerceSandboxScope(request.commerceRun);
+      && isCurrentRuntimeRevision(request.commerceRun);
   }
 
   function scopeChangedError(): Error {

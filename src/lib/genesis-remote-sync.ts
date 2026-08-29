@@ -21,15 +21,10 @@ export interface GenesisRemoteReadScope {
   applyEligibility(eligibility: GenesisEligibility): void;
 }
 
-export type GenesisEligibilityReadError =
-  | "GENESIS_SANDBOX_USER_RUN_CONFLICT"
-  | "GENESIS_ELIGIBILITY_UNAVAILABLE";
+export type GenesisEligibilityReadError = "GENESIS_ELIGIBILITY_UNAVAILABLE";
 
-function eligibilityReadError(...errors: unknown[]): GenesisEligibilityReadError {
-  return errors.some((error) => error instanceof Error
-    && error.message === "GENESIS_SANDBOX_USER_RUN_CONFLICT")
-    ? "GENESIS_SANDBOX_USER_RUN_CONFLICT"
-    : "GENESIS_ELIGIBILITY_UNAVAILABLE";
+function eligibilityReadError(..._errors: unknown[]): GenesisEligibilityReadError {
+  return "GENESIS_ELIGIBILITY_UNAVAILABLE";
 }
 
 /**
@@ -82,9 +77,8 @@ export async function readGenesisRemoteFacts(
     return false;
   }
   // Commit the public control plane first, then let an authenticated account
-  // projection overlay only its explicitly scoped facts (including the local
-  // SANDBOX supply rail). This keeps a just-confirmed purchase visible without
-  // turning the sandbox count into anonymous/production truth.
+  // projection overlay only its explicitly scoped facts. This keeps a
+  // just-confirmed purchase visible without changing public supply ownership.
   if (publicAvailable) scope.applyPublicState(publicResult.value);
   if (accountAvailable) {
     scope.applyAccount(accountResult.value);

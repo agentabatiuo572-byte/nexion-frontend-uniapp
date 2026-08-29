@@ -20,7 +20,6 @@
 
       <!-- Balance hero — de-carded: balance + actions sit on the page floor. -->
       <view :style="heroStyle">
-        <FundsSandboxBadge />
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
         <view class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
@@ -58,7 +57,7 @@
       </view>
       <view v-if="fundsAuthorityError" :style="syncFailBoxStyle">
         <!-- i18n-en-ok: 资金权威同步失败的工程话标题,下一行直接吐后端错误串,受众是排障的人 -->
-        <text class="block" :style="syncFailTitleStyle">SANDBOX</text>
+        <text class="block" :style="syncFailTitleStyle">{{ t.wallet.syncFailedTitle }}</text>
         <text class="block break-all" :style="syncFailBodyStyle">{{ fundsAuthorityError }}</text>
       </view>
 
@@ -118,7 +117,6 @@
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import WalletListRow from "@/components/me/wallet-list-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -131,7 +129,6 @@ import { confirm as uiConfirm } from "@/store/ui";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
-import { developmentFundsEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -140,8 +137,8 @@ const cards = useCards();
 const cfg = useConfig();
 
 const configSyncFailed = computed(() => cfg.syncFailed);
-const fundsAuthorityError = computed(() => developmentFundsEnabled && app.fundsSandboxStatus === "error"
-  ? app.fundsSandboxError
+const fundsAuthorityError = computed(() => app.remoteFleetStatus === "error"
+  ? app.remoteFleetError
   : "");
 
 // SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要

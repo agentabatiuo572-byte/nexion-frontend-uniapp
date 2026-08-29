@@ -1,15 +1,14 @@
 <!--
   EarningsLedgerCard — ZONE 5 recent micro-earnings ledger (ported from
   mission-control.tsx EarningsLedgerCard). Header (Earnings ledger · N of total)
-  + 5 rows (model · client · amount · age). Remote/Sandbox rows come from the
-  Home canonical projection; only the local demo uses mock rows.
+  + 5 rows (model · client · amount · age). Remote rows come from the Home
+  canonical projection; only the local demo uses mock rows.
 -->
 <template>
   <view data-home-section="earnings-ledger" :data-ledger-mode="app.homeTruth?.earningsLedgerMode ?? 'UNAVAILABLE'">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ ledgerTitle }} <text v-if="app.homeTruth?.sourceEnvironment === 'SANDBOX'" class="font-mono-tabular" style="font-size: 10px; color: var(--v5-ink-4)">· SANDBOX</text></text>
-      <text v-if="isQuoteExample" data-home-ledger-disclaimer="true" class="font-mono-tabular" style="font-size: 11px; color: var(--v5-warning-ink)">{{ t.home.sandboxQuoteNoCredit }}</text>
-      <text v-else class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll" @keydown.space.stop.prevent="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}</text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll" @keydown.space.stop.prevent="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
     </view>
 
     <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
@@ -43,9 +42,6 @@ import { useApp } from "@/store/app";
 
 const t = useT();
 const app = useApp();
-const isQuoteExample = computed(() => app.homeTruth?.earningsLedgerMode === "SANDBOX_QUOTE_EXAMPLES");
-const ledgerTitle = computed(() => isQuoteExample.value ? t.value.home.sandboxQuoteLedgerTitle : t.value.home.earningsLedgerTitle);
-
 const ROWS = [
   { id: 1, who: "Pocket Studios", model: "SDXL Turbo", amt: "+$0.00032", t: "2s" },
   { id: 2, who: "Echo Earbuds", model: "Whisper tiny", amt: "+$0.00005", t: "14s" },

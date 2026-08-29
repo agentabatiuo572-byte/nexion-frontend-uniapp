@@ -5,8 +5,8 @@ import { ApiError } from "@/api/errors";
 
 function eligibility(): GenesisEligibility {
   return {
-    sourceEnvironment: "SANDBOX",
-    runId: "seven-closures-20260817",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
     eligible: true,
     reasons: ["HOLDINGS_CONFIRMED"],
     ownedCount: 10,
@@ -25,9 +25,9 @@ function eligibility(): GenesisEligibility {
     asOf: Date.parse("2026-08-18T07:18:13Z"),
     serverTime: Date.parse("2026-08-18T07:18:13Z"),
     provenance: {
-      source: "nx_genesis_sandbox_holding+nx_config_item",
-      environment: "SANDBOX",
-      runId: "seven-closures-20260817",
+      source: "nx_genesis_holding+nx_config_item",
+      environment: "PRODUCTION",
+      runId: "",
     },
   };
 }
@@ -108,12 +108,12 @@ describe("Genesis remote fact orchestration", () => {
     expect(applyPublicState).toHaveBeenCalledWith(publicState);
   });
 
-  it("preserves a stable RunID isolation reason instead of misreporting a policy rejection", async () => {
+  it("maps protected-read failures to one stable unavailable reason", async () => {
     const publicState = {} as GenesisPublicState;
     const applyEligibilityError = vi.fn();
     const isolationError = new ApiError({
       kind: "business",
-      message: "GENESIS_SANDBOX_USER_RUN_CONFLICT",
+      message: "GENESIS_ELIGIBILITY_UNAVAILABLE",
       status: 409,
       code: 409,
     });
@@ -134,7 +134,7 @@ describe("Genesis remote fact orchestration", () => {
       applyEligibility: vi.fn(),
     })).resolves.toBe(true);
 
-    expect(applyEligibilityError).toHaveBeenCalledWith("GENESIS_SANDBOX_USER_RUN_CONFLICT");
+    expect(applyEligibilityError).toHaveBeenCalledWith("GENESIS_ELIGIBILITY_UNAVAILABLE");
   });
 
   it("logs only stable protected-read categories and never raw backend messages", async () => {

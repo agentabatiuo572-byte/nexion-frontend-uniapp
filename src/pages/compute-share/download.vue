@@ -66,7 +66,7 @@
 
         <view
           :style="connectButtonStyle"
-          :data-disabled="developmentFundsEnabled || slotsFull || connecting || enrollment?.status === 'PENDING'"
+          :data-disabled="slotsFull || connecting || enrollment?.status === 'PENDING'"
           data-proof="compute-share-demo-connect"
           @click="connectDemoComputer"
         >
@@ -90,7 +90,7 @@ import { toast } from "@/store/ui";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { computeShareApi, developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { computeShareApi, remoteApiEnabled } from "@/api/runtime";
 import type { ComputeShareEnrollment } from "@/api/compute-share-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 
@@ -147,7 +147,6 @@ const pairingStatusText = computed(() => enrollment.value?.status === "CONNECTED
     ? t.value.computeShare.pairingExpired
     : t.value.computeShare.pairingPending);
 const connectButtonText = computed(() => {
-  if (developmentFundsEnabled) return t.value.computeShare.sandboxHoldCta;
   if (slotsFull.value) return t.value.computeShare.slotsFullCta;
   if (connecting.value) return t.value.computeShare.connectingCta;
   if (enrollment.value?.status === "PENDING") return t.value.computeShare.waitingPairCta;
@@ -162,7 +161,7 @@ function guardDisabled() {
 
 onMounted(() => {
   guardDisabled();
-  if (remoteApiEnabled && !developmentFundsEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration);
+  if (remoteApiEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration);
 });
 onUnmounted(() => {
   if (pollTimer) clearTimeout(pollTimer);
@@ -176,7 +175,7 @@ watch(() => String(app.accountKey), (next, previous) => {
   enrollment.value = null;
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
-  if (remoteApiEnabled && !developmentFundsEnabled) void resumeRemoteEnrollment(next, accountGeneration);
+  if (remoteApiEnabled) void resumeRemoteEnrollment(next, accountGeneration);
 });
 
 function copyDownloadUrl() {
@@ -298,10 +297,6 @@ function connectDemoComputer() {
   }
   if (slotsFull.value) {
     toast.warn(fmt(t.value.computeShare.slotsFullToast, { max: MAX_DEVICES }));
-    return;
-  }
-  if (developmentFundsEnabled) {
-    toast.info(t.value.computeShare.sandboxHoldBody);
     return;
   }
   if (connecting.value || enrollment.value?.status === "PENDING") return;
@@ -515,9 +510,9 @@ const connectButtonStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   display: "grid",
   placeItems: "center",
-  background: developmentFundsEnabled || slotsFull.value || connecting.value || enrollment.value?.status === "PENDING"
+  background: slotsFull.value || connecting.value || enrollment.value?.status === "PENDING"
     ? "var(--v5-surface-3)" : "var(--v5-brand)",
-  color: developmentFundsEnabled || slotsFull.value || connecting.value || enrollment.value?.status === "PENDING"
+  color: slotsFull.value || connecting.value || enrollment.value?.status === "PENDING"
     ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontSize: "13px",

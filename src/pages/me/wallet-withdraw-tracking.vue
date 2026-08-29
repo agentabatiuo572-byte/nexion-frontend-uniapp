@@ -11,7 +11,6 @@
   <AppChassis active="me">
     <view style="padding-bottom: 16px">
       <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
-      <FundsSandboxBadge />
 
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-if="!wd" class="px-5 text-center">
@@ -122,7 +121,6 @@ import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -323,10 +321,6 @@ const etaSub = computed(() => {
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
   if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
-  if (wd.value?.sourceEnvironment === "SANDBOX" && !isTerminalDone.value) {
-    // 工程话,故意不进 i18n 词典(同 :97 的理由:出路②)。
-    return "source=mock · SANDBOX: awaiting server callback, no client-side ETA auto-complete";
-  }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
     const at = wd.value.confirmedAt ?? wd.value.estimatedCompletion;

@@ -102,18 +102,6 @@
           </view>
         </view>
 
-        <view v-if="sandboxPaymentAvailable" class="mx-4 rounded-2xl" :style="sandboxPayCardStyle">
-          <view class="flex items-center justify-between" style="gap: 12px">
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="sandboxPayTitleStyle">{{ t.orders.sandboxPayCta }}</text>
-              <text class="block" :style="sandboxPayHintStyle">{{ t.orders.sandboxPayHint }}</text>
-            </view>
-            <view class="shrink-0 active:opacity-80" :style="sandboxPayBtnStyle" :aria-disabled="sandboxPaying ? 'true' : 'false'" role="button" tabindex="0" @click.stop="handleSandboxPay">
-              <text>{{ sandboxPaying ? t.orders.sandboxPayBusy : t.orders.sandboxPayCta }}</text>
-            </view>
-          </view>
-        </view>
-
         <!-- Timeline -->
         <view class="mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.timelineTitle }}</text>
@@ -153,7 +141,7 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
-import { commercePaymentApi, developmentFundsEnabled, remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
@@ -235,33 +223,6 @@ const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.valu
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
 const cancellable = computed(() => order.value?.status === "placed");
 const isProvisioning = computed(() => order.value?.status === "provisioning");
-const sandboxPaymentAvailable = computed(() => developmentFundsEnabled && !remoteOrderError.value && order.value?.status === "placed");
-const sandboxPaying = ref(false);
-
-async function handleSandboxPay() {
-  const current = order.value;
-  if (!developmentFundsEnabled || !current || current.status !== "placed" || sandboxPaying.value) return;
-  const scope = captureDetailScope();
-  sandboxPaying.value = true;
-  try {
-    await commercePaymentApi.confirm(current.id, `h5-order-pay:${current.id}`);
-    if (!isCurrentDetailScope(scope)) return;
-    await orders.refreshRemote();
-    if (!isCurrentDetailScope(scope)) return;
-    const readBack = orders.orders.find((item) => item.id === current.id);
-    if (readBack?.status !== "paid" && readBack?.status !== "provisioning" && readBack?.status !== "activated") {
-      throw new Error("ORDER_PAYMENT_READBACK_MISMATCH");
-    }
-    if (!isCurrentDetailScope(scope)) return;
-    toast.success(t.value.orders.statusPaid);
-  } catch {
-    if (!isCurrentDetailScope(scope)) return;
-    toast.error(t.value.authOtp.errorServiceUnavailable);
-  } finally {
-    if (isCurrentDetailScope(scope)) sandboxPaying.value = false;
-  }
-}
-
 const STATUS_COLORS: Record<OrderStatus, string> = {
   placed: "var(--v5-ink-3)",
   paid: "var(--v5-brand)",
@@ -472,10 +433,6 @@ const remoteErrorStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
 const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
-const sandboxPayCardStyle: CSSProperties = { marginTop: "12px", padding: "14px 16px", background: "color-mix(in srgb, var(--v5-warning) 9%, transparent)" };
-const sandboxPayTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
-const sandboxPayHintStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-3)" };
-const sandboxPayBtnStyle: CSSProperties = { minHeight: "40px", padding: "0 12px", borderRadius: "999px", background: "var(--v5-warning)", color: "var(--v5-on-warning, #11131A)", fontSize: "12px", fontWeight: 600 };
 </script>
 
 <style scoped>
