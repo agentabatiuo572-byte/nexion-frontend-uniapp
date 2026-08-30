@@ -35,10 +35,16 @@ import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord 
 import type { VietQrIntentSnapshot, VietQrIntentStatus } from "@/api/payment-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 import {
-  appendVietQrReceipts,
   isPayableVietQrCreateStatus,
   remoteGenerationMatches,
 } from "@/lib/vietqr-remote-safety";
+import {
+  beginVietQrReceiptPageRead,
+  createVietQrReceiptPageState,
+  failVietQrReceiptPageRead,
+  invalidateVietQrReceiptPageReads,
+  succeedVietQrReceiptPageRead,
+} from "@/lib/vietqr-receipt-pagination";
 import {
   bindVietQrIntent,
   finishVietQrCommand,
@@ -123,12 +129,42 @@ export const useDeposits = defineStore("deposits", () => {
   const intents = ref<DepositIntent[]>([]);
   const serverStatus = ref<"idle" | "loading" | "ready" | "error">("ready");
   const serverError = ref("");
-  const remoteReceipts = ref<ServerReceiptListItem[]>([]);
-  const remoteReceiptNextOffset = ref<number | null>(null);
+  const remoteReceiptPage = createVietQrReceiptPageState<ServerReceiptListItem>();
+  const remoteReceipts = ref<ServerReceiptListItem[]>(remoteReceiptPage.items);
+  const remoteReceiptNextOffset = ref<number | null>(remoteReceiptPage.nextOffset);
+  const remoteReceiptInitialStatus = ref(remoteReceiptPage.initial.status);
+  const remoteReceiptInitialError = ref(remoteReceiptPage.initial.error);
+  const remoteReceiptMoreStatus = ref(remoteReceiptPage.more.status);
+  const remoteReceiptMoreError = ref(remoteReceiptPage.more.error);
   let remotePollTimer: ReturnType<typeof setInterval> | undefined;
   let remoteGeneration = 0;
   let remotePollingActive = false;
   let remoteRefreshInFlight = false;
+  let remoteRefreshQueued = false;
+
+  function syncRemoteReceiptPage(): void {
+    remoteReceipts.value = remoteReceiptPage.items;
+    remoteReceiptNextOffset.value = remoteReceiptPage.nextOffset;
+    remoteReceiptInitialStatus.value = remoteReceiptPage.initial.status;
+    remoteReceiptInitialError.value = remoteReceiptPage.initial.error;
+    remoteReceiptMoreStatus.value = remoteReceiptPage.more.status;
+    remoteReceiptMoreError.value = remoteReceiptPage.more.error;
+  }
+
+  function resetRemoteReceiptPage(): void {
+    invalidateVietQrReceiptPageReads(remoteReceiptPage);
+    remoteReceiptPage.items = [];
+    remoteReceiptPage.nextOffset = null;
+    remoteReceiptPage.initial = { status: "idle", error: "" };
+    remoteReceiptPage.more = { status: "idle", error: "" };
+    syncRemoteReceiptPage();
+  }
+
+  /** A hidden receipt page must not let its late response overwrite the next view. */
+  function invalidateRemoteVietQrReceiptReads(): void {
+    invalidateVietQrReceiptPageReads(remoteReceiptPage);
+    syncRemoteReceiptPage();
+  }
 
   // mock 到账引擎的在途定时器(depositId → timer)。账号切换即停:引擎跑在
   // client,跨账号继续推进会把钱记进新绑账号;PROD 服务端持续推进,
@@ -205,8 +241,7 @@ export const useDeposits = defineStore("deposits", () => {
       //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
-      remoteReceipts.value = [];
-      remoteReceiptNextOffset.value = null;
+      resetRemoteReceiptPage();
       // 开发与生产统一读取服务端 VietQR provider。
       serverStatus.value = "idle";
       serverError.value = "";
@@ -911,25 +946,37 @@ export const useDeposits = defineStore("deposits", () => {
 
   async function refreshRemoteVietQrDeposits(): Promise<void> {
     if (!remoteApiEnabled) return;
-    if (remoteRefreshInFlight) return;
+    if (remoteRefreshInFlight) {
+      // Account rebinds and a visible retry may arrive while an older account
+      // read is still unwinding. Run one fresh pass afterward; its page epoch
+      // prevents the old response from committing into the new view.
+      remoteRefreshQueued = true;
+      return;
+    }
     remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
+    const receiptRead = beginVietQrReceiptPageRead(remoteReceiptPage, "initial");
+    if (!receiptRead) {
+      remoteRefreshInFlight = false;
+      return;
+    }
+    syncRemoteReceiptPage();
     serverStatus.value = "loading";
     serverError.value = "";
     try {
       const snapshots = await paymentApi.listVietQrIntents(50);
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
-        throw new Error("VIETQR_ACCOUNT_CHANGED");
+        return;
       }
       intents.value = snapshots.map(remoteVietQrIntent);
       records.value = snapshots.map(remoteVietQrRecord).filter((item): item is DepositRecord => item !== null);
       const receiptPage = await paymentApi.listVietQrReceipts(50, 0);
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
-        throw new Error("VIETQR_ACCOUNT_CHANGED");
+        return;
       }
-      remoteReceipts.value = receiptPage.items;
-      remoteReceiptNextOffset.value = receiptPage.nextOffset;
+      if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, receiptPage.items, receiptPage.nextOffset)) return;
+      syncRemoteReceiptPage();
       snapshots.forEach((snapshot) => {
         if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review") {
           finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
@@ -937,7 +984,9 @@ export const useDeposits = defineStore("deposits", () => {
       });
       serverStatus.value = "ready";
     } catch (cause) {
-      if (remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+      const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
+      syncRemoteReceiptPage();
+      if (receiptReadIsCurrent && remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
       }
@@ -948,33 +997,44 @@ export const useDeposits = defineStore("deposits", () => {
       //   需要失败信号的消费方改读 serverStatus / serverError(deposit-bank-pane.vue 已改)。
     } finally {
       remoteRefreshInFlight = false;
+      if (remoteRefreshQueued) {
+        remoteRefreshQueued = false;
+        void refreshRemoteVietQrDeposits();
+      }
     }
   }
 
   async function loadMoreRemoteVietQrReceipts(): Promise<void> {
     if (!remoteApiEnabled || remoteRefreshInFlight) return;
-    const offset = remoteReceiptNextOffset.value;
-    if (offset === null) return;
+    const receiptRead = beginVietQrReceiptPageRead(remoteReceiptPage, "more");
+    if (!receiptRead) return;
+    syncRemoteReceiptPage();
     remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
     serverStatus.value = "loading";
     serverError.value = "";
     try {
-      const page = await paymentApi.listVietQrReceipts(50, offset);
+      const page = await paymentApi.listVietQrReceipts(50, receiptRead.offset);
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
-        throw new Error("VIETQR_ACCOUNT_CHANGED");
+        return;
       }
-      remoteReceipts.value = appendVietQrReceipts<ServerReceiptListItem>(remoteReceipts.value, page.items);
-      remoteReceiptNextOffset.value = page.nextOffset;
+      if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, page.items, page.nextOffset)) return;
+      syncRemoteReceiptPage();
       serverStatus.value = "ready";
     } catch (cause) {
-      if (remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+      const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
+      syncRemoteReceiptPage();
+      if (receiptReadIsCurrent && remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "VIETQR_RECEIPT_REFRESH_FAILED";
       }
     } finally {
       remoteRefreshInFlight = false;
+      if (remoteRefreshQueued) {
+        remoteRefreshQueued = false;
+        void refreshRemoteVietQrDeposits();
+      }
     }
   }
 
@@ -1100,6 +1160,10 @@ export const useDeposits = defineStore("deposits", () => {
     serverError,
     remoteReceipts,
     remoteReceiptNextOffset,
+    remoteReceiptInitialStatus,
+    remoteReceiptInitialError,
+    remoteReceiptMoreStatus,
+    remoteReceiptMoreError,
     chainChannelEnabled,
     bankAccounts,
     bankRailAvailable,
@@ -1113,6 +1177,7 @@ export const useDeposits = defineStore("deposits", () => {
     submitCardPayment,
     refreshRemoteVietQrDeposits,
     loadMoreRemoteVietQrReceipts,
+    invalidateRemoteVietQrReceiptReads,
     startRemoteVietQrPolling,
     stopRemoteVietQrPolling,
     createRemoteBankIntent,

@@ -127,10 +127,10 @@
                 <text class="font-display" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', marginRight: '4px' }">$</text>
                 <input
                   v-model="budgetText"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   :disabled="!unlocked"
                   :style="budgetInputStyle"
-                  @input="onBudgetInput"
                 />
               </view>
             </view>
@@ -180,8 +180,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
-import { onShow, onUnload } from "@dcloudio/uni-app";
+import { navTo } from "@/lib/route";
+import { ref, computed, watch, type CSSProperties } from "vue";
+import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -196,7 +197,14 @@ import { ambassadorApplicationApi, remoteApiEnabled } from "@/api/runtime";
 import type { AmbassadorApplication, AmbassadorApplicationInput } from "@/api/ambassador-application-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
-import { isCurrentAmbassadorAgentFence, type AmbassadorAgentFence } from "@/lib/ambassador-agent-scope";
+import {
+  isCurrentTeamP31718Request,
+  ambassadorSubmitErrorRecovery,
+  parseAmbassadorApplicationDraft,
+  successfulAmbassadorApplicationState,
+  type AmbassadorAgentFormState,
+  type TeamP31718Request,
+} from "@/lib/team-p3-17-18-request-scope";
 
 const t = useT();
 const vrank = useVRank();
@@ -264,7 +272,6 @@ const APPROVED_CASES: ApprovedCase[] = [
 
 const date = ref("");
 const city = ref("");
-const budget = ref(3000);
 const budgetText = ref("3000");
 const selectedBucketTitle = ref("");
 const selectedBucketId = ref<AmbassadorApplicationInput["bucket"] | "">("");
@@ -278,23 +285,42 @@ const applicationProof = computed(() => "PRODUCTION · server");
 
 let agentMounted = true;
 let agentRequestGeneration = 0;
-function captureAgentRequest(): AmbassadorAgentFence {
-  return { accountKey: app.accountKey, generation: agentRequestGeneration };
+function emptyApplication(): AmbassadorApplication {
+  return { applicationId: null, status: "NONE", city: null, eventDate: null, budgetUsdt: null, bucket: null,
+    submittedAt: null, source: "server", sourceEnvironment: "PRODUCTION", runId: "" };
 }
-function requestIsCurrent(request: AmbassadorAgentFence): boolean {
-  return isCurrentAmbassadorAgentFence(request, {
+function captureAgentRequest(): TeamP31718Request {
+  return {
+    accountKey: app.accountKey,
+    accountEpoch: app.accountBindingEpoch,
+    generation: agentRequestGeneration,
+  };
+}
+function requestIsCurrent(request: TeamP31718Request): boolean {
+  return isCurrentTeamP31718Request(request, {
     mounted: agentMounted,
     accountKey: app.accountKey,
+    accountEpoch: app.accountBindingEpoch,
     generation: agentRequestGeneration,
   });
 }
 function invalidateAgentRequests(): void {
   agentRequestGeneration += 1;
 }
-
-function onBudgetInput() {
-  const n = Math.max(0, parseInt(budgetText.value.replace(/\D/g, "")) || 0);
-  budget.value = n;
+function clearAgentFormState(form: AmbassadorAgentFormState = {
+  date: "", city: "", budgetText: "3000", bucketId: "", bucketTitle: "",
+}): void {
+  date.value = form.date;
+  city.value = form.city;
+  budgetText.value = form.budgetText;
+  selectedBucketId.value = form.bucketId;
+  selectedBucketTitle.value = form.bucketTitle;
+}
+function resetAgentPageState(): void {
+  invalidateAgentRequests();
+  clearAgentFormState();
+  latestApplication.value = emptyApplication();
+  submitting.value = false;
 }
 
 const lockedSubText = computed(() =>
@@ -310,12 +336,7 @@ function selectBucket(b: Bucket) {
 }
 
 function payloadIdentity(input: AmbassadorApplicationInput): string {
-  return JSON.stringify([input.eventDate, input.city.trim(), input.budgetUsdt, input.bucket]);
-}
-
-function matches(input: AmbassadorApplicationInput, value: AmbassadorApplication): boolean {
-  return value.status !== "NONE" && value.eventDate === input.eventDate && value.city === input.city.trim()
-    && value.budgetUsdt === input.budgetUsdt && value.bucket === input.bucket;
+  return JSON.stringify([input.eventDate, input.city, input.budgetUsdt, input.bucket]);
 }
 
 async function refreshLatest(requestScope = captureAgentRequest()): Promise<AmbassadorApplication> {
@@ -329,21 +350,30 @@ async function submit() {
     toast.error(t.value.agent.toastV5Required, t.value.agent.toastV5RequiredSub);
     return;
   }
-  if (!date.value || !city.value) {
-    toast.error(t.value.agent.toastMissingFields, t.value.agent.toastMissingFieldsSub);
-    return;
-  }
-  if (!selectedBucketId.value) {
-    toast.error(t.value.agent.toastMissingFields, t.value.agent.toastBucketRequired);
+  const input = parseAmbassadorApplicationDraft({
+    eventDate: date.value,
+    city: city.value,
+    budgetText: budgetText.value,
+    bucket: selectedBucketId.value,
+  });
+  if (!input) {
+    toast.error(t.value.agent.invalidFormTitle, t.value.agent.invalidFormBody);
     return;
   }
   if (remoteApiEnabled) {
     if (submitting.value) return;
-    const input: AmbassadorApplicationInput = { eventDate: date.value, city: city.value.trim(),
-      budgetUsdt: budget.value, bucket: selectedBucketId.value };
     const identity = payloadIdentity(input);
+    // A page-load read may still be in flight. It must not replace this POST's
+    // authoritative receipt when it settles later.
+    invalidateAgentRequests();
     const requestScope = captureAgentRequest();
-    const key = acquireAmbassadorCommandKey(requestScope.accountKey, identity);
+    let key: string;
+    try {
+      key = acquireAmbassadorCommandKey(requestScope.accountKey, identity);
+    } catch {
+      toast.error(t.value.agent.toastRemoteFailed, t.value.agent.submitUnconfirmedBody);
+      return;
+    }
     submitting.value = true;
     try {
       const result = await ambassadorApplicationApi.submit(input, key);
@@ -352,56 +382,62 @@ async function submit() {
       finishAmbassadorCommand(requestScope.accountKey, identity);
     } catch (error) {
       if (!requestIsCurrent(requestScope)) return;
+      const recovery = ambassadorSubmitErrorRecovery(isSettledRejection(error));
       try {
-        const authoritative = await refreshLatest(requestScope);
+        if (recovery.refreshLatestForDisplay) await refreshLatest(requestScope);
         if (!requestIsCurrent(requestScope)) return;
-        if (matches(input, authoritative)) {
-          finishAmbassadorCommand(requestScope.accountKey, identity);
-        } else if (isSettledRejection(error)) {
-          finishAmbassadorCommand(requestScope.accountKey, identity);
-          throw error;
-        } else {
-          throw error;
-        }
-      } catch (readError) {
+      } catch {
         if (!requestIsCurrent(requestScope)) return;
-        if (isSettledRejection(error)) finishAmbassadorCommand(requestScope.accountKey, identity);
-        toast.error(t.value.agent.toastRemoteFailed, readError instanceof Error ? readError.message : String(readError));
-        return;
       }
+      if (!requestIsCurrent(requestScope)) return;
+      if (recovery.finishCommand) finishAmbassadorCommand(requestScope.accountKey, identity);
+      toast.error(t.value.agent.toastRemoteFailed, t.value.agent.submitUnconfirmedBody);
+      return;
     } finally {
       if (requestIsCurrent(requestScope)) submitting.value = false;
     }
   }
   toast.success(
     t.value.agent.toastSubmitted,
-    fmt(t.value.agent.toastSubmittedSub, { city: city.value, budget: budget.value.toLocaleString() }),
+    fmt(t.value.agent.toastSubmittedSub, { city: input.city, budget: input.budgetUsdt.toLocaleString() }),
   );
-  date.value = "";
-  city.value = "";
-  budget.value = 3000;
-  budgetText.value = "3000";
-  selectedBucketId.value = "";
-  selectedBucketTitle.value = "";
+  const settled = successfulAmbassadorApplicationState(latestApplication.value);
+  latestApplication.value = settled.receipt;
+  clearAgentFormState(settled.form);
 }
 
+function refreshAgentPage(): void {
+  if (!remoteApiEnabled) return;
+  const requestScope = captureAgentRequest();
+  void Promise.all([
+    refreshLatest(requestScope).catch(() => undefined),
+    vrank.refreshCanonicalVRank(),
+  ]);
+}
+
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+  resetAgentPageState();
+  if (agentMounted) refreshAgentPage();
+});
+
 onShow(() => {
-  if (remoteApiEnabled) {
-    const requestScope = captureAgentRequest();
-    void Promise.all([
-      refreshLatest(requestScope).catch(() => undefined),
-      vrank.refreshCanonicalVRank(),
-    ]);
-  }
+  agentMounted = true;
+  resetAgentPageState();
+  refreshAgentPage();
+});
+
+onHide(() => {
+  agentMounted = false;
+  resetAgentPageState();
 });
 
 onUnload(() => {
   agentMounted = false;
-  invalidateAgentRequests();
+  resetAgentPageState();
 });
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 // ─── styles ───

@@ -134,8 +134,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -148,12 +148,13 @@ import { useApp } from "@/store/app";
 import { useStaking } from "@/store/staking";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
-import { confirm as uiConfirm, toast } from "@/store/ui";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { accountApi, authApi, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
 import type { AccountDeletionStatus } from "@/api/account-api";
+import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 
 
 const t = useT();
@@ -173,6 +174,13 @@ const auth = useAuth();
 const app = useApp();
 const staking = useStaking();
 const session = useSession();
+const ui = useUI();
+const securityPageFence = createP318AccountPageFence(
+  () => String(app.accountKey),
+  () => app.accountBindingEpoch,
+);
+const securityConfirmOwner = `p3-18-security:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+let securityPageVisible = true;
 
 const remoteSecurity = ref<SecurityState | null>(null);
 const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
@@ -209,6 +217,55 @@ const next = ref("");
 const confirmPwd = ref("");
 const err = ref("");
 
+function isCurrentSecurityRequest(
+  pageScope: P318AccountPageScope,
+  accountScope = captureAccountScope(),
+  accountKey = auth.accountId,
+): boolean {
+  return securityPageVisible
+    && securityPageFence.isCurrent(pageScope)
+    && isCurrentAccountScope(accountScope)
+    && auth.accountId === accountKey;
+}
+
+function clearSecurityAccountState() {
+  securityPageFence.invalidate();
+  ui.clearConfirmsBy(securityConfirmOwner);
+  securityBusy.value = false;
+  remoteSecurityLoading.value = false;
+  remoteSecurity.value = null;
+  deletionStatus.value = { status: "NONE" };
+  editingPwd.value = false;
+  current.value = "";
+  next.value = "";
+  confirmPwd.value = "";
+  twoFactorPassword.value = "";
+  deletionPassword.value = "";
+  deletionCommandKey.value = "";
+  err.value = "";
+}
+
+function refreshSecurityForCurrentAccount() {
+  if (securityPageVisible && remoteApiEnabled) void loadRemoteSecurity();
+}
+
+onShow(() => {
+  securityPageVisible = true;
+  refreshSecurityForCurrentAccount();
+});
+onHide(() => {
+  securityPageVisible = false;
+  clearSecurityAccountState();
+});
+onUnmounted(() => {
+  securityPageVisible = false;
+  clearSecurityAccountState();
+});
+watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
+  clearSecurityAccountState();
+  refreshSecurityForCurrentAccount();
+});
+
 const passwordHintLine = computed(() => {
   if (remoteApiEnabled && !remoteSecurity.value) return "—";
   return t.value.security.passwordHint.replace("{when}", relativeWhen(
@@ -219,8 +276,10 @@ const passwordHintLine = computed(() => {
 });
 
 async function loadRemoteSecurity(): Promise<boolean> {
+  const pageScope = securityPageFence.capture("security-overview");
   const scope = captureAccountScope();
   const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
   remoteSecurityLoading.value = true;
   remoteSecurity.value = null;
   try {
@@ -228,17 +287,17 @@ async function loadRemoteSecurity(): Promise<boolean> {
       accountApi.securityOverview(),
       accountApi.accountDeletionStatus(),
     ]);
-    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return false;
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
     remoteSecurity.value = securityState;
     deletionStatus.value = accountDeletion;
     return true;
   } catch (cause) {
-    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return false;
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
     console.warn("[security] overview load failed:", cause);
     err.value = t.value.security.opFailed;
     return false;
   } finally {
-    if (isCurrentAccountScope(scope) && auth.accountId === accountKey) remoteSecurityLoading.value = false;
+    if (isCurrentSecurityRequest(pageScope, scope, accountKey)) remoteSecurityLoading.value = false;
   }
 }
 
@@ -309,6 +368,10 @@ function cancelPwd() {
 
 async function submitPasswordChange() {
   if (securityBusy.value) return;
+  const pageScope = securityPageFence.capture("password-change");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   err.value = "";
   if (!current.value) {
     err.value = t.value.login.errorInvalidPassword;
@@ -325,20 +388,25 @@ async function submitPasswordChange() {
   securityBusy.value = true;
   try {
       if (remoteApiEnabled) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         await accountApi.changePassword(current.value, next.value);
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     } else {
       security.changePassword(current.value, next.value);
     }
   } catch (cause) {
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     console.warn("[security] password update failed:", cause);
     err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
       ? t.value.login.errorInvalidCredentials
       : t.value.security.opFailed;
-    securityBusy.value = false;
     return;
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
-  securityBusy.value = false;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   current.value = "";
   next.value = "";
   confirmPwd.value = "";
@@ -348,6 +416,10 @@ async function submitPasswordChange() {
 
 async function toggleTwoFactor(value: boolean) {
   if (securityBusy.value) return;
+  const pageScope = securityPageFence.capture("two-factor");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   if (remoteApiEnabled && !remoteSecurity.value) {
     err.value = t.value.security.opFailed;
     return;
@@ -362,86 +434,123 @@ async function toggleTwoFactor(value: boolean) {
       message: t.value.security.twoFactorConfirmDisable,
       danger: true,
       confirmLabel: t.value.security.twoFactorDisable,
+      owner: securityConfirmOwner,
     });
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (ok) {
       securityBusy.value = true;
       try {
         if (remoteApiEnabled) {
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           await accountApi.updateTwoFactor(false, twoFactorPassword.value);
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           twoFactorPassword.value = "";
         } else security.setTwoFactor(false, twoFactorPassword.value);
         twoFactorPassword.value = "";
         toast.warn(t.value.security.twoFactorDisabledToast);
       } catch (cause) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         console.warn("[security] 2FA update failed:", cause);
         err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
           ? t.value.login.errorInvalidCredentials
           : t.value.security.opFailed;
       } finally {
-        securityBusy.value = false;
+        if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
       }
     }
   } else if (value && !twoFactorEnabled.value) {
     securityBusy.value = true;
     try {
       if (remoteApiEnabled) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         await accountApi.updateTwoFactor(true, twoFactorPassword.value);
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         twoFactorPassword.value = "";
       } else security.setTwoFactor(true, twoFactorPassword.value);
       twoFactorPassword.value = "";
       toast.success(t.value.security.twoFactorEnabledToast);
     } catch (cause) {
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       console.warn("[security] 2FA update failed:", cause);
       err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
         ? t.value.login.errorInvalidCredentials
         : t.value.security.opFailed;
     } finally {
-      securityBusy.value = false;
+      if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
   }
 }
 
 async function handleRevoke(s: SessionListItem) {
+  if (securityBusy.value) return;
+  const pageScope = securityPageFence.capture("session-revoke");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   const ok = await uiConfirm({
     title: t.value.security.sessionRevoke,
     message: `${t.value.security.sessionRevokeConfirm}\n\n${sessionDeviceLabel(s)} · ${t.value.security.sessionLocation}`,
     danger: true,
+    owner: securityConfirmOwner,
   });
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   if (ok) {
+    securityBusy.value = true;
     try {
       if (remoteApiEnabled) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         await accountApi.revokeSession(s.id);
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       } else session.revokeSession(s.id);
       toast.success(t.value.security.sessionRevoked);
     } catch (cause) {
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
         ? t.value.security.opFailed
         : cause instanceof Error ? cause.message : t.value.security.opFailed);
+    } finally {
+      if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
   }
 }
 
 async function handleRevokeAll() {
-  if (!hasOtherSessions.value) return;
+  if (!hasOtherSessions.value || securityBusy.value) return;
+  const pageScope = securityPageFence.capture("session-revoke-all");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   const ok = await uiConfirm({
     title: t.value.security.revokeAll,
     message: t.value.security.revokeAllConfirm,
     danger: true,
+    owner: securityConfirmOwner,
   });
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   if (ok) {
+    securityBusy.value = true;
     try {
       if (remoteApiEnabled) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         await accountApi.revokeOtherSessions();
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       } else session.revokeAllOtherSessions();
       toast.success(t.value.security.revokeAllDone);
     } catch (cause) {
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
         ? t.value.security.opFailed
         : cause instanceof Error ? cause.message : t.value.security.opFailed);
+    } finally {
+      if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
   }
 }
@@ -451,6 +560,10 @@ async function handleDeleteAccount() {
   //   双击会各推一个确认弹窗进队列(confirm 是队列不是单例),确认完第一个立刻露出
   //   第二个一模一样的,极易连着点两次。同文件另外两个操作(改密 / 2FA)都有同款闸。
   if (securityBusy.value) return;
+  const pageScope = securityPageFence.capture("account-deletion");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   if (remoteApiEnabled && !remoteSecurity.value) {
     toast.error(t.value.security.opFailed);
     return;
@@ -477,9 +590,11 @@ async function handleDeleteAccount() {
     //   宁可让用户稍后重试,不让他对着错误披露确认永久放弃)。提现列表刷新失败不阻断 ——
     //   它失败时保留旧值(回源核过),且服务端状态机另有「已阻断」兜底。
     if (remoteApiEnabled) {
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       const [fleet, , stake] = await Promise.allSettled([
         app.refreshRemoteFleet(), app.refreshRemoteWithdrawals(), staking.syncRemote(),
       ]);
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       const fleetOk = fleet.status === "fulfilled" && fleet.value === true;
       const stakeOk = stake.status === "fulfilled" && stake.value === true;
       if (!fleetOk || !stakeOk) {
@@ -496,7 +611,9 @@ async function handleDeleteAccount() {
         title: t.value.security.deleteAccount,
         message: t.value.security.deleteAccountBlockedByWithdrawal,
         confirmLabel: t.value.security.deleteAccountViewWithdrawals,
+        owner: securityConfirmOwner,
       });
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       if (view) navTo("/pages/me/wallet-withdraw-tracking");
       return;
     }
@@ -518,28 +635,36 @@ async function handleDeleteAccount() {
       message: `${forfeitLines.join("\n")}\n\n${t.value.security.deleteAccountConfirm}`,
       danger: true,
       confirmLabel: t.value.security.deleteAccount,
+      owner: securityConfirmOwner,
     });
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (ok) {
       if (remoteApiEnabled) {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!deletionCommandKey.value) {
           deletionCommandKey.value = `app-security:account-deletion:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
         }
         try {
           const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           toast.success(t.value.security.deleteAccountToast, request.requestNo);
           deletionCommandKey.value = "";
           await authApi.logout();
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         } catch (cause) {
+          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_REQUEST_FAILED");
           return;
         }
       } else {
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!deleteMockAuthAccount(auth.accountId)) {
           toast.error(t.value.security.opFailed);
           return;
         }
         toast.success(t.value.security.deleteAccountToast);
       }
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       app.interruptAllTasks("logged-out");
       session.signOutSession();
       auth.signOut();
@@ -549,32 +674,42 @@ async function handleDeleteAccount() {
       navReset({ url: "/pages/login/login", fail: () => {} });
     }
   } finally {
-    securityBusy.value = false;
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
 }
 
 async function handleCancelAccountDeletion() {
   if (!remoteApiEnabled || !remoteSecurity.value || !deletionCanCancel.value || securityBusy.value) return;
+  const pageScope = securityPageFence.capture("account-deletion-cancel");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   const ok = await uiConfirm({
     title: t.value.security.cancelDeletionRequest,
     message: t.value.security.cancelDeletionMessage,
     danger: true,
     confirmLabel: t.value.security.cancelDeletionRequest,
+    owner: securityConfirmOwner,
   });
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   if (!ok) return;
   securityBusy.value = true;
   try {
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     const current = deletionStatus.value;
     if (current.status === "NONE") return;
     const key = `app-security:account-deletion-cancel:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
     await accountApi.cancelAccountDeletion(current.version, key);
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_CANCEL_FAILED");
     await loadRemoteSecurity();
   } finally {
-    securityBusy.value = false;
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
 }
 

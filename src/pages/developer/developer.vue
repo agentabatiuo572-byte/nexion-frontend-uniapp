@@ -79,9 +79,9 @@
             <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
           </view>
           <view class="space-y-2">
-            <input v-model="company" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="email" type="email" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <textarea v-model="useCase" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph" />
           </view>
           <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
@@ -121,7 +121,7 @@
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
             <view v-if="!apiKeys.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
-            <input v-model="keyName" :placeholder="t.developer.keyName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="keyName" :maxlength="100" :placeholder="t.developer.keyName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-key')" role="button" tabindex="0" @click="createApiKey"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text></view>
             <view v-if="newKeySecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newKeySecret }}</text></view>
           </view>
@@ -149,9 +149,9 @@
               <view v-else-if="webhookDeliveries[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.deliveryEmpty }}</text></view>
             </view>
             <view v-if="!webhooks.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
-            <input v-model="webhookName" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookUrl" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookEvents" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-webhook')" role="button" tabindex="0" @click="createWebhook"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text></view>
             <view v-if="newWebhookSecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
           </view>
@@ -184,6 +184,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-ap
 import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
+import { validateDeveloperAccess, validateDeveloperKeyName, validateDeveloperWebhook } from "./developer-form-validation";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -401,10 +402,8 @@ async function reconcileResourceFailure<T>(
 }
 async function submitRequest() {
   if (submitting.value) return;
-  if (!company.value.trim() || !email.value.trim() || !useCase.value.trim()) {
-    toast.warn(t.value.developer.formRequiredToast);
-    return;
-  }
+  const issue = validateDeveloperAccess({ company: company.value, email: email.value, useCase: useCase.value });
+  if (issue) return toast.warn(t.value.developer[issue]);
   if (remoteApiEnabled) {
     const accountKey = String(app.accountKey);
     const accountScope = captureAccountScope();
@@ -506,7 +505,8 @@ function retryLoadResources(): void { void loadResources(); }
 async function createApiKey() {
   if (resourceBusy("create-key")) return;
   const name = keyName.value.trim();
-  if (!name) return toast.warn(t.value.developer.formRequiredToast);
+  const issue = validateDeveloperKeyName(name);
+  if (issue) return toast.warn(t.value.developer[issue]);
   const fence = resourceFence();
   const intent = `create-key:${name}`;
   setResourceBusy("create-key", true);
@@ -591,7 +591,8 @@ async function createWebhook() {
   const events = webhookEvents.value.split(",").map((value) => value.trim()).filter(Boolean);
   const name = webhookName.value.trim();
   const url = webhookUrl.value.trim();
-  if (!name || !url || !events.length) return toast.warn(t.value.developer.formRequiredToast);
+  const issue = validateDeveloperWebhook({ name, url, events });
+  if (issue) return toast.warn(t.value.developer[issue]);
   const intent = `create-webhook:${name}:${url}:${events.join(",")}`;
   if (resourceBusy("create-webhook")) return;
   const fence = resourceFence();

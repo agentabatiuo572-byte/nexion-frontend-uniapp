@@ -11,9 +11,9 @@
     :data-copy-version="managedCopy.deliveries[MANAGED_POSITION]?.version ?? 'builtin'"
     :data-experiment-id="managedCopy.deliveries[MANAGED_POSITION]?.experimentId ?? ''"
     :data-target-device="weeklyCard.targetDevice ?? ''"
-    @click="goTarget"
-    @keydown.enter.prevent="goTarget"
-    @keydown.space.prevent="goTarget"
+    @click="onCardAction"
+    @keydown.enter.prevent="onCardAction"
+    @keydown.space.prevent="onCardAction"
   >
     <image
       class="weekly-quest__product"
@@ -34,7 +34,7 @@
             </svg>
           </view>
           <text class="weekly-quest__title">{{ t.home.weeklyQuestEyebrow }}</text>
-          <text class="weekly-quest__multiplier">{{ promoMult === null ? "—" : `${promoMult}×` }}</text>
+          <text class="weekly-quest__multiplier">{{ weeklyState === "ready" && promoMult !== null ? `${promoMult}×` : "—" }}</text>
         </view>
         <view class="weekly-quest__countdown">
           <text class="weekly-quest__countdown-label">{{ t.home.weeklyQuestEndsIn }}</text>
@@ -42,7 +42,16 @@
         </view>
       </view>
 
-      <view class="weekly-quest__body">
+      <view v-if="weeklyState === 'loading'" class="weekly-quest__state" aria-live="polite">
+        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.loading }}</text>
+      </view>
+      <view v-else-if="weeklyState === 'error'" class="weekly-quest__state" role="alert">
+        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.loadError }}</text>
+      </view>
+      <view v-else-if="weeklyState === 'empty'" class="weekly-quest__state" aria-live="polite">
+        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.empty }}</text>
+      </view>
+      <view v-else class="weekly-quest__body">
         <view class="weekly-quest__reward">
           <text class="weekly-quest__reward-value">+{{ finalRewardText }}</text>
           <text class="weekly-quest__reward-unit">NEX</text>
@@ -55,7 +64,7 @@
       </view>
 
       <view class="weekly-quest__cta">
-        <text>{{ weeklyCard.action === "missions" ? t.headerTitles.missions : t.home.weeklyQuestGetNexGridBox }}</text>
+        <text>{{ ctaText }}</text>
         <text class="weekly-quest__cta-arrow" aria-hidden="true">→</text>
       </view>
     </view>
@@ -95,6 +104,11 @@ const weeklyCard = computed(() => presentHomeWeeklyCard(
   wq.snapshot?.promoBanner ?? null,
   wq.multiplier,
 ));
+const weeklyState = computed<"loading" | "error" | "empty" | "ready">(() => {
+  if (wq.error) return "error";
+  if (wq.loading || !wq.snapshot) return "loading";
+  return weeklySource.value ? "ready" : "empty";
+});
 const promoMult = computed<number | null>(() => weeklyCard.value.multiplier);
 const finalRewardText = computed(() => {
   const reward = weeklyCard.value.rewardNex;
@@ -113,6 +127,13 @@ const targetDailyText = computed(() => {
   return value == null ? "—" : value.toFixed(2);
 });
 const subtitleText = computed(() => weeklyCard.value.subtitle || "—");
+const ctaText = computed(() => {
+  if (weeklyState.value === "loading") return t.value.weeklyQuest.loading;
+  if (weeklyState.value === "error" || weeklyState.value === "empty") return t.value.ui.retry;
+  return weeklyCard.value.action === "missions"
+    ? t.value.headerTitles.missions
+    : t.value.home.weeklyQuestGetNexGridBox;
+});
 
 const rootStyle: CSSProperties = {
   position: "relative",
@@ -141,9 +162,14 @@ const productStyle: CSSProperties = {
   WebkitMaskImage: PRODUCT_MASK,
 };
 
-function goTarget() {
+function onCardAction() {
+  if (weeklyState.value !== "ready") {
+    if (!wq.loading) void wq.refresh();
+    return;
+  }
+
   if (weeklyCard.value.action === "missions") {
-    uni.navigateTo({ url: "/pages/missions/missions", fail: () => {} });
+    navTo("/pages/missions/missions");
   } else if (weeklyCard.value.action === "store") {
     navTo("/store");
   }
@@ -238,6 +264,23 @@ function goTarget() {
   z-index: 2;
   width: 62%;
   margin-top: 6px;
+}
+
+.weekly-quest__state {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 62%;
+  min-height: 74px;
+  padding: 12px 0;
+  align-items: center;
+}
+
+.weekly-quest__state-copy {
+  font-family: var(--font-v5);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v5-ink-3);
 }
 
 .weekly-quest__reward {

@@ -15,7 +15,16 @@
       <SubPageHeader back="/pages/me/me" :title="t.receipt.title" />
 
       <view v-if="remoteReceiptsMode" style="margin: 0 16px">
-        <EmptyState v-if="!remoteComputeReceiptLoading && remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+        <EmptyState
+          v-if="showRemoteVietQrInitialError"
+          kind="recoverable-error"
+          :title="t.empty.errorTitle"
+          :desc="t.empty.errorDesc"
+          :cta-label="t.empty.errorCta"
+          emphasis
+          @cta="retryRemoteVietQrReceipts"
+        />
+        <EmptyState v-else-if="!remoteComputeReceiptLoading && !remoteVietQrInitialLoading && remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
           <view
             v-for="r in remoteComputeReceiptItems"
@@ -40,13 +49,26 @@
           <view v-for="r in remoteReceiptItems" :key="r.receiptNo" class="flex items-center" :style="rowStyle(0)">
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
-              <text class="block truncate" :style="rowSubStyle">{{ r.intentNo }} · {{ r.viewType }}</text>
+              <text class="block truncate" :style="rowSubStyle">{{ r.intentNo }} · {{ remoteReceiptStatus(r) }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
-              <text class="block tabular-nums" :style="remoteAmountStyle">+${{ r.creditedUsdt.toFixed(2) }}</text>
+              <text class="block tabular-nums" :style="remoteReceiptAmountStyle(r)">{{ remoteReceiptAmount(r) }}</text>
               <text class="block" :style="rowDateStyle">{{ shortDate(Date.parse(r.createdAt)) }}</text>
             </view>
           </view>
+        </view>
+        <view
+          v-if="showRemoteVietQrInlineError"
+          class="flex items-center justify-center active:opacity-70"
+          style="min-height: 44px; margin: 8px 0"
+          role="button"
+          tabindex="0"
+          :aria-label="t.empty.errorCta"
+          @click="retryRemoteVietQrReceipts"
+          @keydown.enter.stop.prevent="retryRemoteVietQrReceipts"
+          @keydown.space.stop.prevent="retryRemoteVietQrReceipts"
+        >
+          <text :style="rowSubStyle">{{ t.empty.errorDesc }} · {{ t.empty.errorCta }}</text>
         </view>
         <view
           v-if="remoteComputeReceiptNextOffset !== null || depositsStore.remoteReceiptNextOffset !== null"
@@ -54,11 +76,12 @@
           style="min-height: 44px; margin: 8px 0 16px"
           role="button"
           tabindex="0"
+          :aria-disabled="remoteMoreLoading"
           @click="loadMoreRemoteReceipts"
           @keydown.enter.stop.prevent="loadMoreRemoteReceipts"
           @keydown.space.stop.prevent="loadMoreRemoteReceipts"
         >
-          <text :style="rowSubStyle">{{ t.receipt.loadMore }}</text>
+          <text :style="rowSubStyle">{{ remoteMoreLoading ? "…" : t.receipt.loadMore }}</text>
         </view>
       </view>
 
@@ -130,7 +153,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -148,6 +172,8 @@ import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/
 import { useDeposits } from "@/store/deposits";
 import { useApp } from "@/store/app";
 import type { ServerReceiptListItem } from "@/store/deposits";
+import { presentVietQrReceipt } from "@/lib/vietqr-receipt-presentation";
+import { createReceiptsPageRequestFence } from "./receipts-page-request-fence";
 
 type Tab = "ALL" | ReceiptCategory;
 const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
@@ -157,6 +183,10 @@ const PAGE_SIZE = 10;
 const t = useT();
 const app = useApp();
 const depositsStore = useDeposits();
+const receiptsPageFence = createReceiptsPageRequestFence(
+  () => app.accountKey,
+  () => app.accountBindingEpoch,
+);
 // Remote mode owns the entire receipt surface. Never construct
 // the local store in a remote session: its setup reads account-scoped localStorage.
 const remoteReceiptsMode = remoteApiEnabled;
@@ -164,6 +194,17 @@ const remoteReceiptItems = computed<ServerReceiptListItem[]>(() => depositsStore
 const remoteComputeReceiptItems = ref<CanonicalComputeReceiptSummary[]>([]);
 const remoteComputeReceiptNextOffset = ref<number | null>(null);
 const remoteComputeReceiptLoading = ref(remoteReceiptsMode);
+const remoteMoreLoading = ref(false);
+const remoteVietQrInitialLoading = computed(() => depositsStore.remoteReceiptInitialStatus === "loading");
+const showRemoteVietQrInitialError = computed(() =>
+  depositsStore.remoteReceiptInitialStatus === "error"
+  && remoteReceiptItems.value.length === 0
+  && remoteComputeReceiptItems.value.length === 0,
+);
+const showRemoteVietQrInlineError = computed(() =>
+  (depositsStore.remoteReceiptInitialStatus === "error" || depositsStore.remoteReceiptMoreStatus === "error")
+  && (remoteReceiptItems.value.length > 0 || remoteComputeReceiptItems.value.length > 0),
+);
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | CanonicalComputeReceipt | null>(null);
@@ -176,20 +217,35 @@ const filtered = computed(() => filterByCategory(receipts.value, tab.value));
 const visibleReceipts = computed(() => filtered.value.slice(0, visibleCount.value));
 const hasMore = computed(() => visibleCount.value < filtered.value.length);
 
-onMounted(() => {
-  if (!remoteReceiptsMode) return;
-  void depositsStore.refreshRemoteVietQrDeposits();
-});
+function remoteReceiptAmount(receipt: ServerReceiptListItem): string {
+  return presentVietQrReceipt(receipt.status, receipt.creditedUsdt).amountText;
+}
+
+function remoteReceiptStatus(receipt: ServerReceiptListItem): string {
+  const presentation = presentVietQrReceipt(receipt.status, receipt.creditedUsdt);
+  return t.value.receipt.vietQrStatus[presentation.statusKey];
+}
+
+function remoteReceiptAmountStyle(receipt: ServerReceiptListItem): CSSProperties {
+  const presentation = presentVietQrReceipt(receipt.status, receipt.creditedUsdt);
+  return {
+    ...remoteAmountStyle,
+    color: presentation.credited ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
+  };
+}
 
 let receiptPageRequestEpoch = 0;
 async function loadRemoteComputeReceipts(offset: number, append: boolean): Promise<void> {
+  if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptPageRequestEpoch;
+  const requestScope = receiptsPageFence.capture("compute");
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
   remoteComputeReceiptLoading.value = true;
   try {
     const page = await taskAssignmentApi.receipts(offset, 20);
     if (requestEpoch !== receiptPageRequestEpoch
+      || !receiptsPageFence.isCurrent(requestScope)
       || expectedAccountKey !== app.accountKey
       || expectedBindingEpoch !== app.accountBindingEpoch) return;
     remoteComputeReceiptItems.value = append
@@ -198,12 +254,14 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean): Promi
     remoteComputeReceiptNextOffset.value = page.nextOffset;
   } catch {
     if (requestEpoch === receiptPageRequestEpoch
+      && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
       toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
     }
   } finally {
     if (requestEpoch === receiptPageRequestEpoch
+      && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
       remoteComputeReceiptLoading.value = false;
@@ -212,27 +270,46 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean): Promi
 }
 
 async function loadMoreRemoteReceipts(): Promise<void> {
+  if (!remoteReceiptsMode || remoteMoreLoading.value || !receiptsPageFence.isVisible()) return;
+  const requestScope = receiptsPageFence.capture("more");
+  remoteMoreLoading.value = true;
   const requests: Promise<unknown>[] = [];
-  if (remoteComputeReceiptNextOffset.value !== null) {
-    requests.push(loadRemoteComputeReceipts(remoteComputeReceiptNextOffset.value, true));
+  try {
+    if (remoteComputeReceiptNextOffset.value !== null) {
+      requests.push(loadRemoteComputeReceipts(remoteComputeReceiptNextOffset.value, true));
+    }
+    if (depositsStore.remoteReceiptNextOffset !== null) {
+      requests.push(depositsStore.loadMoreRemoteVietQrReceipts());
+    }
+    await Promise.allSettled(requests);
+  } finally {
+    if (receiptsPageFence.isCurrent(requestScope)) remoteMoreLoading.value = false;
   }
-  if (depositsStore.remoteReceiptNextOffset !== null) {
-    requests.push(depositsStore.loadMoreRemoteVietQrReceipts());
+}
+
+function retryRemoteVietQrReceipts(): void {
+  if (depositsStore.remoteReceiptInitialStatus === "error") {
+    void depositsStore.refreshRemoteVietQrDeposits();
+    return;
   }
-  await Promise.allSettled(requests);
+  void depositsStore.loadMoreRemoteVietQrReceipts();
 }
 
 async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+  if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptRequestEpoch;
+  const requestScope = receiptsPageFence.capture("detail");
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
   try {
     const detail = await taskAssignmentApi.receipt(task.receiptNo);
     if (requestEpoch === receiptRequestEpoch
+      && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) open.value = detail;
   } catch {
     if (requestEpoch === receiptRequestEpoch
+      && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
       toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
@@ -244,19 +321,47 @@ watch(
   () => [app.accountKey, app.accountBindingEpoch] as const,
   () => {
     if (!remoteReceiptsMode) return;
-    receiptPageRequestEpoch += 1;
-    receiptRequestEpoch += 1;
+    invalidateRemoteReceiptsPage();
     remoteComputeReceiptItems.value = [];
     remoteComputeReceiptNextOffset.value = null;
-    open.value = null;
-    void loadRemoteComputeReceipts(0, false);
+    if (receiptsPageFence.isVisible()) refreshRemoteReceiptsPage();
   },
   { immediate: true },
 );
 
-onUnmounted(() => {
+function invalidateRemoteReceiptsPage(): void {
   receiptRequestEpoch += 1;
   receiptPageRequestEpoch += 1;
+  receiptsPageFence.invalidate();
+  remoteMoreLoading.value = false;
+  remoteComputeReceiptLoading.value = false;
+  open.value = null;
+  depositsStore.invalidateRemoteVietQrReceiptReads();
+}
+
+function refreshRemoteReceiptsPage(): void {
+  if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
+  void depositsStore.refreshRemoteVietQrDeposits();
+  void loadRemoteComputeReceipts(0, false);
+}
+
+onShow(() => {
+  if (!remoteReceiptsMode) return;
+  receiptsPageFence.show();
+  void depositsStore.refreshRemoteVietQrDeposits();
+  void loadRemoteComputeReceipts(0, false);
+});
+
+onHide(() => {
+  if (!remoteReceiptsMode) return;
+  receiptsPageFence.hide();
+  invalidateRemoteReceiptsPage();
+});
+
+onUnmounted(() => {
+  if (!remoteReceiptsMode) return;
+  receiptsPageFence.hide();
+  invalidateRemoteReceiptsPage();
 });
 
 // Sentinel row (always mounted so the observer attaches from the start —

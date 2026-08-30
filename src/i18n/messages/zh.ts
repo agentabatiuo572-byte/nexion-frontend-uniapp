@@ -3,6 +3,12 @@ import type { Messages } from "./en";
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  howPublished: {
+    loading: "正在加载说明…",
+    unavailableTitle: "说明暂时无法加载",
+    unavailableBody: "未能获取已发布的说明，请重试。",
+    versionMeta: "版本 {version} · 语言 {locale}",
+  },
   tabs: {
     home: "首页",
     earn: "赚取",
@@ -1249,6 +1255,7 @@ export const zh: Messages = {
       ended: "已结束",
     },
     progress: {
+      label: "进度",
       participating: "已加入",
       ready: "可领取",
     },
@@ -3233,6 +3240,13 @@ export const zh: Messages = {
     formUseCasePlaceholder: "告诉我们你将如何使用 NexGrid API…",
     formSubmit: "提交申请",
     formRequiredToast: "请完整填写公司、工作邮箱和使用场景",
+    companyInvalid: "公司名称须为 1–120 个字符",
+    emailInvalid: "请输入有效的工作邮箱（最多 254 个字符）",
+    useCaseInvalid: "使用场景须为 10–2,000 个字符",
+    resourceNameInvalid: "名称须为 1–100 个字符",
+    webhookUrlInvalid: "请输入 HTTPS 地址，不包含账号密码、查询参数或片段",
+    webhookHostInvalid: "Webhook 地址不能使用本地或私有主机",
+    webhookEventsInvalid: "请选择 1–8 个支持的事件，以英文逗号分隔",
     formSubmittedToast: "已收到申请 · 商务团队将尽快联系",
     pendingExists: "已有一份开发者访问申请正在处理,请稍候结果",
     latestLoadFailed: "申请状态暂时读取失败,请稍后刷新;已提交的申请不会丢失。",
@@ -4589,6 +4603,9 @@ export const zh: Messages = {
   },
 
   agent: {
+    submitUnconfirmedBody: "请保留相同的申请信息重试核对。最新记录不代表本次提交已经成功。",
+    invalidFormTitle: "请检查申请信息",
+    invalidFormBody: "请选择分类；日期须在上海时间今天至一年后之间，城市须为 2–64 个字符，预算须为 100–10,000 USDT，最多 6 位小数。",
     pageTitle: "区域大使",
     heroLabel: "官方授权",
     fieldEventDate: "活动日期",

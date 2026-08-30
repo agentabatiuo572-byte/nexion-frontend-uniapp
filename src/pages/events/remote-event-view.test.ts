@@ -14,6 +14,7 @@ const labels: EventActionLabels = {
   spin: "立即抽奖",
   leaderboard: "查看排行",
   viewDetails: "查看详情",
+  progress: "进度",
 };
 
 function canonicalEvent(overrides: Partial<CanonicalEvent> = {}): CanonicalEvent {
