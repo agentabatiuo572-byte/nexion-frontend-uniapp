@@ -8,6 +8,7 @@ export interface EventActionLabels {
   spin: string;
   leaderboard: string;
   viewDetails: string;
+  progress: string;
 }
 
 const TINT_BY_KIND: Record<CanonicalEvent["kind"], string> = {
@@ -48,7 +49,7 @@ export function remoteEventView(event: CanonicalEvent, labels: EventActionLabels
     tint: TINT_BY_KIND[event.kind],
     reward: `${event.rewardAmount} ${event.rewardName}`,
     progress: event.trackable
-      ? { current: event.progressValue, total: event.targetValue, label: "progress" }
+      ? { current: event.progressValue, total: event.targetValue, label: labels.progress }
       : null,
     joined: ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus),
     ctaLabel: businessCtaLabel(event, labels),

@@ -3,6 +3,12 @@ import type { Messages } from "./en";
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  howPublished: {
+    loading: "Đang tải hướng dẫn…",
+    unavailableTitle: "Nội dung tạm thời không khả dụng",
+    unavailableBody: "Không thể tải hướng dẫn đã xuất bản. Vui lòng thử lại.",
+    versionMeta: "Phiên bản {version} · Ngôn ngữ {locale}",
+  },
   tabs: {
     home: "Trang chủ",
     earn: "Sinh lời",
@@ -1269,6 +1275,7 @@ export const vi: Messages = {
       ended: "Đã kết thúc",
     },
     progress: {
+      label: "Tiến độ",
       participating: "Bạn đã tham gia",
       ready: "Sẵn sàng nhận",
     },
@@ -3216,6 +3223,13 @@ export const vi: Messages = {
     formUseCasePlaceholder: "Cho chúng tôi biết bạn sẽ dùng API của NexGrid như thế nào…",
     formSubmit: "Gửi yêu cầu",
     formRequiredToast: "Vui lòng điền công ty, email công việc và mục đích sử dụng",
+    companyInvalid: "Nhập tên công ty từ 1–120 ký tự",
+    emailInvalid: "Nhập email công việc hợp lệ (tối đa 254 ký tự)",
+    useCaseInvalid: "Mô tả mục đích sử dụng trong 10–2.000 ký tự",
+    resourceNameInvalid: "Nhập tên từ 1–100 ký tự",
+    webhookUrlInvalid: "Nhập URL HTTPS không có thông tin đăng nhập, tham số truy vấn hoặc fragment",
+    webhookHostInvalid: "Webhook không được dùng máy chủ cục bộ hoặc riêng tư",
+    webhookEventsInvalid: "Chọn 1–8 sự kiện được hỗ trợ, phân cách bằng dấu phẩy",
     formSubmittedToast: "Đã nhận yêu cầu · đội đối tác của chúng tôi sẽ liên hệ",
     pendingExists: "Đã có một yêu cầu truy cập nhà phát triển đang được xử lý",
     latestLoadFailed: "Tạm thời chưa tải được trạng thái yêu cầu — làm mới sau nhé; yêu cầu đã gửi sẽ không bị mất.",
@@ -4595,6 +4609,9 @@ export const vi: Messages = {
   },
 
   agent: {
+    submitUnconfirmedBody: "Giữ nguyên thông tin khi thử lại. Bản ghi mới nhất không tự xác nhận lần gửi này đã thành công.",
+    invalidFormTitle: "Kiểm tra thông tin đăng ký",
+    invalidFormBody: "Chọn hạng mục và ngày từ hôm nay đến một năm sau (giờ Thượng Hải). Thành phố: 2–64 ký tự. Ngân sách: 100–10.000 USDT, tối đa 6 chữ số thập phân.",
     pageTitle: "Đại Sứ Khu Vực",
     heroLabel: "Ủy quyền chính thức",
     fieldEventDate: "Ngày sự kiện",

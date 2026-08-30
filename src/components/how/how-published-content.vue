@@ -1,13 +1,13 @@
 <template>
   <view>
     <SubPageHeader :back="back" />
-    <view v-if="loading" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status">正在读取说明…</view>
+    <view v-if="loading" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status">{{ t.howPublished.loading }}</view>
     <view v-else-if="error" class="mx-4" style="padding: 28px 0;" role="alert">
       <view style="padding: 14px; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-ink-2);">
-        <text class="block" style="font-size: 14px; font-weight: 600;">说明暂不可用</text>
-        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">服务端内容缺失、未发布或环境校验未通过。请重试。</text>
+        <text class="block" style="font-size: 14px; font-weight: 600;">{{ t.howPublished.unavailableTitle }}</text>
+        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">{{ t.howPublished.unavailableBody }}</text>
         <view class="flex items-center justify-center" style="margin-top: 12px; height: 40px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand);" role="button" tabindex="0" @click="load">
-          <text>重试</text>
+          <text>{{ t.ui.retry }}</text>
         </view>
       </view>
     </view>
@@ -25,14 +25,14 @@
         <HowCalloutBox v-else class="mx-4" :title="block.title" :body="renderBody(block)" tone="purple" />
       </template>
       <view class="mx-4" style="margin-top: 24px; padding: 10px 12px; border-radius: 10px; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 11px;">
-        <text>服务端发布版本 {{ content.version }} · {{ content.locale }} · canonical 同源</text>
+        <text>{{ fmt(t.howPublished.versionMeta, { version: content.version, locale: content.locale }) }}</text>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onUnmounted, ref, watch } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -41,6 +41,8 @@ import { howContentApi, remoteApiEnabled } from "@/api/runtime";
 import type { HowContentDocument, HowContentKey, HowContentBlock } from "@/api/how-content-api";
 import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { PublishedContentRequestFence } from "./p3-14-published-request-fence";
 
 const props = defineProps<{ contentKey: HowContentKey; back: string }>();
 const emit = defineEmits<{ unavailable: [] }>();
@@ -50,6 +52,7 @@ const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
 const error = ref(false);
 const bodyStyle = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+const requestFence = new PublishedContentRequestFence();
 
 function heroLabel(contentKey: HowContentKey): string {
   switch (contentKey) {
@@ -67,10 +70,40 @@ function renderBody(block: HowContentBlock): string {
   return block.body.replaceAll("{value}", `${block.ref.key} · ${block.ref.version}`);
 }
 async function load() {
-  loading.value = true; error.value = false;
-  try { content.value = await howContentApi.published(props.contentKey, locale.code); }
-  catch { content.value = null; error.value = true; emit("unavailable"); }
-  finally { loading.value = false; }
+  const requestKey = `${props.contentKey}:${locale.code}`;
+  const generation = requestFence.begin(requestKey);
+  if (generation === null) return;
+
+  loading.value = true;
+  error.value = false;
+  try {
+    const next = await howContentApi.published(props.contentKey, locale.code);
+    if (!requestFence.isCurrent(generation)) return;
+    content.value = next;
+  } catch {
+    if (!requestFence.isCurrent(generation)) return;
+    content.value = null;
+    error.value = true;
+    emit("unavailable");
+  } finally {
+    if (!requestFence.isCurrent(generation)) return;
+    loading.value = false;
+    requestFence.settle(generation);
+  }
 }
-onMounted(() => { if (remoteApiEnabled) void load(); else loading.value = false; });
+watch(
+  () => [props.contentKey, locale.code] as const,
+  () => {
+    if (remoteApiEnabled) {
+      void load();
+      return;
+    }
+    requestFence.invalidate();
+    content.value = null;
+    error.value = false;
+    loading.value = false;
+  },
+  { immediate: true },
+);
+onUnmounted(() => requestFence.invalidate());
 </script>

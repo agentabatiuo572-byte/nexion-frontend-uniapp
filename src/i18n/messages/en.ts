@@ -2,6 +2,12 @@
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  howPublished: {
+    loading: "Loading explanation…",
+    unavailableTitle: "Content is temporarily unavailable",
+    unavailableBody: "The published explanation could not be loaded. Please retry.",
+    versionMeta: "Version {version} · Language {locale}",
+  },
   tabs: {
     home: "Home",
     earn: "Earn",
@@ -1313,6 +1319,7 @@ export const en = {
       ended: "Ended",
     },
     progress: {
+      label: "Progress",
       participating: "You're in",
       ready: "Ready to claim",
     },
@@ -3344,6 +3351,13 @@ export const en = {
     formUseCasePlaceholder: "Tell us how you'll use NexGrid's APIs…",
     formSubmit: "Request access",
     formRequiredToast: "Complete the company, work email, and use-case fields",
+    companyInvalid: "Enter a company name of 1–120 characters",
+    emailInvalid: "Enter a valid work email (up to 254 characters)",
+    useCaseInvalid: "Describe your use case in 10–2,000 characters",
+    resourceNameInvalid: "Enter a name of 1–100 characters",
+    webhookUrlInvalid: "Enter an HTTPS URL without credentials, query parameters, or a fragment",
+    webhookHostInvalid: "Webhook endpoints cannot use local or private hosts",
+    webhookEventsInvalid: "Choose 1–8 supported events, separated by commas",
     formSubmittedToast: "Request received · our partnerships team will reach out",
     pendingExists: "A developer access request is already in progress",
     latestLoadFailed: "Couldn't load the request status right now — refresh shortly; a submitted request is never lost.",
@@ -4740,6 +4754,9 @@ export const en = {
   },
 
   agent: {
+    submitUnconfirmedBody: "Keep the same application details when retrying. The latest record alone does not confirm this submission.",
+    invalidFormTitle: "Check your application details",
+    invalidFormBody: "Choose a category and a date from today through one year ahead (Shanghai time). City: 2–64 characters. Budget: 100–10,000 USDT, up to 6 decimal places.",
     pageTitle: "Regional Ambassador",
     heroLabel: "Official authorization",
     fieldEventDate: "Event date",

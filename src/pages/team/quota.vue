@@ -66,8 +66,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { navTo } from "@/lib/route";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
@@ -80,30 +81,72 @@ import { specText } from "@/lib/product-copy";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 import { useConfig } from "@/store/config";
+import { useApp } from "@/store/app";
+import { isCurrentTeamP31718Request, type TeamP31718Request } from "@/lib/team-p3-17-18-request-scope";
 
 const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
 const cfg = useConfig();
+const app = useApp();
 const remoteSnapshot = ref<TeamQuotaSnapshot | null>(null);
 const remoteError = ref<string | null>(null);
 const remoteRefreshing = ref(false);
-let remoteRequest = 0;
+let quotaMounted = true;
+let quotaRequestGeneration = 0;
+function captureQuotaRequest(): TeamP31718Request {
+  return {
+    accountKey: app.accountKey,
+    accountEpoch: app.accountBindingEpoch,
+    generation: quotaRequestGeneration,
+  };
+}
+function quotaRequestIsCurrent(request: TeamP31718Request): boolean {
+  return isCurrentTeamP31718Request(request, {
+    mounted: quotaMounted,
+    accountKey: app.accountKey,
+    accountEpoch: app.accountBindingEpoch,
+    generation: quotaRequestGeneration,
+  });
+}
+function resetQuotaPageState(): void {
+  quotaRequestGeneration += 1;
+  remoteSnapshot.value = null;
+  remoteError.value = null;
+  remoteRefreshing.value = false;
+}
 async function refreshRemoteQuota() {
   if (remoteRefreshing.value) return;
-  const request = ++remoteRequest;
+  const request = captureQuotaRequest();
   remoteRefreshing.value = true;
   remoteError.value = null;
+  remoteSnapshot.value = null;
   try {
     const value = await teamQuotaApi.snapshot();
-    if (request === remoteRequest) remoteSnapshot.value = value;
+    if (quotaRequestIsCurrent(request)) remoteSnapshot.value = value;
   } catch {
-    if (request === remoteRequest) { remoteSnapshot.value = null; remoteError.value = t.value.authOtp.errorServiceUnavailable; }
+    if (quotaRequestIsCurrent(request)) remoteError.value = t.value.authOtp.errorServiceUnavailable;
   } finally {
-    if (request === remoteRequest) remoteRefreshing.value = false;
+    if (quotaRequestIsCurrent(request)) remoteRefreshing.value = false;
   }
 }
-onShow(() => { if (remoteApiEnabled) void refreshRemoteQuota(); });
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+  resetQuotaPageState();
+  if (quotaMounted && remoteApiEnabled) void refreshRemoteQuota();
+});
+onShow(() => {
+  quotaMounted = true;
+  resetQuotaPageState();
+  if (remoteApiEnabled) void refreshRemoteQuota();
+});
+onHide(() => {
+  quotaMounted = false;
+  resetQuotaPageState();
+});
+onUnload(() => {
+  quotaMounted = false;
+  resetQuotaPageState();
+});
 // 礼包 NEX 数量单源派生自 platform config。
 const inviteHint = computed(() => remoteApiEnabled ? "—" : fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
@@ -165,7 +208,7 @@ const tiers = computed<QuotaTier[]>(() =>
 );
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 // ─── styles ───

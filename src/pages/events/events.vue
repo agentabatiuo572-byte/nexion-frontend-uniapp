@@ -124,6 +124,7 @@ const eventActionLabels = computed<EventActionLabels>(() => ({
   spin: t.value.events.action.spin,
   leaderboard: t.value.events.action.leaderboard,
   viewDetails: t.value.events.action.viewDetails,
+  progress: t.value.events.progress.label,
 }));
 
 async function loadRemoteEvents() {

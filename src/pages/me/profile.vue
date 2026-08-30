@@ -117,7 +117,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { navTo } from "@/lib/route";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import { profileApi, remoteApiEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import NicknameSheet from "@/components/me/nickname-sheet.vue";
@@ -133,8 +135,9 @@ import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
-import { reconcileProfileEdit, saveProfileAndClaimQuest } from "@/lib/profile-save-flow";
+import { reconcileProfileEdit } from "@/lib/profile-save-flow";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
 type Tier = (typeof TIERS)[number];
@@ -145,14 +148,17 @@ const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
 const quest = useQuest();
+const profilePageFence = createP318AccountPageFence(
+  () => String(app.accountKey),
+  () => app.accountBindingEpoch,
+);
+let profilePageVisible = true;
 onMounted(() => {
   // 合并裁决(2026-08-14):取远端那侧(保留 .catch + 收下新增的两个加载调用)。
   //   本地这侧只是把 payout 那行的 .catch 去掉了 —— 理由是缝已自吞、这层是死代码。
   //   但「死代码」和「有害」不是一回事:留着它,万一将来有人把缝的自吞改回抛,
   //   这个调用点仍是安全的。少一行的收益抵不上那个风险,所以不坚持本地那侧。
-  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
-  if (remoteApiEnabled) void loadProfileCandidates();
-  if (remoteApiEnabled) void loadRemoteProfile();
+  if (remoteApiEnabled) refreshProfileForCurrentAccount();
 });
 
 // Local edit buffer (committed on Save), mirroring the source useState.
@@ -164,6 +170,62 @@ const avatarUrl = ref("");
 const avatarRevision = ref("");
 const avatarUploading = ref(false);
 const setupProfileQuestPending = ref(false);
+
+function isCurrentProfileRequest(
+  pageScope: P318AccountPageScope,
+  accountScope = captureAccountScope(),
+  accountKey = auth.accountId,
+): boolean {
+  return profilePageVisible
+    && profilePageFence.isCurrent(pageScope)
+    && isCurrentAccountScope(accountScope)
+    && auth.accountId === accountKey;
+}
+
+function clearProfileAccountState() {
+  profilePageFence.invalidate();
+  name.value = profile.displayName;
+  saveFeedback.value = "";
+  isSaving.value = false;
+  nicknameSheetOpen.value = false;
+  avatarUrl.value = "";
+  avatarRevision.value = "";
+  avatarUploading.value = false;
+  setupProfileQuestPending.value = false;
+}
+
+function refreshProfileForCurrentAccount() {
+  if (!profilePageVisible || !remoteApiEnabled) return;
+  void refreshPayoutForCurrentAccount();
+  void loadProfileCandidates();
+  void loadRemoteProfile();
+}
+
+async function refreshPayoutForCurrentAccount() {
+  const pageScope = profilePageFence.capture("payout-address");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+  await payout.refreshRemote().catch(() => undefined);
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+}
+
+onShow(() => {
+  profilePageVisible = true;
+  refreshProfileForCurrentAccount();
+});
+onHide(() => {
+  profilePageVisible = false;
+  clearProfileAccountState();
+});
+onUnmounted(() => {
+  profilePageVisible = false;
+  clearProfileAccountState();
+});
+watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
+  clearProfileAccountState();
+  refreshProfileForCurrentAccount();
+});
 
 const displayName = computed(() => profile.displayName);
 // A remote session's user-id key is internal routing state, never profile copy.
@@ -201,13 +263,23 @@ const joinedDate = computed(() =>
 const dirty = computed(() => name.value !== profile.displayName);
 
 async function loadProfileCandidates() {
+  const pageScope = profilePageFence.capture("nickname-candidates");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
   const ok = await profile.refreshNicknameCandidates();
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
   if (!ok) toast.error(t.value.profile.serverMutationFailed);
 }
 
 async function openNicknameSheet() {
+  const pageScope = profilePageFence.capture("nickname-sheet");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
   if (remoteApiEnabled && profile.nicknameCandidates.length === 0) {
     const ok = await profile.refreshNicknameCandidates();
+    if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
     if (!ok) {
       toast.error(t.value.profile.serverMutationFailed);
       return;
@@ -217,20 +289,29 @@ async function openNicknameSheet() {
 }
 
 function onNicknamePick(v: string) {
+  if (!profilePageVisible) return;
   name.value = v;
   nicknameSheetOpen.value = false;
 }
 
 async function handleSave() {
   if (isSaving.value) return;
+  const pageScope = profilePageFence.capture("profile-save");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
   if (!dirty.value) {
     if (remoteApiEnabled && setupProfileQuestPending.value) {
       isSaving.value = true;
       try {
-        if (await claimSetupProfileQuest(quest)) setupProfileQuestPending.value = false;
+        const claimed = await claimSetupProfileQuest(quest);
+        if (isCurrentProfileRequest(pageScope, accountScope, accountKey) && claimed) {
+          setupProfileQuestPending.value = false;
+        }
       } finally {
-        isSaving.value = false;
+        if (isCurrentProfileRequest(pageScope, accountScope, accountKey)) isSaving.value = false;
       }
+      if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
       // The nickname is already authoritative at this point. A missing or
       // temporarily unavailable setup-profile reward must never turn the
       // completed profile mutation into a visible profile-service failure.
@@ -244,75 +325,92 @@ async function handleSave() {
   }
   isSaving.value = true;
   try {
-    const outcome = remoteApiEnabled
-      ? await saveProfileAndClaimQuest(
-          () => profile.setDisplayName(name.value),
-          () => claimSetupProfileQuest(quest),
-        )
-      : { saved: await profile.setDisplayName(name.value), questPending: false };
+    let outcome: { saved: boolean; questPending: boolean };
+    if (remoteApiEnabled) {
+      const saved = await profile.setDisplayName(name.value);
+      if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+      const claimed = saved ? await claimSetupProfileQuest(quest).catch(() => false) : false;
+      if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+      outcome = { saved, questPending: saved && !claimed };
+    } else {
+      const saved = await profile.setDisplayName(name.value);
+      if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+      outcome = { saved, questPending: false };
+    }
+    if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
     if (!outcome.saved) return;
     name.value = profile.displayName;
     setupProfileQuestPending.value = outcome.questPending;
     saveFeedback.value = t.value.profile.savedToast;
     toast.success(t.value.profile.savedToast);
   } catch {
+    if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
     toast.error(t.value.profile.serverMutationFailed);
   } finally {
-    isSaving.value = false;
+    if (isCurrentProfileRequest(pageScope, accountScope, accountKey)) isSaving.value = false;
   }
 }
 
 async function loadRemoteProfile() {
+  const pageScope = profilePageFence.capture("profile");
   const scope = captureAccountScope();
   const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
   try {
     const projection = await profileApi.profile();
-    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
+    if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
     name.value = reconcileProfileEdit(profile.displayName, name.value, projection.nickname);
     profile.projectServerNickname(projection.nickname);
     avatarUrl.value = projection.avatarUrl;
     avatarRevision.value = projection.avatarRevision;
   } catch {
-    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
+    if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
     toast.error(t.value.profile.serverMutationFailed);
   }
 }
 
 async function handleRegen() {
   if (avatarUploading.value) return;
+  const pageScope = profilePageFence.capture("avatar-upload");
+  const scope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
   if (remoteApiEnabled) {
     try {
       const chosen = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) => {
         uni.chooseImage({ count: 1, sizeType: ["compressed"], sourceType: ["album", "camera"], success: resolve, fail: reject });
       });
       const filePath = chosen.tempFilePaths[0];
+      if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
       if (!filePath) return;
       avatarUploading.value = true;
-      const scope = captureAccountScope();
-      const accountKey = auth.accountId;
       const key = `app-profile:avatar:${requireCryptoUuid()}`;
       const before = avatarRevision.value;
       try {
         const result = await profileApi.uploadAvatar(filePath, key);
-        if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
+        if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
         avatarUrl.value = result.avatarUrl;
         avatarRevision.value = result.avatarRevision;
       } catch (cause) {
         const authoritative = await profileApi.profile().catch(() => null);
-        if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
+        if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
         if (!authoritative || !authoritative.avatarRevision || authoritative.avatarRevision === before) throw cause;
         avatarUrl.value = authoritative.avatarUrl;
         avatarRevision.value = authoritative.avatarRevision;
       }
-      toast.success(t.value.profile.avatar, t.value.profile.avatarHint);
+      if (isCurrentProfileRequest(pageScope, scope, accountKey)) {
+        toast.success(t.value.profile.avatar, t.value.profile.avatarHint);
+      }
     } catch (cause) {
+      if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
       if (cause instanceof Error && /cancel/i.test(cause.message)) return;
       toast.error(t.value.profile.serverMutationFailed);
     } finally {
-      avatarUploading.value = false;
+      if (isCurrentProfileRequest(pageScope, scope, accountKey)) avatarUploading.value = false;
     }
     return;
   }
+  if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
   if (!profile.regenerateAvatar()) return;
   toast.info(t.value.profile.avatar, t.value.profile.avatarHint);
 }
@@ -320,7 +418,7 @@ async function handleRegen() {
 function goWallet() {
   // 提现地址行 → 地址管理页(带展示中的网络参数,与 wallet-withdraw.goManage 同模式)
   const query = walletNetwork.value ? `?network=${walletNetwork.value}` : "";
-  uni.navigateTo({ url: `/pages/me/wallet-address-rebind${query}`, fail: () => {} });
+  navTo(`/pages/me/wallet-address-rebind${query}`);
 }
 
 // ── styles ──

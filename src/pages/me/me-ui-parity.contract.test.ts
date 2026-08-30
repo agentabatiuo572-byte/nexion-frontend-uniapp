@@ -44,7 +44,11 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
   "preferences.vue": "1d91c7ba3e5b24311070d04697018c02ad233ce4cca1d7926c0c4fad664efd1b",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
-  "receipts.vue": "b70aab7c11556baa0577c6ff2874ec0e883e17122a5bd2c4869dd96561c056af",
+  // Formal receipts keep the 5174 row layout but render server settlement
+  // status and suppress positive amounts unless the receipt is CREDITED.
+  // P3-13 additionally renders recoverable initial/pagination errors and a busy
+  // load-more label; the successful receipt-row layout is unchanged.
+  "receipts.vue": "f8bc3661a5ec95dbba6b6a2fe193d91b206dc13a4fb92c77f569b20df1fed1df",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
   "security.vue": "d2ee24d1b0833bda99c89e316f49c223f867a3e419f979e27a630d5a7ca661aa",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",

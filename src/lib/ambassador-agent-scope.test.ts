@@ -29,7 +29,10 @@ describe("ambassador agent request fence", () => {
     expect(agentSource).toContain("agentMounted = false");
     expect(agentSource).toMatch(/const value = await ambassadorApplicationApi\.latest\(\);[\s\S]*requestIsCurrent\(requestScope\)/);
     expect(agentSource).toMatch(/const result = await ambassadorApplicationApi\.submit\(input, key\);[\s\S]*requestIsCurrent\(requestScope\)/);
-    expect(agentSource).toMatch(/const authoritative = await refreshLatest\(requestScope\);[\s\S]*requestIsCurrent\(requestScope\)/);
+    // Readback only updates the display; it no longer falsely identifies a
+    // matching historical application as this command's successful receipt.
+    expect(agentSource).toMatch(/await refreshLatest\(requestScope\);[\s\S]*requestIsCurrent\(requestScope\)/);
+    expect(agentSource).not.toContain("matches(input, authoritative)");
     expect(agentSource).toMatch(/finally \{[\s\S]*if \(requestIsCurrent\(requestScope\)\) submitting\.value = false;/);
   });
 });
