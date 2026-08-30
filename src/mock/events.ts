@@ -42,6 +42,8 @@ export interface NexEvent {
   joined: boolean;
   ctaLabel?: string;
   href?: string;
+  /** Runtime authority marker: remote rows must never fall back to Mock-only actions. */
+  runtimeSource?: "remote" | "mock";
   /** Where "Use it" navigates after the reward is claimed (discount → store, NEX reward → NEX wallet). */
   useHref?: string;
   featured?: boolean;

@@ -156,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -814,13 +815,13 @@ function launchRegistrationSuccess() {
   // [FEAT-SHARE5] H5 注册完成 → 成功页(礼包确认 + 引导下载 APP);
   // APP 壳内注册装 APP 引导无意义,直进 onboarding(异常2)。
   // #ifdef H5
-  uni.reLaunch({
+  navReset({
     url: "/pages/register/success",
-    fail: () => uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} }),
+    fail: () => navReset({ url: "/pages/onboarding/estimator", fail: () => {} }),
   });
   // #endif
   // #ifndef H5
-  uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} });
+  navReset({ url: "/pages/onboarding/estimator", fail: () => {} });
   // #endif
 }
 function prospectiveIdentity() {
@@ -840,9 +841,9 @@ function back() {
   resendLeft.value = 0;
   step.value = (step.value === 3 ? 2 : 1) as Step;
 }
-function close() { uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }); }
-function goLogin() { uni.reLaunch({ url: "/pages/login/login", fail: () => {} }); }
-function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} }); }
+function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
+function goLogin() { navReset({ url: "/pages/login/login", fail: () => {} }); }
+function goTerms() { navTo("/pages/onboarding/terms"); }
 
 function cleanup() {
   mounted = false;

@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -169,10 +170,10 @@ const DATA_DOTS = [
 ];
 
 function goBills() {
-  uni.navigateTo({ url: "/pages/me/wallet-bills", fail: () => {} });
+  navTo("/pages/me/wallet-bills");
 }
 function goStore() {
-  uni.reLaunch({ url: "/pages/store/store", fail: () => {} });
+  navReset({ url: "/pages/store/store", fail: () => {} });
 }
 
 const cardStyle: CSSProperties = {

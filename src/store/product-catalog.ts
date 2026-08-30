@@ -58,6 +58,14 @@ export function prepareProductCatalog(): void {
 export function refreshProductCatalog(force = false): Promise<boolean> {
   if (!remoteApiEnabled) return Promise.resolve(true);
   if (!force && productCatalogState.status === "ready") return Promise.resolve(true);
+
+  // A visible-page refresh is a newer observation, not merely another caller
+  // waiting for an older request. Advance the epoch so its late success/failure
+  // cannot overwrite the newer catalog snapshot.
+  if (force) {
+    catalogEpoch += 1;
+    refreshInFlight = null;
+  }
   if (refreshInFlight) return refreshInFlight;
 
   productCatalogState.status = "loading";

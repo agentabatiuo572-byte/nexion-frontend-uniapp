@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReplace, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -93,6 +94,12 @@ import { fmt } from "@/i18n/format";
 import { computeShareApi, remoteApiEnabled } from "@/api/runtime";
 import type { ComputeShareEnrollment } from "@/api/compute-share-api";
 import { isAmbiguousOutcome } from "@/api/errors";
+import { createComputeShareEnrollmentJournal } from "./enrollment-recovery";
+import {
+  preserveInMemoryPairingCode,
+  runComputeShareEnrollmentFlow,
+  type InMemoryComputeSharePairingCode,
+} from "./enrollment-flow";
 
 const GPU_MODEL_PRESETS = [
   "Intel Iris Xe",
@@ -110,7 +117,14 @@ const selectedModel = ref(GPU_MODEL_PRESETS[2]);
 const enrollment = ref<ComputeShareEnrollment | null>(null);
 const connecting = ref(false);
 let accountGeneration = 0;
+let lifecycleGeneration = 0;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let inMemoryPairingCode: InMemoryComputeSharePairingCode | null = null;
+const enrollmentJournal = createComputeShareEnrollmentJournal({
+  read: () => uni.getStorageSync("nexgrid.compute-share.enrollment.v1"),
+  write: (value) => uni.setStorageSync("nexgrid.compute-share.enrollment.v1", value),
+  remove: () => uni.removeStorageSync("nexgrid.compute-share.enrollment.v1"),
+});
 const enabled = computed(() => cfg.isEnabled("computeShareEnabled"));
 const downloadUrl = computed(() => cfg.config.computeShare.downloadUrl.trim());
 const downloadTitle = computed(() => {
@@ -156,26 +170,41 @@ const connectButtonText = computed(() => {
 function guardDisabled() {
   if (enabled.value) return;
   toast.info(t.value.computeShare.disabledToast);
-  uni.redirectTo({ url: "/pages/me/devices", fail: () => uni.reLaunch({ url: "/pages/me/devices", fail: () => {} }) });
+  navReplace("/pages/me/devices");
 }
 
 onMounted(() => {
+  lifecycleGeneration += 1;
   guardDisabled();
-  if (remoteApiEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration);
+  if (remoteApiEnabled && enabled.value) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration, lifecycleGeneration);
 });
 onUnmounted(() => {
+  lifecycleGeneration += 1;
+  inMemoryPairingCode = null;
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
 });
-watch(enabled, guardDisabled);
+watch(enabled, (next) => {
+  if (!next) {
+    lifecycleGeneration += 1;
+    inMemoryPairingCode = null;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    guardDisabled();
+    return;
+  }
+  lifecycleGeneration += 1;
+  if (remoteApiEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration, lifecycleGeneration);
+});
 watch(() => String(app.accountKey), (next, previous) => {
   if (next === previous) return;
   accountGeneration += 1;
   connecting.value = false;
   enrollment.value = null;
+  inMemoryPairingCode = null;
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
-  if (remoteApiEnabled) void resumeRemoteEnrollment(next, accountGeneration);
+  if (remoteApiEnabled && enabled.value) void resumeRemoteEnrollment(next, accountGeneration, lifecycleGeneration);
 });
 
 function copyDownloadUrl() {
@@ -194,99 +223,110 @@ function copyDownloadUrl() {
   });
 }
 
-function storageScope(accountKey: string): string {
-  return `nexgrid.compute-share.enrollment.${accountKey}`;
-}
-
-function readPending(accountKey: string): { requestedGpuModel: string; idempotencyKey: string } | null {
-  try {
-    const value = JSON.parse(localStorage.getItem(storageScope(accountKey)) ?? "null") as Record<string, unknown> | null;
-    if (!value || typeof value.requestedGpuModel !== "string" || typeof value.idempotencyKey !== "string") return null;
-    if (!value.requestedGpuModel.trim() || !value.idempotencyKey.trim()) return null;
-    return { requestedGpuModel: value.requestedGpuModel.trim(), idempotencyKey: value.idempotencyKey.trim() };
-  } catch {
-    return null;
-  }
-}
-
-function writePending(accountKey: string, value: { requestedGpuModel: string; idempotencyKey: string }) {
-  try { localStorage.setItem(storageScope(accountKey), JSON.stringify(value)); } catch { /* storage may be unavailable */ }
-}
-
-function clearPending(accountKey: string) {
-  try { localStorage.removeItem(storageScope(accountKey)); } catch { /* storage may be unavailable */ }
-}
-
-// IDEMPOTENCY-FRESH-OK: 仅在账号当前没有同型号 pending 意图时铸键，随后持久化并跨重试复用。
+// IDEMPOTENCY-FRESH-OK: 仅在账号当前没有 pending 意图时铸键，随后持久化并跨重试复用。
 function newEnrollmentKey(): string {
   const suffix = globalThis.crypto?.randomUUID?.()
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   return `compute-share-${suffix}`;
 }
 
-async function adoptEnrollment(next: ComputeShareEnrollment, expectedAccount: string, expectedGeneration: number) {
-  if (expectedAccount !== String(app.accountKey) || expectedGeneration !== accountGeneration) return;
+function isCurrent(expectedAccount: string, expectedGeneration: number, expectedLifecycle: number): boolean {
+  return expectedAccount === String(app.accountKey)
+    && expectedGeneration === accountGeneration
+    && expectedLifecycle === lifecycleGeneration;
+}
+
+async function adoptEnrollment(
+  candidate: ComputeShareEnrollment,
+  expectedAccount: string,
+  expectedGeneration: number,
+  expectedLifecycle: number,
+) {
+  if (!isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) return;
+  const preserved = preserveInMemoryPairingCode(candidate, inMemoryPairingCode, expectedAccount);
+  const next = preserved.enrollment;
+  inMemoryPairingCode = preserved.pairingCode;
   enrollment.value = next;
   if (next.status === "CONNECTED") {
-    clearPending(expectedAccount);
+    enrollmentJournal.clear(expectedAccount);
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     await app.refreshRemoteFleet();
-    if (expectedAccount !== String(app.accountKey) || expectedGeneration !== accountGeneration) return;
+    if (!isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) return;
     toast.success(fmt(t.value.computeShare.connectedToast, { tier: selectedTierLabel.value }));
-    uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+    navTo("/pages/me/devices");
     return;
   }
   if (next.status === "EXPIRED") {
-    clearPending(expectedAccount);
+    enrollmentJournal.clear(expectedAccount);
     return;
   }
-  scheduleStatusPoll(next.enrollmentNo, expectedAccount, expectedGeneration);
+  scheduleStatusPoll(next.enrollmentNo, expectedAccount, expectedGeneration, expectedLifecycle);
 }
 
-function scheduleStatusPoll(enrollmentNo: string, expectedAccount: string, expectedGeneration: number) {
+function scheduleStatusPoll(
+  enrollmentNo: string,
+  expectedAccount: string,
+  expectedGeneration: number,
+  expectedLifecycle: number,
+) {
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = setTimeout(async () => {
-    if (expectedAccount !== String(app.accountKey) || expectedGeneration !== accountGeneration) return;
+    if (!isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) return;
     try {
-      await adoptEnrollment(await computeShareApi.status(enrollmentNo), expectedAccount, expectedGeneration);
+      await adoptEnrollment(
+        await computeShareApi.status(enrollmentNo), expectedAccount, expectedGeneration, expectedLifecycle,
+      );
     } catch {
-      if (expectedAccount === String(app.accountKey) && expectedGeneration === accountGeneration) {
-        scheduleStatusPoll(enrollmentNo, expectedAccount, expectedGeneration);
+      if (isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) {
+        scheduleStatusPoll(enrollmentNo, expectedAccount, expectedGeneration, expectedLifecycle);
       }
     }
   }, 3_000);
 }
 
-async function resumeRemoteEnrollment(expectedAccount: string, expectedGeneration: number) {
-  const pending = readPending(expectedAccount);
-  if (!pending || connecting.value) return;
-  selectedModel.value = pending.requestedGpuModel;
-  await createRemoteEnrollment(pending, expectedAccount, expectedGeneration);
+async function resumeRemoteEnrollment(expectedAccount: string, expectedGeneration: number, expectedLifecycle: number) {
+  if (!isCurrent(expectedAccount, expectedGeneration, expectedLifecycle) || !enabled.value || connecting.value) return;
+  const stored = enrollmentJournal.read(expectedAccount);
+  if (stored.kind !== "ok" || !stored.pending) return;
+  selectedModel.value = stored.pending.requestedGpuModel;
+  await createRemoteEnrollment(expectedAccount, expectedGeneration, expectedLifecycle);
 }
 
 async function createRemoteEnrollment(
-  pending?: { requestedGpuModel: string; idempotencyKey: string },
   expectedAccount = String(app.accountKey),
   expectedGeneration = accountGeneration,
+  expectedLifecycle = lifecycleGeneration,
 ) {
-  if (connecting.value) return;
-  const requestedGpuModel = selectedModel.value.trim();
-  const retained = readPending(expectedAccount);
-  const intent = pending
-    ?? (retained?.requestedGpuModel === requestedGpuModel ? retained : null)
-    ?? { requestedGpuModel, idempotencyKey: newEnrollmentKey() };
-  writePending(expectedAccount, intent);
+  if (connecting.value || !isCurrent(expectedAccount, expectedGeneration, expectedLifecycle) || !enabled.value) return;
   connecting.value = true;
   try {
-    await adoptEnrollment(await computeShareApi.create(intent.requestedGpuModel, intent.idempotencyKey), expectedAccount, expectedGeneration);
+    const result = await runComputeShareEnrollmentFlow({
+      accountKey: expectedAccount,
+      requestedGpuModel: selectedModel.value,
+      journal: enrollmentJournal,
+      createKey: newEnrollmentKey,
+      isCurrent: () => isCurrent(expectedAccount, expectedGeneration, expectedLifecycle),
+      isEnabled: () => enabled.value,
+      create: computeShareApi.create,
+      status: computeShareApi.status,
+    });
+    if (result.kind === "enrollment") {
+      await adoptEnrollment(result.enrollment, expectedAccount, expectedGeneration, expectedLifecycle);
+    } else if (isCurrent(expectedAccount, expectedGeneration, expectedLifecycle) && enabled.value) {
+      toast.warn(result.kind === "recovery-required" ? t.value.computeShare.recoveryRequired : t.value.computeShare.pairingFailed);
+    }
   } catch (cause) {
-    if (expectedAccount !== String(app.accountKey) || expectedGeneration !== accountGeneration) return;
-    if (!isAmbiguousOutcome(cause)) clearPending(expectedAccount);
+    if (!isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) return;
+    // Once an enrollment number is known, recovery must query it; otherwise replay the retained key.
+    const stored = enrollmentJournal.read(expectedAccount);
+    if (!isAmbiguousOutcome(cause) && stored.kind === "ok" && !stored.pending?.enrollmentNo) {
+      enrollmentJournal.clear(expectedAccount);
+    }
     console.warn("[compute-share] pairing failed:", cause);
     toast.warn(t.value.computeShare.pairingFailed);
   } finally {
-    if (expectedAccount === String(app.accountKey) && expectedGeneration === accountGeneration) connecting.value = false;
+    if (isCurrent(expectedAccount, expectedGeneration, expectedLifecycle)) connecting.value = false;
   }
 }
 
@@ -310,11 +350,11 @@ function connectDemoComputer() {
       return;
     }
     toast.success(fmt(t.value.computeShare.connectedToast, { tier: selectedTierLabel.value }));
-    uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+    navTo("/pages/me/devices");
     return;
   }
   const accountKey = String(app.accountKey);
-  void createRemoteEnrollment(readPending(accountKey) ?? undefined, accountKey, accountGeneration);
+  void createRemoteEnrollment(accountKey, accountGeneration, lifecycleGeneration);
 }
 
 function copyPairingCode() {
@@ -327,7 +367,7 @@ function copyPairingCode() {
 }
 
 function goDevices() {
-  uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+  navTo("/pages/me/devices");
 }
 
 // De-carded: download hero sits on the page floor (accent border + tint

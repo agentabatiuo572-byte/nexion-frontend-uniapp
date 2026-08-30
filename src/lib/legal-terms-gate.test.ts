@@ -8,6 +8,8 @@ import {
   sameLegalTermsRun,
   isLegalTermsAcknowledged,
   sameLegalTermsSession,
+  shouldBlockLegalTermsExit,
+  isLegalTermsGateExemptRoute,
   type LegalTermsSessionFence,
 } from "./legal-terms-gate";
 
@@ -46,6 +48,20 @@ describe("legal terms session gate", () => {
   it("requires a server snapshot that is not acknowledged", () => {
     expect(isLegalTermsAcknowledged(acknowledged(false))).toBe(false);
     expect(isLegalTermsAcknowledged(acknowledged(true))).toBe(true);
+  });
+
+  it("blocks every authenticated remote exit until the authoritative version is acknowledged", () => {
+    expect(shouldBlockLegalTermsExit(true, true, null)).toBe(true);
+    expect(shouldBlockLegalTermsExit(true, true, acknowledged(false))).toBe(true);
+    expect(shouldBlockLegalTermsExit(true, true, acknowledged(true))).toBe(false);
+    expect(shouldBlockLegalTermsExit(true, false, acknowledged(false))).toBe(false);
+    expect(shouldBlockLegalTermsExit(false, true, acknowledged(false))).toBe(false);
+  });
+
+  it("allows only the Terms and risk-disclosure pages while acknowledgement is pending", () => {
+    expect(isLegalTermsGateExemptRoute("/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme")).toBe(true);
+    expect(isLegalTermsGateExemptRoute("pages/me/risk-disclosure?return=%2Fpages%2Fonboarding%2Fterms")).toBe(true);
+    expect(isLegalTermsGateExemptRoute("/pages/me/me")).toBe(false);
   });
 
   it("claims one redirect per account/version/return target so onShow refresh cannot loop", () => {

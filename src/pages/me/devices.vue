@@ -167,6 +167,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -372,7 +373,7 @@ function onSheetWait() {
 }
 
 function goPhoneActivation() {
-  uni.navigateTo({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => {} });
+  navTo("/pages/onboarding/connect?mode=recalibrate");
 }
 
 async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
@@ -520,7 +521,7 @@ async function runRemoteDeviceCommand(d: Device, operation: "activate" | "deacti
 }
 
 function goStore() {
-  uni.reLaunch({ url: "/pages/store/store", fail: () => {} });
+  navReset({ url: "/pages/store/store", fail: () => {} });
 }
 
 // ── styles ──

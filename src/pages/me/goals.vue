@@ -115,6 +115,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -218,7 +219,7 @@ async function remove(id: string) {
 }
 
 function goStore() {
-  uni.reLaunch({ url: "/pages/store/store", fail: () => {} });
+  navReset({ url: "/pages/store/store", fail: () => {} });
 }
 
 // ── styles ──

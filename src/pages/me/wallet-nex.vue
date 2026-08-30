@@ -140,6 +140,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -246,15 +247,11 @@ function fmtUSD(n: number): string {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 }
 
-function navTo(href: string) {
-  if (!href || href === "#") return;
-  uni.navigateTo({ url: href, fail: () => {} });
-}
 function goMarket() {
-  uni.reLaunch({ url: "/pages/market/market", fail: () => {} });
+  navReset({ url: "/pages/market/market", fail: () => {} });
 }
 function goBills() {
-  uni.navigateTo({ url: "/pages/me/wallet-bills", fail: () => {} });
+  navTo("/pages/me/wallet-bills");
 }
 
 // ── inline-icon SVG strings (lucide replacements) ──

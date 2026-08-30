@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -782,11 +783,11 @@ function back() {
 }
 function close() {
   invalidateOtpFlow();
-  uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} });
+  navReset({ url: "/pages/onboarding/intro", fail: () => {} });
 }
 function goRegister() {
   invalidateOtpFlow();
-  uni.reLaunch({ url: "/pages/register/register", fail: () => {} });
+  navReset({ url: "/pages/register/register", fail: () => {} });
 }
 
 function cleanup() {

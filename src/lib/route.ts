@@ -14,6 +14,8 @@
 
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { toast } from "@/store/ui";
+import { getT } from "@/i18n/use-t";
 
 const TAB_ROOT: Record<string, string> = {
   "/": "/pages/index/index",
@@ -24,12 +26,38 @@ const TAB_ROOT: Record<string, string> = {
   "/me": "/pages/me/me",
 };
 
+function reportNavigationFailure(): void {
+  // Bare Intro/Terms/session-ended pages do not mount GlobalUi. Native feedback
+  // must be first even when Pinia is active, for every kind of navigation.
+  let title = "页面暂时无法打开，请重试。";
+  try { title = getT().ui.navigationFailed; } catch { /* i18n is not mounted yet */ }
+  try {
+    uni.showToast({ title, icon: "none" });
+  } catch {
+    try { toast.error(title); } catch { /* Neither renderer is mounted yet. */ }
+  }
+}
+
+function closeTransientNavigationSheets(): void {
+  // Navigation can be triggered by startup/deep-link code before Pinia is
+  // active. Overlay cleanup is best-effort and must never block routing.
+  try { useTrialClaimSheet().closeTransient(); } catch { /* store unavailable */ }
+  try { useVoucherClaimSheet().closeTransient(); } catch { /* store unavailable */ }
+}
+
+function isUsableNavigationHref(href: unknown): href is string {
+  return typeof href === "string" && !!href.trim() && href.trim() !== "#";
+}
+
 export function toUniRoute(href: string): { url: string; tab: boolean } {
   const qi = href.indexOf("?");
   const path = qi >= 0 ? href.slice(0, qi) : href;
   const query = qi >= 0 ? href.slice(qi) : "";
-  // Already a uni route → pass through.
-  if (path.startsWith("/pages/")) return { url: href, tab: false };
+  // Already a uni route → pass through, while still recognizing real tab roots.
+  // Calling navigateTo for a tabBar page fails on App/mini-program runtimes.
+  if (path.startsWith("/pages/")) {
+    return { url: href, tab: Object.values(TAB_ROOT).includes(path) };
+  }
   if (TAB_ROOT[path]) return { url: TAB_ROOT[path] + query, tab: true };
   const segs = path.split("/").filter(Boolean);
   if (segs.length === 0) return { url: "/pages/index/index" + query, tab: true };
@@ -37,6 +65,61 @@ export function toUniRoute(href: string): { url: string; tab: boolean } {
   // 2+ segments: first segment is the directory; flatten the rest with dashes
   // (matches uni's flattened filenames: me/wallet/exchange → me/wallet-exchange).
   return { url: `/pages/${segs[0]}/${segs.slice(1).join("-")}` + query, tab: false };
+}
+
+type ForcedNavigationOptions = UniApp.ReLaunchOptions;
+
+/** Keep auth/terms resets as resets; never fall back to pushing a business page. */
+export function navReset(target: string | ForcedNavigationOptions): Promise<boolean> {
+  return forceNavigation(target, false);
+}
+
+/** Replace the current page, with a same-destination reset if replacement fails. */
+export function navReplace(target: string | ForcedNavigationOptions): Promise<boolean> {
+  return forceNavigation(target, true);
+}
+
+function forceNavigation(target: string | ForcedNavigationOptions, replace: boolean): Promise<boolean> {
+  closeTransientNavigationSheets();
+  const options = typeof target === "string" ? { url: target } : target;
+  if (!options || !isUsableNavigationHref(options.url)) {
+    reportNavigationFailure();
+    return Promise.resolve(false);
+  }
+  const { url } = toUniRoute(options.url.trim());
+  return new Promise((resolve) => {
+    let settled = false;
+    const invoke = (callback: Function | undefined, result: unknown) => {
+      try { callback?.(result); } catch { reportNavigationFailure(); }
+    };
+    const finish = (ok: boolean, result: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (!ok) reportNavigationFailure();
+      invoke(ok ? options.success : options.fail, result);
+      invoke(options.complete, result);
+      resolve(ok);
+    };
+    const attempt = (retry: boolean) => {
+      let responded = false;
+      const success = (result: unknown) => {
+        if (responded || settled) return;
+        responded = true;
+        finish(true, result);
+      };
+      const fail = (result: unknown) => {
+        if (responded || settled) return;
+        responded = true;
+        if (!retry) attempt(true);
+        else finish(false, result);
+      };
+      try {
+        if (replace && !retry) uni.redirectTo({ ...options, url, success, fail, complete: undefined });
+        else uni.reLaunch({ ...options, url, success, fail, complete: undefined });
+      } catch (cause) { fail(cause); }
+    };
+    attempt(false);
+  });
 }
 
 /**
@@ -53,17 +136,25 @@ export function navBack(fallbackHref?: string): void {
   // just before the current page was pushed. Close only the in-memory sheets
   // before popping/replacing so their backdrop cannot consume the next tap on
   // the destination page. Cooldown and server state remain untouched.
-  useTrialClaimSheet().closeTransient();
-  useVoucherClaimSheet().closeTransient();
+  closeTransientNavigationSheets();
   let len = 1;
   try { len = getCurrentPages().length; } catch { /* unavailable → treat as cold-open */ }
   if (len > 1) {
     // Real history: pop (restores the previous page + its scroll position).
-    uni.navigateBack({ fail: () => { if (fallbackHref) navTo(fallbackHref); } });
+    uni.navigateBack({
+      fail: () => {
+        if (fallbackHref) navTo(fallbackHref);
+        else reportNavigationFailure();
+      },
+    });
     return;
   }
   // Cold-open / no history: navigateBack would no-op here, so go to the declared
   // back target. reLaunch (not navigateTo) replaces the lone page instead of stacking.
+  if (fallbackHref !== undefined && !isUsableNavigationHref(fallbackHref)) {
+    reportNavigationFailure();
+    return;
+  }
   if (fallbackHref) {
     const { url } = toUniRoute(fallbackHref);
     uni.reLaunch({ url, fail: () => navTo(fallbackHref) });
@@ -71,7 +162,7 @@ export function navBack(fallbackHref?: string): void {
   }
   // No declared back target on a singleton stack — never leave the back button a
   // dead end; fall back to home so a cold-opened caller without a backHref still moves.
-  uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
+  uni.reLaunch({ url: "/pages/index/index", fail: reportNavigationFailure });
 }
 
 /** Navigate to a logical-or-uni href, picking reLaunch for tab roots. */
@@ -79,15 +170,18 @@ export function navTo(href: string): void {
   // A transient Home offer must never remain above the destination page and
   // steal its first tap. Persistent cooldown state is intentionally untouched;
   // this only arbitrates the in-memory overlay before navigation.
-  useTrialClaimSheet().closeTransient();
-  useVoucherClaimSheet().closeTransient();
+  closeTransientNavigationSheets();
+  if (!isUsableNavigationHref(href)) {
+    reportNavigationFailure();
+    return;
+  }
   const { url, tab } = toUniRoute(href);
   if (tab) {
     uni.reLaunch({
       url,
       fail: () => uni.redirectTo({
         url,
-        fail: () => uni.navigateTo({ url, fail: () => {} }),
+        fail: () => uni.navigateTo({ url, fail: reportNavigationFailure }),
       }),
     });
     return;
@@ -96,7 +190,7 @@ export function navTo(href: string): void {
     url,
     fail: () => uni.redirectTo({
       url,
-      fail: () => uni.reLaunch({ url, fail: () => {} }),
+      fail: () => uni.reLaunch({ url, fail: reportNavigationFailure }),
     }),
   });
 }

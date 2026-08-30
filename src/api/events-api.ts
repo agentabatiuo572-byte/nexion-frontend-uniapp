@@ -150,6 +150,14 @@ function required(value: string, error: string): string {
   return normalized;
 }
 
+export function isValidEventHref(href: string): boolean {
+  if (href === "") return true;
+  if (!/^\/pages\/[A-Za-z0-9_./-]+$/.test(href)) return false;
+  const segments = href.slice("/pages/".length).split("/");
+  return segments.length >= 2
+    && segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
 function parseEvent(value: unknown): CanonicalEvent {
   const row = record(value);
   const eventCode = text(row?.eventCode);
@@ -171,7 +179,7 @@ function parseEvent(value: unknown): CanonicalEvent {
       || !title || subtitle === null || !rewardName || !rewardType || rewardAmount === null
       || featured === null || trackable === null || targetValue === null || progressValue === null
       || !USER_STATUSES.includes(userStatus) || geo === null || href === null
-      || (href !== "" && !/^\/pages\/[A-Za-z0-9_./-]+$/.test(href))) {
+      || !isValidEventHref(href)) {
     return invalid();
   }
   return {

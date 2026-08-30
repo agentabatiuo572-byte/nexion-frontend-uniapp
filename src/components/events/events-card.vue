@@ -56,18 +56,20 @@
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else-if="ev._claimed && ev.useHref" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimedUseBtnStyle" role="button" tabindex="0" :aria-label="claimedAriaLabel" @click="onClaimedUse">
+      <view v-else-if="ev._claimed" class="mt-3 w-full rounded-full flex items-center justify-center transition-transform" :class="{ 'active:scale-[0.98]': !!ev.useHref }" :style="claimedUseBtnStyle" :role="ev.useHref ? 'button' : undefined" :tabindex="ev.useHref ? 0 : undefined" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
-        <text style="font-size: 13px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
-        <text :style="{ fontSize: '13px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
+        <template v-if="ev.useHref">
+          <text style="font-size: 13px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
+          <text :style="{ fontSize: '13px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
+        </template>
       </view>
-      <view v-else-if="ev._trackable && ev.joined && !ev._done" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" @click="openHref">
+      <view v-else-if="showProgressAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" @click="openHref">
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ t.events.viewProgress }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else-if="!ev._trackable && ev.status === 'ongoing' && ev.ctaLabel" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="onDecorativeCta">
+      <view v-else-if="showDecorativeAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="onDecorativeCta">
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
@@ -76,11 +78,17 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { EVENT_KIND_LABEL, type NexEvent } from "@/mock/events";
+import {
+  eventOpenTarget,
+  shouldShowDecorativeAction,
+  shouldShowJoinedProgressAction,
+} from "./event-open-target";
 
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
@@ -95,6 +103,9 @@ const showClaim = computed(() => props.ev._trackable && props.ev._done && !props
 const showJoinAction = computed(
   () => props.ev._trackable && !props.ev.joined && !props.ev._done && props.ev.status === "ongoing",
 );
+const openTarget = computed(() => eventOpenTarget(props.ev));
+const showProgressAction = computed(() => shouldShowJoinedProgressAction(props.ev));
+const showDecorativeAction = computed(() => shouldShowDecorativeAction(props.ev));
 const claimLabel = computed(() => fmt(t.value.events.claimCta, { n: props.rewardNex.toLocaleString() }));
 const kindLabel = computed(() => EVENT_KIND_LABEL[props.ev.kind]);
 const progressPct = computed(() =>
@@ -131,24 +142,24 @@ const statusChip = computed<StatusChip | null>(() => {
 });
 
 function openHref() {
-  if (props.ev.href) uni.navigateTo({ url: props.ev.href, fail: () => {} });
-}
-
-// After the reward is claimed, the row offers a "Use it" link to the relevant
-// surface (discount → store, NEX reward → NEX wallet). No useHref ⇒ no row.
-const claimedAriaLabel = computed(() => `${t.value.events.claimedLabel} · ${t.value.events.useCta}`);
-function onClaimedUse() {
-  if (props.ev.useHref) uni.navigateTo({ url: props.ev.useHref, fail: () => {} });
-}
-
-// Decorative (non-trackable) ongoing CTA. The lucky-wheel ("Spin now") routes
-// to the page so it can open the Lucky Spin sheet; all others keep navigating
-// via their href (no-op when absent), matching prior behaviour.
-function onDecorativeCta() {
-  if (props.ev.kind === "wheel") {
-    emit("cta");
+  const target = openTarget.value;
+  if (target?.type === "route") {
+    navTo(target.href);
     return;
   }
+  if (target?.type === "local") emit("cta");
+}
+
+// After the reward is claimed, the row offers a "Use it" link only when the
+// event model has an explicit destination. No useHref means no actionable row.
+const claimedAriaLabel = computed(() => `${t.value.events.claimedLabel} · ${t.value.events.useCta}`);
+function onClaimedUse() {
+  if (props.ev.useHref) navTo(props.ev.useHref);
+}
+
+// A canonical backend href always wins. Mock-only wheel/discount rows without
+// one retain their local sheet/claim behaviour through the parent CTA handler.
+function onDecorativeCta() {
   openHref();
 }
 

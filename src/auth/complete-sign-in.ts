@@ -1,3 +1,4 @@
+import { navReset } from "@/lib/route";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
@@ -178,20 +179,14 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   if (remoteApiEnabled) scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index");
   if (options.deferNavigation) return { ok: true };
   if (!auth.onboardingComplete) {
-    uni.reLaunch({
-      url: "/pages/onboarding/estimator",
-      fail: () => uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }),
-    });
+    void navReset("/pages/onboarding/estimator");
     return { ok: true };
   }
   if (requiresRecalibration) {
-    uni.reLaunch({
-      url: "/pages/onboarding/connect?mode=recalibrate",
-      fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }),
-    });
+    void navReset("/pages/onboarding/connect?mode=recalibrate");
     return { ok: true };
   }
   const dest = safeReturnTo(options.returnTo ?? null, "/pages/index/index");
-  uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+  void navReset(dest);
   return { ok: true };
 }

@@ -146,7 +146,7 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 // ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
 import { useStaking } from "@/store/staking";
-import { navTo } from "@/lib/route";
+import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -546,7 +546,7 @@ async function handleDeleteAccount() {
       // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
       app.bindAccount("default");
       rebindAccountScopedStores("default");
-      uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+      navReset({ url: "/pages/login/login", fail: () => {} });
     }
   } finally {
     securityBusy.value = false;

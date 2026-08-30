@@ -165,6 +165,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
@@ -264,13 +265,13 @@ onUnmounted(() => {
 });
 
 function goRegister() {
-  uni.reLaunch({ url: "/pages/register/register", fail: () => {} });
+  navReset({ url: "/pages/register/register", fail: () => {} });
 }
 function goLogin() {
-  uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+  navReset({ url: "/pages/login/login", fail: () => {} });
 }
 function goTerms() {
-  uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} });
+  navTo("/pages/onboarding/terms");
 }
 </script>
 

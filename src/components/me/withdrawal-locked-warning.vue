@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -34,7 +35,7 @@ const shortBy = computed(() => (MIN_WITHDRAWAL_USD - props.balance).toFixed(2));
 const bodyLine = computed(() => fmt(t.value.me.withdrawalLockedBody, { min: MIN_WITHDRAWAL_USD, short: shortBy.value }));
 
 function goStore() {
-  uni.reLaunch({ url: "/pages/store/store", fail: () => {} });
+  navReset({ url: "/pages/store/store", fail: () => {} });
 }
 
 const rowStyle: CSSProperties = {

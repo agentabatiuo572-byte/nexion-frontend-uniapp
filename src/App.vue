@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
 import {
@@ -52,7 +53,12 @@ import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { refreshEarnConfig } from "@/store/earn-config";
 import { useMarket } from "@/store/market";
 import { shouldClaimQuestOnRoute } from "@/lib/remote-quest-route";
-import { scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
+import {
+  enforcePendingLegalTermsGate,
+  hasPendingLegalTermsRequirement,
+  scheduleLegalTermsGate,
+} from "@/lib/legal-terms-gate-runtime";
+import { isLegalTermsGateExemptRoute } from "@/lib/legal-terms-gate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -578,7 +584,7 @@ function checkAuthGuard(): boolean {
       pendingServerSessionRecovery = false;
       serverAuthenticatedAccountTraceAtBoot = false;
     } else {
-      uni.reLaunch({ url: "/pages/login/login?notice=server-session-reload" });
+      navReset({ url: "/pages/login/login?notice=server-session-reload" });
       return true;
     }
   }
@@ -594,7 +600,7 @@ function checkAuthGuard(): boolean {
     sessionVault.clear();
     useSession().signOutSession();
     auth.signOut();
-    uni.reLaunch({
+    navReset({
       url: requiresServerSessionRecovery
         ? "/pages/login/login?notice=server-session-reload"
         : "/pages/onboarding/intro",
@@ -602,11 +608,11 @@ function checkAuthGuard(): boolean {
     return true;
   }
   if (!auth.isAuthenticated) {
-    uni.reLaunch({ url: "/pages/onboarding/intro" });
+    navReset({ url: "/pages/onboarding/intro" });
     return true;
   }
   if (!auth.onboardingComplete) {
-    uni.reLaunch({ url: "/pages/onboarding/estimator" });
+    navReset({ url: "/pages/onboarding/estimator" });
     return true;
   }
   return false;
@@ -636,7 +642,7 @@ function checkSession(): boolean {
     // 踢出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
     useApp().bindAccount("default");
     rebindAccountScopedStores("default");
-    uni.reLaunch({ url: "/pages/session/kicked" });
+    navReset({ url: "/pages/session/kicked" });
     return true;
   }
   // Active session → ensure mining is running (resumes after a fresh re-login
@@ -644,7 +650,7 @@ function checkSession(): boolean {
   const app = useApp();
   if (app.miningPaused) app.resumeMining();
   if (session.requiresRecalibration && auth.onboardingComplete) {
-    uni.reLaunch({ url: "/pages/onboarding/connect?mode=recalibrate" });
+    navReset({ url: "/pages/onboarding/connect?mode=recalibrate" });
     return true;
   }
   return false;
@@ -686,6 +692,7 @@ function detachSessionWatch() {
 const QUEST_TICK_MS = 1000;
 let questTimer: ReturnType<typeof setInterval> | undefined;
 let lastQuestRoute = "";
+let lastLegalTermsGateRoute = "";
 
 // 🔴 本文件**唯一**的路由读取口 —— 不要加第二个(verify 哨兵 app-route-single-reader 盯着)。
 //
@@ -721,7 +728,7 @@ function readCurrentRoute(): string {
     if (canonicalUrl !== comparableRawUrl && repairRetryDue) {
       pendingCanonicalRouteRepair = canonicalUrl;
       pendingCanonicalRouteRepairAt = Date.now();
-      uni.reLaunch({
+      navReset({
         url: canonicalUrl,
         fail: () => {
           if (pendingCanonicalRouteRepair === canonicalUrl) {
@@ -789,7 +796,7 @@ function bootstrapAccountSession() {
       // 踢出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
       app.bindAccount("default");
       rebindAccountScopedStores("default");
-      uni.reLaunch({ url: "/pages/session/kicked" });
+      navReset({ url: "/pages/session/kicked" });
     }
   }
 }
@@ -831,7 +838,7 @@ function checkQuestRoute() {
   const retiredRoute = resolveRetiredRoute(route);
   if (retiredRoute) {
     stopBusinessLoops();
-    uni.reLaunch({ url: retiredRoute });
+    navReset({ url: retiredRoute });
     return;
   }
   if (isStaticReviewRoute(route)) {
@@ -852,6 +859,21 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted / needs recalibration → redirected
+  if (route !== lastLegalTermsGateRoute) {
+    lastLegalTermsGateRoute = route;
+    if (canRefreshRemoteAccount(useAuth())) scheduleLegalTermsGate(`/${route}`);
+  }
+  if (enforcePendingLegalTermsGate(`/${route}`)) {
+    stopBusinessLoops();
+    return;
+  }
+  // Risk disclosure remains readable from the required Terms page, but it is
+  // still a legal-only surface: no earnings, orders, trials or analytics may
+  // run until the current account acknowledges the authoritative version.
+  if (hasPendingLegalTermsRequirement()) {
+    stopBusinessLoops();
+    return;
+  }
   // H5 站内路由不会重发 App.onShow。静态评审页会按安全边界停掉业务循环，
   // 所以离开评审页后必须由仍存活的守卫在这一拍重新校验并恢复；放在同路由短路前，
   // 才能覆盖「路由已经切回业务页、lastQuestRoute 也已更新」的时序。
@@ -897,6 +919,7 @@ function startQuestWatch() {
   // 播种置空,故意不预填当前页:quest 一次性 + 发钱/markComplete 幂等,重放无害;
   // 冷启深链落地页要记一次访问(112b9d0 以此作实证基线),预填会把这一次吞掉。
   lastQuestRoute = "";
+  lastLegalTermsGateRoute = "";
   questTimer = setInterval(checkQuestRoute, QUEST_TICK_MS);
 }
 function stopQuestWatch() {
@@ -959,7 +982,7 @@ function stopBusinessLoops() {
 
 function canRunBusinessLoops(): boolean {
   const route = readCurrentRoute();
-  if (!route || isAuthWhitelisted(route)) return false;
+  if (!route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return false;
   const auth = useAuth();
   if (!auth.isAuthenticated || !auth.onboardingComplete) return false;
   return useSession().validate() === "active";
@@ -1030,7 +1053,7 @@ onLaunch(() => {
       stopBusinessLoops();
       const route = readCurrentRoute();
       if (route && !isAuthWhitelisted(route)) {
-        uni.reLaunch({
+        navReset({
           url: requiresServerSessionRecovery
             ? "/pages/login/login?notice=server-session-reload"
             : "/pages/onboarding/intro",
@@ -1071,7 +1094,7 @@ onLaunch(() => {
   const retiredRoute = resolveRetiredRoute(readCurrentRoute());
   if (retiredRoute) {
     stopBusinessLoops();
-    uni.reLaunch({ url: retiredRoute, fail: () => {} });
+    navReset({ url: retiredRoute, fail: () => {} });
     return;
   }
   if (isStaticReviewRoute(readCurrentRoute())) {
@@ -1093,6 +1116,15 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
+  // startQuestWatch resets the route marker. Seed it with the check just
+  // scheduled above so the first one-second tick does not duplicate the same
+  // current-terms request; a real route change still schedules immediately.
+  lastLegalTermsGateRoute = termsGateRoute;
+  if (termsGateRoute && (enforcePendingLegalTermsGate(`/${termsGateRoute}`)
+    || hasPendingLegalTermsRequirement())) {
+    stopBusinessLoops();
+    return;
+  }
   if (canRefreshRemoteAccount(useAuth())) {
     void useApp().refreshHomeTruth();
     void refreshAuthenticatedRemoteFleet();

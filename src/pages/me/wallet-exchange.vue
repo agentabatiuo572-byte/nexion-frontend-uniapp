@@ -190,6 +190,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -217,6 +218,7 @@ import {
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
+import { refreshWalletAfterCommittedExchange } from "@/lib/remote-commerce-refresh";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
@@ -521,7 +523,7 @@ function onRefresh() {
   toast.info(t.value.exchange.quoteRefreshing);
 }
 function goHowItWorks() {
-  uni.navigateTo({ url: "/pages/me/wallet-exchange-how", fail: () => {} });
+  navTo("/pages/me/wallet-exchange-how");
 }
 
 function notifyRemoteSwapResult(
@@ -551,6 +553,18 @@ function notifyRemoteSwapResult(
     reason ?? fmt(t.value.exchange.swapNotFilled, { status: order.status }),
     order.exchangeNo,
   ));
+}
+
+function refreshCommittedExchangeWalletProjection(
+  order: ExchangeOrder,
+  scope: ReturnType<typeof captureAccountScope>,
+  runScope: RuntimeRevisionScope,
+) {
+  void refreshWalletAfterCommittedExchange({
+    status: order.status,
+    isCurrent: () => remoteScopeCurrent(scope, runScope),
+    refreshWallet: () => app.refreshRemoteFleet(),
+  });
 }
 
 async function handleConfirm() {
@@ -623,6 +637,7 @@ async function handleConfirm() {
       remoteError.value = null;
       if (["COMPLETED", "SUCCESS", "QUEUED"].includes(result.order.status)) input.value = "";
       if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
+      refreshCommittedExchangeWalletProjection(result.order as ExchangeOrder, requestScope, requestRunScope);
       notifyRemoteSwapResult(result.order as ExchangeOrder, requestScope, requestRunScope);
       return;
     }

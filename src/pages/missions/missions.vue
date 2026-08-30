@@ -111,7 +111,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { navTo } from "@/lib/route";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -125,24 +127,32 @@ import { EVENTS } from "@/mock/events";
 import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { useApp } from "@/store/app";
-import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { useLocaleStore } from "@/store/locale";
+import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { createRemotePageRequestFence } from "@/lib/remote-page-request-fence";
 
 const t = useT();
 const eventQuest = useEventQuest();
 const app = useApp();
+const locale = useLocaleStore();
+const language = computed(() => locale.code);
 const remoteEvents = ref<CanonicalEvent[]>([]);
 const remoteEventsError = ref(false);
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
-async function refreshRemoteEvents(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<void> {
+let mounted = false;
+const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted);
+async function refreshRemoteEvents(): Promise<void> {
   if (!remoteApiEnabled) return;
+  const scope = remoteRequestFence.capture();
   try {
     const snapshot = await eventsApi.state();
-    if (remoteAccountEpoch.isCurrent(request)) {
+    if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = snapshot.events;
       remoteEventsError.value = false;
     }
   } catch {
-    if (remoteAccountEpoch.isCurrent(request)) {
+    if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = [];
       remoteEventsError.value = true;
     }
@@ -151,16 +161,38 @@ async function refreshRemoteEvents(request: RemoteAccountRequest = remoteAccount
 function retryRemoteEvents() {
   void refreshRemoteEvents();
 }
-onMounted(() => {
+const missionVisibility = createPageVisibilityRefresh((reason) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
-  remoteEvents.value = [];
-  remoteEventsError.value = false;
+  if (reason === "initial") {
+    remoteEvents.value = [];
+    remoteEventsError.value = false;
+  }
   void refreshRemoteEvents();
 });
-watch(() => app.accountKey, (accountKey) => {
+bindPageVisibilityRefresh(missionVisibility, {
+  mounted: (callback) => onMounted(() => {
+    mounted = true;
+    callback();
+  }),
+  shown: (callback) => onShow(() => {
+    mounted = true;
+    callback();
+  }),
+  hidden: (callback) => onHide(() => {
+    mounted = false;
+    remoteRequestFence.invalidate();
+    callback();
+  }),
+});
+onUnmounted(() => {
+  mounted = false;
+  remoteRequestFence.invalidate();
+});
+watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => language.value], ([accountKey]) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
+  remoteRequestFence.invalidate();
   remoteEvents.value = [];
   remoteEventsError.value = false;
   void refreshRemoteEvents();
@@ -198,7 +230,7 @@ const eventStatText = computed(() =>
 );
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 // ── styles ──

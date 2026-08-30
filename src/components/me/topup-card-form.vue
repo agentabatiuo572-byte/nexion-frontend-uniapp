@@ -132,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -292,7 +293,7 @@ function retry() {
 }
 
 function goWallet() {
-  uni.reLaunch({ url: "/pages/me/wallet", fail: () => {} });
+  navReset({ url: "/pages/me/wallet", fail: () => {} });
 }
 
 // ── styles ──

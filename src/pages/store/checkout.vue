@@ -291,7 +291,7 @@ import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
-import { navBack, navTo } from "@/lib/route";
+import { navReplace, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
@@ -1045,7 +1045,7 @@ async function onConfirmPay() {
       orderId.value = conversion.orderNo;
       // Replace checkout with the canonical order URL. A browser refresh now
       // reloads the paid server order instead of reopening a fresh purchase.
-      uni.redirectTo({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}` });
+      navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}` });
       return;
     }
     await submitRemoteOrder();
