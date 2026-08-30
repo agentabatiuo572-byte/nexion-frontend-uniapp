@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { ref, computed, onUnmounted, watch } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -436,7 +437,7 @@ async function activate() {
     // App-level resilience owns refresh failure and the next page can retry it.
     void app.refreshRemoteFleet();
     if (isRecal.value) app.resumeMining();
-    uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
+    navReset({ url: "/pages/index/index", fail: () => {} });
   } catch {
     if (scopeIsCurrent(requestScope)) {
       failedAction.value = "activate";
@@ -498,7 +499,7 @@ async function deferPhoneActivation() {
     }
     if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
     uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
-    uni.reLaunch({ url: isRecal.value ? "/pages/me/devices" : "/pages/index/index", fail: () => {} });
+    navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/index/index", fail: () => {} });
   } catch {
     if (scopeIsCurrent(requestScope)) {
       failedAction.value = "defer";
@@ -512,7 +513,7 @@ function leaveConnect() {
   if (calInterval) clearInterval(calInterval);
   if (calTimeout) clearTimeout(calTimeout);
   requestGeneration += 1;
-  uni.reLaunch({ url: isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
+  navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
 }
 
 onLoad((options) => {

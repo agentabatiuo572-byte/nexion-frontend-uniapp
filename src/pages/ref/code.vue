@@ -128,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -224,20 +225,20 @@ function perkLabel(k: PerkKey): string {
 
 function goRegister() {
   const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
-  uni.navigateTo({ url: `/pages/register/register${q}`, fail: () => {} });
+  navTo(`/pages/register/register${q}`);
 }
 function goLogin() {
   const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
-  uni.navigateTo({ url: `/pages/login/login${q}`, fail: () => {} });
+  navTo(`/pages/login/login${q}`);
 }
 function enterApp() {
-  uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
+  navReset({ url: "/pages/index/index", fail: () => {} });
 }
 function goTrust() {
-  uni.navigateTo({ url: "/pages/trust/trust", fail: () => {} });
+  navTo("/pages/trust/trust");
 }
 function goTerms() {
-  uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} });
+  navTo("/pages/onboarding/terms");
 }
 
 const rootStyle: CSSProperties = { position: "relative", minHeight: "100vh", background: "var(--v5-bg)" };

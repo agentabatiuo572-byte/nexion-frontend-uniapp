@@ -1,7 +1,10 @@
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 export interface DeveloperResourceFence {
   accountKey: string;
+  accountScope: RemoteAccountRequest;
   generation: number;
   runScope: RuntimeRevisionScope;
 }
@@ -20,11 +23,15 @@ export function createDeveloperResourceFenceReader(
   getAccountKey: () => string,
   getGeneration: () => number,
   getRunScope: () => RuntimeRevisionScope = captureRuntimeRevision,
+  isRunScopeCurrent: (scope: RuntimeRevisionScope) => boolean = isCurrentRuntimeRevision,
+  getAccountScope: () => RemoteAccountRequest = captureAccountScope,
+  isAccountScopeCurrent: (scope: RemoteAccountRequest) => boolean = isCurrentAccountScope,
 ): DeveloperResourceFenceReader {
   return {
-    capture: () => ({ accountKey: getAccountKey(), generation: getGeneration(), runScope: getRunScope() }),
+    capture: () => ({ accountKey: getAccountKey(), accountScope: getAccountScope(), generation: getGeneration(), runScope: getRunScope() }),
     isCurrent: (fence) => fence.accountKey === getAccountKey()
       && fence.generation === getGeneration()
-      && isCurrentRuntimeRevision(fence.runScope),
+      && isAccountScopeCurrent(fence.accountScope)
+      && isRunScopeCurrent(fence.runScope),
   };
 }

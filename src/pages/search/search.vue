@@ -46,6 +46,18 @@
         </view>
       </view>
 
+      <view v-else-if="remoteApiEnabled && productCatalogState.status === 'loading'" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.home.networkStatUpdating }}</text>
+      </view>
+
+      <EmptyState
+        v-else-if="remoteApiEnabled && productCatalogState.status === 'error'"
+        kind="recoverable-error"
+        :title="t.authOtp.errorServiceUnavailable"
+        :cta-label="t.ui.retry"
+        @cta="retrySearchSources"
+      />
+
       <!-- 无搜索结果 —— 《06》no-search-results:插画 + 引导 + 清除搜索 -->
       <EmptyState
         v-else-if="results.length === 0"
@@ -82,7 +94,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -90,11 +103,13 @@ import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
+import { useLocaleStore } from "@/store/locale";
 import { PRODUCTS } from "@/mock/products";
 import { productCopy } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 import { remoteApiEnabled } from "@/api/runtime";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -107,14 +122,28 @@ interface Hit {
 const t = useT();
 const app = useApp();
 const network = useNetwork();
+const locale = useLocaleStore();
 
 const q = ref("");
 
-onMounted(() => {
+function refreshSearchSources(force = false) {
   if (!remoteApiEnabled) return;
-  void refreshProductCatalog();
+  void refreshProductCatalog(force);
   void network.refreshCanonicalNetwork();
+}
+
+const searchVisibility = createPageVisibilityRefresh((reason) => refreshSearchSources(reason === "return"));
+
+bindPageVisibilityRefresh(searchVisibility, {
+  mounted: onMounted,
+  shown: onShow,
+  hidden: onHide,
 });
+watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => refreshSearchSources(true));
+
+function retrySearchSources() {
+  refreshSearchSources(true);
+}
 
 const devices = computed(() => app.visibleDevices);
 const members = computed(() => network.members);

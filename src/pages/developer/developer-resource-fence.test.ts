@@ -21,4 +21,20 @@ describe("developer resource async fence", () => {
     expect(fence.isCurrent(first)).toBe(false);
     advanceRuntimeRevision(null);
   });
+
+  it("rejects a response after the same account is rebound to a new epoch", () => {
+    let epoch = 1;
+    const fence = createDeveloperResourceFenceReader(
+      () => "account-a",
+      () => 1,
+      undefined,
+      undefined,
+      () => ({ accountKey: "account-a", epoch }),
+      (scope) => scope.accountKey === "account-a" && scope.epoch === epoch,
+    );
+    const first = fence.capture();
+
+    epoch += 1;
+    expect(fence.isCurrent(first)).toBe(false);
+  });
 });

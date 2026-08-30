@@ -71,7 +71,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -85,10 +86,16 @@ import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useApp } from "@/store/app";
-import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { useLocaleStore } from "@/store/locale";
+import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { createRemotePageRequestFence } from "@/lib/remote-page-request-fence";
+import { createRemotePageCommandFence } from "@/lib/remote-page-command-fence";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 import { EVENTS, type EventStatus, type NexEvent } from "@/mock/events";
+import { remoteEventView, type EventActionLabels } from "./remote-event-view";
+import { runRemoteEventAction } from "./remote-event-action";
 
 type TabId = "all" | EventStatus | "joined";
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
@@ -99,45 +106,36 @@ const t = useT();
 const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
 const app = useApp();
+const locale = useLocaleStore();
+const language = computed(() => locale.code);
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);
 const remoteEventsError = ref(false);
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
+let mounted = false;
+const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted);
+const remoteCommandFence = createRemotePageCommandFence(remoteAccountEpoch, () => mounted);
 
-function remoteEventView(event: CanonicalEvent): NexEvent {
-  const tintByKind: Record<CanonicalEvent["kind"], string> = {
-    discount: "#FFC83D", referral: "#7DD3FC", wheel: "#C4B5FD", regional: "#FB7185",
-    boost: "#86EFAC", seasonal: "#F9A8D4", holding: "#93C5FD", onboarding: "#FDE68A",
-  };
-  return {
-    id: event.eventCode,
-    kind: event.kind,
-    status: event.state,
-    title: event.title,
-    subtitle: event.subtitle,
-    emoji: "✦",
-    tint: tintByKind[event.kind],
-    reward: `${event.rewardAmount} ${event.rewardName}`,
-    progress: event.trackable ? { current: event.progressValue, total: event.targetValue, label: "progress" } : null,
-    joined: ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus),
-    href: event.href || undefined,
-    featured: event.featured,
-    trackable: event.trackable,
-    done: ["CLAIMABLE", "CLAIMED"].includes(event.userStatus),
-    rewardNEX: event.rewardType === "NEX" ? event.rewardAmount : 0,
-  };
-}
+const eventActionLabels = computed<EventActionLabels>(() => ({
+  claimDiscount: t.value.events.action.claimDiscount,
+  checkIn: t.value.events.action.checkIn,
+  reinvest: t.value.events.action.reinvest,
+  spin: t.value.events.action.spin,
+  leaderboard: t.value.events.action.leaderboard,
+  viewDetails: t.value.events.action.viewDetails,
+}));
 
-async function loadRemoteEvents(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
+async function loadRemoteEvents() {
   if (!remoteApiEnabled) return;
+  const scope = remoteRequestFence.capture();
   try {
     const snapshot = await eventsApi.state();
-    if (!remoteAccountEpoch.isCurrent(request)) return;
+    if (!remoteRequestFence.isCurrent(scope)) return;
     remoteEvents.value = snapshot.events;
     remoteEventsError.value = false;
   } catch {
-    if (remoteAccountEpoch.isCurrent(request)) {
+    if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = [];
       remoteEventsError.value = true;
     }
@@ -146,16 +144,42 @@ async function loadRemoteEvents(request: RemoteAccountRequest = remoteAccountEpo
 function retryRemoteEvents() {
   void loadRemoteEvents();
 }
-onMounted(() => {
+
+const eventVisibility = createPageVisibilityRefresh((reason) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
-  remoteEvents.value = [];
-  remoteEventsError.value = false;
+  if (reason === "initial") {
+    remoteEvents.value = [];
+    remoteEventsError.value = false;
+  }
   void loadRemoteEvents();
 });
-watch(() => app.accountKey, (accountKey) => {
+bindPageVisibilityRefresh(eventVisibility, {
+  mounted: (callback) => onMounted(() => {
+    mounted = true;
+    callback();
+  }),
+  shown: (callback) => onShow(() => {
+    mounted = true;
+    callback();
+  }),
+  hidden: (callback) => onHide(() => {
+    mounted = false;
+    remoteRequestFence.invalidate();
+    remoteCommandFence.invalidate();
+    callback();
+  }),
+});
+onUnmounted(() => {
+  mounted = false;
+  remoteRequestFence.invalidate();
+  remoteCommandFence.invalidate();
+});
+watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => language.value], ([accountKey]) => {
+  remoteCommandFence.invalidate();
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
+  remoteRequestFence.invalidate();
   remoteEvents.value = [];
   remoteEventsError.value = false;
   void loadRemoteEvents();
@@ -163,7 +187,10 @@ watch(() => app.accountKey, (accountKey) => {
 
 // Enrich each event with live join/claim state from the store.
 const enrichedEvents = computed<EnrichedEvent[]>(() =>
-  (remoteApiEnabled ? remoteEvents.value.map(remoteEventView) : EVENTS).map((ev) => {
+  (remoteApiEnabled
+    ? remoteEvents.value.map((event) => remoteEventView(event, eventActionLabels.value))
+    : EVENTS.map((event) => ({ ...event, runtimeSource: "mock" as const }))
+  ).map((ev) => {
     const trackable = ev.trackable === true;
     const remoteStatus = remoteApiEnabled
       ? remoteEvents.value.find((event) => event.eventCode === ev.id)?.userStatus
@@ -219,12 +246,13 @@ function rewardNexOf(ev: EnrichedEvent): number {
 async function handleJoin(ev: EnrichedEvent) {
   if (!ev._trackable) return;
   if (remoteApiEnabled) {
-    if (await eventQuest.joinRemote(ev.id)) {
-      await loadRemoteEvents();
-      toast.success(t.value.events.toast.joinedTitle.replace("{name}", ev.title), t.value.events.toast.joinedBody);
-    } else {
-      toast.error(t.value.authOtp.errorServiceUnavailable);
-    }
+    await runRemoteEventAction({
+      fence: remoteCommandFence,
+      command: () => eventQuest.joinRemote(ev.id),
+      refresh: loadRemoteEvents,
+      onSuccess: () => toast.success(t.value.events.toast.joinedTitle.replace("{name}", ev.title), t.value.events.toast.joinedBody),
+      onFailure: () => toast.error(t.value.authOtp.errorServiceUnavailable),
+    });
     return;
   }
   const joined = eventQuest.join(ev.id);
@@ -244,12 +272,13 @@ async function handleJoin(ev: EnrichedEvent) {
 async function handleClaim(ev: EnrichedEvent) {
   if (!ev._trackable || !ev._done || ev._claimed) return;
   if (remoteApiEnabled) {
-    if (await eventQuest.claimRemote(ev.id)) {
-      await loadRemoteEvents();
-      toast.success(t.value.events.toast.claimedTitle.replace("{n}", rewardNexOf(ev).toLocaleString()), ev.title);
-    } else {
-      toast.error(t.value.authOtp.errorServiceUnavailable);
-    }
+    await runRemoteEventAction({
+      fence: remoteCommandFence,
+      command: () => eventQuest.claimRemote(ev.id),
+      refresh: loadRemoteEvents,
+      onSuccess: () => toast.success(t.value.events.toast.claimedTitle.replace("{n}", rewardNexOf(ev).toLocaleString()), ev.title),
+      onFailure: () => toast.error(t.value.authOtp.errorServiceUnavailable),
+    });
     return;
   }
   const reward = rewardNexOf(ev);

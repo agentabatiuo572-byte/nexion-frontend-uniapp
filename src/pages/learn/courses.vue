@@ -8,7 +8,9 @@
   </view></AppChassis>
 </template>
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { learningApi } from "@/api/learning-runtime";
@@ -19,6 +21,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
 import { captureRuntimeRevision } from "@/api/order-api";
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import type { LearningCourse, LearningOverview } from "@/api/learning-api";
 // 存 key 而不是译好的串:译文一旦快照进 ref 就不再跟随语言(uni 复用页面实例时,
 // 上一次访问用的语言会留在错误提示上 —— 实景走查实测:zh 下重试按钮是中文、正文还是英文)。
@@ -60,14 +63,35 @@ async function load() {
     if (current(scope)) loading.value = false;
   }
 }
-function open(id: string) { uni.navigateTo({ url: `/pages/learn/course?id=${encodeURIComponent(id)}` }); }
-onMounted(() => { mounted = true; void load(); });
+function open(id: string) { navTo(`/pages/learn/course?id=${encodeURIComponent(id)}`); }
+const courseVisibility = createPageVisibilityRefresh((reason) => {
+  if (reason === "return") generation += 1;
+  void load();
+});
+bindPageVisibilityRefresh(courseVisibility, {
+  mounted: (callback) => onMounted(() => {
+    mounted = true;
+    callback();
+  }),
+  shown: (callback) => onShow(() => {
+    mounted = true;
+    callback();
+  }),
+  hidden: (callback) => onHide(() => {
+    mounted = false;
+    generation += 1;
+    callback();
+  }),
+});
 onUnmounted(() => { mounted = false; generation += 1; });
-watch(() => String(app.accountKey), () => {
+function refreshForScopeChange() {
   accountEpoch += 1;
   generation += 1;
   overview.value = null;
   error.value = "";
   if (mounted) void load();
-});
+}
+watch(() => String(app.accountKey), refreshForScopeChange);
+watch(() => app.accountBindingEpoch, refreshForScopeChange);
+watch(() => language.value, refreshForScopeChange);
 </script>

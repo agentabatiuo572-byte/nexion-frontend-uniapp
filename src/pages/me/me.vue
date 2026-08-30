@@ -107,7 +107,7 @@ import OrdersCard from "@/components/me/orders-card.vue";
 import ThemePickerSheet from "@/components/me/theme-picker-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
+import { navReset, navTo } from "@/lib/route";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -541,7 +541,7 @@ async function handleSignOut() {
     // app(余额/设备/收益,account-cloud 快照)+ 其余 28 个账号级 store 一并归 default。
     app.bindAccount("default");
     rebindAccountScopedStores("default");
-    uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+    navReset({ url: "/pages/login/login", fail: () => {} });
   }
 }
 

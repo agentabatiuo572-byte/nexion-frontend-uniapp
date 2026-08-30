@@ -98,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
@@ -203,10 +204,10 @@ onUnmounted(() => {
 
 function goConnect() {
   if (!detected.value || !calibration.value?.calibrationAvailable) return;
-  uni.reLaunch({ url: "/pages/onboarding/connect", fail: () => {} });
+  navReset({ url: "/pages/onboarding/connect", fail: () => {} });
 }
 function leaveEstimator() {
-  uni.reLaunch({ url: "/pages/register/success", fail: () => uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }) });
+  navReset({ url: "/pages/register/success", fail: () => navReset({ url: "/pages/onboarding/intro", fail: () => {} }) });
 }
 </script>
 

@@ -35,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset, navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -47,10 +48,10 @@ const orderCount = computed(() => orders.orders.length);
 const latestOrder = computed(() => orders.orders[orders.orders.length - 1] ?? null);
 
 function goStore() {
-  uni.reLaunch({ url: "/pages/store/store", fail: () => {} });
+  navReset({ url: "/pages/store/store", fail: () => {} });
 }
 function goOrders() {
-  uni.navigateTo({ url: "/pages/store/orders", fail: () => {} });
+  navTo("/pages/store/orders");
 }
 
 const ORDER_STATUS_STYLE: Record<string, { color: string; bg: string; border: string }> = {

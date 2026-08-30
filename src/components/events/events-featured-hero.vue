@@ -73,7 +73,7 @@
         <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta)" @click="openHref">
+      <view v-else-if="showOpenAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta)" @click="openHref">
         <svg v-if="ev.joined" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
         <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="openHref">{{ ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta) }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
@@ -83,11 +83,13 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import type { NexEvent } from "@/mock/events";
+import { eventOpenTarget } from "./event-open-target";
 
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
@@ -99,26 +101,29 @@ const { elRef: barEl, inView: barInView } = useScrollGrowProgress();
 
 const showClaim = computed(() => props.ev._trackable && props.ev._done && !props.ev._claimed);
 const showJoinAction = computed(() => props.ev._trackable && !props.ev.joined && !props.ev._done);
+const openTarget = computed(() => eventOpenTarget(props.ev));
+const showOpenAction = computed(() => Boolean(openTarget.value));
 const claimLabel = computed(() => fmt(t.value.events.claimCta, { n: props.rewardNex.toLocaleString() }));
 const progressPct = computed(() =>
   props.ev.progress ? Math.min(100, (props.ev.progress.current / props.ev.progress.total) * 100) : 0,
 );
 
 function openHref() {
-  if (props.ev.href) {
-    uni.navigateTo({ url: props.ev.href, fail: () => {} });
+  const target = openTarget.value;
+  if (target?.type === "route") {
+    navTo(target.href);
     return;
   }
-  emit("cta");
+  if (target?.type === "local") emit("cta");
 }
 
-// After the reward is claimed, the pill becomes a "Use it" link to the relevant
-// surface (discount → store, NEX reward → NEX wallet). No useHref ⇒ inert pill.
+// After the reward is claimed, the pill becomes a "Use it" link only when the
+// event model has an explicit destination. No useHref means an inert status.
 const claimedAriaLabel = computed(() =>
   props.ev.useHref ? `${t.value.events.claimedLabel} · ${t.value.events.useCta}` : t.value.events.claimedLabel,
 );
 function onClaimedUse() {
-  if (props.ev.useHref) uni.navigateTo({ url: props.ev.useHref, fail: () => {} });
+  if (props.ev.useHref) navTo(props.ev.useHref);
 }
 
 const cardStyle = computed<CSSProperties>(() => ({

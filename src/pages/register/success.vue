@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -191,7 +192,7 @@ function openOfficialDownload() {
 // #endif
 
 function continueWeb() {
-  uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} });
+  navReset({ url: "/pages/onboarding/estimator", fail: () => {} });
 }
 // 禁回注册流:返回键视同「继续」(App 端;H5 hash 回退由浏览器承担)。
 onBackPress(() => {

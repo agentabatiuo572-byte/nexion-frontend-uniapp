@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -129,12 +130,21 @@ import { confirm as uiConfirm } from "@/store/ui";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
+import { onShow } from "@dcloudio/uni-app";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
 const cards = useCards();
 const cfg = useConfig();
+
+// uni pages remain alive in the navigation stack. Refresh the server-owned
+// wallet projection whenever this page becomes visible so a completed exchange
+// cannot send the user back to a stale pre-exchange balance.
+onShow(() => {
+  if (remoteApiEnabled) void app.refreshRemoteFleet();
+});
 
 const configSyncFailed = computed(() => cfg.syncFailed);
 const fundsAuthorityError = computed(() => app.remoteFleetStatus === "error"
@@ -242,16 +252,16 @@ function fmtTime(ts: number): string {
 }
 
 function goNex() {
-  uni.navigateTo({ url: "/pages/me/wallet-nex", fail: () => {} });
+  navTo("/pages/me/wallet-nex");
 }
 function goTopup() {
-  uni.navigateTo({ url: "/pages/me/wallet-topup", fail: () => {} });
+  navTo("/pages/me/wallet-topup");
 }
 function goWithdraw() {
-  uni.navigateTo({ url: "/pages/me/wallet-withdraw", fail: () => {} });
+  navTo("/pages/me/wallet-withdraw");
 }
 function goExchange() {
-  uni.navigateTo({ url: "/pages/me/wallet-exchange", fail: () => {} });
+  navTo("/pages/me/wallet-exchange");
 }
 
 // ── styles ──

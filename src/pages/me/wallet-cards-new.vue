@@ -95,7 +95,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
-import { navBack } from "@/lib/route";
+import { navReplace, navBack } from "@/lib/route";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -199,7 +199,7 @@ async function handleBind() {
       return;
     }
     toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
-    uni.redirectTo({
+    navReplace({
       url: returnTo.value,
       fail: () => { isBinding.value = false; navBack(returnTo.value); },
     });
@@ -234,7 +234,7 @@ async function handleBind() {
   } else {
     toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
   }
-  uni.redirectTo({
+  navReplace({
     url: returnTo.value,
     fail: () => { isBinding.value = false; navBack(returnTo.value); },
   });

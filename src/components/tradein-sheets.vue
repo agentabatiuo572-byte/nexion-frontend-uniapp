@@ -229,7 +229,7 @@ import { computeTradeInCredit, ladderBandFor, TRADEIN_LADDER_RULES } from "@/moc
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, isPhaseReached, isTradeInTargetAvailable } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { navTo } from "@/lib/route";
+import { navReset, navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
@@ -310,7 +310,7 @@ function hide() {
 // ── deferred route past the sheet's exit so it doesn't flash on /me/devices ──
 function goDevices() {
   setTimeout(() => {
-    uni.reLaunch({ url: "/pages/me/devices", fail: () => {} });
+    navReset({ url: "/pages/me/devices", fail: () => {} });
   }, 260);
 }
 

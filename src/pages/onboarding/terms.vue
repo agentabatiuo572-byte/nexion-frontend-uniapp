@@ -11,7 +11,7 @@
   <StandalonePageShell class="tos-root" :reserve-bottom="false">
     <!-- Sticky back header + brand -->
     <view class="tos-top">
-      <view class="tos-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
+      <view class="tos-back active:opacity-60" :class="{ 'tos-back--blocked': exitBlocked }" role="button" tabindex="0" :aria-disabled="exitBlocked ? 'true' : 'false'" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="tos-brand">
@@ -30,7 +30,12 @@
       </view>
 
       <!-- Numbered sections -->
-      <view v-if="loadError" class="tos-fail" role="alert">{{ loadError }}</view>
+      <view v-if="loadError" class="tos-fail" role="alert">
+        <text class="tos-fail__message">{{ loadError }}</text>
+        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" @click="loadTerms" @keydown.enter.prevent="loadTerms" @keydown.space.prevent="loadTerms">
+          <text>{{ t.ui.retry }}</text>
+        </view>
+      </view>
       <view v-else-if="loaded" class="tos-sections">
         <view v-for="b in blocks" :key="b.n" class="tos-block">
           <view class="tos-block__head">
@@ -54,7 +59,7 @@
 
       <!-- Acknowledge & return -->
       <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms" @keydown.space.prevent="confirmTerms">
-        <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : "确认并继续") }}</text>
+        <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : t.terms.confirmContinue) }}</text>
       </view>
     </view>
   </StandalonePageShell>
@@ -62,7 +67,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
@@ -75,17 +80,23 @@ import {
   sameLegalTermsSession,
   sameLegalTermsRun,
   canonicalLegalTermsReturnTo,
+  shouldBlockLegalTermsExit,
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
+import { recordLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const locale = useLocaleStore();
 const serverTerms = ref<LegalTermsCurrent | null>(null);
-const loadError = ref<string | null>(null);
+type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed";
+const loadErrorKey = ref<TermsErrorKey | null>(null);
+const loadError = computed(() => loadErrorKey.value ? t.value.terms[loadErrorKey.value] : null);
 const confirming = ref(false);
 const loaded = ref(!remoteApiEnabled);
 const returnTo = ref("/pages/onboarding/intro");
+const explicitReturn = ref(false);
+const exitBlocked = computed(() => shouldBlockLegalTermsExit(remoteApiEnabled, !!currentSessionFence(), serverTerms.value));
 
 const blocks = computed(() => {
   if (serverTerms.value) return [...serverTerms.value.sections].sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => ({ n: index + 1, title: section.title, body: section.body }));
@@ -106,9 +117,14 @@ const blocks = computed(() => {
 });
 
 onLoad((options) => {
+  explicitReturn.value = typeof options?.return === "string" && options.return.length > 0;
   returnTo.value = canonicalLegalTermsReturnTo(options?.return, "/pages/onboarding/intro");
 });
 onMounted(() => { void loadTerms(); });
+onBackPress(() => {
+  if (blockRequiredExit()) return true;
+  return false;
+});
 
 function currentSessionFence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
@@ -120,30 +136,31 @@ function currentSessionFence(): LegalTermsSessionFence | null {
 async function loadTerms() {
   if (!remoteApiEnabled) return;
   loaded.value = false;
-  loadError.value = null;
+  loadErrorKey.value = null;
   const requestFence = currentSessionFence();
   try {
     const authenticated = !!requestFence;
     const snapshot = await legalTermsApi.current(locale.code, "GLOBAL", authenticated);
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       serverTerms.value = null;
-      loadError.value = "当前登录会话或运行批次已变化，请重新打开条款";
+      loadErrorKey.value = "sessionChanged";
       return;
     }
     if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
       serverTerms.value = null;
-      loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
+      loadErrorKey.value = "runChanged";
       return;
     }
     serverTerms.value = snapshot;
-  } catch (cause) {
+    if (snapshot.acknowledged) recordLegalTermsAcknowledged(snapshot);
+  } catch {
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       serverTerms.value = null;
-      loadError.value = "当前登录会话或运行批次已变化，请重新打开条款";
+      loadErrorKey.value = "sessionChanged";
       return;
     }
     serverTerms.value = null;
-    loadError.value = cause instanceof Error ? cause.message : "法律条款暂不可用，请稍后重试";
+    loadErrorKey.value = "loadFailed";
   } finally {
     loaded.value = true;
   }
@@ -153,26 +170,41 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+let lastRequiredExitNotice = Number.NEGATIVE_INFINITY;
+function blockRequiredExit(): boolean {
+  if (!shouldBlockLegalTermsExit(remoteApiEnabled, !!currentSessionFence(), serverTerms.value)) return false;
+  const now = Date.now();
+  if (now - lastRequiredExitNotice >= 3_000) {
+    lastRequiredExitNotice = now;
+    uni.showToast({ title: t.value.terms.confirmRequired, icon: "none" });
+  }
+  return true;
+}
+
 function goBack() {
+  if (blockRequiredExit()) return;
+  // The post-login gate reaches this page through reLaunch. H5 can still expose
+  // a stale stack depth during the acknowledgement transition, making a generic
+  // navigateBack pop to an empty hash. An explicit, validated return target is
+  // authoritative and must be re-launched deterministically.
+  if (explicitReturn.value) { navTo(returnTo.value); return; }
   navBack(returnTo.value);
 }
 function goRisk() {
-  uni.navigateTo({
-    url: `/pages/me/risk-disclosure?return=${encodeURIComponent(returnTo.value)}`,
-    fail: () => {},
-  });
+  navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(returnTo.value)}`);
 }
 async function confirmTerms() {
+  if (confirming.value) return;
   if (!remoteApiEnabled || !serverTerms.value || serverTerms.value.acknowledged) { goBack(); return; }
   if (!currentSessionFence()) {
-    loadError.value = "请先登录后确认条款";
+    loadErrorKey.value = "loginRequired";
     navTo(buildLegalTermsLoginRoute(buildLegalTermsRoute(returnTo.value)));
     return;
   }
     const requestFence = currentSessionFence();
     const snapshot = serverTerms.value;
     if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
-      loadError.value = "当前条款属于旧运行批次，请重新加载后再试";
+      loadErrorKey.value = "runChanged";
       return;
     }
   confirming.value = true;
@@ -182,13 +214,16 @@ async function confirmTerms() {
       || acknowledged.version !== snapshot.version
       || acknowledged.runId !== snapshot.runId
       || !sameLegalTermsRun(acknowledged, captureRuntimeRevision().runId)) {
-      loadError.value = "登录会话已变化，请重新打开当前条款后再确认";
+      loadErrorKey.value = "sessionChanged";
       return;
     }
     serverTerms.value = acknowledged;
-    if (acknowledged.acknowledged) goBack();
-  } catch (cause) {
-    loadError.value = cause instanceof Error ? cause.message : "条款确认失败";
+    if (acknowledged.acknowledged) {
+      recordLegalTermsAcknowledged(acknowledged);
+      goBack();
+    }
+  } catch {
+    loadErrorKey.value = "ackFailed";
   }
   finally { confirming.value = false; }
 }
@@ -224,6 +259,9 @@ async function confirmTerms() {
   align-items: center;
   justify-content: center;
   justify-self: start;
+}
+.tos-back--blocked {
+  opacity: 0.35;
 }
 .tos-brand {
   display: flex;
@@ -303,6 +341,20 @@ async function confirmTerms() {
   border-radius: 14px;
   color: var(--v5-danger);
   background: color-mix(in srgb, var(--v5-danger) 10%, transparent);
+}
+.tos-fail__message {
+  display: block;
+  line-height: 1.55;
+}
+.tos-fail__retry {
+  width: fit-content;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  color: var(--v5-on-brand);
+  background: var(--v5-brand);
+  font-size: 13px;
+  font-weight: 600;
 }
 .tos-block {
   padding: 14px 0;

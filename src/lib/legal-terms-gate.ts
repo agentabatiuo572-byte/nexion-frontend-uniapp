@@ -57,6 +57,21 @@ export function isLegalTermsAcknowledged(snapshot: LegalTermsCurrent): boolean {
   return snapshot.source === "server" && snapshot.acknowledged === true;
 }
 
+/** Fail closed only for an authenticated remote-account acknowledgement flow. */
+export function shouldBlockLegalTermsExit(
+  remote: boolean,
+  authenticated: boolean,
+  snapshot: LegalTermsCurrent | null,
+): boolean {
+  return remote && authenticated && (!snapshot || !isLegalTermsAcknowledged(snapshot));
+}
+
+/** Legal documents remain readable while every business route stays gated. */
+export function isLegalTermsGateExemptRoute(route: string): boolean {
+  const path = `/${route.replace(/^#?\/?/, "").split("?", 1)[0]}`;
+  return path === LEGAL_TERMS_ROUTE || path === "/pages/me/risk-disclosure";
+}
+
 /** Only canonical development/production Terms facts are accepted. */
 export function sameLegalTermsRun(snapshot: LegalTermsCurrent, _runtimeRunId?: null): boolean {
   return snapshot.sourceEnvironment === "PRODUCTION" && snapshot.runId === "";

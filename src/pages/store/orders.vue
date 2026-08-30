@@ -12,21 +12,25 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
-      <view v-if="remoteOrdersError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
-        <view class="flex items-center justify-between" style="gap: 12px">
-          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrders">
+      <view v-if="orderPanels.mainPresentation === 'loading'" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+        <text :style="{ color: 'var(--v5-ink-3)', fontSize: '12px', lineHeight: '1.5' }">{{ t.store.catalogLoadingTitle }}</text>
+      </view>
+
+      <view v-if="orderPanels.showSourceOutage" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+        <view v-for="source in unavailableOrderSources" :key="source" class="flex items-center justify-between" style="gap: 12px">
+          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source }} · {{ t.authOtp.errorServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
       </view>
 
       <!-- Empty state -->
-      <EmptyState v-if="!remoteOrdersError && orderList.length === 0" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <EmptyState v-if="orderPanels.mainPresentation === 'empty'" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
-      <view v-else-if="!remoteOrdersError" class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
+      <view v-if="orderPanels.mainPresentation === 'list'" class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
         <view
           v-for="(o, i) in orderList"
           :key="o.id"
@@ -62,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -72,10 +76,19 @@ import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
-import { onShow } from "@dcloudio/uni-app";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import {
+  createRemoteOrdersRefresh,
+  isInitialOrderReadLoading,
+  orderListPanels,
+  remoteCommerceRequestCurrent,
+  type OrderSourceAvailability,
+} from "@/lib/remote-commerce-refresh";
 
 const t = useT();
+const app = useApp();
 const orders = useOrders();
 const genesis = useGenesis();
 type CommerceOrderListItem = Order & { kind: "commerce"; meta?: string };
@@ -84,27 +97,76 @@ const orderList = computed<OrderListItem[]>(() => [
   ...orders.orders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
   ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
 ].sort((a, b) => b.placedAt - a.placedAt));
-const remoteOrdersError = ref(false);
-const remoteOrdersRefreshing = ref(false);
+const remoteOrderAvailability = ref<OrderSourceAvailability>("ready");
+const remoteOrdersRefreshing = ref(remoteApiEnabled);
+const remoteOrdersResolved = ref(false);
+const commerceOrdersUnavailable = ref(false);
+const genesisOrdersUnavailable = ref(false);
+const unavailableOrderSources = computed(() => [
+  ...(commerceOrdersUnavailable.value ? [t.value.headerTitles.storeOrders] : []),
+  ...(genesisOrdersUnavailable.value ? [t.value.me.genesisNode] : []),
+]);
+const orderPanels = computed(() => orderListPanels({
+  loading: isInitialOrderReadLoading({
+    loading: remoteOrdersRefreshing.value,
+    hasResolved: remoteOrdersResolved.value,
+  }),
+  availability: remoteOrderAvailability.value,
+  orderCount: orderList.value.length,
+}));
+let refreshEpoch = 0;
+let ordersPageActive = true;
 async function refreshOrders() {
-  if (!remoteApiEnabled || remoteOrdersRefreshing.value) return;
+  if (!remoteApiEnabled) return;
+  const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
+  const currentRefresh = ++refreshEpoch;
+  const current = () => ordersPageActive && currentRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
+    accountKey: app.accountKey,
+    epoch: app.accountBindingEpoch,
+  });
   remoteOrdersRefreshing.value = true;
-  remoteOrdersError.value = false;
-  try {
-    const [commerceResult, genesisResult] = await Promise.allSettled([
-      orders.refreshRemote(),
-      genesis.syncRemote(),
-    ]);
-    const commerceAvailable = commerceResult.status === "fulfilled";
-    const genesisAvailable = genesisResult.status === "fulfilled" && genesisResult.value;
-    remoteOrdersError.value = !commerceAvailable && !genesisAvailable;
-  } catch {
-    remoteOrdersError.value = true;
-  } finally {
-    remoteOrdersRefreshing.value = false;
+  // During a retry, leave the prior per-source failure and its retry control
+  // visible. Reset only for a genuinely new first read (including account
+  // rebind), where an empty list would otherwise be misleading.
+  if (!remoteOrdersResolved.value) {
+    remoteOrderAvailability.value = "ready";
+    commerceOrdersUnavailable.value = false;
+    genesisOrdersUnavailable.value = false;
   }
+  const outcome = await createRemoteOrdersRefresh({
+    commerce: () => orders.refreshRemote(),
+    genesis: () => genesis.syncRemote(),
+    genesisAccountUnavailable: () => !!genesis.remoteEligibilityError,
+    isCurrent: current,
+  })();
+  if (outcome.availability === "stale") return;
+  commerceOrdersUnavailable.value = outcome.commerceUnavailable;
+  genesisOrdersUnavailable.value = outcome.genesisUnavailable;
+  remoteOrderAvailability.value = outcome.availability;
+  remoteOrdersResolved.value = true;
+  remoteOrdersRefreshing.value = false;
 }
-onShow(() => { void refreshOrders(); });
+function requestOrdersRefresh() {
+  if (remoteOrdersRefreshing.value) return;
+  void refreshOrders();
+}
+onShow(() => {
+  ordersPageActive = true;
+  void refreshOrders();
+});
+onHide(() => {
+  ordersPageActive = false;
+  refreshEpoch += 1;
+  remoteOrdersRefreshing.value = false;
+});
+onUnmounted(() => {
+  ordersPageActive = false;
+  refreshEpoch += 1;
+});
+watch(() => app.accountBindingEpoch, () => {
+  remoteOrdersResolved.value = false;
+  if (ordersPageActive) void refreshOrders();
+});
 
 // Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted
 // colocation, nothing ships to the user, so the old "track your hardware

@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { navReset } from "@/lib/route";
 import { computed } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
@@ -51,7 +52,7 @@ const bodyText = computed(() =>
 function reLogin() {
   // Route to login; a successful sign-in creates a fresh session for this carrier
   // (and resumes mining via App.vue's checkSession).
-  uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+  navReset({ url: "/pages/login/login", fail: () => {} });
 }
 </script>
 

@@ -1,9 +1,11 @@
+import { navReset } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { captureRuntimeRevision } from "@/api/order-api";
 import {
   buildLegalTermsRoute,
   claimLegalTermsRedirect,
+  isLegalTermsGateExemptRoute,
   LEGAL_TERMS_ROUTE,
   sameLegalTermsRun,
   isLegalTermsAcknowledged,
@@ -14,6 +16,14 @@ import {
 let inFlight: { key: string; promise: Promise<void> } | null = null;
 const failedKeys = new Set<string>();
 const redirectedKeys = new Set<string>();
+const verificationKeys = new Set<string>();
+const REDIRECT_RETRY_MS = 5_000;
+let lastRedirectAttempt: { key: string; url: string; at: number } | null = null;
+let pendingRequirement: {
+  key: string;
+  version: string;
+  reason: "verification" | "acknowledgement";
+} | null = null;
 
 function fence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
@@ -22,40 +32,142 @@ function fence(): LegalTermsSessionFence | null {
   return { accessToken: session.accessToken, userId: session.user.userId, runEpoch: revision.epoch };
 }
 
+function sessionKey(value: LegalTermsSessionFence): string {
+  return `${value.userId}:${value.accessToken}:${value.runEpoch ?? 0}`;
+}
+
+function rescheduleAfterEpochChange(expected: LegalTermsSessionFence, returnTo: string): void {
+  const current = fence();
+  if (!current
+      || current.userId !== expected.userId
+      || current.accessToken !== expected.accessToken
+      || current.runEpoch === expected.runEpoch) return;
+  scheduleLegalTermsGate(returnTo);
+}
+
+function currentPendingRequirement(): typeof pendingRequirement {
+  const current = fence();
+  return current && pendingRequirement?.key === sessionKey(current) ? pendingRequirement : null;
+}
+
+function beginVerification(key: string): void {
+  verificationKeys.add(key);
+  uni.showLoading({ title: "", mask: true });
+}
+
+function finishVerification(key: string): void {
+  if (!verificationKeys.delete(key)) return;
+  if (verificationKeys.size === 0) uni.hideLoading();
+}
+
+function redirectToRequiredTerms(key: string, returnTo: string): void {
+  const url = buildLegalTermsRoute(returnTo);
+  const now = Date.now();
+  // The App guard polls every second. Keep the obligation active but avoid
+  // concurrent reset storms and a fresh platform toast on every guard tick.
+  if (lastRedirectAttempt?.key === key && lastRedirectAttempt.url === url
+      && now - lastRedirectAttempt.at < REDIRECT_RETRY_MS) return;
+  lastRedirectAttempt = { key, url, at: now };
+  void navReset(url);
+}
+
+/**
+ * Report a known obligation without redirecting. Legal-document routes are
+ * readable while pending, but they must not restart earnings or order loops.
+ */
+export function hasPendingLegalTermsRequirement(): boolean {
+  if (!remoteApiEnabled) return false;
+  return currentPendingRequirement() !== null;
+}
+
+/**
+ * Re-apply a known unacknowledged requirement synchronously. This closes the
+ * browser-history/system-back gap without another network round trip.
+ */
+export function enforcePendingLegalTermsGate(returnTo: string): boolean {
+  if (!remoteApiEnabled) return false;
+  const pending = currentPendingRequirement();
+  if (!pending) return false;
+  // While current() is unresolved, the masked loading layer blocks input and
+  // App treats true as a signal to stop every business loop. Do not flash an
+  // already-acknowledged user through the Terms page merely to verify state.
+  if (pending.reason === "verification") return true;
+  if (isLegalTermsGateExemptRoute(returnTo)) return false;
+  redirectToRequiredTerms(pending.key, returnTo);
+  return true;
+}
+
+/** Clear the current account obligation after an authoritative current snapshot. */
+export function recordLegalTermsAcknowledged(snapshot: Parameters<typeof isLegalTermsAcknowledged>[0]): void {
+  const current = fence();
+  if (!current || !sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)
+      || !isLegalTermsAcknowledged(snapshot)) return;
+  const key = sessionKey(current);
+  finishVerification(key);
+  if (pendingRequirement?.key === key) pendingRequirement = null;
+  if (lastRedirectAttempt?.key === key) lastRedirectAttempt = null;
+  failedKeys.delete(key);
+}
+
 /**
  * Check the server's current version after login and on session restore.
  * The request is fenced to the exact in-memory bearer + account; a late
  * response can never redirect a subsequent account. A failed check redirects
- * once to the Terms page so the error is visible, while the page remains
- * escapable and retryable after the session changes.
+ * once to the Terms page and retains a fail-closed in-memory obligation until
+ * the server confirms the current account has acknowledged its current terms.
  */
 export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
   if (!remoteApiEnabled) return;
   // The Terms page owns its own snapshot/ack flow.  Re-running the global
   // gate while that page is visible loses its query return target because the
   // App route reader intentionally strips query strings.
-  if (returnTo.split("?", 1)[0] === LEGAL_TERMS_ROUTE) return;
+  const path = `/${returnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
+  if (path === LEGAL_TERMS_ROUTE) return;
   const requestFence = fence();
   if (!requestFence) return;
-  const key = `${requestFence.userId}:${requestFence.accessToken}`;
+  const key = sessionKey(requestFence);
+  // A known obligation is authoritative until acknowledgement succeeds. Do
+  // not let browser history or a repeated failed check downgrade it to the
+  // non-redirecting verification state or replace its original return target.
+  if (pendingRequirement?.key === key
+      && pendingRequirement.reason === "acknowledgement") return;
   if (inFlight?.key === key) return;
+  // Every authoritative recheck is fail-closed, including a previously
+  // acknowledged session: a newly published version must not gain a network
+  // response window in which business activity can continue.
+  pendingRequirement = { key, version: "", reason: "verification" };
+  beginVerification(key);
   const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
     .then((snapshot) => {
-      if (!sameLegalTermsSession(requestFence, fence())) return;
+      if (!sameLegalTermsSession(requestFence, fence())) {
+        rescheduleAfterEpochChange(requestFence, returnTo);
+        return;
+      }
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
+        finishVerification(key);
+        pendingRequirement = { key, version: snapshot.version, reason: "acknowledgement" };
         const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${returnTo}`;
         if (claimLegalTermsRedirect(redirectedKeys, redirectKey)) {
-          uni.reLaunch({ url: buildLegalTermsRoute(returnTo), fail: () => {} });
+          redirectToRequiredTerms(key, returnTo);
         }
+      } else {
+        recordLegalTermsAcknowledged(snapshot);
       }
     })
     .catch(() => {
-      if (!sameLegalTermsSession(requestFence, fence()) || failedKeys.has(key)) return;
+      if (!sameLegalTermsSession(requestFence, fence())) {
+        rescheduleAfterEpochChange(requestFence, returnTo);
+        return;
+      }
+      if (failedKeys.has(key)) return;
+      finishVerification(key);
+      pendingRequirement = { key, version: "", reason: "acknowledgement" };
       failedKeys.add(key);
-      uni.reLaunch({ url: buildLegalTermsRoute(returnTo), fail: () => {} });
+      redirectToRequiredTerms(key, returnTo);
     })
     .finally(() => {
+      finishVerification(key);
       if (inFlight?.key === key) inFlight = null;
     });
   inFlight = { key, promise };
