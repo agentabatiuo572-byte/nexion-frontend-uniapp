@@ -15,6 +15,12 @@ export interface ThreadMsg {
   ctaLabel?: string;
   /** Logical route (mapped by lib/route navTo at tap time). */
   ctaHref?: string;
+  queue?: {
+    turnId: string;
+    state: "queued" | "processing" | "editing" | "failed";
+    label: string;
+    editable: boolean;
+  };
 }
 
 export interface QuickChip {

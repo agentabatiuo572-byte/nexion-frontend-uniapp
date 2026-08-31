@@ -16,6 +16,21 @@ beforeEach(() => {
 });
 
 describe("Nova conversation scope", () => {
+  it("retains existing mock messages, cooldowns and read receipts alongside remote queues", () => {
+    const nova = useNova();
+    nova.open(); nova.setTyping(true);
+    expect(nova.isOpen).toBe(true);
+    nova.sendUser("question"); nova.markUserRead(); nova.markUserRead();
+    expect(nova.messages[0].status).toBe("read");
+    expect(nova.push({ kind: "nova-reply", text: "answer" }, { cooldownKey: "test" })).toBe(true);
+    expect(nova.push({ kind: "nova-reply", text: "suppressed" }, { cooldownKey: "test" })).toBe(false);
+    expect(nova.unread).toBe(0);
+    nova.close();
+    nova.push({ kind: "nova-reply", text: "notification" });
+    expect(nova.unread).toBe(1);
+    nova.reset();
+    expect(nova.typing).toBe(false);
+  });
   it("keeps one UUID within a conversation and rotates it for a new conversation or account", () => {
     const nova = useNova();
 

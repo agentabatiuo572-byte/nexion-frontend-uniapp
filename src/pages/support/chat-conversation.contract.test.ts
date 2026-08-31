@@ -20,7 +20,7 @@ describe("Nova visible thinking cadence", () => {
     expect(source).toContain("remainingNovaThinkingMs(requestStartedAt, novaThinkingNow())");
     expect(source).toContain("await waitForNovaThinkingDelay");
     expect(source.indexOf("await waitForNovaThinkingDelay"))
-      .toBeLessThan(source.indexOf('nova.push({ kind: "nova-reply", text: result.reply })'));
+      .toBeLessThan(source.indexOf('nova.completeRemote(item.turnId, result.reply)'));
   });
 
   it("shows honest user-facing stages instead of exposing hidden model reasoning", () => {
