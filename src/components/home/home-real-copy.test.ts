@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import techMoneyCardSource from "./tech-money-card.vue?raw";
 
 import { homeEarningsSubtitle } from "./home-real-copy";
 
 describe("home real-data copy", () => {
+  it("uses the prototype live label without a remote-only settlement badge", () => {
+    const template = techMoneyCardSource.split("<script setup")[0];
+    expect(template).toContain("{{ t.home.techStreaming }}");
+    expect(template).not.toContain("techSettlementSnapshot");
+  });
+
   it("shows loading instead of telling an already authenticated user to sign in", () => {
     expect(homeEarningsSubtitle(true, "loading", null, null, null,
       "mock trend", "loading", "unavailable", "empty", "{arrow} {delta} settled {count}"))
