@@ -100,7 +100,7 @@ export interface EventSpinState {
 }
 
 export interface EventsApi {
-  state(): Promise<EventSnapshot>;
+  state(locale?: string): Promise<EventSnapshot>;
   spinState(eventCode: string): Promise<EventSpinState>;
   join(eventCode: string, idempotencyKey: string): Promise<EventJoinResult>;
   claim(eventCode: string, idempotencyKey: string): Promise<EventClaimResult>;
@@ -330,7 +330,10 @@ export function createEventsApi(client: ApiClient): EventsApi {
   const code = (value: string) => encodeURIComponent(required(value, "EVENT_CODE_REQUIRED"));
   const key = (value: string) => required(value, "EVENT_IDEMPOTENCY_KEY_REQUIRED");
   return {
-    state: async () => parseSnapshot(await client.request({ method: "GET", path: "/api/events" })),
+    state: async (locale = "en") => parseSnapshot(await client.request({
+      method: "GET",
+      path: `/api/events?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
+    })),
     spinState: async (eventCode) => parseSpinState(await client.request({
       method: "GET",
       path: `/api/events/${code(eventCode)}/spin/state`,

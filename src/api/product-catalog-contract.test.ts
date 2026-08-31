@@ -114,6 +114,34 @@ describe("product catalog strict specification contract", () => {
     })).toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
   });
 
+  it("accepts a server-issued product image URL and drops unsafe media URLs without voiding the catalog", () => {
+    const signedImage = "https://minio.example.test/nexion/admin/e/sku-image/20260831/product.webp?X-Amz-Signature=token";
+    expect(parseProductCatalogPayload({
+      source: "nx_product", ...proof, serverCanonical: true, revision: null,
+      products: [{ ...product, imageUrl: signedImage }],
+    }).products[0].imageUrl).toBe(signedImage);
+
+    for (const imageUrl of ["javascript:alert(1)", "data:image/png;base64,AAAA", "https://user:pass@example.test/image.png"]) {
+      expect(parseProductCatalogPayload({
+        source: "nx_product", ...proof, serverCanonical: true, revision: null,
+        products: [{ ...product, imageUrl }],
+      }).products[0].imageUrl).toBeUndefined();
+    }
+  });
+
+  it("keeps a separately typed server-issued product video URL and drops unsafe video URLs", () => {
+    const signedVideo = "https://minio.example.test/nexion/admin/e/sku-video/20260831/product.mp4?X-Amz-Signature=token";
+    expect(parseProductCatalogPayload({
+      source: "nx_product", ...proof, serverCanonical: true, revision: null,
+      products: [{ ...product, videoUrl: signedVideo }],
+    }).products[0].videoUrl).toBe(signedVideo);
+
+    expect(parseProductCatalogPayload({
+      source: "nx_product", ...proof, serverCanonical: true, revision: null,
+      products: [{ ...product, videoUrl: "javascript:alert(1)" }],
+    }).products[0].videoUrl).toBeUndefined();
+  });
+
   it("requires the Java production provenance and rejects sandbox catalogs", () => {
     expect(() => parseProductCatalogPayload({ source: "nx_product", serverCanonical: true, revision: null, products: [product] }))
       .toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");

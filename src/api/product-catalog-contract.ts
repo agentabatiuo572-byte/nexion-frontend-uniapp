@@ -97,6 +97,21 @@ function displayString(value: unknown): string | undefined {
   return normalized || undefined;
 }
 
+function productMediaUrl(value: unknown): string | undefined {
+  const raw = optionalString(value);
+  if (!raw) return undefined;
+  try {
+    const parsed = new URL(raw);
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      || parsed.username || parsed.password || parsed.hash) return undefined;
+    return parsed.toString();
+  } catch {
+    // An invalid optional image must not blank the whole canonical catalogue.
+    // The renderer will use its product-tier fallback instead.
+    return undefined;
+  }
+}
+
 function booleanValue(value: unknown): boolean {
   if (typeof value !== "boolean") return invalid();
   return value;
@@ -182,6 +197,8 @@ function product(value: unknown): CatalogProduct {
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
+    imageUrl: productMediaUrl(source.imageUrl),
+    videoUrl: productMediaUrl(source.videoUrl),
     productType,
     inventoryMode,
     stock: optionalInteger(source.stock),

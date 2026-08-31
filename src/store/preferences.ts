@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { notificationPreferencesApi, remoteApiEnabled } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/account-error-message";
 
 /**
  * User preferences. Ported from Nexion-prototype/lib/store/preferences.ts
@@ -62,7 +63,7 @@ export const usePreferences = defineStore("preferences", () => {
   const hapticsEnabled = ref<boolean>(init.hapticsEnabled);
   const notifPrefs = ref<NotifPrefs>(init.notifPrefs);
   const loading = ref(false);
-  const error = ref<string | null>(null);
+  const error = ref<AccountErrorMessageKey | null>(null);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let generation = 0;
 
@@ -110,7 +111,7 @@ export const usePreferences = defineStore("preferences", () => {
       } catch (cause) {
         if (!isCurrent(request, mutationGeneration)) return;
         notifPrefs.value = { ...notifPrefs.value, [k]: previous };
-        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_PREFERENCES_UPDATE_FAILED";
+        error.value = accountErrorMessageKey(cause instanceof Error ? cause : "NOTIFICATION_PREFERENCES_UPDATE_FAILED");
       }
       return;
     }
@@ -128,7 +129,7 @@ export const usePreferences = defineStore("preferences", () => {
       notifPrefs.value = canonical;
     } catch (cause) {
       if (isCurrent(request, expectedGeneration)) {
-        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_PREFERENCES_UNAVAILABLE";
+        error.value = accountErrorMessageKey(cause);
       }
     } finally {
       if (isCurrent(request, expectedGeneration)) loading.value = false;

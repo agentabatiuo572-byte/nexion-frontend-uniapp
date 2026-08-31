@@ -155,6 +155,7 @@ import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
 import type { AccountDeletionStatus } from "@/api/account-api";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
+import { accountErrorMessageKey } from "@/lib/account-error-message";
 
 
 const t = useT();
@@ -216,6 +217,19 @@ const current = ref("");
 const next = ref("");
 const confirmPwd = ref("");
 const err = ref("");
+
+function securityErrorMessage(cause: unknown): string {
+  const labels = t.value.security as typeof t.value.security & Record<
+    "currentPasswordInvalid" | "securityVerificationRateLimited" | "accountDeletionVersionConflict" | "sessionUnavailable", string
+  >;
+  switch (accountErrorMessageKey(cause)) {
+    case "currentPasswordInvalid": return labels.currentPasswordInvalid;
+    case "securityVerificationRateLimited": return labels.securityVerificationRateLimited;
+    case "accountDeletionVersionConflict": return labels.accountDeletionVersionConflict;
+    case "sessionUnavailable": return labels.sessionUnavailable;
+    default: return t.value.security.opFailed;
+  }
+}
 
 function isCurrentSecurityRequest(
   pageScope: P318AccountPageScope,
@@ -399,9 +413,7 @@ async function submitPasswordChange() {
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     console.warn("[security] password update failed:", cause);
-    err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
-      ? t.value.login.errorInvalidCredentials
-      : t.value.security.opFailed;
+    err.value = securityErrorMessage(cause);
     return;
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
@@ -453,9 +465,7 @@ async function toggleTwoFactor(value: boolean) {
       } catch (cause) {
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         console.warn("[security] 2FA update failed:", cause);
-        err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
-          ? t.value.login.errorInvalidCredentials
-          : t.value.security.opFailed;
+        err.value = securityErrorMessage(cause);
       } finally {
         if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
       }
@@ -476,9 +486,7 @@ async function toggleTwoFactor(value: boolean) {
     } catch (cause) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       console.warn("[security] 2FA update failed:", cause);
-      err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
-        ? t.value.login.errorInvalidCredentials
-        : t.value.security.opFailed;
+      err.value = securityErrorMessage(cause);
     } finally {
       if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
@@ -511,9 +519,7 @@ async function handleRevoke(s: SessionListItem) {
       toast.success(t.value.security.sessionRevoked);
     } catch (cause) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
-        ? t.value.security.opFailed
-        : cause instanceof Error ? cause.message : t.value.security.opFailed);
+      toast.error(securityErrorMessage(cause));
     } finally {
       if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
@@ -546,9 +552,7 @@ async function handleRevokeAll() {
       toast.success(t.value.security.revokeAllDone);
     } catch (cause) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
-        ? t.value.security.opFailed
-        : cause instanceof Error ? cause.message : t.value.security.opFailed);
+      toast.error(securityErrorMessage(cause));
     } finally {
       if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
     }
@@ -653,7 +657,7 @@ async function handleDeleteAccount() {
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         } catch (cause) {
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_REQUEST_FAILED");
+          toast.error(securityErrorMessage(cause));
           return;
         }
       } else {
@@ -706,7 +710,7 @@ async function handleCancelAccountDeletion() {
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_CANCEL_FAILED");
+    toast.error(securityErrorMessage(cause));
     await loadRemoteSecurity();
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;

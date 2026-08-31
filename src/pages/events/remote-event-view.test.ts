@@ -15,6 +15,7 @@ const labels: EventActionLabels = {
   leaderboard: "查看排行",
   viewDetails: "查看详情",
   progress: "进度",
+  wheelPool: "转盘奖池",
 };
 
 function canonicalEvent(overrides: Partial<CanonicalEvent> = {}): CanonicalEvent {
@@ -61,6 +62,11 @@ describe("remoteEventView", () => {
     expect(view.ctaLabel).toBe("立即抽奖");
     expect(view.href).toBeUndefined();
     expect(view.useHref).toBeUndefined();
+  });
+
+  it("does not present a wheel as a zero-value generic reward", () => {
+    expect(remoteEventView(canonicalEvent({ kind: "wheel", rewardAmount: 0, rewardName: "Wheel pool award" }), labels).reward)
+      .toBe("转盘奖池");
   });
 
   it("does not render a dead decorative CTA when neither an href nor an in-app action exists", () => {

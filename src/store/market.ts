@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { marketApi, remoteApiEnabled } from "@/api/runtime";
+import type { NexMarketSnapshot } from "@/api/market-api";
 
 // Local curves are deliberately available only when VITE_API_MODE=mock. Remote
 // mode starts empty: an unavailable authority must never be rendered as a quote.
@@ -27,10 +28,12 @@ export const useMarket = defineStore("market", () => {
   const costBasis = ref(isMockMode ? 0.085 : 0);
   const klineHourly = ref<number[]>(isMockMode ? [...HOURLY_SEED] : []);
   const klineDaily = ref<number[]>(isMockMode ? [...DAILY_SEED] : []);
+  const historySamples = ref<NexMarketSnapshot["history"]>([]);
   const lastTickTs = ref(0);
   const remoteError = ref<string | null>(null);
   const remoteReady = ref(isMockMode);
   const marketRunId = ref<string | null>(null);
+  let lastRemoteFetchAt = 0;
   let nexGeneration = 0;
   let syncInFlight: Promise<boolean> | null = null;
   const marketCap = computed(() => nexPriceUSDT.value * circulating.value);
@@ -46,12 +49,13 @@ export const useMarket = defineStore("market", () => {
     costBasis.value = 0;
     klineHourly.value = [];
     klineDaily.value = [];
+    historySamples.value = [];
     lastTickTs.value = 0;
     remoteReady.value = false;
   }
 
   function commitNex(snapshot: Awaited<ReturnType<typeof marketApi.fetch>>) {
-    const history = snapshot.history24h.map((point) => point.price);
+    const history = snapshot.history.map((point) => point.price);
     const series = history.length >= 2 ? history : snapshot.sparkline;
     const open = series[0] ?? snapshot.currentPrice;
     nexPriceUSDT.value = snapshot.currentPrice;
@@ -62,6 +66,7 @@ export const useMarket = defineStore("market", () => {
     change24hPct.value = ((snapshot.currentPrice - open) / open) * 100;
     klineHourly.value = series;
     klineDaily.value = snapshot.sparkline;
+    historySamples.value = snapshot.history;
     lastTickTs.value = Date.now();
     remoteError.value = null;
     remoteReady.value = true;
@@ -72,6 +77,8 @@ export const useMarket = defineStore("market", () => {
   function syncRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return Promise.resolve(true);
     if (syncInFlight) return syncInFlight;
+    if (remoteReady.value && Date.now() - lastRemoteFetchAt < 30_000) return Promise.resolve(true);
+    lastRemoteFetchAt = Date.now();
     const generation = ++nexGeneration;
     const operation = (async () => {
       try {
@@ -112,7 +119,7 @@ export const useMarket = defineStore("market", () => {
 
   return {
     isMockMode, nexPriceUSDT, open24h, high24h, low24h, change24hPct, volume24hUSDT,
-    circulating, costBasis, klineHourly, klineDaily, lastTickTs, marketCap, remoteError, remoteReady,
+    circulating, costBasis, klineHourly, klineDaily, historySamples, lastTickTs, marketCap, remoteError, remoteReady,
     marketRunId, syncRemote, tickPrice,
   };
 });

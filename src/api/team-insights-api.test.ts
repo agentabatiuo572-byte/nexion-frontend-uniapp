@@ -3,6 +3,31 @@ import type { ApiClient } from "./api-client";
 import { createTeamInsightsApi } from "./team-insights-api";
 
 describe("team unilevel API", () => {
+  it("keeps server-wide commission totals and real contributors separate from the recent event feed", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      events: [], generatedAt: "2026-08-13T00:00:00Z",
+      aggregate: { totalUSDT: 150, totalNEX: 20, directUSDT: 30, extendedUSDT: 120, contributorCount: 4 },
+    });
+
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).commissions()).resolves.toMatchObject({
+      aggregate: { totalUSDT: 150, extendedUSDT: 120, contributorCount: 4 },
+    });
+  });
+
+  it("accepts configured leadership eligibility and the cron-derived next settlement time", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      currentWeekPoolUSDT: 100, myRank: 4, myVotes: 0, totalVotes: 0, mySharePct: 0,
+      projectedPayoutUSDT: 0, distribution: [], history: [], nextPayoutAt: "2026-08-16T23:59:00Z",
+      unlockRank: 5, injectRate: 0.05,
+    });
+
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).leadershipPool()).resolves.toMatchObject({
+      unlockRank: 5, injectRate: 0.05, nextPayoutAt: "2026-08-16T23:59:00Z",
+    });
+  });
+
   it("accepts server-owned cycle, source, layer and currency split", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", period: "week",
@@ -40,6 +65,7 @@ describe("team unilevel API", () => {
         orderId: "ORD-1", orderAmountUSD: 99, amountUSDT: 9.9, amountNEX: 50,
         ts: 1755043200000, unlockAt: 1757635200000, status: "unlocked",
         settlementState: "CANONICAL", withdrawable: true }],
+      aggregate: { totalUSDT: 9.9, totalNEX: 50, directUSDT: 9.9, extendedUSDT: 0, contributorCount: 1 },
       generatedAt: "2026-08-13T00:00:00Z",
     });
     const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");

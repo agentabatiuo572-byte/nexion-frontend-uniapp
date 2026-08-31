@@ -17,6 +17,7 @@ const eventLabels: EventActionLabels = {
   leaderboard: "Leaderboard",
   viewDetails: "View details",
   progress: "Progress",
+  wheelPool: "Wheel prize pool",
 };
 
 const trackableEvent: CanonicalEvent = {

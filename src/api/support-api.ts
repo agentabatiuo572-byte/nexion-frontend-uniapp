@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { Conversation, ConvMessage, SupportFaq, Ticket, TicketCategory, TicketMessage, TicketPriority, TicketStatus } from "@/domain/support";
+import type { Conversation, ConvMessage, SupportFaq, SupportSlaTarget, Ticket, TicketCategory, TicketMessage, TicketPriority, TicketStatus } from "@/domain/support";
 
 interface Page<T> { items: T[]; total: number }
 interface TicketInput { category: TicketCategory; subject: string; body: string }
@@ -23,6 +23,7 @@ export interface SupportApi {
   replyConversation(conversation: Conversation, body: string, key: string): Promise<Conversation>;
   convertConversationToTicket(conversation: Conversation, category: TicketCategory, title: string, key: string): Promise<ConversationTicketResult>;
   commandResult(key: string): Promise<SupportCommandResult | null>;
+  slaTargets(): Promise<SupportSlaTarget[]>;
   faqs(language: string, category?: string): Promise<SupportFaq[]>;
 }
 
@@ -89,12 +90,18 @@ function parseConversationPage(value: unknown): Page<Conversation> {
   const v = row(value); const total = integer(v?.total); if (!v || !Array.isArray(v.records) || total === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
   const items = v.records.map(parseConversationHeader); if (new Set(items.map(i => i.id)).size !== items.length) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID"); return { items, total };
 }
-function parseFaq(value: unknown): SupportFaq {
+  function parseFaq(value: unknown): SupportFaq {
   const v = row(value); const id = text(v?.id); const category = text(v?.category); const question = text(v?.question); const answer = text(v?.answer);
   const language = text(v?.language); const sortOrder = integer(v?.sortOrder); const version = integer(v?.version); const updatedAt = time(v?.updatedAt);
   if (!v || !id || !category || !question || !answer || !language || sortOrder === null || version === null || updatedAt === null) invalid("SUPPORT_FAQ_RESPONSE_INVALID");
-  return { id, category, question, answer, language, sortOrder, version, updatedAt };
-}
+    return { id, category, question, answer, language, sortOrder, version, updatedAt };
+  }
+  function parseSlaTarget(value: unknown): SupportSlaTarget {
+    const v = row(value); const category = enumValue(v?.category, ticketCategories);
+    const firstResponseMins = integer(v?.firstResponseMins, 1); const resolutionHours = integer(v?.resolutionHours, 1);
+    if (!v || !category || firstResponseMins === null || resolutionHours === null || v.statisticsAvailable !== false) invalid("SUPPORT_SLA_TARGET_RESPONSE_INVALID");
+    return { category, firstResponseMins, resolutionHours, statisticsAvailable: false };
+  }
 
 export function createSupportApi(client: ApiClient): SupportApi {
   const supportRoot = "/api/app/support";
@@ -159,6 +166,11 @@ export function createSupportApi(client: ApiClient): SupportApi {
         if (cause instanceof ApiError && cause.status === 404) return null;
         throw cause;
       }
+    },
+    slaTargets: async () => {
+      const value = await client.request({ method: "GET", path: await supportPath("/sla-targets") });
+      if (!Array.isArray(value)) invalid("SUPPORT_SLA_TARGET_RESPONSE_INVALID");
+      return value.map(parseSlaTarget);
     },
     faqs: async (language, category) => {
       const params = new URLSearchParams({ language: language.trim() || "en-US" }); if (category?.trim()) params.set("category", category.trim());

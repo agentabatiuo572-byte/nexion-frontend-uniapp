@@ -8,7 +8,7 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
       <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text>{{ prefs.error }}</text>
+        <text>{{ preferenceError }}</text>
         <text class="block" style="margin-top: 6px;" @click="prefs.refreshRemote()">{{ t.ui.retry }}</text>
       </view>
 
@@ -63,6 +63,10 @@ import { usePreferences, type NotifKind } from "@/store/preferences";
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
+const preferenceError = computed(() => {
+  const labels = t.value.preferences as typeof t.value.preferences & Record<"updateFailed" | "unavailable", string>;
+  return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
+});
 
 const notifKinds: NotifKind[] = ["commission", "team", "staking", "market", "genesis", "system"];
 const NOTIF_COLOR: Record<NotifKind, string> = {

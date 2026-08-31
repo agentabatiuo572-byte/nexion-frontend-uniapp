@@ -45,6 +45,12 @@
         </view>
 
         <text class="block text-center" :style="footStyle">{{ fmt(t.language.countLine, { n: localeCount }) }} · {{ t.language.autoDetect }}</text>
+        <view v-if="profileLocaleSyncState === 'syncing'" class="text-center" :style="syncNoteStyle">
+          <text>{{ t.language.preferenceSyncing }}</text>
+        </view>
+        <view v-else-if="profileLocaleSyncState === 'failed'" class="text-center active:opacity-70" :style="syncNoteStyle" @click="retryCurrentProfileLocale">
+          <text>{{ t.language.preferenceSyncFailed }} · {{ t.language.preferenceSyncRetry }}</text>
+        </view>
 
         <view class="flex items-center justify-center active:opacity-70 transition-opacity" :style="backLinkStyle" @click="goAccount">
           <text>{{ t.language.backToAccount }}</text>
@@ -63,6 +69,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
 import { LOCALES, PRIORITY_LABELS, localesByPriority, type LocaleCode } from "@/i18n";
+import { profileLocaleSyncState, retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -131,6 +138,7 @@ const checkBadgeStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const footStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "20px" };
+const syncNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", marginTop: "8px", minHeight: "32px", display: "grid", placeItems: "center" };
 const backLinkStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand)",

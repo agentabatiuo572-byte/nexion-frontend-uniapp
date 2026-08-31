@@ -38,7 +38,7 @@
             <view>
               <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-warning)')">{{ t.leaderboard.pool.label }} · {{ prize.label }}</text>
               <text class="block font-display tabular-nums" :style="heroBigStyle">{{ fmtCompactUSD(prize.poolUSD) }}</text>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '6px' }">{{ payoutToText }}</text>
+              <text v-if="prize.poolUSD > 0" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '6px' }">{{ payoutToText }}</text>
             </view>
             <view class="rounded-2xl grid place-items-center" :style="heroIconStyle">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
@@ -92,15 +92,6 @@
               <text class="block" :style="{ fontSize: '12px' }">{{ p.row.flag }}</text>
               <text class="block font-mono-tabular tabular-nums" :style="podiumEarnStyle(p.prize.color)">{{ fmtCompactUSD(p.row.earnedUSDT) }}</text>
               <text class="block" :style="{ marginTop: '2px', fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ fmt(t.leaderboard.chips.directs, { n: p.row.directs }) }}</text>
-            </view>
-          </view>
-          <view style="margin-top: 14px; padding: 10px 2px 0; border-top: 1px solid var(--v5-border); display: flex; flex-direction: column; gap: 6px">
-            <view v-for="(p, i) in PODIUM_PRIZE" :key="i" class="flex items-center justify-between" style="font-size: 12px">
-              <view class="flex items-center" style="gap: 6px">
-                <text>{{ p.medal }}</text>
-                <text :style="{ color: 'var(--v5-ink-3)' }">#{{ i + 1 }}</text>
-              </view>
-              <text :style="{ color: 'var(--v5-ink-2)' }">{{ p.reward }}</text>
             </view>
           </view>
         </view>
@@ -178,7 +169,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { LEADERBOARD, PERIOD_PRIZE, PODIUM_PRIZE, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
+import { LEADERBOARD, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
@@ -205,7 +196,9 @@ watch(() => app.accountKey, () => {
 
 const rows = computed(() => remoteApiEnabled ? (remoteSnapshot.value?.period === period.value ? remoteSnapshot.value.rows : []) : LEADERBOARD[period.value]);
 const prize = computed(() => remoteApiEnabled ? { poolUSD: remoteSnapshot.value?.poolUsd ?? 0,
-  topN: remoteSnapshot.value?.topN ?? 0, resetsIn: "—", label: period.value } : PERIOD_PRIZE[period.value]);
+  topN: remoteSnapshot.value?.topN ?? 0, resetsIn: "—", label: period.value }
+  // Fixture rows can support layout preview, but client fixtures must never invent a cash pool.
+  : { poolUSD: 0, topN: 0, resetsIn: "—", label: period.value });
 const me = computed(() => remoteApiEnabled ? { rank: remoteSnapshot.value?.myRank ?? null,
   gapToNext: remoteSnapshot.value?.gapToNext ?? 0 } : MY_RANK[period.value]);
 const myRankDisplay = computed(() => me.value.rank === null ? "—" : String(me.value.rank));
@@ -251,10 +244,17 @@ const podiumDisplay = computed(() => {
     .map((row, idx) => {
       if (!row) return null;
       const actualIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
-      return { row, prize: PODIUM_PRIZE[actualIdx], isFirst: actualIdx === 0 };
+      return { row, prize: podiumVisuals[actualIdx], isFirst: actualIdx === 0 };
     })
-    .filter((x): x is { row: (typeof rows.value)[number]; prize: (typeof PODIUM_PRIZE)[number]; isFirst: boolean } => x !== null);
+    .filter((x): x is { row: (typeof rows.value)[number]; prize: (typeof podiumVisuals)[number]; isFirst: boolean } => x !== null);
 });
+
+// Visual rank markers only. Reward amounts and prize names are never inferred on the client.
+const podiumVisuals = [
+  { medal: "🥇", color: "var(--v5-warning-soft)" },
+  { medal: "🥈", color: "var(--v5-surface-2)" },
+  { medal: "🥉", color: "var(--v5-brand-soft)" },
+] as const;
 
 const payoutToText = computed(() => fmt(t.value.leaderboard.pool.payoutTo, { n: prize.value.topN }));
 const gapText = computed(() => me.value.rank === null

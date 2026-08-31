@@ -70,14 +70,14 @@
           <template v-else>
             <text class="block font-mono-tabular" :style="statusCapStyle('var(--v5-ink-3)')">{{ t.pool.locked }}</text>
             <text class="block" :style="lockedHeadStyle">
-              <text>{{ requiresV3Parts[0] }}</text>
-              <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ requiresV3Parts[1] }}</text>
-              <text>{{ requiresV3Parts[2] }}</text>
+              <text>{{ requiresUnlockRankParts[0] }}</text>
+              <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ requiresUnlockRankParts[1] }}</text>
+              <text>{{ requiresUnlockRankParts[2] }}</text>
             </text>
             <text class="block" :style="lockedSubStyle">{{ currentlyVText }}</text>
             <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="pathCtaStyle" @click="go('/pages/team/rank')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
-              <text>{{ t.pool.seePathV3 }}</text>
+              <text>{{ pathCtaText }}</text>
             </view>
           </template>
         </view>
@@ -172,7 +172,9 @@ let remoteRequest = 0;
 let mounted = true;
 
 const myRank = computed(() => (remoteApiEnabled ? remotePool.value?.myRank ?? 0 : vState.myRank) as VRank);
-const unlocked = computed(() => myRank.value >= 3);
+const poolUnlockRank = computed(() => (remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3) as VRank);
+const poolInjectRate = computed(() => remoteApiEnabled ? remotePool.value?.injectRate ?? 0 : 0.05);
+const unlocked = computed(() => remoteApiEnabled ? (remotePool.value?.myVotes ?? 0) > 0 : myRank.value >= poolUnlockRank.value);
 const dist = computed(() => {
   if (!remoteApiEnabled) return pool.globalVDistribution;
   const result = {} as Record<VRank, number>;
@@ -201,26 +203,22 @@ const hoursToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value -
 
 const weeklyDescText = computed(() => {
   const n = daysToPayout.value > 0 ? `${daysToPayout.value}${t.value.pool.daysShort}` : `${hoursToPayout.value}${t.value.pool.hoursShort}`;
-  return fmt(t.value.pool.weeklyDesc, { n });
+  const rate = `${(poolInjectRate.value * 100).toFixed(2).replace(/\\.00$/, "")}%`;
+  return fmt(t.value.pool.weeklyDesc, { rate, n });
 });
-// 领导池解锁档位的头衔标签由服务端 ladder 投影提供，
-// 不再在模板和脚本里各写一份 "V3 Captain" 字面量 —— 原来两处各一份,改了一处另一处静默错位。
-// 头衔是**数据**不是文案:三语的 pool.requiresV3 句子里嵌的就是这个英文权威值
-// 中文镜像同样从该 canonical ladder 读取。
-const POOL_UNLOCK_RANK: VRank = 3;
-// 中文界面用中文头衔(主人 2026-08-17 拍板:V3 = 舰长),与 zh 词典里 requiresV3 那句的写法必须一致
 const isZh = computed(() => useLocaleStore().code === "zh");
 const rankReady = computed(() => vState.remoteReady);
-const poolUnlockRankLabel = computed(() => rankReady.value ? rankLabel(POOL_UNLOCK_RANK, isZh.value, vState.ladder) : "—");
-const requiresV3Parts = computed(() => {
-  // 🔴 「句子里必然包含这个头衔」是一条无门保护的不变量(独立审计点出):某天单侧改了译文,
-  //    split 拿不到第二段,原来会渲染成「整句 + 重复头衔」。取不到就退化成整句 + 不高亮。
-  const sentence = t.value.pool.requiresV3;
+const poolUnlockRankLabel = computed(() => rankReady.value ? rankLabel(poolUnlockRank.value, isZh.value, vState.ladder) : "—");
+const requiresUnlockRankParts = computed(() => {
+  const sentence = fmt(t.value.pool.requiresUnlockRank, { rank: poolUnlockRankLabel.value });
   const i = sentence.indexOf(poolUnlockRankLabel.value);
-  if (i < 0) return [sentence, "", ""];
-  return [sentence.slice(0, i), poolUnlockRankLabel.value, sentence.slice(i + poolUnlockRankLabel.value.length)];
+  if (i >= 0) return [sentence.slice(0, i), poolUnlockRankLabel.value, sentence.slice(i + poolUnlockRankLabel.value.length)];
+  return [sentence, "", ""];
 });
-const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: myRank.value, title: rankTitle(myRank.value, isZh.value, vState.ladder) }));
+const currentlyVText = computed(() => fmt(t.value.pool.currentlyUnlockRank, {
+  n: myRank.value, title: rankTitle(myRank.value, isZh.value, vState.ladder), rank: poolUnlockRankLabel.value,
+}));
+const pathCtaText = computed(() => fmt(t.value.pool.seePathUnlockRank, { rank: poolUnlockRankLabel.value }));
 const totalPeopleText = computed(() =>
   fmt(t.value.pool.totalPeople, { n: Object.values(dist.value).reduce((a, b) => a + b, 0).toLocaleString() }),
 );
@@ -229,7 +227,7 @@ const topPct = computed(() => {
   if (!remoteApiEnabled) return Math.round(pool.topConcentrationPct() * 100);
   if (totalVotes.value <= 0) return 0;
   let remaining = POOL_TOP_N; let votes = 0;
-  for (let rank = 12; rank >= 3 && remaining > 0; rank -= 1) {
+  for (let rank = 12; rank >= poolUnlockRank.value && remaining > 0; rank -= 1) {
     const count = dist.value[rank as VRank] ?? 0; const take = Math.min(count, remaining);
     votes += take * (remoteVotesByRank.value[rank] ?? 0); remaining -= take;
   }
@@ -238,7 +236,8 @@ const topPct = computed(() => {
 const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n: POOL_TOP_N, pct: topPct.value }));
 
 const voteRows = computed(() => {
-  const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const ranks = Array.from({ length: 13 - poolUnlockRank.value }, (_, index) =>
+    (poolUnlockRank.value + index) as VRank);
   const canonicalRows = remoteApiEnabled
     ? leadershipMainRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, myRank.value, ranks)
     : [];

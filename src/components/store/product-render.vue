@@ -14,17 +14,18 @@
   <view class="relative w-full overflow-hidden" :style="rootStyle">
     <view aria-hidden :style="bgStyle" />
 
-    <template v-if="photo">
+    <template v-if="video || photo">
       <!-- Tilted product image layer -->
       <view :style="tiltLayerStyle">
-        <image :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" />
+        <video v-if="video" :src="video" :poster="videoPoster" controls :autoplay="false" preload="metadata" playsinline style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover" @error="fallbackProductVideo" />
+        <image v-else-if="photo" :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
       </view>
       <!-- Bottom vignette (flat) so the brand overlay reads cleanly -->
       <view aria-hidden :style="vignetteStyle" />
       <!-- Brand overlay — flat 2D label, does NOT tilt with the product -->
       <view class="absolute text-right" style="bottom: 10px; right: 16px; pointer-events: none">
         <text class="block" :style="brandStyle">NEXGRID</text>
-        <text class="block" :style="tierCodeStyle">{{ photo.tierCode }}</text>
+        <text class="block" :style="tierCodeStyle">{{ displayTierCode }}</text>
       </view>
     </template>
 
@@ -78,10 +79,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import SvgText from "@/components/svg-text";
 
-const props = defineProps<{ tier: "Entry" | "Pro" | "Flagship" | "Share" }>();
+const props = defineProps<{ tier: "Entry" | "Pro" | "Flagship" | "Share"; imageUrl?: string; videoUrl?: string }>();
 
 const PHOTO_MAP: Record<string, { src: string; tierCode: string } | null> = {
   Entry: { src: "/static/img/products/nexgridbox-s1-v4.png", tierCode: "S1" },
@@ -90,7 +91,23 @@ const PHOTO_MAP: Record<string, { src: string; tierCode: string } | null> = {
   Share: null,
 };
 
-const photo = computed(() => PHOTO_MAP[props.tier] ?? null);
+const failedImageUrl = ref("");
+watch(() => props.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
+const photo = computed(() => {
+  const imageUrl = failedImageUrl.value === props.imageUrl ? undefined : props.imageUrl;
+  return imageUrl ? { src: imageUrl, tierCode: PHOTO_MAP[props.tier]?.tierCode ?? props.tier } : PHOTO_MAP[props.tier] ?? null;
+});
+function fallbackProductImage() {
+  failedImageUrl.value = props.imageUrl ?? "";
+}
+const failedVideoUrl = ref("");
+watch(() => props.videoUrl, () => { failedVideoUrl.value = ""; }, { immediate: true });
+const video = computed(() => failedVideoUrl.value === props.videoUrl ? undefined : props.videoUrl);
+const videoPoster = computed(() => photo.value?.src ?? "");
+const displayTierCode = computed(() => photo.value?.tierCode ?? props.tier);
+function fallbackProductVideo() {
+  failedVideoUrl.value = props.videoUrl ?? "";
+}
 
 const cloudNodes = [
   { x: 160, y: 92, label: "GPU" },

@@ -334,7 +334,8 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.me.secHelp,
     items: [
       { key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: conversationUnread.value > 0 ? String(conversationUnread.value) : undefined, tone: "purple" },
-      { key: "support", label: t.value.me.liveSupportRow, href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
+      // This opens the support hub; availability is not inferred from a local badge.
+      { key: "support", label: t.value.me.supportHubRow, href: "/me/support", icon: "chat", meta: t.value.me.supportHubMeta, tone: "success" },
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
       { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },

@@ -158,7 +158,7 @@ const remoteRows = computed<FlatRow[]>(() => {
   if (!proof) return [];
   const rows: FlatRow[] = [
     { n: proof.windowSales, label: `${t.value.store.soldLabel} · ${proof.windowDays}d`, color: "var(--v5-brand)" },
-    { n: proof.cumulativeSales, label: t.value.store.soldLabel, color: "var(--v5-success-ink)" },
+    { n: proof.cumulativeSales, label: t.value.store.liveProof.cumulativeSalesLabel, color: "var(--v5-success-ink)" },
   ];
   const stock = props.product.stock;
   if (stock !== undefined && stock < 50) {

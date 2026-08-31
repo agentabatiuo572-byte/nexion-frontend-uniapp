@@ -15,7 +15,7 @@ const snapshot = (): CommissionsHowSnapshot => ({
   ] },
   rates: { unilevelUsdt: { 1: .123456, 2: .025 }, unilevelNex: { 1: 2.5, 2: 1 } },
   guide: { source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: null, coolingDays: 17, network: { depthGateLayer: 5, depthGateRank: 4, exitCapRate: .21 }, binary: { threshold: 876.123456, matchRate: .1375, dailyCap: 6789, settlePeriod: "weekly", residualPolicy: "carryForward", paused: false }, leadership: null, capabilities: { peer: false, genesis: false } },
-  ranks: [{ v: 4, title: "Live", cnTitle: "Live", directBonus: .123456, unilevelDepth: 7, peerBonus: .0375, leadershipVotes: 9, cultivationBonus: 321.123456, visible: true }],
+  ranks: [{ v: 4, title: "Live", cnTitle: "Live", directBonus: .123456, unilevelDepth: 7, peerBonus: .0375, leadershipVotes: 9, cultivationBonus: 321.123456, rewards: [], visible: true }],
 });
 describe("commissions-how presentation", () => {
   it("uses changed canonical rates, cooldown and eligibility rather than prototype constants", () => {

@@ -29,7 +29,7 @@
         <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
         <view class="flex items-center" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
-          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" @input="onTarget" />
+          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" :disabled="savePending" @input="onTarget" />
         </view>
         <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px">
           <view
@@ -37,7 +37,7 @@
             :key="p"
             class="flex items-center justify-center active:opacity-70"
             :style="presetTargetStyle(p)"
-            @click="target = p"
+            @click="selectTarget(p)"
           >
             <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${p / 1000}K` : p }}</text>
           </view>
@@ -50,7 +50,7 @@
             :key="d"
             class="flex items-center justify-center active:opacity-70"
             :style="presetDeadlineStyle(d)"
-            @click="days = d"
+            @click="selectDays(d)"
           >
             <text :style="presetDeadlineLabelStyle(d)">{{ d }}d</text>
           </view>
@@ -78,7 +78,7 @@
 
       <!-- Save -->
       <view style="padding: 0 16px; margin-top: 12px">
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="saveBtnStyle" role="button" tabindex="0" :aria-label="t.goals.saveCta" @click="onSave">
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, savePending ? saveBtnPendingStyle : {}]" role="button" tabindex="0" :aria-label="t.goals.saveCta" :aria-disabled="savePending" @click="onSave">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
           <text :style="saveLabelStyle" style="pointer-events: none">{{ t.goals.saveCta }}</text>
         </view>
@@ -139,6 +139,10 @@ const lifeTimeEarnings = computed(() => remoteApiEnabled ? goalsStore.lifetimeEa
 const goals = computed(() => goalsStore.goals);
 const target = ref(1000);
 const days = ref(90);
+const savePending = ref(false);
+type GoalSaveIntent = { targetUSDT: number; days: number; deadlineMs: number; idempotencyKey: string };
+const retryableSaveIntents = new Map<string, GoalSaveIntent>();
+let saveEpoch = 0;
 
 const recommendation = computed(() => {
   if (remoteApiEnabled && goalsStore.recommendation) {
@@ -171,7 +175,14 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onTarget(e: Event) {
+  if (savePending.value) return;
   target.value = Math.max(0, parseFloat(detailVal(e)) || 0);
+}
+function selectTarget(value: number) {
+  if (!savePending.value) target.value = value;
+}
+function selectDays(value: number) {
+  if (!savePending.value) days.value = value;
 }
 
 onMounted(() => {
@@ -187,6 +198,12 @@ watch([target, days], () => {
   }
 });
 
+watch(() => goalsStore.accountEpoch, () => {
+  saveEpoch += 1;
+  savePending.value = false;
+  retryableSaveIntents.clear();
+}, { flush: "sync" });
+
 function deadlineLine(deadlineMs: number): string {
   const daysLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / ONE_DAY_MS));
   return fmt(t.value.goals.deadlineRow, { n: daysLeft });
@@ -196,17 +213,36 @@ function goalPct(targetUSDT: number): number {
 }
 
 async function onSave() {
+  if (savePending.value) return;
   if (target.value < 100) {
     toast.warn(t.value.goals.minTargetWarn);
     return;
   }
+  const intentKey = `${target.value}|${days.value}`;
+  const expectedAccountEpoch = goalsStore.accountEpoch;
+  const expectedSaveEpoch = ++saveEpoch;
+  const isCurrentSave = () => expectedAccountEpoch === goalsStore.accountEpoch && expectedSaveEpoch === saveEpoch;
+  const intent = retryableSaveIntents.get(intentKey)
+    ?? {
+        targetUSDT: target.value,
+        days: days.value,
+        deadlineMs: Date.now() + days.value * ONE_DAY_MS,
+        idempotencyKey: `goal-save-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`,
+      };
+  retryableSaveIntents.set(intentKey, intent);
+  savePending.value = true;
   try {
-    await goalsStore.setGoal({ targetUSDT: target.value, deadlineMs: Date.now() + days.value * ONE_DAY_MS });
+    const outcome = await goalsStore.setGoal(intent);
+    if (!isCurrentSave() || outcome === "stale") return;
     toast.success(fmt(t.value.goals.savedToast, { amount: target.value, days: days.value }));
+    retryableSaveIntents.delete(intentKey);
     target.value = 1000;
     days.value = 90;
   } catch (error) {
+    if (!isCurrentSave()) return;
     toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);
+  } finally {
+    if (isCurrentSave()) savePending.value = false;
   }
 }
 
@@ -354,6 +390,7 @@ const saveBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-warning)",
 };
+const saveBtnPendingStyle: CSSProperties = { opacity: 0.65 };
 const saveLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",

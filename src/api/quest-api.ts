@@ -45,7 +45,7 @@ export interface QuestClaimResult {
 }
 
 export interface QuestApi {
-  state(): Promise<QuestSnapshot>;
+  state(locale?: string): Promise<QuestSnapshot>;
   claim(questCode: string, idempotencyKey: string): Promise<QuestClaimResult>;
 }
 
@@ -171,9 +171,9 @@ function required(value: string, error: string): string {
 
 export function createQuestApi(client: ApiClient, mode: ApiEnvironment = "prod"): QuestApi {
   return {
-    state: async () => parseQuestSnapshot(await client.request({
+    state: async (locale = "en") => parseQuestSnapshot(await client.request({
       method: "GET",
-      path: "/api/quests/state",
+      path: `/api/quests/state?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
     }), mode),
     claim: async (questCode, idempotencyKey) => parseQuestClaim(await client.request({
       method: "POST",

@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { useLocaleStore } from "./locale";
 
 /**
  * Quest store — ported from Nexion-prototype/lib/store/quest.ts + lib/mock/quest.ts
@@ -128,7 +129,7 @@ export const useQuest = defineStore("quest", () => {
     // Account changes explicitly discard it in bindAccount() below.
     if (!hasRemoteSnapshot) remoteStatus.value = "loading";
     try {
-      const snapshot = await questApi.state();
+      const snapshot = await questApi.state(useLocaleStore().code);
       if (!isCurrentRequest()) return false;
       const nextQuests = snapshot.quests.map((quest) => ({ ...quest }));
       const nextRewards: Record<string, number> = {};
@@ -159,6 +160,16 @@ export const useQuest = defineStore("quest", () => {
       return false;
     }
   }
+
+  watch(
+    () => useLocaleStore().code,
+    () => {
+      // The home carousel consumes this store directly. Refresh an already
+      // confirmed server catalogue so a deliberate language switch never
+      // leaves it showing a previous locale's authored task name.
+      if (remoteApiEnabled && hasRemoteSnapshot) void refreshRemote();
+    },
+  );
 
   async function claimRemote(id: QuestTaskId): Promise<boolean> {
     if (!remoteApiEnabled) return false;

@@ -89,6 +89,7 @@
                 <text v-if="r.peerBonus > 0" :style="chipStyle('default')">{{ t.rank.chips.peer }} {{ Math.round(r.peerBonus * 100) }}%</text>
                 <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">{{ t.rank.chips.pool }} {{ r.leadershipVotes }} {{ t.rank.chips.votes }}</text>
                 <text v-if="r.cultivationBonus > 0" :style="chipStyle('lemon')">🎁 {{ r.cultivationBonus.toLocaleString() }} NEX</text>
+                <text v-for="reward in nonNexRewards(r)" :key="`${r.v}-${reward.type}-${reward.voucherId ?? reward.skuId ?? reward.customLabel ?? reward.amount}`" :style="chipStyle('lemon')">🎁 {{ rewardText(reward) }}</text>
               </view>
             </view>
           </view>
@@ -109,7 +110,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
-import { useVRank, nextRankProgress, type VRank, type VRankDef } from "@/store/v-rank";
+import { useVRank, nextRankProgress, type VRank, type VRankDef, type VRankReward } from "@/store/v-rank";
 import { rankGapText, rankConditionsText, rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -126,7 +127,7 @@ const rankDefs = computed(() => vState.ladder);
 const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
   v: vState.myRank, title: "", cnTitle: "", conditions: {}, directBonus: 0,
-  unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+  unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [],
 });
 const prog = computed(() =>
   nextRankProgress({
@@ -156,6 +157,17 @@ const heroSubText = computed(() => {
 
 function rowStatus(v: VRank): "done" | "current" | "locked" {
   return v < vState.myRank ? "done" : v === vState.myRank ? "current" : "locked";
+}
+
+function nonNexRewards(rank: VRankDef): VRankReward[] {
+  return rank.rewards.filter((reward) => reward.type !== "NEX");
+}
+
+function rewardText(reward: VRankReward): string {
+  if (reward.type === "USDT") return `${reward.amount.toLocaleString()} USDT`;
+  if (reward.type === "VOUCHER") return reward.voucherId ?? "VOUCHER";
+  if (reward.type === "SKU") return reward.skuId ?? "SKU";
+  return reward.customLabel ?? "CUSTOM";
 }
 
 // 三语:词典里 rank.cond.* 五条早就有(此前是死键,这里原本拼英文)

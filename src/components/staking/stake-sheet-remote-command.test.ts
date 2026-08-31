@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import source from "./stake-sheet.vue?raw";
 import { RemoteIntentKeyRegistry, type RemoteIntentStorage } from "@/lib/g-remote-intent";
+import { normalizeCommandAmount } from "@/lib/command-amount";
 
 // Execute the component's actual remote submit branch without DOM or real funds.
 const leaseFunction = source.slice(source.indexOf("function intentLease("), source.indexOf("// Seed the amount"));
@@ -38,6 +39,7 @@ function harness(storage?: RemoteIntentStorage) {
     navTo: vi.fn(),
     fmt: vi.fn(),
     ApiError: class extends Error {},
+    normalizeCommandAmount,
   };
   const submit = new Function(...Object.keys(dependencies), compiled)(...Object.values(dependencies)) as () => Promise<void>;
   return { ...dependencies, submit, finishRisk, storage: persistent };

@@ -75,7 +75,7 @@
           <view aria-hidden :style="auroraStyle" />
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender :tier="product.tier" />
+            <ProductRender :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <!-- Folded-corner ribbon -->
             <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
               <text>{{ copy.badge }}</text>
@@ -96,7 +96,7 @@
 
             <!-- trust chips -->
             <view class="flex flex-wrap" style="margin-top: 14px; gap: 8px">
-              <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} {{ t.store.soldLabel }}</text>
+              <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} {{ t.store.liveProof.cumulativeSalesLabel }}</text>
               <text v-if="stockUnavailable" class="font-mono-tabular" :style="codeChip('amber')">{{ t.store.temporarilyOutOfStock }}</text>
               <text v-if="stockLow" class="font-mono-tabular" :style="codeChip('amber')">🔥 {{ product.stock }} {{ t.store.onlyXLeft }}</text>
             </view>
@@ -457,7 +457,8 @@ function openTrustUrl(raw: string) {
 }
 const faqs = computed(() => {
   const f = t.value.store.faq;
-  return [f.location, f.withdraw, f.demand, f.refund];
+  const datacenter = product.value?.datacenter;
+  return [{ ...f.location, a: datacenter && datacenter !== SPEC_UNAVAILABLE ? datacenter : t.value.store.specValueUnavailable }, f.withdraw, f.demand, f.refund];
 });
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──

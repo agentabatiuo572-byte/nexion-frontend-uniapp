@@ -19,6 +19,8 @@ export interface Goal {
 }
 
 export type GoalsLoadStatus = "idle" | "loading" | "ready" | "error";
+export type GoalSaveOutcome = "saved" | "stale";
+type GoalSaveInput = Pick<Goal, "targetUSDT" | "deadlineMs"> & { idempotencyKey: string };
 
 function hydrate(accountKey: string): Goal[] {
   if (remoteApiEnabled) return [];
@@ -31,6 +33,9 @@ export const useGoals = defineStore("goals", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
   let scopeEpoch = 0;
+  let recommendationEpoch = 0;
+  let pendingGoalSave: { scopeEpoch: number; promise: Promise<GoalSaveOutcome> } | null = null;
+  const accountEpoch = ref(0);
   const goals = ref<Goal[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const lifetimeEarningsUsdt = ref(0);
   const status = ref<GoalsLoadStatus>(remoteApiEnabled ? "idle" : "ready");
@@ -45,9 +50,13 @@ export const useGoals = defineStore("goals", () => {
 
   /** 账号切换重绑:装载该账号的目标(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
+    const nextBoundKey = normalizeAccountKey(rawAccountKey);
+    const accountChanged = nextBoundKey !== boundKey;
+    boundKey = nextBoundKey;
+    if (accountChanged) accountEpoch.value += 1;
     if (remoteApiEnabled) {
       scopeEpoch += 1;
+      recommendationEpoch += 1;
       goals.value = [];
       lifetimeEarningsUsdt.value = 0;
       recommendation.value = null;
@@ -81,36 +90,53 @@ export const useGoals = defineStore("goals", () => {
 
   async function refreshRecommendation(targetUSDT: number, deadlineMs: number) {
     if (!remoteApiEnabled) return;
-    const expectedEpoch = scopeEpoch;
+    const expectedScopeEpoch = scopeEpoch;
+    const expectedRecommendationEpoch = ++recommendationEpoch;
     recommendationStatus.value = "loading";
     try {
-      recommendation.value = await goalsApi.recommendation(targetUSDT, deadlineMs);
-      if (expectedEpoch !== scopeEpoch) return;
+      const nextRecommendation = await goalsApi.recommendation(targetUSDT, deadlineMs);
+      if (expectedScopeEpoch !== scopeEpoch || expectedRecommendationEpoch !== recommendationEpoch) return;
+      recommendation.value = nextRecommendation;
       recommendationStatus.value = "ready";
     } catch {
-      if (expectedEpoch !== scopeEpoch) return;
+      if (expectedScopeEpoch !== scopeEpoch || expectedRecommendationEpoch !== recommendationEpoch) return;
       recommendation.value = null;
       recommendationStatus.value = "error";
     }
   }
 
-  async function setGoal(g: Pick<Goal, "targetUSDT" | "deadlineMs">) {
+  async function setGoal(g: GoalSaveInput): Promise<GoalSaveOutcome> {
     if (remoteApiEnabled) {
       const expectedEpoch = scopeEpoch;
-      const goal = await goalsApi.create({ targetUsdt: g.targetUSDT, deadlineAt: g.deadlineMs });
-      if (expectedEpoch !== scopeEpoch) return;
-      goals.value = [...goals.value, {
-        id: String(goal.id), targetUSDT: goal.targetUsdt, deadlineMs: goal.deadlineAt,
-        createdAt: goal.createdAt, achieved: goal.achieved,
-      }];
-      lifetimeEarningsUsdt.value = goal.lifetimeEarningsUsdt;
-      return;
+      if (pendingGoalSave?.scopeEpoch === expectedEpoch) return pendingGoalSave.promise;
+      const promise = (async () => {
+        const goal = await goalsApi.create({
+          targetUsdt: g.targetUSDT,
+          deadlineAt: g.deadlineMs,
+          idempotencyKey: g.idempotencyKey,
+        });
+        if (expectedEpoch !== scopeEpoch) return "stale";
+        goals.value = [...goals.value, {
+          id: String(goal.id), targetUSDT: goal.targetUsdt, deadlineMs: goal.deadlineAt,
+          createdAt: goal.createdAt, achieved: goal.achieved,
+        }];
+        lifetimeEarningsUsdt.value = goal.lifetimeEarningsUsdt;
+        return "saved";
+      })();
+      const pending = { scopeEpoch: expectedEpoch, promise };
+      pendingGoalSave = pending;
+      try {
+        return await promise;
+      } finally {
+        if (pendingGoalSave === pending) pendingGoalSave = null;
+      }
     }
     goals.value = [
       ...goals.value,
-      { ...g, id: `goal-${Date.now()}`, createdAt: Date.now(), achieved: false },
+      { targetUSDT: g.targetUSDT, deadlineMs: g.deadlineMs, id: `goal-${Date.now()}`, createdAt: Date.now(), achieved: false },
     ];
     persist();
+    return "saved";
   }
 
   async function markAchieved(id: string) {
@@ -145,7 +171,7 @@ export const useGoals = defineStore("goals", () => {
   }
 
   return {
-    goals, lifetimeEarningsUsdt, status, error, recommendation, recommendationStatus,
+    goals, lifetimeEarningsUsdt, status, error, recommendation, recommendationStatus, accountEpoch,
     refresh, refreshRecommendation, setGoal, markAchieved, remove, clear, bindAccount,
   };
 });

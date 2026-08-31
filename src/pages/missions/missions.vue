@@ -146,7 +146,7 @@ async function refreshRemoteEvents(): Promise<void> {
   if (!remoteApiEnabled) return;
   const scope = remoteRequestFence.capture();
   try {
-    const snapshot = await eventsApi.state();
+    const snapshot = await eventsApi.state(language.value);
     if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = snapshot.events;
       remoteEventsError.value = false;

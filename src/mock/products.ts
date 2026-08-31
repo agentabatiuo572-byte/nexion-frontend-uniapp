@@ -59,6 +59,10 @@ export interface Product {
   monthlyPrice?: number;
   installMonths?: number;
   sold: number;
+  /** Short-lived server-issued URL for the SKU's approved main image. */
+  imageUrl?: string;
+  /** Short-lived server-issued URL for an approved SKU detail video. */
+  videoUrl?: string;
   /** 服务端商品形态；SHARE 是可交付的数字份额，不占实物设备库存。 */
   productType?: "DEVICE" | "SHARE";
   /** FINITE 扣减实际库存；UNLIMITED 成交只累计销量。 */

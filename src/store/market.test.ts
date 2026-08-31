@@ -22,8 +22,9 @@ const nexSnapshot = {
   currentPrice: 0.125,
   costBasis: 0.085,
   sparkline: [0.1, 0.11, 0.12, 0.13, 0.12, 0.124, 0.125],
-  history24h: [],
-  source: "G3 weekly_curve + nx_price_index 24h history",
+  history: [],
+  historyMaxDays: 365,
+  source: "G3 weekly_curve + nx_price_index sampled history",
   sourceEnvironment: "PRODUCTION" as const,
   runId: "",
 };
@@ -52,7 +53,7 @@ describe("NEX market refresh concurrency", () => {
   it("uses the seven-day PC curve until at least two real 24h samples exist", async () => {
     fetchNex.mockResolvedValue({
       ...nexSnapshot,
-      history24h: [{ price: 0.125, sampledAt: "2026-08-20 12:08:11" }],
+      history: [{ price: 0.125, sampledAt: "2026-08-20 12:08:11" }],
     });
     const market = useMarket();
 
@@ -61,6 +62,17 @@ describe("NEX market refresh concurrency", () => {
     expect(market.remoteReady).toBe(true);
     expect(market.klineHourly).toEqual(nexSnapshot.sparkline);
     expect(market.open24h).toBe(nexSnapshot.sparkline[0]);
+  });
+
+  it("does not refetch the complete market history on each three-second wallet tick", async () => {
+    fetchNex.mockResolvedValue(nexSnapshot);
+    const market = useMarket();
+
+    await market.syncRemote();
+    await market.tickPrice();
+    await market.tickPrice();
+
+    expect(fetchNex).toHaveBeenCalledTimes(1);
   });
 
   it("keeps one canonical request in flight without a sandbox-run reset", async () => {

@@ -51,7 +51,7 @@
             <NexChart :data="nexChartData" :up="nexUp" />
           </view>
           <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
-            <text class="active:opacity-70" :style="marketHoldBodyStyle" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : t.home.networkStatUpdating }}</text>
+            <text class="active:opacity-70" :style="marketHoldBodyStyle" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
@@ -97,12 +97,14 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import NexChart from "@/components/market/nex-chart.vue";
 import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
+import { selectMarketHistoryWindow, type MarketTimeframe } from "@/lib/market-history-window";
+import { fmt } from "@/i18n/format";
 
 const t = useT();
 const market = useMarket();
 
-type Timeframe = "1H" | "24H" | "7D" | "1M" | "ALL";
-const TIMEFRAMES: Timeframe[] = ["1H", "24H", "7D", "1M", "ALL"];
+type Timeframe = MarketTimeframe;
+const TIMEFRAMES: Timeframe[] = ["1H", "24H", "7D", "1M", "1Y"];
 const nex = computed(() => ({
   rank: market.isMockMode ? 247 : "—",
   priceUSD: market.nexPriceUSDT,
@@ -125,9 +127,11 @@ function retryMarkets() {
   void market.syncRemote();
 }
 
-const nexChartData = computed(() =>
-  tf.value === "1M" || tf.value === "ALL" ? nex.value.spark30d : nex.value.spark24h,
-);
+const nexChartData = computed(() => {
+  if (market.isMockMode) return tf.value === "1M" || tf.value === "1Y" ? nex.value.spark30d : nex.value.spark24h;
+  return selectMarketHistoryWindow(market.historySamples, tf.value).map((sample) => sample.price);
+});
+const historyUnavailableText = computed(() => fmt(t.value.marketPage.nexHero.historyUnavailable, { range: tf.value }));
 const nexUp = computed(() => nex.value.change24h >= 0);
 const nexDirection = computed(() => nex.value.change24h > 0 ? "▲" : nex.value.change24h < 0 ? "▼" : "•");
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);

@@ -71,19 +71,21 @@
           </view>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
           <view v-if="remoteApiEnabled && latestRequest" class="rounded-xl" :style="requestStatusStyle">
-            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ latestRequest.requestNo }} · {{ latestRequest.status }}</text>
+            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ latestRequest.requestNo }} · {{ latestRequestStatusLabel }}</text>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ new Date(latestRequest.submittedAt).toLocaleString(dateLocale()) }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ latestRequestStatusDetail }}</text>
+            <text v-if="requestReviewReason" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ developerCopy[requestReviewReason] }}</text>
           </view>
           <view v-if="remoteApiEnabled && latestLoadFailed" class="rounded-xl" :style="requestStatusStyle">
             <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
             <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
           </view>
-          <view class="space-y-2">
+          <view v-if="canSubmitAccessRequest" class="space-y-2">
             <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph" />
           </view>
-          <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
+          <view v-if="canSubmitAccessRequest" class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ submitting ? "…" : t.developer.formSubmit }}</text>
           </view>
@@ -185,6 +187,7 @@ import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperKeyName, validateDeveloperWebhook } from "./developer-form-validation";
+import { developerAccessReviewReasonKey, developerAccessState, type DeveloperAccessCopyKey } from "./developer-access-state";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -228,6 +231,12 @@ const rotationJournal = createDeveloperRotationJournal(
   developerRotationUniStorage,
   () => `${expectedApiEnvironment.toUpperCase()}:${String(app.accountKey)}`,
 );
+const requestState = computed(() => developerAccessState(latestRequest.value));
+const requestReviewReason = computed(() => developerAccessReviewReasonKey(latestRequest.value));
+const canSubmitAccessRequest = computed(() => requestState.value?.canReapply ?? true);
+const developerCopy = computed(() => t.value.developer as unknown as Record<DeveloperAccessCopyKey, string>);
+const latestRequestStatusLabel = computed(() => requestState.value ? developerCopy.value[requestState.value.label] : "");
+const latestRequestStatusDetail = computed(() => requestState.value ? developerCopy.value[requestState.value.detail] : "");
 
 const tabOptions = computed(() => [
   { value: "overview" as Tab, label: t.value.developer.apiOverviewTab },
@@ -402,16 +411,17 @@ async function reconcileResourceFailure<T>(
 }
 async function submitRequest() {
   if (submitting.value) return;
+  if (!canSubmitAccessRequest.value) {
+    const state = requestState.value;
+    if (state) toast.info(developerCopy.value[state.detail]);
+    return;
+  }
   const issue = validateDeveloperAccess({ company: company.value, email: email.value, useCase: useCase.value });
   if (issue) return toast.warn(t.value.developer[issue]);
   if (remoteApiEnabled) {
     const accountKey = String(app.accountKey);
     const accountScope = captureAccountScope();
     const runScope = captureRuntimeRevision();
-    if (latestRequest.value?.status === "PENDING") {
-      toast.info(t.value.developer.pendingExists);
-      return;
-    }
     const generation = ++requestGeneration;
     const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
       && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);

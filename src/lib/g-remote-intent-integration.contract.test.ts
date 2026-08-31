@@ -9,7 +9,12 @@ describe("staking durable remote intent integration", () => {
   });
 
   it("freezes the amount and account before the asynchronous risk gate", () => {
-    expect(stakeSheetSource).toContain("const submittedAmount = amount.value");
+    const frozenAmount = "const submittedAmount = normalizeCommandAmount(amount.value);";
+    const freezeAt = stakeSheetSource.indexOf(frozenAmount);
+    const riskGateAt = stakeSheetSource.indexOf('await risk.checkGate("staking", lease.key);');
+
+    expect(freezeAt).toBeGreaterThan(0);
+    expect(riskGateAt).toBeGreaterThan(freezeAt);
     expect(stakeSheetSource).toContain("const expectedBindingEpoch = app.accountBindingEpoch");
     expect(stakeSheetSource).toContain("expectedAccountKey !== app.accountKey");
     expect(stakeSheetSource).toContain("expectedBindingEpoch !== app.accountBindingEpoch");

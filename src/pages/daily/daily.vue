@@ -51,7 +51,7 @@
         </view>
 
         <!-- Lucky multiplier hint -->
-        <text class="text-center" :style="luckyHintStyle">{{ t.daily.luckyHint }}</text>
+        <text class="text-center" :style="luckyHintStyle">{{ luckyHint }}</text>
 
         <!-- Milestone rewards -->
         <view :style="milestoneCardStyle">
@@ -200,6 +200,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
+import { dailyLuckyHint, dailyMilestoneRewardText } from "./daily-reward-view";
 
 const ONE_DAY_MS = 86400 * 1000;
 
@@ -239,6 +240,7 @@ const t = useT();
 const faucet = useNexFaucet();
 const app = useApp();
 const luckySpin = useLuckySpin();
+const luckyHint = computed(() => dailyLuckyHint(faucet.remoteRules, t.value.daily.luckyHint));
 const leaderRows = computed(() => remoteApiEnabled ? faucet.topStreakers : MOCK_TOP_STREAKERS);
 const milestones = computed<Milestone[]>(() => remoteApiEnabled
   ? faucet.remoteMilestones.map((m) => ({
@@ -246,7 +248,7 @@ const milestones = computed<Milestone[]>(() => remoteApiEnabled
       rewardKey: "reward3",
       labelKey: "day3",
       labelText: `Day-${m.milestoneDay}`,
-      rewardText: `${m.rewardType} ${m.rewardAmount}`,
+      rewardText: dailyMilestoneRewardText(m),
       status: m.status,
       reward: { type: (m.rewardType.toLowerCase() === "usdt" ? "usdt" : m.rewardType.toLowerCase() === "spin" ? "spin" : m.rewardType.toLowerCase() === "badge" ? "badge" : "nex") as Milestone["reward"]["type"], amount: m.rewardAmount },
       tint: "var(--v5-nex)", iconPath: "m12 3v18M3 12h18",

@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createBundleOrderApi } from "./bundle-order-api";
 import { advanceRuntimeRevision } from "./order-api";
 
 describe("bundle order API", () => {
+  afterEach(() => advanceRuntimeRevision(null));
+
   it("creates one server-priced bundle", async () => {
     const request = vi.fn().mockResolvedValue({
       orderNo: "BND-1", orderType: "BUNDLE", itemCount: 2,
@@ -30,7 +32,7 @@ describe("bundle order API", () => {
       .create(["a", "b"], "bundle-key")).rejects.toMatchObject({ message: "BUNDLE_ORDER_RESPONSE_INVALID" });
   });
 
-  it("accepts a run-scoped sandbox-server receipt", async () => {
+  it("rejects retired sandbox receipts even when their run matches", async () => {
     advanceRuntimeRevision("sandbox-run-20260815");
     const request = vi.fn().mockResolvedValue({
       orderNo: "BND-SBX-1", orderType: "BUNDLE", itemCount: 2,
@@ -41,7 +43,7 @@ describe("bundle order API", () => {
     });
     await expect(createBundleOrderApi({ request } as unknown as ApiClient)
       .create(["stellarbox-s1", "stellarbox-pro"], "sandbox-key"))
-      .resolves.toMatchObject({ orderNo: "BND-SBX-1", idSource: "sandbox-server" });
+      .rejects.toMatchObject({ kind: "protocol", message: "BUNDLE_ORDER_RESPONSE_INVALID" });
     advanceRuntimeRevision(null);
   });
 

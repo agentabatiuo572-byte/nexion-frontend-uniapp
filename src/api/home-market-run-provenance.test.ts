@@ -12,7 +12,8 @@ const snapshot = {
   currentPrice: 0.125,
   costBasis: 0.085,
   sparkline: [0.113, 0.117, 0.121, 0.125, 0.129, 0.126, 0.125],
-  history24h: [{ price: 0.125, sampledAt: "2026-08-19 13:33:00" }],
+  history: [{ price: 0.125, sampledAt: "2026-08-19 13:33:00" }],
+  historyMaxDays: 365,
 };
 
 describe("Home NEX market Run provenance", () => {
@@ -21,11 +22,11 @@ describe("Home NEX market Run provenance", () => {
   });
 
   it("validates backend DATETIME values without browser-dependent parsing", () => {
-    const canonical = { ...snapshot, source: "G3 weekly_curve + nx_price_index 24h history", sourceEnvironment: "PRODUCTION", runId: "" };
-    expect(parseNexMarketSnapshot(canonical, "dev").history24h[0]?.sampledAt).toBe("2026-08-19 13:33:00");
+    const canonical = { ...snapshot, source: "G3 weekly_curve + nx_price_index sampled history", sourceEnvironment: "PRODUCTION", runId: "" };
+    expect(parseNexMarketSnapshot(canonical, "dev").history[0]?.sampledAt).toBe("2026-08-19 13:33:00");
     expect(() => parseNexMarketSnapshot({
       ...canonical,
-      history24h: [{ price: 0.125, sampledAt: "2026-02-31 13:33:00" }],
+      history: [{ price: 0.125, sampledAt: "2026-02-31 13:33:00" }],
     }, "dev")).toThrow("NEX_MARKET_RESPONSE_INVALID");
   });
 });

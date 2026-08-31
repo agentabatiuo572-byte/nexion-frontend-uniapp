@@ -20,6 +20,8 @@ function response(overrides: Record<string, unknown> = {}) {
     ],
     history: [],
     nextPayoutAt: "2026-08-24T00:00:00Z",
+    unlockRank: 3,
+    injectRate: 0.05,
     ...overrides,
   };
 }

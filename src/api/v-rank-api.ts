@@ -22,8 +22,27 @@ export interface CanonicalVRankRow {
   peerBonus: number;
   leadershipVotes: number;
   cultivationBonus: number;
+  rewards: CanonicalVRankReward[];
   visible: boolean;
 }
+
+export interface MonetaryVRankReward {
+  type: "USDT" | "NEX";
+  amount: number;
+  voucherId?: string;
+  skuId?: string;
+  customLabel?: string;
+}
+
+export interface EntitlementVRankReward {
+  type: "VOUCHER" | "SKU" | "CUSTOM";
+  amount?: number;
+  voucherId?: string;
+  skuId?: string;
+  customLabel?: string;
+}
+
+export type CanonicalVRankReward = MonetaryVRankReward | EntitlementVRankReward;
 
 export interface CanonicalVRankLadder {
   source: string;
@@ -83,6 +102,24 @@ function integer(value: unknown, minimum = 0): number {
   return parsed;
 }
 
+function optionalText(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  return text(value);
+}
+
+function reward(value: unknown): CanonicalVRankReward {
+  const source = record(value);
+  const type = text(source.type).toUpperCase();
+  if (type !== "USDT" && type !== "NEX" && type !== "VOUCHER" && type !== "SKU" && type !== "CUSTOM") return invalid();
+  if (type === "USDT" || type === "NEX") {
+    return { type, amount: number(source.amount), voucherId: optionalText(source.voucherId),
+      skuId: optionalText(source.skuId), customLabel: optionalText(source.customLabel) };
+  }
+  const amount = optionalNumber(source.amount);
+  return { type, ...(amount === undefined ? {} : { amount }), voucherId: optionalText(source.voucherId),
+    skuId: optionalText(source.skuId), customLabel: optionalText(source.customLabel) };
+}
+
 function rankRow(value: unknown): CanonicalVRankRow {
   const source = record(value);
   const v = integer(source.v);
@@ -90,6 +127,7 @@ function rankRow(value: unknown): CanonicalVRankRow {
   const requiredRank = source.requiredDownlineRank == null || source.requiredDownlineRank === ""
     ? undefined
     : integer(String(source.requiredDownlineRank).replace(/^V/i, ""));
+  if (!Array.isArray(source.rewards)) return invalid();
   return {
     v,
     title: text(source.title),
@@ -104,6 +142,7 @@ function rankRow(value: unknown): CanonicalVRankRow {
     peerBonus: number(source.peerBonus),
     leadershipVotes: integer(source.leadershipVotes),
     cultivationBonus: number(source.cultivationBonus),
+    rewards: source.rewards.map(reward),
     visible: source.visible,
   };
 }
