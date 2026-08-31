@@ -286,9 +286,13 @@ const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
   conv.value?.type === "advisor" || conv.value?.type === "support" ? conv.value.type : startType.value,
 );
 
-// Timed-out support session → thread is read-only history with a restart CTA.
+// The App only permits replies to the same states accepted by AppSupportService.
+// A transferred thread is history: a restart creates a new user-owned conversation.
+const replyAllowedStatuses = new Set(["open", "resolved"]);
+const isReplyAllowed = computed(() => !conv.value || replyAllowedStatuses.has(conv.value.status));
+const isTransferredSession = computed(() => !isAi.value && conv.value?.status === "transferred");
 const isClosedSession = computed(() =>
-  isAi.value ? novaProviderHold.value : conv.value?.sessionStatus === "closed",
+  isAi.value ? novaProviderHold.value : !!conv.value && !isReplyAllowed.value,
 );
 
 const headerName = computed(() => {
@@ -322,6 +326,7 @@ const headerRole = computed(() => {
   if (isAi.value) return t.value.conversations.roleAi;
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
+  if (isTransferredSession.value) return t.value.conversations.sessionTransferred;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
   return t.value.conversations[conv.value.roleKey];
 });
@@ -646,6 +651,11 @@ async function onSend(text: string, restore?: () => void) {
       restore?.();
       toast.error(t.value.conversations.convertTicketFailed, "");
     }
+    return;
+  }
+  if (!isReplyAllowed.value) {
+    restore?.();
+    toast.info(isTransferredSession.value ? t.value.conversations.sessionTransferred : t.value.conversations.sessionEnded, "");
     return;
   }
   try { await convStore.sendUser(id, text); } catch { restore?.(); toast.error(t.value.conversations.convertTicketFailed, ""); }

@@ -77,3 +77,11 @@ export interface SupportFaq {
   version: number;
   updatedAt: number;
 }
+
+/** A configured M4 service target. It is deliberately separate from historical response statistics. */
+export interface SupportSlaTarget {
+  category: TicketCategory;
+  firstResponseMins: number;
+  resolutionHours: number;
+  statisticsAvailable: boolean;
+}

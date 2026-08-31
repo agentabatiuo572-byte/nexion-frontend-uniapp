@@ -59,7 +59,7 @@
           <view class="flex items-baseline" style="gap: 8px; margin-top: 8px">
             <text class="shrink-0" :style="dollarStyle">$</text>
             <input
-              :value="String(amount)"
+              :value="formatCommandAmount(amount)"
               type="digit"
               :disabled="confirming || repurchase.submitting"
               :style="amountInputStyle"
@@ -83,7 +83,7 @@
         <view :style="cardStyle">
           <text class="block" :style="monoLabelStyle">{{ w.after90 }}</text>
           <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
-            <Row :label="w.principal" :value="`$${amount.toFixed(2)}`" />
+            <Row :label="w.principal" :value="`$${formatCommandAmount(amount)}`" />
             <Row :label="w.interest" :value="projectedYield === null ? '—' : `+$${projectedYield.toFixed(2)}`" tint="var(--v5-brand)" />
             <view :style="dividerStyle" />
             <Row :label="w.unlockable" :value="projectedYield === null ? '—' : `$${(amount + projectedYield).toFixed(2)}`" bold />
@@ -119,6 +119,7 @@ import { apiRuntimeConfig } from "@/api/runtime";
 import { useRepurchase } from "@/store/repurchase";
 import { resolveRepurchaseRuntimePolicy } from "@/lib/repurchase-runtime-policy";
 import { navTo } from "@/lib/route";
+import { formatCommandAmount, normalizeCommandAmount } from "@/lib/command-amount";
 
 const PRESETS = [100, 200, 500, 1000];
 
@@ -160,7 +161,7 @@ const canSubmit = computed(() => {
   return amount.value > 0 && amount.value <= user.value.usdtBalance;
 });
 
-const ctaLabel = computed(() => fmt(w.value.cta, { amount: amount.value.toFixed(2) }));
+const ctaLabel = computed(() => fmt(w.value.cta, { amount: formatCommandAmount(amount.value) }));
 const unavailableTitle = computed(() => w.value.unavailableTitle);
 const unavailableBody = computed(() => w.value.unavailableBody);
 const retryLabel = computed(() => w.value.retry);
@@ -212,7 +213,7 @@ function detailVal(e: Event): string {
 function onAmount(e: Event) {
   if (confirming.value || repurchase.submitting) return;
   amountTouched.value = true;
-  amount.value = Math.max(0, parseFloat(detailVal(e)) || 0);
+  amount.value = normalizeCommandAmount(detailVal(e));
 }
 
 function selectPreset(preset: number) {
@@ -234,14 +235,14 @@ async function handleRepurchase() {
   if (isRemote.value) {
     if (!remoteReady.value || !canSubmit.value || !isMounted.value) return;
     confirming.value = true;
-    const quoteAmount = amount.value;
+    const quoteAmount = normalizeCommandAmount(amount.value);
     let confirmed = false;
     try {
       const config = repurchase.config;
       confirmed = await uiConfirm({
         title: w.value.confirmTitle,
         message: fmt(w.value.confirmMessage, {
-          amount: quoteAmount.toFixed(2),
+          amount: formatCommandAmount(quoteAmount),
           days: config?.lockDays ?? 0,
           penalty: config?.earlyPenaltyPct ?? 0,
         }),

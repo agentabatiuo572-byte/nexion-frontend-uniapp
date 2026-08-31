@@ -22,7 +22,7 @@ beforeEach(() => {
   };
 });
 
-test("sandbox credential stays available without interrupting the user", async () => {
+test("retired sandbox receipts never expose a credential or interrupt the user", async () => {
   const closed = vi.fn();
   const opened = vi.fn();
   const unsubscribeOpened = onAcceptanceObservationModalOpened(opened);
@@ -51,7 +51,7 @@ test("sandbox credential stays available without interrupting the user", async (
   tracker.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
   await tracker.flush();
 
-  expect(getAcceptanceObservationCredential()).toBe(`h5.20260818.${token}`);
+  expect(getAcceptanceObservationCredential()).toBe("");
   expect(uni.setClipboardData).not.toHaveBeenCalled();
   expect(uni.showModal).not.toHaveBeenCalled();
   expect(opened).not.toHaveBeenCalled();

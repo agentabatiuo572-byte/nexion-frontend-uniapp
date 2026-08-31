@@ -835,6 +835,8 @@ export const en = {
   },
 
   preferences: {
+    unavailable: "Preferences could not be loaded. Please try again later.",
+    updateFailed: "Preferences were not saved. Please try again.",
     navTitle: "Preferences",
     feedbackHeading: "Feedback",
     soundLabel: "UI sound effects",
@@ -956,7 +958,7 @@ export const en = {
       networkMap: { label: "Network visualization", sub: "Direct / Extended orbits" },
       wallet: { label: "Wallet", sub: "Balance + withdraw + topup" },
       withdraw: { label: "Withdraw", sub: "Cash out USDT to chain" },
-      staking: { label: "Staking Vault", sub: "4 lock tiers up to 180%" },
+      staking: { label: "Staking Vault", sub: "View current lock terms and rates" },
       genesis: { label: "Genesis marketplace", sub: "Secondary Genesis trading" },
       goals: { label: "Goals", sub: "Set earnings target + recommended path" },
       risk: { label: "Risk disclosure", sub: "Required reading" },
@@ -1195,6 +1197,9 @@ export const en = {
   },
 
   tickets: {
+    slaStatisticsUnavailable: "No response statistics are available yet.",
+    slaTargetLabel: "Service target",
+    slaTargetValue: "First-response target {firstResponseMins} min; resolution target {resolutionHours} h.",
     pageTitle: "Support Tickets",
     subtitle: "Track conversations with our support team",
     statsOpen: "Open",
@@ -1243,7 +1248,7 @@ export const en = {
       descPlaceholder: "Include any error codes, tx hashes, screenshots links, or device IDs.",
       submit: "Submit ticket",
       cancel: "Cancel",
-      submittedToast: "Ticket created · we'll respond within 12 min",
+      submittedToast: "Ticket created. Track its progress in the ticket details.",
       missingFields: "Please fill subject and description",
     },
     detail: {
@@ -1303,6 +1308,7 @@ export const en = {
   },
 
   events: {
+    wheelPool: "Wheel prize pool",
     pageTitle: "Events",
     subtitle: "Promotions · contests · seasonal drops",
     heroLabel: "FEATURED",
@@ -1361,6 +1367,7 @@ export const en = {
       buy: "Buy NEX",
       sell: "Sell NEX",
       chartTitle: "Price",
+      historyUnavailable: "Not enough price history for {range}",
     },
     stats: {
       marketCap: "Market Cap",
@@ -1978,6 +1985,7 @@ export const en = {
     firstOrderAchievement: "Achievement unlocked · First Hardware Owner · +50 NEX",
     // Sprint A-1 / B.1: LiveSocialProof
     liveProof: {
+      cumulativeSalesLabel: "total sold",
       label: "Activity right now",
       viewingLabel: "viewing",
       sold24hLabel: "sold · 24h",
@@ -2437,6 +2445,8 @@ export const en = {
     kickedCta: "Sign in again",
   },
   me: {
+    supportHubRow: "Support",
+    supportHubMeta: "View support options and tickets",
     accountTitle: "Account",
     activeContributor: "Active Contributor",
     referralCode: "Referral code:",
@@ -2742,6 +2752,9 @@ export const en = {
     },
   },
   language: {
+    preferenceSyncing: "Syncing your account language…",
+    preferenceSyncFailed: "Language changed on this device but has not synced to your account. Please retry.",
+    preferenceSyncRetry: "Retry sync",
     pageTitle: "Language",
     intro:
       "Choose your preferred language. Translation coverage rolls out per priority tier — layout & RTL preview available for every option.",
@@ -2809,6 +2822,11 @@ export const en = {
     },
   },
   security: {
+    currentPasswordInvalid: "The current password is incorrect. Please try again.",
+    securityVerificationRateLimited: "Too many security checks. Please try again later.",
+    accountDeletionVersionConflict: "Your account status has changed. Refresh and check the deletion requirements again.",
+    accountDeletionUnavailable: "The deletion request could not be processed. Please try again later.",
+    sessionUnavailable: "Your session has expired. Please sign in again.",
     title: "Security",
     back: "Back",
     passwordTitle: "Password",
@@ -2895,7 +2913,7 @@ export const en = {
     remoteFailed: "Nova could not answer from the server. No account action was performed.",
     remoteError: "Server error: {code} · language: {language}",
     contactSupport: "Contact support",
-    contactHint: "Average response time · 24h via email",
+    contactHint: "View service targets on the tickets page. Actual response times may vary.",
     contactCta: "Open ticket",
     contactComingSoon: "Need help? Chat with support — the ticket system is opening soon.",
     emptyResults: "No articles match \"{q}\". Try a broader keyword.",
@@ -2907,20 +2925,20 @@ export const en = {
     onlineNow: "Online now",
     avgResponse: "Avg. response {n}m",
     chTelegram: "Telegram",
-    chTelegramHint: "@nexgrid_official · 24/7 community",
+    chTelegramHint: "@nexgrid_official · Official community",
     chDiscord: "Discord",
     chDiscordHint: "discord.gg/nexgrid · #ask-an-engineer",
     chTicket: "Open a ticket",
     chTicketHint: "For account / payout escalations",
     chEmail: "Email",
-    chEmailHint: "support@nexgrid.ai · within 24h",
+    chEmailHint: "support@nexgrid.ai · Email support",
     pinnedTitle: "Pinned by support",
     pinnedItem1:
-      "Withdrawals processed Mon-Fri 09:00-21:00 UTC. Weekend queue clears Monday.",
+      "Track progress and replies in the ticket details. Service targets depend on the ticket category.",
     pinnedItem2:
-      "Set your withdrawal address in the wallet before withdrawing (SMS confirmation). One-time setup per network.",
+      "Check the address and network in your wallet before withdrawing, then complete the security checks shown on the page.",
     pinnedItem3:
-      "Devices that go offline for 24h reset their compounding streak — keep them charging.",
+      "Check your device details for its current status and earnings records.",
     pinnedItem4:
       "Beware of fake NexGrid DMs — official accounts never DM you first.",
     openChannel: "Open",
@@ -2928,6 +2946,7 @@ export const en = {
     chLiveChatHint: "Chat with your advisor & support team",
   },
   conversations: {
+    sessionTransferred: "This conversation was transferred and can no longer receive replies. Start a new conversation.",
     title: "Messages",
     back: "Back",
     // Left type-rail short labels
@@ -2936,8 +2955,8 @@ export const en = {
     typeSupport: "Support",
     // Role subtitles (list row + chat header)
     roleAi: "AI compute advisor",
-    roleAdvisor: "Growth advisor · online",
-    roleSupport: "Customer support · online",
+    roleAdvisor: "Growth advisor",
+    roleSupport: "Customer support",
     online: "online",
     unassignedAgent: "Unassigned",
     // List empty states
@@ -3330,6 +3349,20 @@ export const en = {
     a_diamond_miner_d: "Cumulative earnings reach $1,000",
   },
   developer: {
+    requestStatusPending: "Under review",
+    requestStatusApproved: "Approved",
+    requestStatusRejected: "Not approved",
+    requestStatusRevoked: "Revoked",
+    requestStatusExpired: "Previous request expired",
+    requestStatusPendingDetail: "Your request is under review. Please do not submit it again.",
+    requestStatusApprovedDetail: "You already have access and do not need to reapply.",
+    requestStatusRejectedDetail: "This request was not approved. Update your information before applying again.",
+    requestStatusRevokedDetail: "Your access has been revoked. You may submit a new request.",
+    requestStatusExpiredDetail: "This request has been marked as an expired historical record. You may submit a new request.",
+    reviewReasonIdentityVerificationRequired: "Identity verification is required",
+    reviewReasonBusinessInformationInsufficient: "Business information is incomplete",
+    reviewReasonPolicyRequirementsNotMet: "Application requirements were not met",
+    reviewReasonAccessRevokedByPolicy: "Access revoked under policy requirements",
     resourceActionUnknown: "The result is not confirmed. Refresh the latest status before deciding whether to retry.",
     rotationUnknownWarning: "The previous rotation is unconfirmed; the old secret may no longer work. Secrets are returned only once. If you did not save it, confirm a new rotation and update your receiver.",
     rotateRecoveryConfirmBody: "The previous rotation is unconfirmed and its new secret cannot be retrieved. This starts a new rotation and invalidates the current secret. Save the returned secret and update your receiver.",
@@ -3670,6 +3703,8 @@ export const en = {
       label: "Compound calculator",
       principal: "Stake amount",
       singlePayout: "1 cycle payout",
+      singlePayoutDuration: "Single payout · {days} days",
+      compoundPayoutDuration: "{reinvestments} re-stakes · {days} days",
       compoundPayout: "{n}× re-stake (1 year)",
       disclaimer: "Compound assumes re-stake on each maturity at current APY. Real APY may vary cycle-to-cycle.",
       compoundSuffix: "from compounding · re-stake {n}× at maturity",
@@ -4432,7 +4467,10 @@ export const en = {
     loadError: "The leadership pool is unavailable. Check your connection and retry.",
     retry: "Reload",
     weekPool: "Week pool",
-    weeklyDesc: "5% of weekly platform volume · settles in {n}",
+    weeklyDesc: "{rate} of weekly platform volume · settles in {n}",
+    requiresUnlockRank: "Leadership pool unlocks at {rank}",
+    currentlyUnlockRank: "You're currently V{n} {title} · Reach {rank} to unlock the leadership pool",
+    seePathUnlockRank: "See path to {rank}",
     daysShort: "d",
     hoursShort: "h",
     unlocked: "Unlocked",
@@ -5469,7 +5507,7 @@ export const en = {
     devicesDesc: "Plug one in and it starts earning",
     devicesCta: "Browse devices",
     stakingTitle: "You have nothing staked",
-    stakingDesc: "Lock NEX and it earns while you sleep",
+    stakingDesc: "Lock USDT and it earns while you sleep",
     stakingCta: "Pick a plan",
     cardsTitle: "No cards saved",
     cardsDesc: "In local development, verify bind, default, and unbind; cards are not charged at checkout",

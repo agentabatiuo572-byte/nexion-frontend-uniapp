@@ -35,8 +35,8 @@ describe("V-rank remote authority state", () => {
   it("derives preview labels from the supplied canonical ladder", () => {
     const store = useVRank();
     const canonicalLadder: VRankDef[] = [
-    { v: 0, title: "Remote Base", cnTitle: "Remote Base CN", conditions: {}, directBonus: 0, unilevelDepth: 1, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0 },
-    { v: 1, title: "Remote Apex", cnTitle: "Remote Apex CN", conditions: { teamVolumeUSD: 100 }, directBonus: 0, unilevelDepth: 2, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0 },
+    { v: 0, title: "Remote Base", cnTitle: "Remote Base CN", conditions: {}, directBonus: 0, unilevelDepth: 1, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [] },
+    { v: 1, title: "Remote Apex", cnTitle: "Remote Apex CN", conditions: { teamVolumeUSD: 100 }, directBonus: 0, unilevelDepth: 2, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [] },
     ];
 
     const state: VRankData = {
@@ -64,7 +64,7 @@ describe("V-rank remote authority state", () => {
 
     resolveLadder({ source: "server", ranks: Array.from({ length: 13 }, (_, v) => ({
       v, title: `V${v}`, cnTitle: `V${v}`, directBonus: 0, unilevelDepth: 1,
-      peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, visible: true,
+      peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
     })) });
     resolveCurrent({ source: "server", rankCode: "V2", progress: {
       selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {},

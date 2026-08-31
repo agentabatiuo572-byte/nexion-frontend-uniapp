@@ -16,4 +16,24 @@ describe("developer access API", () => {
       submittedAt: "2026-08-13T00:00:00Z", source: "local", sourceEnvironment: "PRODUCTION", runId: "" });
     await expect(createDeveloperAccessApi({ request } as unknown as ApiClient).latest()).rejects.toMatchObject({ message: "DEVELOPER_ACCESS_RESPONSE_INVALID" });
   });
+
+  it.each(["REVOKED", "EXPIRED"] as const)("keeps %s as a server historical access state", async (status) => {
+    const request = vi.fn().mockResolvedValue({ requestNo: "DEV-1", idempotencyKey: "key-1", status,
+      submittedAt: "2026-08-13T00:00:00Z", source: "server", sourceEnvironment: "PRODUCTION", runId: "" });
+
+    await expect(createDeveloperAccessApi({ request } as unknown as ApiClient).latest())
+      .resolves.toMatchObject({ status });
+  });
+
+  it("accepts only controlled public review reasons", async () => {
+    const request = vi.fn().mockResolvedValue({ requestNo: "DEV-1", idempotencyKey: "key-1", status: "REVOKED",
+      reviewReason: "ACCESS_REVOKED_BY_POLICY", submittedAt: "2026-08-13T00:00:00Z", source: "server", sourceEnvironment: "PRODUCTION", runId: "" });
+    await expect(createDeveloperAccessApi({ request } as unknown as ApiClient).latest())
+      .resolves.toMatchObject({ reviewReason: "ACCESS_REVOKED_BY_POLICY" });
+
+    request.mockResolvedValueOnce({ requestNo: "DEV-1", idempotencyKey: "key-1", status: "REVOKED",
+      reviewReason: "operator free text", submittedAt: "2026-08-13T00:00:00Z", source: "server", sourceEnvironment: "PRODUCTION", runId: "" });
+    await expect(createDeveloperAccessApi({ request } as unknown as ApiClient).latest())
+      .rejects.toMatchObject({ message: "DEVELOPER_ACCESS_RESPONSE_INVALID" });
+  });
 });

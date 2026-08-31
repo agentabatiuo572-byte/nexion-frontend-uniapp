@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { remoteApiEnabled, repurchaseApi } from "@/api/runtime";
+import { normalizeCommandAmount } from "@/lib/command-amount";
 import type {
   RepurchaseConfig,
   RepurchaseOrder,
@@ -149,12 +150,13 @@ export const useRepurchase = defineStore("repurchase", () => {
     if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
     const policy = config.value;
     if (!policy || !policy.enabled) throw new Error("REPURCHASE_PRODUCT_UNAVAILABLE");
-    if (!Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsdt) {
+    const commandAmount = normalizeCommandAmount(amountUsdt);
+    if (!Number.isFinite(amountUsdt) || commandAmount < policy.minAmountUsdt) {
       throw new Error("REPURCHASE_MIN_AMOUNT_NOT_MET");
     }
-    if (amountUsdt > walletBalanceUsdt.value) throw new Error("REPURCHASE_WALLET_INSUFFICIENT");
-    return command(`open:${amountUsdt}`, (idempotencyKey) =>
-      repurchaseApi.open(amountUsdt, idempotencyKey));
+    if (commandAmount > walletBalanceUsdt.value) throw new Error("REPURCHASE_WALLET_INSUFFICIENT");
+    return command(`open:${commandAmount}`, (idempotencyKey) =>
+      repurchaseApi.open(commandAmount, idempotencyKey));
   }
 
   async function claim(orderNo: string) {

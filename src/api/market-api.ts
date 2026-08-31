@@ -7,7 +7,8 @@ export interface NexMarketSnapshot {
   currentPrice: number;
   costBasis: number;
   sparkline: number[];
-  history24h: Array<{ price: number; sampledAt: string }>;
+  history: Array<{ price: number; sampledAt: string; sampledAtEpochMs?: number }>;
+  historyMaxDays: number;
   source: string;
   sourceEnvironment: ServerSourceEnvironment;
   runId: string;
@@ -51,12 +52,22 @@ function sampledAt(value: unknown): string | null {
   return normalized;
 }
 
-function expectedSource(mode: ApiEnvironment, production: string): string {
-  return production;
+function epochMilliseconds(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function expectedSource(mode: ApiEnvironment, production: string): readonly string[] {
+  return [production, "G3 weekly_curve + nx_price_index 24h history"];
 }
 
 function provenance(data: Record<string, unknown>, mode: ApiEnvironment, productionSource: string): boolean {
-  if (data.serverCanonical !== true || data.source !== expectedSource(mode, productionSource)) return false;
+  if (data.serverCanonical !== true || !expectedSource(mode, productionSource).includes(String(data.source))) return false;
   return (mode === "prod" || mode === "dev")
     && data.sourceEnvironment === "PRODUCTION" && data.runId === "";
 }
@@ -65,26 +76,32 @@ export function parseNexMarketSnapshot(value: unknown, mode: ApiEnvironment = "p
   const data = row(value);
   const currentPrice = positive(data?.currentPrice);
   const costBasis = positive(data?.costBasis);
+  const historyMaxDays = positiveInteger(data?.historyMaxDays);
+  const historyPayload = Array.isArray(data?.history) ? data?.history : data?.history24h;
   if (!data || data.asset !== "NEX" || data.currency !== "USDT"
-      || !provenance(data, mode, "G3 weekly_curve + nx_price_index 24h history")
-      || currentPrice === null || costBasis === null
-      || !Array.isArray(data.sparkline) || !Array.isArray(data.history24h)) {
+      || !provenance(data, mode, "G3 weekly_curve + nx_price_index sampled history")
+      || currentPrice === null || costBasis === null || historyMaxDays === null
+      || !Array.isArray(data.sparkline) || !Array.isArray(historyPayload)) {
     return invalid();
   }
   const sparkline = data.sparkline.map(positive);
   if (sparkline.some((point) => point === null) || sparkline.length !== 7) return invalid();
-  const history24h = data.history24h.map((item) => {
+  const history = historyPayload.map((item) => {
     const point = row(item);
     const price = positive(point?.price);
     const at = sampledAt(point?.sampledAt);
     if (!point || price === null || !at) return invalid();
-    return { price, sampledAt: at };
+    if (point.sampledAtEpochMs === undefined) return { price, sampledAt: at };
+    const atEpochMs = epochMilliseconds(point.sampledAtEpochMs);
+    if (atEpochMs === null) return invalid();
+    return { price, sampledAt: at, sampledAtEpochMs: atEpochMs };
   });
   return {
     currentPrice,
     costBasis,
     sparkline: sparkline as number[],
-    history24h,
+    history,
+    historyMaxDays,
     source: data.source as string,
     sourceEnvironment: data.sourceEnvironment as ServerSourceEnvironment,
     runId: data.runId as string,

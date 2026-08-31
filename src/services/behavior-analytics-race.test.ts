@@ -44,7 +44,7 @@ beforeEach(() => {
   };
 });
 
-test("an A receipt resolving after logout and B login cannot overwrite B's credential", async () => {
+test("retired credentials stay unavailable across late receipts and account rotation", async () => {
   let resolveA: ((value: ReturnType<typeof receipt>) => void) | undefined;
   const a = tracker("account-A", () => new Promise((resolve) => { resolveA = resolve; }));
   a.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
@@ -55,9 +55,11 @@ test("an A receipt resolving after logout and B login cannot overwrite B's crede
   const b = tracker("account-B", async () => receipt("h5.20260812", tokenB));
   b.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
   await b.flush();
-  expect(getAcceptanceObservationCredential()).toBe(`h5.20260812.${tokenB}`);
+  expect(getAcceptanceObservationCredential()).toBe("");
 
   resolveA?.(receipt("h5.20260812", tokenA));
   await a.flush();
-  expect(getAcceptanceObservationCredential()).toBe(`h5.20260812.${tokenB}`);
+  expect(getAcceptanceObservationCredential()).toBe("");
+  expect(uni.setClipboardData).not.toHaveBeenCalled();
+  expect(uni.showModal).not.toHaveBeenCalled();
 });

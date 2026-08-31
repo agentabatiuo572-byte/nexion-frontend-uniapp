@@ -54,6 +54,10 @@ export const useLocaleStore = defineStore("locale", () => {
   const init = hydrate();
   const code = ref<LocaleCode>(init.code);
   const userSet = ref<boolean>(init.userSet);
+  // This changes only for a deliberate picker/onboarding selection. Server
+  // hydration and device detection must never be mistaken for an account
+  // preference that should be written back.
+  const explicitRevision = ref(0);
 
   function persist() {
     try {
@@ -66,6 +70,12 @@ export const useLocaleStore = defineStore("locale", () => {
   function setLocale(next: LocaleCode) {
     code.value = next;
     userSet.value = true;
+    explicitRevision.value += 1;
+    persist();
+  }
+
+  function applyServerLocale(next: LocaleCode) {
+    code.value = next;
     persist();
   }
 
@@ -79,5 +89,5 @@ export const useLocaleStore = defineStore("locale", () => {
     }
   }
 
-  return { code, userSet, setLocale, ensureSystemDetected };
+  return { code, userSet, explicitRevision, setLocale, applyServerLocale, ensureSystemDetected };
 });

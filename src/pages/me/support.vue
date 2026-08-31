@@ -1,6 +1,6 @@
 <!--
   Support hub (ported from Nexion-prototype/app/(main)/me/support/page.tsx).
-  Live-status banner + 4 contact channels (Telegram/Discord/Ticket/Email) +
+  Support channels (Telegram/Discord/Ticket/Email) +
   pinned support notes. Ticket channel routes to /me/support-tickets; others
   toast their hint. Wrapped in <AppChassis active="me">.
 -->
@@ -8,16 +8,6 @@
   <AppChassis active="me">
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
-
-      <!-- Live status -->
-      <view class="mx-4 flex items-center" :style="statusStyle">
-        <view class="relative flex" style="width: 8px; height: 8px">
-          <view :style="pingStyle" />
-          <view :style="dotStyle" />
-        </view>
-        <text :style="onlineTextStyle">{{ w.onlineNow }}</text>
-        <text class="text-right" :style="avgStyle" style="flex: 1">{{ avgResponse }}</text>
-      </view>
 
       <!-- Channels -->
       <view class="mx-4" :style="cardStyle">
@@ -64,14 +54,11 @@ import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.support);
-
-const avgResponse = computed(() => fmt(w.value.avgResponse, { n: "4" }));
 
 interface Channel {
   id: string;
@@ -106,24 +93,6 @@ function onChannel(c: Channel) {
   toast.info(c.label, c.hint);
 }
 
-// Live status — plain indicator line on the page floor; the pulsing brand dot +
-// brand "online" text carry the affordance, the boxed chrome added nothing.
-const statusStyle: CSSProperties = {
-  gap: "8px",
-  marginBottom: "12px",
-  padding: "0 2px",
-};
-const pingStyle: CSSProperties = {
-  position: "absolute",
-  inset: "0",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  opacity: 0.6,
-  animation: "mc-pulse 1.6s ease-in-out infinite",
-};
-const dotStyle: CSSProperties = { width: "8px", height: "8px", borderRadius: "999px", background: "var(--v5-brand)" };
-const onlineTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", fontWeight: 500 };
-const avgStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 // Channels — transparent hairline nav list on the floor (2px optical indent,
 // border-top opens the group; per-row hairlines below). No card chrome.
 const cardStyle: CSSProperties = {

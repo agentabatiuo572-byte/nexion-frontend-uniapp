@@ -104,12 +104,15 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
 import { useLocaleStore } from "@/store/locale";
+import { useStaking } from "@/store/staking";
 import { PRODUCTS } from "@/mock/products";
 import { productCopy } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 import { remoteApiEnabled } from "@/api/runtime";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { searchStakingRateSummary } from "@/lib/search-staking-rate";
+import { fmt } from "@/i18n/format";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -123,6 +126,7 @@ const t = useT();
 const app = useApp();
 const network = useNetwork();
 const locale = useLocaleStore();
+const staking = useStaking();
 
 const q = ref("");
 
@@ -130,6 +134,7 @@ function refreshSearchSources(force = false) {
   if (!remoteApiEnabled) return;
   void refreshProductCatalog(force);
   void network.refreshCanonicalNetwork();
+  void staking.syncRemote();
 }
 
 const searchVisibility = createPageVisibilityRefresh((reason) => refreshSearchSources(reason === "return"));
@@ -191,8 +196,16 @@ const results = computed<Hit[]>(() => {
   const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
     const c = routeCopy[r.key];
-    if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
-      out.push({ group: "route", label: c.label, sublabel: c.sub, href: r.href });
+    const sublabel = r.key === "staking"
+      ? searchStakingRateSummary({
+        remoteReady: staking.remoteReady,
+        pools: staking.pools,
+        fallback: c.sub,
+        formatApy: (apy) => fmt(t.value.home.quickStakeApyFormat, { n: apy }),
+      })
+      : c.sub;
+    if (c.label.toLowerCase().includes(query) || sublabel.toLowerCase().includes(query)) {
+      out.push({ group: "route", label: c.label, sublabel, href: r.href });
     }
   }
   for (const p of searchableProducts.value) {

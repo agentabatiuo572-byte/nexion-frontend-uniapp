@@ -39,3 +39,12 @@ describe("Nova visible thinking cadence", () => {
     expect(source).toContain("novaRequestControl.isCurrent(request.epoch)");
   });
 });
+
+describe("human conversation reply-state contract", () => {
+  it("retires the composer for every backend-rejected reply state, including transferred", () => {
+    expect(source).toContain('const replyAllowedStatuses = new Set(["open", "resolved"])');
+    expect(source).toContain("replyAllowedStatuses.has(conv.value.status)");
+    expect(source).toContain("sessionTransferred");
+    expect(source).toContain("if (!isReplyAllowed.value)");
+  });
+});

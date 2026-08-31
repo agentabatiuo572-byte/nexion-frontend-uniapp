@@ -125,13 +125,14 @@ const eventActionLabels = computed<EventActionLabels>(() => ({
   leaderboard: t.value.events.action.leaderboard,
   viewDetails: t.value.events.action.viewDetails,
   progress: t.value.events.progress.label,
+  wheelPool: t.value.events.wheelPool,
 }));
 
 async function loadRemoteEvents() {
   if (!remoteApiEnabled) return;
   const scope = remoteRequestFence.capture();
   try {
-    const snapshot = await eventsApi.state();
+    const snapshot = await eventsApi.state(language.value);
     if (!remoteRequestFence.isCurrent(scope)) return;
     remoteEvents.value = snapshot.events;
     remoteEventsError.value = false;

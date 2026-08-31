@@ -9,6 +9,7 @@ vi.mock("@/api/runtime", () => ({
 }));
 
 import { useQuest } from "./quest";
+import { useLocaleStore } from "./locale";
 
 describe("PC-managed H3 quest catalogue", () => {
   beforeEach(() => {
@@ -35,6 +36,22 @@ describe("PC-managed H3 quest catalogue", () => {
         { questCode: "H3_FIRST_ORDER_STARTED", rewardNex: 50 },
         { questCode: "H3_REFERRAL_SETTLED", rewardNex: 200 },
       ]);
+  });
+
+  it("refreshes the visible home task catalogue after an explicit locale change", async () => {
+    state.mockResolvedValueOnce({
+      quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
+    }).mockResolvedValueOnce({
+      quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "开始首笔订单", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
+    });
+    const quest = useQuest();
+    const locale = useLocaleStore();
+    await quest.refreshRemote();
+
+    locale.setLocale("zh");
+
+    await vi.waitFor(() => expect(state).toHaveBeenLastCalledWith("zh"));
+    expect(quest.remoteQuests[0]?.name).toBe("开始首笔订单");
   });
 
   it("keeps the last confirmed catalogue visible while a background refresh is pending", async () => {

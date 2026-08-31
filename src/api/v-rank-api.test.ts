@@ -3,7 +3,25 @@ import { createVRankApi } from "./v-rank-api";
 
 const row = (v: number) => ({
   v, title: `V${v}`, cnTitle: `V${v}`, directBonus: 0.1, unilevelDepth: 1,
-  peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, visible: true,
+  peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
+});
+
+it("preserves every configured reward type for App display without issuing a reward", async () => {
+  const request = vi.fn().mockResolvedValue({
+    source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    ranks: ladder().map((item) => item.v === 3 ? { ...item, rewards: [
+      { type: "USDT", amount: 10 }, { type: "VOUCHER", voucherId: "WELCOME-10" },
+      { type: "SKU", skuId: "SKU-PRO" }, { type: "CUSTOM", customLabel: "Event access" },
+    ] } : item),
+  });
+
+  const result = await createVRankApi({ request } as never).ladder();
+  expect(result.ranks.find((item) => item.v === 3)?.rewards.map((item) => item.type))
+    .toEqual(["USDT", "VOUCHER", "SKU", "CUSTOM"]);
+  expect(result.ranks.find((item) => item.v === 3)?.rewards.slice(1))
+    .toEqual([{ type: "VOUCHER", voucherId: "WELCOME-10", skuId: undefined, customLabel: undefined },
+      { type: "SKU", voucherId: undefined, skuId: "SKU-PRO", customLabel: undefined },
+      { type: "CUSTOM", voucherId: undefined, skuId: undefined, customLabel: "Event access" }]);
 });
 const ladder = () => Array.from({ length: 13 }, (_, v) => row(v));
 const current = {

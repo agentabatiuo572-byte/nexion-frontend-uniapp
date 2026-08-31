@@ -14,6 +14,7 @@ export interface TeamLeaderboardSnapshot extends TeamProvenance {
 }
 export interface TeamCommissionSnapshot extends TeamProvenance {
   events: CommissionEvent[]; generatedAt: string;
+  aggregate: { totalUSDT: number; totalNEX: number; directUSDT: number; extendedUSDT: number; contributorCount: number };
   factStatus?: "SIMULATED" | "CANONICAL";
   withdrawable?: boolean;
   payoutStatus?: "NON_WITHDRAWABLE" | "CANONICAL";
@@ -35,6 +36,7 @@ export interface TeamLeadershipPoolSnapshot extends TeamProvenance {
   currentWeekPoolUSDT: number; myRank: number; myVotes: number; totalVotes: number;
   mySharePct: number; projectedPayoutUSDT: number; distribution: TeamPoolDistribution[];
   history: TeamLeadershipHistory[]; nextPayoutAt: string;
+  unlockRank: number; injectRate: number;
 }
 export interface TeamInsightsApi {
   leaderboard(period: LeaderPeriod): Promise<TeamLeaderboardSnapshot>;
@@ -77,8 +79,11 @@ function commissions(value: unknown, mode: ApiEnvironment): TeamCommissionSnapsh
   if (source.withdrawable !== undefined && typeof source.withdrawable !== "boolean") return invalid();
   if (source.payoutStatus !== undefined && source.payoutStatus !== "CANONICAL") return invalid();
   const events=source.events.map((item):CommissionEvent=>{const v=row(item);const rawStatus=String(v.status);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId")||!KINDS.has(String(v.kind))||!STATUSES.has(rawStatus)) return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:rawStatus as CommissionEvent["status"],...state};});
+  const aggregate=row(source.aggregate);
+  const totalUSDT=num(aggregate.totalUSDT), totalNEX=num(aggregate.totalNEX), directUSDT=num(aggregate.directUSDT), extendedUSDT=num(aggregate.extendedUSDT), contributorCount=num(aggregate.contributorCount,true);
+  if (!almostEqual(totalUSDT, directUSDT + extendedUSDT)) return invalid();
   const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();
-  return {...proof,events,generatedAt,...(source.factStatus === undefined ? {} : {factStatus: source.factStatus as "SIMULATED" | "CANONICAL"}),...(source.withdrawable === undefined ? {} : {withdrawable: source.withdrawable as boolean}),...(source.payoutStatus === undefined ? {} : {payoutStatus: source.payoutStatus as "NON_WITHDRAWABLE" | "CANONICAL"})};
+  return {...proof,events,aggregate:{totalUSDT,totalNEX,directUSDT,extendedUSDT,contributorCount},generatedAt,...(source.factStatus === undefined ? {} : {factStatus: source.factStatus as "SIMULATED" | "CANONICAL"}),...(source.withdrawable === undefined ? {} : {withdrawable: source.withdrawable as boolean}),...(source.payoutStatus === undefined ? {} : {payoutStatus: source.payoutStatus as "NON_WITHDRAWABLE" | "CANONICAL"})};
 }
 
 function split(value: unknown): TeamUnilevelSplit { const source=row(value); return { amountUSDT:num(source.amountUSDT), amountNEX:num(source.amountNEX), count:num(source.count,true) }; }
@@ -115,6 +120,9 @@ function pool(value: unknown, mode: ApiEnvironment): TeamLeadershipPoolSnapshot 
   const totalVotes = num(source.totalVotes, true);
   const mySharePct = num(source.mySharePct);
   const projectedPayoutUSDT = num(source.projectedPayoutUSDT);
+  const unlockRank = num(source.unlockRank, true);
+  const injectRate = num(source.injectRate);
+  if (unlockRank < 1 || unlockRank > 12 || injectRate > 0.3) return invalid();
   const calculatedTotalVotes = distribution.reduce((sum, fact) => sum + fact.people * fact.votes, 0);
   const calculatedMyVotes = distribution.find((fact) => fact.vRank === myRank)?.votes ?? 0;
   const calculatedShare = totalVotes === 0 ? 0 : myVotes / totalVotes;
@@ -134,6 +142,8 @@ function pool(value: unknown, mode: ApiEnvironment): TeamLeadershipPoolSnapshot 
     distribution,
     history,
     nextPayoutAt,
+    unlockRank,
+    injectRate,
   };
 }
 

@@ -134,7 +134,7 @@
         <TeamLedgerCard
           v-if="!remoteApiEnabled || (network.remoteStatus === 'ready' && commission.eventsStatus === 'ready')"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
-          :contributors="localTotalMembersCount"
+          :contributors="commissionAggregate.contributorCount"
           :direct-u-s-d-t="directUSDT"
           :extended-u-s-d-t="extendedUSDT"
           :month-u-s-d-t="monthUSDT"
@@ -239,6 +239,9 @@ const myRankDisplay = computed(() => (remoteApiEnabled && !vrank.remoteReady ? "
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
+const commissionAggregate = computed(() => commission.eventsEvidence?.aggregate ?? {
+  totalUSDT: 0, totalNEX: 0, directUSDT: 0, extendedUSDT: 0, contributorCount: 0,
+});
 
 const rankInfo = computed(() =>
   nextRankProgress({
@@ -279,6 +282,12 @@ const ledger = computed(() => {
     if (e.kind === "unilevel" && e.layer === 1) dU += e.amountUSDT;
     else eU += e.amountUSDT;
   }
+  if (remoteApiEnabled) {
+    return { monthUSDT: mU, monthNEX: mS, unlockedUSDT: uU, coolingUSDT: cU,
+      totalUSDTLifetime: commissionAggregate.value.totalUSDT,
+      directUSDT: commissionAggregate.value.directUSDT,
+      extendedUSDT: commissionAggregate.value.extendedUSDT };
+  }
   return { monthUSDT: mU, monthNEX: mS, unlockedUSDT: uU, coolingUSDT: cU, totalUSDTLifetime: tU, directUSDT: dU, extendedUSDT: eU };
 });
 const monthUSDT = computed(() => ledger.value.monthUSDT);
@@ -313,6 +322,7 @@ const leftVolText = computed(() => binary.value === null ? "—" : `$${binary.va
 const rightVolText = computed(() => binary.value === null ? "—" : `$${binary.value.rightVol.toFixed(0)}`);
 
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vrank.myRank));
+const leadershipUnlockRank = computed(() => remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3);
 const myShare = computed(() => remoteApiEnabled ? remotePool.value?.mySharePct ?? 0 : pool.mySharePct(vrank.myRank));
 const projectedPayout = computed(() => remoteApiEnabled ? remotePool.value?.projectedPayoutUSDT ?? 0 : pool.myProjectedPayout(vrank.myRank));
 const leadershipPoolUnlocked = computed(() => myVotes.value > 0);
@@ -321,7 +331,7 @@ const leadershipPoolPrimary = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value.toFixed(1)}K`,
 );
 const leadershipPoolLineA = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.projectionErrorDesc : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : t.value.home.poolV3Unlock,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.projectionErrorDesc : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const leadershipPoolLineB = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.retry : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,

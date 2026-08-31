@@ -35,13 +35,11 @@
       </view>
 
       <template v-if="amountNum > 0">
-        <text class="block" :style="periodLabelStyle">{{ fmt(t.uiChrome.afterDays, { n: 365 }) }}</text>
-
         <!-- Single bar -->
         <view class="flex items-center" style="margin-top: 8px; gap: 10px">
           <view ref="singleBarRef" class="flex-1 relative overflow-hidden" :style="barTrackStyle">
             <view :style="singleFillStyle" />
-            <text class="block absolute flex items-center" :style="barLabelStyle">{{ w.singlePayout }}</text>
+            <text class="block absolute flex items-center" :style="barLabelStyle">{{ singleLabel }}</text>
           </view>
           <view class="text-right" style="min-width: 88px">
             <text class="block tabular-nums" :style="barAmtStyle('var(--v5-ink)')">${{ singleText }}</text>
@@ -66,7 +64,7 @@
           <text style="color: var(--v5-brand); font-weight: 500">+${{ extraText }}</text>
           <!-- 分隔空格显式拼在表达式里,不藏在词典值的前导空格里(不可见契约,trim 型格式化会静默吃掉);
                也不能只在模板里打一个空格 —— Vue 的空白折叠会把标签边上的空白删掉(实景实测粘成 `+$550来自复投`)。 -->
-          <text>{{ " " + fmt(t.stakingV3.calc.compoundSuffix, { n: cycles }) }}</text>
+          <text>{{ " " + fmt(t.stakingV3.calc.compoundSuffix, { n: reinvestments }) }}</text>
         </view>
       </template>
 
@@ -84,6 +82,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { resolveStakingPool } from "@/lib/staking-canonical";
+import { compoundDurationDays, reinvestmentCount } from "@/lib/compound-cycles";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
@@ -109,6 +108,8 @@ const apy = computed(() => pool.value?.apy ?? 0);
 const single = computed(() => amountNum.value * (1 + (apy.value * term.value) / 365));
 const singleProfit = computed(() => single.value - amountNum.value);
 const cycles = computed(() => Math.floor(365 / term.value));
+const reinvestments = computed(() => reinvestmentCount(cycles.value));
+const compoundDays = computed(() => compoundDurationDays(term.value));
 const compound = computed(() => {
   let c = amountNum.value;
   for (let i = 0; i < cycles.value; i++) c *= 1 + (apy.value * term.value) / 365;
@@ -128,7 +129,11 @@ const singleProfitText = computed(() => singleProfit.value.toFixed(0));
 const compoundText = computed(() => compound.value.toFixed(0));
 const compoundProfitText = computed(() => compoundProfit.value.toFixed(0));
 const extraText = computed(() => extraFromCompounding.value.toFixed(0));
-const compoundLabel = computed(() => fmt(w.value.compoundPayout, { n: cycles.value }));
+const singleLabel = computed(() => fmt(w.value.singlePayoutDuration, { days: term.value }));
+const compoundLabel = computed(() => fmt(w.value.compoundPayoutDuration, {
+  reinvestments: reinvestments.value,
+  days: compoundDays.value,
+}));
 
 function onAmountInput(e: Event) {
   const raw = (e as unknown as { detail: { value: string } }).detail.value;
@@ -213,13 +218,6 @@ function segPillStyle(active: boolean): CSSProperties {
     justifyContent: "center",
   };
 }
-const periodLabelStyle: CSSProperties = {
-  marginTop: "14px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-  letterSpacing: "0.02em",
-};
 const barTrackStyle: CSSProperties = {
   height: "28px",
   borderRadius: "6px",

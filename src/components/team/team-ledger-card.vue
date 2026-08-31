@@ -31,9 +31,6 @@
           </view>
           <text class="block font-mono-tabular" :style="nexStyle">+ {{ monthNEX.toLocaleString() }} NEX</text>
         </view>
-        <view :style="growthStyle">
-          <text class="font-mono-tabular">↑ +12.4%</text>
-        </view>
       </view>
 
       <view class="grid" :style="metricGridStyle">
@@ -78,9 +75,9 @@ const t = useT();
 
 const intPart = computed(() => Math.floor(props.monthUSDT));
 const fracPart = computed(() => (props.monthUSDT - intPart.value).toFixed(2).slice(2));
-const splitTotal = computed(() => Math.max(0.01, props.directUSDT + props.extendedUSDT));
-const directPct = computed(() => Math.round((props.directUSDT / splitTotal.value) * 100));
-const extendedPct = computed(() => 100 - directPct.value);
+const splitTotal = computed(() => Math.max(0, props.directUSDT + props.extendedUSDT));
+const directPct = computed(() => splitTotal.value === 0 ? 0 : Math.round((props.directUSDT / splitTotal.value) * 100));
+const extendedPct = computed(() => splitTotal.value === 0 ? 0 : 100 - directPct.value);
 
 function goCommissions() {
   navTo("/pages/team/commissions");
@@ -142,12 +139,6 @@ const amountRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "18px",
   marginTop: "28px",
-};
-const growthStyle: CSSProperties = {
-  paddingBottom: "8px",
-  color: "var(--v5-success-ink)",
-  fontSize: "15px",
-  fontWeight: 600,
 };
 const metricGridStyle: CSSProperties = {
   marginTop: "28px",

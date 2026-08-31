@@ -49,6 +49,7 @@
             placeholder-style="color: var(--v5-ink-2)"
             :disabled="submitting"
             @input="onInput"
+            @blur="onInputBlur"
           />
           <text class="shrink-0" style="font-size: 15px; color: var(--v5-ink-3)">{{ fromSym }}</text>
         </view>
@@ -218,6 +219,7 @@ import {
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
+import { canonicalExchangeAmount, sanitizeExchangeAmountInput } from "@/lib/exchange-input-amount";
 import { refreshWalletAfterCommittedExchange } from "@/lib/remote-commerce-refresh";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
@@ -491,7 +493,11 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onInput(e: Event) {
-  input.value = detailVal(e).replace(/[^0-9.]/g, "");
+  input.value = sanitizeExchangeAmountInput(detailVal(e));
+}
+
+function onInputBlur() {
+  input.value = canonicalExchangeAmount(input.value);
 }
 function setMax() {
   // 提交在途时输入面整体冻结(输入框有 :disabled,这两个裸 <view @click> 入口没有)。
@@ -571,6 +577,7 @@ async function handleConfirm() {
   // 🔴 重入守卫排在最前:无守卫时连点两次会排队两条完整兑换链,而第二条的额度门
   // 读到的还是第一条 v3.record 之前的计数 —— 两笔都放行,日限直接翻倍。
   if (submitting.value) return;
+  input.value = canonicalExchangeAmount(input.value);
   if (!valid.value) return;
   const requestScope = captureAccountScope();
   const requestRunScope = captureRuntimeRevision();

@@ -10,6 +10,7 @@ import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
 import { authApi, remoteApiEnabled } from "@/api/runtime";
+import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
 
@@ -162,6 +163,10 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   if (remoteApiEnabled && options.serverProfile) {
     app.projectServerIdentity(options.serverProfile);
     useProfile().projectServerIdentity(options.serverProfile);
+    // Account language is hydrated before any server write. An explicit picker
+    // selection made during this read wins; a device default never overwrites
+    // the account preference merely because the user signed in.
+    hydrateCurrentProfileLocale();
   }
   // App.onShow is not guaranteed after an H5 reLaunch. Complete the canonical
   // catalogue/fleet bootstrap here as well.

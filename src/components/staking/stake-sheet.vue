@@ -98,6 +98,7 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { ApiError } from "@/api/errors";
 import { resolveStakingPool } from "@/lib/staking-canonical";
+import { formatCommandAmount, normalizeCommandAmount } from "@/lib/command-amount";
 
 const PRESETS = [100, 500, 1000, 5000];
 const ONE_DAY_MS = 86400 * 1000;
@@ -151,7 +152,7 @@ const interestLabel = computed(() =>
   props.term !== null ? fmt(t.value.stakingV3.sheet.interest, { n: props.term }) : "",
 );
 const balanceText = computed(() => (staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt).toFixed(2));
-const principalText = computed(() => amount.value.toFixed(2));
+const principalText = computed(() => formatCommandAmount(amount.value));
 const interestText = computed(() =>
   props.term !== null ? (amount.value * apyRate.value * (props.term / 365)).toFixed(2) : "0.00",
 );
@@ -162,7 +163,7 @@ const totalText = computed(() =>
   props.term !== null ? (amount.value * (1 + apyRate.value * (props.term / 365))).toFixed(2) : "0.00",
 );
 const ctaText = computed(() =>
-  props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: amount.value.toFixed(2), n: props.term }) : "",
+  props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: formatCommandAmount(amount.value), n: props.term }) : "",
 );
 const lockedNoticeText = computed(() =>
   props.term !== null
@@ -172,10 +173,10 @@ const lockedNoticeText = computed(() =>
 
 function onAmountInput(e: Event) {
   const raw = (e as unknown as { detail: { value: string } }).detail.value;
-  amount.value = parseFloat(raw) || 0;
+  amount.value = normalizeCommandAmount(raw);
 }
 function setMax() {
-  amount.value = Math.floor(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
+  amount.value = normalizeCommandAmount(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
 }
 function emitClose() {
   emit("update:open", false);
@@ -199,7 +200,7 @@ async function submit() {
       return;
     }
     remotePending.value = true;
-    const submittedAmount = amount.value;
+    const submittedAmount = normalizeCommandAmount(amount.value);
     const expectedAccountKey = app.accountKey;
     const expectedBindingEpoch = app.accountBindingEpoch;
     let lease: RemoteIntentLease | null = null;

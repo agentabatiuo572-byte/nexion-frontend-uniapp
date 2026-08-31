@@ -12,8 +12,8 @@ describe("repurchase confirmation boundary", () => {
     expect(source).toContain('if (!confirmed || !isMounted.value) return;');
 
     const confirmation = source.indexOf('confirmed = await uiConfirm({');
-    expect(source).toContain('const quoteAmount = amount.value;');
-    expect(source).toContain('amount: quoteAmount.toFixed(2),');
+    expect(source).toContain('const quoteAmount = normalizeCommandAmount(amount.value);');
+    expect(source).toContain('amount: formatCommandAmount(quoteAmount),');
     expect(source).toContain('await repurchase.open(quoteAmount);');
     expect(source).toContain(':disabled="confirming || repurchase.submitting"');
 

@@ -36,7 +36,7 @@ export interface GoalRecommendation {
 
 export interface GoalsApi {
   list(): Promise<GoalList>;
-  create(input: { targetUsdt: number; deadlineAt: number }): Promise<Goal>;
+  create(input: { targetUsdt: number; deadlineAt: number; idempotencyKey: string }): Promise<Goal>;
   setStatus(goalId: number, achieved: boolean): Promise<Goal>;
   remove(goalId: number): Promise<void>;
   recommendation(targetUsdt: number, deadlineAt: number): Promise<GoalRecommendation>;
@@ -92,7 +92,13 @@ export function createGoalsApi(client: ApiClient, mode: ApiEnvironment = "prod")
       return validList(value) ? value : invalid();
     },
     async create(input) {
-      const value = await client.request<unknown>({ method: "POST", path: "/api/goals", body: input });
+      const idempotencyKey = input.idempotencyKey.trim();
+      if (!idempotencyKey) return invalid();
+      const value = await client.request<unknown>({
+        method: "POST", path: "/api/goals",
+        body: { targetUsdt: input.targetUsdt, deadlineAt: input.deadlineAt },
+        idempotencyKey,
+      });
       return validGoal(value) ? value : invalid();
     },
     async setStatus(goalId, achieved) {

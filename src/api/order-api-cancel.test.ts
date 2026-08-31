@@ -30,7 +30,7 @@ describe("order cancellation API", () => {
     await expect(api.cancel("ORD-1", "cancel-key")).rejects.toMatchObject({ kind: "protocol" });
   });
 
-  it("accepts only the current catalog run for sandbox cancellation", async () => {
+  it("rejects retired sandbox cancellation even when the catalog run matches", async () => {
     advanceRuntimeRevision("run-20260816");
     const request = vi.fn().mockResolvedValue({
       orderNo: "ORD-1", orderStatus: "CANCELLED", paymentStatus: "CANCELLED",
@@ -38,8 +38,8 @@ describe("order cancellation API", () => {
       serverCanonical: true, idempotent: true,
     });
     const api = createOrderApi({ request } as unknown as ApiClient, "dev");
-    await expect(api.cancel("ORD-1", "cancel-key")).resolves.toMatchObject({
-      source: "mock", sourceEnvironment: "SANDBOX", runId: "run-20260816", serverCanonical: true,
+    await expect(api.cancel("ORD-1", "cancel-key")).rejects.toMatchObject({
+      kind: "protocol", message: "ORDER_RESPONSE_INVALID",
     });
   });
 

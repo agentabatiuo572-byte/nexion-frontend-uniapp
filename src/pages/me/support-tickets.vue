@@ -29,11 +29,7 @@
           <text style="margin-left: 8px">{{ t.tickets.newTicketCta }}</text>
         </view>
 
-        <view class="flex items-center" :style="avgRowStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          <text :style="avgLabelStyle">{{ t.tickets.avgResponseLabel }}</text>
-          <text :style="avgValueStyle">{{ t.tickets.avgResponseValue }}</text>
-        </view>
+        <text class="block" :style="slaNoticeStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
 
         <view class="grid grid-cols-4" :style="tabsStyle">
           <view v-for="id in tabs" :key="id" class="active:opacity-70 transition-opacity" :style="tabStyle(tab === id)" role="button" tabindex="0" :aria-label="tabLabel(id)" @click="selectTab(id)">
@@ -59,6 +55,11 @@
             <view v-for="c in categoriesForNew" :key="c" :style="catChipStyle(newCat === c)" role="button" tabindex="0" :aria-label="catLabel(c)" @click="newCat = c">
               <text>{{ catLabel(c) }}</text>
             </view>
+          </view>
+          <view v-if="newSlaTarget" :style="slaTargetStyle">
+            <text class="block" :style="slaTargetLabelStyle">{{ t.tickets.slaTargetLabel }}</text>
+            <text class="block" :style="slaTargetValueStyle">{{ fmt(t.tickets.slaTargetValue, { firstResponseMins: newSlaTarget.firstResponseMins, resolutionHours: newSlaTarget.resolutionHours }) }}</text>
+            <text class="block" :style="slaStatisticsStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
           </view>
         </view>
         <view>
@@ -93,6 +94,11 @@
           <view class="flex items-center justify-between" :style="detailTimesStyle">
             <text>{{ createdLabel }}</text>
             <text>{{ updatedLabel }}</text>
+          </view>
+          <view v-if="detailSlaTarget" :style="slaTargetStyle">
+            <text class="block" :style="slaTargetLabelStyle">{{ t.tickets.slaTargetLabel }}</text>
+            <text class="block" :style="slaTargetValueStyle">{{ fmt(t.tickets.slaTargetValue, { firstResponseMins: detailSlaTarget.firstResponseMins, resolutionHours: detailSlaTarget.resolutionHours }) }}</text>
+            <text class="block" :style="slaStatisticsStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
           </view>
         </view>
 
@@ -137,12 +143,14 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
+import { supportApi } from "@/api/runtime";
 import {
   STATUS_COLOR,
   type Ticket,
   type TicketCategory,
   type TicketMessage,
   type TicketStatus,
+  type SupportSlaTarget,
 } from "@/domain/support";
 
 type Mode = { kind: "list" } | { kind: "create" } | { kind: "detail"; id: string };
@@ -161,6 +169,7 @@ const subject = ref("");
 const desc = ref("");
 const reply = ref("");
 const filterFeedback = ref("");
+const slaTargets = ref<SupportSlaTarget[]>([]);
 
 onLoad((query) => {
   if (query?.mode === "create") mode.value = { kind: "create" };
@@ -173,12 +182,17 @@ onLoad((query) => {
 
 onShow(async () => {
   try {
-    await ticketsStore.refresh();
+    const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets()]);
+    if (tickets.status === "rejected") throw tickets.reason;
     if (mode.value.kind === "detail") await ticketsStore.load(mode.value.id);
   } catch {
     toast.warn(t.value.security.opFailed);
   }
 });
+
+async function loadSlaTargets() {
+  slaTargets.value = await supportApi.slaTargets();
+}
 
 async function reloadTickets() {
   try { await ticketsStore.refresh(); }
@@ -223,6 +237,10 @@ const detailTicket = computed(() => {
   const m = mode.value;
   return m.kind === "detail" ? ticketsStore.tickets.find((x) => x.id === m.id) ?? null : null;
 });
+const newSlaTarget = computed(() => slaTargets.value.find(target => target.category === newCat.value));
+const detailSlaTarget = computed(() => detailTicket.value
+  ? slaTargets.value.find(target => target.category === detailTicket.value?.category)
+  : undefined);
 const createdLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.detail.created, { when: relWhen(detailTicket.value.createdAt) }) : ""));
 const updatedLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.detail.lastUpdate, { when: relWhen(detailTicket.value.updatedAt) }) : ""));
 
@@ -310,14 +328,11 @@ async function closeTicket() {
 
 const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };
 const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "15px" };
-// Plain info line on the page floor — the boxed chrome added nothing.
-const avgRowStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 6px",
-  fontSize: "12px",
-};
-const avgLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
-const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", color: "var(--v5-brand-2)", fontWeight: 600 };
+const slaNoticeStyle: CSSProperties = { padding: "0 6px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const slaTargetStyle: CSSProperties = { marginTop: "10px", padding: "10px 12px", borderRadius: "12px", background: "var(--v5-surface)" };
+const slaTargetLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const slaTargetValueStyle: CSSProperties = { marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const slaStatisticsStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Segmented control — filled container, no border (single visual difference).
 // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
 const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)" };

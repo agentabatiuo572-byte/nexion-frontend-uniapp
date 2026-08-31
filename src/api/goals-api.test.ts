@@ -19,23 +19,23 @@ describe("goals API", () => {
     expect(request).toHaveBeenCalledWith({ method: "GET", path: "/api/goals" });
   });
 
-  it("creates and updates goals without local persistence", async () => {
+  it("creates and updates goals with an idempotency key and no local persistence", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce({ id: 8, targetUsdt: 500, deadlineAt: 1890000000000, createdAt: 1880000000000, achieved: false, progressPct: 0, lifetimeEarningsUsdt: 0 })
       .mockResolvedValueOnce({ id: 8, targetUsdt: 500, deadlineAt: 1890000000000, createdAt: 1880000000000, achieved: true, progressPct: 100, lifetimeEarningsUsdt: 600 });
     const api = createGoalsApi({ request } as never, "prod");
 
-    await api.create({ targetUsdt: 500, deadlineAt: 1890000000000 });
+    await api.create({ targetUsdt: 500, deadlineAt: 1890000000000, idempotencyKey: "goal-save-1" });
     await api.setStatus(8, true);
     expect(request).toHaveBeenNthCalledWith(1, {
-      method: "POST", path: "/api/goals", body: { targetUsdt: 500, deadlineAt: 1890000000000 },
+      method: "POST", path: "/api/goals", body: { targetUsdt: 500, deadlineAt: 1890000000000 }, idempotencyKey: "goal-save-1",
     });
     expect(request).toHaveBeenNthCalledWith(2, {
       method: "POST", path: "/api/goals/8/status", body: { achieved: true },
     });
   });
 
-  it("accepts only current run-scoped server recommendations in sandbox", async () => {
+  it("rejects retired Sandbox recommendation payloads", async () => {
     advanceRuntimeRevision("sandbox-run-20260817");
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true, source: "mock", sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260817",
@@ -44,7 +44,7 @@ describe("goals API", () => {
     });
     const api = createGoalsApi({ request } as never, "dev");
 
-    await expect(api.recommendation(100, 1890000000000)).resolves.toMatchObject({ productNo: "sandbox-sku" });
+    await expect(api.recommendation(100, 1890000000000)).rejects.toMatchObject({ message: "GOALS_RESPONSE_INVALID" });
   });
 
   it("rejects mock recommendation payload in remote mode", async () => {
