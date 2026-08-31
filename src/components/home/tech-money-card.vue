@@ -34,7 +34,7 @@
         <text
           class="inline-flex items-center gap-1 font-mono-tabular"
           style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan-ink); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
-        >{{ remoteApiEnabled ? t.home.techSettlementSnapshot : t.home.techStreaming }}</text>
+        >{{ t.home.techStreaming }}</text>
       </view>
 
       <view
