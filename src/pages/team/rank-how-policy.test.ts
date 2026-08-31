@@ -37,16 +37,17 @@ describe("rank-how page source contract", () => {
     eager: true,
   })["./rank-how.vue"] ?? "") as string;
 
-  it("must branch every detailed section on server readiness", () => {
-    expect(source).toContain("rankHowPresentation");
-    expect(source).toContain("canonical-ladder");
-    expect(source).toContain("policyHold");
-    expect(source).toContain("v-if=\"!remoteApiEnabled\"");
-    expect(source).toContain("formatCanonicalRankConditions");
+  it("restores all six shared layout sections for the formal app", () => {
+    expect((source.match(/<HowSection\b/g) ?? []).length).toBe(6);
+    for (const component of ["HowHero", "HowCalloutBox", "HowIconRow", "HowStepRow", "HowFaqRow", "VBadgeIcon"]) expect(source).toContain(`<${component}`);
+    expect(source).not.toContain('v-if="!remoteApiEnabled"');
+    expect(source).toContain("buildRankHowContent");
   });
 
-  it("must not render local detail arrays while server data is enabled", () => {
-    expect(source).toContain("v-if=\"!remoteApiEnabled\"");
-    expect(source).toContain("v-if=\"remoteApiEnabled\"");
+  it("must not use prototype stories, account requests or unsafe HTML", () => {
+    expect(source).not.toMatch(/w\.value\.(req\dBody|s5Phase\dBody|faqA\d)|w\.(s1Para\d|s5StartBody|s5Unlock\d)|useVRank|v-html|\.current\(/);
+    expect(source).toContain("createRankHowResource");
+    expect(source).toContain('@keydown.enter.prevent="goBack"');
+    expect(source).toContain('@keydown.space.prevent="goBack"');
   });
 });

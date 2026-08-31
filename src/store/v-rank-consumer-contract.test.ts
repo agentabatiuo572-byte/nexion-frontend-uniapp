@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const consumers = [
-  ["../pages/team/rank-how.vue", "vState"],
   ["../pages/team/rank.vue", "vState"],
   ["../pages/team/team.vue", "vrank"],
   ["../pages/team/agent.vue", "vrank"],
@@ -21,7 +20,7 @@ function source(file: string): string {
 
 describe("V-rank remote consumer authority", () => {
   it("does not import or read the mock V_RANKS table", () => {
-    for (const [file] of consumers) {
+    for (const [file] of [...consumers, ["../pages/team/rank-how.vue"]]) {
       const text = source(file);
       expect(text, file).not.toMatch(/\bV_RANKS\b/);
     }
@@ -33,5 +32,13 @@ describe("V-rank remote consumer authority", () => {
       expect(text, file).toContain(`${storeName}.remoteReady`);
       expect(text, file).toContain(`${storeName}.ladder`);
     }
+  });
+
+  it("reads public rank documentation through the canonical API, not an account-scoped store", () => {
+    const text = source("../pages/team/rank-how.vue");
+    expect(text).toContain("ladder: vRankApi.ladder");
+    expect(text).toContain("createRankHowResource");
+    expect(text).toContain("buildRankHowContent(state.value.policy, state.value.ranks");
+    expect(text).not.toContain("useVRank");
   });
 });
