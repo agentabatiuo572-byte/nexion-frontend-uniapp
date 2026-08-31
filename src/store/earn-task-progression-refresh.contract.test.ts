@@ -13,7 +13,7 @@ describe("Earn server task progression refresh", () => {
     expect(sync).not.toContain("trustedTaskProof");
     expect(sync).not.toContain("taskMutationKey");
     expect(sync).toContain("readRemoteTaskAssignments(request)");
-    expect(sync).toContain("refreshRemoteFleet(request)");
+    expect(sync).toContain("refreshRemoteFleet(request, { coalesce: true })");
     expect(sync).toContain("refreshHomeTruth(request)");
 
     const fleetStart = appSource.indexOf("async function refreshRemoteFleet");
@@ -29,7 +29,7 @@ describe("Earn server task progression refresh", () => {
     const showEnd = earnSource.indexOf("});", showStart);
     const onShow = earnSource.slice(showStart, showEnd);
 
-    expect(onShow).toContain("app.refreshRemoteFleet()");
+    expect(onShow).toContain("app.refreshRemoteFleet(undefined, { coalesce: true })");
     expect(onShow).toContain("app.refreshHomeTruth()");
   });
 });

@@ -31,6 +31,24 @@ describe("App Home authority refresh isolation", () => {
     expect(fleetRefresh).toContain("applyRemoteAssignments(canonicalDevices, confirmedAssignments)");
   });
 
+  it("coalesces only explicit lifecycle reads within one account and runtime scope", () => {
+    const fleetStart = appSource.indexOf("async function refreshRemoteFleet(");
+    const fleetEnd = appSource.indexOf("function bindAccount(", fleetStart);
+    const fleetRefresh = appSource.slice(fleetStart, fleetEnd);
+
+    expect(fleetRefresh).toContain("captureRuntimeRevision()");
+    expect(fleetRefresh).toContain("accountEpoch: request.epoch");
+    expect(fleetRefresh).toContain("mode: expectedApiEnvironment");
+    expect(fleetRefresh).toContain("runId: runScope.runId");
+    expect(fleetRefresh).toContain("remoteFleetRefreshCoordinator.refresh(scope");
+    expect(appSource).toContain("refreshRemoteFleet(request, { coalesce: true })");
+    expect(fleetRefresh).toContain("isCurrentRuntimeRevision(runScope)");
+    expect(fleetRefresh).toContain("remoteFleetRefreshCoordinator.isCurrent(lease)");
+    expect(appSource).toContain("function invalidateRemoteFleet(request?: RemoteAccountRequest)");
+    expect(appSource).toContain("invalidateRemoteFleet(receiptScope);");
+    expect(appSource).toContain("invalidateRemoteFleet(fleetRequest);");
+  });
+
   it("gives every Home retry action the narrow Home-only refresh", () => {
     for (const source of [ledgerSource, gridSource, marketSource]) {
       expect(source).toContain("app.refreshHomeTruth()");

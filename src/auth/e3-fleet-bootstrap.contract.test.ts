@@ -12,7 +12,7 @@ describe("E3 fleet bootstrap and projection atomicity", () => {
   it("gates App cold start and onShow fleet refresh on the authenticated catalog", () => {
     expect(appShell).toContain("async function refreshAuthenticatedRemoteFleet()");
     expect(appShell).toContain("await refreshProductCatalog()");
-    expect(appShell).toContain("return useApp().refreshRemoteFleet()");
+    expect(appShell).toContain("return useApp().refreshRemoteFleet(undefined, { coalesce: true })");
     expect(appShell).not.toContain("if (canRefreshRemoteAccount(auth)) void useApp().refreshRemoteFleet();");
   });
 
@@ -22,7 +22,7 @@ describe("E3 fleet bootstrap and projection atomicity", () => {
     expect(signIn).toContain("rebindAccountScopedStores(options.identity);");
     expect(signIn).toContain("refreshRemoteFleetAfterCatalog(options.identity)");
     expect(bootstrap).toContain("await refreshProductCatalog()");
-    expect(bootstrap).toContain("return useApp().refreshRemoteFleet()");
+    expect(bootstrap).toContain("return useApp().refreshRemoteFleet(undefined, { coalesce: true })");
   });
 
   it("settles fleet and assignments independently without owning the Home projection", () => {
