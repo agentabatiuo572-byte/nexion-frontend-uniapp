@@ -67,11 +67,11 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <view class="flex items-center" style="gap: 6px">
+              <view class="flex flex-wrap items-center" style="gap: 6px">
                 <text class="truncate" :style="trialNameStyle">NexGridBox S1</text>
-                <text :style="trialBadgeStyle">{{ t.trial.ghostBadge }}</text>
+                <text :style="trialBadgeStyle">{{ trialLabels.badge }}</text>
               </view>
-              <text class="block" :style="trialSubStyle">{{ t.trial.deviceRowSub }}</text>
+              <text class="block" :style="trialSubStyle">{{ trial.status === 'grace' ? t.trial.ghostRibbonGrace : t.trial.deviceRowSub }}</text>
             </view>
           </view>
           <!-- Spec ④: user cancel exists on the active edge only — grace has
@@ -178,6 +178,7 @@ import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
+import { trialCardLabels } from "@/lib/trial-card-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
@@ -217,6 +218,7 @@ function deferredCommandBusy(device: Device): boolean {
 // Typed against TrialStatus so a future enum change fails tsc here instead of
 // silently widening to string[] (FEAT-TRIAL02 audit trap).
 const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
+const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
