@@ -78,4 +78,34 @@ describe("points API provenance", () => {
     await expect(api.useSaver("saver-key")).resolves.toMatchObject({ restoredStreak: 1, sourceEnvironment: "PRODUCTION", runId: "" });
     await expect(api.activatePowerUp(1, "power-up-key")).resolves.toMatchObject({ status: "ACTIVATED", sourceEnvironment: "PRODUCTION", runId: "" });
   });
+
+  it("sends a selected earning milestone in the canonical request body and retains the legacy default call", async () => {
+    const canonical = {
+      fired: [{ milestoneId: "M-500", thresholdUsd: 500, rewardNex: 50, lifetimeEarningsUsd: 500 }],
+      count: 1,
+      serverCanonical: true,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+    };
+    const request = vi.fn().mockResolvedValue(canonical);
+    const api = createPointsApi({ request } as never, "prod");
+
+    await expect(api.evaluateEarningMilestones("earning-selected-key", "M-500"))
+      .resolves.toMatchObject({ fired: [{ milestoneId: "M-500" }] });
+    expect(request).toHaveBeenLastCalledWith({
+      method: "POST",
+      path: "/api/earnings/milestones/evaluate",
+      body: { milestoneId: "M-500" },
+      idempotencyKey: "earning-selected-key",
+    });
+
+    await expect(api.evaluateEarningMilestones("earning-default-key"))
+      .resolves.toMatchObject({ fired: [{ milestoneId: "M-500" }] });
+    expect(request).toHaveBeenLastCalledWith({
+      method: "POST",
+      path: "/api/earnings/milestones/evaluate",
+      body: undefined,
+      idempotencyKey: "earning-default-key",
+    });
+  });
 });

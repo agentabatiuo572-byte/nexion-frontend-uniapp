@@ -191,6 +191,7 @@
 </template>
 
 <script setup lang="ts">
+import { onLoad } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -392,6 +393,9 @@ const displayQueue = computed(() => remoteApiEnabled
 const rate = computed(() => remoteApiEnabled ? (remoteState.value?.caps.currentPrice ?? 0) : exchange.rate);
 
 const direction = ref<"usdt2nex" | "nex2usdt">("nex2usdt");
+onLoad((options) => {
+  direction.value = options?.direction === "usdt2nex" ? "usdt2nex" : "nex2usdt";
+});
 const input = ref("");
 const secsAgo = ref(0);
 

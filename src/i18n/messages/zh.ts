@@ -769,7 +769,7 @@ export const zh: Messages = {
       buy: "再认购",
       sell: "二级市场出售",
     },
-    note: "Genesis 席位是以太坊主网 ERC-721 · 合约地址 0xNX...A98F · 由 CertiK 和 Halborn 审计。",
+    disclosureNote: "Genesis 持有数量与权益以账户记录为准；已发布的披露信息请查看信任中心。",
   },
 
   preferences: {
@@ -1222,9 +1222,10 @@ export const zh: Messages = {
       pendingHint: "无 NEX 在冷却",
     },
     pnl: {
-      label: "盈亏",
-      costBasis: "持仓成本",
-      totalSpent: "总投入",
+      label: "平台基准估算",
+      costBasis: "平台基准价",
+      totalSpent: "按基准价估值",
+      note: "仅供参考，不代表个人买入成本或已实现收益。",
       currentValue: "当前估值",
     },
     useNex: {
@@ -2447,7 +2448,7 @@ export const zh: Messages = {
     walletSlotMore: "更多",
     walletSlotsLine: "{online} 台在线 · {open} 个空位",
     withdrawalLocked: "未达最低提现额",
-    withdrawalLockedBody: "至少需要 ${min} 才能提现(还差 ${short})。手机算力 $0.06/天 → 约 325 天才够。一台 NexGridBox S1 不到 3 天即可达 $20。",
+    withdrawalLockedBody: "至少需要 ${min} 才能提现（还差 ${short}）。能否提现以可用余额和当前提现规则为准。",
     withdrawalLockedBrowse: "浏览设备",
     secWithPasskey: "Passkey · 2FA",
     secNoTwoFa: "2FA 未开启",
@@ -4410,6 +4411,7 @@ export const zh: Messages = {
   },
 
   commissions: {
+    recentEventsHint: "明细展示最近 {n} 条记录，上方汇总包含全部记录。",
     pageTitle: "佣金明细",
     directBadge: "直推",
     extendedBadge: "扩展",
@@ -4726,8 +4728,8 @@ export const zh: Messages = {
     earned: "获得",
     spent: "消耗",
     onPayouts: "用于提现",
-    pointsUnlockHint: "你的 NEX 可解锁高达 ${n} USDT",
-    pointsRule: "每 10 NEX = 可提 $100",
+    pointsUnlockHint: "NEX 可用于抵扣提现网络费",
+    pointsRule: "NEX 不会增加可提现 USDT 余额；实际费用和抵扣金额以提现页为准。",
     recent: "最近",
     noActivity: "暂无记录",
     streakBonus: "🔥 连续 {n} 天!+{p} NEX",
@@ -4745,6 +4747,9 @@ export const zh: Messages = {
       claimed: "已领",
       locked: "第 {n} 天",
       daysLeft: "还需 {n} 天",
+      dayLabel: "第 {n} 天",
+      claimedDay: "第 {n} 天里程碑已领取",
+      badgeLabel: "徽章",
       day3: "第 3 天",
       day7: "第 7 天",
       day14: "第 14 天",

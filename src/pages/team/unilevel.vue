@@ -167,7 +167,7 @@
              rest-list idiom); the surface + border shell was redundant
              boundary weight around already hairline-separated rows. -->
         <view v-if="remoteApiEnabled && remoteState === 'ready' && commission.configStatus === 'ready'" :style="memberGroupStyle">
-          <view v-for="(event, i) in (remoteSnapshot?.events ?? [])" :key="event.id" class="flex items-center" :style="memberRowStyle(i === (remoteSnapshot?.events.length ?? 0) - 1)">
+          <view v-for="(event, i) in remoteFilteredEvents" :key="event.id" class="flex items-center" :style="memberRowStyle(i === remoteFilteredEvents.length - 1)">
             <view class="rounded-full grid place-items-center shrink-0" :style="memberAvatarStyle"><text style="font-size: 15px">↗</text></view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ event.sourceUserName }}</text>
@@ -175,7 +175,7 @@
             </view>
             <view class="text-right"><text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ event.amountUSDT.toFixed(2) }}</text><text v-if="event.amountNEX > 0" class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand-2)' }">+{{ event.amountNEX.toLocaleString() }} NEX</text></view>
           </view>
-          <EmptyState v-if="(remoteSnapshot?.events.length ?? 0) === 0" kind="empty-list" :title="t.empty.commissionsTitle" :desc="t.empty.commissionsDesc" />
+          <EmptyState v-if="remoteFilteredEvents.length === 0" kind="empty-list" :title="t.empty.commissionsTitle" :desc="t.empty.commissionsDesc" />
         </view>
         <view v-else-if="!remoteApiEnabled" :style="memberGroupStyle">
           <EmptyState v-if="filteredMembers.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" compact />
@@ -305,6 +305,9 @@ async function loadRemote() {
 onUnmounted(() => { mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
 function retryRemote() { void Promise.all([commission.refreshCanonicalConfig(), network.refreshCanonicalNetwork(), loadRemote()]); }
 const filter = ref<FilterId>("all");
+const remoteFilteredEvents = computed(() => (remoteSnapshot.value?.events ?? []).filter((event) =>
+  filter.value === "all" || (filter.value === "direct" ? event.layer === 1 : event.layer > 1),
+));
 
 const byLayer = computed(() => network.byLayer());
 const directMembers = computed(() => byLayer.value[1] ?? []);

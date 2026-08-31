@@ -77,6 +77,8 @@
           </view>
         </view>
 
+        <text v-if="remoteApiEnabled" class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.commissions.recentEventsHint, { n: events.length }) }}</text>
+
         <!-- filter pills -->
         <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%">
           <view class="inline-flex" style="gap: 6px">
@@ -90,7 +92,7 @@
               :style="pillStyle(filter === k, KIND[k].color)"
               @click="filter = k"
             >
-              <text :style="pillTextStyle(filter === k, KIND[k].color)">{{ t.commissions.kind[k] }} ({{ byKind[k].count }})</text>
+              <text :style="pillTextStyle(filter === k, KIND[k].color)">{{ t.commissions.kind[k] }} ({{ events.filter(e => e.kind === k).length }})</text>
             </view>
           </view>
         </scroll-view>
@@ -178,6 +180,10 @@ const filtered = computed(() =>
 );
 
 const coolingOverviewText = computed(() => {
+  if (remoteApiEnabled) {
+    const next = commission.eventsEvidence?.aggregate.nextUnlockAt;
+    return next == null ? "—" : fmt(t.value.commissions.coolingTag, { n: Math.max(0, Math.ceil((next - Date.now()) / 86400000)) });
+  }
   const next = events.value
     .filter((event) => event.status === "cooling" && Number.isFinite(event.unlockAt))
     .sort((a, b) => a.unlockAt - b.unlockAt)[0];

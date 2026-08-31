@@ -831,7 +831,7 @@ export const en = {
       buy: "Claim another",
       sell: "Sell on market",
     },
-    note: "Genesis seats are ERC-721 on Ethereum mainnet. Contract: 0xNX...A98F. Audited by CertiK and Halborn.",
+    disclosureNote: "Genesis holdings and benefits follow your account records. See the Trust Center for published disclosures.",
   },
 
   preferences: {
@@ -1286,9 +1286,10 @@ export const en = {
       pendingHint: "No NEX in cooldown",
     },
     pnl: {
-      label: "PROFIT & LOSS",
-      costBasis: "Avg cost",
-      totalSpent: "Total invested",
+      label: "PLATFORM BASELINE ESTIMATE",
+      costBasis: "Platform baseline",
+      totalSpent: "Value at baseline",
+      note: "Reference estimate only; this is not your acquisition cost or realized return.",
       currentValue: "Current value",
     },
     useNex: {
@@ -2523,7 +2524,7 @@ export const en = {
     walletSlotMore: "more",
     walletSlotsLine: "{online} live · {open} slots open",
     withdrawalLocked: "Minimum not reached yet",
-    withdrawalLockedBody: "You need ${min} minimum (need ${short} more). At phone-tier earnings of $0.06/d, that's ~325 days. A NexGridBox S1 hits $20 in under 3 days.",
+    withdrawalLockedBody: "You need at least ${min} to withdraw (${short} more). Eligibility depends on your available balance and the current withdrawal rules.",
     withdrawalLockedBrowse: "Browse hardware",
     secWithPasskey: "Passkey · 2FA",
     secNoTwoFa: "2FA off",
@@ -4555,6 +4556,7 @@ export const en = {
   },
 
   commissions: {
+    recentEventsHint: "The list shows the latest {n} events. Summary totals include all records.",
     pageTitle: "Commissions",
     directBadge: "Direct",
     extendedBadge: "Extended",
@@ -4878,8 +4880,8 @@ export const en = {
     earned: "earned",
     spent: "Spent",
     onPayouts: "on payouts",
-    pointsUnlockHint: "Your NEX unlocks up to ${n} USDT",
-    pointsRule: "Each 10 NEX = $100 withdrawable",
+    pointsUnlockHint: "NEX can offset withdrawal network fees",
+    pointsRule: "NEX does not increase your withdrawable USDT balance. The withdrawal page shows the applicable fee and offset.",
     recent: "Recent",
     noActivity: "No activity yet",
     streakBonus: "🔥 {n}-day streak! +{p} NEX",
@@ -4898,6 +4900,9 @@ export const en = {
       claimed: "Claimed",
       locked: "Day {n}",
       daysLeft: "{n}d to unlock",
+      dayLabel: "Day {n}",
+      claimedDay: "Day {n} milestone claimed",
+      badgeLabel: "Badge",
       day3: "Day 3",
       day7: "Day 7",
       day14: "Day 14",

@@ -12,6 +12,7 @@ export interface TeamNetworkSnapshot {
   monthVolumeUsdt: number; lifetimeVolumeUsdt: number | null; members: TeamNetworkMember[];
   source: "server"; sourceEnvironment: "PRODUCTION" | "SANDBOX"; runId: string;
   serverCanonical: true; generatedAt: string;
+  nextCursor?: string | null;
 }
 export interface TeamNetworkApi { snapshot(): Promise<TeamNetworkSnapshot> }
 
@@ -54,9 +55,38 @@ function snapshot(value: unknown, mode: ApiEnvironment): TeamNetworkSnapshot {
       || new Set(members.map((item) => item.id)).size !== members.length || !Number.isFinite(Date.parse(generatedAt))) return invalid();
   return { totalMembers, directMembers, activeMembers, monthVolumeUsdt: amount(source.monthVolumeUsdt),
     lifetimeVolumeUsdt: optionalAmount(source.lifetimeVolumeUsdt), members, source: "server", ...proof,
-    serverCanonical: true, generatedAt };
+    serverCanonical: true, generatedAt, nextCursor: source.nextCursor === undefined || source.nextCursor === null ? null : text(source.nextCursor) };
 }
 
 export function createTeamNetworkApi(client: ApiClient, mode: ApiEnvironment = "prod"): TeamNetworkApi {
-  return { async snapshot() { return snapshot(await client.request<unknown>({ path: "/api/app/team/network" }), mode); } };
+  return { async snapshot() {
+    let result: TeamNetworkSnapshot | null = null;
+    let cursor: string | null = null;
+    const seen = new Set<string>();
+    do {
+      const page: TeamNetworkSnapshot = snapshot(await client.request<unknown>({
+        path: cursor === null ? "/api/app/team/network" : `/api/app/team/network?afterId=${encodeURIComponent(cursor)}`,
+      }), mode);
+      if (result && (page.runId !== result.runId || page.sourceEnvironment !== result.sourceEnvironment)) return invalid();
+      for (const member of page.members) {
+        if (seen.has(member.id)) return invalid();
+        seen.add(member.id);
+      }
+      if (page.nextCursor && (!/^[1-9][0-9]*$/.test(page.nextCursor) || page.members.length === 0
+          || page.nextCursor !== page.members[page.members.length - 1]?.id
+          || (cursor !== null && BigInt(page.nextCursor) <= BigInt(cursor)))) return invalid();
+      result = result === null ? page : {
+        ...page, members: [...result.members, ...page.members],
+        totalMembers: result.totalMembers + page.totalMembers,
+        directMembers: result.directMembers + page.directMembers,
+        activeMembers: result.activeMembers + page.activeMembers,
+        monthVolumeUsdt: result.monthVolumeUsdt + page.monthVolumeUsdt,
+        lifetimeVolumeUsdt: result.lifetimeVolumeUsdt === null || page.lifetimeVolumeUsdt === null ? null
+          : result.lifetimeVolumeUsdt + page.lifetimeVolumeUsdt,
+      };
+      cursor = page.nextCursor ?? null;
+    } while (cursor !== null);
+    return result;
+  } };
+
 }

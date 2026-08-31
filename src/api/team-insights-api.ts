@@ -14,7 +14,10 @@ export interface TeamLeaderboardSnapshot extends TeamProvenance {
 }
 export interface TeamCommissionSnapshot extends TeamProvenance {
   events: CommissionEvent[]; generatedAt: string;
-  aggregate: { totalUSDT: number; totalNEX: number; directUSDT: number; extendedUSDT: number; contributorCount: number };
+  aggregate: { totalUSDT: number; totalNEX: number; directUSDT: number; extendedUSDT: number; contributorCount: number;
+    monthUSDT: number; monthNEX: number; todayUSDT: number; unlockedUSDT: number; unlockedNEX: number; coolingUSDT: number;
+    eventCount: number; nextUnlockAt: number | null;
+    byKind: Record<CommissionEvent["kind"], { usdt: number; nex: number; count: number }> };
   factStatus?: "SIMULATED" | "CANONICAL";
   withdrawable?: boolean;
   payoutStatus?: "NON_WITHDRAWABLE" | "CANONICAL";
@@ -80,10 +83,23 @@ function commissions(value: unknown, mode: ApiEnvironment): TeamCommissionSnapsh
   if (source.payoutStatus !== undefined && source.payoutStatus !== "CANONICAL") return invalid();
   const events=source.events.map((item):CommissionEvent=>{const v=row(item);const rawStatus=String(v.status);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId")||!KINDS.has(String(v.kind))||!STATUSES.has(rawStatus)) return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:rawStatus as CommissionEvent["status"],...state};});
   const aggregate=row(source.aggregate);
+  const rawKinds=row(aggregate.byKind);
+  const byKind = {} as TeamCommissionSnapshot["aggregate"]["byKind"];
+  for (const key of KINDS) {
+    const bucket=row(rawKinds[key]);
+    byKind[key as CommissionEvent["kind"]] = {usdt:num(bucket.usdt),nex:num(bucket.nex),count:num(bucket.count,true)};
+  }
+  const totals = { monthUSDT:num(aggregate.monthUSDT), monthNEX:num(aggregate.monthNEX), todayUSDT:num(aggregate.todayUSDT),
+    unlockedUSDT:num(aggregate.unlockedUSDT), unlockedNEX:num(aggregate.unlockedNEX), coolingUSDT:num(aggregate.coolingUSDT),
+    eventCount:num(aggregate.eventCount,true), nextUnlockAt:aggregate.nextUnlockAt===null?null:num(aggregate.nextUnlockAt,true), byKind };
   const totalUSDT=num(aggregate.totalUSDT), totalNEX=num(aggregate.totalNEX), directUSDT=num(aggregate.directUSDT), extendedUSDT=num(aggregate.extendedUSDT), contributorCount=num(aggregate.contributorCount,true);
   if (!almostEqual(totalUSDT, directUSDT + extendedUSDT)) return invalid();
+  const kindTotals = Object.values(byKind).reduce((sum, bucket) => ({
+    usdt: sum.usdt + bucket.usdt, nex: sum.nex + bucket.nex, count: sum.count + bucket.count,
+  }), {usdt: 0, nex: 0, count: 0});
+  if (!almostEqual(totalUSDT, kindTotals.usdt) || !almostEqual(totalNEX, kindTotals.nex) || totals.eventCount !== kindTotals.count) return invalid();
   const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();
-  return {...proof,events,aggregate:{totalUSDT,totalNEX,directUSDT,extendedUSDT,contributorCount},generatedAt,...(source.factStatus === undefined ? {} : {factStatus: source.factStatus as "SIMULATED" | "CANONICAL"}),...(source.withdrawable === undefined ? {} : {withdrawable: source.withdrawable as boolean}),...(source.payoutStatus === undefined ? {} : {payoutStatus: source.payoutStatus as "NON_WITHDRAWABLE" | "CANONICAL"})};
+  return {...proof,events,aggregate:{totalUSDT,totalNEX,directUSDT,extendedUSDT,contributorCount,...totals},generatedAt,...(source.factStatus === undefined ? {} : {factStatus: source.factStatus as "SIMULATED" | "CANONICAL"}),...(source.withdrawable === undefined ? {} : {withdrawable: source.withdrawable as boolean}),...(source.payoutStatus === undefined ? {} : {payoutStatus: source.payoutStatus as "NON_WITHDRAWABLE" | "CANONICAL"})};
 }
 
 function split(value: unknown): TeamUnilevelSplit { const source=row(value); return { amountUSDT:num(source.amountUSDT), amountNEX:num(source.amountNEX), count:num(source.count,true) }; }

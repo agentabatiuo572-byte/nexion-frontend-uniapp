@@ -299,9 +299,11 @@ export const useCommission = defineStore("commission", () => {
   }
 
   function totalUSDTLifetime() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.totalUSDT ?? 0;
     return events.value.reduce((s, e) => s + e.amountUSDT, 0);
   }
   function totalNEXLifetime() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.totalNEX ?? 0;
     return events.value.reduce((s, e) => s + e.amountNEX, 0);
   }
   /** Pages must use this lookup so remote mode can never fall back to mock rates. */
@@ -310,25 +312,33 @@ export const useCommission = defineStore("commission", () => {
     return UNILEVEL_USDT[layer] ?? 0;
   }
   function unlockedUSDT() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.unlockedUSDT ?? 0;
     return events.value.filter((e) => e.status === "unlocked" && e.withdrawable !== false && e.settlementState !== "SIMULATED").reduce((s, e) => s + e.amountUSDT, 0);
   }
   function unlockedNEX() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.unlockedNEX ?? 0;
     return events.value.filter((e) => e.status === "unlocked" && e.withdrawable !== false && e.settlementState !== "SIMULATED").reduce((s, e) => s + e.amountNEX, 0);
   }
   function coolingUSDT() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.coolingUSDT ?? 0;
     return events.value.filter((e) => e.status === "cooling").reduce((s, e) => s + e.amountUSDT, 0);
   }
   /** sum since local midnight — Home Hero "today's earnings" cross-stream. */
   function todayUSDT() {
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.todayUSDT ?? 0;
     const cutoff = localDayStart();
     return events.value.filter((e) => e.ts >= cutoff).reduce((s, e) => s + e.amountUSDT, 0);
   }
   function monthUSDT() {
-    const cutoff = Date.now() - 30 * ONE_DAY;
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.monthUSDT ?? 0;
+    const today = new Date();
+    const cutoff = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
     return events.value.filter((e) => e.ts >= cutoff).reduce((s, e) => s + e.amountUSDT, 0);
   }
   function monthNEX() {
-    const cutoff = Date.now() - 30 * ONE_DAY;
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.monthNEX ?? 0;
+    const today = new Date();
+    const cutoff = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
     return events.value.filter((e) => e.ts >= cutoff).reduce((s, e) => s + e.amountNEX, 0);
   }
 
@@ -336,6 +346,7 @@ export const useCommission = defineStore("commission", () => {
     const kinds: CommissionKind[] = ["unilevel", "binary", "peer", "cultivation", "leadership", "genesis"];
     const out = {} as Record<CommissionKind, { usdt: number; nex: number; count: number }>;
     for (const k of kinds) out[k] = { usdt: 0, nex: 0, count: 0 };
+    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.byKind ?? out;
     for (const e of events.value) {
       out[e.kind].usdt += e.amountUSDT;
       out[e.kind].nex += e.amountNEX;

@@ -15,6 +15,9 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "me.vue",
   "preferences.vue",
   "profile.vue",
+  // Formal earnings proof deliberately omits the Prototype's synthetic sparkline;
+  // this surface displays the server-authoritative total rather than invented trend data.
+  "proof.vue",
   "receipts.vue",
   // Same 5174 cards, plus production-only authoritative-summary unavailable/retry state.
   "rewards.vue",
@@ -55,6 +58,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "7542b5f017a2c86127c8009c659a74868b6b02793d689ad3dc1bc66b76053ba0",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
+  // R2-06: server facts take precedence over the Prototype's fabricated earnings curve.
+  "proof.vue": "96d5320da341bc25337e4290b25dfdbcc12d2e84ff550b04d0ce6b680184d381",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // P3-13 additionally renders recoverable initial/pagination errors and a busy
@@ -73,7 +78,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   "wallet-exchange.vue": "56d32953f04a0c8ed538ed9caa55642867bcf0be02cd7892776dcc34bfc3a3a5",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
-  "wallet-nex.vue": "98c55a4d34cac2fc73b0985652ebb5faf601ae25db70fdf955763a85ce295aa5",
+  // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
+  "wallet-nex.vue": "e3cb6933ab8f85a035f63e68f6e74de3ed10e0143d20713881ced423ae753a87",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   "wallet-repurchase.vue": "5f5835e141a1c8d20b6c8f42cebaee7a5f3ecba4dcdbd369a1f19e88200df48c",

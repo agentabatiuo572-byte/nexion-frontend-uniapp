@@ -1,3 +1,4 @@
+import { market24hSummary } from "@/lib/market-24h-summary";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { marketApi, remoteApiEnabled } from "@/api/runtime";
@@ -21,6 +22,7 @@ export const useMarket = defineStore("market", () => {
   const high24h = ref(isMockMode ? 0.178 : 0);
   const low24h = ref(isMockMode ? 0.139 : 0);
   const change24hPct = ref(isMockMode ? 20.4 : 0);
+  const change24hAvailable = ref(isMockMode);
   // The G3 endpoint does not authorise volume/supply. Zero means unavailable,
   // not a client estimate.
   const volume24hUSDT = ref(0);
@@ -44,6 +46,7 @@ export const useMarket = defineStore("market", () => {
     high24h.value = 0;
     low24h.value = 0;
     change24hPct.value = 0;
+    change24hAvailable.value = false;
     volume24hUSDT.value = 0;
     circulating.value = 0;
     costBasis.value = 0;
@@ -55,16 +58,15 @@ export const useMarket = defineStore("market", () => {
   }
 
   function commitNex(snapshot: Awaited<ReturnType<typeof marketApi.fetch>>) {
-    const history = snapshot.history.map((point) => point.price);
-    const series = history.length >= 2 ? history : snapshot.sparkline;
-    const open = series[0] ?? snapshot.currentPrice;
+    const summary = market24hSummary(snapshot.history, snapshot.currentPrice);
     nexPriceUSDT.value = snapshot.currentPrice;
     costBasis.value = snapshot.costBasis;
-    open24h.value = open;
-    high24h.value = Math.max(...series, snapshot.currentPrice);
-    low24h.value = Math.min(...series, snapshot.currentPrice);
-    change24hPct.value = ((snapshot.currentPrice - open) / open) * 100;
-    klineHourly.value = series;
+    open24h.value = summary?.open ?? 0;
+    high24h.value = summary?.high ?? 0;
+    low24h.value = summary?.low ?? 0;
+    change24hPct.value = summary?.changePct ?? 0;
+    change24hAvailable.value = summary !== null;
+    klineHourly.value = summary?.prices ?? [];
     klineDaily.value = snapshot.sparkline;
     historySamples.value = snapshot.history;
     lastTickTs.value = Date.now();
@@ -118,7 +120,7 @@ export const useMarket = defineStore("market", () => {
   }
 
   return {
-    isMockMode, nexPriceUSDT, open24h, high24h, low24h, change24hPct, volume24hUSDT,
+    isMockMode, nexPriceUSDT, open24h, high24h, low24h, change24hPct, change24hAvailable, volume24hUSDT,
     circulating, costBasis, klineHourly, klineDaily, historySamples, lastTickTs, marketCap, remoteError, remoteReady,
     marketRunId, syncRemote, tickPrice,
   };
