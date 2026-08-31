@@ -104,6 +104,7 @@ import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
 import { useMarket } from "@/store/market";
+import { fundsServerEnabled } from "@/api/runtime";
 import { MAX_DEVICES, derivePromoUpgrade } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
@@ -156,6 +157,8 @@ const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUp
 const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { online: onlineCount.value, open: emptySlots.value }));
 
 const billsThisMonth = computed(() => {
+  if (fundsServerEnabled && bills.summaryStatus !== "ready") return "--";
+  if (fundsServerEnabled) return bills.summary?.monthBillCount ?? "--";
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   return bills.bills.filter((b) => b.ts >= startOfMonth).length;

@@ -176,7 +176,9 @@ test("production wallet bills come from the authenticated server ledger", async 
   assert.match(store, /walletBillsApi\.list/);
   assert.match(store, /refreshServerLedger/);
   assert.doesNotMatch(store, /FUNDS_BILLS_PROVIDER_NOT_CONFIGURED/);
-  assert.match(page, /refreshServerLedger/);
+  assert.match(page, /getLedger/);
+  assert.match(page, /activePager\.value\.refresh/);
+  assert.doesNotMatch(page, /refreshServerLedger/);
 });
 
 test("remote Genesis holder renders server holdings and emission ledger without fabricated ranks or token ids", async () => {

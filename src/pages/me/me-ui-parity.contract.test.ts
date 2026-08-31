@@ -16,6 +16,8 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "preferences.vue",
   "profile.vue",
   "receipts.vue",
+  // Same 5174 cards, plus production-only authoritative-summary unavailable/retry state.
+  "rewards.vue",
   // Formal App keeps the 5174 visual styles while adding production-only
   // accessibility, server-authority and fail-closed controls in these templates.
   "risk-disclosure.vue",
@@ -26,6 +28,7 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "wallet-cards-new.vue",
   "wallet-cards.vue",
   "wallet-exchange-how.vue",
+  "wallet-nex.vue",
   "wallet-repurchase-how.vue",
   "wallet-repurchase.vue",
   "wallet-topup.vue",
@@ -49,14 +52,17 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // P3-13 additionally renders recoverable initial/pagination errors and a busy
   // load-more label; the successful receipt-row layout is unchanged.
   "receipts.vue": "f8bc3661a5ec95dbba6b6a2fe193d91b206dc13a4fb92c77f569b20df1fed1df",
+  "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
   "security.vue": "d2ee24d1b0833bda99c89e316f49c223f867a3e419f979e27a630d5a7ca661aa",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",
-  "wallet-bills.vue": "9cc229e2d58c12036fb4f5730223e3360cc79c68e9dc59a49aca444afa97ece4",
+  "wallet-bills.vue": "289a982f94511e9bee5917d67b735f720935f4b58ed41666e67c2429c8794033",
   "wallet-cards-new.vue": "d0134756c231552e9068b064b664c5ef1cc7ee3242272f03d4ed1744f9696c97",
   "wallet-cards.vue": "3d1ab2de2b31a61e95bf2a388ba334b6d785a977421f7de75d9ab6e147171622",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
+  // Same recent-activity rows; loading/error/retry now precede the true empty state.
+  "wallet-nex.vue": "98c55a4d34cac2fc73b0985652ebb5faf601ae25db70fdf955763a85ce295aa5",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   "wallet-repurchase.vue": "db6d2885e48405029ca9ae45565166c57cf416406637b413b4e39e29e35852f3",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",

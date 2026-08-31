@@ -29,16 +29,17 @@
         </view>
       </view>
 
-      <view v-if="ledgerError" :style="ledgerErrorStyle">
+      <view v-if="initialError" :style="ledgerErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="ledgerRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshLedger">
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
       </view>
 
       <!-- Empty -->
+      <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
       <EmptyState v-else-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
 
       <!-- Grouped list -->
@@ -84,6 +85,23 @@
             </view>
           </view>
         </view>
+        <view ref="scrollAnchor" style="height: 1px" />
+        <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" aria-live="polite" aria-busy="true"><text>…</text></view>
+        <view v-if="refreshErrorWithRows" :style="appendErrorStyle">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="inline-flex items-center active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+        <view v-else-if="appendError" :style="appendErrorStyle">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="inline-flex items-center active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="loadMore">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+        <view v-if="showManualLoadMore" class="inline-flex items-center active:opacity-70" :style="manualLoadMoreStyle" role="button" tabindex="0" @click="loadMore">
+          <text>{{ t.receipt.loadMore }}</text>
+        </view>
       </view>
 
       <text class="block" :style="footerStyle">{{ t.bills.footer }}</text>
@@ -92,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -105,32 +123,42 @@ import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import { navTo } from "@/lib/route";
 import { fundsServerEnabled } from "@/api/runtime";
+import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
 
 const t = useT();
 const billsStore = useBills();
 const deposits = useDeposits();
-const refreshError = ref("");
-const ledgerRefreshing = ref(false);
-const ledgerError = computed(() => refreshError.value || billsStore.serverError);
-
-async function refreshLedger() {
-  if (!fundsServerEnabled) return;
-  if (ledgerRefreshing.value) return;
-  ledgerRefreshing.value = true;
-  refreshError.value = "";
-  try {
-    await billsStore.refreshServerLedger();
-  } catch (cause) {
-    refreshError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
-  } finally {
-    ledgerRefreshing.value = false;
-  }
-}
-onShow(() => { void refreshLedger(); });
 
 type Tab = "all" | "in" | "out";
 const TABS: Tab[] = ["all", "in", "out"];
 const tab = ref<Tab>("all");
+const allPager = billsStore.getLedger();
+const inPager = billsStore.getLedger({ direction: "IN" });
+const outPager = billsStore.getLedger({ direction: "OUT" });
+const activePager = computed(() => tab.value === "in" ? inPager : tab.value === "out" ? outPager : allPager);
+const scrollAnchor = ref<unknown>(null);
+
+async function refreshLedger() {
+  if (!fundsServerEnabled) return;
+  try { await activePager.value.refresh(); } catch { /* pager owns recoverable state */ }
+}
+async function loadMore() {
+  if (!fundsServerEnabled) return;
+  try { await activePager.value.loadMore(); } catch { /* retain rows; render retry */ }
+}
+onShow(() => { void refreshLedger(); });
+watch(tab, () => { void refreshLedger(); });
+useManualScrollLoadMore(scrollAnchor, {
+  enabled: () => fundsServerEnabled && !activePager.value.error,
+  hasMore: () => activePager.value.hasMore,
+  loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
+  loadMore,
+});
+const initialLoading = computed(() => fundsServerEnabled && activePager.value.status === "loading" && activePager.value.rows.length === 0);
+const initialError = computed(() => fundsServerEnabled && activePager.value.status === "error" && activePager.value.rows.length === 0);
+const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.value.status === "error" && activePager.value.rows.length > 0);
+const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.rows.length > 0 && Boolean(activePager.value.error));
+const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
 
 // Type accent colours. Most map to tokens; refer/topup use official accents
 // (like the card-brand colours) kept literal on purpose.
@@ -165,6 +193,7 @@ function typeColor(type: BillType): string {
 // 判据回到本工程自己的规矩:**指不出单源的数字,要么接单源,要么别显示**。
 // mock 期 balanceAfter 恒为 undefined → 这一列不渲染;接上真后端自动出现,零改动。
 const filtered = computed<Bill[]>(() => {
+  if (fundsServerEnabled) return activePager.value.rows;
   if (tab.value === "all") return billsStore.bills;
   if (tab.value === "in") return billsStore.bills.filter((b) => b.amount > 0);
   return billsStore.bills.filter((b) => b.amount < 0);
@@ -360,6 +389,13 @@ const retryBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
   fontSize: "12px",
+};
+const loadingStyle: CSSProperties = { margin: "0 16px", padding: "32px", textAlign: "center", color: "var(--v5-ink-3)" };
+const appendErrorStyle: CSSProperties = {
+  marginTop: "8px", padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", color: "var(--v5-danger)", fontSize: "12px",
+};
+const manualLoadMoreStyle: CSSProperties = {
+  minHeight: "40px", margin: "4px 0 0", padding: "0 14px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "12px",
 };
 // Transparent hairline group per month: container border-top opens it, the mono
 // month header + rows carry their own dividers (first row = no top border).

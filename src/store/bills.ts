@@ -1,15 +1,16 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { mockServerId } from "./mock-id";
 import { mockServerNow } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { fundsServerEnabled, walletBillsApi } from "@/api/runtime";
-import type { WalletBillRow } from "@/api/wallet-bills-api";
+import type { WalletBillRow, WalletBillFilters, WalletBillsSummary } from "@/api/wallet-bills-api";
+import { createWalletLedgerPager, type LedgerLoadStatus, type WalletLedgerPager } from "./wallet-ledger-pager";
 
 // Ported from Nexion-prototype/lib/store/bills.ts (zustand → Pinia).
-// MOCK-ONLY: 30-day history fabricated client-side; production replaces seed
-// with GET /api/bills and lets the server own ids + balanceAfter.
+// MOCK-ONLY seed below. Real account history uses demand-paged canonical ledger
+// rows; totals always come from the independent server summary, never this page.
 export type BillType =
   | "earn" | "refer" | "bonus" | "topup" | "withdraw"
   | "purchase" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
@@ -179,10 +180,31 @@ export const useBills = defineStore("bills", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const bills = ref<Bill[]>(fundsServerEnabled ? [] : hydrate(boundKey));
-  const serverStatus = ref<"idle" | "loading" | "ready" | "error">("ready");
-  const serverError = ref("");
+  const localBills = ref<Bill[]>(fundsServerEnabled ? [] : hydrate(boundKey));
   let requestGeneration = 0;
+  const ledgers = new Map<string, WalletLedgerPager>();
+  function getLedger(filters: WalletBillFilters = {}): WalletLedgerPager {
+    const key = `${filters.asset ?? ""}|${filters.direction ?? ""}|${filters.category ?? ""}`;
+    let pager = ledgers.get(key);
+    if (!pager) {
+      const stableFilters = { ...filters };
+      pager = createWalletLedgerPager((page, cursor) => walletBillsApi.list(page, 50, { ...stableFilters, cursor }), productionBill);
+      ledgers.set(key, pager);
+    }
+    return pager;
+  }
+  const defaultLedger = getLedger();
+  const bills = computed<Bill[]>({
+    get: () => fundsServerEnabled ? defaultLedger.rows : localBills.value,
+    set: rows => { if (fundsServerEnabled) defaultLedger.rows = rows; else localBills.value = rows; },
+  });
+  const serverStatus = computed(() => fundsServerEnabled ? defaultLedger.status : "ready");
+  const serverError = computed(() => fundsServerEnabled ? defaultLedger.error : "");
+  const summary = ref<(Omit<WalletBillsSummary, "recentNexBills"> & { recentNexBills: Bill[] }) | null>(null);
+  const summaryStatus = ref<LedgerLoadStatus>("idle");
+  const summaryError = ref("");
+  let summaryFlight: Promise<void> | null = null;
+  let summaryGeneration = 0;
 
   function persist(): boolean {
     if (fundsServerEnabled) return false;
@@ -217,39 +239,31 @@ export const useBills = defineStore("bills", () => {
     return "other";
   }
 
-  async function refreshProductionLedger(): Promise<void> {
-    const expectedAccountKey = boundKey;
-    const expectedGeneration = requestGeneration;
-    serverStatus.value = "loading";
-    serverError.value = "";
-    try {
-      const pages: WalletBillRow[] = [];
-      let page = 1;
-      let nextPage: number | null = 1;
-      while (nextPage !== null && pages.length < 1000) {
-        const snapshot = await walletBillsApi.list(page, 50);
-        pages.push(...snapshot.bills);
-        nextPage = snapshot.nextPage;
-        page = nextPage ?? page;
-      }
-      if (expectedAccountKey !== boundKey || expectedGeneration !== requestGeneration) {
-        throw new Error("WALLET_BILLS_REQUEST_SUPERSEDED");
-      }
-      bills.value = recomputeBalance(pages.map(productionBill));
-      serverStatus.value = "ready";
-    } catch (cause) {
-      if (expectedAccountKey === boundKey && expectedGeneration === requestGeneration) {
-        bills.value = [];
-        serverStatus.value = "error";
-        serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
-      }
-      throw cause;
-    }
+  function refreshServerLedger(options: { force?: boolean } = {}): Promise<void> {
+    return fundsServerEnabled ? defaultLedger.refresh(options) : Promise.resolve();
   }
 
-  async function refreshServerLedger(): Promise<void> {
-    if (!fundsServerEnabled) return;
-    return refreshProductionLedger();
+  /** Coalesce only active reads; a later read must see newly posted financial events. */
+  function refreshSummary(options: { force?: boolean } = {}): Promise<void> {
+    if (!fundsServerEnabled) return Promise.resolve();
+    if (summaryFlight && !options.force) return summaryFlight;
+    const expectedAccount = requestGeneration;
+    const expected = ++summaryGeneration;
+    summaryStatus.value = "loading"; summaryError.value = "";
+    const request = walletBillsApi.summary().then(snapshot => {
+      if (expectedAccount !== requestGeneration || expected !== summaryGeneration) throw new Error("WALLET_SUMMARY_REQUEST_SUPERSEDED");
+      summary.value = { ...snapshot, recentNexBills: snapshot.recentNexBills.map(productionBill) };
+      summaryStatus.value = "ready";
+    }).catch(cause => {
+      if (expectedAccount === requestGeneration && expected === summaryGeneration) {
+        summary.value = null;
+        summaryStatus.value = "error";
+        summaryError.value = cause instanceof Error ? cause.message : "WALLET_SUMMARY_REFRESH_FAILED";
+      }
+      throw cause;
+    }).finally(() => { if (expectedAccount === requestGeneration && expected === summaryGeneration) summaryFlight = null; });
+    summaryFlight = request;
+    return request;
   }
 
   /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
@@ -257,17 +271,11 @@ export const useBills = defineStore("bills", () => {
     requestGeneration += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
     if (fundsServerEnabled) {
-      const expectedAccountKey = boundKey;
-      const expectedGeneration = requestGeneration;
-      bills.value = [];
-      serverStatus.value = "idle";
-      serverError.value = "";
-      void refreshServerLedger().catch((cause) => {
-        if (expectedAccountKey === boundKey && expectedGeneration === requestGeneration
-            && !serverError.value) {
-          serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
-        }
-      });
+      for (const pager of ledgers.values()) pager.reset();
+      summaryGeneration++; summaryFlight = null;
+      summary.value = null; summaryStatus.value = "idle"; summaryError.value = "";
+      // Binding must not fetch the entire ledger (or any detail page).
+      if (boundKey !== "default") void refreshSummary().catch(() => { /* summaryError owns the visible failure */ });
       return;
     }
     bills.value = hydrate(boundKey);
@@ -453,6 +461,7 @@ export const useBills = defineStore("bills", () => {
 
   return {
     bills, serverStatus, serverError,
+    summary, summaryStatus, summaryError, refreshSummary, getLedger,
     add, addMany, addManyForAccountOnce, addOnce, seed, settleByRef, bindAccount,
     refreshServerLedger,
   };
