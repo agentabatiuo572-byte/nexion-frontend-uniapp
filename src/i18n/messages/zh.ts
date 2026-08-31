@@ -1438,6 +1438,7 @@ export const zh: Messages = {
     ghostRibbonActive: "免费体验中",
     ghostRibbonGrace: "已停止产出",
     ghostEta: "剩余 {eta}",
+    ghostGraceEta: "抵扣金剩余有效期 {eta}",
     ghostSubtitle: "NexGridBox S1 试用抵扣金",
     ghostDiscount: "提前买断立省 {amount} · 抵扣金抵购机款",
     deviceRowSub: "免费试用中",

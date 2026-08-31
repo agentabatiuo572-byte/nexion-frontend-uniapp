@@ -1449,6 +1449,7 @@ export const vi: Messages = {
     ghostRibbonActive: "Dùng thử miễn phí",
     ghostRibbonGrace: "Đã ngừng sinh lời",
     ghostEta: "Còn {eta}",
+    ghostGraceEta: "Tiền khấu trừ còn hiệu lực {eta}",
     ghostSubtitle: "Tiền khấu trừ dùng thử NexGridBox S1",
     ghostDiscount: "Mua sớm: tiết kiệm {amount} + dùng tiền khấu trừ",
     deviceRowSub: "Đang dùng thử miễn phí",

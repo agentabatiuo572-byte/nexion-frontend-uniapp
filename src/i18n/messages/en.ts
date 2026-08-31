@@ -1501,6 +1501,7 @@ export const en = {
     ghostRibbonActive: "Free trial",
     ghostRibbonGrace: "Production stopped",
     ghostEta: "{eta} left",
+    ghostGraceEta: "Trial credit valid for {eta}",
     ghostSubtitle: "NexGridBox S1 trial credit",
     ghostDiscount: "Buy early: save {amount} + use trial credit",
     deviceRowSub: "On free trial",
