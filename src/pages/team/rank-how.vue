@@ -1,168 +1,104 @@
-<!--
-  Rank · How it works — migrated onto the shared how/* component system in the
-  2026-07 de-card sweep (was 6 page-local surface+border section cards with
-  nested sub-cards). HowHero + HowSection(violet) + HowCalloutBox + HowIconRow +
-  HowFaqRow; ladder/requirements/phases stay page-local (VBadgeIcon ladder is
-  unique to this page). violet accent = brand-2, preserving the rank page's
-  visual identity.
--->
 <template>
   <AppChassis active="team">
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/rank" />
+      <HowHero :label="w.heroLabel" :title="content.copy.headline" :sub="state.policy?.hero || statusText" accent="violet" />
 
-      <!-- Hero -->
-      <HowHero
-        :label="remoteApiEnabled ? t.rank.pageTitle : w.heroLabel"
-        :title="remoteApiEnabled ? t.rank.pageTitle : w.heroTitle"
-        :sub="heroSub"
-        accent="violet"
-      />
+      <view v-if="state.loading || incomplete" class="mx-4 rounded-xl" :style="unavailableStyle" aria-live="polite">
+        <text class="block" :style="bodyStyle">{{ statusText }}</text>
+        <view v-if="!state.loading" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ content.copy.retry }}</view>
+      </view>
 
-      <HowSection v-if="remoteApiEnabled" :title="policy?.hero || t.rank.pageTitle" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18" /></svg>
-        </template>
-        <view v-if="policy" style="display: flex; flex-direction: column; gap: 10px">
-          <view v-for="section in policy.sections" :key="section.id" class="rounded-xl" :style="reqCardStyle">
-            <text class="block" :style="reqLabelStyle">{{ section.title }}</text>
-            <text class="block" :style="reqBodyStyle">{{ section.body }}</text>
-          </view>
-          <text class="block" :style="captionStyle">{{ policy.version }} · {{ policy.locale }} · server-canonical</text>
-        </view>
-        <view v-else class="rounded-xl" :style="policyHoldStyle" role="button" tabindex="0" @click="retryPolicy">
-          <text class="block" :style="unavailableTextStyle">{{ policyError || policyHold }}</text>
-          <text class="block" :style="unavailableRetryStyle">{{ t.rank.retry }}</text>
-        </view>
-      </HowSection>
-
-      <!-- §1 What is the Rank System -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.s1Title" accent="violet">
+      <!-- §1 · Published overview; the same section shell as 5174. -->
+      <HowSection :title="s('overview', w.s1Title).title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         </template>
-        <template v-if="!remoteApiEnabled">
-          <text class="block" :style="bodyStyle">{{ w.s1Para1 }}</text>
-          <text class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ w.s1Para2 }}</text>
-        </template>
-        <view v-else class="rounded-xl" :style="policyHoldStyle">
-          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
-        </view>
+        <text class="block" :style="bodyStyle">{{ s('overview').body }}</text>
+        <text class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ s('overview-detail').body }}</text>
       </HowSection>
 
-      <!-- §2 13 ranks at a glance -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.s2Title" accent="violet">
+      <!-- §2 · Server ladder, without prototype names or clipped inline thresholds. -->
+      <HowSection :title="s('ladder', w.s2Title).title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" /><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" /><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" /></svg>
         </template>
-        <text class="block" :style="captionStyle">{{ remoteApiEnabled ? t.rank.canonicalLadder : w.s2Caption }}</text>
-        <!-- Ladder — transparent row group on the page floor -->
-        <view v-if="rankHowView === 'canonical-ladder'" style="margin-top: 14px; padding: 0 2px; display: flex; flex-direction: column; gap: 7px">
-          <view v-for="r in rankDefs" :key="r.v" class="flex items-center" style="gap: 10px">
-            <VBadgeIcon :v="r.v" :size="22" />
-            <text class="font-display tabular-nums" :style="ladderVStyle">V{{ r.v }}</text>
-            <text :style="ladderTitleStyle">{{ r.title }}</text>
-            <text v-if="isZh" class="truncate" :style="ladderCnStyle">· {{ r.cnTitle }}</text>
-            <text v-if="remoteApiEnabled" class="truncate" :style="ladderConditionStyle">
-              · {{ formatCanonicalRankConditions(r, conditionLabels).join(" · ") }}
-            </text>
+        <text class="block" :style="captionStyle">{{ s('ladder').body }}</text>
+        <view v-if="content.ladder.length" style="margin-top: 14px; padding: 0 2px; display: flex; flex-direction: column; gap: 7px">
+          <view v-for="rank in content.ladder" :key="rank.v" class="flex items-center" style="gap: 10px; min-width: 0">
+            <VBadgeIcon :v="rank.v as VRank" :size="22" />
+            <text class="font-display tabular-nums" :style="ladderVStyle">V{{ rank.v }}</text>
+            <text :style="ladderTitleStyle">{{ rank.title }}</text>
+            <text v-if="isZh && rank.cnTitle !== rank.title" :style="ladderCnStyle">· {{ rank.cnTitle }}</text>
           </view>
         </view>
-        <view v-else class="rounded-xl" :style="unavailableStyle" role="button" tabindex="0" @click="retryRank">
-          <text class="block" :style="unavailableTextStyle">HOLD · {{ t.rank.loadError }}</text>
-          <text class="block" :style="unavailableRetryStyle">{{ t.rank.retry }}</text>
-        </view>
+        <text v-else class="block mt-3" :style="bodyStyle">{{ state.loading ? content.copy.loading : content.copy.emptyLadder }}</text>
       </HowSection>
 
-      <!-- §3 How to level up -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.s3Title" accent="violet">
+      <!-- §3 · Four requirement tiles plus stepwise/protection callouts. -->
+      <HowSection :title="s('promotion', w.s3Title).title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
         </template>
-        <template v-if="!remoteApiEnabled">
-          <text class="block" :style="{ ...captionStyle, marginBottom: '14px' }">{{ w.s3Intro }}</text>
-          <view style="display: flex; flex-direction: column; gap: 10px">
-            <view v-for="req in requirements" :key="req.label" class="rounded-xl" :style="reqCardStyle">
-              <text class="block" :style="reqLabelStyle">{{ req.label }}</text>
-              <text class="block" :style="reqBodyStyle">{{ req.body }}</text>
-            </view>
+        <text class="block" :style="{ ...captionStyle, marginBottom: '14px' }">{{ s('promotion').body }}</text>
+        <view style="display: flex; flex-direction: column; gap: 10px">
+          <view v-for="req in requirements" :key="req.id" class="rounded-xl" :style="reqCardStyle">
+            <text class="block" :style="reqLabelStyle">{{ req.title }}</text>
+            <text class="block" :style="reqBodyStyle">{{ req.body }}</text>
           </view>
-          <HowCalloutBox :title="'⚠️ ' + w.s3RuleATitle" :body="w.s3RuleABody" tone="amber" />
-          <HowCalloutBox :title="'✓ ' + w.s3RuleBTitle" :body="w.s3RuleBBody" tone="purple" />
-        </template>
-        <view v-else class="rounded-xl" :style="policyHoldStyle">
-          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
         </view>
+        <HowCalloutBox :title="'⚠️ ' + s('stepwise').title" :body="s('stepwise').body" tone="amber" />
+        <HowCalloutBox :title="'✓ ' + s('protection').title" :body="s('protection').body" tone="purple" />
       </HowSection>
 
-      <!-- §4 What you unlock -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.s4Title" accent="violet">
+      <!-- §4 · Same four icon rows; published settlement caveats are not replaced. -->
+      <HowSection :title="s('rewards', w.s4Title).title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="8" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         </template>
-        <template v-if="!remoteApiEnabled">
-          <text class="block" :style="captionStyle">{{ w.s4Intro }}</text>
-          <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
-            <HowIconRow v-for="u in unlocks" :key="u.label" :emoji="u.emoji" :label="u.label" :body="u.body" />
-          </view>
-        </template>
-        <view v-else class="rounded-xl" :style="policyHoldStyle">
-          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
+        <text class="block" :style="captionStyle">{{ s('rewards').body }}</text>
+        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
+          <HowIconRow v-for="item in unlocks" :key="item.id" :emoji="item.emoji" :label="item.title" :body="item.body" />
         </view>
       </HowSection>
 
-      <!-- §5 Worked example -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.s5Title" accent="violet">
+      <!-- §5 · Illustrative adjacent ranks selected from current visible server configuration. -->
+      <HowSection :title="s('example', content.copy.example).title" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
         </template>
-        <template v-if="!remoteApiEnabled">
-          <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
-
+        <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ content.example ? s('example').body : (state.loading ? content.copy.loading : content.copy.noExample) }}</text>
+        <template v-if="content.example">
           <view class="rounded-xl" :style="startCardStyle">
-            <text class="block" :style="startLabelStyle">{{ w.s5StartLabel }}</text>
-            <text class="block" :style="bodyStyle">{{ w.s5StartBody }}</text>
+            <text class="block" :style="startLabelStyle">{{ s('example-start').title }}</text>
+            <text class="block" :style="bodyStyle">{{ s('example-start').body }}</text>
           </view>
-
           <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px">
-            <HowStepRow v-for="ph in phases" :key="ph.n" :n="ph.n" :title="ph.title" :body="ph.body" accent="violet" />
+            <HowStepRow v-for="phase in phases" :key="phase.id" :n="phase.n" :title="phase.title" :body="phase.body" accent="violet" />
           </view>
-
-          <HowCalloutBox :title="'⚡ ' + w.s5TriggerLabel" :body="w.s5TriggerBody" tone="purple" />
-
+          <HowCalloutBox :title="'⚡ ' + s('example-trigger').title" :body="s('example-trigger').body" tone="purple" />
           <view class="rounded-xl border" :style="unlockResultCardStyle">
-            <text class="block" :style="unlockResultLabelStyle">🎉 {{ w.s5UnlockLabel }}</text>
+            <text class="block" :style="unlockResultLabelStyle">🎉 {{ s('example-results').title }}</text>
+            <text class="block" :style="{ ...captionStyle, marginBottom: '6px' }">{{ s('example-results').body }}</text>
             <view style="display: flex; flex-direction: column; gap: 4px">
-              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock1 }}</text>
-              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock2 }}</text>
-              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock3 }}</text>
-              <text class="block" :style="unlockResultItemStyle">• {{ w.s5Unlock4 }}</text>
+              <text v-for="result in results" :key="result.id" class="block" :style="unlockResultItemStyle">• {{ result.body }}</text>
             </view>
           </view>
         </template>
-        <view v-else class="rounded-xl" :style="policyHoldStyle">
-          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
-        </view>
       </HowSection>
 
-      <!-- §6 FAQ -->
-      <HowSection v-if="!remoteApiEnabled" :title="w.faqTitle" accent="violet">
+      <!-- §6 · Published FAQ, using the reference's shared FAQ rows. -->
+      <HowSection :title="w.faqTitle" accent="violet">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         </template>
-        <template v-if="!remoteApiEnabled">
-          <view style="display: flex; flex-direction: column; gap: 10px">
-            <HowFaqRow v-for="faq in faqs" :key="faq.q" :q="faq.q" :a="faq.a" />
-          </view>
-        </template>
-        <view v-else class="rounded-xl" :style="policyHoldStyle">
-          <text class="block" :style="unavailableTextStyle">{{ policyHold }}</text>
+        <view style="display: flex; flex-direction: column; gap: 10px">
+          <HowFaqRow v-for="faq in faqs" :key="faq.id" :q="faq.title" :a="faq.body" />
         </view>
       </HowSection>
 
-      <!-- Footer CTA -->
       <view class="mx-4 mt-6">
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="goBack">
+        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
           <text :style="ctaTextStyle">{{ w.ctaBack }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
         </view>
@@ -172,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -185,106 +121,54 @@ import HowStepRow from "@/components/how/how-step-row.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
+import type { VRank } from "@/store/v-rank";
 import { navBack } from "@/lib/route";
-import { useVRank, type VRankDef } from "@/store/v-rank";
-import { apiClient, expectedApiEnvironment, remoteApiEnabled } from "@/api/runtime";
-import { createRankHowPolicyApi, type RankHowPolicy } from "@/api/rank-how-policy-api";
-import { formatCanonicalRankConditions, rankHowPresentation } from "@/lib/v-rank-how-policy";
+import { apiClient, expectedApiEnvironment, vRankApi } from "@/api/runtime";
+import { createRankHowPolicyApi } from "@/api/rank-how-policy-api";
+import { buildRankHowContent, createRankHowResource, type RankHowResourceState } from "@/lib/rank-how-content";
 
 const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
-// 中文头衔只给中文用户看 —— 与 network-card.vue:83 的 titleOf 同一条守卫。
-// 缺它时 en/vi 用户会在 V 级阶梯上读到 13 行中文(独立审计实测)。
 const locale = useLocaleStore();
 const isZh = computed(() => locale.code === "zh");
-const vState = useVRank();
-const rankDefs = computed<VRankDef[]>(() => vState.ladder);
-const rankHowView = computed(() => rankHowPresentation(expectedApiEnvironment, vState.remoteReady));
-const heroSub = computed(() => remoteApiEnabled ? (policy.value?.hero || policyHold.value) : w.value.heroSub);
-const policyHold = computed(() => `HOLD · ${t.value.rank.policyUnavailable}`);
-const policy = ref<RankHowPolicy | null>(null);
-const policyError = ref<string | null>(null);
+const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [] });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
-const conditionLabels = computed(() => t.value.rank.cond);
+const resource = createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => { state.value = value; } });
+const content = computed(() => buildRankHowContent(state.value.policy, state.value.ranks, locale.code, t.value.rank.cond));
+const s = (id: string, fallbackTitle?: string) => content.value.section(id, fallbackTitle);
+const requirements = computed(() => ["requirement-self", "requirement-direct", "requirement-team", "requirement-legs"].map(id => s(id)));
+const unlocks = computed(() => ["network", "peer", "leadership", "cultivation"].map((name, index) => ({ ...s(`unlock-${name}`), emoji: ["📈", "🤝", "🏆", "🌱"][index] })));
+const phases = computed(() => ["self", "team", "legs"].map((name, index) => ({ ...s(`example-${name}`), n: index + 1 })));
+const results = computed(() => ["network", "peer", "leadership", "cultivation"].map(name => s(`result-${name}`)));
+const faqs = computed(() => ["members", "rank", "rewards"].map(name => s(`faq-${name}`)));
+const incomplete = computed(() => state.value.error || [
+  ...requirements.value, ...unlocks.value, ...faqs.value,
+  ...["overview", "overview-detail", "ladder", "promotion", "stepwise", "protection", "rewards"].map(id => s(id)),
+  ...(content.value.example ? [...phases.value, ...results.value, ...["example", "example-start", "example-trigger", "example-results"].map(id => s(id))] : []),
+].some(section => !section.available));
+const statusText = computed(() => state.value.loading ? content.value.copy.loading : content.value.copy.unavailable);
+function reload() { void resource.load(locale.code); }
+function goBack() { navBack("/pages/team/rank"); }
+onShow(reload);
+watch(() => locale.code, reload);
+onUnmounted(resource.dispose);
 
-const requirements = computed(() => [
-  { label: w.value.req1Label, body: w.value.req1Body },
-  { label: w.value.req2Label, body: w.value.req2Body },
-  { label: w.value.req3Label, body: w.value.req3Body },
-  { label: w.value.req4Label, body: w.value.req4Body },
-]);
-const unlocks = computed(() => [
-  { emoji: "📈", label: w.value.unlock1Label, body: w.value.unlock1Body },
-  { emoji: "🤝", label: w.value.unlock2Label, body: w.value.unlock2Body },
-  { emoji: "🏆", label: w.value.unlock3Label, body: w.value.unlock3Body },
-  { emoji: "🌱", label: w.value.unlock5Label, body: w.value.unlock5Body },
-]);
-const phases = computed(() => [
-  { n: 1, title: w.value.s5Phase1Title, body: w.value.s5Phase1Body },
-  { n: 2, title: w.value.s5Phase2Title, body: w.value.s5Phase2Body },
-  { n: 3, title: w.value.s5Phase3Title, body: w.value.s5Phase3Body },
-]);
-const faqs = computed(() => [
-  { q: w.value.faqQ1, a: w.value.faqA1 },
-  { q: w.value.faqQ2, a: w.value.faqA2 },
-  { q: w.value.faqQ3, a: w.value.faqA3 },
-]);
-
-function goBack() {
-  navBack("/pages/team/rank");
-}
-
-function retryRank() {
-  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
-}
-
-async function retryPolicy() {
-  if (!remoteApiEnabled) return;
-  policyError.value = null;
-  try { policy.value = await policyApi.published(locale.code); }
-  catch (error) { policy.value = null; policyError.value = error instanceof Error ? error.message : "RANK_HOW_POLICY_UNAVAILABLE"; }
-}
-
-onShow(() => {
-  if (remoteApiEnabled) { void vState.refreshCanonicalVRank(); void retryPolicy(); }
-});
-watch(() => locale.code, () => { if (remoteApiEnabled) void retryPolicy(); });
-
-// ─── styles ───
-// Section shells / hero / callouts now come from the how/* components; only
-// page-local content styles remain.
-const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
-
-const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px" };
-const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
-const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
-const ladderConditionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", flex: 1 };
-const unavailableStyle: CSSProperties = { marginTop: "14px", padding: "14px", background: "var(--v5-surface-2)" };
-const unavailableTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
-const unavailableRetryStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-brand)" };
-const policyHoldStyle: CSSProperties = { marginTop: "14px", padding: "14px", background: "var(--v5-surface-2)" };
-
-// Requirement tiles — filled, no border (single visual difference).
+// Preserve the 5174 shared how-page scale and violet section identity.
+const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65, overflowWrap: "anywhere" };
+const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
+const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px", flexShrink: 0 };
+const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500, overflowWrap: "anywhere" };
+const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", overflowWrap: "anywhere" };
+const unavailableStyle: CSSProperties = { padding: "14px", background: "var(--v5-surface-2)" };
+const retryStyle: CSSProperties = { marginTop: "8px", color: "var(--v5-brand)", background: "var(--v5-surface-2)" };
 const reqCardStyle: CSSProperties = { background: "var(--v5-surface-2)", padding: "10px 12px" };
 const reqLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
-const reqBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 }; // how-row scale: body 13/1.62 ink-2
-
-// Worked-example start tile — filled, no border.
+const reqBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62, overflowWrap: "anywhere" };
 const startCardStyle: CSSProperties = { marginTop: "14px", background: "var(--v5-surface-2)", padding: "12px 14px" };
 const startLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "4px" };
-
-const unlockResultCardStyle: CSSProperties = {
-  marginTop: "8px",
-  borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  borderColor: "color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
-  padding: "12px",
-};
+const unlockResultCardStyle: CSSProperties = { marginTop: "8px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)", borderColor: "color-mix(in srgb, var(--v5-brand-2) 30%, transparent)", padding: "12px" };
 const unlockResultLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "6px" };
 const unlockResultItemStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
-
-
 const ctaStyle: CSSProperties = { gap: "8px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
 const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
 </script>
