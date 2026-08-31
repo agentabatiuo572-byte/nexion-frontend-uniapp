@@ -811,7 +811,9 @@ function goNotifications() {
 }
 .nx-logo {
   position: relative;
-  width: 96px;
+  /* 2026-08-31 品牌包横版 compact 是 356×120(2.967:1);容器按这个比例给,
+     否则 aspectFit 会在 96px 盒子里留 8px 透明边,logo 看着离页边不齐。 */
+  width: 80px;
   height: 27px;
   display: block;
   flex-shrink: 0;
