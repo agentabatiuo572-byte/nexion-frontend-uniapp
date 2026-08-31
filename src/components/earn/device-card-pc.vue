@@ -509,7 +509,7 @@ function toggleNetwork() {
   app.setPhoneRuntime(props.device.id, { isWifiConnected: !isOnline.value });
 }
 function goTaskHistory() {
-  uni.navigateTo({ url: "/pages/me/receipts", fail: () => {} });
+  navTo("/pages/me/receipts");
 }
 
 // ── Phone live hashpower (effective = calibrated capability × condition factors) ──
@@ -596,7 +596,7 @@ const LOCKED_ITEMS: { model: string; daily: number; vram: string }[] = [
 const lockedTotalDaily = computed(() => LOCKED_ITEMS.reduce((s, it) => s + it.daily, 0));
 const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", "142"));
 function goUnlock() {
-  uni.navigateTo({ url: `/pages/store/detail?id=${promo.value.targetKind}`, fail: () => {} });
+  navTo(`/pages/store/detail?id=${promo.value.targetKind}`);
 }
 
 // Lifecycle chip
@@ -788,10 +788,10 @@ function goStatsMenu() {
 }
 function goTradeinMenu() {
   closeMenu();
-  uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+  navTo("/pages/me/devices");
 }
 function goDevices() {
-  uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+  navTo("/pages/me/devices");
 }
 
 // ── styles ──

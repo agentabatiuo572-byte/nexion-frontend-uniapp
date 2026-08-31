@@ -18,6 +18,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import type { CSSProperties } from "vue";
 
 const props = defineProps<{
@@ -27,7 +28,7 @@ const props = defineProps<{
 }>();
 
 function go() {
-  uni.navigateTo({ url: props.href, fail: () => {} });
+  navTo(props.href);
 }
 
 const iconStyle: CSSProperties = {

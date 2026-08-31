@@ -103,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -161,7 +162,7 @@ function rowStatus(v: VRank): "done" | "current" | "locked" {
 const formatConditions = (r: VRankDef): string => rankConditionsText(t.value, r.conditions);
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 // ─── styles ───

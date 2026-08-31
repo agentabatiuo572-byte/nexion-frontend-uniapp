@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -135,7 +136,7 @@ async function handleRemove(card: SavedCard) {
 
 function goNew() {
   if (!cardBindingAvailable.value) return;
-  uni.navigateTo({ url: "/pages/me/wallet-cards-new", fail: () => {} });
+  navTo("/pages/me/wallet-cards-new");
 }
 
 // ── styles ──

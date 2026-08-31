@@ -248,6 +248,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -441,16 +442,16 @@ function mintedText(ms: number): string {
 }
 
 function goGenesis() {
-  uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
+  navTo("/pages/genesis/genesis");
 }
 function goMarketplace() {
-  uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+  navTo("/pages/genesis/marketplace");
 }
 function goHowItWorks() {
-  uni.navigateTo({ url: "/pages/genesis/how-it-works", fail: () => {} });
+  navTo("/pages/genesis/how-it-works");
 }
 function goStaking() {
-  uni.navigateTo({ url: "/pages/staking/staking", fail: () => {} });
+  navTo("/pages/staking/staking");
 }
 
 // ── styles ──

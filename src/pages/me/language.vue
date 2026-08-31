@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -75,7 +76,7 @@ function pick(next: LocaleCode) {
   locale.setLocale(next);
 }
 function goAccount() {
-  uni.navigateTo({ url: "/pages/me/me", fail: () => {} });
+  navTo("/pages/me/me");
 }
 
 // Intro caption — header already provides the 24px breathing (no top margin).

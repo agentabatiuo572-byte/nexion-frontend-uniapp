@@ -178,6 +178,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -398,10 +399,10 @@ function onEligSubscribe() {
   }, 260);
 }
 function goHowItWorks() {
-  uni.navigateTo({ url: "/pages/genesis/how-it-works", fail: () => {} });
+  navTo("/pages/genesis/how-it-works");
 }
 function goMarketplace() {
-  uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+  navTo("/pages/genesis/marketplace");
 }
 
 // ── styles ──

@@ -11,6 +11,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
@@ -20,6 +21,6 @@ const app = useApp();
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 
 function go() {
-  uni.navigateTo({ url: resolveAddDeviceRoute(promo.value.targetKind), fail: () => {} });
+  navTo(resolveAddDeviceRoute(promo.value.targetKind));
 }
 </script>

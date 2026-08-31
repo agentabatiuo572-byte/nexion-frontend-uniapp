@@ -123,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -147,6 +148,7 @@ import {
 } from "@/store/staking";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
+import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
@@ -172,27 +174,25 @@ function poolForTerm(term: StakingTerm) {
 const sheetOpen = ref(false);
 const sheetTerm = ref<StakingTerm | null>(null);
 const pendingRemoteMutations = ref(new Set<string>());
-const remoteMutationKeys = new Map<string, string>();
-
-function intentKey(kind: "claim" | "early", positionNo: string) {
-  const intent = `${kind}:${positionNo}`;
-  const existing = remoteMutationKeys.get(intent);
-  if (existing) return { intent, key: existing };
-  const key = `G1-${kind.toUpperCase()}-${positionNo}-${Date.now().toString(36)}`;
-  remoteMutationKeys.set(intent, key);
-  return { intent, key };
-}
+const remoteMutationGate = createRemoteIntentGate("G1");
 
 async function runRemoteMutation(kind: "claim" | "early", positionNo: string) {
-  const { intent, key } = intentKey(kind, positionNo);
+  let lease;
+  try {
+    lease = remoteMutationGate.acquire(app.accountKey, kind, { positionNo });
+  } catch {
+    return false;
+  }
+  const intent = lease.fingerprint;
   if (pendingRemoteMutations.value.has(intent)) return false;
   pendingRemoteMutations.value = new Set([...pendingRemoteMutations.value, intent]);
   try {
-    if (kind === "claim") await staking.claimRemote(positionNo, key);
-    else await staking.earlyWithdrawRemote(positionNo, key);
-    remoteMutationKeys.delete(intent);
+    if (kind === "claim") await staking.claimRemote(positionNo, lease.key);
+    else await staking.earlyWithdrawRemote(positionNo, lease.key);
+    remoteMutationGate.complete(lease, true);
     return true;
   } catch {
+    remoteMutationGate.complete(lease, false);
     // The request may have reached the service even when its response is unknown.
     await staking.syncRemote();
     return false;
@@ -256,7 +256,7 @@ function openSheet(term: StakingTerm) {
   sheetOpen.value = true;
 }
 function goHowItWorks() {
-  uni.navigateTo({ url: "/pages/staking/how-it-works", fail: () => {} });
+  navTo("/pages/staking/how-it-works");
 }
 
 /**

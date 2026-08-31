@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
@@ -73,6 +74,6 @@ function retryHome() {
 }
 
 function goAll() {
-  uni.navigateTo({ url: "/pages/me/wallet-bills", fail: () => {} });
+  navTo("/pages/me/wallet-bills");
 }
 </script>

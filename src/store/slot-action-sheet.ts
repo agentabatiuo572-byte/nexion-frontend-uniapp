@@ -1,3 +1,4 @@
+import { navTo } from "@/lib/route";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useApp } from "./app";
@@ -31,7 +32,7 @@ export const useSlotActionSheet = defineStore("slotActionSheet", () => {
     if (hasInactive) {
       open.value = true;
     } else {
-      uni.navigateTo({ url: "/pages/store/store", fail: () => {} });
+      navTo("/pages/store/store");
     }
   }
 

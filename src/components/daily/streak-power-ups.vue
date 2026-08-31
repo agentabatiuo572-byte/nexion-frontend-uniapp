@@ -73,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -162,7 +163,7 @@ async function handleClaim(p: PowerUp) {
       // Remote targetPath is the server canonical href. Navigate only after
       // activation is confirmed; a failed claim remains retryable in the store.
       const target = canonicalPowerUpTarget(p.href);
-      if (target) uni.navigateTo({ url: target, fail: () => {} });
+      if (target) navTo(target);
     } else {
       toast.error(t.value.authOtp.errorServiceUnavailable);
     }
@@ -176,7 +177,7 @@ async function handleClaim(p: PowerUp) {
     toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
   }
   // Route into the deeper linked touchpoint (no-op if not yet ported).
-  uni.navigateTo({ url: p.href, fail: () => {} });
+  navTo(p.href);
 }
 
 // ── styles ──

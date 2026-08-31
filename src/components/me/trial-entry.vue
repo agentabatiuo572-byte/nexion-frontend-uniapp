@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -40,7 +41,7 @@ const stateLabel = computed(() =>
 const activeTitle = computed(() => fmt(t.value.trial.activeTitle, { state: stateLabel.value }));
 
 function goTrial() {
-  uni.navigateTo({ url: "/pages/me/trial", fail: () => {} });
+  navTo("/pages/me/trial");
 }
 
 // ── styles ──

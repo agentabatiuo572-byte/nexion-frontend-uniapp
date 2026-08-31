@@ -25,6 +25,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, useAttrs, useSlots, type CSSProperties } from "vue";
 
 const props = withDefaults(
@@ -47,7 +48,7 @@ const interactive = computed(() => !!props.href || !!attrs.onClick);
 
 function go() {
   if (!props.href) return;
-  uni.navigateTo({ url: props.href, fail: () => {} });
+  navTo(props.href);
 }
 
 // Content aligns to the transparent group's gutter (page 16px + 2px inset); the

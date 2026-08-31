@@ -453,7 +453,7 @@ async function abandonPendingAttempt() {
       if (result.state === "COMMITTED") {
         toast.info(t.value.walletV3.withdrawAbandonAlreadyCommitted);
         await app.refreshRemoteFleet();
-        uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`, fail: () => {} });
+        navTo(`/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`);
       } else {
         toast.info(t.value.walletV3.withdrawAbandonSuccess);
       }
@@ -1067,7 +1067,7 @@ function useMax() {
 
 function goEarnNex() {
   // NEX 主来源 = 设备算力任务;引导去赚更多 NEX 才能解锁更大额提现
-  uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
+  navTo("/pages/earn/earn");
 }
 
 async function handleResetAddresses() {
@@ -1109,7 +1109,7 @@ async function handleSubmit() {
   }
   if (!risk.accepted) {
     // Source pushes to the risk-disclosure page (not yet ported) and returns.
-    uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
+    navTo("/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw");
     return;
   }
   // 🔴 **一份提交快照收全族**(2026-08-04 R2 三条 P1 同一个根:跨 await 的状态漂移)。
@@ -1205,7 +1205,7 @@ async function handleSubmit() {
   } catch (cause) {
     clearSubmitFreeze();
     if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
-      uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
+      navTo("/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw");
     } else {
       toast.error(t.value.riskDisclosure.gateUnavailable);
     }
@@ -1348,7 +1348,7 @@ async function handleSubmit() {
       toast.info(t.value.wallet.withdrawSubmittedOtherAccountTitle, t.value.wallet.withdrawSubmittedOtherAccountBody);
       return;
     }
-    uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${wd.id}`, fail: () => {} });
+    navTo(`/pages/me/wallet-withdraw-tracking?id=${wd.id}`);
     return;
   } catch (err) {
     clearSubmitFreeze();

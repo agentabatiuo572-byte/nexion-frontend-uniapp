@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { getLifecycleSummary, getNetworkMonthlyLoss, hasServerLifecycleProjection, isDegradable } from "@/store/device-lifecycle";
@@ -137,6 +138,6 @@ const ctaLabelStyle: CSSProperties = {
 };
 
 function goDevices() {
-  uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+  navTo("/pages/me/devices");
 }
 </script>

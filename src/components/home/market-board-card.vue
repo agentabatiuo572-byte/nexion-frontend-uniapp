@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -83,10 +84,10 @@ function deltaColor(row: AppHomeWorkload) {
     : tone === "negative" ? "var(--v5-danger)" : "var(--v5-ink-4)";
 }
 function goMarket() {
-  uni.navigateTo({ url: "/pages/market/market", fail: () => {} });
+  navTo("/pages/market/market");
 }
 function goEarn() {
-  uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
+  navTo("/pages/earn/earn");
 }
 function retryHome() {
   void app.refreshHomeTruth();

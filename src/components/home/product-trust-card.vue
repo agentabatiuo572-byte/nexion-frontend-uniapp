@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, type CSSProperties } from "vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useT } from "@/i18n/use-t";
@@ -60,7 +61,7 @@ function retry() {
 
 function openProduct() {
   if (!selected.value) return;
-  uni.navigateTo({ url: `/pages/store/detail?id=${encodeURIComponent(selected.value.product.id)}`, fail: () => {} });
+  navTo(`/pages/store/detail?id=${encodeURIComponent(selected.value.product.id)}`);
 }
 
 onMounted(() => {

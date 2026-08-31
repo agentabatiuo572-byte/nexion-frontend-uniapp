@@ -70,10 +70,10 @@ export const useNetworkRank = defineStore("networkRank", () => {
     });
     return pending;
   }
-  const unsubscribeCommerceRun = subscribeRuntimeRevision((scope) => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
     invalidate();
-    if (scope.runId !== null) void refresh();
+    void refresh();
   });
   onScopeDispose(unsubscribeCommerceRun);
   return { snapshot, status, bindAccount, refresh };

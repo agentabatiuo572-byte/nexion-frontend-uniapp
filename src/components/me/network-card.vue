@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -146,7 +147,7 @@ const perkLine = computed(() =>
 );
 
 function goTeam() {
-  uni.navigateTo({ url: "/pages/team/team", fail: () => {} });
+  navTo("/pages/team/team");
 }
 
 // ── styles ──

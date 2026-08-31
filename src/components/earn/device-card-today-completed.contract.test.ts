@@ -23,7 +23,7 @@ describe("per-device today-completed section", () => {
     expect(source).toContain('@click.stop="goTaskHistory"');
     expect(source).toContain('@keydown.enter.stop.prevent="goTaskHistory"');
     expect(source).toContain('@keydown.space.stop.prevent="goTaskHistory"');
-    expect(source).toContain('url: "/pages/me/receipts"');
+    expect(source).toContain('navTo("/pages/me/receipts")');
   });
 
   it("ships the new section label in all supported languages", () => {

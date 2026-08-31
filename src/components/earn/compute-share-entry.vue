@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
@@ -42,7 +43,7 @@ const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsFull = computed(() => app.activeSlotCount + trialSlot.value >= MAX_DEVICES);
 
 function goDownload() {
-  uni.navigateTo({ url: "/pages/compute-share/download", fail: () => {} });
+  navTo("/pages/compute-share/download");
 }
 
 const rootStyle: CSSProperties = {
