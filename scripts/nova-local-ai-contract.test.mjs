@@ -50,7 +50,7 @@ test("human support routes never inherit Nova connection or HOLD state", () => {
   assert.match(chat, /isAi\.value && novaProviderHold\.value/);
   assert.match(
     chat,
-    /isAi\.value \? novaProviderHold\.value : conv\.value\?\.sessionStatus === "closed"/,
+    /isAi\.value \? novaProviderHold\.value : !!conv\.value && !isReplyAllowed\.value/,
   );
 });
 
@@ -74,7 +74,7 @@ test("remote tab routes keep a persistent Nova launcher without mock push timers
   assert.match(bubble, /remoteApiEnabled \? nova\.unread : nova\.unread \+ conversations\.totalUnread/);
   assert.match(
     bubble,
-    /navTo\(remoteApiEnabled \? "\/pages\/support\/chat\?type=ai" : "\/pages\/support\/messages"\)/,
+    /function open\(\) \{\s*navTo\("\/pages\/support\/messages"\);\s*\}/,
   );
   assert.match(bubble, /if \(remoteApiEnabled\) \{[\s\S]{0,120}notifications\.refreshRemote\(\);[\s\S]{0,80}return;/);
 });
