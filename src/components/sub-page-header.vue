@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, onMounted, onUnmounted } from "vue";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications } from "@/store/notifications";
@@ -86,7 +86,22 @@ function readRoute(): string {
 // Display title precedence: explicit prop → route-derived title → "" (empty →
 // .spv-title v-if doesn't render, matching the prototype's unmapped="" behaviour).
 // Mirrors Nexion-prototype header.tsx computeTitle.
-const displayTitle = computed(() => props.title ?? resolveHeaderTitleText(readRoute(), t.value.headerTitles));
+const currentRoute = ref(readRoute());
+const syncRoute = () => { currentRoute.value = readRoute(); };
+onMounted(() => {
+  syncRoute();
+  if (typeof window !== "undefined") {
+    window.addEventListener("hashchange", syncRoute);
+    window.addEventListener("popstate", syncRoute);
+  }
+});
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("hashchange", syncRoute);
+    window.removeEventListener("popstate", syncRoute);
+  }
+});
+const displayTitle = computed(() => props.title ?? resolveHeaderTitleText(currentRoute.value, t.value.headerTitles));
 const statusBarHeight = computed(() => {
   try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); }
 });

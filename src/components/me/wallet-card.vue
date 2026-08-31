@@ -80,11 +80,6 @@
               <view aria-hidden :style="pulseDotStyle" />
               <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-3)">{{ slotsLine }}</text>
             </view>
-            <view class="flex items-baseline" style="gap: 4px; margin-top: 4px">
-              <text style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-ink-2)">{{ t.me.walletSlotUnlock }}</text>
-              <text class="tabular-nums" :style="slotPotentialStyle">+${{ slotPotential }}/d</text>
-              <text style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-ink-3)">{{ t.me.walletSlotMore }}</text>
-            </view>
           </view>
           <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" data-me-action="add-device" role="button" tabindex="0" :aria-label="t.me.addDeviceCta" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
             <text>{{ t.me.addDeviceCta }}</text>
@@ -105,7 +100,7 @@ import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
 import { useMarket } from "@/store/market";
 import { fundsServerEnabled } from "@/api/runtime";
-import { MAX_DEVICES, derivePromoUpgrade } from "@/store/device-types";
+import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
 import SectionHeader from "@/components/me/section-header.vue";
@@ -137,7 +132,7 @@ const nex = computed(() => app.user.nexBalance);
 const nexLabel = computed(() => nex.value.toLocaleString());
 const marketReady = computed(() => market.isMockMode || market.remoteReady);
 const nexChangeLabel = computed(() => {
-  if (!marketReady.value) return "—";
+  if (!marketReady.value || !market.change24hAvailable) return "—";
   const change = market.change24hPct;
   return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
 });
@@ -153,7 +148,6 @@ const emptySlots = computed(() => Math.max(0, MAX_DEVICES - activeCount.value - 
 const onlineCount = computed(
   () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length + trialSlot.value,
 );
-const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUpgrade(app.visibleDevices).targetDaily));
 const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { online: onlineCount.value, open: emptySlots.value }));
 
 const billsThisMonth = computed(() => {
@@ -279,14 +273,6 @@ const pulseDotStyle: CSSProperties = {
   borderRadius: "50%",
   background: "var(--v5-tech-cyan)",
   animation: "v5-hb-pulse 1.8s ease-in-out infinite",
-};
-const slotPotentialStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "20px",
-  fontWeight: 600,
-  letterSpacing: "-0.022em",
-  color: "var(--v5-brand-2-ink)",
-  lineHeight: 1,
 };
 const addDeviceBtnStyle: CSSProperties = {
   minHeight: "44px",

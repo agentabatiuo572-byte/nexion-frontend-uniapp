@@ -153,9 +153,16 @@ test("eligible first-time users retain a visible H2 claim entry which opens the 
   const hero = read("src/components/trial-hero-banner.vue");
   const sheet = read("src/components/trial-claim-sheet.vue");
   assert.match(earn, /<TrialHeroBanner class="w-full"/);
-  assert.match(hero, /trial\.status === "none"[\s\S]*seatsLeftToday > 0[\s\S]*trial\.canStart\(\)/);
+  // The hero now uses the authoritative detailed eligibility result rather
+  // than the legacy canStart() wrapper. Keep the three gates together: idle
+  // account, positive server quota, and an eligible claim. The exceptional
+  // product-unavailable branch remains visible only to disclose stock, while
+  // canClaim still controls whether the sheet may open.
+  assert.match(hero, /const eligibility = computed\(\(\) => trial\.eligibility\(\)\);/);
+  assert.match(hero, /const canClaim = computed\(\(\) => trial\.status === "none" && eligibility\.value\.ok\);/);
+  assert.match(hero, /const visible = computed\(\(\) => trial\.status === "none"\s+&& trialCfg\.config\.seatsLeftToday > 0\s+&& \(canClaim\.value \|\| productUnavailable\.value\)\);/);
   assert.match(hero, /@click="onClick"/);
-  assert.match(hero, /claimSheet\.show\(\)/);
+  assert.match(hero, /function onClick\(\) \{\s+if \(!canClaim\.value\) return;\s+claimSheet\.show\(\);/);
   assert.match(sheet, /await freeTrial\.start\(\)/);
 });
 
@@ -196,6 +203,10 @@ test("remote free-trial store never persists or locally advances an authoritativ
   assert.match(apiSource, /start:\s*\(idempotencyKey, deviceName\)/);
   assert.match(apiSource, /body:\s*\{ deviceName \}/);
   const storeSource = read("src/store/free-trial.ts");
-  assert.match(storeSource, /resolveTrialDeviceName\(useTrialConfig\(\)\.config\.trialProductId\)/);
+  // The authoritative E1 name is now carried with the authoritative product
+  // id. Require both fields and the fail-closed branch before a command can
+  // reach the remote start endpoint; do not pin the former inline expression.
+  assert.match(storeSource, /const trialConfig = useTrialConfig\(\)\.config;\s+const deviceName = resolveTrialDeviceName\(trialConfig\.trialProductId, trialConfig\.trialProductName\);/);
+  assert.match(storeSource, /if \(!deviceName\) \{\s+clearRemoteFacts\("error", "TRIAL_CONFIG_RESPONSE_INVALID"\);\s+return \{ ok: false, reason: "unknown" \};/);
   assert.match(storeSource, /trialApi\.start\(pendingStartKey, deviceName\)/);
 });

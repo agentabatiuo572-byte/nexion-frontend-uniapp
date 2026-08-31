@@ -247,8 +247,8 @@ const milestones = computed<Milestone[]>(() => remoteApiEnabled
       day: m.milestoneDay,
       rewardKey: "reward3",
       labelKey: "day3",
-      labelText: `Day-${m.milestoneDay}`,
-      rewardText: dailyMilestoneRewardText(m),
+      labelText: fmt(t.value.daily.milestones.dayLabel, { n: m.milestoneDay }),
+      rewardText: dailyMilestoneRewardText(m, t.value.daily.milestones.badgeLabel),
       status: m.status,
       reward: { type: (m.rewardType.toLowerCase() === "usdt" ? "usdt" : m.rewardType.toLowerCase() === "spin" ? "spin" : m.rewardType.toLowerCase() === "badge" ? "badge" : "nex") as Milestone["reward"]["type"], amount: m.rewardAmount },
       tint: "var(--v5-nex)", iconPath: "m12 3v18M3 12h18",
@@ -360,7 +360,7 @@ const saverCountText = computed(() =>
 const yourBestText = computed(() =>
   fmt(t.value.daily.topStreakers.yourBest, { n: faucet.longestStreak || streak.value || 0 }),
 );
-const pointsUnlockText = computed(() => fmt(t.value.daily.pointsUnlockHint, { n: (app.user.nexBalance * 10).toFixed(0) }));
+const pointsUnlockText = computed(() => t.value.daily.pointsUnlockHint);
 const lifetimeEarned = computed(() =>
   String(faucet.history.reduce((s, h) => s + (h.delta > 0 ? h.delta : 0), 0)),
 );
@@ -450,7 +450,7 @@ async function handleClaimMilestone(m: Milestone) {
       toast.error(t.value.authOtp.errorServiceUnavailable);
       return;
     }
-    toast.success(m.rewardText ?? `${m.reward.type} ${m.reward.amount}`, `Day-${m.day} milestone claimed`);
+    toast.success(m.rewardText ?? `${m.reward.type} ${m.reward.amount}`, fmt(t.value.daily.milestones.claimedDay, { n: m.day }));
     return;
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
@@ -498,7 +498,7 @@ async function handleClaimMilestone(m: Milestone) {
     luckySpin.openSheet();
   }
   // spin / badge milestones are non-currency unlocks → claim (+ spin sheet above).
-  toast.success(rewardDisplay, `Day-${m.day} milestone claimed`);
+  toast.success(rewardDisplay, fmt(t.value.daily.milestones.claimedDay, { n: m.day }));
 }
 
 async function handleUseSaver() {

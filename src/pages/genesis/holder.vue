@@ -241,7 +241,7 @@
           </view>
         </template>
 
-        <text class="block text-center" :style="noteStyle">{{ t.genesisHolder.note }}</text>
+        <text class="block text-center" :style="noteStyle">{{ t.genesisHolder.disclosureNote }}</text>
       </view>
     </view>
   </AppChassis>

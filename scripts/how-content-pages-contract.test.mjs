@@ -9,11 +9,10 @@ const cases = {
   "src/pages/me/wallet-exchange-how.vue": "wallet-exchange-how",
   "src/pages/me/wallet-repurchase-how.vue": "wallet-repurchase-how",
   "src/pages/team/binary-how.vue": "team-binary-how",
-  "src/pages/team/commissions-how.vue": "team-commissions-how",
   "src/pages/team/unilevel-how.vue": "team-unilevel-how",
 };
 
-test("six How-it-works pages use published Java content in the formal runtime", () => {
+test("five general How-it-works pages use the shared published-content renderer", () => {
   for (const [file, key] of Object.entries(cases)) {
     const source = fs.readFileSync(path.join(root, file), "utf8");
     assert.match(source, /HowPublishedContent/);
@@ -23,10 +22,20 @@ test("six How-it-works pages use published Java content in the formal runtime", 
   }
 });
 
-test("team How pages fall back to their bundled 5174 explanation when publication is unavailable", () => {
+test("the commission guide reads its published document with the canonical commission facts", () => {
+  const source = fs.readFileSync(path.join(root, "src/pages/team/commissions-how.vue"), "utf8");
+  assert.doesNotMatch(source, /HowPublishedContent|publishedContentUnavailable/);
+  assert.match(source, /howContentApi\.published\("team-commissions-how", language\)/);
+  assert.match(source, /commissionGuideApi\.rates\(\), commissionGuideApi\.read\(\), vRankApi\.ladder\(\)/);
+  assert.match(source, /createCommissionsHowResource/);
+  assert.match(source, /v-if="state\.loading \|\| state\.error \|\| content\.incomplete"/);
+  assert.match(source, /watch\(\(\) => locale\.code, reload\)/);
+  assert.doesNotMatch(source, /apiRuntimeConfig\.mode/);
+});
+
+test("binary and unilevel How pages fall back to their bundled 5174 explanation when publication is unavailable", () => {
   const teamPages = {
     "src/pages/team/binary-how.vue": "teamBinary",
-    "src/pages/team/commissions-how.vue": "teamCommissions",
     "src/pages/team/unilevel-how.vue": "teamUnilevel",
   };
 

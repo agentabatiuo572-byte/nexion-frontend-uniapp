@@ -787,7 +787,7 @@ export const vi: Messages = {
       buy: "Nhận thêm suất",
       sell: "Bán trên thị trường",
     },
-    note: "Suất Genesis là ERC-721 trên Ethereum mainnet. Hợp đồng: 0xNX...A98F. Được CertiK và Halborn kiểm toán.",
+    disclosureNote: "Số lượng Genesis và quyền lợi theo hồ sơ tài khoản. Xem thông tin công bố tại Trung tâm tin cậy.",
   },
 
   preferences: {
@@ -1242,9 +1242,10 @@ export const vi: Messages = {
       pendingHint: "Không có NEX đang hồi",
     },
     pnl: {
-      label: "LÃI & LỖ",
-      costBasis: "Giá vốn trung bình",
-      totalSpent: "Tổng đã đầu tư",
+      label: "ƯỚC TÍNH THEO MỐC NỀN TẢNG",
+      costBasis: "Giá mốc nền tảng",
+      totalSpent: "Giá trị theo mốc",
+      note: "Chỉ để tham khảo; không phải giá mua cá nhân hay lợi nhuận đã thực hiện.",
       currentValue: "Giá trị hiện tại",
     },
     useNex: {
@@ -2429,7 +2430,7 @@ export const vi: Messages = {
     walletSlotMore: "nữa",
     walletSlotsLine: "{online} đang chạy · {open} chỗ trống",
     withdrawalLocked: "Chưa đạt mức rút tối thiểu",
-    withdrawalLockedBody: "Bạn cần tối thiểu ${min} (còn thiếu ${short}). Với mức điện thoại $0.06/ngày, sẽ mất ~325 ngày. Một NexGridBox S1 chạm mốc $20 trong chưa đầy 3 ngày.",
+    withdrawalLockedBody: "Cần tối thiểu ${min} để rút (còn thiếu ${short}). Điều kiện rút phụ thuộc số dư khả dụng và quy định hiện hành.",
     withdrawalLockedBrowse: "Xem phần cứng",
     secWithPasskey: "Passkey · 2FA",
     secNoTwoFa: "2FA đang tắt",
@@ -4410,6 +4411,7 @@ export const vi: Messages = {
   },
 
   commissions: {
+    recentEventsHint: "Danh sách hiển thị {n} sự kiện gần nhất. Tổng hợp bao gồm tất cả bản ghi.",
     pageTitle: "Hoa Hồng",
     directBadge: "Trực tiếp",
     extendedBadge: "Mở rộng",
@@ -4733,8 +4735,8 @@ export const vi: Messages = {
     earned: "đã nhận",
     spent: "Đã tiêu",
     onPayouts: "cho các khoản chi",
-    pointsUnlockHint: "NEX của bạn mở khóa tối đa ${n} USDT",
-    pointsRule: "Mỗi 10 NEX = $100 có thể rút",
+    pointsUnlockHint: "NEX có thể bù phí mạng khi rút tiền",
+    pointsRule: "NEX không tăng số dư USDT có thể rút. Phí và khoản bù áp dụng được hiển thị trên trang rút tiền.",
     recent: "Gần đây",
     noActivity: "Chưa có hoạt động",
     streakBonus: "🔥 Chuỗi {n} ngày! +{p} NEX",
@@ -4753,6 +4755,9 @@ export const vi: Messages = {
       claimed: "Đã nhận",
       locked: "Ngày {n}",
       daysLeft: "Còn {n} ngày để mở",
+      dayLabel: "Ngày {n}",
+      claimedDay: "Đã nhận mốc ngày {n}",
+      badgeLabel: "Huy hiệu",
       day3: "Ngày 3",
       day7: "Ngày 7",
       day14: "Ngày 14",

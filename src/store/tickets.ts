@@ -157,6 +157,24 @@ export const useTickets = defineStore("tickets", () => {
     return ticket;
   }
 
+  async function markRead(ticket: Ticket): Promise<void> {
+    if (ticket.unread === 0) return;
+    const scope = snapshotScope();
+    const current = tickets.value.find(row => row.id === ticket.id);
+    if (!current || current.version !== ticket.version) return;
+    let result: Ticket;
+    try {
+      result = await supportApi.markTicketRead(ticket);
+    } catch (cause) {
+      // Reading is a best-effort acknowledgement, but a stale header means a
+      // newer agent reply may have arrived. Refresh that ticket before the page
+      // decides what unread state to render; never apply the old acknowledgement.
+      if (mustReadBack(cause)) await reconcile(ticket.id, scope.epoch);
+      throw cause;
+    }
+    if (snapshotIsCurrent(scope)) replace(result);
+  }
+
   async function reconcile(id: string, epoch: number): Promise<void> {
     try {
       const accountKey = accountKeyValue;
@@ -269,5 +287,5 @@ export const useTickets = defineStore("tickets", () => {
   }
   function reset() { clearAccount(); pendingKeys = new Map(); }
 
-  return { tickets, loading, mutating, error, refresh, load, createTicket, reply, close, reset, bindAccount };
+  return { tickets, loading, mutating, error, refresh, load, markRead, createTicket, reply, close, reset, bindAccount };
 });

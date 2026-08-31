@@ -267,9 +267,10 @@ const extendedCountText = computed(() => {
 });
 const totalMembersCountText = computed(() => remoteApiEnabled && network.remoteStatus !== "ready" ? "—" : String(localTotalMembersCount.value));
 
-// Commission month aggregates (30d) + direct/extended split.
+// Calendar-month totals and lifetime direct/extended split.
 const ledger = computed(() => {
-  const cutoff = Date.now() - 30 * 86400000;
+  const today = new Date();
+  const cutoff = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
   let mU = 0, mS = 0, uU = 0, cU = 0, tU = 0, dU = 0, eU = 0;
   for (const e of events.value) {
     if (e.ts >= cutoff) {
@@ -283,7 +284,7 @@ const ledger = computed(() => {
     else eU += e.amountUSDT;
   }
   if (remoteApiEnabled) {
-    return { monthUSDT: mU, monthNEX: mS, unlockedUSDT: uU, coolingUSDT: cU,
+    return { monthUSDT: commission.monthUSDT(), monthNEX: commission.monthNEX(), unlockedUSDT: commission.unlockedUSDT(), coolingUSDT: commission.coolingUSDT(),
       totalUSDTLifetime: commissionAggregate.value.totalUSDT,
       directUSDT: commissionAggregate.value.directUSDT,
       extendedUSDT: commissionAggregate.value.extendedUSDT };

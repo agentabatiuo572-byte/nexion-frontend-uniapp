@@ -28,7 +28,7 @@ export function dailyMilestoneRewardText(reward: {
   rewardType: string;
   rewardAmount: number;
   badgeCode: string | null;
-}): string {
+}, badgeLabel = "Badge"): string {
   if (reward.rewardType.trim().toUpperCase() !== "BADGE") return `${reward.rewardType} ${reward.rewardAmount}`;
-  return reward.badgeCode?.trim() ? `Badge · ${reward.badgeCode.trim()}` : "Badge";
+  return reward.badgeCode?.trim() ? `${badgeLabel} · ${reward.badgeCode.trim()}` : badgeLabel;
 }

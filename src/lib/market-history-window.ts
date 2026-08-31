@@ -14,12 +14,12 @@ const WINDOW_MS: Partial<Record<MarketTimeframe, number>> = {
   "1Y": 365 * 24 * 60 * 60 * 1000,
 };
 
-function timestamp(sample: TimestampedMarketSample): number | null {
+export function marketSampleTimestamp(sample: TimestampedMarketSample): number | null {
   if (Number.isFinite(sample.sampledAtEpochMs)) return sample.sampledAtEpochMs as number;
   const value = sample.sampledAt;
   // Legacy G3 DATETIME values are Asia/Shanghai local times. New payloads carry
   // sampledAtEpochMs, so browser parsing never has to infer a business zone.
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/.test(value)
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/.test(value)
     ? `${value.replace(" ", "T")}+08:00`
     : value;
   const parsed = Date.parse(normalized);
@@ -38,7 +38,7 @@ export function selectMarketHistoryWindow(
 ): TimestampedMarketSample[] {
   const cutoff = now - (WINDOW_MS[timeframe] ?? 0);
   const verified = samples
-    .map((sample) => ({ sample, at: timestamp(sample) }))
+    .map((sample) => ({ sample, at: marketSampleTimestamp(sample) }))
     .filter((entry): entry is { sample: TimestampedMarketSample; at: number } =>
       entry.at !== null && Number.isFinite(entry.sample.price) && entry.sample.price > 0
         && entry.at <= now)

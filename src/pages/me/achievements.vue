@@ -132,6 +132,7 @@ import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import { dailyMilestoneRewardText } from "@/pages/daily/daily-reward-view";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
@@ -221,7 +222,7 @@ const remoteGroups = computed(() => {
     id: row.milestoneId,
     label: `${w.value.dailyMilestone} ${row.milestoneDay}`,
     description: `${w.value.streakProgress}: ${snapshot.streak.currentStreak}/${row.milestoneDay}`,
-    reward: `+${row.rewardAmount} ${row.rewardType}`,
+    reward: dailyMilestoneRewardText(row, t.value.daily.milestones.badgeLabel),
     status: row.status,
     iconId: "power_user",
   }));
@@ -270,7 +271,7 @@ async function claimRemote(row: RemoteMilestoneRow) {
     if (row.kind === "daily") {
       await pointsApi.claimMilestone(Number(row.id), `h5-achievement-daily:${row.id}`);
     } else {
-      await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`);
+      await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`, String(row.id));
     }
     remoteSnapshot.value = await pointsApi.state();
     toast.success(w.value.claimToast);

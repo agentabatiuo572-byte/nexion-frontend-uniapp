@@ -28,7 +28,7 @@
             <view class="text-right">
               <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ nexPriceText }}</text>
               <text v-if="market.isMockMode || market.remoteReady" class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
-                {{ nexDirection }} {{ Math.abs(nex.change24h).toFixed(2) }}% (24h)
+                {{ market.change24hAvailable ? `${nexDirection} ${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
               </text>
             </view>
           </view>
@@ -129,6 +129,7 @@ function retryMarkets() {
 
 const nexChartData = computed(() => {
   if (market.isMockMode) return tf.value === "1M" || tf.value === "1Y" ? nex.value.spark30d : nex.value.spark24h;
+  if (tf.value === "24H") return market.klineHourly;
   return selectMarketHistoryWindow(market.historySamples, tf.value).map((sample) => sample.price);
 });
 const historyUnavailableText = computed(() => fmt(t.value.marketPage.nexHero.historyUnavailable, { range: tf.value }));

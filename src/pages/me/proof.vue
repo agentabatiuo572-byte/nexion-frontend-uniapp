@@ -68,7 +68,6 @@
           <view v-if="variant === 'earnings'" style="margin-top: 16px">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand)')">{{ t.proof.totalEarned }}</text>
             <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotalText }}</text>
-            <ProofSparkline />
           </view>
           <view v-else-if="variant === 'streak'" style="margin-top: 16px">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.longestStreak }}</text>
@@ -199,7 +198,6 @@ import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
-import ProofSparkline from "@/components/me/proof-sparkline.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";

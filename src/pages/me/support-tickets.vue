@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, nextTick, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -184,7 +184,7 @@ onShow(async () => {
   try {
     const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets()]);
     if (tickets.status === "rejected") throw tickets.reason;
-    if (mode.value.kind === "detail") await ticketsStore.load(mode.value.id);
+    if (mode.value.kind === "detail") await openTicket(mode.value.id);
   } catch {
     toast.warn(t.value.security.opFailed);
   }
@@ -202,8 +202,15 @@ async function reloadTickets() {
 async function openTicket(id: string) {
   if (ticketsStore.mutating) return;
   try {
-    await ticketsStore.load(id);
+    const ticket = await ticketsStore.load(id);
     mode.value = { kind: "detail", id };
+    await nextTick();
+    if (mode.value.kind === "detail" && mode.value.id === id) {
+      // The detail is already available. A stale read acknowledgement has its
+      // own store-side readback and must not turn opening the ticket into an
+      // erroneous user-facing failure toast.
+      await ticketsStore.markRead(ticket).catch(() => undefined);
+    }
   } catch {
     toast.warn(t.value.security.opFailed);
   }

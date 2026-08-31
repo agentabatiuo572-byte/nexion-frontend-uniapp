@@ -125,12 +125,14 @@ test("remote leaderboard, leadership pool, and commission pages use self-scoped 
   assert.match(runtime, /createTeamInsightsApi/);
   assert.match(leaderboard, /teamInsightsApi\.leaderboard/);
   assert.match(leaderboard, /remoteApiEnabled/);
-  assert.match(leaderboard, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
+  assert.match(leaderboard, /const runScope = captureRuntimeRevision\(\)/);
+  assert.match(leaderboard, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentRuntimeRevision\(runScope\)/);
   assert.match(leaderboard, /remoteState !== 'ready'/);
   assert.match(leaderboard, /remoteState\.value = "error"/);
   assert.doesNotMatch(leaderboard, /myRank:\s*remoteSnapshot\.value\?\.myRank \?\? 0/);
   assert.match(pool, /teamInsightsApi\.leadershipPool/);
-  assert.match(pool, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
+  assert.match(pool, /const runScope = captureRuntimeRevision\(\)/);
+  assert.match(pool, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentRuntimeRevision\(runScope\)/);
   assert.match(pool, /remoteState !== 'ready'/);
   assert.match(pool, /remoteState\.value = "error"/);
   assert.match(commission, /teamInsightsApi\.commissions/);
@@ -147,9 +149,13 @@ test("remote unilevel page renders only the server cycle/source/layer/split proj
   assert.match(api, /cycle/);
   assert.match(api, /amountUSDT/);
   assert.match(page, /teamInsightsApi\.unilevel/);
-  assert.match(page, /remoteSnapshot\?\.events/);
+  assert.match(page, /const remoteFilteredEvents = computed\(\(\) => \(remoteSnapshot\.value\?\.events \?\? \[\]\)\.filter/);
+  assert.match(page, /filter\.value === "all" \|\| \(filter\.value === "direct" \? event\.layer === 1 : event\.layer > 1\)/);
+  assert.match(page, /v-for="\(event, i\) in remoteFilteredEvents"/);
+  assert.match(page, /v-if="remoteFilteredEvents\.length === 0"/);
   assert.match(page, /remoteState === 'error'/);
-  assert.match(page, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentCommerceSandboxScope\(runScope\)/);
+  assert.match(page, /const runScope = captureRuntimeRevision\(\)/);
+  assert.match(page, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentRuntimeRevision\(runScope\)/);
   assert.doesNotMatch(page, /remoteApiEnabled[\s\S]{0,220}Math\.log10/);
 });
 

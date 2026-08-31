@@ -124,7 +124,7 @@ export interface PointsApi {
   claimMilestone(milestoneId: number, idempotencyKey: string): Promise<DailyMilestoneClaimResult>;
   useSaver(idempotencyKey: string): Promise<StreakSaverResult>;
   activatePowerUp(powerUpId: number, idempotencyKey: string): Promise<DailyPowerUpActivationResult>;
-  evaluateEarningMilestones(idempotencyKey: string): Promise<EarningMilestoneEvaluationResult>;
+  evaluateEarningMilestones(idempotencyKey: string, milestoneId?: string): Promise<EarningMilestoneEvaluationResult>;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -454,9 +454,10 @@ export function createPointsApi(client: ApiClient, mode: ApiEnvironment = "prod"
         idempotencyKey: requiredKey(idempotencyKey),
       }), mode);
     },
-    evaluateEarningMilestones: async (idempotencyKey) => parseEarningEvaluation(await client.request({
+    evaluateEarningMilestones: async (idempotencyKey, milestoneId) => parseEarningEvaluation(await client.request({
       method: "POST",
       path: "/api/earnings/milestones/evaluate",
+      body: milestoneId ? { milestoneId } : undefined,
       idempotencyKey: requiredKey(idempotencyKey),
     }), mode),
   };

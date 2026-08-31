@@ -32,12 +32,12 @@
               </view>
               <view class="text-right">
                 <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ fmtUSD(usdValue) }}</text>
-                <text class="block tabular-nums" :style="heroChangeStyle">{{ isUp ? "▲" : "▼" }} {{ Math.abs(change24h).toFixed(2) }}% (24h)</text>
+                <text class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 
             <!-- sparkline -->
-            <view class="overflow-hidden" :style="sparkBoxStyle">
+            <view v-if="market.change24hAvailable" class="overflow-hidden" :style="sparkBoxStyle">
               <NexSparkline :data="kline" :up="isUp" />
             </view>
 
@@ -82,6 +82,7 @@
             <text :style="cardLabelStyle">{{ t.nexWallet.pnl.label }}</text>
             <text class="tabular-nums" :style="pnlValueStyle">{{ pnlSummary }}</text>
           </view>
+          <text class="block" :style="pnlCellLabelStyle" style="margin-top: 8px">{{ t.nexWallet.pnl.note }}</text>
           <view class="grid grid-cols-3" style="margin-top: 12px; gap: 8px 12px">
             <view v-for="cell in pnlCells" :key="cell.label">
               <text class="block" :style="pnlCellLabelStyle">{{ cell.label }}</text>
@@ -270,8 +271,8 @@ const ICON = {
 };
 
 const quickCells = computed(() => [
-  { href: "/pages/me/wallet-exchange", icon: tintIcon(ICON.up, "var(--v5-success)"), label: t.value.nexWallet.actions.buy, tint: "var(--v5-success)" },
-  { href: "/pages/me/wallet-exchange", icon: tintIcon(ICON.down, "var(--v5-brand-2)"), label: t.value.nexWallet.actions.sell, tint: "var(--v5-brand-2)" },
+  { href: "/pages/me/wallet-exchange?direction=usdt2nex", icon: tintIcon(ICON.up, "var(--v5-success)"), label: t.value.nexWallet.actions.buy, tint: "var(--v5-success)" },
+  { href: "/pages/me/wallet-exchange?direction=nex2usdt", icon: tintIcon(ICON.down, "var(--v5-brand-2)"), label: t.value.nexWallet.actions.sell, tint: "var(--v5-brand-2)" },
 ]);
 
 const breakdownRows = computed(() => [

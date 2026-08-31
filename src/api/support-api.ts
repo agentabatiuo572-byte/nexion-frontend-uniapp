@@ -13,6 +13,7 @@ export interface SupportApi {
   authorityRevision(): Promise<string>;
   tickets(): Promise<Page<Ticket>>;
   ticket(id: string): Promise<Ticket>;
+  markTicketRead(ticket: Ticket): Promise<Ticket>;
   createTicket(input: TicketInput, key: string): Promise<Ticket>;
   replyTicket(ticket: Ticket, body: string, key: string): Promise<Ticket>;
   closeTicket(ticket: Ticket, key: string): Promise<Ticket>;
@@ -73,7 +74,7 @@ function parseConversationHeader(value: unknown): Conversation {
   const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt); const unread = integer(v?.unreadCount); const agentName = text(v?.ownerAgentName, true);
   const lastMessage = text(v?.lastMessage, true);
   if (!v || !id || !type || !status || version === null || lastTs === null || unread === null || agentName === null || lastMessage === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, sessionStatus: status === "closed" ? "closed" : "active" };
+  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed" };
 }
 function parseConversationMessage(value: unknown): ConvMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
@@ -144,6 +145,7 @@ export function createSupportApi(client: ApiClient): SupportApi {
     authorityRevision: async () => "canonical-v1",
     tickets: allTickets,
     ticket: async id => parseTicketDetail(await client.request({ method: "GET", path: await supportPath(`/tickets/${pathId(id)}`) })),
+    markTicketRead: async ticket => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/read`), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version } })),
     createTicket: async (input, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath("/tickets"), idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim(), clientMessageId: key } })),
     replyTicket: async (ticket, body, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     closeTicket: async (ticket, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/close`), idempotencyKey: requiredKey(key), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
