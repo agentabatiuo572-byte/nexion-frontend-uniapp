@@ -46,8 +46,25 @@
           </view>
         </view>
         <!-- delivery receipt (user messages only, pre-localised by the page) -->
-        <view v-if="m.receipt" class="nx-conv-receipt">
+        <view v-if="m.receipt && !m.queue" class="nx-conv-receipt">
           <text class="nx-conv-receipt-t">{{ m.receipt }}</text>
+        </view>
+        <view v-if="m.queue && queueLabels" class="nx-conv-queue" :data-state="m.queue.state">
+          <text class="nx-conv-queue-status" :role="m.queue.state === 'failed' ? 'alert' : 'status'" aria-live="polite">{{ m.queue.label }}</text>
+          <view v-if="m.queue.state === 'editing'" class="nx-conv-edit">
+            <textarea class="nx-conv-edit-input" :value="edits[m.queue.turnId] ?? m.text" :maxlength="2000" :aria-label="queueLabels.edit" auto-height @input="onEditInput(m.queue.turnId, $event)" />
+            <view class="nx-conv-queue-actions">
+              <button class="nx-conv-queue-action" @click="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)">{{ queueLabels.save }}</button>
+              <button class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'cancel-edit')">{{ queueLabels.cancelEdit }}</button>
+            </view>
+          </view>
+          <view v-else class="nx-conv-queue-actions">
+            <button v-if="m.queue.state === 'failed'" class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'retry')">{{ queueLabels.retry }}</button>
+            <template v-if="m.queue.state === 'queued' && m.queue.editable">
+              <button class="nx-conv-queue-action" @click="startEdit(m)">{{ queueLabels.edit }}</button>
+              <button class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'cancel')">{{ queueLabels.cancel }}</button>
+            </template>
+          </view>
         </view>
       </view>
 
@@ -90,6 +107,7 @@
       <input
         class="nx-conv-input"
         :value="draft"
+        :maxlength="maxInputLength ?? 140"
         :placeholder="inputPlaceholder"
         placeholder-class="nx-conv-input-ph"
         confirm-type="send"
@@ -120,6 +138,9 @@ const props = defineProps<{
   /** Closed session (support timeout) → swap the input row for the restart CTA. */
   closed?: boolean;
   restartLabel?: string;
+  queueLabels?: { edit: string; cancel: string; retry: string; save: string; cancelEdit: string };
+  composerKey?: string;
+  maxInputLength?: number;
 }>();
 
 const emit = defineEmits<{
@@ -129,9 +150,28 @@ const emit = defineEmits<{
   (e: "chip", key: string): void;
   (e: "cta", href: string, label: string): void;
   (e: "restart"): void;
+  (e: "queue-action", turnId: string, action: "edit" | "cancel" | "retry" | "cancel-edit"): void;
+  (e: "queue-save", turnId: string, text: string): void;
 }>();
 
 const draft = ref("");
+const edits = ref<Record<string, string>>({});
+watch(() => props.composerKey, () => { draft.value = ""; edits.value = {}; });
+watch(() => props.messages, () => {
+  for (const id of Object.keys(edits.value)) {
+    if (!props.messages.some(m => m.queue?.turnId === id && m.queue.state === "editing")) delete edits.value[id];
+  }
+});
+
+function startEdit(m: ThreadMsg) {
+  if (!m.queue) return;
+  edits.value[m.queue.turnId] = m.text;
+  emit("queue-action", m.queue.turnId, "edit");
+}
+
+function onEditInput(turnId: string, e: Event) {
+  edits.value[turnId] = (e as unknown as { detail: { value: string } }).detail.value;
+}
 
 function onDraft(e: Event) {
   draft.value = (e as unknown as { detail: { value: string } }).detail.value;
@@ -261,6 +301,13 @@ const sendStyle = computed<CSSProperties>(() => ({
 .nx-conv-msg-row {
   margin-bottom: 12px;
 }
+.nx-conv-queue { margin: 6px 0 0 auto; max-width: 90%; text-align: right; }
+.nx-conv-queue-status { display: block; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
+.nx-conv-queue[data-state="failed"] .nx-conv-queue-status { color: var(--v5-danger, #b42318); }
+.nx-conv-queue-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.nx-conv-queue-action { margin: 0; padding: 0 12px; min-height: 44px; line-height: 44px; font-size: 12px; color: var(--v5-brand); background: transparent; }
+.nx-conv-queue-action::after { border: 0; }
+.nx-conv-edit-input { box-sizing: border-box; width: 100%; padding: 10px; margin-top: 8px; border: 1px solid var(--v5-border); border-radius: 10px; text-align: left; color: var(--v5-ink); background: var(--v5-surface); font-size: 14px; }
 .nx-conv-sys {
   text-align: center;
   padding: 4px 0;

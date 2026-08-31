@@ -60,7 +60,12 @@
       :reveal-tick="revealTick"
       :closed="isClosedSession"
       :restart-label="isAi && remoteApiEnabled ? t.nova.localRetry : t.conversations.restartSession"
+      :queue-labels="isAi && remoteApiEnabled ? t.nova.queue : undefined"
+      :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : cid"
+      :max-input-length="isAi && remoteApiEnabled ? 2000 : undefined"
       @send="onSend"
+      @queue-action="onQueueAction"
+      @queue-save="onQueueSave"
       @chip="onChip"
       @cta="onCta"
       @restart="onRestart"
@@ -80,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onUnload, onShow, onHide } from "@dcloudio/uni-app";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import ConversationThread from "@/components/support/conversation-thread.vue";
@@ -97,11 +102,11 @@ import { isDeviceOnline } from "@/lib/hashpower";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
-import { toast } from "@/store/ui";
+import { toast, confirm, useUI } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
 import type { ConversationType } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
-import { asApiError } from "@/api/errors";
+import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import {
@@ -127,6 +132,11 @@ const initialPrompt = ref("");
 const novaProviderHold = ref(false);
 const novaStatusLoading = ref(false);
 const novaAiRequestInFlight = ref(false);
+const novaHistoryLoading = ref(false);
+let novaPageVisible = false;
+let novaHistoryEpoch = 0;
+let novaDispatchTimer: ReturnType<typeof setTimeout> | undefined;
+const dialogOwner = `nova-chat-${Date.now()}`;
 const novaThinkingStage = ref<NovaThinkingStage>("understanding");
 let novaStatusEpoch = 0;
 const novaRequestControl = createLatestAbortableRequest();
@@ -214,6 +224,8 @@ onLoad((q) => {
 // sessionStatus guards) makes redundant ticks free. A real backend pushes these
 // events — the interval then becomes a harmless no-op.
 onShow(async () => {
+  novaPageVisible = true;
+  novaHistoryLoading.value = false;
   revealTick.value += 1;
   if (isAi.value) {
     if (remoteApiEnabled) {
@@ -228,6 +240,7 @@ onShow(async () => {
     nova.open(); // mark Nova as being viewed → clears + tracks unread
     if (remoteApiEnabled) {
       await Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
+      void drainNovaQueue();
     }
   }
   else if (cid.value) {
@@ -243,6 +256,10 @@ onShow(async () => {
   }
 });
 onHide(() => {
+  novaPageVisible = false;
+  novaStatusEpoch += 1;
+  novaHistoryEpoch += 1;
+  useUI().clearConfirmsBy(dialogOwner);
   if (isAi.value) {
     cancelNovaThinking();
     nova.close(); // no longer viewing Nova → later pushes accrue unread
@@ -252,6 +269,17 @@ onHide(() => {
 
 const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
 const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>`;
+
+watch(() => app.accountKey, () => {
+  if (!isAi.value || !remoteApiEnabled) return;
+  cancelNovaThinking();
+  novaStatusEpoch += 1;
+  novaHistoryEpoch += 1;
+  novaHistoryLoading.value = false;
+  useUI().clearConfirmsBy(dialogOwner);
+  try { nova.bindRemoteAccount(app.accountKey); } catch { novaProviderHold.value = true; return; }
+  if (novaPageVisible) void Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
+}, { flush: "sync" });
 
 const conv = computed(() => (cid.value ? convStore.get(cid.value) : undefined));
 const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
@@ -355,6 +383,16 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       tone: m.sender === "user" ? "user" : "agent",
       text: m.text,
       receipt: receiptFor(m.status, i === lastUser),
+      queue: m.delivery ? {
+        turnId: m.turnId!, state: m.delivery,
+        label: m.delivery === "failed" ? t.value.nova.queue[m.failure ?? "failed"]
+          : m.delivery === "processing" ? t.value.nova.queue.processing
+          : m.delivery === "editing" ? t.value.nova.queue.editing
+          : nova.pendingRemote[0]?.delivery === "failed" ? t.value.nova.queue.paused
+          : nova.pendingRemote.indexOf(m) === 0 ? t.value.nova.queue.ready
+          : fmt(t.value.nova.queue.waiting, { n: nova.pendingRemote.indexOf(m) }),
+        editable: !m.attempted,
+      } : undefined,
       ctaLabel: m.ctaLabel,
       ctaHref: m.ctaHref,
     }));
@@ -394,16 +432,31 @@ async function refreshNovaAvailability() {
     if (epoch !== novaStatusEpoch || accountKey !== app.accountKey) return;
     novaProviderHold.value = true;
   } finally {
-    if (epoch === novaStatusEpoch && accountKey === app.accountKey) novaStatusLoading.value = false;
+    if (epoch === novaStatusEpoch && accountKey === app.accountKey) {
+      novaStatusLoading.value = false;
+      void drainNovaQueue();
+    }
   }
 }
 
 async function refreshNovaHistory() {
-  if (!remoteApiEnabled || !isAi.value) return;
+  if (!remoteApiEnabled || !isAi.value || nova.historyLoaded || nova.pendingRemote.length) return;
   const accountKey = app.accountKey;
-  const history = await novaAiApi.history();
-  if (accountKey !== app.accountKey || !history.conversationId) return;
-  nova.hydrateRemote(accountKey, history.conversationId, history.messages);
+  const conversationId = nova.conversationId;
+  const epoch = ++novaHistoryEpoch;
+  novaHistoryLoading.value = true;
+  try {
+    const history = await novaAiApi.history();
+    if (epoch !== novaHistoryEpoch || accountKey !== app.accountKey
+        || conversationId !== nova.conversationId || nova.pendingRemote.length) return;
+    if (history.conversationId) nova.hydrateRemote(accountKey, history.conversationId, history.messages);
+    nova.historyLoaded = true;
+  } finally {
+    if (epoch === novaHistoryEpoch) {
+      novaHistoryLoading.value = false;
+      void drainNovaQueue();
+    }
+  }
 }
 
 function quickLabel(k: QuickPromptKey): string {
@@ -483,6 +536,8 @@ function finishNovaThinking(epoch: number) {
 }
 
 function cancelNovaThinking() {
+  if (novaDispatchTimer !== undefined) clearTimeout(novaDispatchTimer);
+  novaDispatchTimer = undefined;
   novaRequestControl.cancel();
   clearNovaThinkingTimers();
   if (pendingNovaThinkingWait) {
@@ -492,9 +547,14 @@ function cancelNovaThinking() {
   }
   nova.setTyping(false);
   novaAiRequestInFlight.value = false;
+  nova.interruptRemote();
 }
 
 function cleanup() {
+  novaPageVisible = false;
+  novaStatusEpoch += 1;
+  novaHistoryEpoch += 1;
+  useUI().clearConfirmsBy(dialogOwner);
   stopHumanThreadPolling();
   pendingTimers.forEach(clearTimeout);
   pendingTimers.length = 0;
@@ -516,6 +576,10 @@ const SEND_MAX = 5; // max sends…
 const SEND_WINDOW_MS = 15_000; // …per rolling window
 const SEND_MIN_GAP_MS = 1000; // min gap between two consecutive sends
 const sendLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
+// Continuous input is accepted immediately. Apply the original anti-spam
+// budget to actual dispatch (including retries), without discarding input.
+let novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
+let novaDispatchAccount = app.accountKey;
 
 function acquireSendSlot(): boolean {
   const verdict = sendLimiter.tryAcquire();
@@ -533,64 +597,31 @@ const AI_TYPING_ON_MS = 300;
 const AI_REPLY_MS = 1100;
 
 async function onSend(text: string, restore?: () => void) {
+  if (isAi.value && remoteApiEnabled) {
+    if (!text.trim() || text.length > 2000) {
+      restore?.(); toast.warn(t.value.nova.queue.invalid); return;
+    }
+    if (nova.pendingRemote.length >= 4) {
+      restore?.(); toast.info(t.value.nova.queue.full); return;
+    }
+    if (novaProviderHold.value) {
+      restore?.(); toast.info(t.value.nova.localUnavailable, t.value.nova.localRetry); return;
+    }
+    // Bound admission by queue capacity. Only the serial worker sends requests.
+    try {
+      if (!nova.enqueueRemote(requireCryptoUuid(), text,
+        locale.code === "zh" || locale.code === "vi" ? locale.code : "en")) {
+        restore?.(); toast.warn(t.value.nova.queue.failed); return;
+      }
+    } catch { restore?.(); toast.error(t.value.nova.queue.failed); return; }
+    void drainNovaQueue();
+    return;
+  }
   if (!acquireSendSlot()) {
     restore?.(); // rejected send must not swallow the typed message
     return;
   }
   if (isAi.value) {
-    if (remoteApiEnabled) {
-      if (novaProviderHold.value || novaStatusLoading.value || novaAiRequestInFlight.value) {
-        restore?.();
-        toast.info(t.value.nova.localUnavailable, t.value.nova.localRetry);
-        return;
-      }
-      const accountKey = app.accountKey;
-      const conversationId = nova.conversationId;
-      if (!conversationId) {
-        restore?.();
-        novaProviderHold.value = true;
-        toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
-        return;
-      }
-      nova.sendUser(text);
-      nova.markUserRead();
-      const requestStartedAt = novaThinkingNow();
-      const request = beginNovaThinking();
-      novaAiRequestInFlight.value = true;
-      try {
-        const result = await novaAiApi.chat({
-          message: text,
-          language: locale.code === "zh" || locale.code === "vi" ? locale.code : "en",
-          conversationId,
-          turnId: requireCryptoUuid(),
-        }, request.signal);
-        if (!novaRequestControl.isCurrent(request.epoch)
-            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
-        const delayCompleted = await waitForNovaThinkingDelay(
-          remainingNovaThinkingMs(requestStartedAt, novaThinkingNow()),
-          request.epoch,
-        );
-        if (!delayCompleted || !novaRequestControl.isCurrent(request.epoch)
-            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
-        nova.push({ kind: "nova-reply", text: result.reply });
-      } catch (error) {
-        if (!novaRequestControl.isCurrent(request.epoch)
-            || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
-        const failure = asApiError(error);
-        if (["NOVA_AI_DISABLED", "NOVA_AI_UNAVAILABLE"].includes(failure.message)) novaProviderHold.value = true;
-        nova.push({ kind: "nova-reply", text: t.value.nova.localFailed });
-        toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
-      } finally {
-        if (novaRequestControl.isCurrent(request.epoch)) {
-          finishNovaThinking(request.epoch);
-          novaAiRequestInFlight.value = false;
-        }
-        if (accountKey !== app.accountKey || conversationId !== nova.conversationId) {
-          nova.bindRemoteAccount(app.accountKey);
-        }
-      }
-      return;
-    }
     nova.sendUser(text);
     nova.markUserRead(); // Nova reads instantly
     schedule(() => nova.setTyping(true), AI_TYPING_ON_MS);
@@ -620,6 +651,65 @@ async function onSend(text: string, restore?: () => void) {
   try { await convStore.sendUser(id, text); } catch { restore?.(); toast.error(t.value.conversations.convertTicketFailed, ""); }
 }
 
+async function drainNovaQueue() {
+  if (!novaPageVisible || !isAi.value || !remoteApiEnabled || novaProviderHold.value
+      || novaStatusLoading.value || novaHistoryLoading.value || novaAiRequestInFlight.value) return;
+  if (nova.pendingRemote[0]?.delivery !== "queued" || novaDispatchTimer !== undefined) return;
+  if (novaDispatchAccount !== app.accountKey) {
+    novaDispatchAccount = app.accountKey;
+    novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
+  }
+  const verdict = novaDispatchLimiter.tryAcquire();
+  if (!verdict.ok) {
+    novaDispatchTimer = setTimeout(() => {
+      novaDispatchTimer = undefined;
+      void drainNovaQueue();
+    }, verdict.retryInSec * 1000);
+    return;
+  }
+  const item = nova.claimRemote();
+  if (!item) return;
+  const accountKey = app.accountKey;
+  const conversationId = nova.conversationId;
+  const requestStartedAt = novaThinkingNow();
+  const request = beginNovaThinking();
+  novaAiRequestInFlight.value = true;
+  const current = () => novaPageVisible && novaRequestControl.isCurrent(request.epoch)
+    && accountKey === app.accountKey && conversationId === nova.conversationId;
+  try {
+    const result = await novaAiApi.chat({ message: item.text, language: item.language,
+      conversationId, turnId: item.turnId }, request.signal);
+    if (!current()) return;
+    const completed = await waitForNovaThinkingDelay(
+      remainingNovaThinkingMs(requestStartedAt, novaThinkingNow()), request.epoch);
+    if (!completed || !current()) return;
+    nova.completeRemote(item.turnId, result.reply);
+  } catch (error) {
+    if (current()) nova.failRemote(item.turnId, novaFailure(error));
+  } finally {
+    if (novaRequestControl.isCurrent(request.epoch)) {
+      finishNovaThinking(request.epoch);
+      novaAiRequestInFlight.value = false;
+      void drainNovaQueue();
+    }
+  }
+}
+
+function onQueueAction(turnId: string, action: "edit" | "cancel" | "retry" | "cancel-edit") {
+  if (!isAi.value || !remoteApiEnabled || !novaPageVisible) return;
+  if (action === "edit") nova.editRemote(turnId);
+  if (action === "cancel") nova.cancelRemote(turnId);
+  if (action === "cancel-edit") nova.cancelRemoteEdit(turnId);
+  if (action === "retry") nova.retryRemote(turnId);
+  void drainNovaQueue();
+}
+
+function onQueueSave(turnId: string, text: string) {
+  if (!novaPageVisible || !isAi.value || !remoteApiEnabled) return;
+  if (!nova.saveRemoteEdit(turnId, text)) toast.warn(t.value.nova.queue.invalid);
+  void drainNovaQueue();
+}
+
 async function onConvertToTicket() {
   const current = conv.value;
   if (!current) return;
@@ -632,7 +722,6 @@ async function onConvertToTicket() {
 function onChip(key: string) {
   if (remoteApiEnabled) {
     const message = key === "search-query" ? initialPrompt.value : quickLabel(key as QuickPromptKey);
-    if (key === "search-query") initialPrompt.value = "";
     void onSend(message);
     return;
   }
@@ -652,8 +741,17 @@ function onCta(href: string) {
   navTo(href);
 }
 
-function onStartNewConversation() {
+async function onStartNewConversation() {
+  const accountKey = app.accountKey;
+  const conversationId = nova.conversationId;
+  if (nova.pendingRemote.length && !await confirm({
+    title: t.value.conversations.restartSession, message: t.value.nova.queue.newConfirm,
+    confirmLabel: t.value.nova.queue.newConfirmAction, owner: dialogOwner,
+  })) return;
+  if (!novaPageVisible || accountKey !== app.accountKey || conversationId !== nova.conversationId) return;
   try {
+    novaHistoryEpoch += 1;
+    novaHistoryLoading.value = false;
     cancelNovaThinking();
     nova.startNewConversation();
     initialPrompt.value = "";

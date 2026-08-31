@@ -409,9 +409,10 @@ export function createUniHttpTransport(): HttpTransport {
             data: response.data,
             headers: response.header as Record<string, string>,
           }),
-          fail: () => rejectOnce(request.signal?.aborted
+          fail: (error) => rejectOnce(request.signal?.aborted
             ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
-            : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true })),
+            : new ApiError({ kind: "network", message: /timeout/i.test(error.errMsg ?? "")
+              ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE", retryable: true })),
         });
       });
     },

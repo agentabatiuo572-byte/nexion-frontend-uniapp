@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import type { NovaFailure } from "@/lib/nova-failure";
 
 /**
  * Ported from Nexion-prototype/lib/store/nova.ts (zustand → Pinia).
@@ -41,6 +42,11 @@ export interface NovaMessage {
   ts: number;          // epoch ms
   ctaLabel?: string;
   ctaHref?: string;
+  turnId?: string;
+  language?: "en" | "zh" | "vi";
+  delivery?: "queued" | "processing" | "editing" | "failed";
+  failure?: NovaFailure;
+  attempted?: boolean;
 }
 
 let counter = 1;
@@ -58,6 +64,10 @@ export const useNova = defineStore("nova", () => {
   // throttle keys → last fire timestamp (prevents same auto-push firing too often).
   const cooldowns = ref<Record<string, number>>({});
   const conversationId = ref("");
+  // Pending text stays in memory, not browser storage. Reopening this page keeps
+  // the same turn ID; a full app reload restores only server-confirmed history.
+  const pendingRemote = computed(() => messages.value.filter(m => m.delivery));
+  const historyLoaded = ref(false);
   let boundRemoteAccount = "";
 
   function bindRemoteAccount(accountKey: string) {
@@ -65,6 +75,7 @@ export const useNova = defineStore("nova", () => {
     if (boundRemoteAccount === normalized && conversationId.value) return;
     const nextConversationId = requireCryptoUuid();
     clearTranscript();
+    historyLoaded.value = false;
     boundRemoteAccount = normalized;
     conversationId.value = nextConversationId;
   }
@@ -75,7 +86,7 @@ export const useNova = defineStore("nova", () => {
     remoteMessages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>,
   ) {
     const normalized = accountKey.trim();
-    if (!normalized || normalized !== boundRemoteAccount) return;
+    if (!normalized || normalized !== boundRemoteAccount || pendingRemote.value.length) return;
     conversationId.value = remoteConversationId;
     messages.value = remoteMessages.map((message) => ({
       id: message.id,
@@ -87,6 +98,86 @@ export const useNova = defineStore("nova", () => {
     }));
     unread.value = 0;
     typing.value = false;
+    historyLoaded.value = true;
+  }
+
+  function enqueueRemote(turnId: string, text: string, language: "en" | "zh" | "vi"): boolean {
+    if (!conversationId.value || !text.trim() || text.length > 2000
+        || pendingRemote.value.length >= 4 || messages.value.some(m => m.turnId === turnId)) return false;
+    messages.value.push({ id: `${turnId}:user`, turnId, language, sender: "user",
+      kind: "user-text", status: "sent", delivery: "queued", text: text.trim(), ts: Date.now() });
+    historyLoaded.value = true;
+    return true;
+  }
+
+  function claimRemote() {
+    const head = pendingRemote.value[0];
+    if (!head || head.delivery !== "queued") return;
+    head.delivery = "processing";
+    head.attempted = true;
+    head.status = "read";
+    head.failure = undefined;
+    return { turnId: head.turnId!, text: head.text, language: head.language! };
+  }
+
+  function completeRemote(turnId: string, reply: string) {
+    const index = messages.value.findIndex(m => m.turnId === turnId && m.delivery === "processing");
+    if (index < 0) return;
+    messages.value[index].delivery = undefined;
+    messages.value[index].failure = undefined;
+    messages.value.splice(index + 1, 0, { id: `${turnId}:nova`, sender: "nova",
+      kind: "nova-reply", text: reply, ts: Date.now() });
+  }
+
+  function failRemote(turnId: string, failure: NovaFailure) {
+    const head = pendingRemote.value[0];
+    if (head?.turnId !== turnId || head.delivery !== "processing") return;
+    head.delivery = "failed";
+    head.failure = failure;
+  }
+
+  function retryRemote(turnId: string): boolean {
+    const head = pendingRemote.value[0];
+    if (head?.turnId !== turnId || head.delivery !== "failed") return false;
+    head.delivery = "queued";
+    head.failure = undefined;
+    return true;
+  }
+
+  function editRemote(turnId: string): boolean {
+    const item = pendingRemote.value.find(m => m.turnId === turnId);
+    if (item?.delivery !== "queued" || item.attempted) return false;
+    item.delivery = "editing";
+    return true;
+  }
+
+  function saveRemoteEdit(turnId: string, text: string): boolean {
+    const item = pendingRemote.value.find(m => m.turnId === turnId);
+    if (item?.delivery !== "editing" || !text.trim() || text.length > 2000) return false;
+    item.text = text.trim();
+    item.delivery = "queued";
+    return true;
+  }
+
+  function cancelRemoteEdit(turnId: string): boolean {
+    const item = pendingRemote.value.find(m => m.turnId === turnId);
+    if (item?.delivery !== "editing") return false;
+    item.delivery = "queued";
+    return true;
+  }
+
+  function cancelRemote(turnId: string): boolean {
+    const item = pendingRemote.value.find(m => m.turnId === turnId);
+    if (!item || item.attempted || !["queued", "editing"].includes(item.delivery!)) return false;
+    messages.value = messages.value.filter(m => m !== item);
+    return true;
+  }
+
+  function interruptRemote() {
+    for (const item of pendingRemote.value) {
+      if (item.delivery === "processing") failRemote(item.turnId!, "interrupted");
+      if (item.delivery === "editing") item.delivery = "queued";
+    }
   }
 
   function open() {
@@ -148,16 +239,20 @@ export const useNova = defineStore("nova", () => {
     const nextConversationId = requireCryptoUuid();
     clearTranscript();
     conversationId.value = nextConversationId;
+    historyLoaded.value = true;
   }
 
   function reset() {
     clearTranscript();
     conversationId.value = "";
+    historyLoaded.value = false;
   }
 
   return {
     messages, unread, isOpen, typing, cooldowns, conversationId,
     open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
     bindRemoteAccount, hydrateRemote,
+    pendingRemote, historyLoaded, enqueueRemote, claimRemote, completeRemote, failRemote,
+    retryRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
   };
 });
