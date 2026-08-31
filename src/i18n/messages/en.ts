@@ -2,6 +2,39 @@
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  privacy: {
+    "title": "Privacy Policy",
+    "unavailable": "The published privacy policy is not available yet. Please try again later.",
+    "version": "Version",
+    "back": "Back"
+  },
+  holderFacts: {
+    "title": "Holder eligibility",
+    "allocation": "Reserved allocation",
+    "priority": "Priority",
+    "unavailable": "Holder information is unavailable. Please refresh to check again.",
+    "stale": "Holder information needs updating. Please refresh.",
+    "unpublished": "The allocation policy has not been published. No allocation is confirmed.",
+    "notEffective": "The published allocation policy is not effective yet.",
+    "notEligible": "You do not currently qualify for the holder allocation.",
+    "confirmed": "Holder eligibility confirmed.",
+    "unconfirmed": "Holder eligibility has not been confirmed.",
+    "topPercent": "Top {n}%",
+    "standard": "Standard",
+    "notQualified": "Not qualified",
+    "reasons": {
+      "HOLDINGS_CONFIRMED": "Active Genesis holdings confirmed",
+      "NO_ACTIVE_HOLDINGS": "No active Genesis holdings",
+      "ACCOUNT_AGE_REQUIRED": "Account age requirement not met",
+      "COUNTRY_REQUIRED": "Country information is required",
+      "GEO_BLOCKED": "This country is not eligible",
+      "SALE_POLICY_UNAVAILABLE": "Eligibility policy is unavailable",
+      "PRESALE_NOT_OPEN": "The sale window is not open",
+      "USER_CAP_REACHED": "Holding limit reached",
+      "POLICY_CONFIRMED": "Eligibility policy confirmed",
+      "POLICY_NOT_EFFECTIVE": "The policy is not effective yet"
+    }
+  },
   howPublished: {
     loading: "Loading explanation…",
     unavailableTitle: "Content is temporarily unavailable",
@@ -1309,6 +1342,8 @@ export const en = {
   },
 
   events: {
+    claimRewardCta: "Claim {reward}",
+    claimedReward: "Received {reward}",
     wheelPool: "Wheel prize pool",
     pageTitle: "Events",
     subtitle: "Promotions · contests · seasonal drops",
@@ -4384,8 +4419,8 @@ export const en = {
     weak: "Smaller",
     gapHint:
       "Balance Match is calculated on the smaller track. Grow the smaller track to lift your {freq} payout.",
-    spilloverTitle: "Auto-placement: {n} members assigned to Track B",
-    spilloverHint: "from network partner V5 Sarah K. — volume auto-merged into your tracks",
+    spilloverTitle: "Auto-placement: {n} members across both tracks",
+    spilloverHint: "Members may be placed in either track according to placement rules.",
     recentMatches: "Recent matches",
     left: "A",
     right: "B",
@@ -4656,6 +4691,8 @@ export const en = {
   },
 
   repurchase: {
+    recoveryHint: "The previous request is awaiting confirmation. Retry the original amount with the same operation ID to check its result; do not create another investment until it is resolved.",
+    recoveryCta: "Check previous ${amount} request",
     pageTitle: "Re-invest Boost",
     hero: "Faster withdrawals",
     benefits: {
@@ -5444,7 +5481,7 @@ export const en = {
     cardRebindBody: "Your {brand} •••• {last4} can no longer be used. Bind a new card so you can complete a purchase in one tap when your trial ends.",
     cardRebindCta: "Bind a new card",
     loadMore: "Load more",
-    loadFailed: "We could not load your notifications. Check your connection and try again.",
+    loadFailed: "We could not load or update your notifications. Check your connection and try again.",
   },
 
   // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).

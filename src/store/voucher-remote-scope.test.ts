@@ -59,6 +59,19 @@ function snapshot(account: string, grantStatus: "UNCLAIMED" | "AVAILABLE" | "USE
   return { vouchers: [voucher(account, grantStatus)], source: "test" };
 }
 
+function claimReceipt(voucherId: string) {
+  return {
+    voucherId,
+    grantId: `${voucherId}-grant`,
+    status: "AVAILABLE" as const,
+    replay: false,
+    serverCanonical: true as const,
+    source: "nx_growth_voucher",
+    sourceEnvironment: "PRODUCTION" as const,
+    runId: "" as const,
+  };
+}
+
 async function flush() {
   await Promise.resolve();
   await Promise.resolve();
@@ -125,7 +138,7 @@ describe("voucher remote account scope", () => {
     store.bindAccount("A");
     await flush();
 
-    const claim = deferred<{ status: "AVAILABLE" }>();
+    const claim = deferred<ReturnType<typeof claimReceipt>>();
     remote.voucherApi.claim.mockReturnValue(claim.promise);
     remote.voucherApi.state.mockResolvedValue(snapshot("B"));
     const pending = store.claimRemote("A-voucher", "home");
@@ -133,7 +146,7 @@ describe("voucher remote account scope", () => {
     store.bindAccount("B");
     await flush();
     const stateCallsAfterRebind = remote.voucherApi.state.mock.calls.length;
-    claim.resolve({ status: "AVAILABLE" });
+    claim.resolve(claimReceipt("A-voucher"));
 
     await expect(pending).resolves.toBe(false);
     await flush();
@@ -147,7 +160,7 @@ describe("voucher remote account scope", () => {
     store.bindAccount("A");
     await flush();
 
-    const claim = deferred<{ status: "AVAILABLE" }>();
+    const claim = deferred<ReturnType<typeof claimReceipt>>();
     remote.voucherApi.claim.mockReturnValue(claim.promise);
     remote.voucherApi.state.mockResolvedValue(snapshot("B"));
     const pending = store.claimRemote("A-voucher", "home");
@@ -204,7 +217,7 @@ describe("voucher remote account scope", () => {
 
   it("passes the visible entry surface to the canonical claim command", async () => {
     const store = await createStore();
-    remote.voucherApi.claim.mockResolvedValue({ status: "AVAILABLE" });
+    remote.voucherApi.claim.mockResolvedValue(claimReceipt("store-voucher"));
     remote.voucherApi.state.mockResolvedValue({ vouchers: [], source: "test" });
 
     await store.claimRemote("store-voucher", "store");
@@ -214,5 +227,19 @@ describe("voucher remote account scope", () => {
       "store",
       "h7-voucher-claim:store-voucher",
     );
+  });
+
+  it("keeps the typed canonical claim receipt when its follow-up GET fails", async () => {
+    const store = await createStore();
+    remote.voucherApi.state.mockResolvedValueOnce(snapshot("receipt", "UNCLAIMED"));
+    await expect(store.refreshRemote()).resolves.toBe(true);
+    remote.voucherApi.claim.mockResolvedValue(claimReceipt("receipt-voucher"));
+    remote.voucherApi.state.mockRejectedValueOnce(new Error("readback unavailable"));
+
+    await expect(store.claimRemote("receipt-voucher", "me")).resolves.toBe(true);
+
+    expect(store.claimed).toMatchObject([{ id: "receipt-voucher", usedAt: null }]);
+    expect(store.catalog).toMatchObject([{ id: "receipt-voucher", grantId: "receipt-voucher-grant", grantStatus: "AVAILABLE", claimable: false }]);
+    expect(store.claimedUnused.map((item) => item.id)).toEqual(["receipt-voucher"]);
   });
 });

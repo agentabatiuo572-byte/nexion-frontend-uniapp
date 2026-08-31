@@ -101,6 +101,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const remoteRules = ref<Array<{ key: string; value: string }>>([]);
   const topStreakers = ref<CanonicalTopStreaker[]>([]);
   const remoteServerDate = ref("");
+  const remoteCheckedInToday = ref(false);
+  const remoteNextResetAt = ref(0);
   const remoteAccountEpoch = createRemoteAccountEpoch();
   let remoteRefreshGeneration = 0;
 
@@ -117,6 +119,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
     remoteRules.value = [];
     topStreakers.value = [];
     remoteServerDate.value = "";
+    remoteCheckedInToday.value = false;
+    remoteNextResetAt.value = 0;
   }
 
   async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
@@ -126,6 +130,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
       const snapshot = await pointsApi.state();
       if (!remoteAccountEpoch.isCurrent(request) || refreshGeneration !== remoteRefreshGeneration) return false;
       remoteServerDate.value = snapshot.serverDate;
+      remoteCheckedInToday.value = snapshot.streak.checkedInToday;
+      remoteNextResetAt.value = Date.parse(snapshot.nextResetAtUtc);
       topStreakers.value = snapshot.topStreakers;
       remoteMilestones.value = snapshot.dailyMilestones;
       remotePowerUps.value = snapshot.powerUps;
@@ -160,6 +166,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
       const result = await pointsApi.checkIn(`h5-check-in:${businessDate}`);
       if (!remoteAccountEpoch.isCurrent(request)) return { ok: false, gained: 0, streak: 0, multiplier: 1 };
       const checkedAt = Date.parse(`${result.checkInDate}T00:00:00Z`);
+      remoteCheckedInToday.value = true;
+      remoteServerDate.value = result.checkInDate;
       if (Number.isFinite(checkedAt)) lastSignedInAt.value = checkedAt;
       signInStreak.value = result.streakDays;
       longestStreak.value = Math.max(longestStreak.value, result.streakDays);
@@ -354,6 +362,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
+    remoteCheckedInToday, remoteNextResetAt,
     topStreakers, remoteMilestones, remotePowerUps, remoteRules,
     signIn, useSaver, claimMilestone, bindAccount, refreshRemote,
     checkInRemote, claimMilestoneRemote, useSaverRemote,

@@ -3,6 +3,39 @@ import type { Messages } from "./en";
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  privacy: {
+    "title": "Chính sách quyền riêng tư",
+    "unavailable": "Chưa thể tải chính sách quyền riêng tư đã công bố. Vui lòng thử lại sau.",
+    "version": "Phiên bản",
+    "back": "Quay lại"
+  },
+  holderFacts: {
+    "title": "Điều kiện người sở hữu",
+    "allocation": "Hạn mức dự trữ",
+    "priority": "Ưu tiên",
+    "unavailable": "Chưa thể tải thông tin người sở hữu. Vui lòng làm mới.",
+    "stale": "Thông tin người sở hữu cần cập nhật. Vui lòng làm mới.",
+    "unpublished": "Chính sách phân bổ chưa được công bố. Chưa có hạn mức được xác nhận.",
+    "notEffective": "Chính sách phân bổ đã công bố chưa có hiệu lực.",
+    "notEligible": "Bạn chưa đáp ứng điều kiện nhận hạn mức.",
+    "confirmed": "Điều kiện người sở hữu đã được xác nhận.",
+    "unconfirmed": "Điều kiện người sở hữu chưa được xác nhận.",
+    "topPercent": "Top {n}%",
+    "standard": "Tiêu chuẩn",
+    "notQualified": "Chưa đủ điều kiện",
+    "reasons": {
+      "HOLDINGS_CONFIRMED": "Đã xác nhận sở hữu Genesis đang hoạt động",
+      "NO_ACTIVE_HOLDINGS": "Không có Genesis đang hoạt động",
+      "ACCOUNT_AGE_REQUIRED": "Tuổi tài khoản chưa đạt yêu cầu",
+      "COUNTRY_REQUIRED": "Cần bổ sung thông tin quốc gia",
+      "GEO_BLOCKED": "Quốc gia này chưa đủ điều kiện",
+      "SALE_POLICY_UNAVAILABLE": "Chưa thể tải chính sách điều kiện",
+      "PRESALE_NOT_OPEN": "Đợt mở bán chưa bắt đầu",
+      "USER_CAP_REACHED": "Đã đạt giới hạn sở hữu",
+      "POLICY_CONFIRMED": "Đã xác nhận chính sách điều kiện",
+      "POLICY_NOT_EFFECTIVE": "Chính sách chưa có hiệu lực"
+    }
+  },
   howPublished: {
     loading: "Đang tải hướng dẫn…",
     unavailableTitle: "Nội dung tạm thời không khả dụng",
@@ -1265,6 +1298,8 @@ export const vi: Messages = {
   },
 
   events: {
+    claimRewardCta: "Nhận {reward}",
+    claimedReward: "Đã nhận {reward}",
     wheelPool: "Quỹ thưởng vòng quay",
     pageTitle: "Sự kiện",
     subtitle: "Ưu đãi · thi đấu · quà theo mùa",
@@ -4239,8 +4274,8 @@ export const vi: Messages = {
     weak: "Nhỏ hơn",
     gapHint:
       "Ghép Cân Bằng tính theo nhánh nhỏ hơn. Bồi thêm nhánh nhỏ để nâng khoản thưởng {freq} của bạn.",
-    spilloverTitle: "Tự động xếp: {n} người được phân vào Nhánh B",
-    spilloverHint: "từ đối tác mạng lưới V5 Sarah K. — doanh số tự động gộp vào hai nhánh của bạn",
+    spilloverTitle: "Tự động xếp: tổng cộng {n} thành viên ở hai nhánh",
+    spilloverHint: "Thành viên được phân vào nhánh A hoặc B theo quy tắc sắp xếp.",
     recentMatches: "Ghép gần đây",
     left: "A",
     right: "B",
@@ -4511,6 +4546,8 @@ export const vi: Messages = {
   },
 
   repurchase: {
+    recoveryHint: "Yêu cầu trước đang chờ xác nhận. Thử lại đúng số tiền với cùng mã thao tác để kiểm tra kết quả; không tạo khoản đầu tư khác cho đến khi có kết quả.",
+    recoveryCta: "Kiểm tra yêu cầu ${amount} trước",
     pageTitle: "Tái Đầu Tư Tăng Tốc",
     hero: "Rút tiền nhanh hơn",
     benefits: {
@@ -5299,7 +5336,7 @@ export const vi: Messages = {
     cardRebindBody: "Thẻ {brand} •••• {last4} của bạn không dùng được nữa. Liên kết thẻ mới để khi kết thúc dùng thử, bạn có thể mua chỉ với một chạm.",
     cardRebindCta: "Liên kết thẻ mới",
     loadMore: "Tải thêm",
-    loadFailed: "Chưa tải được thông báo, vui lòng kiểm tra mạng rồi thử lại.",
+    loadFailed: "Không thể tải hoặc cập nhật thông báo. Vui lòng kiểm tra mạng rồi thử lại.",
   },
 
   // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).

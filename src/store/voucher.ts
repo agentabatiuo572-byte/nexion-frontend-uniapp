@@ -123,7 +123,6 @@ export const useVoucher = defineStore("voucher", () => {
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
-    clearRemoteFacts();
     try {
       const snapshot = await voucherApi.state();
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
@@ -131,7 +130,6 @@ export const useVoucher = defineStore("voucher", () => {
       return true;
     } catch {
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
-      clearRemoteFacts();
       // 拉取失败也算「等到头了」:再等下去只会把自动弹层无限期卡住,让位给下一个候选。
       catalogReady.value = true;
       return false;
@@ -158,11 +156,14 @@ export const useVoucher = defineStore("voucher", () => {
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
     try {
-      await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
+      const receipt = await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
-      return refreshRemote();
+      claimed.value = [{ id, claimedAt: mockServerNow(), usedAt: null }, ...claimed.value.filter((item) => item.id !== id)];
+      remoteCatalog.value = remoteCatalog.value.map((item) => item.id === id
+        ? { ...item, grantId: receipt.grantId, grantStatus: receipt.status, claimable: false } : item);
+      await refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
     } catch {
-      if (remoteRequestIsCurrent(request, runScope, generation)) clearRemoteFacts();
       return false;
     }
   }

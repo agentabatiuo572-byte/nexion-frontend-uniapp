@@ -24,7 +24,7 @@
             <text style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
           </view>
         </view>
-        <view style="text-align: right">
+        <view v-if="!remoteApiEnabled" style="text-align: right">
           <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
           <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
         </view>

@@ -61,7 +61,7 @@
             <input
               :value="formatCommandAmount(amount)"
               type="digit"
-              :disabled="confirming || repurchase.submitting"
+              :disabled="confirming || repurchase.submitting || recovering"
               :style="amountInputStyle"
               @input="onAmount"
             />
@@ -91,6 +91,7 @@
         </view>
 
         <!-- CTA -->
+        <text v-if="recovering" class="block" :style="lockedNoticeStyle">{{ w.recoveryHint }}</text>
         <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" @click="handleRepurchase">
           <text>{{ ctaLabel }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSubmit ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -104,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import Row from "@/components/me/repurchase-row.vue";
@@ -137,6 +138,10 @@ const user = computed(() => app.user);
 const amount = ref<number>(200);
 const amountTouched = ref(false);
 const confirming = ref(false);
+const recovering = computed(() => isRemote.value && repurchase.pendingOpenAmount !== null);
+watch(() => repurchase.pendingOpenAmount, (pending) => {
+  if (pending !== null) amount.value = pending;
+}, { immediate: true });
 const presets = computed(() => (isRemote.value ? (repurchase.config?.presets ?? []) : PRESETS));
 const displayBalance = computed(() => (isRemote.value ? repurchase.walletBalanceUsdt : user.value.usdtBalance));
 const remoteReady = computed(() => isRemote.value && repurchase.config !== null && !repurchase.error);
@@ -150,18 +155,18 @@ const canSubmit = computed(() => {
   if (isRemote.value) {
     const config = repurchase.config;
     return Boolean(
-      config?.enabled
+      (config?.enabled || recovering.value)
       && !confirming.value
       && !repurchase.submitting
       && Number.isFinite(amount.value)
-      && amount.value >= config.minAmountUsdt
-      && amount.value <= repurchase.walletBalanceUsdt,
+      && (recovering.value || (amount.value >= (config?.minAmountUsdt ?? Infinity)
+        && amount.value <= repurchase.walletBalanceUsdt)),
     );
   }
   return amount.value > 0 && amount.value <= user.value.usdtBalance;
 });
 
-const ctaLabel = computed(() => fmt(w.value.cta, { amount: formatCommandAmount(amount.value) }));
+const ctaLabel = computed(() => fmt(recovering.value ? w.value.recoveryCta : w.value.cta, { amount: formatCommandAmount(amount.value) }));
 const unavailableTitle = computed(() => w.value.unavailableTitle);
 const unavailableBody = computed(() => w.value.unavailableBody);
 const retryLabel = computed(() => w.value.retry);
@@ -211,13 +216,13 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAmount(e: Event) {
-  if (confirming.value || repurchase.submitting) return;
+  if (confirming.value || repurchase.submitting || recovering.value) return;
   amountTouched.value = true;
   amount.value = normalizeCommandAmount(detailVal(e));
 }
 
 function selectPreset(preset: number) {
-  if (confirming.value || repurchase.submitting) return;
+  if (confirming.value || repurchase.submitting || recovering.value) return;
   amountTouched.value = true;
   amount.value = preset;
 }
@@ -226,7 +231,8 @@ async function refreshRemote() {
   if (!isRemote.value || !isMounted.value) return;
   await repurchase.refresh();
   if (!isMounted.value) return;
-  if (!amountTouched.value && repurchase.config) {
+  if (repurchase.pendingOpenAmount !== null) amount.value = repurchase.pendingOpenAmount;
+  else if (!amountTouched.value && repurchase.config) {
     amount.value = repurchase.config.presets[0] ?? repurchase.config.minAmountUsdt;
   }
 }
@@ -241,7 +247,7 @@ async function handleRepurchase() {
       const config = repurchase.config;
       confirmed = await uiConfirm({
         title: w.value.confirmTitle,
-        message: fmt(w.value.confirmMessage, {
+        message: fmt(recovering.value ? w.value.recoveryHint : w.value.confirmMessage, {
           amount: formatCommandAmount(quoteAmount),
           days: config?.lockDays ?? 0,
           penalty: config?.earlyPenaltyPct ?? 0,
@@ -260,7 +266,7 @@ async function handleRepurchase() {
       if (!isMounted.value) return;
       toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: quoteAmount }));
       const nextPreset = repurchase.config?.presets?.[0];
-      amount.value = nextPreset ?? repurchase.config?.minAmountUsdt ?? 0;
+      amount.value = repurchase.pendingOpenAmount ?? nextPreset ?? repurchase.config?.minAmountUsdt ?? 0;
     } catch (cause) {
       if (!isMounted.value) return;
       const message = cause instanceof Error && cause.message

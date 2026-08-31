@@ -32,7 +32,9 @@
         <view
           class="active:opacity-70"
           :style="chipStyle(cat === 'all')"
+          role="button" tabindex="0" :aria-pressed="cat === 'all'"
           @click="cat = 'all'"
+          @keydown.enter.prevent="cat = 'all'" @keydown.space.prevent="cat = 'all'"
         >
           <text>{{ t.receipt.tabAll }}</text>
         </view>
@@ -41,7 +43,9 @@
           :key="c"
           class="active:opacity-70"
           :style="chipStyle(cat === c)"
+          role="button" tabindex="0" :aria-pressed="cat === c"
           @click="cat = c"
+          @keydown.enter.prevent="cat = c" @keydown.space.prevent="cat = c"
         >
           <text>{{ categoryLabel(c) }}</text>
         </view>
@@ -57,7 +61,7 @@
             :key="it.id"
             :style="i !== 0 ? faqDividerStyle : undefined"
           >
-            <view class="w-full flex items-center active:opacity-90" :style="faqHeadStyle" @click="toggleFaq(it.id)">
+            <view class="w-full flex items-center active:opacity-90" :style="faqHeadStyle" role="button" tabindex="0" :aria-expanded="openId === it.id" @click="toggleFaq(it.id)" @keydown.enter.prevent="toggleFaq(it.id)" @keydown.space.prevent="toggleFaq(it.id)">
               <text :style="faqQStyle" style="flex: 1">{{ it.q }}</text>
               <view :style="chevStyle(openId === it.id)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>

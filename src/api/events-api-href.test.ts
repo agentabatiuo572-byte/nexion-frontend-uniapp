@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isValidEventHref } from "./events-api";
+import { describe, expect, it, vi } from "vitest";
+import { createEventsApi, isValidEventHref } from "./events-api";
 
 describe("isValidEventHref", () => {
   it.each([
@@ -20,5 +20,23 @@ describe("isValidEventHref", () => {
     "/pages//store",
   ])("rejects an unsafe or ambiguous event route %s", (href) => {
     expect(isValidEventHref(href)).toBe(false);
+  });
+
+  it("preserves a canonical non-NEX claim receipt without coercing its asset", async () => {
+    const request = vi.fn().mockResolvedValue({
+      eventId: "usdt-boost",
+      rewardType: "USDT",
+      rewardAmount: 12.5,
+      badgeCode: null,
+    });
+    const api = createEventsApi({ request } as never);
+
+    await expect(api.claim("usdt-boost", "event-claim-usdt-boost"))
+      .resolves.toEqual({ eventId: "usdt-boost", rewardType: "USDT", rewardAmount: 12.5, badgeCode: null });
+    expect(request).toHaveBeenCalledWith({
+      method: "POST",
+      path: "/api/events/usdt-boost/claim",
+      idempotencyKey: "event-claim-usdt-boost",
+    });
   });
 });

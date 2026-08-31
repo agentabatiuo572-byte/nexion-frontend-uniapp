@@ -37,6 +37,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/onboarding/privacy",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/register/register",
       "style": { "navigationStyle": "custom" }
     },

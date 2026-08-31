@@ -144,9 +144,9 @@ const emptyTitle = computed(() =>
 
 function timeAgo(ts: number): string {
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-  if (mins < 60) return `${mins}m`;
-  if (mins < 1440) return `${Math.floor(mins / 60)}h`;
-  return `${Math.floor(mins / 1440)}d`;
+  if (mins < 60) return fmt(t.value.tickets.timeMinutesAgo, { n: mins });
+  if (mins < 1440) return fmt(t.value.tickets.timeHoursAgo, { n: Math.floor(mins / 60) });
+  return fmt(t.value.tickets.timeDaysAgo, { n: Math.floor(mins / 1440) });
 }
 
 async function onTap(n: Notification) {

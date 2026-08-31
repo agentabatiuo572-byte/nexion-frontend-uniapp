@@ -2,18 +2,13 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { remoteApiEnabled, repurchaseApi } from "@/api/runtime";
 import { normalizeCommandAmount } from "@/lib/command-amount";
+import { createRemoteIntentGate } from "@/lib/g-remote-intent";
+import { isSettledRejection } from "@/api/errors";
 import type {
   RepurchaseConfig,
   RepurchaseOrder,
   RepurchaseSnapshot,
 } from "@/api/repurchase-api";
-
-let sequence = 0;
-
-function newKey(operation: string): string {
-  sequence += 1;
-  return `g7-${operation}-${Date.now().toString(36)}-${sequence.toString(36)}`;
-}
 
 function message(error: unknown): string {
   return error instanceof Error && error.message ? error.message : "REPURCHASE_REQUEST_FAILED";
@@ -27,7 +22,9 @@ export const useRepurchase = defineStore("repurchase", () => {
   const loading = ref(false);
   const submitting = ref(false);
   const error = ref("");
-  const pendingKeys = new Map<string, string>();
+  const intents = createRemoteIntentGate("g7");
+  const pendingOpenAmount = ref<number | null>(null);
+  let boundAccount = "";
   let accountGeneration = 0;
   let configGeneration = 0;
   let ordersGeneration = 0;
@@ -110,31 +107,41 @@ export const useRepurchase = defineStore("repurchase", () => {
     }
   }
 
-  function key(scope: string): string {
-    const existing = pendingKeys.get(scope);
-    if (existing) return existing;
-    const created = newKey(scope.replace(/[^a-z0-9-]/gi, "-").toLowerCase());
-    pendingKeys.set(scope, created);
-    return created;
+  function restorePendingOpen() {
+    const pending = boundAccount ? intents.unresolved(boundAccount, "open") : [];
+    if (pending.length > 1 || pending.some((amount) => typeof amount !== "number"
+        || !Number.isFinite(amount) || amount <= 0)) throw new Error("REMOTE_INTENT_PERSIST_FAILED");
+    pendingOpenAmount.value = pending.length ? pending[0] as number : null;
   }
 
-  async function command(scope: string, action: (idempotencyKey: string) => Promise<RepurchaseSnapshot>) {
+  async function command(scope: string, payload: number | string, action: (idempotencyKey: string) => Promise<RepurchaseSnapshot>) {
     if (submitting.value) throw new Error("REPURCHASE_COMMAND_IN_PROGRESS");
+    if (!boundAccount) throw new Error("REMOTE_INTENT_ACCOUNT_INVALID");
+    const recovering = intents.unresolved(boundAccount, scope).includes(payload);
+    const lease = intents.acquire(boundAccount, scope, payload);
     const account = accountGeneration;
     const request = ++commandGeneration;
     submitting.value = true;
     try {
-      const snapshot = await action(key(scope));
+      restorePendingOpen();
+      const snapshot = await action(lease.key);
       if (account !== accountGeneration || request !== commandGeneration) {
         throw new Error("REPURCHASE_ACCOUNT_CHANGED");
       }
-      pendingKeys.delete(scope);
       // Commands update orders and wallet, but not the independent config
       // resource. Only invalidate pre-receipt orders reads.
       ordersGeneration += 1;
       apply(snapshot);
+      intents.complete(lease, true);
+      // A storage cleanup problem cannot undo an acknowledged server receipt.
+      try { restorePendingOpen(); } catch (cause) { error.value = message(cause); }
       return snapshot;
     } catch (cause) {
+      // A later rejection cannot disprove an earlier unknown commit.
+      intents.complete(lease, !recovering && isSettledRejection(cause));
+      if (account === accountGeneration) {
+        try { restorePendingOpen(); } catch (storageError) { error.value = message(storageError); }
+      }
       // A rejected money command does not invalidate the last canonical config
       // and order snapshot. The page can show the command error in a toast and
       // remain usable; only refresh/read failures put the whole screen in HOLD.
@@ -148,30 +155,34 @@ export const useRepurchase = defineStore("repurchase", () => {
 
   async function open(amountUsdt: number) {
     if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
-    const policy = config.value;
-    if (!policy || !policy.enabled) throw new Error("REPURCHASE_PRODUCT_UNAVAILABLE");
+    restorePendingOpen();
     const commandAmount = normalizeCommandAmount(amountUsdt);
-    if (!Number.isFinite(amountUsdt) || commandAmount < policy.minAmountUsdt) {
+    const recovering = pendingOpenAmount.value !== null;
+    if (recovering && pendingOpenAmount.value !== commandAmount) throw new Error("REPURCHASE_PENDING_RECOVERY_REQUIRED");
+    const policy = config.value;
+    if (!recovering && (!policy || !policy.enabled)) throw new Error("REPURCHASE_PRODUCT_UNAVAILABLE");
+    if (!Number.isFinite(amountUsdt) || commandAmount <= 0 || (!recovering && commandAmount < policy!.minAmountUsdt)) {
       throw new Error("REPURCHASE_MIN_AMOUNT_NOT_MET");
     }
-    if (commandAmount > walletBalanceUsdt.value) throw new Error("REPURCHASE_WALLET_INSUFFICIENT");
-    return command(`open:${commandAmount}`, (idempotencyKey) =>
+    if (!recovering && commandAmount > walletBalanceUsdt.value) throw new Error("REPURCHASE_WALLET_INSUFFICIENT");
+    return command("open", commandAmount, (idempotencyKey) =>
       repurchaseApi.open(commandAmount, idempotencyKey));
   }
 
   async function claim(orderNo: string) {
     if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
-    return command(`claim:${orderNo}`, (idempotencyKey) =>
+    return command("claim", orderNo, (idempotencyKey) =>
       repurchaseApi.claim(orderNo, idempotencyKey));
   }
 
   async function earlyWithdraw(orderNo: string) {
     if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
-    return command(`early:${orderNo}`, (idempotencyKey) =>
+    return command("early", orderNo, (idempotencyKey) =>
       repurchaseApi.earlyWithdraw(orderNo, idempotencyKey));
   }
 
-  function bindAccount() {
+  function bindAccount(accountKey: string) {
+    boundAccount = accountKey.trim();
     accountGeneration += 1;
     configGeneration += 1;
     ordersGeneration += 1;
@@ -184,7 +195,8 @@ export const useRepurchase = defineStore("repurchase", () => {
     error.value = "";
     loading.value = false;
     submitting.value = false;
-    pendingKeys.clear();
+    pendingOpenAmount.value = null;
+    try { restorePendingOpen(); } catch (cause) { error.value = message(cause); }
     if (remoteApiEnabled) void refresh();
   }
 
@@ -196,6 +208,7 @@ export const useRepurchase = defineStore("repurchase", () => {
     loading,
     submitting,
     error,
+    pendingOpenAmount,
     refresh,
     open,
     claim,

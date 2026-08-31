@@ -119,7 +119,7 @@
         <text>{{ t.ref.legalLine }} </text>
         <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTerms">{{ t.ref.terms }}</text>
         <text> · </text>
-        <text>{{ t.ref.privacy }}</text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy" @keydown.space.prevent="goPrivacy">{{ t.ref.privacy }}</text>
         <text> · </text>
         <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
@@ -237,6 +237,7 @@ function enterApp() {
 function goTrust() {
   navTo("/pages/trust/trust");
 }
+function goPrivacy() { navTo("/pages/onboarding/privacy"); }
 function goTerms() {
   navTo("/pages/onboarding/terms");
 }

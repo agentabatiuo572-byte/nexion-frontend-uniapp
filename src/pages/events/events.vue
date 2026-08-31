@@ -278,7 +278,7 @@ async function handleClaim(ev: EnrichedEvent) {
       fence: remoteCommandFence,
       command: () => eventQuest.claimRemote(ev.id),
       refresh: loadRemoteEvents,
-      onSuccess: () => toast.success(t.value.events.toast.claimedTitle.replace("{n}", rewardNexOf(ev).toLocaleString()), ev.title),
+      onSuccess: () => toast.success(t.value.events.claimedReward.replace("{reward}", ev.reward), ev.title),
       onFailure: () => toast.error(t.value.authOtp.errorServiceUnavailable),
     });
     return;

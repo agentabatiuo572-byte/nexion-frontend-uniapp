@@ -103,7 +103,7 @@ const showClaim = computed(() => props.ev._trackable && props.ev._done && !props
 const showJoinAction = computed(() => props.ev._trackable && !props.ev.joined && !props.ev._done);
 const openTarget = computed(() => eventOpenTarget(props.ev));
 const showOpenAction = computed(() => Boolean(openTarget.value));
-const claimLabel = computed(() => fmt(t.value.events.claimCta, { n: props.rewardNex.toLocaleString() }));
+const claimLabel = computed(() => fmt(t.value.events.claimRewardCta, { reward: props.ev.reward }));
 const progressPct = computed(() =>
   props.ev.progress ? Math.min(100, (props.ev.progress.current / props.ev.progress.total) * 100) : 0,
 );

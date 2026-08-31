@@ -114,10 +114,10 @@
           </view>
         </view>
 
-        <view v-if="canClose(detailTicket)" :style="replyCardStyle">
+        <view v-if="canReply(detailTicket)" :style="replyCardStyle">
           <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
           <view class="grid grid-cols-2" style="gap: 8px; margin-top: 8px">
-            <view class="flex items-center justify-center active:scale-[0.98]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
+            <view v-if="canClose(detailTicket)" class="flex items-center justify-center active:scale-[0.98]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
               <text>{{ t.tickets.detail.closeBtn }}</text>
             </view>
             <view class="flex items-center justify-center active:scale-[0.98]" :style="sendReplyStyle(!!reply.trim())" role="button" tabindex="0" :aria-label="t.tickets.detail.sendBtn" @click="sendReply">
@@ -272,6 +272,9 @@ function selectTab(id: Tab) {
 function canClose(tk: Ticket): boolean {
   return tk.status !== "closed" && tk.status !== "resolved";
 }
+function canReply(tk: Ticket): boolean {
+  return tk.status !== "closed";
+}
 function relWhen(ts: number): string {
   const ms = Date.now() - ts;
   if (ms < 60_000) return t.value.tickets.timeJustNow;
@@ -315,7 +318,7 @@ async function submitCreate() {
 async function sendReply() {
   if (ticketsStore.mutating) return;
   const current = detailTicket.value;
-  if (!current || !reply.value.trim()) return;
+  if (!current || !canReply(current) || !reply.value.trim()) return;
   try {
     await ticketsStore.reply(current.id, reply.value);
     reply.value = "";

@@ -82,10 +82,10 @@
             <view>
               <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 4px">
                 <text :style="{ color: 'var(--v5-ink)' }">{{ t.binary.strong }} ${{ strongVol.toLocaleString() }}</text>
-                <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-3)' }">100%</text>
+                <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-3)' }">{{ strongVol > 0 ? 100 : 0 }}%</text>
               </view>
               <view class="rounded-full overflow-hidden" :style="gapBarTrackStyle">
-                <view class="h-full rounded-full" :style="{ width: '100%', background: 'var(--v5-brand)' }" />
+                <view class="h-full rounded-full" :style="{ width: strongVol > 0 ? '100%' : '0%', background: 'var(--v5-brand)' }" />
               </view>
             </view>
             <view>
