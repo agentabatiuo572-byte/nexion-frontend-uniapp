@@ -147,7 +147,7 @@ const freeTrial = useFreeTrial();
 onShow(() => {
   if (remoteApiEnabled) {
     void freeTrial.refreshRemote(true);
-    void app.refreshRemoteFleet().catch(() => undefined);
+    void app.refreshRemoteFleet(undefined, { coalesce: true }).catch(() => undefined);
     void app.refreshHomeTruth().catch(() => undefined);
   }
 });

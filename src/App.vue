@@ -492,7 +492,7 @@ async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth)) return false;
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  return useApp().refreshRemoteFleet();
+  return useApp().refreshRemoteFleet(undefined, { coalesce: true });
 }
 
 function readServerAuthenticatedAccountTrace(): boolean {

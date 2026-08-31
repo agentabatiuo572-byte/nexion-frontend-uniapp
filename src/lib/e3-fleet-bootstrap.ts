@@ -17,5 +17,5 @@ export async function refreshRemoteFleetAfterCatalog(accountKey: string): Promis
     return false;
   }
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  return useApp().refreshRemoteFleet();
+  return useApp().refreshRemoteFleet(undefined, { coalesce: true });
 }

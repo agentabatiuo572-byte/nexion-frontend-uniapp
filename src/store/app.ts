@@ -57,7 +57,12 @@ import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import {
+  createRemoteFleetRefreshCoordinator,
+  type RemoteFleetRefreshOptions,
+} from "./remote-fleet-refresh-coordinator";
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
@@ -405,6 +410,7 @@ export const useApp = defineStore("app", () => {
     key: string;
     request: Promise<CanonicalTaskAssignments>;
   } | null = null;
+  const remoteFleetRefreshCoordinator = createRemoteFleetRefreshCoordinator();
   let remoteFleetRefreshSequence = 0;
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
   //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
@@ -729,7 +735,7 @@ export const useApp = defineStore("app", () => {
       // receipts and money mutations are server jobs; the App only refreshes their
       // task, per-device earnings and Home aggregate projections.
       await Promise.allSettled([
-        refreshRemoteFleet(request),
+        refreshRemoteFleet(request, { coalesce: true }),
         refreshHomeTruth(request),
       ]);
       return;
@@ -789,86 +795,111 @@ export const useApp = defineStore("app", () => {
     return refresh;
   }
 
-  async function refreshRemoteFleet(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+  function invalidateRemoteFleet(request?: RemoteAccountRequest): void {
+    if (request && !remoteAccountEpoch.isCurrent(request)) return;
+    remoteFleetRefreshCoordinator.invalidate();
+    remoteFleetRefreshSequence += 1;
+  }
+
+  async function refreshRemoteFleet(
+    request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
+    options: RemoteFleetRefreshOptions = {},
+  ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const expectedAccountKey = request.accountKey;
-    let refreshSequence: number | null = null;
+    const runScope = captureRuntimeRevision();
+    const scope = {
+      accountKey: request.accountKey,
+      accountEpoch: request.epoch,
+      mode: expectedApiEnvironment,
+      runId: runScope.runId,
+      runEpoch: runScope.epoch,
+    };
     // H5 deliberately drops its access token on reload and restores it through
     // the HttpOnly refresh cookie. Never turn a Login page lifecycle hook or a
     // default-account rebind into an authenticated request: its late
     // unauthorized callback could otherwise clear a newer restored session.
-    try {
-      const activeSession = sessionVault.read();
-      if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
-      if (!remoteAccountEpoch.isCurrent(request)) return false;
-      refreshSequence = ++remoteFleetRefreshSequence;
-      remoteFleetStatus.value = "loading";
-      remoteFleetError.value = "";
-      remoteAssignmentStatus.value = "loading";
-      remoteAssignmentError.value = "";
-      const [fleetResult, assignmentResult] = await Promise.allSettled([
-        deviceE3Api.fleet(), readRemoteTaskAssignments(request),
-      ]);
-      if (!remoteAccountEpoch.isCurrent(request) || refreshSequence !== remoteFleetRefreshSequence) {
-        throw new Error("REMOTE_FLEET_REQUEST_SUPERSEDED");
-      }
-      if (assignmentResult.status === "rejected") {
-        remoteAssignmentStatus.value = "error";
-        remoteAssignmentError.value = assignmentResult.reason instanceof Error
-          ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
-      } else {
-        remoteAssignmentStatus.value = "ready";
-        lastConfirmedAssignments = { request: { ...request }, state: assignmentResult.value };
-      }
-      if (fleetResult.status === "rejected") throw fleetResult.reason;
-      const fleet = fleetResult.value;
-      installCanonicalLifecycleConfig(fleet.capacitySchedule);
-      const capacitySnapshotReceivedAt = readMonotonicNowMs();
-      const canonicalDevices = fleet.devices.map((device) => canonicalDevice(
-        device,
-        fleet.serverNow,
-        capacitySnapshotReceivedAt,
-      ));
-      const confirmedAssignments = assignmentResult.status === "fulfilled"
-        ? assignmentResult.value
-        : lastConfirmedAssignments?.request.accountKey === request.accountKey
-          && lastConfirmedAssignments.request.epoch === request.epoch
-          ? lastConfirmedAssignments.state
-          : null;
-      const nextDevices = confirmedAssignments
-        ? applyRemoteAssignments(canonicalDevices, confirmedAssignments)
-        : canonicalDevices;
-      devices.value = nextDevices;
-      syncDeviceRuntime(nextDevices, true);
-      user.value = {
-        ...user.value,
-        joinedAt: fleet.userJoinedAt,
-        nexBalance: fleet.walletNex,
-        pendingEarnings: 0,
-        usdtBalance: fleet.walletUsdt,
-        earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
-      };
-      remoteFleetStatus.value = "ready";
-      return true;
-    } catch (cause) {
-      if (remoteAccountEpoch.isCurrent(request)
-        && refreshSequence != null
-        && refreshSequence === remoteFleetRefreshSequence) {
-        devices.value = [];
-        syncDeviceRuntime([], true);
+    return remoteFleetRefreshCoordinator.refresh(scope, async (lease) => {
+      let refreshSequence: number | null = null;
+      try {
+        const activeSession = sessionVault.read();
+        if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
+        if (!remoteAccountEpoch.isCurrent(request)) return false;
+        if (!isCurrentRuntimeRevision(runScope)) return false;
+        refreshSequence = ++remoteFleetRefreshSequence;
+        remoteFleetStatus.value = "loading";
+        remoteFleetError.value = "";
+        remoteAssignmentStatus.value = "loading";
+        remoteAssignmentError.value = "";
+        const [fleetResult, assignmentResult] = await Promise.allSettled([
+          deviceE3Api.fleet(), readRemoteTaskAssignments(request),
+        ]);
+        if (!remoteAccountEpoch.isCurrent(request)
+          || !isCurrentRuntimeRevision(runScope)
+          || !remoteFleetRefreshCoordinator.isCurrent(lease)
+          || refreshSequence !== remoteFleetRefreshSequence) {
+          throw new Error("REMOTE_FLEET_REQUEST_SUPERSEDED");
+        }
+        if (assignmentResult.status === "rejected") {
+          remoteAssignmentStatus.value = "error";
+          remoteAssignmentError.value = assignmentResult.reason instanceof Error
+            ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
+        } else {
+          remoteAssignmentStatus.value = "ready";
+          lastConfirmedAssignments = { request: { ...request }, state: assignmentResult.value };
+        }
+        if (fleetResult.status === "rejected") throw fleetResult.reason;
+        const fleet = fleetResult.value;
+        installCanonicalLifecycleConfig(fleet.capacitySchedule);
+        const capacitySnapshotReceivedAt = readMonotonicNowMs();
+        const canonicalDevices = fleet.devices.map((device) => canonicalDevice(
+          device,
+          fleet.serverNow,
+          capacitySnapshotReceivedAt,
+        ));
+        const confirmedAssignments = assignmentResult.status === "fulfilled"
+          ? assignmentResult.value
+          : lastConfirmedAssignments?.request.accountKey === request.accountKey
+            && lastConfirmedAssignments.request.epoch === request.epoch
+            ? lastConfirmedAssignments.state
+            : null;
+        const nextDevices = confirmedAssignments
+          ? applyRemoteAssignments(canonicalDevices, confirmedAssignments)
+          : canonicalDevices;
+        devices.value = nextDevices;
+        syncDeviceRuntime(nextDevices, true);
         user.value = {
           ...user.value,
-          joinedAt: 0,
-          nexBalance: 0,
+          joinedAt: fleet.userJoinedAt,
+          nexBalance: fleet.walletNex,
           pendingEarnings: 0,
-          usdtBalance: 0,
-          earningBuckets: createEarningBuckets(0, 0),
+          usdtBalance: fleet.walletUsdt,
+          earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         };
-        remoteFleetStatus.value = "error";
-        remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+        remoteFleetStatus.value = "ready";
+        return true;
+      } catch (cause) {
+        if (remoteAccountEpoch.isCurrent(request)
+          && isCurrentRuntimeRevision(runScope)
+          && remoteFleetRefreshCoordinator.isCurrent(lease)
+          && refreshSequence != null
+          && refreshSequence === remoteFleetRefreshSequence) {
+          devices.value = [];
+          syncDeviceRuntime([], true);
+          user.value = {
+            ...user.value,
+            joinedAt: 0,
+            nexBalance: 0,
+            pendingEarnings: 0,
+            usdtBalance: 0,
+            earningBuckets: createEarningBuckets(0, 0),
+          };
+          remoteFleetStatus.value = "error";
+          remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+        }
+        return false;
       }
-      return false;
-    }
+    }, options);
   }
 
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
@@ -891,7 +922,7 @@ export const useApp = defineStore("app", () => {
       taskAssignmentSnapshot = null;
       taskAssignmentSnapshotInFlight = null;
       remoteTaskSyncAfter = 0;
-      remoteFleetRefreshSequence += 1;
+      invalidateRemoteFleet();
       homeTruth.value = null;
       homeTruthStatus.value = "idle";
       homeTruthError.value = null;
@@ -1942,6 +1973,9 @@ export const useApp = defineStore("app", () => {
     if (!remoteApiEnabled || expectedApiEnvironment !== "dev"
         || !remoteAccountEpoch.isCurrent(receiptScope)
         || !Number.isFinite(balanceAfterUsdt) || balanceAfterUsdt < 0) return false;
+    // A committed wallet receipt must make the next fleet read bypass any
+    // earlier in-flight wallet projection.
+    invalidateRemoteFleet(receiptScope);
     const nextBalance = +balanceAfterUsdt.toFixed(6);
     const current = withDefaultEarningBuckets(user.value);
     user.value = {
@@ -2001,6 +2035,7 @@ export const useApp = defineStore("app", () => {
     // 有扣款无单据,追踪页深链「查无此单」。
     // 页面侧的账单行早已钉死 `snap.account`,只钉一半反而更糟:账与单分家,对账永远配不上。
     const acct = accountKey.value;
+    const fleetRequest = remoteAccountEpoch.snapshot();
     // D5 real boundary: the backend re-prices the request under policyVersion and
     // commits wallet reservation, optional NEX burn, order and ledgers atomically.
     // The local store only mirrors the returned order for rendering; it never
@@ -2014,6 +2049,9 @@ export const useApp = defineStore("app", () => {
       idempotencyKey,
     );
     const canonical = toCanonicalWithdrawal(submission, address);
+    // Submission is a committed server-side wallet mutation. Do not let the
+    // caller's mandatory readback reuse a pre-submission fleet request.
+    invalidateRemoteFleet(fleetRequest);
     // 🔴 换号了:这一单属于 acct,当前绑定的是别人。直接写进**冻结账号**的那一行,
     // 内存(现在装的是新账号的视图)一个字都不碰 —— 与 bills.addManyForAccountOnce 同一条纪律。
     // 落盘成败都要把单交还调用方:服务端已经建单,吞掉它 = 旧账号有扣款无凭证。
@@ -2262,7 +2300,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,
