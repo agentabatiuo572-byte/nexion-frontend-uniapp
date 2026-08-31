@@ -102,6 +102,23 @@ export class RemoteIntentKeyRegistry {
     }
   }
 
+  /** Read unresolved payloads for recovery without creating or sending a command. */
+  unresolved(accountKey: string, intent: string): unknown[] {
+    const account = normalized(accountKey, "REMOTE_INTENT_ACCOUNT_INVALID");
+    const name = normalized(intent, "REMOTE_INTENT_NAME_INVALID");
+    return Object.keys(this.read().pending).flatMap((fingerprint) => {
+      try {
+        const parts: unknown = JSON.parse(fingerprint);
+        if (!Array.isArray(parts) || parts.length !== 4) throw new Error();
+        if (parts[0] !== account || parts[1] !== this.scope || parts[2] !== name) return [];
+        if (typeof parts[3] !== "string") throw new Error();
+        return [JSON.parse(parts[3]) as unknown];
+      } catch {
+        throw new Error("REMOTE_INTENT_PERSIST_FAILED");
+      }
+    });
+  }
+
   acquire(accountKey: string, intent: string, payload: unknown): RemoteIntentLease {
     const intentName = normalized(intent, "REMOTE_INTENT_NAME_INVALID");
     const fingerprint = commandFingerprint(this.scope, accountKey, intentName, payload);

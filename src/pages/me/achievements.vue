@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -151,6 +151,16 @@ const remoteSnapshot = ref<DailySnapshot | null>(null);
 const remoteLoading = ref(false);
 const remoteError = ref(false);
 const remoteBusy = ref("");
+let accountGeneration = 0;
+let readGeneration = 0;
+watch(() => app.accountKey, () => {
+  accountGeneration += 1;
+  readGeneration += 1;
+  remoteSnapshot.value = null;
+  remoteLoading.value = false;
+  remoteBusy.value = "";
+  if (remoteApiEnabled) void refreshRemote();
+});
 
 type RemoteStatus = DailyMilestoneStatus | EarningMilestoneStatus;
 interface RemoteMilestoneRow {
@@ -195,16 +205,20 @@ function evaluate() {
   if (earningsTotal > 0) ach.unlock("first_contribution");
 }
 async function refreshRemote() {
-  if (!remoteApiEnabled || remoteLoading.value) return;
+  if (!remoteApiEnabled) return;
+  const account = accountGeneration;
+  const request = ++readGeneration;
   remoteLoading.value = true;
   remoteError.value = false;
   try {
-    remoteSnapshot.value = await pointsApi.state();
+    const snapshot = await pointsApi.state();
+    if (account === accountGeneration && request === readGeneration) remoteSnapshot.value = snapshot;
   } catch {
+    if (account !== accountGeneration || request !== readGeneration) return;
     remoteError.value = true;
     if (remoteSnapshot.value) toast.warn(w.value.remoteUnavailable);
   } finally {
-    remoteLoading.value = false;
+    if (account === accountGeneration && request === readGeneration) remoteLoading.value = false;
   }
 }
 
@@ -267,18 +281,32 @@ const percentLabel = computed(() => percent.value === null ? "—" : `${percent.
 async function claimRemote(row: RemoteMilestoneRow) {
   if (!remoteApiEnabled || row.status !== "CLAIMABLE" || remoteBusy.value) return;
   remoteBusy.value = row.key;
+  const account = accountGeneration;
   try {
     if (row.kind === "daily") {
-      await pointsApi.claimMilestone(Number(row.id), `h5-achievement-daily:${row.id}`);
+      const receipt = await pointsApi.claimMilestone(Number(row.id), `h5-achievement-daily:${row.id}`);
+      if (account !== accountGeneration) return;
+      if (remoteSnapshot.value) remoteSnapshot.value = {
+        ...remoteSnapshot.value,
+        dailyMilestones: remoteSnapshot.value.dailyMilestones.map((item) => item.milestoneId === receipt.milestoneId
+          ? { ...item, status: "CLAIMED" } : item),
+      };
     } else {
-      await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`, String(row.id));
+      const receipt = await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`, String(row.id));
+      if (account !== accountGeneration) return;
+      if (remoteSnapshot.value) remoteSnapshot.value = {
+        ...remoteSnapshot.value,
+        earningMilestones: remoteSnapshot.value.earningMilestones.map((item) => receipt.fired.some((fired) => fired.milestoneId === item.milestoneId)
+          ? { ...item, status: "FIRED" } : item),
+      };
     }
-    remoteSnapshot.value = await pointsApi.state();
+    readGeneration += 1;
     toast.success(w.value.claimToast);
+    await refreshRemote();
   } catch {
-    toast.error(w.value.remoteUnavailable);
+    if (account === accountGeneration) toast.error(w.value.remoteUnavailable);
   } finally {
-    remoteBusy.value = "";
+    if (account === accountGeneration) remoteBusy.value = "";
   }
 }
 

@@ -15,14 +15,16 @@ vi.mock("@/api/runtime", () => remote);
 
 const { useNexFaucet } = await import("./nex-faucet");
 
-function dailySnapshot(currentStreak = 3, serverDate = "2026-08-22") {
+function dailySnapshot(currentStreak = 3, serverDate = "2026-08-22", checkedInToday = false) {
   return {
     serverDate,
+    nextResetAtUtc: "2026-08-23T00:00:00Z",
     streak: {
       currentStreak,
       longestStreak: 5,
       streakSavers: 1,
       lastCheckInDate: "2026-08-21",
+      checkedInToday,
     },
     dailyMilestones: [{
       milestoneId: 7,
@@ -105,7 +107,17 @@ describe("NEX faucet remote failure resilience", () => {
 
     expect(remote.pointsApi.checkIn).toHaveBeenCalledWith("h5-check-in:2026-08-22");
     expect(store.signInStreak).toBe(4);
+    expect(store.remoteCheckedInToday).toBe(true);
     expect(store.remoteMilestones).toHaveLength(1);
+  });
+
+  it("takes both daily UI boundary facts from the canonical snapshot", async () => {
+    remote.pointsApi.state.mockResolvedValue(dailySnapshot(3, "2026-08-22", true));
+    const store = useNexFaucet();
+    await flush();
+
+    expect(store.remoteCheckedInToday).toBe(true);
+    expect(store.remoteNextResetAt).toBe(Date.parse("2026-08-23T00:00:00Z"));
   });
 
   it("refreshes the server business date before a streak saver command and keeps write success when readback fails", async () => {

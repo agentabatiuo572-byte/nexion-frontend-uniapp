@@ -29,7 +29,6 @@ export async function runRemoteEventAction({
   }
 
   if (!fence.isCurrent(scope)) return;
-  await refresh();
-  if (!fence.isCurrent(scope)) return;
   onSuccess();
+  try { await refresh(); } catch { /* The command receipt remains successful; refresh owns its recovery UI. */ }
 }

@@ -116,7 +116,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useWeeklyQuest().bindAccount(accountKey);
   useReferralReward().bindAccount(accountKey);
   useNetwork().bindAccount(accountKey);
-  useRepurchase().bindAccount();
+  useRepurchase().bindAccount(accountKey);
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useGenesisPoints().bindAccount(accountKey);
   useNetworkRank().bindAccount(accountKey);

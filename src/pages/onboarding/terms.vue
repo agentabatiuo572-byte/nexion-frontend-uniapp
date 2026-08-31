@@ -54,9 +54,6 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
       </view>
 
-      <!-- Footer entity / contact -->
-      <text class="tos-footer">{{ t.terms.footer }}</text>
-
       <!-- Acknowledge & return -->
       <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms" @keydown.space.prevent="confirmTerms">
         <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : t.terms.confirmContinue) }}</text>

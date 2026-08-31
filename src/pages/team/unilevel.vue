@@ -41,7 +41,7 @@
           </view>
           <text class="block font-display tabular-nums" :style="heroBigStyle">{{ remoteApiEnabled ? (remoteState === 'ready' ? `$${remoteTotalUSDT.toFixed(2)}` : '—') : `$${totalRoyalty.toFixed(2)}` }}</text>
           <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
-            <text>{{ remoteApiEnabled ? `${t.unilevel.serverRewardHold} · ${canonicalPolicyText}` : heroRateLineText }}</text>
+            <text>{{ remoteApiEnabled ? canonicalPolicyText : heroRateLineText }}</text>
           </view>
         </view>
 

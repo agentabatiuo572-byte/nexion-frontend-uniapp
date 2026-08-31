@@ -278,7 +278,13 @@ onShow(() => { void refreshDaily(); });
 const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
-  timer = setInterval(() => (tick.value += 1), 1000);
+  timer = setInterval(() => {
+    tick.value += 1;
+    if (remoteApiEnabled && faucet.remoteNextResetAt > 0
+        && Date.now() >= faucet.remoteNextResetAt && tick.value % 30 === 0 && !remoteRefreshing.value) {
+      void refreshDaily();
+    }
+  }, 1000);
   // 🔴 这里曾挂过一个 reconcileFaucetBills()「签到/里程碑发币没落盘就补发」——**已撤销**。
   // 实景走查当场证伪:判据是「有领取状态、无对应账单行 ⇒ 补发」,它分不清
   //   ① 从没发过(该补)与 ② 发过了但账单行丢了(不该补)。
@@ -314,7 +320,8 @@ function formatCountdown(ms: number): string {
 }
 
 const streak = computed(() => faucet.signInStreak);
-const lastSignedToday = computed(() => faucet.lastSignedInAt > 0 && isSameDay(faucet.lastSignedInAt, Date.now()));
+const lastSignedToday = computed(() => remoteApiEnabled ? faucet.remoteCheckedInToday
+  : faucet.lastSignedInAt > 0 && isSameDay(faucet.lastSignedInAt, Date.now()));
 const claimedSet = computed(() => new Set(faucet.claimedMilestones));
 
 function isMilestoneClaimed(m: Milestone): boolean {
@@ -334,6 +341,7 @@ const daysToMilestone = computed(() => Math.max(1, nextMilestone.value - streak.
 
 const nextResetMs = computed(() => {
   void tick.value;
+  if (remoteApiEnabled) return Math.max(0, faucet.remoteNextResetAt - Date.now());
   const next = today();
   next.setDate(next.getDate() + 1);
   return next.getTime() - Date.now();

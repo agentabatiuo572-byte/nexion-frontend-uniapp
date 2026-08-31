@@ -19,6 +19,7 @@ import { createGenesisApi } from "./genesis-api";
 import { createRepurchaseApi } from "./repurchase-api";
 import { createRiskDisclosureApi } from "./risk-disclosure-api";
 import { createLegalTermsApi } from "./legal-terms-api";
+import { createPrivacyPolicyApi } from "./privacy-policy-api";
 import { createPayoutAddressApi } from "./payout-address-api";
 import { createPaymentMethodApi } from "./payment-method-api";
 import { createTrialApi } from "./trial-api";
@@ -164,6 +165,7 @@ export const onboardingCalibrationApi = createOnboardingCalibrationApi(
 export const shareEventApi = createShareEventApi(apiClient, expectedApiEnvironment);
 export const goalsApi = createGoalsApi(apiClient, expectedApiEnvironment);
 export const howContentApi = createHowContentApi(apiClient, expectedApiEnvironment);
+export const privacyPolicyApi = createPrivacyPolicyApi(apiClient, expectedApiEnvironment);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

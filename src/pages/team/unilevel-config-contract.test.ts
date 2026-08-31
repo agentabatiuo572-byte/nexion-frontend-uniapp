@@ -22,7 +22,8 @@ describe("unilevel canonical commission consumer contract", () => {
     expect(source).not.toContain("commission.config.runId");
     expect(source).toContain("remoteState === 'ready'");
     expect(source).toContain('v-else-if="!remoteApiEnabled"');
-    expect(source).toContain("t.unilevel.serverRewardHold");
+    expect(source).toContain("canonicalPolicyText");
+    expect(source).not.toContain("t.unilevel.serverRewardHold");
     expect(source).toContain("t.network.projectionErrorDesc");
   });
 });

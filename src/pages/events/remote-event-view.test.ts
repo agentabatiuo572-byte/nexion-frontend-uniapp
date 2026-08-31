@@ -119,6 +119,19 @@ describe("remoteEventView", () => {
     expect(view.useHref).toBeUndefined();
   });
 
+  it("does not expose a USDT claim as a client-side NEX reward", () => {
+    const view = remoteEventView(canonicalEvent({
+      trackable: true,
+      userStatus: "CLAIMABLE",
+      rewardType: "USDT",
+      rewardAmount: 12.5,
+      rewardName: "USDT rebate",
+    }), labels);
+
+    expect(view.reward).toBe("12.5 USDT rebate");
+    expect(view.rewardNEX).toBe(0);
+  });
+
   it("does not expose a post-claim link before the reward is claimed", () => {
     const view = remoteEventView(canonicalEvent({
       trackable: true,

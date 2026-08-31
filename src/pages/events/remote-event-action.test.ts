@@ -37,7 +37,7 @@ describe("remote event actions", () => {
     expect(failure).not.toHaveBeenCalled();
   });
 
-  it("does not toast when the page hides while its post-command refresh is pending", async () => {
+  it("keeps the canonical command success when the page hides during readback", async () => {
     const accountEpoch = createRemoteAccountEpoch("A");
     let visible = true;
     const fence = createRemotePageCommandFence(accountEpoch, () => visible);
@@ -60,7 +60,7 @@ describe("remote event actions", () => {
     refreshResult.resolve();
     await action;
 
-    expect(success).not.toHaveBeenCalled();
+    expect(success).toHaveBeenCalledTimes(1);
     expect(failure).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,39 @@ import type { Messages } from "./en";
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  privacy: {
+    "title": "隐私政策",
+    "unavailable": "隐私政策的已发布正文暂时不可用，请稍后重试。",
+    "version": "版本",
+    "back": "返回"
+  },
+  holderFacts: {
+    "title": "持有人资格",
+    "allocation": "预留额度",
+    "priority": "优先级",
+    "unavailable": "暂时无法读取持有人信息，请刷新后重试。",
+    "stale": "持有人信息需要更新，请刷新。",
+    "unpublished": "额度政策尚未发布，当前没有已确认额度。",
+    "notEffective": "已发布的额度政策尚未生效。",
+    "notEligible": "你目前未满足持有人额度的资格要求。",
+    "confirmed": "持有人资格已确认。",
+    "unconfirmed": "持有人资格尚未确认。",
+    "topPercent": "前 {n}%",
+    "standard": "标准",
+    "notQualified": "未满足资格",
+    "reasons": {
+      "HOLDINGS_CONFIRMED": "已确认有效创世节点持仓",
+      "NO_ACTIVE_HOLDINGS": "当前没有有效创世节点持仓",
+      "ACCOUNT_AGE_REQUIRED": "账户注册时长未达要求",
+      "COUNTRY_REQUIRED": "请补充国家信息",
+      "GEO_BLOCKED": "当前国家不符合资格",
+      "SALE_POLICY_UNAVAILABLE": "暂时无法读取资格政策",
+      "PRESALE_NOT_OPEN": "发售窗口尚未开放",
+      "USER_CAP_REACHED": "已达到持仓上限",
+      "POLICY_CONFIRMED": "资格政策已确认",
+      "POLICY_NOT_EFFECTIVE": "资格政策尚未生效"
+    }
+  },
   howPublished: {
     loading: "正在加载说明…",
     unavailableTitle: "说明暂时无法加载",
@@ -1245,6 +1278,8 @@ export const zh: Messages = {
   },
 
   events: {
+    claimRewardCta: "领取 {reward}",
+    claimedReward: "已领取 {reward}",
     wheelPool: "转盘奖池",
     pageTitle: "活动中心",
     subtitle: "限时优惠 · 挑战 · 季节福利",
@@ -4240,8 +4275,8 @@ export const zh: Messages = {
     strong: "较大",
     weak: "较小",
     gapHint: "平衡匹配按较小一轨计算。继续邀请较小一轨提升{freq}发放。",
-    spilloverTitle: "自动分配:{n} 位成员被分到 B 轨道",
-    spilloverHint: "来自网络伙伴 V5 Sarah K. — 业绩自动并入你的双轨",
+    spilloverTitle: "自动安置：双轨共 {n} 位成员",
+    spilloverHint: "成员按安置规则分配，可能进入 A 轨或 B 轨。",
     recentMatches: "最近匹配",
     left: "A",
     right: "B",
@@ -4507,6 +4542,8 @@ export const zh: Messages = {
   },
 
   repurchase: {
+    recoveryHint: "上一笔请求的结果尚未确认。请按原金额重试，系统会沿用同一操作编号核对结果；确认前请勿另开一笔复投。",
+    recoveryCta: "核对上一笔 ${amount} 请求",
     pageTitle: "复投增益",
     hero: "加速提现",
     benefits: {
@@ -5283,7 +5320,7 @@ export const zh: Messages = {
     cardRebindBody: "你的 {brand} •••• {last4} 已无法继续使用。绑定新卡后,试用结束时想购买可以一键完成。",
     cardRebindCta: "绑定新卡",
     loadMore: "加载更多",
-    loadFailed: "通知没能加载出来,请检查网络后重试。",
+    loadFailed: "通知加载或更新失败，请检查网络后重试。",
   },
 
   // FEAT-SHARE01 邀请分享全链路(海报面板/渠道面板/入口)。

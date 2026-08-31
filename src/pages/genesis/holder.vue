@@ -32,21 +32,18 @@
             <text :style="previewTextStyle">{{ t.genesisHolder.previewModeBanner }}</text>
           </view>
           <view v-if="remoteApiEnabled" :style="serverFactsEmptyStyle">
-            <text class="block" :style="cardTitleStyle">Server holder facts</text>
+            <text class="block" :style="cardTitleStyle">{{ t.holderFacts.title }}</text>
             <text class="block" :style="serverFactStyle">{{ holderFactText }}</text>
             <view class="grid grid-cols-2" style="gap: 10px; margin-top: 8px">
               <view>
-                <text class="block" :style="cellLabelStyle">Reserved allocation</text>
+                <text class="block" :style="cellLabelStyle">{{ t.holderFacts.allocation }}</text>
                 <text class="block tabular-nums" :style="cellValStyle('var(--v5-ink)')">{{ allocText }}</text>
               </view>
               <view>
-                <text class="block" :style="cellLabelStyle">Priority</text>
+                <text class="block" :style="cellLabelStyle">{{ t.holderFacts.priority }}</text>
                 <text class="block" :style="cellValStyle('var(--v5-ink)')">{{ priorityText }}</text>
               </view>
             </view>
-            <text class="block" :style="serverFactStyle">{{ holderPolicyText }}</text>
-            <text class="block" :style="serverFactStyle">{{ holderTimingText }}</text>
-            <text class="block" :style="serverFactStyle">{{ holderProvenanceText }}</text>
           </view>
         </template>
 
@@ -72,9 +69,6 @@
               <text class="tabular-nums" style="font-weight: 600; color: var(--v5-brand)">{{ allocText }}</text>
             </view>
             <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderFactText }}</text>
-            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderPolicyText }}</text>
-            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderTimingText }}</text>
-            <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderProvenanceText }}</text>
 
             <view class="grid grid-cols-2" :style="heroStatGridStyle">
               <view>
@@ -300,43 +294,18 @@ const holderFactStale = computed(() => {
   const age = Date.now() - fact.asOf;
   return age > 15 * 60_000 || age < -5 * 60_000;
 });
-const reasonText = (code: string): string => ({
-  HOLDINGS_CONFIRMED: "Active Genesis holdings confirmed",
-  NO_ACTIVE_HOLDINGS: "No active Genesis holdings",
-  ACCOUNT_AGE_REQUIRED: "Account age requirement not met",
-  COUNTRY_REQUIRED: "Country information is required",
-  GEO_BLOCKED: "This country is not eligible",
-  SALE_POLICY_UNAVAILABLE: "Genesis qualification policy is unavailable",
-  PRESALE_NOT_OPEN: "Genesis sale window is not open",
-  USER_CAP_REACHED: "Genesis holding cap reached",
-  POLICY_CONFIRMED: "Holder policy confirmed",
-  POLICY_NOT_EFFECTIVE: "Holder policy is not effective yet",
-}[code] ?? code.replaceAll("_", " ").toLowerCase());
+const reasonText = (code: string): string =>
+  (t.value.holderFacts.reasons as Record<string, string>)[code] ?? t.value.holderFacts.unconfirmed;
 const holderFactText = computed(() => {
   const fact = remoteHolderFact.value;
-  if (!fact) return "Server holder facts unavailable; retry to verify.";
-  if (holderFactStale.value) return "Server holder facts are stale; refresh to verify.";
-  if (fact.holderStatus === "CONFIG_UNAVAILABLE") return "Holder allocation policy is not published; no local estimate is shown.";
-  if (fact.holderStatus === "NOT_EFFECTIVE") return "Holder policy is published but not effective yet; no allocation is confirmed.";
-  if (fact.holderStatus === "NOT_ELIGIBLE") return "You are not currently qualified for the holder allocation.";
-  const reasons = fact.qualificationReasonCodes.map(reasonText).join(" · ");
-  return reasons || (fact.holderStatus === "READY" ? "Holder qualification confirmed by server." : "Holder qualification is not confirmed.");
-});
-const holderPolicyText = computed(() => {
-  const fact = remoteHolderFact.value;
-  if (!fact || holderFactStale.value) return "Policy version: — (server fact unavailable or stale)";
-  return `Policy version: ${fact.policyVersion ?? "not published"}`;
-});
-const holderTimingText = computed(() => {
-  const fact = remoteHolderFact.value;
-  if (!fact || holderFactStale.value) return "Effective / as-of / server time: —";
-  const effective = fact.effectiveAt === null ? "not published" : new Date(fact.effectiveAt).toISOString();
-  return `Effective: ${effective} · As of: ${new Date(fact.asOf).toISOString()} · Server: ${new Date(fact.serverTime).toISOString()}`;
-});
-const holderProvenanceText = computed(() => {
-  const fact = remoteHolderFact.value;
-  if (!fact || holderFactStale.value) return "Provenance: —";
-  return `Provenance: ${fact.provenance.environment} · ${fact.provenance.source} · Run ${fact.provenance.runId}`;
+  const copy = t.value.holderFacts;
+  if (!fact) return copy.unavailable;
+  if (holderFactStale.value) return copy.stale;
+  if (fact.holderStatus === "CONFIG_UNAVAILABLE") return copy.unpublished;
+  if (fact.holderStatus === "NOT_EFFECTIVE") return copy.notEffective;
+  if (fact.holderStatus === "NOT_ELIGIBLE") return copy.notEligible;
+  return fact.qualificationReasonCodes.map(reasonText).join(" · ")
+    || (fact.holderStatus === "READY" ? copy.confirmed : copy.unconfirmed);
 });
 const allocText = computed(() => {
   if (!remoteApiEnabled) return `${genesis.reservedAllocationNEX().toLocaleString()} NEX`;
@@ -348,9 +317,10 @@ const priorityText = computed(() => {
   if (!remoteApiEnabled) return owned.value >= 5 ? "Top 1%" : owned.value >= 2 ? "Top 3%" : "Top 5%";
   const fact = remoteHolderFact.value;
   if (!fact || holderFactStale.value || fact.holderStatus === "CONFIG_UNAVAILABLE" || fact.holderStatus === "NOT_EFFECTIVE") return "—";
-  if (fact.holderStatus === "NOT_ELIGIBLE") return "Not qualified";
-  if (fact.priorityTier === "NONE") return "Not qualified";
-  return `${fact.priorityTier.replace("_", " ")} · #${fact.priorityRank ?? "—"}`;
+  if (fact.holderStatus === "NOT_ELIGIBLE") return t.value.holderFacts.notQualified;
+  if (fact.priorityTier === "NONE") return t.value.holderFacts.notQualified;
+  const tier = fact.priorityTier === "STANDARD" ? t.value.holderFacts.standard : fmt(t.value.holderFacts.topPercent, { n: fact.priorityTier.slice(4) });
+  return fact.priorityRank === null ? tier : `${tier} · #${fact.priorityRank}`;
 });
 const poolText = computed(() => fmt(t.value.genesisHolder.pre.pointsPool, { amount: "$250K" }));
 const leaderboard = computed(() => [

@@ -145,7 +145,7 @@
       <!-- Footer -->
       <view class="rg-footer">
         <text v-if="step === 1" class="rg-footer__acc">{{ t.register.haveAccount }} <text class="rg-footer__link" role="link" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">{{ t.register.signIn }}</text></text>
-        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.register.termsServiceLink }}</text>{{ t.register.termsAndPrivacy }}</text>
+        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.register.termsServiceLink }}</text> · <text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy" @keydown.space.prevent="goPrivacy">{{ t.privacy.title }}</text></text>
       </view>
     </view>
 
@@ -844,6 +844,7 @@ function back() {
 function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
 function goLogin() { navReset({ url: "/pages/login/login", fail: () => {} }); }
 function goTerms() { navTo("/pages/onboarding/terms"); }
+function goPrivacy() { navTo("/pages/onboarding/privacy"); }
 
 function cleanup() {
   mounted = false;

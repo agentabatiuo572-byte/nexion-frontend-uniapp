@@ -230,7 +230,7 @@ const results = computed<Hit[]>(() => {
       out.push({ group: "device", label: name, sublabel: gpu, href: "/pages/earn/earn" });
     }
   }
-  for (const m of members.value.slice(0, 30)) {
+  for (const m of members.value) {
     if (m.name.toLowerCase().includes(query)) {
       out.push({
         group: "member",

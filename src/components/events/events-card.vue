@@ -106,7 +106,7 @@ const showJoinAction = computed(
 const openTarget = computed(() => eventOpenTarget(props.ev));
 const showProgressAction = computed(() => shouldShowJoinedProgressAction(props.ev));
 const showDecorativeAction = computed(() => shouldShowDecorativeAction(props.ev));
-const claimLabel = computed(() => fmt(t.value.events.claimCta, { n: props.rewardNex.toLocaleString() }));
+const claimLabel = computed(() => fmt(t.value.events.claimRewardCta, { reward: props.ev.reward }));
 const kindLabel = computed(() => EVENT_KIND_LABEL[props.ev.kind]);
 const progressPct = computed(() =>
   props.ev.progress ? Math.min(100, (props.ev.progress.current / props.ev.progress.total) * 100) : 0,

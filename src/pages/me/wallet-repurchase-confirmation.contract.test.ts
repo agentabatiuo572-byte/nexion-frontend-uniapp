@@ -15,7 +15,7 @@ describe("repurchase confirmation boundary", () => {
     expect(source).toContain('const quoteAmount = normalizeCommandAmount(amount.value);');
     expect(source).toContain('amount: formatCommandAmount(quoteAmount),');
     expect(source).toContain('await repurchase.open(quoteAmount);');
-    expect(source).toContain(':disabled="confirming || repurchase.submitting"');
+    expect(source).toContain(':disabled="confirming || repurchase.submitting || recovering"');
 
     const command = source.indexOf('await repurchase.open(quoteAmount);');
     expect(confirmation).toBeGreaterThan(0);

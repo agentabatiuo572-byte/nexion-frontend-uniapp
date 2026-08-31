@@ -132,7 +132,8 @@ export const useNotifications = defineStore("notifications", () => {
         await notificationApi.markRead(Number(id));
       } catch (cause) {
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        throw cause;
+        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+        return false;
       }
       if (!remoteAccountEpoch.isCurrent(request)) return;
     }
@@ -146,7 +147,8 @@ export const useNotifications = defineStore("notifications", () => {
         await notificationApi.markAllRead();
       } catch (cause) {
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        throw cause;
+        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+        return false;
       }
       if (!remoteAccountEpoch.isCurrent(request)) return;
     }
@@ -159,7 +161,8 @@ export const useNotifications = defineStore("notifications", () => {
         await notificationApi.clearRead();
       } catch (cause) {
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        throw cause;
+        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+        return false;
       }
       if (!remoteAccountEpoch.isCurrent(request)) return;
     }

@@ -53,7 +53,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "devices.vue": "23fea78987f10dfcdcabb8d6a176eda307e087fdbacb28678b8674a11d4bc716",
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
-  "help.vue": "3778085811bed95842e216e5d1a2d56cecaf1feb1e44e0b1773ddaa5c67ea671",
+  // R3: preserve layout while enabling keyboard FAQ and category controls.
+  "help.vue": "c7e130659141b96a10c901bc70bb6c7970f8735932d6a49b04ad3e2957a026b2",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "7542b5f017a2c86127c8009c659a74868b6b02793d689ad3dc1bc66b76053ba0",
@@ -68,7 +69,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
   "security.vue": "d2ee24d1b0833bda99c89e316f49c223f867a3e419f979e27a630d5a7ca661aa",
-  "support-tickets.vue": "d8e7636778eccb869fb086231126505c5eddfd832a051f4612136ff5caa8bfe8",
+  // R3: resolved tickets can receive replies; closed tickets remain read-only.
+  "support-tickets.vue": "ca72383e2850949fa7f39bbecfd391a6c4c06f90b88025136db7494c010bac7d",
   "support.vue": "6f1d1582608f17177bb3c902a2849db742f410da016e66dcf6e602cb7c43f714",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",
@@ -82,7 +84,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-nex.vue": "e3cb6933ab8f85a035f63e68f6e74de3ed10e0143d20713881ced423ae753a87",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
-  "wallet-repurchase.vue": "5f5835e141a1c8d20b6c8f42cebaee7a5f3ecba4dcdbd369a1f19e88200df48c",
+  // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
+  "wallet-repurchase.vue": "876bc068892e35c026ac750a8e723388d328a04bb6aca02f1e342534b89dd560",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
   "wallet-withdraw.vue": "7e7767300871771fdbd248bcbbb36b965c4165288c2b1c33dc447329a0514cf2",
