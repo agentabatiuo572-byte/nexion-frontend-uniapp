@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
@@ -43,7 +44,7 @@ function retry() {
 }
 
 function goMarket() {
-  uni.navigateTo({ url: "/pages/market/market", fail: () => {} });
+  navTo("/pages/market/market");
 }
 
 onMounted(() => {

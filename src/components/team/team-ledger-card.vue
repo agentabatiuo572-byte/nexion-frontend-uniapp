@@ -59,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 
@@ -82,7 +83,7 @@ const directPct = computed(() => Math.round((props.directUSDT / splitTotal.value
 const extendedPct = computed(() => 100 - directPct.value);
 
 function goCommissions() {
-  uni.navigateTo({ url: "/pages/team/commissions", fail: () => {} });
+  navTo("/pages/team/commissions");
 }
 
 // ─── styles ───

@@ -28,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -47,6 +48,6 @@ const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, {
 }));
 
 function goManage() {
-  uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
+  navTo("/pages/earn/earn");
 }
 </script>

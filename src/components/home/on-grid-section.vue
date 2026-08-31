@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -92,6 +93,6 @@ function companyInitial(value: string | null) {
   return value?.trim().charAt(0).toUpperCase() || "—";
 }
 function goGlobe() {
-  uni.navigateTo({ url: "/pages/globe/globe", fail: () => {} });
+  navTo("/pages/globe/globe");
 }
 </script>

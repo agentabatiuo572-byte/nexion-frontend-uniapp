@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -93,7 +94,7 @@ function toneColor(tone: Tone): string {
 }
 
 function goStaking() {
-  uni.navigateTo({ url: "/pages/staking/staking", fail: () => {} });
+  navTo("/pages/staking/staking");
 }
 
 // ── styles ──

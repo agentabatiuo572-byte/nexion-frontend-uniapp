@@ -17,3 +17,15 @@ test("learning list and course pages guard async state with account/run/generati
   assert.match(course, /const scope = fence\(\);[\s\S]*learningApi\.start/);
   assert.match(course, /recoverAuthoritative\(scope, submittedCourse\)/);
 });
+
+test("course page restores canonical result details and committed quiz receipts", () => {
+  assert.match(course, /learningResultDetails\(course\.value, result\.value\)/);
+  assert.match(course, /currentPendingLearningAttempt\(identity\)/);
+  assert.match(course, /learningApi\.quizReceipt\(expectedCourse\.id, expectedCourse\.version, pending\.key\)/);
+  assert.match(course, /matchingCourseResult\(expectedCourse, submitted\)/);
+  assert.match(course, /pendingLearningAttempt\(identity, submittedAnswers\)/);
+  assert.match(course, /t\.value\.learning\.resultScore/);
+  assert.match(course, /t\.value\.learning\.resultAttempts/);
+  assert.match(course, /t\.value\.learning\.rewardNotGranted/);
+  assert.doesNotMatch(course, /没有任何接口能取回/);
+});

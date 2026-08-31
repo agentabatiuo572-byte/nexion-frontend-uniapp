@@ -100,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -126,10 +127,10 @@ const tableRows = computed(() => [
 ]);
 
 function goExchange() {
-  uni.navigateTo({ url: "/pages/me/wallet-exchange", fail: () => {} });
+  navTo("/pages/me/wallet-exchange");
 }
 function goBack() {
-  uni.navigateTo({ url: "/pages/trust/trust", fail: () => {} });
+  navTo("/pages/trust/trust");
 }
 
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2

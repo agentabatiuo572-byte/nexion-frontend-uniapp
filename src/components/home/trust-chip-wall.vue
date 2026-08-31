@@ -29,6 +29,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, watch, type CSSProperties } from "vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { TrustLocale } from "@/api/trust-section-api";
@@ -49,7 +50,7 @@ function load(force = false) {
 }
 
 function goTrust() {
-  uni.navigateTo({ url: "/pages/trust/trust", fail: () => {} });
+  navTo("/pages/trust/trust");
 }
 
 onMounted(() => load());

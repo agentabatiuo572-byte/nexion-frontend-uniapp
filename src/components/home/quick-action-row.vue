@@ -43,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -99,6 +100,6 @@ function chipStyle(tone: "brand" | "warm"): CSSProperties {
   };
 }
 function go(href: string) {
-  uni.navigateTo({ url: href, fail: () => {} });
+  navTo(href);
 }
 </script>

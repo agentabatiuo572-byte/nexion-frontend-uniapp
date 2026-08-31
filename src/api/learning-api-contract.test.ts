@@ -140,3 +140,67 @@ test("rejects a sandbox learning response from a stale commerce run", async () =
   await expect(api.course("course-1", "en")).rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" } satisfies Partial<ApiError>);
   advanceRuntimeRevision(null);
 });
+
+test.each([
+  { progress: 100, completed: false, rewardGranted: false },
+  { progress: 50, completed: false, rewardGranted: true },
+])("rejects contradictory canonical course state: %o", async (state) => {
+  const api = createLearningApi({ request: async () => ({
+    id: "course-1", title: "Course", body: "Body", category: "Basics", format: "Article", level: "Beginner",
+    duration: "5 min", rewardNex: "1.0", featured: false, version: "v1",
+    attempts: 1, lastScore: 80, serverCanonical: true, source: "provider",
+    sourceEnvironment: "PRODUCTION", runId: "", permanentLabel: "PRODUCTION LEARNING FACTS", questions: [],
+    ...state,
+  }) } as never);
+
+  await expect(api.course("course-1", "en")).rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" });
+});
+
+test("rejects a result whose completed and passed states disagree", async () => {
+  const api = createLearningApi({ request: async () => ({
+    courseId: "course-1", version: "v1", score: 40, passed: false, completed: true,
+    rewardGranted: false, rewardNex: 0, attempts: 1, serverCanonical: true,
+    sourceEnvironment: "PRODUCTION", runId: "",
+  }) } as never);
+
+  await expect(api.submitQuiz("course-1", "v1", [0], "learning-quiz-course-1-v1"))
+    .rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" });
+});
+
+test.each([
+  [{ status: "ABSENT", committed: false, requestHash: null, result: null }, "ABSENT"],
+  [{ status: "PENDING", committed: false, requestHash: "hash-pending", result: null }, "PENDING"],
+  [{ status: "FAILED", committed: false, requestHash: "hash-failed", result: null }, "FAILED"],
+  [{ status: "UNKNOWN", committed: false, requestHash: "hash-unknown", result: null }, "UNKNOWN"],
+] as const)("parses an explicit quiz receipt state: %o", async (response, expectedStatus) => {
+  const api = createLearningApi({ request: async () => response } as never);
+
+  await expect(api.quizReceipt("course-1", "v1", "learning-quiz-course-1-v1"))
+    .resolves.toMatchObject({ status: expectedStatus, committed: false });
+});
+
+test("maps a pre-status uncommitted receipt to PENDING during a rolling deployment", async () => {
+  const api = createLearningApi({ request: async () => ({ committed: false, requestHash: null, result: null }) } as never);
+
+  await expect(api.quizReceipt("course-1", "v1", "learning-quiz-course-1-v1"))
+    .resolves.toEqual({ status: "PENDING", committed: false, requestHash: null, result: null });
+});
+
+test("parses a committed receipt and rejects contradictory receipt state", async () => {
+  const committedResult = {
+    courseId: "course-1", version: "v1", score: 100, passed: true, completed: true,
+    rewardGranted: true, rewardNex: "5.000000", attempts: 1, serverCanonical: true,
+    sourceEnvironment: "PRODUCTION", runId: "",
+  };
+  const api = createLearningApi({ request: async () => ({
+    status: "COMMITTED", committed: true, requestHash: "hash-committed", result: committedResult,
+  }) } as never);
+  await expect(api.quizReceipt("course-1", "v1", "learning-quiz-course-1-v1"))
+    .resolves.toMatchObject({ status: "COMMITTED", committed: true, result: committedResult });
+
+  const contradictory = createLearningApi({ request: async () => ({
+    status: "PENDING", committed: true, requestHash: "hash", result: committedResult,
+  }) } as never);
+  await expect(contradictory.quizReceipt("course-1", "v1", "learning-quiz-course-1-v1"))
+    .rejects.toMatchObject({ message: "LEARNING_RESPONSE_INVALID" });
+});

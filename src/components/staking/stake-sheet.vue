@@ -84,13 +84,14 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { createRemoteIntentGate } from "@/lib/g-remote-intent";
+import { createRemoteIntentGate, type RemoteIntentLease } from "@/lib/g-remote-intent";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -111,7 +112,6 @@ const risk = useRiskDisclosure();
 
 const amount = ref(0);
 const remotePending = ref(false);
-const remoteIntent = ref<{ fingerprint: string; key: string } | null>(null);
 const remoteGate = createRemoteIntentGate("G1");
 const selectedPool = computed(() => props.term === null ? null : resolveStakingPool(
   { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
@@ -126,12 +126,8 @@ const apyRate = computed(() => selectedPool.value?.apy ?? 0);
 const penaltyRate = computed(() => selectedPool.value?.penalty ?? 0);
 const minAmount = computed(() => selectedPool.value?.minAmountUsdt ?? 0);
 
-function intentKey(tierKey: string, amountUsdt: number) {
-  const fingerprint = `${tierKey}:${amountUsdt.toFixed(2)}`;
-  if (remoteIntent.value?.fingerprint === fingerprint) return remoteIntent.value.key;
-  const key = remoteGate.acquire("open", { tierKey, amountUsdt: amountUsdt.toFixed(2) }).key;
-  remoteIntent.value = { fingerprint, key };
-  return key;
+function intentLease(tierKey: string, amountUsdt: number): RemoteIntentLease {
+  return remoteGate.acquire(app.accountKey, "open", { tierKey, amountUsdt });
 }
 
 // Seed the amount to the term's minimum each time the sheet opens.
@@ -203,19 +199,29 @@ async function submit() {
       return;
     }
     remotePending.value = true;
+    const submittedAmount = amount.value;
+    const expectedAccountKey = app.accountKey;
+    const expectedBindingEpoch = app.accountBindingEpoch;
+    let lease: RemoteIntentLease | null = null;
     try {
-      const key = intentKey(pool.tierKey, amount.value);
-      await risk.checkGate("staking", key);
-      await staking.openRemote(pool.tierKey, amount.value, key);
-      remoteIntent.value = null;
-      remoteGate.complete(`${"open"}:${JSON.stringify({ tierKey: pool.tierKey, amountUsdt: amount.value.toFixed(2) })}`, true);
+      lease = intentLease(pool.tierKey, submittedAmount);
+      await risk.checkGate("staking", lease.key);
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) {
+        remoteGate.complete(lease, false);
+        return;
+      }
+      await staking.openRemote(pool.tierKey, submittedAmount, lease.key);
+      remoteGate.complete(lease, true);
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) return;
       toast.success(t.value.stakingV3.toast.stakeSuccess);
       emitClose();
     } catch (cause) {
+      if (lease) remoteGate.complete(lease, false);
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) return;
       // Unknown timeout/result: read the authority before allowing a retry with the same key.
       await staking.syncRemote();
       if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
-        uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/staking/staking", fail: () => {} });
+        navTo("/pages/me/risk-disclosure?return=/pages/staking/staking");
         return;
       }
       toast.error(t.value.stakingV3.toast.openFailedTitle);

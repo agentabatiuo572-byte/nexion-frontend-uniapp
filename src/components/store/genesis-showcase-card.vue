@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, type CSSProperties } from "vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
@@ -137,12 +138,12 @@ const ctaText = computed(() => {
 
 function goGenesis() {
   eligSheetOpen.value = false;
-  uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
+  navTo("/pages/genesis/genesis");
 }
 function onCardTap() {
   // 🔴 与 ctaText 同问 `block` 一处,顺序不在此重排(FEAT-GEN10 ④)。
   if (block.value === "soldOut") {
-    uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+    navTo("/pages/genesis/marketplace");
     return;
   }
   if (block.value !== null) {

@@ -4,7 +4,7 @@
   Mounted as a direct chassis child (absolute positioning) so it stays inside
   the device bezel and respects overflow:hidden + rounded corners.
     · renders only when store.cta !== null
-    · Link → <view @click> + uni.navigateTo (P-036: no native <button>/<a>)
+    · Link → <view @click> + shared navTo (P-036: no native <button>/<a>)
     · lucide ArrowRight → inline <svg stroke="currentColor">
     · useHaptic("medium") → uni.vibrateShort
     · frosted gradient via existing --v5-sticky-bar-bg / -border tokens
@@ -47,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
@@ -82,7 +83,7 @@ const ctaStyle = computed<CSSProperties>(() => ({ background: accentColor.value 
 function onTap() {
   if (!cta.value || cta.value.disabled) return;
   uni.vibrateShort({ fail: () => {} });
-  uni.navigateTo({ url: cta.value.href, fail: () => {} });
+  navTo(cta.value.href);
 }
 </script>
 

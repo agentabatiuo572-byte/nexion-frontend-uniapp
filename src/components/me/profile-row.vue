@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -52,7 +53,7 @@ const daysJoined = computed(() => Math.max(1, Math.floor((Date.now() - app.user.
 const joinedLabel = computed(() => fmt(t.value.me.profileJoinedDay, { n: daysJoined.value }));
 
 function goProfile() {
-  uni.navigateTo({ url: "/pages/me/profile", fail: () => {} });
+  navTo("/pages/me/profile");
 }
 
 const avatarStyle: CSSProperties = {

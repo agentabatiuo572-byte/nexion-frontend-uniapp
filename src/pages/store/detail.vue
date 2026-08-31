@@ -246,6 +246,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -442,7 +443,7 @@ async function refreshTrustMaterial() {
 function openTrustUrl(raw: string) {
   const value = raw.trim();
   if (!value) return;
-  if (/^\/pages\/[A-Za-z0-9/_-]+$/.test(value)) { uni.navigateTo({ url: value, fail: () => {} }); return; }
+  if (/^\/pages\/[A-Za-z0-9/_-]+$/.test(value)) { navTo(value); return; }
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" || parsed.username || parsed.password) return;

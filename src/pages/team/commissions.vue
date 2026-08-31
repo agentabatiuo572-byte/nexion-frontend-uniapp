@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -201,7 +202,7 @@ function coolingTag(e: CommissionEvent): string {
 }
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 // ─── styles ───

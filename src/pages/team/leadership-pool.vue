@@ -138,6 +138,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -266,7 +267,7 @@ function poolTotalText(h: LeadershipPayout): string {
 }
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 async function loadRemotePool() {

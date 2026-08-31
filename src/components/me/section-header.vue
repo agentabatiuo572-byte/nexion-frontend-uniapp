@@ -27,6 +27,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -40,6 +41,6 @@ const hasLink = computed(() => !!props.link && !!props.linkLabel);
 
 function go() {
   if (!props.link) return;
-  uni.navigateTo({ url: props.link, fail: () => {} });
+  navTo(props.link);
 }
 </script>

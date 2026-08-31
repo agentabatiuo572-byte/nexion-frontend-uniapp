@@ -6,7 +6,9 @@ function source(path) {
 }
 
 const howPage = source("../src/pages/team/leadership-pool-how.vue");
-assert.match(howPage, /subscribeCurrentCommerceSandboxRun/);
+assert.match(howPage, /subscribeRuntimeRevision/);
+assert.match(howPage, /captureRuntimeRevision/);
+assert.match(howPage, /isCurrentRuntimeRevision/);
 assert.match(howPage, /unsubscribeRemotePoolRun/);
 assert.match(howPage, /remotePool\.value = null/);
 assert.match(howPage, /void loadRemotePool\(\)/);
@@ -21,8 +23,9 @@ assert.match(howPage, /votes: V_VOTES\[v\]/);
 const homeCard = source("../src/components/home/leadership-pool-card.vue");
 assert.match(homeCard, /teamInsightsApi\.leadershipPool\(\)/);
 assert.match(homeCard, /remoteApiEnabled/);
-assert.match(homeCard, /subscribeCurrentCommerceSandboxRun/);
+assert.match(homeCard, /subscribeRuntimeRevision/);
 assert.match(homeCard, /captureAccountScope/);
-assert.match(homeCard, /captureCommerceSandboxRun/);
+assert.match(homeCard, /captureRuntimeRevision/);
+assert.match(homeCard, /isCurrentRuntimeRevision/);
 
 console.log("leadership pool consumers: PASS");

@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import type { CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -151,7 +152,7 @@ function sparkPoints(data: number[]): string {
 }
 
 function goDetail(kind: Exclude<DeviceKind, "phone">) {
-  uni.navigateTo({ url: `/pages/store/detail?id=${kind}`, fail: () => {} });
+  navTo(`/pages/store/detail?id=${kind}`);
 }
 
 const sectionLabelStyle: CSSProperties = {

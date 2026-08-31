@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -70,6 +71,6 @@ const barStyle = computed<CSSProperties>(() => ({
 }));
 
 function goRank() {
-  uni.navigateTo({ url: "/pages/team/rank", fail: () => {} });
+  navTo("/pages/team/rank");
 }
 </script>

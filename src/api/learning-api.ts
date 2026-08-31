@@ -6,7 +6,8 @@ export interface LearningQuestion { questionId: string; question: string; option
 export interface LearningCourse { id: string; title: string; body: string; category: string; format: string; level: string; duration: string; rewardNex: string | number; featured: boolean; version: string; progress: number; completed: boolean; attempts: number; lastScore: number; rewardGranted: boolean; serverCanonical: true; source: string; sourceEnvironment: "PRODUCTION"; runId: ""; permanentLabel: string; questions: LearningQuestion[]; }
 export interface LearningOverview { courses: LearningCourse[]; completedCourses: number; totalCourses: number; earnedNex: string | number; serverCanonical: true; sourceEnvironment: "PRODUCTION"; runId: ""; }
 export interface LearningResult { courseId: string; version: string; score: number; passed: boolean; completed: boolean; rewardGranted: boolean; rewardNex: string | number; attempts: number; serverCanonical: true; sourceEnvironment: "PRODUCTION"; runId: ""; }
-export interface LearningQuizReceipt { committed: boolean; requestHash: string | null; result: LearningResult | null; }
+export type LearningQuizReceiptStatus = "ABSENT" | "PENDING" | "COMMITTED" | "FAILED" | "UNKNOWN";
+export interface LearningQuizReceipt { status: LearningQuizReceiptStatus; committed: boolean; requestHash: string | null; result: LearningResult | null; }
 export interface LearningApi {
   courses(language: string): Promise<LearningOverview>;
   course(courseId: string, language: string): Promise<LearningCourse>;
@@ -32,7 +33,7 @@ function course(value: unknown, mode: ApiEnvironment): LearningCourse {
   const progress = integer(row.progress);
   const attempts = integer(row.attempts);
   const lastScore = integer(row.lastScore);
-  if (progress > 100 || lastScore > 100 || (row.completed && progress !== 100)) return invalid();
+  if (progress > 100 || lastScore > 100 || row.completed !== (progress === 100) || (row.rewardGranted && !row.completed)) return invalid();
   if (!provenance(row, mode)) return invalid();
   const sourceEnvironment = text(row.sourceEnvironment) as "PRODUCTION";
   const runId = row.runId as string;
@@ -42,8 +43,20 @@ function course(value: unknown, mode: ApiEnvironment): LearningCourse {
   return { id: text(row.id), title: text(row.title), body: text(row.body), category: text(row.category), format: text(row.format), level: text(row.level), duration: text(row.duration), rewardNex: reward(row.rewardNex), featured: row.featured, version: text(row.version), progress, completed: row.completed, attempts, lastScore, rewardGranted: row.rewardGranted, serverCanonical: true, source, sourceEnvironment, runId, permanentLabel, questions: row.questions.map((value) => { const item = record(value); if (!Array.isArray(item.options)) return invalid(); return { questionId: text(item.questionId), question: text(item.question), options: item.options.map(text) }; }) };
 }
 function overview(value: unknown, mode: ApiEnvironment): LearningOverview { const row = record(value); if (!Array.isArray(row.courses) || !provenance(row, mode)) return invalid(); return { courses: row.courses.map((value) => course(value, mode)), completedCourses: integer(row.completedCourses), totalCourses: integer(row.totalCourses), earnedNex: reward(row.earnedNex), serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "" }; }
-function result(value: unknown, mode: ApiEnvironment): LearningResult { const row = record(value); if (typeof row.passed !== "boolean" || typeof row.completed !== "boolean" || typeof row.rewardGranted !== "boolean" || !provenance(row, mode)) return invalid(); const score = integer(row.score); if (score > 100 || (row.passed && !row.completed)) return invalid(); return { courseId: text(row.courseId), version: text(row.version), score, passed: row.passed, completed: row.completed, rewardGranted: row.rewardGranted, rewardNex: reward(row.rewardNex), attempts: integer(row.attempts, 1), serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "" }; }
-function receipt(value: unknown, mode: ApiEnvironment): LearningQuizReceipt { const row = record(value); if (typeof row.committed !== "boolean") return invalid(); if (!row.committed && (row.requestHash != null || row.result != null)) return invalid(); return { committed: row.committed, requestHash: row.requestHash == null ? null : text(row.requestHash), result: row.result == null ? null : result(row.result, mode) }; }
+function result(value: unknown, mode: ApiEnvironment): LearningResult { const row = record(value); if (typeof row.passed !== "boolean" || typeof row.completed !== "boolean" || typeof row.rewardGranted !== "boolean" || !provenance(row, mode)) return invalid(); const score = integer(row.score); if (score > 100 || row.passed !== row.completed || (row.rewardGranted && !row.completed)) return invalid(); return { courseId: text(row.courseId), version: text(row.version), score, passed: row.passed, completed: row.completed, rewardGranted: row.rewardGranted, rewardNex: reward(row.rewardNex), attempts: integer(row.attempts, 1), serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "" }; }
+function receipt(value: unknown, mode: ApiEnvironment): LearningQuizReceipt {
+  const row = record(value);
+  if (typeof row.committed !== "boolean") return invalid();
+  const status = (row.status == null ? (row.committed ? "COMMITTED" : "PENDING") : row.status) as LearningQuizReceiptStatus;
+  if (!["ABSENT", "PENDING", "COMMITTED", "FAILED", "UNKNOWN"].includes(status)) return invalid();
+  const requestHash = row.requestHash == null ? null : text(row.requestHash);
+  const parsedResult = row.result == null ? null : result(row.result, mode);
+  if (status === "COMMITTED") {
+    if (!row.committed || !requestHash || !parsedResult) return invalid();
+  } else if (row.committed || parsedResult) return invalid();
+  if (status === "ABSENT" && requestHash) return invalid();
+  return { status, committed: row.committed, requestHash, result: parsedResult };
+}
 function id(value: string): string { return text(value); }
 function key(value: string): string { const normalized = text(value); if (normalized.length < 8 || normalized.length > 128) return invalid(); return normalized; }
 export function createLearningApi(client: ApiClient, mode: ApiEnvironment = "prod"): LearningApi { return {

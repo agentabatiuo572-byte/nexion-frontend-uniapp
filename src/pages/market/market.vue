@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -161,7 +162,7 @@ const statCells = computed(() => [
 ]);
 
 function goExchange() {
-  uni.navigateTo({ url: "/pages/me/wallet-exchange", fail: () => {} });
+  navTo("/pages/me/wallet-exchange");
 }
 
 // ─── styles ───

@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig, computeDiscountedPrice } from "@/store/trial-config";
@@ -178,6 +179,6 @@ const discountText = computed(() => fmt(t.value.trial.ghostDiscount, { amount: `
 const shadowNexText = computed(() => `+ ${shadowNEX.value.toLocaleString()} NEX`);
 
 function goTrial() {
-  uni.navigateTo({ url: "/pages/me/trial", fail: () => {} });
+  navTo("/pages/me/trial");
 }
 </script>

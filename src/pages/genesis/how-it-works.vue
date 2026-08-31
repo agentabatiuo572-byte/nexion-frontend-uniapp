@@ -91,6 +91,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
@@ -110,10 +111,10 @@ const w = computed(() => t.value.genesisHowItWorks);
 const flowItems = computed(() => [w.value.s4Flow1, w.value.s4Flow2, w.value.s4Flow3, w.value.s4Flow4]);
 
 function goGenesis() {
-  uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
+  navTo("/pages/genesis/genesis");
 }
 function goMarketplace() {
-  uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+  navTo("/pages/genesis/marketplace");
 }
 
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2

@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -515,7 +516,7 @@ async function handleUseSaver() {
 }
 
 function goWithdraw() {
-  uni.navigateTo({ url: "/pages/me/wallet-withdraw", fail: () => {} });
+  navTo("/pages/me/wallet-withdraw");
 }
 
 // ── styles ──

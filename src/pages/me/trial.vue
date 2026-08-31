@@ -279,10 +279,10 @@ function goCheckout() {
   navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
 function goEarn() {
-  uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
+  navTo("/pages/earn/earn");
 }
 function goDevices() {
-  uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
+  navTo("/pages/me/devices");
 }
 
 // ── styles — hairline-separated blocks on the page floor ──

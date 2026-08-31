@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
@@ -193,7 +194,7 @@ function goStore() {
   const url = remoteApiEnabled && productNo
     ? `/pages/store/detail?id=${encodeURIComponent(productNo)}`
     : "/pages/store/store";
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 
 const rootStyle: CSSProperties = {

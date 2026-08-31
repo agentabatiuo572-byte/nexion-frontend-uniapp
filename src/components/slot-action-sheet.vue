@@ -67,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useApp } from "@/store/app";
@@ -111,7 +112,7 @@ function hide() {
 function onActivate(d: Device) {
   if (d.kind === "phone") {
     sheet.hide();
-    uni.navigateTo({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => {} });
+    navTo("/pages/onboarding/connect?mode=recalibrate");
     return;
   }
   if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= MAX_DEVICES) {
@@ -127,7 +128,7 @@ function onActivate(d: Device) {
 
 function onGoStore() {
   sheet.hide();
-  uni.navigateTo({ url: "/pages/store/store", fail: () => {} });
+  navTo("/pages/store/store");
 }
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),

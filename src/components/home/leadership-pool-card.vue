@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -107,6 +108,6 @@ onUnmounted(() => {
 });
 
 function goPool() {
-  uni.navigateTo({ url: "/pages/team/leadership-pool", fail: () => {} });
+  navTo("/pages/team/leadership-pool");
 }
 </script>

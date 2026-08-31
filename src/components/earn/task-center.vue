@@ -112,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
@@ -220,11 +221,11 @@ function categoryIconPath(category: TaskCategory): string {
 }
 
 function goStore() {
-  uni.navigateTo({ url: "/pages/store/store", fail: () => {} });
+  navTo("/pages/store/store");
 }
 
 function goReceipts() {
-  uni.navigateTo({ url: "/pages/me/receipts", fail: () => {} });
+  navTo("/pages/me/receipts");
 }
 
 function retryAssignments() {

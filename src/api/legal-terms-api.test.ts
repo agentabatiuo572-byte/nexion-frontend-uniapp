@@ -5,10 +5,10 @@ import type { LegalTermsCurrent } from "./legal-terms-api";
 const terms = { source: "server", sourceEnvironment: "PRODUCTION", runId: "", requestedLocale: "zh-CN", resolvedLocale: "en", requestedJurisdiction: "VN", resolvedJurisdiction: "GLOBAL", provenance: "fallback:en/GLOBAL", version: "v3", effectiveAt: "2026-08-17T00:00:00", title: "Terms", summary: "Summary", sections: [{ key: "eligibility", title: "Eligibility", body: "18+", sortOrder: 10 }], acknowledged: false, acknowledgedAt: null } as LegalTermsCurrent;
 describe("legal terms API", () => {
   it("accepts server provenance and explicit fallback metadata", async () => { const request = vi.fn().mockResolvedValue(terms); const result = await createLegalTermsApi({ request } as never).current("zh-CN", "VN"); expect(result.resolvedLocale).toBe("en"); expect(result.provenance).toBe("fallback:en/GLOBAL"); expect(request).toHaveBeenCalledWith(expect.objectContaining({ authenticated: false })); });
-  it("accepts a dev sandbox response only when the backend supplies a non-empty run id", async () => {
+  it("rejects sandbox provenance even when the backend supplies a run id", async () => {
     const sandbox = { ...terms, sourceEnvironment: "SANDBOX", runId: "dev" };
     await expect(createLegalTermsApi({ request: vi.fn().mockResolvedValue(sandbox) } as never).current("en", "GLOBAL"))
-      .resolves.toMatchObject({ sourceEnvironment: "SANDBOX", runId: "dev" });
+      .rejects.toThrow("LEGAL_TERMS_RESPONSE_INVALID");
     await expect(createLegalTermsApi({ request: vi.fn().mockResolvedValue({ ...sandbox, runId: "" }) } as never).current("en", "GLOBAL"))
       .rejects.toThrow("LEGAL_TERMS_RESPONSE_INVALID");
   });

@@ -149,7 +149,7 @@
 
         <!-- Team tools -->
         <view class="grid" :style="toolGridStyle">
-          <view class="active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
+          <view class="nx-team-quota-link active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-warning-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
@@ -159,7 +159,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.hardwareQuota }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.quotaSubtitle }}</text>
           </view>
-          <view class="active:opacity-95" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
+          <view class="nx-team-agent-link active:opacity-95" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-brand-2-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
@@ -169,7 +169,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.ambassador }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.ambassadorSubtitle }}</text>
           </view>
-          <view class="active:opacity-95" :style="toolCellStyle(2)" @click="go('/pages/team/network')">
+          <view class="nx-team-network-link active:opacity-95" :style="toolCellStyle(2)" @click="go('/pages/team/network')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-tech-cyan-soft)')">
                 <view class="rounded-full" :style="orbDotStyle" />
@@ -179,7 +179,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.visualizations.influenceNetwork }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.visualizations.orbitLiveMap }}</text>
           </view>
-          <view class="active:opacity-95" :style="toolCellStyle(3)" @click="go('/pages/team/tree')">
+          <view class="nx-team-tree-link active:opacity-95" :style="toolCellStyle(3)" @click="go('/pages/team/tree')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-brand-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -196,6 +196,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import InviteEarnCard from "@/components/team/invite-earn-card.vue";
@@ -327,7 +328,7 @@ const leadershipPoolLineB = computed(() =>
 );
 
 function go(url: string) {
-  uni.navigateTo({ url, fail: () => {} });
+  navTo(url);
 }
 function openReferralNetwork() {
   go("/pages/team/unilevel");

@@ -145,6 +145,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, ref, onUnmounted, watch } from "vue";
 import type { CSSProperties } from "vue";
 import {
@@ -468,7 +469,7 @@ function onBackdrop() {
 
 function goEarnTicket() {
   spin.closeSheet();
-  uni.navigateTo({ url: "/pages/daily/daily", fail: () => {} });
+  navTo("/pages/daily/daily");
 }
 
 // 卸载时清兜底 timer,防 setState on unmounted(组件级 → onUnmounted,P-021)

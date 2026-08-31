@@ -62,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -124,6 +125,6 @@ const gridBgStyle: CSSProperties = {
 function goStore() {
   const productNo = calculator.value?.target.productNo;
   if (!productNo) return;
-  uni.navigateTo({ url: `/pages/store/detail?id=${encodeURIComponent(productNo)}`, fail: () => {} });
+  navTo(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
 }
 </script>
