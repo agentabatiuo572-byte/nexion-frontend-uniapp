@@ -66,7 +66,7 @@ const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
 
 function open() {
-  navTo(remoteApiEnabled ? "/pages/support/chat?type=ai" : "/pages/support/messages");
+  navTo("/pages/support/messages");
 }
 
 // ── focused trigger port (nova-triggers welcome + nova-triggers-v3 channels)
