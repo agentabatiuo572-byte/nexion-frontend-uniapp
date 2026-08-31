@@ -114,7 +114,12 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <EmptyState v-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
+          <view v-if="remoteApiEnabled && bills.summaryStatus === 'error'" :style="activityEmptyStyle">
+            <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+            <view role="button" tabindex="0" class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="refreshNexSummary"><text>{{ t.store.catalogRetry }}</text></view>
+          </view>
+          <view v-else-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" :style="activityEmptyStyle"><text>…</text></view>
+          <EmptyState v-else-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
             <view class="grid place-items-center shrink-0" :style="activityIconStyle(a.kind)">
@@ -171,9 +176,10 @@ onMounted(() => {
 onUnmounted(() => {
   if (priceTimer) clearInterval(priceTimer);
 });
-onShow(() => {
-  if (remoteApiEnabled) void bills.refreshServerLedger().catch(() => undefined);
-});
+function refreshNexSummary() {
+  if (remoteApiEnabled) void bills.refreshSummary().catch(() => undefined);
+}
+onShow(refreshNexSummary);
 
 const nexBalance = computed(() => app.user.nexBalance);
 const nexPrice = computed(() => market.nexPriceUSDT);
@@ -185,11 +191,9 @@ const isUp = computed(() => change24h.value >= 0);
 // Only active devices contribute today's NEX.
 const todayNEX = computed<number | null>(() =>
   remoteApiEnabled
-    ? bills.serverStatus !== "ready"
+    ? bills.summaryStatus !== "ready"
       ? null
-      : bills.bills
-        .filter((bill) => bill.symbol === "NEX" && bill.type === "earn" && bill.status !== "failed" && bill.ts >= new Date().setHours(0, 0, 0, 0))
-        .reduce((sum, bill) => sum + bill.amount, 0)
+      : bills.summary?.todayNexEarn ?? null
     : app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
 );
 
@@ -198,8 +202,8 @@ const pnl = computed(() => usdValue.value - totalSpent.value);
 const pnlPct = computed(() => (totalSpent.value > 0 ? (pnl.value / totalSpent.value) * 100 : 0));
 
 const nexLedger = computed(() => {
-  if (!remoteApiEnabled || bills.serverStatus !== "ready") return [];
-  return bills.bills
+  if (!remoteApiEnabled || bills.summaryStatus !== "ready") return [];
+  return (bills.summary?.recentNexBills ?? [])
     .filter((bill) => bill.symbol === "NEX" && bill.status !== "failed")
     .map((bill) => ({
       id: bill.id,
@@ -211,10 +215,8 @@ const nexLedger = computed(() => {
 });
 const pendingNex = computed<number | null>(() => {
   if (!remoteApiEnabled) return 0;
-  if (bills.serverStatus !== "ready") return null;
-  return bills.bills
-    .filter((bill) => bill.symbol === "NEX" && bill.status === "pending")
-    .reduce((sum, bill) => sum + Math.abs(bill.amount), 0);
+  if (bills.summaryStatus !== "ready") return null;
+  return bills.summary?.pendingNex ?? null;
 });
 
 // NEX activity — mock uses the prototype fixture; remote uses the production

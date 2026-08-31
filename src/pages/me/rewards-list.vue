@@ -80,7 +80,12 @@
 
       <!-- ── USDT / NEX reward records (paginated) ── -->
       <template v-else>
-        <EmptyState v-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
+        <view v-if="initialError" class="flex items-center justify-between" :style="remoteErrorStyle">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
+        </view>
+        <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
+        <EmptyState v-else-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
 
         <view v-else :style="recordListStyle">
           <view v-for="(b, i) in visibleRecords" :key="b.id" class="flex items-center" :style="recordRowStyle(i)">
@@ -98,8 +103,20 @@
           </view>
         </view>
 
-        <!-- Always mounted so the observer attaches at first mount (receipts idiom). -->
-        <view ref="loadMoreSentinel" style="height: 1px" />
+        <!-- Mock keeps its prototype sentinel pagination; production binds only
+             to an intentional downward scroll on AppChassis' real container. -->
+        <view v-if="!fundsServerEnabled" ref="loadMoreSentinel" style="height: 1px" />
+        <view v-else ref="scrollAnchor" style="height: 1px" />
+        <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" aria-live="polite" aria-busy="true"><text>…</text></view>
+        <view v-if="refreshErrorWithRows" class="flex items-center justify-between" :style="remoteErrorStyle">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
+        </view>
+        <view v-else-if="appendError" class="flex items-center justify-between" :style="remoteErrorStyle">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.store.catalogRetry }}</text></view>
+        </view>
+        <view v-if="showManualLoadMore" class="inline-flex items-center active:opacity-70" :style="manualLoadMoreStyle" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.receipt.loadMore }}</text></view>
       </template>
     </view>
   </AppChassis>
@@ -107,7 +124,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watchEffect, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -119,6 +136,8 @@ import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { navTo } from "@/lib/route";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
+import { fundsServerEnabled } from "@/api/runtime";
 
 // Mirrors L1's RewardsCat (pages/me/rewards.vue); unknown values fall back.
 type RewardsCat = "voucher" | "usdt" | "nex";
@@ -146,16 +165,46 @@ const expired = computed<VoucherDef[]>(() => voucher.expiredVouchers);
 
 // ── reward records (per-symbol, newest-first from the ledger) ──
 const symbol = computed(() => (cat.value === "nex" ? "NEX" : "USDT"));
-const records = computed(() => bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
+const usdtRewardsPager = bills.getLedger({ asset: "USDT", category: "REWARD" });
+const nexRewardsPager = bills.getLedger({ asset: "NEX", category: "REWARD" });
+const activePager = computed(() => cat.value === "nex" ? nexRewardsPager : usdtRewardsPager);
+const records = computed(() => fundsServerEnabled
+  ? activePager.value.rows
+  : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
 const visibleCount = ref(PAGE_SIZE);
-const visibleRecords = computed(() => records.value.slice(0, visibleCount.value));
-const hasMore = computed(() => visibleCount.value < records.value.length);
+const visibleRecords = computed(() => fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value));
+const hasMore = computed(() => fundsServerEnabled ? activePager.value.hasMore : visibleCount.value < records.value.length);
+const scrollAnchor = ref<unknown>(null);
+const initialLoading = computed(() => fundsServerEnabled && activePager.value.status === "loading" && records.value.length === 0);
+const initialError = computed(() => fundsServerEnabled && activePager.value.status === "error" && records.value.length === 0);
+const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.value.status === "error" && records.value.length > 0);
+const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && records.value.length > 0 && Boolean(activePager.value.error));
+const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
+
+async function refreshRecords() {
+  if (!fundsServerEnabled || cat.value === "voucher") return;
+  try { await activePager.value.refresh(); } catch { /* the pager retains rows and exposes the error */ }
+}
+async function loadMoreRecords() {
+  if (fundsServerEnabled) {
+    try { await activePager.value.loadMore(); } catch { /* keep loaded rows visible for retry */ }
+    return;
+  }
+  if (hasMore.value) visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);
+}
+onShow(() => { void refreshRecords(); });
+useManualScrollLoadMore(scrollAnchor, {
+  enabled: () => fundsServerEnabled && cat.value !== "voucher" && !activePager.value.error,
+  hasMore: () => activePager.value.hasMore,
+  loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
+  loadMore: loadMoreRecords,
+});
 
 // Tail sentinel auto-load — same mechanics (and same ponytail caveats) as
 // receipts.vue: watchEffect re-checks on every dependency change.
 const { elRef: loadMoreSentinel, inView: loadMoreInView } = useScrollGrowProgress({ threshold: 0 });
 watchEffect(() => {
-  if (cat.value !== "voucher" && loadMoreInView.value && hasMore.value) {
+  if (!fundsServerEnabled && cat.value !== "voucher" && loadMoreInView.value && hasMore.value) {
     visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);
   }
 });
@@ -333,4 +382,8 @@ const emptyStyle: CSSProperties = {
 };
 const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
 const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
+const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
+const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
+const loadingStyle: CSSProperties = { margin: "0 16px", padding: "32px", textAlign: "center", color: "var(--v5-ink-3)" };
+const manualLoadMoreStyle: CSSProperties = { minHeight: "40px", margin: "8px 16px 0", padding: "0 14px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "12px" };
 </script>

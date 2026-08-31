@@ -396,7 +396,7 @@ async function refreshRemoteMe() {
     ["vouchers", () => voucher.refreshRemote()],
     ["rank", () => vrank.refreshCanonicalVRank()],
     ["genesis", () => genesis.syncRemote()],
-    ["bills", () => bills.refreshServerLedger()],
+    ["bills", () => bills.refreshSummary()],
     ["market", () => market.syncRemote()],
     ["config", () => config.load()],
   ]);
