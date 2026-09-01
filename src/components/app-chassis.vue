@@ -20,10 +20,7 @@
     <!-- Header brand row — TAB routes only (sub-pages carry their own back row) -->
     <view v-if="isTabRoute" class="nx-header" :style="{ top: statusBarHeight + 'px' }">
       <view class="nx-header__l">
-        <view class="nx-logo" aria-hidden="true">
-          <image class="nx-logo-img nx-logo-img--light" src="/static/img/brand/header-logo-light.png" mode="aspectFit" />
-          <image class="nx-logo-img nx-logo-img--dark" src="/static/img/brand/header-logo-dark.png" mode="aspectFit" />
-        </view>
+        <BrandLockup :height="40" aria-hidden="true" />
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
@@ -166,6 +163,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
+import BrandLockup from "@/components/brand-lockup.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
@@ -791,7 +789,9 @@ function goNotifications() {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  width: 104px;
+  /* 品牌包给横版定的最小渲染宽度是 120px(低于它 8 个节点糊成一团),槽宽跟着它走。
+     原值 104px 是旧字标 logo 的宽度,装不下新标会溢出到中间区。 */
+  width: 120px;
   flex-shrink: 0;
 }
 .nx-header__center {
@@ -799,7 +799,8 @@ function goNotifications() {
   left: 50%;
   top: 0;
   height: 52px;
-  max-width: calc(100% - 208px);
+  /* 两侧各让出一个槽宽(120px),左右都不会压到居中区。原值 208 = 旧槽宽 104×2。 */
+  max-width: calc(100% - 240px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -808,29 +809,6 @@ function goNotifications() {
   min-width: 0;
   text-align: center;
   pointer-events: none;
-}
-.nx-logo {
-  position: relative;
-  /* 2026-08-31 品牌包横版 compact 是 356×120(2.967:1);容器按这个比例给,
-     否则 aspectFit 会在 96px 盒子里留 8px 透明边,logo 看着离页边不齐。 */
-  width: 80px;
-  height: 27px;
-  display: block;
-  flex-shrink: 0;
-}
-.nx-logo-img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.nx-logo-img--dark {
-  display: none;
-}
-html[data-theme="dark"] .nx-logo-img--light {
-  display: none;
-}
-html[data-theme="dark"] .nx-logo-img--dark {
-  display: block;
 }
 .nx-brand {
   font-size: 20px;
