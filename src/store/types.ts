@@ -414,9 +414,9 @@ export interface DepositIntent {
   /** = round(usdtAmount × fxRate),精确到盾不凑整千;server 计算。 */
   vndAmount: number;
   /** server mint `NX-` + 6 位大写字母数字;在途期内全局唯一。 */
-  memoCode: string;
+  memoCode?: string;
   /** 收款账户池按轮换策略分配;server 派发(用户需完整账号转账,不脱敏)。 */
-  bankAccount: { accountName: string; accountNumber: string; bankName: string };
+  bankAccount?: { accountName: string; accountNumber: string; bankName: string };
   /** Optional server/provider-signed QR payload. Never synthesized by the client. */
   qrPayload?: string;
   status: DepositIntentStatus;
@@ -429,6 +429,10 @@ export interface DepositIntent {
   receivedVnd?: number;
   /** 回单匹配时间(ms epoch)。 */
   matchedAt?: number;
+  /** Provider-hosted bank payment page. Manual account fields stay compatibility-only. */
+  paymentMode?: "manual" | "hosted";
+  paymentUrl?: string;
+  providerStatus?: "created" | "pending" | "submit_unknown" | "rejected" | "not_submitted";
 }
 
 export interface AppState {

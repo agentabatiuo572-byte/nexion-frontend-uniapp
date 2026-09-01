@@ -918,14 +918,17 @@ export const useDeposits = defineStore("deposits", () => {
       usdtAmount: snapshot.usdtAmount,
       fxRate: snapshot.fxRate,
       vndAmount: snapshot.vndAmount,
-      memoCode: snapshot.memoCode,
-      bankAccount: snapshot.bankAccount,
+      ...(snapshot.memoCode ? { memoCode: snapshot.memoCode } : {}),
+      ...(snapshot.bankAccount ? { bankAccount: snapshot.bankAccount } : {}),
       ...(snapshot.qrPayload ? { qrPayload: snapshot.qrPayload } : {}),
       status: remoteIntentStatus(snapshot.status),
       createdAt,
       expireAt: Date.parse(snapshot.expiresAt),
       ...(snapshot.receivedVnd === undefined ? {} : { receivedVnd: snapshot.receivedVnd }),
       ...(snapshot.matchedAt ? { matchedAt: Date.parse(snapshot.matchedAt) } : {}),
+      ...(snapshot.paymentMode ? { paymentMode: snapshot.paymentMode } : {}),
+      ...(snapshot.paymentUrl ? { paymentUrl: snapshot.paymentUrl } : {}),
+      ...(snapshot.providerStatus ? { providerStatus: snapshot.providerStatus } : {}),
     };
   }
 

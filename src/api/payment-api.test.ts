@@ -89,6 +89,85 @@ test("accepts production payment config and quote on the development rail", asyn
   await expect(api.fxQuote()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
 });
 
+test("accepts an HDPay hosted payment page on the canonical bank intent", async () => {
+  const { memoCode: _memoCode, bankAccount: _bankAccount, ...hostedIntent } = intent;
+  const api = createPaymentApi({ request: async () => ({
+    ...hostedIntent,
+    paymentMode: "hosted",
+    paymentUrl: "https://api.hdpayadmin.com/placeAnOrder?orderId=1826145351742570496",
+    providerStatus: "created",
+  }) } as never);
+
+  const result = await api.getVietQrIntent("VQR-12345678");
+  expect(result).toMatchObject({
+    paymentMode: "hosted",
+    paymentUrl: "https://api.hdpayadmin.com/placeAnOrder?orderId=1826145351742570496",
+    providerStatus: "created",
+  });
+  expect(result).not.toHaveProperty("memoCode");
+  expect(result).not.toHaveProperty("bankAccount");
+});
+
+test("fails closed when a hosted payment URL is not HTTPS", async () => {
+  const { memoCode: _memoCode, bankAccount: _bankAccount, ...hostedIntent } = intent;
+  const api = createPaymentApi({ request: async () => ({
+    ...hostedIntent,
+    paymentMode: "hosted",
+    paymentUrl: "http://api.hdpayadmin.com/placeAnOrder?orderId=1",
+    providerStatus: "created",
+  }) } as never);
+
+  await expect(api.getVietQrIntent("VQR-12345678")).rejects.toMatchObject({
+    kind: "protocol",
+    message: "VIETQR_INTENT_RESPONSE_INVALID",
+  });
+});
+
+test("fails closed when a hosted payment URL uses an untrusted HTTPS host", async () => {
+  const { memoCode: _memoCode, bankAccount: _bankAccount, ...hostedIntent } = intent;
+  const api = createPaymentApi({ request: async () => ({
+    ...hostedIntent,
+    paymentMode: "hosted",
+    paymentUrl: "https://api.hdpayadmin.com.evil.example/placeAnOrder?orderId=1",
+    providerStatus: "created",
+  }) } as never);
+
+  await expect(api.getVietQrIntent("VQR-12345678")).rejects.toMatchObject({
+    kind: "protocol",
+    message: "VIETQR_INTENT_RESPONSE_INVALID",
+  });
+});
+
+test("accepts a closed pending hosted state only when it has no payment URL", async () => {
+  const { memoCode: _memoCode, bankAccount: _bankAccount, ...hostedIntent } = intent;
+  const api = createPaymentApi({ request: async () => ({
+    ...hostedIntent,
+    paymentMode: "hosted",
+    providerStatus: "submit_unknown",
+  }) } as never);
+
+  await expect(api.getVietQrIntent("VQR-12345678")).resolves.toMatchObject({
+    paymentMode: "hosted",
+    providerStatus: "submit_unknown",
+  });
+});
+
+test("accepts a terminal hosted order only after its payment URL is withheld", async () => {
+  const { memoCode: _memoCode, bankAccount: _bankAccount, ...hostedIntent } = intent;
+  const api = createPaymentApi({ request: async () => ({
+    ...hostedIntent,
+    status: "expired",
+    paymentMode: "hosted",
+    providerStatus: "created",
+  }) } as never);
+
+  await expect(api.getVietQrIntent("VQR-12345678")).resolves.toMatchObject({
+    status: "expired",
+    paymentMode: "hosted",
+    providerStatus: "created",
+  });
+});
+
 test("accepts an operational VietQR rail whose daily capacity is below the minimum", async () => {
   const response = {
     serverCanonical: true,

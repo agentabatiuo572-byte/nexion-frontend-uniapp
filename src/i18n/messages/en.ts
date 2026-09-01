@@ -5739,6 +5739,10 @@ export const en = {
     dailyCapacityExhaustedTitle: "Today's bank top-up capacity is used up",
     dailyCapacityExhaustedBody: "Today's remaining capacity is {remaining}, below the {min} minimum. You can top up again tomorrow.",
     railPaused: "The bank channel is temporarily under maintenance. Please try again later.",
+    hostedSecureNote: "Bank details and the QR code are provided on the payment provider's secure page. Check the amount there before paying.",
+    hostedPendingNote: "The payment provider is confirming this order. Your order is saved; refresh later or contact support if it remains unavailable.",
+    hostedContinueCta: "Go to bank payment page",
+    hostedOpenFailed: "The bank payment page could not be opened. Your order is saved; tap continue payment to try again.",
   },
   uiChrome: {
     best: "Best",

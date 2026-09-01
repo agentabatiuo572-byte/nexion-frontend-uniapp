@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
+import { validateHostedPaymentUrl } from "@/lib/hosted-payment";
 
 export interface VietQrPaymentConfig {
   enabled: boolean;
@@ -14,6 +15,7 @@ export interface VietQrPaymentConfig {
   version: number;
   feeVnd: number;
   feeUsdt: number;
+  paymentMode?: "manual" | "hosted";
 }
 
 interface PaymentProvenance {
@@ -52,8 +54,8 @@ export interface VietQrIntentSnapshot {
   usdtAmount: number;
   fxRate: number;
   vndAmount: number;
-  memoCode: string;
-  bankAccount: {
+  memoCode?: string;
+  bankAccount?: {
     accountName: string;
     accountNumber: string;
     bankName: string;
@@ -68,6 +70,9 @@ export interface VietQrIntentSnapshot {
   receivedVnd?: number;
   matchedAt?: string;
   createdAt?: string;
+  paymentMode?: "manual" | "hosted";
+  paymentUrl?: string;
+  providerStatus?: "created" | "pending" | "submit_unknown" | "rejected" | "not_submitted";
 }
 
 export interface VietQrReceiptSnapshot {
@@ -265,17 +270,27 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     : number(source.receivedVnd, { min: 1 }) ?? null;
   const matchedAt = source?.matchedAt === undefined ? undefined : date(source.matchedAt);
   const createdAt = source?.createdAt === undefined ? undefined : date(source.createdAt);
+  const paymentMode = source?.paymentMode === undefined || source.paymentMode === "manual"
+    ? "manual"
+    : source.paymentMode === "hosted" ? "hosted" : null;
+  const paymentUrl = source?.paymentUrl === undefined || typeof source.paymentUrl !== "string"
+    ? undefined : validateHostedPaymentUrl(source.paymentUrl) ?? undefined;
+  const providerStatuses = new Set(["created", "pending", "submit_unknown", "rejected", "not_submitted"]);
+  const providerStatusText = source?.providerStatus === undefined ? undefined : text(source.providerStatus);
+  const providerStatus = providerStatusText && providerStatuses.has(providerStatusText)
+    ? providerStatusText as VietQrIntentSnapshot["providerStatus"] : undefined;
+  const manualFieldsValid = Boolean(account && memoCode && accountName && accountNumber && bankName);
+  const hostedStateValid = paymentMode === "hosted"
+    && Boolean(providerStatus)
+    && (providerStatus === "created"
+      ? (status === "awaiting_payment" ? Boolean(paymentUrl) : !paymentUrl)
+      : !paymentUrl);
   if (
     !source
-    || !account
     || !intentNo
     || usdtAmount === null
     || fxRate === null
     || vndAmount === null
-    || !memoCode
-    || !accountName
-    || !accountNumber
-    || !bankName
     || !status
     || !expiresAt
     || creditedUsdt === null
@@ -286,6 +301,11 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     || receivedVnd === null
     || (source.matchedAt !== undefined && !matchedAt)
     || (source.createdAt !== undefined && !createdAt)
+    || paymentMode === null
+    || (source.paymentUrl !== undefined && !paymentUrl)
+    || (source.providerStatus !== undefined && !providerStatus)
+    || (paymentMode === "manual" && (!manualFieldsValid || paymentUrl || providerStatus))
+    || (paymentMode === "hosted" && !hostedStateValid)
   ) {
     throw new ApiError({ kind: "protocol", message: "VIETQR_INTENT_RESPONSE_INVALID" });
   }
@@ -294,8 +314,10 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     usdtAmount,
     fxRate,
     vndAmount,
-    memoCode,
-    bankAccount: { accountName, accountNumber, bankName },
+    ...(paymentMode === "manual" ? {
+      memoCode: memoCode!,
+      bankAccount: { accountName: accountName!, accountNumber: accountNumber!, bankName: bankName! },
+    } : {}),
     status,
     expiresAt,
     creditedUsdt,
@@ -306,6 +328,9 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     ...(receivedVnd === undefined ? {} : { receivedVnd }),
     ...(matchedAt ? { matchedAt } : {}),
     ...(createdAt ? { createdAt } : {}),
+    ...(paymentMode === "hosted" ? { paymentMode } : {}),
+    ...(paymentUrl ? { paymentUrl } : {}),
+    ...(providerStatus ? { providerStatus } : {}),
   };
 }
 
