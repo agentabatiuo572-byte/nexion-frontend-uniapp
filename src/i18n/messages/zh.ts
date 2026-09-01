@@ -5576,6 +5576,10 @@ export const zh: Messages = {
     dailyCapacityExhaustedTitle: "今日银行充值额度已用完",
     dailyCapacityExhaustedBody: "今日剩余额度 {remaining}，低于最低充值 {min}；明日可继续充值。",
     railPaused: "银行通道暂时维护中，请稍后再试。",
+    hostedSecureNote: "银行账户与二维码由支付服务商在安全付款页提供。请在付款页核对金额后完成转账。",
+    hostedPendingNote: "支付服务商正在确认该订单。订单已保留，请稍后刷新；若长时间不可用，请联系客服。",
+    hostedContinueCta: "前往银行付款页",
+    hostedOpenFailed: "暂时无法打开银行付款页。订单已保留，请稍后点击继续付款。",
   },
   uiChrome: {
     best: "最优",

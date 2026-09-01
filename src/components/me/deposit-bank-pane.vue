@@ -80,6 +80,19 @@
         <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
         <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
 
+        <template v-if='intent.paymentMode === "hosted"'>
+          <view class="flex flex-col items-center" style="margin-top: 18px; padding: 18px 14px; border-radius: 16px; background: var(--v5-surface-2)">
+            <view class="grid place-items-center" :style="hostedIconStyle">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" /><path d="M3 10h18" /><path d="M7 15h.01" /></svg>
+            </view>
+            <text class="block text-center" style="margin-top: 10px; font-size: 13px; color: var(--v5-ink-2); line-height: 1.55">{{ hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
+          </view>
+          <view v-if="hostedCanOpen" class="nx-bank-hosted-continue-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="openHostedOrder(intent)">
+            <text>{{ t.bankPane.hostedContinueCta }}</text>
+          </view>
+        </template>
+
+        <template v-if="intent.paymentMode !== 'hosted'">
         <!-- 远程没有服务端签发的二维码载荷时，禁止展示本地点阵与扫码文案。 -->
         <view v-if="intent.qrPayload" :style="qrBoxStyle">
           <image :src="intent.qrPayload" mode="aspectFit" style="width: 100%; height: 100%" />
@@ -90,12 +103,12 @@
         <view style="margin-top: 14px">
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.accountName }}</text></view>
-            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount.accountName }}</text></view>
+            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount?.accountName }}</text></view>
           </view>
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.accountNo }}</text></view>
             <view class="flex items-center min-w-0" style="gap: 4px">
-              <text class="font-mono-tabular" :style="bankValStyle" style="white-space: nowrap">{{ intent.bankAccount.accountNumber }}</text>
+              <text class="font-mono-tabular" :style="bankValStyle" style="white-space: nowrap">{{ intent.bankAccount?.accountNumber }}</text>
               <view
                 class="nx-bank-copy-account-cta grid place-items-center shrink-0 active:opacity-80"
                 :style="copyIconBtnStyle"
@@ -109,7 +122,7 @@
           </view>
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.bankLabel }}</text></view>
-            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount.bankName }}</text></view>
+            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount?.bankName }}</text></view>
           </view>
         </view>
 
@@ -135,8 +148,9 @@
         <view class="nx-bank-paid-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="paidPressed = true">
           <text>{{ t.bankPane.paidCta }}</text>
         </view>
-        <!-- 取消 = ghost 弱权重(转化场景 cancel 必明显弱于主 CTA);仅 awaiting 态 -->
-        <view class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="askCancel">
+        </template>
+        <!-- HDPay 无关闭订单/退款接口，provider order 创建后禁止制造本地取消分叉。 -->
+        <view v-if="intent.paymentMode !== 'hosted'" class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="askCancel">
           <text :style="ghostTextStyle">{{ t.bankPane.cancelCta }}</text>
         </view>
       </view>
@@ -255,6 +269,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
+import { findResumablePaymentIntent, openHostedPaymentPage } from "@/lib/hosted-payment";
 
 const t = useT();
 const fx = useFx();
@@ -263,6 +278,8 @@ const dep = useDeposits();
 // ── 视图派生(单选真源 = store intents;本地只记「正在看哪张单」+ UI 等待旗)──
 const viewIntentId = ref<string | null>(null);
 const paidPressed = ref(false);
+const autoResumePending = ref(true);
+const openingHosted = ref(false);
 
 const intent = computed<DepositIntent | null>(
   () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
@@ -293,9 +310,18 @@ onMounted(() => {
     });
     dep.startRemoteVietQrPolling();
   }
-  const resume = dep.intents.find((i) => i.status === "awaiting_payment" || i.status === "mismatch_review");
-  if (resume) viewIntentId.value = resume.intentId;
 });
+watch(
+  () => dep.intents.map((item) => `${item.intentId}:${item.status}`).join("|"),
+  () => {
+    if (!autoResumePending.value || viewIntentId.value) return;
+    const resume = findResumablePaymentIntent(dep.intents);
+    if (!resume) return;
+    viewIntentId.value = resume.intentId;
+    autoResumePending.value = false;
+  },
+  { immediate: true },
+);
 watch(
   () => intent.value?.intentId,
   () => {
@@ -435,8 +461,10 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     }
     }, {
       success: (it) => {
+        autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
+        if (it.paymentMode === "hosted") openHostedOrder(it);
       },
       failure: (reason) => {
         const userFacingReason = approvedBusinessFailureCopy || reason;
@@ -458,6 +486,7 @@ function finishCreditedFlow() {
   navBack("/pages/me/wallet");
 }
 function startNewTopup() {
+  autoResumePending.value = false;
   viewIntentId.value = null;
   paidPressed.value = false;
 }
@@ -465,6 +494,7 @@ function startNewTopup() {
 // ── 真倒计时(派生自 expireAt,与 store 过期引擎同源;到点 store 翻 expired 视图自换)──
 const nowTick = ref(mockServerNow());
 let tickTimer: ReturnType<typeof setInterval> | undefined;
+let hostedOpenTimer: ReturnType<typeof setTimeout> | undefined;
 onMounted(() => {
   tickTimer = setInterval(() => {
     nowTick.value = mockServerNow();
@@ -473,6 +503,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
+  if (hostedOpenTimer) clearTimeout(hostedOpenTimer);
   if (remoteApiEnabled) dep.stopRemoteVietQrPolling();
 });
 const countdownText = computed(() => {
@@ -481,6 +512,9 @@ const countdownText = computed(() => {
   const left = Math.max(0, Math.floor((it.expireAt - nowTick.value) / 1000));
   return `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
 });
+const hostedCanOpen = computed(() => intent.value?.paymentMode === "hosted"
+  && intent.value.providerStatus === "created"
+  && Boolean(intent.value.paymentUrl));
 
 // ── 展示派生 ──
 /** 成功态入账额读关联 DepositRecord(差额核销/迟到补入账时 ≠ 原下单额);
@@ -502,7 +536,7 @@ const steps = computed(() => {
   const it = intent.value;
   return buildVietQrTransferSteps(
     it?.qrPayload,
-    it?.bankAccount.accountNumber ?? "",
+    it?.bankAccount?.accountNumber ?? "",
     it ? fmtVnd(it.vndAmount) : "",
     {
       scan: t.value.bankPane.step1,
@@ -526,11 +560,27 @@ function copyText(data: string, okText: string) {
   });
 }
 function copyMemo() {
-  if (intent.value) copyText(intent.value.memoCode, t.value.bankPane.memoCopied);
+  if (intent.value?.memoCode) copyText(intent.value.memoCode, t.value.bankPane.memoCopied);
 }
 function copyAccount() {
   // 复制纯数字账号(去空格,银行 App 粘贴即用)
-  if (intent.value) copyText(intent.value.bankAccount.accountNumber.replace(/\s/g, ""), t.value.bankPane.accountCopied);
+  if (intent.value?.bankAccount) copyText(intent.value.bankAccount.accountNumber.replace(/\s/g, ""), t.value.bankPane.accountCopied);
+}
+function openHostedOrder(it: DepositIntent) {
+  if (openingHosted.value) return;
+  if (it.paymentMode !== "hosted" || it.providerStatus !== "created" || !it.paymentUrl) {
+    createError.value = t.value.bankPane.hostedOpenFailed;
+    toast.error(createError.value);
+    return;
+  }
+  openingHosted.value = true;
+  if (!openHostedPaymentPage(it.paymentUrl)) {
+    openingHosted.value = false;
+    createError.value = t.value.bankPane.hostedOpenFailed;
+    toast.error(createError.value);
+    return;
+  }
+  hostedOpenTimer = setTimeout(() => { openingHosted.value = false; }, 1000);
 }
 async function askCancel() {
   const it = intent.value;
@@ -751,6 +801,12 @@ const pausedIconStyle: CSSProperties = {
   height: "44px",
   borderRadius: "14px",
   background: "var(--v5-surface-2)",
+};
+const hostedIconStyle: CSSProperties = {
+  width: "52px",
+  height: "52px",
+  borderRadius: "16px",
+  background: "var(--v5-brand-soft)",
 };
 </script>
 
