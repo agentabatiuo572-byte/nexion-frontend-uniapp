@@ -5373,6 +5373,7 @@ export const en = {
     rewardReady: "Reward is ready to claim.",
     refreshing: "Refreshing…",
     refreshStatus: "Refresh status",
+    goComplete: "Complete now",
     bonusCta: "Claim Weekly Champion bonus · +{n} NEX",
     bonusClaimed: "Weekly Champion · {n} NEX + badge claimed",
 

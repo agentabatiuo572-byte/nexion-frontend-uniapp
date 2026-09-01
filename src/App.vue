@@ -52,7 +52,6 @@ import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-ca
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { refreshEarnConfig } from "@/store/earn-config";
 import { useMarket } from "@/store/market";
-import { shouldClaimQuestOnRoute } from "@/lib/remote-quest-route";
 import {
   enforcePendingLegalTermsGate,
   hasPendingLegalTermsRequirement,
@@ -880,17 +879,15 @@ function checkQuestRoute() {
   if (!ensureBusinessLoopsRunning()) return;
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
-  const id = questIdForRoute(route);
-  if (!id) return;
   if (remoteApiEnabled) {
-    // Profile setup is an explicit save action, not a page visit. The profile
-    // page claims this task only after the server confirms the saved profile.
-    if (!shouldClaimQuestOnRoute(true, id)) return;
-    // Visiting a tracked screen is the H3 completion event. The server claim
-    // decides eligibility and reward; the client never credits locally.
-    if (!useQuest().isComplete(id)) void useQuest().claimRemote(id);
+    // In formal server mode, task identity, completion facts and reward state
+    // all come from the backend. A route visit only triggers a fresh readback;
+    // the legacy task-code table below is never consulted.
+    void useQuest().refreshRemote();
     return;
   }
+  const id = questIdForRoute(route);
+  if (!id) return;
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
   // 三处漏改)。原来先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
   // 而 quest 是一次性的,再也拿不到。奖励从静态表查得到,顺序反得过来。

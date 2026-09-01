@@ -5228,6 +5228,7 @@ export const vi: Messages = {
     rewardReady: "Phần thưởng đã sẵn sàng để nhận.",
     refreshing: "Đang làm mới…",
     refreshStatus: "Làm mới tiến độ",
+    goComplete: "Đi hoàn thành",
     bonusCta: "Nhận thưởng Weekly Champion · +{n} NEX",
     bonusClaimed: "Weekly Champion · đã nhận {n} NEX + huy hiệu",
 

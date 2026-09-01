@@ -56,8 +56,8 @@ export interface QuestTaskDef {
 }
 
 /**
- * Canonical task table — mirrors Nexion-prototype/lib/mock/quest.ts QUEST_TASKS
- * (same ids / rewards / order). Frozen so callers can't mutate the seed.
+ * Legacy non-remote fallback table. Formal server mode never uses it for task
+ * presentation or route completion; PC H3 and nx_mission remain authoritative.
  */
 export const QUEST_TASKS: readonly QuestTaskDef[] = [
   { id: "bind_bank_card", i18nKey: "bind_bank_card", href: "/me/wallet/cards/new", nexReward: 50, order: 1 },
@@ -171,8 +171,9 @@ export const useQuest = defineStore("quest", () => {
     },
   );
 
-  async function claimRemote(id: QuestTaskId): Promise<boolean> {
+  async function claimRemote(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return false;
+    if (!remoteQuests.value.some((quest) => quest.questCode === id)) return false;
     const epoch = accountEpoch;
     const requestSequence = ++claimSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;

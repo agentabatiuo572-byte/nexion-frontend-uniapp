@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 import conversionBannerSource from "../components/home/conversion-banner.vue?raw";
+import weeklyQuestHeroSource from "../components/home/weekly-quest-hero.vue?raw";
+import weeklyQuestListSource from "../components/home/weekly-quest-list.vue?raw";
 import {
   deriveHomeTaskCards,
   isHomeWeeklyCardReady,
@@ -14,6 +16,8 @@ const weeklyQuest: CanonicalQuest = {
   layer: "WEEKLY_T1",
   rewardNex: 30,
   status: "PENDING",
+  category: "explore",
+  actionRoute: "/pages/learn/courses",
 };
 
 const pausedPromo: CanonicalPromoBanner = {
@@ -102,7 +106,8 @@ describe("home task carousel", () => {
       subtitle: "Complete a learning course · StellarBox Pro",
       targetDevice: "StellarBox Pro",
       targetDaily: 1.5,
-      action: "missions",
+      category: "explore",
+      actionRoute: "/pages/learn/courses",
     });
     expect(conversionBannerSource).not.toContain('v-if="!weeklyQuest"');
   });
@@ -116,8 +121,18 @@ describe("home task carousel", () => {
       subtitle: "Complete a learning course",
       targetDevice: null,
       targetDaily: null,
-      action: "missions",
+      category: "explore",
+      actionRoute: "/pages/learn/courses",
     });
+  });
+
+  it("routes every pending weekly entry through the PC-configured actionRoute", () => {
+    expect(conversionBannerSource).toContain("navTo(weeklyCard.value.actionRoute)");
+    expect(conversionBannerSource).toContain("weeklyCard.value.category");
+    expect(weeklyQuestHeroSource).toContain("navTo(q.actionRoute)");
+    expect(weeklyQuestHeroSource).toContain("w.value.goComplete");
+    expect(weeklyQuestListSource).toContain("navTo(q.actionRoute)");
+    expect(conversionBannerSource).not.toContain('navTo("/pages/missions/missions")');
   });
 
   it("keeps mock-only weekly values out of the formal UniApp component", () => {

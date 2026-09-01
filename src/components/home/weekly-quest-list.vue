@@ -1,4 +1,4 @@
-<!-- Weekly Tier 2 is a server-authoritative list; pending rows only refresh status. -->
+<!-- Weekly Tier 2 is server-authoritative; pending rows use PC-configured routes. -->
 <template>
   <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
     <text :style="pendingLabelStyle">{{ w.loadError }}</text>
@@ -21,7 +21,10 @@
           <view class="grid place-items-center shrink-0" :style="checkBoxStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           </view>
-          <text class="flex-1" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
+          <view class="flex-1">
+            <text class="block" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
+            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+          </view>
           <text :style="claimedRewardStyle">+{{ rewardOf(q) }} NEX</text>
         </view>
 
@@ -30,7 +33,10 @@
           <view class="grid place-items-center shrink-0" :style="sparkBoxStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
-          <text class="flex-1" :style="claimLabelStyle">{{ claimTextFor(q) }}</text>
+          <view class="flex-1">
+            <text class="block" :style="claimLabelStyle">{{ claimTextFor(q) }}</text>
+            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+          </view>
           <text :style="claimRewardStyle">+{{ rewardOf(q) }} NEX</text>
         </view>
 
@@ -39,7 +45,10 @@
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
-          <text class="flex-1" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
+          <view class="flex-1">
+            <text class="block" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
+            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+          </view>
           <view class="flex items-baseline" style="gap: 4px">
             <text :style="pendingRewardStyle">+{{ rewardOf(q) }} NEX</text>
           </view>
@@ -60,6 +69,7 @@ import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -88,12 +98,21 @@ function rewardOf(q: CanonicalQuest): number {
 function titleOf(q: CanonicalQuest): string {
   return q.name;
 }
+function categoryOf(q: CanonicalQuest): string {
+  return ({
+    wallet: t.value.home.dayOneCatWallet,
+    explore: t.value.home.dayOneCatExplore,
+    recommend: t.value.home.dayOneCatRecommend,
+    identity: t.value.home.dayOneCatIdentity,
+    social: t.value.home.dayOneCatSocial,
+  })[q.category];
+}
 function claimTextFor(q: CanonicalQuest): string {
   return fmt(w.value.claim, { n: rewardOf(q).toLocaleString() });
 }
 
-function onRowCta(_q: CanonicalQuest) {
-  void wq.refresh();
+function onRowCta(q: CanonicalQuest) {
+  navTo(q.actionRoute);
 }
 
 function retry() {
@@ -167,6 +186,12 @@ const pendingLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   color: "var(--v5-ink)",
+};
+const categoryLabelStyle: CSSProperties = {
+  marginTop: "2px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "11px",
+  color: "var(--v5-ink-4)",
 };
 const pendingRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

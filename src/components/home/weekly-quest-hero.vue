@@ -12,6 +12,7 @@
         <view class="inline-flex items-center" :style="labelStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
           <text>{{ w.heroLabel }}</text>
+          <text v-if="quest" :style="categoryStyle">{{ categoryText }}</text>
         </view>
 
         <!-- Card title h-md 18 / 600 ink -->
@@ -62,6 +63,7 @@ import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -94,13 +96,22 @@ const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].inc
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
 
 const titleText = computed(() => quest.value?.name ?? "");
+const categoryText = computed(() => quest.value ? ({
+  wallet: t.value.home.dayOneCatWallet,
+  explore: t.value.home.dayOneCatExplore,
+  recommend: t.value.home.dayOneCatRecommend,
+  identity: t.value.home.dayOneCatIdentity,
+  social: t.value.home.dayOneCatSocial,
+})[quest.value.category] : "");
 const bodyText = computed(() => quest.value?.status === "PENDING" ? w.value.progressVerified : w.value.rewardReady);
-const ctaText = computed(() => wq.loading ? w.value.refreshing : w.value.refreshStatus);
+const ctaText = computed(() => wq.loading ? w.value.refreshing : w.value.goComplete);
 const promoChipText = computed(() => fmt(w.value.promoChip, { mult: mult.value.toFixed(1) }));
 const claimText = computed(() => fmt(w.value.claim, { n: rewardDisplay.value }));
 
 function onCta() {
-  void wq.refresh();
+  const q = quest.value;
+  if (!q || wq.loading) return;
+  navTo(q.actionRoute);
 }
 
 async function onClaim() {
@@ -144,6 +155,14 @@ const labelStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-warning)",
   letterSpacing: "0.06em",
+};
+const categoryStyle: CSSProperties = {
+  marginLeft: "4px",
+  padding: "2px 6px",
+  borderRadius: "999px",
+  background: "var(--v5-warning-soft)",
+  color: "var(--v5-ink-3)",
+  letterSpacing: "normal",
 };
 const titleStyle: CSSProperties = {
   marginTop: "10px",

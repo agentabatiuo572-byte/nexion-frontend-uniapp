@@ -11,6 +11,7 @@
     :data-copy-version="managedCopy.deliveries[MANAGED_POSITION]?.version ?? 'builtin'"
     :data-experiment-id="managedCopy.deliveries[MANAGED_POSITION]?.experimentId ?? ''"
     :data-target-device="weeklyCard.targetDevice ?? ''"
+    :data-quest-category="weeklyCard.category ?? ''"
     @click="onCardAction"
     @keydown.enter.prevent="onCardAction"
     @keydown.space.prevent="onCardAction"
@@ -34,6 +35,7 @@
             </svg>
           </view>
           <text class="weekly-quest__title">{{ t.home.weeklyQuestEyebrow }}</text>
+          <text v-if="categoryText" class="weekly-quest__category">{{ categoryText }}</text>
           <text class="weekly-quest__multiplier">{{ weeklyState === "ready" && promoMult !== null ? `${promoMult}×` : "—" }}</text>
         </view>
         <view class="weekly-quest__countdown">
@@ -127,11 +129,22 @@ const targetDailyText = computed(() => {
   return value == null ? "—" : value.toFixed(2);
 });
 const subtitleText = computed(() => weeklyCard.value.subtitle || "—");
+const categoryText = computed(() => {
+  const category = weeklyCard.value.category;
+  if (!category) return "";
+  return ({
+    wallet: t.value.home.dayOneCatWallet,
+    explore: t.value.home.dayOneCatExplore,
+    recommend: t.value.home.dayOneCatRecommend,
+    identity: t.value.home.dayOneCatIdentity,
+    social: t.value.home.dayOneCatSocial,
+  })[category];
+});
 const ctaText = computed(() => {
   if (weeklyState.value === "loading") return t.value.weeklyQuest.loading;
   if (weeklyState.value === "error" || weeklyState.value === "empty") return t.value.ui.retry;
-  return weeklyCard.value.action === "missions"
-    ? t.value.headerTitles.missions
+  return weeklySource.value?.kind === "quest"
+    ? t.value.weeklyQuest.goComplete
     : t.value.home.weeklyQuestGetNexGridBox;
 });
 
@@ -168,11 +181,7 @@ function onCardAction() {
     return;
   }
 
-  if (weeklyCard.value.action === "missions") {
-    navTo("/pages/missions/missions");
-  } else if (weeklyCard.value.action === "store") {
-    navTo("/store");
-  }
+  if (weeklyCard.value.actionRoute) navTo(weeklyCard.value.actionRoute);
 }
 </script>
 
@@ -264,6 +273,17 @@ function onCardAction() {
   z-index: 2;
   width: 62%;
   margin-top: 6px;
+}
+
+.weekly-quest__category {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--v5-brand-soft);
+  font-family: var(--font-v5);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--v5-brand);
+  white-space: nowrap;
 }
 
 .weekly-quest__state {
