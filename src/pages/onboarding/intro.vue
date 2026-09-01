@@ -87,12 +87,11 @@
             <circle cx="120" cy="120" r="56" fill="url(#orb-core)" />
 
           </svg>
-          <!-- App icon badge(官方品牌资产,双主题成对切换 —— 与 app-chassis 的 header logo 同机制)。
+          <!-- 中心品牌标(走 BrandLockup,全站 logo 的唯一出口)。
                🔴 不能放进上面的 SVG:uni 编译器会把 <image> 劫持成 uni-image 组件,落在 SVG 命名空间里
                完全不渲染(实测 0×0)。改为容器内绝对定位叠加,60/240 = 25% 居中。 -->
           <view class="orb-appicon-wrap">
-            <image class="orb-appicon orb-appicon--light" src="/static/img/brand/app-icon-light.png" mode="aspectFit" />
-            <image class="orb-appicon orb-appicon--dark" src="/static/img/brand/app-icon-dark.png" mode="aspectFit" />
+            <BrandLockup variant="mark" :height="60" />
           </view>
         </view>
       </view>
@@ -168,6 +167,7 @@
 import { navReset, navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
+import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
@@ -331,24 +331,7 @@ function goTerms() {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 25%;
-  height: 25%;
   pointer-events: none;
-}
-.orb-appicon {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.orb-appicon--dark {
-  display: none;
-}
-html[data-theme="dark"] .orb-appicon--light {
-  display: none;
-}
-html[data-theme="dark"] .orb-appicon--dark {
-  display: block;
 }
 
 /* Language entry + in-place sheet(bg 填充零 border;字号取 9 档;tap ≥44) */
