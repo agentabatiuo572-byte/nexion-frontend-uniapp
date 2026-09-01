@@ -16,6 +16,7 @@ import type { ShareEventChannel } from "@/api/share-event-api";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { runShareEventFlight } from "@/lib/share-event-flight";
+import { referralShareText } from "@/lib/referral-reward-gate";
 
 // §8.1.1 邀请人回报口径:每注册好友 lifetime 贡献估值(展示用)× 阶段倍率。
 // 单一常量源 — invite-earn-card 与渠道面板共用,禁再写局部镜像(F4)。
@@ -78,7 +79,9 @@ export function buildShareLink(referralCode = currentShareReferralCode()): strin
 export function buildShareText(): string {
   if (remoteApiEnabled) return "";
   const t = useT();
-  const gift = useConfig().config.rewards.welcomeGift;
+  const rewards = useConfig().config.rewards;
+  if (!rewards.enabled) return `${t.value.team.sharingStillAvailable} ${buildShareLink()}`.trim();
+  const gift = rewards.welcomeGift;
   return fmt(t.value.share.shareText, { usd: gift.usdtAmount, nex: gift.nexAmount, link: buildShareLink() });
 }
 
@@ -125,12 +128,21 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
     toast.info(t.value.share.noCodeYet);
     return;
   }
+  const remoteRewardEnabled = useReferralReward().snapshot?.rewardEnabled === true;
   const text = remoteApiEnabled
-    ? (def.textTemplate?.replace("{link}", link) ?? "")
+    ? referralShareText(
+      remoteRewardEnabled,
+      def.textTemplate ?? "{link}",
+      `${t.value.team.sharingStillAvailable} {link}`,
+      link,
+    )
     : buildShareText();
+  const effectiveDef = remoteApiEnabled && !remoteRewardEnabled
+    ? { ...def, textTemplate: undefined }
+    : def;
   switch (def.intentType) {
     case "web": {
-      const url = channelIntentUrl(def, link, text);
+      const url = channelIntentUrl(effectiveDef, link, text);
       if (!url) return;
       let opened = false;
       // #ifdef H5

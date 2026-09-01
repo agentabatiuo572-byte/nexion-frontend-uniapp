@@ -13,6 +13,7 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
           <text>{{ w.heroLabel }}</text>
           <text v-if="quest" :style="categoryStyle">{{ categoryText }}</text>
+          <text v-if="quest" :style="periodStyle">{{ periodText }}</text>
         </view>
 
         <!-- Card title h-md 18 / 600 ink -->
@@ -64,10 +65,12 @@ import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/q
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { useNow } from "@/composables/use-now";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+const nowTick = useNow();
 
 // 🔴 观测闸,**不是过滤器**——为什么客户端不过滤,见 lib/quest-genesis-tripwire.ts 顶部。
 //   判定走唯一消费入口 useGenesisSaleGate,本文件不自判(GEN10 ④「单一派生」)。
@@ -94,6 +97,7 @@ const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * 
 const rewardDisplay = computed(() => reward.value.toLocaleString());
 const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].includes(quest.value.status));
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
+const periodExpired = computed(() => Date.parse(quest.value?.eligibleUntil ?? "") <= nowTick.value * 1000);
 
 const titleText = computed(() => quest.value?.name ?? "");
 const categoryText = computed(() => quest.value ? ({
@@ -107,16 +111,24 @@ const bodyText = computed(() => quest.value?.status === "PENDING" ? w.value.prog
 const ctaText = computed(() => wq.loading ? w.value.refreshing : w.value.goComplete);
 const promoChipText = computed(() => fmt(w.value.promoChip, { mult: mult.value.toFixed(1) }));
 const claimText = computed(() => fmt(w.value.claim, { n: rewardDisplay.value }));
+const periodText = computed(() => {
+  const remainingMs = Date.parse(quest.value?.eligibleUntil ?? "") - nowTick.value * 1000;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return fmt(w.value.periodEndsIn, { time: "00:00:00" });
+  const totalMinutes = Math.floor(remainingMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return fmt(w.value.periodEndsIn, { time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}` });
+});
 
 function onCta() {
   const q = quest.value;
-  if (!q || wq.loading) return;
+  if (!q || wq.loading || periodExpired.value) return;
   navTo(q.actionRoute);
 }
 
 async function onClaim() {
   const q = quest.value;
-  if (!completed.value || !q) return;
+  if (!completed.value || !q || periodExpired.value) return;
   await wq.claim(q);
 }
 
@@ -163,6 +175,12 @@ const categoryStyle: CSSProperties = {
   background: "var(--v5-warning-soft)",
   color: "var(--v5-ink-3)",
   letterSpacing: "normal",
+};
+const periodStyle: CSSProperties = {
+  marginLeft: "4px",
+  color: "var(--v5-ink-4)",
+  letterSpacing: "normal",
+  fontVariantNumeric: "tabular-nums",
 };
 const titleStyle: CSSProperties = {
   marginTop: "10px",

@@ -14,6 +14,7 @@ export interface ReferralRewardLedgerItem {
 
 export interface ReferralRewardSnapshot {
   referralCode: string;
+  rewardEnabled: boolean;
   inviterRewardNex: number;
   invitedCount: number;
   pendingCount: number;
@@ -59,6 +60,7 @@ function matchesRuntimeProvenance(row: Record<string, unknown>, mode: ApiEnviron
 export function parseReferralRewardSnapshot(value: unknown, mode: ApiEnvironment = "prod"): ReferralRewardSnapshot {
   const row = record(value);
   const referralCode = text(row?.referralCode);
+  const rewardEnabled = row?.rewardEnabled;
   const inviterRewardNex = num(row?.inviterRewardNex);
   const invitedCount = count(row?.invitedCount);
   const pendingCount = count(row?.pendingCount);
@@ -74,12 +76,12 @@ export function parseReferralRewardSnapshot(value: unknown, mode: ApiEnvironment
   const rewardValues = row?.recentRewards;
   const facts = Array.isArray(factValues) ? factValues.map(text) : [];
   const rawRecentRewards = Array.isArray(rewardValues) ? rewardValues : null;
-  if (!row || !referralCode || inviterRewardNex === null || invitedCount === null || pendingCount === null
+  if (!row || !referralCode || typeof rewardEnabled !== "boolean" || inviterRewardNex === null || invitedCount === null || pendingCount === null
       || settledCount === null || lifetimeInviterNex === null || walletNexAvailable === null
       || limit === null || limit < 1 || !refreshedAt || Number.isNaN(Date.parse(refreshedAt))
       || facts.some((fact) => !fact)
       || !matchesRuntimeProvenance(row, mode)
-      || !rawRecentRewards) return invalid();
+      || !rawRecentRewards || (!rewardEnabled && inviterRewardNex !== 0)) return invalid();
   if (!PRODUCTION_FACTS.every((fact) => facts.includes(fact))) return invalid();
   const recentRewards = rawRecentRewards.map((item) => {
     const entry = record(item);
@@ -96,7 +98,7 @@ export function parseReferralRewardSnapshot(value: unknown, mode: ApiEnvironment
     return { settlementNo, amountNex, ledgerStatus, balanceAfter, releaseBucket, sourceEnvironment: environment, settledAt };
   });
   if (recentRewards.length > limit || settledCount > invitedCount || pendingCount + settledCount > invitedCount) return invalid();
-  return { referralCode, inviterRewardNex, invitedCount, pendingCount, settledCount, lifetimeInviterNex,
+  return { referralCode, rewardEnabled, inviterRewardNex, invitedCount, pendingCount, settledCount, lifetimeInviterNex,
     walletNexAvailable, recentRewards, limit, source, sourceEnvironment, runId, factSources: facts as string[], refreshedAt };
 }
 

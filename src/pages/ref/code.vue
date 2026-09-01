@@ -1,7 +1,7 @@
 <!--
   Referral landing (ported from Nexion-prototype/app/ref/[code]/page.tsx).
   Public full-screen entry for users arriving via a shared /ref link. Establishes
-  sponsor social proof + dangles the $5 + 20 NEX gift, then pushes into register
+  sponsor social proof and the server-authorized offer, then pushes into register
   with the ref code preserved. No chassis (full-bleed, like onboarding). Reads the
   code from `?code=` (the source's dynamic [code] segment). Literal dark hex from
   source mapped to v5 tokens.
@@ -19,7 +19,7 @@
 
       <!-- [FEAT-SHARE4] 异常2:本机已登录 → 提示条 + CTA 变「进入」,不重复领礼 -->
       <view v-if="authed" :style="alreadyBarStyle">
-        <text>{{ t.ref.alreadyBar }}</text>
+        <text>{{ rewardEnabled ? t.ref.alreadyBar : t.ref.alreadyBarNoReward }}</text>
       </view>
 
       <!-- Sponsor hero([FEAT-SHARE4] 异常1:无码/非法码 → 整块隐藏;已登录也隐藏,
@@ -42,7 +42,7 @@
       </view>
 
       <!-- Gift hero: remote promotion is rendered only after the server preview succeeds. -->
-      <view v-if="!remoteApiEnabled || remotePreview" class="text-center relative overflow-hidden" :style="giftCardStyle">
+      <view v-if="rewardEnabled" class="text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
           <text :style="giftAmountStyle">${{ giftUsdt }}</text>
@@ -64,8 +64,8 @@
 
       <!-- CTA(已登录 → 进入 NexGrid,隐藏注册入口;异常2) -->
       <view v-if="!authed && (!remoteApiEnabled || remotePreview)" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
-        <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
+        <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
+        <text style="margin: 0 8px">{{ rewardEnabled ? fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) : t.ref.joinCta }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
       <view v-if="remoteApiEnabled && !remotePreview" class="text-center" style="padding: 28px 12px">
@@ -141,6 +141,7 @@ import { useConfig } from "@/store/config";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { monthlyPayoutUsdOf, publicStatsHealth } from "@/lib/platform-stats";
+import { visibleReferralGift } from "@/lib/referral-reward-gate";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
 const t = useT();
@@ -164,13 +165,17 @@ const joinersText = computed(() => {
 });
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
-// 礼包金额单源派生自 platform config(禁写死镜像)。
+const rewardEnabled = computed(() => remoteApiEnabled
+  ? !!remotePreview.value && remotePreview.value.gift.status !== "DISABLED"
+  : cfg.config.rewards.enabled);
+const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
+// 礼包金额单源派生自服务端预览或已过 H8 闸门的 platform config。
 const giftUsdt = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.usdtAmount ?? 0
-  : cfg.config.rewards.welcomeGift.usdtAmount);
+  ? (rewardEnabled.value ? remotePreview.value?.gift.usdtAmount ?? 0 : 0)
+  : localGift.value.usdtAmount);
 const giftNex = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.nexAmount ?? 0
-  : cfg.config.rewards.welcomeGift.nexAmount);
+  ? (rewardEnabled.value ? remotePreview.value?.gift.nexAmount ?? 0 : 0)
+  : localGift.value.nexAmount);
 // [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
 onLoad(async (options) => {
   if (remoteApiEnabled) {
@@ -210,12 +215,13 @@ const ZAP_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" str
 const USERS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>`;
 
 type PerkKey = "gift" | "day1" | "always" | "sponsor";
-const perks: { key: PerkKey; icon: string; tint: string }[] = [
+const ALL_PERKS: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "gift", icon: GIFT_SVG, tint: "var(--v5-brand)" },
   { key: "day1", icon: SPARK_SVG, tint: "var(--v5-tech-cyan)" },
   { key: "always", icon: ZAP_SVG, tint: "var(--v5-warning)" },
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];
+const perks = computed(() => ALL_PERKS.filter((perk) => rewardEnabled.value || perk.key !== "gift"));
 function perkLabel(k: PerkKey): string {
   const s = t.value.ref.perks[k];
   return k === "gift" ? fmt(s, { usd: giftUsdt.value, nex: giftNex.value }) : s;

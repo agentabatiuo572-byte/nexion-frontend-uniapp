@@ -24,7 +24,7 @@
             <text style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
           </view>
         </view>
-        <view v-if="!remoteApiEnabled" style="text-align: right">
+        <view v-if="!questUnavailable && (!remoteApiEnabled || dayOneWindow)" style="text-align: right">
           <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
           <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
         </view>
@@ -48,11 +48,11 @@
         <view
           v-for="task in tasks"
           :key="task.id"
-          :class="isDone(task) ? '' : 'active:scale-[0.98] active:opacity-80 transition-transform'"
+          :class="isActionable(task) ? 'active:scale-[0.98] active:opacity-80 transition-transform' : ''"
           :style="rowStyle(task)"
           role="button"
-          :tabindex="props.active && !isDone(task) ? 0 : -1"
-          :aria-disabled="isDone(task)"
+          :tabindex="props.active && isActionable(task) ? 0 : -1"
+          :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
           @keydown.enter.prevent="onRowTap(task)"
           @keydown.space.prevent="onRowTap(task)"
@@ -73,7 +73,7 @@
           </view>
           <text :style="rewardStyle(task)">{{ task.nex === null ? "—" : `+${task.nex} NEX` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ task.usdt }}</text></text>
           <view>
-            <svg v-if="!isDone(task)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7">
+            <svg v-if="isActionable(task)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </view>
@@ -125,6 +125,7 @@ interface QuestTask {
   /** 该填充色之上的前景色(勾/序号)。quest 两色恒浅 → on-quest 恒深墨;
    *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
   onColor: string;
+  eligible: boolean;
 }
 
 const props = withDefaults(defineProps<{ active?: boolean; expanded?: boolean }>(), {
@@ -154,12 +155,12 @@ const categoryLabel = (category: QuestTaskCategory): string => ({
 })[category];
 
 const fallbackTasks = computed<QuestTask[]>(() => [
-  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
-  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
-  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
-  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
-  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
-  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)", eligible: true },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
 ]);
 const remoteTasks = computed<QuestTask[]>(() => {
   const palette = [
@@ -176,6 +177,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
       nex: row.rewardNex,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
+      eligible: row.eligible,
       ...palette[index % palette.length],
     }));
 });
@@ -209,13 +211,19 @@ const rewardText = computed(() => {
   const totalReward = tasks.value.reduce((sum, task) => sum + (task.nex ?? 0), 0);
   return totalReward > 0 ? String(totalReward) : "—";
 });
+const dayOneWindow = computed(() => quest.remoteQuests.find((row) => row.layer === "DAY_ONE") ?? null);
 
+const remainingMs = computed(() => remoteApiEnabled
+    ? Date.parse(dayOneWindow.value?.eligibleUntil ?? "") - nowTick.value * 1000
+    : 18 * 60 * 60 * 1000 + 24 * 60 * 1000 - ((nowTick.value * 1000) % 60_000));
+const dayOneExpired = computed(() => remoteApiEnabled && Number.isFinite(remainingMs.value) && remainingMs.value <= 0);
 const remainingLabel = computed(() => {
-  if (remoteApiEnabled) return "—";
-  const remainingMs = 18 * 60 * 60 * 1000 + 24 * 60 * 1000 - ((nowTick.value * 1000) % 60_000);
-  const hours = Math.floor(remainingMs / 3600_000);
-  const minutes = Math.floor((remainingMs % 3600_000) / 60_000);
-  const seconds = Math.floor((remainingMs % 60_000) / 1000);
+  const remaining = remainingMs.value;
+  if (!Number.isFinite(remaining)) return "—";
+  if (remaining <= 0) return t.value.home.dayOneExpired;
+  const hours = Math.floor(remaining / 3600_000);
+  const minutes = Math.floor((remaining % 3600_000) / 60_000);
+  const seconds = Math.floor((remaining % 60_000) / 1000);
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 });
 
@@ -223,8 +231,12 @@ function isDone(task: QuestTask) {
   return quest.isComplete(task.id);
 }
 
+function isActionable(task: QuestTask) {
+  return task.eligible && !dayOneExpired.value && !isDone(task);
+}
+
 function onRowTap(task: QuestTask) {
-  if (isDone(task)) return;
+  if (!isActionable(task)) return;
   navTo(task.href);
 }
 
@@ -250,7 +262,7 @@ function rowStyle(task: QuestTask): CSSProperties {
     gap: "10px",
     alignItems: "center",
     padding: "8px 0",
-    cursor: isDone(task) ? "default" : "pointer",
+    cursor: isActionable(task) ? "pointer" : "default",
   };
 }
 

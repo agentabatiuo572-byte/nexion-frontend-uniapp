@@ -21,7 +21,7 @@ function deferred<T>() {
 
 function snapshot(account: string): ReferralRewardSnapshot {
   return {
-    referralCode: `REF-${account}`, inviterRewardNex: 10, invitedCount: 1, pendingCount: 0, settledCount: 1,
+    referralCode: `REF-${account}`, rewardEnabled: true, inviterRewardNex: 10, invitedCount: 1, pendingCount: 0, settledCount: 1,
     lifetimeInviterNex: 10, walletNexAvailable: 20, recentRewards: [], limit: 10,
     source: "ledger", sourceEnvironment: "PRODUCTION", runId: null,
     factSources: ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"],

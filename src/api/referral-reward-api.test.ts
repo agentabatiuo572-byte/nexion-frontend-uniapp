@@ -9,7 +9,7 @@ const sandboxFacts = ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referr
 function snapshot(sourceEnvironment: "PRODUCTION" | "SANDBOX", runId: string | null, source: "ledger" | "mock" = sourceEnvironment === "PRODUCTION" ? "ledger" : "mock") {
   const facts = sourceEnvironment === "PRODUCTION" ? productionFacts : sandboxFacts;
   return {
-    referralCode: "NX-REF-1", inviterRewardNex: 10, invitedCount: 2, pendingCount: 1, settledCount: 1,
+    referralCode: "NX-REF-1", rewardEnabled: true, inviterRewardNex: 10, invitedCount: 2, pendingCount: 1, settledCount: 1,
     lifetimeInviterNex: 10, walletNexAvailable: 20, limit: 10, source, sourceEnvironment, runId,
     factSources: facts, refreshedAt: "2026-08-16T00:00:00Z",
     recentRewards: [{ settlementNo: "SET-1", amountNex: 10, ledgerStatus: "SUCCESS", balanceAfter: 20,
@@ -32,5 +32,15 @@ describe("referral reward provenance", () => {
   it("rejects mock or unscoped facts on every non-matching rail", async () => {
     await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("PRODUCTION", null, "mock")) } as unknown as ApiClient, "prod").snapshot()).rejects.toMatchObject({ kind: "protocol" });
     await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(snapshot("SANDBOX", RUN)) } as unknown as ApiClient, "dev").snapshot()).rejects.toMatchObject({ kind: "protocol" });
+  });
+
+  it("accepts a disabled reward gate only when the advertised reward is zero", async () => {
+    const disabled = { ...snapshot("PRODUCTION", null), rewardEnabled: false, inviterRewardNex: 0 };
+    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(disabled) } as unknown as ApiClient, "prod").snapshot())
+      .resolves.toMatchObject({ rewardEnabled: false, inviterRewardNex: 0 });
+
+    const inconsistent = { ...disabled, inviterRewardNex: 10 };
+    await expect(createReferralRewardApi({ request: vi.fn().mockResolvedValue(inconsistent) } as unknown as ApiClient, "prod").snapshot())
+      .rejects.toMatchObject({ kind: "protocol" });
   });
 });

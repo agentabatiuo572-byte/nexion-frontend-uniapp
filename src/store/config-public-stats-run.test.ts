@@ -13,7 +13,7 @@ vi.mock("@/api/runtime", () => ({
 
 import { useConfig } from "./config";
 
-function snapshot(fleetDevices = 28_432) {
+function snapshot(fleetDevices = 28_432, referralRewardsEnabled = false) {
   return {
     featureFlags: {
       computeShareEnabled: true,
@@ -39,8 +39,9 @@ function snapshot(fleetDevices = 28_432) {
     },
     onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 },
     rewards: {
-      welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
-      inviterReward: { nexAmount: 0 },
+      enabled: referralRewardsEnabled,
+      welcomeGift: { lockMode: "risk_bucket", usdtAmount: referralRewardsEnabled ? 5 : 0, nexAmount: referralRewardsEnabled ? 20 : 0 },
+      inviterReward: { nexAmount: referralRewardsEnabled ? 200 : 0 },
     },
     computeShare: { downloadUrl: "", content: { zhTitle: "", zhGuide: "", enTitle: "", enGuide: "" }, gpuTiers: [] },
     share: {
@@ -97,5 +98,22 @@ describe("H9 public stats canonical authority", () => {
     expect(config.syncFailed).toBe(true);
     expect(config.publicStatsAuthority).toBeNull();
     expect(config.config.publicStats.fleetDevices).toBe(0);
+  });
+
+  it("clears a previously enabled referral reward projection when the remote authority fails", async () => {
+    platformConfig.mockResolvedValueOnce(snapshot(28_432, true));
+    const config = useConfig();
+    await config.load();
+    expect(config.config.rewards.enabled).toBe(true);
+
+    platformConfig.mockRejectedValueOnce(new Error("backend unavailable"));
+    await config.load();
+
+    expect(config.syncFailed).toBe(true);
+    expect(config.config.rewards).toEqual({
+      enabled: false,
+      welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
+      inviterReward: { nexAmount: 0 },
+    });
   });
 });

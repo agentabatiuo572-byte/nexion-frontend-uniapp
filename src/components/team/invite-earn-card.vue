@@ -18,7 +18,7 @@
 
     <!-- Top label row -->
     <view class="relative flex items-center justify-between" style="z-index: 1; font-size: 12px">
-      <text :style="{ color: 'var(--v5-brand)', fontWeight: 500 }">💰 {{ t.team.earnForEachFriend }}</text>
+      <text :style="{ color: 'var(--v5-brand)', fontWeight: 500 }">{{ rewardEnabled ? '💰' : '🤝' }} {{ rewardEnabled ? t.team.earnForEachFriend : t.team.shareWithFriends }}</text>
       <view class="flex items-center" style="gap: 4px">
         <PulseDot color="var(--v5-success)" :size="6" />
         <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-3)' }">{{ settlementStatus }}</text>
@@ -36,12 +36,14 @@
     <view class="relative grid" :style="bodyGridStyle">
       <!-- LEFT — stats -->
       <view class="min-w-0 flex flex-col" style="gap: 6px">
-        <view class="flex items-baseline" style="gap: 4px; line-height: 1">
+        <view v-if="rewardEnabled" class="flex items-baseline" style="gap: 4px; line-height: 1">
           <text class="font-mono-tabular" :style="leftDollarStyle">{{ nexReward.toLocaleString() }}</text>
           <text class="font-display tabular-nums" :style="leftDollarSignStyle">NEX</text>
         </view>
-        <text class="font-display tabular-nums" :style="nexLineStyle">{{ t.team.serverRewardPerSettlement }}</text>
-        <text :style="cooldownStyle">{{ t.team.perFriendCooldown }}</text>
+        <text v-if="rewardEnabled" class="font-display tabular-nums" :style="nexLineStyle">{{ t.team.serverRewardPerSettlement }}</text>
+        <text v-if="rewardEnabled" :style="cooldownStyle">{{ t.team.perFriendCooldown }}</text>
+        <text v-else class="font-display" :style="nexLineStyle">{{ t.team.referralRewardsDisabled }}</text>
+        <text v-if="!rewardEnabled" :style="cooldownStyle">{{ t.team.sharingStillAvailable }}</text>
         <!-- Cumulative earned pill — 仅在有已结算战绩时渲染,零收益无空态文案 -->
         <view v-if="lifetimeEarned > 0" class="inline-flex items-center" :style="earnedPillStyle">
           <text>💎</text>
@@ -69,7 +71,7 @@
 
         <view class="nx-team-share-now rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" @click="openShare">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-          <text :style="primaryCtaTextStyle">{{ fmt(t.team.shareAndEarn, { n: `${nexReward.toLocaleString()} NEX` }) }}</text>
+          <text :style="primaryCtaTextStyle">{{ rewardEnabled ? fmt(t.team.shareAndEarn, { n: `${nexReward.toLocaleString()} NEX` }) : t.team.shareNow }}</text>
         </view>
       </view>
     </view>
@@ -143,13 +145,16 @@ const tickerItems = computed<TickerItem[]>(() => (rewards.snapshot?.recentReward
 })));
 const hasPromo = computed(() => false);
 const multiplier = computed(() => 1);
+const rewardEnabled = computed(() => rewards.snapshot?.rewardEnabled === true);
 const nexReward = computed(() => rewards.snapshot?.inviterRewardNex ?? 0);
 const lifetimeEarned = computed(() => rewards.snapshot?.lifetimeInviterNex ?? 0);
 const settlementStatus = computed(() => rewards.snapshot
-  ? fmt(t.value.team.settlementStatus, {
+  ? rewards.snapshot.rewardEnabled
+    ? fmt(t.value.team.settlementStatus, {
       settled: rewards.snapshot.settledCount,
       pending: rewards.snapshot.pendingCount,
     })
+    : t.value.team.referralRewardsDisabled
   : t.value.team.settlementUnavailable);
 
 const referralCode = computed(() => {

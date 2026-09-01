@@ -75,6 +75,7 @@ export function completePlatformConfigSeed(seed: PlatformConfigSeed): PlatformCo
       networkConfirmFeeUsd: { ...networkConfirmFeeUsd },
     },
     rewards: {
+      enabled: seed.rewards.enabled,
       welcomeGift: { ...seed.rewards.welcomeGift },
       inviterReward: { ...seed.rewards.inviterReward },
     },

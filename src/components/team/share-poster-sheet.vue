@@ -119,20 +119,22 @@ const inst = getCurrentInstance();
 type TplKey = "gift" | "yield" | "brand";
 type GenState = "idle" | "generating" | "ready" | "failed";
 
-const tpl = ref<TplKey>("gift");
+const tpl = ref<TplKey>("brand");
 const showUsername = ref(true);
 const genState = ref<GenState>("idle");
 const imgSrc = ref("");
 
-const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
-const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
-const posterRewardLine = computed(() => fmt(t.value.share.posterRewardLine, { usd: giftUsdt.value, nex: giftNex.value }));
+const rewardEnabled = computed(() => cfg.config.rewards.enabled);
+const giftUsdt = computed(() => rewardEnabled.value ? cfg.config.rewards.welcomeGift.usdtAmount : 0);
+const giftNex = computed(() => rewardEnabled.value ? cfg.config.rewards.welcomeGift.nexAmount : 0);
+const posterRewardLine = computed(() => rewardEnabled.value
+  ? fmt(t.value.share.posterRewardLine, { usd: giftUsdt.value, nex: giftNex.value })
+  : t.value.team.sharingStillAvailable);
 
-// yield 模板依赖用户真设备数据;无设备自动隐藏(异常3),gift/brand 恒可用。
+// yield 模板依赖用户真设备数据；gift 模板仅在 H8 奖励开启时可用。
 const availableTpls = computed(() => {
-  const list: { key: TplKey; label: string; tint: string }[] = [
-    { key: "gift", label: t.value.share.tplGift, tint: "var(--v5-brand)" },
-  ];
+  const list: { key: TplKey; label: string; tint: string }[] = [];
+  if (rewardEnabled.value) list.push({ key: "gift", label: t.value.share.tplGift, tint: "var(--v5-brand)" });
   if (app.devices.length > 0) list.push({ key: "yield", label: t.value.share.tplYield, tint: "var(--v5-tech-cyan)" });
   list.push({ key: "brand", label: t.value.share.tplBrand, tint: "var(--v5-warning)" });
   return list;
@@ -371,12 +373,20 @@ function paint(link: string, myToken: number) {
     ctx.setFillStyle(FAINT_ON_DARK);
     ctx.setFontSize(9.5);
     ctx.fillText(t.value.share.posterYieldDevices, 20, 262);
-    ctx.fillText(t.value.share.posterYieldYou, 110, 262);
+    ctx.fillText(
+      rewardEnabled.value ? t.value.share.posterYieldYou : t.value.share.posterYieldInviteNoReward,
+      110,
+      262,
+    );
     ctx.setFillStyle(INK_ON_DARK);
     ctx.setFontSize(12.5);
     ctx.fillText(fmt(t.value.share.posterYieldUnit, { n: app.devices.length }), 20, 280);
     ctx.setFillStyle(brand);
-    ctx.fillText(`$${usd} + ${nex} NEX`, 110, 280);
+    ctx.fillText(
+      rewardEnabled.value ? `$${usd} + ${nex} NEX` : t.value.share.posterYieldInviteValueNoReward,
+      110,
+      280,
+    );
   } else {
     ctx.setFillStyle(cyan);
     ctx.setFontSize(10);
@@ -387,7 +397,13 @@ function paint(link: string, myToken: number) {
     ctx.fillText(t.value.share.posterBrandTitle2, 20, 240);
     ctx.setFillStyle(MUTED_ON_DARK);
     ctx.setFontSize(11);
-    ctx.fillText(fmt(t.value.share.posterBrandSub, { usd, nex }), 20, 270);
+    ctx.fillText(
+      rewardEnabled.value
+        ? fmt(t.value.share.posterBrandSub, { usd, nex })
+        : t.value.share.posterBrandSubNoReward,
+      20,
+      270,
+    );
   }
 
   // 底栏:用户名(可关)+ 邀请码 + 扫码提示 + 真二维码
@@ -404,7 +420,7 @@ function paint(link: string, myToken: number) {
   ctx.fillText(currentShareReferralCode(), 20, footY + 40);
   ctx.setFillStyle(FAINT_ON_DARK);
   ctx.setFontSize(8.5);
-  ctx.fillText(t.value.share.scanTip, 20, footY + 58);
+  ctx.fillText(rewardEnabled.value ? t.value.share.scanTip : t.value.share.scanTipNoReward, 20, footY + 58);
   paintQr(ctx, W - 94, footY - 2, 74, link);
 
   ctx.draw(false, () => {
@@ -471,9 +487,9 @@ watch(
     }
   },
 );
-// 打开时若 yield 模板已不可用(设备清空),回落 gift。
+// 当前模板失效时回落到仍可用的首个模板。
 watch(availableTpls, (list) => {
-  if (!list.some((x) => x.key === tpl.value)) tpl.value = "gift";
+  if (!list.some((x) => x.key === tpl.value)) tpl.value = list[0]?.key ?? "brand";
 });
 
 // ── 动作 ────────────────────────────────────────────────────────────────
