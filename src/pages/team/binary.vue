@@ -44,8 +44,8 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
           <view style="font-size: 12px; line-height: 1.375">
             <text class="block" :style="{ color: 'var(--v5-ink)', fontWeight: 600 }">{{ t.binary.blocked }}</text>
-            <text class="block" :style="{ color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ blockedDetailText }} {{ t.binary.blockedAction }}</text>
-            <view class="inline-flex items-center active:opacity-70" :style="inviteCtaStyle" @click="go('/pages/team/team')">
+            <text class="block" :style="{ color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ blockedRecoveryText }}</text>
+            <view v-if="showGrowthRecoveryCta" class="inline-flex items-center active:opacity-70" :style="inviteCtaStyle" @click="go('/pages/team/team')">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
               <text>{{ t.binary.inviteCta }}</text>
             </view>
@@ -129,7 +129,7 @@
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
               <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ new Date(e.ts).toLocaleDateString(dateLocale()) }}</text>
             </view>
-            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: 'var(--v5-warning)', fontWeight: 600 }">+${{ e.amountUSDT.toFixed(2) }}</text>
+            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: binaryAmountColor(e.status), fontWeight: 600 }">{{ binaryAmountLabel(e) }}</text>
           </view>
           </view>
         </view>
@@ -180,12 +180,14 @@ const periodMatch = computed(() => {
   const factor = settleDays.value / 30;
   return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
-const blocked = computed(() => leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
+const blocked = computed(() => remoteApiEnabled
+  ? Boolean(snapshot.value?.blockedReason)
+  : leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
 
 const recentBinaries = computed(() =>
   remoteApiEnabled
     ? (snapshot.value?.recentMatches ?? []).map((match) => ({
-      id: match.id, sourceUserName: match.id, amountUSDT: match.amountUsdt, ts: match.createdAt,
+      id: match.id, sourceUserName: match.id, amountUSDT: match.amountUsdt, ts: match.createdAt, status: match.status,
     }))
     : commission.events.filter((e) => e.kind === "binary").slice(0, 5),
 );
@@ -238,11 +240,25 @@ const formulaText = computed(() =>
     freq: periodFreqLabel.value,
   }),
 );
-const blockedDetailText = computed(() =>
-  fmt(t.value.binary.blockedDetail, {
+const blockedDetailText = computed(() => {
+  const blockedReason = snapshot.value?.blockedReason;
+  if (remoteApiEnabled && blockedReason) {
+    return t.value.binary.blockReasons[blockedReason as keyof typeof t.value.binary.blockReasons]
+      ?? t.value.binary.blockReasons.UNKNOWN;
+  }
+  return fmt(t.value.binary.blockedDetail, {
     side: weakSide.value === "left" ? t.value.binary.left : t.value.binary.right,
     vol: weakVol.value.toFixed(0),
-  }),
+  });
+});
+const showGrowthRecoveryCta = computed(() => {
+  if (!remoteApiEnabled) return blocked.value;
+  return ["BINARY_LEG_ASSIGNMENT_INCOMPLETE", "BINARY_THRESHOLD_NOT_MET"]
+    .includes(snapshot.value?.blockedReason ?? "");
+});
+const blockedRecoveryText = computed(() => showGrowthRecoveryCta.value
+  ? `${blockedDetailText.value} ${t.value.binary.blockedAction}`
+  : blockedDetailText.value,
 );
 const spilloverTitleText = computed(() =>
   fmt(t.value.binary.spilloverTitle, { n: spilloverCount.value }),
@@ -253,6 +269,20 @@ function wingMembersText(n: number): string {
 
 function go(url: string) {
   navTo(url);
+}
+
+function binaryAmountLabel(event: { amountUSDT: number; status?: string }): string {
+  const amount = `$${event.amountUSDT.toFixed(2)}`;
+  if (event.status === "reversed") return `−${amount}`;
+  if (event.status === "frozen" || event.status === "rejected") return amount;
+  return `+${amount}`;
+}
+
+function binaryAmountColor(status?: string): string {
+  if (status === "rejected") return "var(--v5-danger)";
+  if (status === "frozen") return "var(--v5-tech-cyan)";
+  if (status === "reversed") return "var(--v5-ink-4)";
+  return "var(--v5-warning)";
 }
 
 function retryCanonicalData(): void {

@@ -9,6 +9,7 @@ function order(overrides: Partial<CanonicalOrder> = {}): CanonicalOrder {
     productNo: "stellarbox-s1",
     productName: "StellarBox S1",
     quantity: 1,
+    subtotalUsdt: 100,
     unitPriceUsdt: 100,
     discountUsdt: 0,
     amountUsdt: 100,

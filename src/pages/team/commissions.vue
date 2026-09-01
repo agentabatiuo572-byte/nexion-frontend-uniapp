@@ -117,11 +117,14 @@
                 <text class="block font-mono-tabular" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
               </view>
               <view class="text-right">
-                <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-brand)' }">+${{ e.amountUSDT.toFixed(2) }}</text>
-                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-warning)' }">+{{ e.amountNEX.toLocaleString() }} NEX</text>
+                <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
+                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'nex')">{{ commissionNexLabel(e) }}</text>
                 <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
                 <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
+                <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-tech-cyan)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
+                <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
+                <text v-else-if="e.status === 'rejected'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.rejectedTag }}</text>
               </view>
             </view>
         </view>
@@ -205,6 +208,31 @@ function eventMeta(e: CommissionEvent): string {
 function coolingTag(e: CommissionEvent): string {
   const days = Math.max(0, Math.ceil((e.unlockAt - Date.now()) / 86400000));
   return fmt(t.value.commissions.coolingTag, { n: days });
+}
+
+function commissionAmountLabel(e: CommissionEvent): string {
+  const amount = `$${e.amountUSDT.toFixed(2)}`;
+  if (e.status === "reversed") return `−${amount}`;
+  if (e.status === "frozen" || e.status === "rejected") return amount;
+  return `+${amount}`;
+}
+
+function commissionNexLabel(e: CommissionEvent): string {
+  const amount = `${e.amountNEX.toLocaleString()} NEX`;
+  if (e.status === "reversed") return `−${amount}`;
+  if (e.status === "frozen" || e.status === "rejected") return amount;
+  return `+${amount}`;
+}
+
+function commissionAmountStyle(e: CommissionEvent, asset: "usdt" | "nex"): CSSProperties {
+  const color = e.status === "rejected"
+    ? "var(--v5-danger)"
+    : e.status === "frozen"
+      ? "var(--v5-tech-cyan)"
+      : e.status === "reversed"
+        ? "var(--v5-ink-4)"
+        : asset === "usdt" ? "var(--v5-brand)" : "var(--v5-warning)";
+  return { fontSize: asset === "usdt" ? "13px" : "12px", fontWeight: asset === "usdt" ? 600 : 400, color };
 }
 
 function go(url: string) {

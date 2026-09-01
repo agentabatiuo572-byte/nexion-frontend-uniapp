@@ -194,7 +194,8 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { ambassadorApplicationApi, remoteApiEnabled } from "@/api/runtime";
-import type { AmbassadorApplication, AmbassadorApplicationInput } from "@/api/ambassador-application-api";
+import type { AmbassadorApplication, AmbassadorApplicationInput, AmbassadorPolicy,
+  AmbassadorPolicyBucket } from "@/api/ambassador-application-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
 import {
@@ -216,47 +217,24 @@ const rankReady = computed(() => vrank.remoteReady);
 const unlocked = computed(() => rankReady.value && vrank.myRank >= 5);
 
 interface Bucket {
-  id: string;
+  id: AmbassadorPolicyBucket["id"];
   title: string;
   range: string;
   rule: string;
   tint: string;
   paths: string[];
 }
-const BUCKETS = computed<Bucket[]>(() => [
-  {
-    id: "venue",
-    title: t.value.agent.buckets.venue.title,
-    range: "$1,000 — $10,000",
-    rule: t.value.agent.buckets.venue.rule,
-    tint: "var(--v5-brand)",
-    paths: ["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4M10 10h4M10 14h4M10 18h4"],
-  },
-  {
-    id: "kol",
-    title: t.value.agent.buckets.kol.title,
-    range: t.value.agent.bucketRangeFlat,
-    rule: t.value.agent.buckets.kol.rule,
-    tint: "var(--v5-tech-cyan)",
-    paths: ["m3 11 18-5v12L3 14v-3z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"],
-  },
-  {
-    id: "print",
-    title: t.value.agent.buckets.print.title,
-    range: t.value.agent.bucketRangeQuota,
-    rule: t.value.agent.buckets.print.rule,
-    tint: "var(--v5-warning)",
-    paths: ["M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2", "M6 9V2h12v7", "M6 14h12v8H6z"],
-  },
-  {
-    id: "dev",
-    title: t.value.agent.buckets.dev.title,
-    range: t.value.agent.bucketRangeHourly,
-    rule: t.value.agent.buckets.dev.rule,
-    tint: "var(--v5-tech-cyan)",
-    paths: ["m16 18 6-6-6-6", "m8 6-6 6 6 6"],
-  },
-]);
+const BUCKET_VISUALS: Record<AmbassadorPolicyBucket["id"], Pick<Bucket, "tint" | "paths">> = {
+  venue: { tint: "var(--v5-brand)", paths: ["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4M10 10h4M10 14h4M10 18h4"] },
+  kol: { tint: "var(--v5-tech-cyan)", paths: ["m3 11 18-5v12L3 14v-3z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"] },
+  print: { tint: "var(--v5-warning)", paths: ["M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2", "M6 9V2h12v7", "M6 14h12v8H6z"] },
+  dev: { tint: "var(--v5-tech-cyan)", paths: ["m16 18 6-6-6-6", "m8 6-6 6 6 6"] },
+};
+const policy = ref<AmbassadorPolicy | null>(null);
+const BUCKETS = computed<Bucket[]>(() => (policy.value?.buckets ?? []).map((bucket) => ({
+  id: bucket.id, title: bucket.title, range: bucket.range, rule: bucket.rule,
+  ...BUCKET_VISUALS[bucket.id],
+})));
 
 interface ApprovedCase {
   name: string;
@@ -320,6 +298,7 @@ function resetAgentPageState(): void {
   invalidateAgentRequests();
   clearAgentFormState();
   latestApplication.value = emptyApplication();
+  policy.value = null;
   submitting.value = false;
 }
 
@@ -357,6 +336,12 @@ async function submit() {
     bucket: selectedBucketId.value,
   });
   if (!input) {
+    toast.error(t.value.agent.invalidFormTitle, t.value.agent.invalidFormBody);
+    return;
+  }
+  const activeBucket = policy.value?.buckets.find((bucket) => bucket.id === input.bucket);
+  if (remoteApiEnabled && (!activeBucket || input.budgetUsdt < activeBucket.minBudgetUsdt
+      || input.budgetUsdt > activeBucket.maxBudgetUsdt)) {
     toast.error(t.value.agent.invalidFormTitle, t.value.agent.invalidFormBody);
     return;
   }
@@ -411,6 +396,11 @@ function refreshAgentPage(): void {
   const requestScope = captureAgentRequest();
   void Promise.all([
     refreshLatest(requestScope).catch(() => undefined),
+    ambassadorApplicationApi.policy().then((value) => {
+      if (!requestIsCurrent(requestScope)) return;
+      policy.value = value;
+      budgetText.value = String(value.defaultBudgetUsdt);
+    }).catch(() => undefined),
     vrank.refreshCanonicalVRank(),
   ]);
 }

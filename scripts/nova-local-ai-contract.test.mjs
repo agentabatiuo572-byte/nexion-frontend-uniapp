@@ -71,7 +71,9 @@ test("remote tab routes keep a persistent Nova launcher without mock push timers
   assert.match(bubble, /const visible = computed\(\(\) => remoteApiEnabled \|\| totalUnread\.value > 0\)/);
   assert.match(bubble, /v-if="showUnreadBadge"/);
   assert.match(bubble, /const showUnreadBadge = computed\(\(\) => totalUnread\.value > 0\)/);
-  assert.match(bubble, /remoteApiEnabled \? nova\.unread : nova\.unread \+ conversations\.totalUnread/);
+  assert.match(bubble, /conversations\.byType\("advisor"\)/);
+  assert.match(bubble, /conversations\.byType\("support"\)/);
+  assert.doesNotMatch(bubble, /remoteApiEnabled \? nova\.unread/);
   assert.match(
     bubble,
     /function open\(\) \{\s*navTo\("\/pages\/support\/messages"\);\s*\}/,

@@ -59,8 +59,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "7542b5f017a2c86127c8009c659a74868b6b02793d689ad3dc1bc66b76053ba0",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
-  // R2-06: server facts take precedence over the Prototype's fabricated earnings curve.
-  "proof.vue": "96d5320da341bc25337e4290b25dfdbcc12d2e84ff550b04d0ce6b680184d381",
+  // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
+  // the formal page also uses the shared BrandLockup without changing the surrounding layout.
+  "proof.vue": "9f7085d75b1c1efe9cee5ec54693ccf80d27451cc240db2442a6c122cc4e57da",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // P3-13 additionally renders recoverable initial/pagination errors and a busy
@@ -70,7 +71,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
   "security.vue": "d2ee24d1b0833bda99c89e316f49c223f867a3e419f979e27a630d5a7ca661aa",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
-  "support-tickets.vue": "ca72383e2850949fa7f39bbecfd391a6c4c06f90b88025136db7494c010bac7d",
+  // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
+  "support-tickets.vue": "9454b7413765e6aec2a4ea010984786e5a2d0d4b838666dc7c19ea0079036f57",
   "support.vue": "6f1d1582608f17177bb3c902a2849db742f410da016e66dcf6e602cb7c43f714",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",

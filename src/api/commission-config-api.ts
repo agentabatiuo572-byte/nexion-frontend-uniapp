@@ -29,7 +29,7 @@ export type CanonicalBinaryResidualPolicy = "monthlyClear" | "perPairClear" | "c
 export interface CanonicalBinaryMatch {
   id: string;
   amountUsdt: number;
-  status: "cooling" | "unlocked" | "withdrawn";
+  status: "cooling" | "unlocked" | "withdrawn" | "frozen" | "reversed" | "rejected";
   createdAt: number;
   unlockAt: number;
 }
@@ -169,9 +169,12 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
 
 function binaryStatus(value: unknown): CanonicalBinaryMatch["status"] {
   const status = text(value).toUpperCase();
-  if (["PENDING", "COOLING"].includes(status)) return "cooling";
-  if (["PAID", "SETTLED", "UNLOCKED"].includes(status)) return "unlocked";
-  if (status === "WITHDRAWN") return "withdrawn";
+  if (["PENDING", "COOLING", "LOCKED"].includes(status)) return "cooling";
+  if (["UNLOCKED", "AVAILABLE"].includes(status)) return "unlocked";
+  if (["PAID", "SETTLED", "WITHDRAWN"].includes(status)) return "withdrawn";
+  if (status === "FROZEN") return "frozen";
+  if (["REVERSED", "ROLLBACK"].includes(status)) return "reversed";
+  if (status === "REJECTED") return "rejected";
   return invalid();
 }
 

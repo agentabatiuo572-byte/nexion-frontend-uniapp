@@ -96,6 +96,7 @@ import type { ComputeShareEnrollment } from "@/api/compute-share-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { createComputeShareEnrollmentJournal } from "./enrollment-recovery";
 import { enrollmentStatusLabel } from "./enrollment-status-view";
+import { createComputeSharePairingHandoff } from "./pairing-handoff";
 import {
   preserveInMemoryPairingCode,
   runComputeShareEnrollmentFlow,
@@ -126,8 +127,18 @@ const enrollmentJournal = createComputeShareEnrollmentJournal({
   write: (value) => uni.setStorageSync("nexgrid.compute-share.enrollment.v1", value),
   remove: () => uni.removeStorageSync("nexgrid.compute-share.enrollment.v1"),
 });
-const enabled = computed(() => cfg.isEnabled("computeShareEnabled"));
 const downloadUrl = computed(() => cfg.config.computeShare.downloadUrl.trim());
+function isComputeShareReady(featureEnabled: boolean, installerUrl: string): boolean {
+  if (!featureEnabled || !installerUrl.startsWith("https://")) return false;
+  try {
+    const parsed = new URL(installerUrl);
+    return parsed.protocol === "https:" && Boolean(parsed.hostname)
+      && !parsed.username && !parsed.password && !parsed.hash;
+  } catch {
+    return false;
+  }
+}
+const enabled = computed(() => isComputeShareReady(cfg.isEnabled("computeShareEnabled"), downloadUrl.value));
 const downloadTitle = computed(() => {
   const content = cfg.config.computeShare.content;
   const configured = (locale.code === "zh" ? content.zhTitle : content.enTitle).trim();
@@ -363,10 +374,22 @@ function connectDemoComputer() {
 
 function copyPairingCode() {
   if (!enrollment.value?.pairingCode) return;
+  let payload = "";
+  try {
+    payload = createComputeSharePairingHandoff({
+      enrollmentNo: enrollment.value.enrollmentNo,
+      pairingCode: enrollment.value.pairingCode,
+      requestedGpuModel: enrollment.value.requestedGpuModel,
+      expiresAt: enrollment.value.expiresAt,
+    });
+  } catch {
+    toast.warn(t.value.computeShare.pairingFailed);
+    return;
+  }
   uni.setClipboardData({
-    data: enrollment.value.pairingCode,
+    data: payload,
     success: () => toast.success(t.value.computeShare.pairingCodeCopied),
-    fail: () => toast.info(enrollment.value?.pairingCode ?? ""),
+    fail: () => toast.info(payload),
   });
 }
 

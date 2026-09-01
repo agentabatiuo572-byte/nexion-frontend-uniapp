@@ -25,7 +25,7 @@ export interface SupportApi {
   convertConversationToTicket(conversation: Conversation, category: TicketCategory, title: string, key: string): Promise<ConversationTicketResult>;
   commandResult(key: string): Promise<SupportCommandResult | null>;
   slaTargets(): Promise<SupportSlaTarget[]>;
-  faqs(language: string, category?: string): Promise<SupportFaq[]>;
+  faqs(language: string, category?: string, surface?: "Help Center" | "Ticket Create"): Promise<SupportFaq[]>;
 }
 
 function invalid(message: string): never { throw new ApiError({ kind: "protocol", message }); }
@@ -174,8 +174,8 @@ export function createSupportApi(client: ApiClient): SupportApi {
       if (!Array.isArray(value)) invalid("SUPPORT_SLA_TARGET_RESPONSE_INVALID");
       return value.map(parseSlaTarget);
     },
-    faqs: async (language, category) => {
-      const params = new URLSearchParams({ language: language.trim() || "en-US" }); if (category?.trim()) params.set("category", category.trim());
+    faqs: async (language, category, surface = "Help Center") => {
+      const params = new URLSearchParams({ language: language.trim() || "en-US", surface }); if (category?.trim()) params.set("category", category.trim());
       const value = await client.request({ method: "GET", path: `/api/app/support/faqs?${params.toString()}` }); if (!Array.isArray(value)) invalid("SUPPORT_FAQ_RESPONSE_INVALID"); return value.map(parseFaq);
     },
   };

@@ -5,7 +5,7 @@ import { createOrderApi, advanceRuntimeRevision } from "./order-api";
 function order() {
   return {
     orderNo: "ORD-1", productId: 1, productNo: "stellarrack-p1", productName: "Rack",
-    quantity: 1, unitPriceUsdt: 100, discountUsdt: 0, amountUsdt: 100,
+    quantity: 1, subtotalUsdt: 100, unitPriceUsdt: 100, discountUsdt: 0, amountUsdt: 100,
     paymentMethod: "USDT", paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT",
     activationStatus: "WAITING_PAYMENT", canonicalStatus: "placed", orderType: "SINGLE",
     placedAt: 1, paidAt: null, activatedAt: null, dataCenter: "Frankfurt DC",

@@ -23,6 +23,7 @@ export interface CanonicalOrder {
   productNo: string;
   productName: string;
   quantity: number;
+  subtotalUsdt: number;
   unitPriceUsdt: number;
   discountUsdt: number;
   amountUsdt: number;
@@ -173,6 +174,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     productNo: nonEmptyString(source.productNo),
     productName: nonEmptyString(source.productName),
     quantity: integer(source.quantity, 1),
+    subtotalUsdt: finiteNumber(source.subtotalUsdt),
     unitPriceUsdt: finiteNumber(source.unitPriceUsdt),
     discountUsdt: finiteNumber(source.discountUsdt),
     amountUsdt: finiteNumber(source.amountUsdt),

@@ -43,6 +43,8 @@ export interface Order {
   quantity: number;
   /** Number of products represented by a canonical bundle order. */
   itemCount?: number;
+  /** Server-calculated sum of every line item before discounts. */
+  subtotal: number;
   unitPrice: number;        // USDT
   discount: number;         // USDT (voucher)
   /** FEAT-DEV02 旧机抵扣(USDT)——仅结算抵减,永不入余额;服务端同事务复算。 */
@@ -113,7 +115,11 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
 type OrdersRow = { orders: Order[] };
 function parseOrdersRow(raw: unknown): OrdersRow {
   const row = raw as { orders?: unknown } | null;
-  return { orders: row && Array.isArray(row.orders) ? (row.orders as Order[]) : [] };
+  const parsed = row && Array.isArray(row.orders) ? (row.orders as Order[]) : [];
+  return { orders: parsed.map((order) => ({
+    ...order,
+    subtotal: Number.isFinite(order.subtotal) ? order.subtotal : order.unitPrice * order.quantity,
+  })) };
 }
 
 // app store optional device-CRUD surface — these actions land on useApp when the
@@ -192,6 +198,7 @@ export const useOrders = defineStore("orders", () => {
       productName: row.productName,
       quantity: row.quantity,
       ...(row.itemCount != null && { itemCount: row.itemCount }),
+      subtotal: row.subtotalUsdt,
       unitPrice: row.unitPriceUsdt,
       discount: row.tradeinNo ? 0 : row.discountUsdt,
       ...(row.tradeinNo && { tradeInCredit: row.discountUsdt, tradeInDeviceId: String(row.sourceDeviceId) }),
@@ -281,6 +288,7 @@ export const useOrders = defineStore("orders", () => {
       productId,
       productName,
       quantity: 1,
+      subtotal: unitPrice,
       unitPrice,
       discount,
       ...(tradeInCredit > 0 && { tradeInCredit, tradeInDeviceId }),

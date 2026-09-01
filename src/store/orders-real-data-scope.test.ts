@@ -23,7 +23,7 @@ function deferred<T>() {
 function list(label: string): CanonicalOrderList {
   const order: CanonicalOrder = {
     orderNo: `ORD-${label}`, productId: 1, productNo: "stellarbox-pro", productName: label,
-    quantity: 1, unitPriceUsdt: 100, discountUsdt: 0, amountUsdt: 100,
+    quantity: 1, subtotalUsdt: 100, unitPriceUsdt: 100, discountUsdt: 0, amountUsdt: 100,
     paymentMethod: "USDT", paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT",
     activationStatus: "WAITING_PAYMENT", canonicalStatus: "placed", orderType: "SINGLE",
     placedAt: 1, paidAt: null, activatedAt: null, dataCenter: null, tradeinNo: null,

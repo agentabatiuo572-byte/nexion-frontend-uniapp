@@ -24,7 +24,7 @@ export type CommissionKind =
   | "leadership"
   | "genesis";
 
-export type CommissionStatus = "cooling" | "unlocked" | "withdrawn" | "simulated";
+export type CommissionStatus = "cooling" | "unlocked" | "withdrawn" | "frozen" | "reversed" | "rejected" | "simulated";
 
 export interface CommissionEvent {
   id: string;
