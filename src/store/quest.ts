@@ -197,7 +197,11 @@ export const useQuest = defineStore("quest", () => {
     const requestSequence = ++claimSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
     try {
-      const result = await questApi.claim(id, `h3-quest-claim:${id}:${currentQuest.instanceKey}`);
+      const result = await questApi.claim(
+        id,
+        `h3-quest-claim:${id}:${currentQuest.instanceKey}`,
+        currentQuest.instanceKey,
+      );
       if (!isCurrentRequest()) return false;
       if (result.status !== "CLAIMED" || result.instanceKey !== currentQuest.instanceKey) return false;
       return refreshRemote();
