@@ -91,7 +91,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
   "wallet-withdraw.vue": "7e7767300871771fdbd248bcbbb36b965c4165288c2b1c33dc447329a0514cf2",
-  "wallet.vue": "ef089d14a5ffe0cec0dc7663b78b867b62f822fc3acc50e9d57a075dccc657cf",
+  // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
+  "wallet.vue": "9231b2983d0e21f6e6cbd38a8cc1c7fa8037f693b339c689dc05b14cff2f0fe4",
 };
 
 function block(text: string, tag: "style" | "template"): string {

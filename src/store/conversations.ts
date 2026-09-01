@@ -125,24 +125,24 @@ export const useConversations = defineStore("conversations", () => {
 
   async function refresh(): Promise<void> {
     const epoch = accountEpoch;
+    const requestGeneration = ++listRequestGeneration;
     loading.value = true;
     error.value = null;
     try {
       await preparePendingRun();
       const scope = snapshotScope();
-      if (scope.epoch !== epoch) return;
-      const requestGeneration = ++listRequestGeneration;
+      if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration) return;
       await reconcilePending();
       if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration) return;
       const items = (await supportApi.conversations()).items;
       if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration) mergeConversations(items);
     } catch (cause) {
-      if (epoch === accountEpoch) {
+      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) {
         error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
       }
       throw cause;
     } finally {
-      if (epoch === accountEpoch) loading.value = false;
+      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
     }
   }
 

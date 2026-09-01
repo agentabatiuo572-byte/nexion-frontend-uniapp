@@ -11,6 +11,7 @@ export interface CanonicalCommissionConfig {
   runId: string | null;
   unilevelUsdt: Record<number, number>;
   unilevelNex: Record<number, number>;
+  unilevelPaused: Record<number, boolean>;
   partnerThresholds: {
     standard: number;
     verified: number;
@@ -146,6 +147,14 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
     unilevelNex[layer] = number(row.nexReward, 0);
   }
   if (Object.keys(unilevelUsdt).length !== 7) return invalid();
+  const pausedSource = record(source.unilevelPaused);
+  const unilevelPaused: Record<number, boolean> = {};
+  for (let layer = 1; layer <= 7; layer += 1) {
+    const value = pausedSource[`L${layer}`];
+    if (typeof value !== "boolean") return invalid();
+    unilevelPaused[layer] = value;
+  }
+  if (Object.keys(pausedSource).length !== 7) return invalid();
   if (Math.abs(unilevelUsdt[1] - 0.1) > 0.0000001) return invalid();
   const totalPct = Object.values(unilevelUsdt).reduce((sum, rate) => sum + rate, 0) * 100;
   if (totalPct > 25.000001) return invalid();
@@ -159,6 +168,7 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
     runId: null,
     unilevelUsdt,
     unilevelNex,
+    unilevelPaused,
     partnerThresholds: parsePartnerThresholds(source.partnerTiersJson),
     influenceClampMin,
     influenceClampMax,

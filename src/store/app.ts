@@ -396,6 +396,8 @@ export const useApp = defineStore("app", () => {
   let homeTruthRefreshInFlight: { key: string; request: Promise<boolean> } | null = null;
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
+  const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
+  const remoteWalletReceiptHasSnapshot = ref(false);
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
   let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments } | null = null;
@@ -876,6 +878,8 @@ export const useApp = defineStore("app", () => {
           usdtBalance: fleet.walletUsdt,
           earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         };
+        remoteFleetHasSnapshot.value = true;
+        remoteWalletReceiptHasSnapshot.value = false;
         remoteFleetStatus.value = "ready";
         return true;
       } catch (cause) {
@@ -884,16 +888,6 @@ export const useApp = defineStore("app", () => {
           && remoteFleetRefreshCoordinator.isCurrent(lease)
           && refreshSequence != null
           && refreshSequence === remoteFleetRefreshSequence) {
-          devices.value = [];
-          syncDeviceRuntime([], true);
-          user.value = {
-            ...user.value,
-            joinedAt: 0,
-            nexBalance: 0,
-            pendingEarnings: 0,
-            usdtBalance: 0,
-            earningBuckets: createEarningBuckets(0, 0),
-          };
           remoteFleetStatus.value = "error";
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
         }
@@ -916,6 +910,8 @@ export const useApp = defineStore("app", () => {
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
+      remoteFleetHasSnapshot.value = false;
+      remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
       remoteAssignmentError.value = "";
       lastConfirmedAssignments = null;
@@ -1983,6 +1979,7 @@ export const useApp = defineStore("app", () => {
       usdtBalance: nextBalance,
       earningBuckets: { ...current.earningBuckets, withdrawableUsdt: nextBalance },
     };
+    remoteWalletReceiptHasSnapshot.value = true;
     return true;
   }
 
@@ -2298,7 +2295,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError, remoteAssignmentStatus, remoteAssignmentError,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,

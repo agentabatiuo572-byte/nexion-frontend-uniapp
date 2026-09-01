@@ -722,7 +722,7 @@ async function finishReset() {
     error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
       ? t.value.login.errorInvalidCode
       : message === "USER_NEW_PASSWORD_MUST_DIFFER"
-        ? t.value.login.errorWeakPassword
+        ? t.value.login.errorPasswordUnchanged
         : t.value.authOtp.errorServiceUnavailable;
     return;
   }

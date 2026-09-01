@@ -18,6 +18,7 @@ function config(account: string, directRate = 0.1): CanonicalCommissionConfig {
     source: `server-${account}`, serverCanonical: true, sourceEnvironment: "SANDBOX", runId: "commission-run-20260817",
     unilevelUsdt: { 1: directRate, 2: 0.05, 3: 0.03, 4: 0.02, 5: 0.01, 6: 0.005, 7: 0.005 },
     unilevelNex: { 1: 50, 2: 20, 3: 10, 4: 5, 5: 2.5, 6: 1, 7: 1 },
+    unilevelPaused: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false },
     partnerThresholds: { standard: 0, verified: 5000, premium: 50000, diamond: 500000 },
     influenceClampMin: 1, influenceClampMax: 5, coolingDays: 30, promoMultiplier: 1,
   };

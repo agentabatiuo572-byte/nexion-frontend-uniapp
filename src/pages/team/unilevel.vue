@@ -26,6 +26,10 @@
         <view v-if="remoteApiEnabled && commission.configStatus !== 'ready' && remoteState !== 'error' && commission.configStatus !== 'error'" class="text-center" style="padding: 24px 20px">
           <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
         </view>
+        <view v-if="remoteApiEnabled && commission.configStatus === 'ready' && pausedLayers.length" :style="pausedLayersStyle">
+          <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-warning)">{{ t.unilevel.pausedLayersTitle }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ pausedLayersText }}</text>
+        </view>
         <!-- Hero — de-carded: royalty total sits directly on the page floor
              (bordered card + page-floor radial glow deleted outright, owner
              call 2026-07-08). Rules-intro pill sits on the section-title row
@@ -353,6 +357,12 @@ const remoteTotalNEX = computed(() => remoteDirect.value.amountNEX + remoteExten
 const canonicalPolicyText = computed(() => commission.config
   ? `${commission.config.coolingDays}d cooling · ×${commission.config.promoMultiplier} promo`
   : "");
+const pausedLayers = computed(() => commission.config
+  ? ([1, 2, 3, 4, 5, 6, 7] as const).filter((layer) => commission.config?.unilevelPaused[layer])
+  : []);
+const pausedLayersText = computed(() => fmt(t.value.unilevel.pausedLayersDesc, {
+  layers: pausedLayers.value.map((layer) => `L${layer}`).join(", "),
+}));
 const filteredMembers = computed<PlottedMember[]>(() => {
   if (filter.value === "all") {
     return [
@@ -424,6 +434,7 @@ const howEntryStyle: CSSProperties = {
 // floor (page-floor auras are deleted outright per owner call, not re-tuned).
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 const errorStateStyle: CSSProperties = { padding: "14px", borderRadius: "14px", background: "var(--v5-warning-soft)", color: "var(--v5-ink)" };
+const pausedLayersStyle: CSSProperties = { padding: "12px 14px", borderRadius: "14px", background: "var(--v5-warning-soft)" };
 const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "grid", placeItems: "center", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)" };
 const remoteBreakdownStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-glass-bg)", backdropFilter: "blur(18px) saturate(180%)" };
 const remoteAmountStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };

@@ -20,6 +20,7 @@ function payload(overrides: Record<string, unknown> = {}) {
       { level: "L6", usdtPct: 0.5, nexReward: 1 },
       { level: "L7", usdtPct: 0.5, nexReward: 1 },
     ],
+    unilevelPaused: { L1: false, L2: true, L3: false, L4: false, L5: false, L6: false, L7: false },
     partnerTiersJson: JSON.stringify({ standard: 0, verified: 5000, premium: 50000, diamond: 500000 }),
     influenceClampMin: 1,
     influenceClampMax: 5,
@@ -62,6 +63,7 @@ describe("commission config provenance and protocol", () => {
     await expect(api.rates()).resolves.toMatchObject({
       sourceEnvironment: "PRODUCTION", runId: null, coolingDays: 30, promoMultiplier: 1,
       partnerThresholds: { verified: 5000, premium: 50000 }, unilevelUsdt: { 1: 0.1, 7: 0.005 },
+      unilevelPaused: { 1: false, 2: true, 7: false },
     });
   });
 

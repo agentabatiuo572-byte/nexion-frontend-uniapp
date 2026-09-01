@@ -26,4 +26,13 @@ describe("unilevel canonical commission consumer contract", () => {
     expect(source).not.toContain("t.unilevel.serverRewardHold");
     expect(source).toContain("t.network.projectionErrorDesc");
   });
+
+  it("shows every server-paused settlement layer and explains that accrual is suspended", () => {
+    expect(source).toContain("commission.config?.unilevelPaused");
+    expect(source).toContain("pausedLayersText");
+    expect(source).toContain("t.unilevel.pausedLayersTitle");
+    expect(source).toContain("t.value.unilevel.pausedLayersDesc");
+    expect(source).toContain('join(", ")');
+    expect(source).not.toContain('join("、")');
+  });
 });
