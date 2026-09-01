@@ -110,7 +110,7 @@ import { useNow } from "@/composables/use-now";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { useQuest } from "@/store/quest";
 import { remoteApiEnabled } from "@/api/runtime";
-import { dayOneTaskCategory, type DayOneTaskCategory } from "@/lib/day-one-task-category";
+import { dayOneTaskCategory, dayOneTaskRoute, type DayOneTaskCategory } from "@/lib/day-one-task-category";
 import { selectHomeQuestRows } from "./home-quest-source";
 
 interface QuestTask {
@@ -174,7 +174,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
       order: index + 1,
       label: row.name,
       nex: row.rewardNex,
-      href: "/pages/missions/missions",
+      href: dayOneTaskRoute(row.questCode),
       cat: categoryLabel(dayOneTaskCategory(row.questCode)),
       ...palette[index % palette.length],
     }));
