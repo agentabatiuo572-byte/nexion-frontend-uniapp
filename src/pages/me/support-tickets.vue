@@ -61,6 +61,13 @@
             <text class="block" :style="slaTargetValueStyle">{{ fmt(t.tickets.slaTargetValue, { firstResponseMins: newSlaTarget.firstResponseMins, resolutionHours: newSlaTarget.resolutionHours }) }}</text>
             <text class="block" :style="slaStatisticsStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
           </view>
+          <view v-if="ticketSuggestions.length" :style="suggestionsStyle">
+            <text class="block" :style="formLabelStyle">{{ t.tickets.create.suggestionsLabel }}</text>
+            <view v-for="faq in ticketSuggestions" :key="faq.id" :style="suggestionRowStyle">
+              <text class="block" :style="suggestionQuestionStyle">{{ faq.question }}</text>
+              <text class="block" :style="suggestionAnswerStyle">{{ faq.answer }}</text>
+            </view>
+          </view>
         </view>
         <view>
           <text class="block" :style="formLabelStyle">{{ t.tickets.create.subjectLabel }}</text>
@@ -132,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, type CSSProperties } from "vue";
+import { computed, ref, nextTick, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -144,6 +151,7 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
 import { supportApi } from "@/api/runtime";
+import { useLocaleStore } from "@/store/locale";
 import {
   STATUS_COLOR,
   type Ticket,
@@ -151,6 +159,7 @@ import {
   type TicketMessage,
   type TicketStatus,
   type SupportSlaTarget,
+  type SupportFaq,
 } from "@/domain/support";
 
 type Mode = { kind: "list" } | { kind: "create" } | { kind: "detail"; id: string };
@@ -158,6 +167,7 @@ type Tab = "all" | "open" | "resolved" | "closed";
 
 const t = useT();
 const ticketsStore = useTickets();
+const locale = useLocaleStore();
 const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
 const tabs: Tab[] = ["all", "open", "resolved", "closed"];
@@ -170,6 +180,7 @@ const desc = ref("");
 const reply = ref("");
 const filterFeedback = ref("");
 const slaTargets = ref<SupportSlaTarget[]>([]);
+const ticketSuggestions = ref<SupportFaq[]>([]);
 
 onLoad((query) => {
   if (query?.mode === "create") mode.value = { kind: "create" };
@@ -182,7 +193,7 @@ onLoad((query) => {
 
 onShow(async () => {
   try {
-    const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets()]);
+    const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets(), loadTicketSuggestions()]);
     if (tickets.status === "rejected") throw tickets.reason;
     if (mode.value.kind === "detail") await openTicket(mode.value.id);
   } catch {
@@ -193,6 +204,12 @@ onShow(async () => {
 async function loadSlaTargets() {
   slaTargets.value = await supportApi.slaTargets();
 }
+
+async function loadTicketSuggestions() {
+  ticketSuggestions.value = await supportApi.faqs(locale.code, newCat.value, "Ticket Create");
+}
+
+watch(newCat, () => { void loadTicketSuggestions().catch(() => { ticketSuggestions.value = []; }); });
 
 async function reloadTickets() {
   try { await ticketsStore.refresh(); }
@@ -343,6 +360,10 @@ const slaTargetStyle: CSSProperties = { marginTop: "10px", padding: "10px 12px",
 const slaTargetLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const slaTargetValueStyle: CSSProperties = { marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const slaStatisticsStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const suggestionsStyle: CSSProperties = { marginTop: "12px", borderTop: "1px solid var(--v5-border)", paddingTop: "12px" };
+const suggestionRowStyle: CSSProperties = { padding: "10px 0", borderBottom: "1px solid var(--v5-border)" };
+const suggestionQuestionStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const suggestionAnswerStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.625, color: "var(--v5-ink-3)" };
 // Segmented control — filled container, no border (single visual difference).
 // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
 const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)" };

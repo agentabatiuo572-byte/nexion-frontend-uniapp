@@ -33,6 +33,7 @@ function canonical(account: string): CanonicalOrder {
     productNo: "stellarrack-p1",
     productName: `Product ${account}`,
     quantity: 1,
+    subtotalUsdt: 100,
     unitPriceUsdt: 100,
     discountUsdt: 0,
     amountUsdt: 100,

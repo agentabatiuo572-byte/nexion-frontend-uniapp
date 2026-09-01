@@ -66,7 +66,7 @@ function leaderboard(value: unknown, mode: ApiEnvironment): TeamLeaderboardSnaps
 }
 
 const KINDS=new Set(["unilevel","binary","peer","cultivation","leadership","genesis"]);
-const STATUSES=new Set(["cooling","unlocked","withdrawn"]);
+const STATUSES=new Set(["cooling","unlocked","withdrawn","frozen","reversed","rejected"]);
 function settlement(v: Record<string, unknown>): { settlementState?: "CANONICAL"; withdrawable?: boolean } {
   if (v.settlementState !== undefined && v.settlementState !== "CANONICAL") return invalid();
   if (v.withdrawable !== undefined && typeof v.withdrawable !== "boolean") return invalid();

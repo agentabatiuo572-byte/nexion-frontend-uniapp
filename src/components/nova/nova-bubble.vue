@@ -55,16 +55,20 @@ const notifications = useNotifications();
 const genesisCfg = useGenesisConfig();
 const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
 
-// Bubble badge reflects ALL unread — Nova pushes + human-category conversations
-// (the advisor's proactive seed shows immediately as a conversion hook). Tapping
-// opens the unified conversation center; unread clears per-thread on open there.
-const totalUnread = computed(() =>
-  remoteApiEnabled ? nova.unread : nova.unread + conversations.totalUnread,
+// Nova is held in its own store, while advisor/support conversations come
+// from the server-backed conversation store. Sum those three categories once
+// so a waiting human reply cannot be hidden and an AI row cannot be counted
+// twice if it also appears in the unified center.
+const humanUnread = computed(() =>
+  [...conversations.byType("advisor"), ...conversations.byType("support")]
+    .reduce((sum, row) => sum + row.unread, 0),
 );
+const totalUnread = computed(() => nova.unread + humanUnread.value);
 const visible = computed(() => remoteApiEnabled || totalUnread.value > 0);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
 
+// 5173 and 5174 both use the conversation center as the floating entry.
 function open() {
   navTo("/pages/support/messages");
 }
@@ -162,6 +166,7 @@ const intervals: ReturnType<typeof setInterval>[] = [];
 onMounted(() => {
   if (remoteApiEnabled) {
     void notifications.refreshRemote();
+    void conversations.refresh().catch(() => undefined);
     return;
   }
   timers.push(setTimeout(() => {
