@@ -102,6 +102,7 @@ const SERVED_PLATFORM = {
 };
 
 const SERVED_REFERRAL = {
+  enabled: true,
   welcomeGift: { lockMode: "risk_bucket", usdtAmount: 3, nexAmount: 30 },
   inviterReward: { nexAmount: 12 },
   rhythmMonth: 3,

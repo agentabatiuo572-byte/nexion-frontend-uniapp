@@ -101,6 +101,7 @@ export const useQuest = defineStore("quest", () => {
   let accountEpoch = 0;
   let refreshSequence = 0;
   let claimSequence = 0;
+  let eligibilityTimer: ReturnType<typeof setTimeout> | null = null;
   let hasRemoteSnapshot = false;
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
@@ -109,9 +110,24 @@ export const useQuest = defineStore("quest", () => {
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   function clearRemoteFacts() {
+    if (eligibilityTimer) clearTimeout(eligibilityTimer);
+    eligibilityTimer = null;
     for (const key of Object.keys(completedMap)) delete completedMap[key];
     for (const key of Object.keys(rewardMap)) delete rewardMap[key];
     remoteQuests.value = [];
+  }
+
+  function scheduleEligibilityRefresh(rows: CanonicalQuest[]) {
+    if (eligibilityTimer) clearTimeout(eligibilityTimer);
+    eligibilityTimer = null;
+    const nextBoundary = rows
+      .filter((row) => row.eligible)
+      .map((row) => Date.parse(row.eligibleUntil))
+      .filter(Number.isFinite)
+      .reduce((earliest, value) => Math.min(earliest, value), Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(nextBoundary)) return;
+    const delay = Math.min(Math.max(nextBoundary - Date.now() + 250, 250), 2_147_000_000);
+    eligibilityTimer = setTimeout(() => void refreshRemote(), delay);
   }
 
   function discardRemoteSnapshot() {
@@ -147,6 +163,7 @@ export const useQuest = defineStore("quest", () => {
       Object.assign(completedMap, nextCompleted);
       hasRemoteSnapshot = true;
       remoteStatus.value = "ready";
+      scheduleEligibilityRefresh(nextQuests);
       return true;
     } catch {
       if (isCurrentRequest()) {
@@ -173,14 +190,16 @@ export const useQuest = defineStore("quest", () => {
 
   async function claimRemote(id: string): Promise<boolean> {
     if (!remoteApiEnabled) return false;
-    if (!remoteQuests.value.some((quest) => quest.questCode === id)) return false;
+    const currentQuest = remoteQuests.value.find((quest) => quest.questCode === id);
+    if (!currentQuest?.eligible || Date.parse(currentQuest.eligibleUntil) <= Date.now()
+        || !["COMPLETED", "CLAIMABLE"].includes(currentQuest.status)) return false;
     const epoch = accountEpoch;
     const requestSequence = ++claimSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
     try {
-      const result = await questApi.claim(id, `h3-quest-claim:${id}`);
+      const result = await questApi.claim(id, `h3-quest-claim:${id}:${currentQuest.instanceKey}`);
       if (!isCurrentRequest()) return false;
-      if (result.status !== "CLAIMED") return false;
+      if (result.status !== "CLAIMED" || result.instanceKey !== currentQuest.instanceKey) return false;
       return refreshRemote();
     } catch {
       // A failed route-triggered claim is not evidence that the last confirmed

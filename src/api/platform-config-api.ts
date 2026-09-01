@@ -394,6 +394,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
     },
     // H8 is fetched from its own bounded context and merged by createPlatformConfigApi.
     rewards: {
+      enabled: false,
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
       inviterReward: { nexAmount: 0 },
     },
@@ -417,6 +418,9 @@ export function parseReferralRewardConfig(value: unknown): ReferralRewardConfigS
     const root = record(value);
     const welcomeGift = record(root.welcomeGift);
     const inviterReward = record(root.inviterReward);
+    if (typeof root.enabled !== "boolean") {
+      return invalid("H8_REFERRAL_REWARD_CONFIG_RESPONSE_INVALID");
+    }
     const lockMode = string(welcomeGift.lockMode);
     if (lockMode !== "risk_bucket" && lockMode !== "direct") {
       return invalid("H8_REFERRAL_REWARD_CONFIG_RESPONSE_INVALID");
@@ -433,15 +437,22 @@ export function parseReferralRewardConfig(value: unknown): ReferralRewardConfigS
     if (!sources.includes("nx_user.sponsor_user_id")) {
       return invalid("H8_REFERRAL_REWARD_CONFIG_RESPONSE_INVALID");
     }
+    const welcomeUsdt = rewardAmount(welcomeGift.usdtAmount);
+    const welcomeNex = rewardAmount(welcomeGift.nexAmount);
+    const inviterNex = rewardAmount(inviterReward.nexAmount);
+    if (!root.enabled && (welcomeUsdt !== 0 || welcomeNex !== 0 || inviterNex !== 0)) {
+      return invalid("H8_REFERRAL_REWARD_CONFIG_RESPONSE_INVALID");
+    }
     return {
       rewards: {
+        enabled: root.enabled,
         welcomeGift: {
           lockMode,
-          usdtAmount: rewardAmount(welcomeGift.usdtAmount),
-          nexAmount: rewardAmount(welcomeGift.nexAmount),
+          usdtAmount: welcomeUsdt,
+          nexAmount: welcomeNex,
         },
         inviterReward: {
-          nexAmount: rewardAmount(inviterReward.nexAmount),
+          nexAmount: inviterNex,
         },
       },
       rhythmMonth,

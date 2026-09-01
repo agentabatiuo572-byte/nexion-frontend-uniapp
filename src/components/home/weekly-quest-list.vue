@@ -10,12 +10,15 @@
     <!-- Header -->
     <view class="px-4 py-3 flex items-center justify-between" :style="headerStyle">
       <text :style="tier2LabelStyle">{{ w.tier2Label }}</text>
-      <text class="tabular-nums" :style="countStyle">{{ completedCount }} / {{ tier2Quests.length }}</text>
+      <view style="text-align: right">
+        <text class="block tabular-nums" :style="countStyle">{{ completedCount }} / {{ tier2Quests.length }}</text>
+        <text v-if="tier2Quests[0]" class="block tabular-nums" :style="periodStyle">{{ periodText }}</text>
+      </view>
     </view>
 
     <!-- Quest rows -->
     <view>
-      <view v-for="(q, i) in tier2Quests" :key="q.questCode" :style="{ borderBottom: i === tier2Quests.length - 1 ? 'none' : '1px solid var(--v5-border)' }">
+      <view v-for="(q, i) in tier2Quests" :key="`${q.questCode}:${q.instanceKey}`" :style="{ borderBottom: i === tier2Quests.length - 1 ? 'none' : '1px solid var(--v5-border)' }">
         <!-- claimed: struck-through done -->
         <view v-if="isClaimed(q)" class="flex items-center px-4 py-3" :style="claimedRowStyle">
           <view class="grid place-items-center shrink-0" :style="checkBoxStyle">
@@ -41,7 +44,7 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="pendingRowStyle" @click="onRowCta(q)">
+        <view v-else class="flex items-center px-4 py-3" :class="isExpired(q) ? 'opacity-50' : 'active:opacity-80'" :role="isExpired(q) ? undefined : 'button'" :tabindex="isExpired(q) ? -1 : 0" :aria-disabled="isExpired(q)" :style="pendingRowStyle" @click="onRowCta(q)">
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
@@ -70,11 +73,13 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { useNow } from "@/composables/use-now";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
 const mounted = ref(false);
+const nowTick = useNow();
 
 onMounted(async () => {
   await wq.refresh();
@@ -85,12 +90,23 @@ const tier2Quests = computed<CanonicalQuest[]>(() => mounted.value ? wq.tier2Que
 
 const mult = computed(() => wq.multiplier);
 const completedCount = computed(() => tier2Quests.value.filter((q) => q.status === "CLAIMED").length);
+const periodText = computed(() => {
+  const remainingMs = Date.parse(tier2Quests.value[0]?.eligibleUntil ?? "") - nowTick.value * 1000;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return fmt(w.value.periodEndsIn, { time: "00:00:00" });
+  const totalMinutes = Math.floor(remainingMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return fmt(w.value.periodEndsIn, { time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}` });
+});
 
 function isClaimed(q: CanonicalQuest): boolean {
   return q.status === "CLAIMED";
 }
 function isCompleted(q: CanonicalQuest): boolean {
-  return ["COMPLETED", "CLAIMABLE"].includes(q.status);
+  return !isExpired(q) && ["COMPLETED", "CLAIMABLE"].includes(q.status);
+}
+function isExpired(q: CanonicalQuest): boolean {
+  return Date.parse(q.eligibleUntil) <= nowTick.value * 1000;
 }
 function rewardOf(q: CanonicalQuest): number {
   return Math.round(q.rewardNex * mult.value);
@@ -112,6 +128,7 @@ function claimTextFor(q: CanonicalQuest): string {
 }
 
 function onRowCta(q: CanonicalQuest) {
+  if (isExpired(q)) return;
   navTo(q.actionRoute);
 }
 
@@ -186,6 +203,12 @@ const pendingLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   color: "var(--v5-ink)",
+};
+const periodStyle: CSSProperties = {
+  marginTop: "2px",
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "11px",
+  color: "var(--v5-ink-4)",
 };
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",

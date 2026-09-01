@@ -5,7 +5,7 @@ export type PublicSponsorPreview = {
   code: string;
   sourceEnvironment: "PRODUCTION";
   sponsor: { displayName: string; vRank: string };
-  gift: { status: "PENDING_REVIEW" | "POSTED"; usdtAmount: number; nexAmount: number };
+  gift: { status: "DISABLED" | "PENDING_REVIEW" | "POSTED"; usdtAmount: number; nexAmount: number };
 };
 
 function invalid(): never {
@@ -44,7 +44,8 @@ export function parsePublicSponsorPreview(value: unknown): PublicSponsorPreview 
       || !code || !REMOTE_REFERRAL_CODE_RE.test(code)
       || sourceEnvironment !== "PRODUCTION"
       || !displayName || !vRank
-      || (status !== "PENDING_REVIEW" && status !== "POSTED")
+      || (status !== "DISABLED" && status !== "PENDING_REVIEW" && status !== "POSTED")
+      || (status === "DISABLED" && (usdtAmount !== 0 || nexAmount !== 0))
       || usdtAmount === null || nexAmount === null) return invalid();
   return { code, sourceEnvironment, sponsor: { displayName, vRank },
     gift: { status, usdtAmount, nexAmount } };

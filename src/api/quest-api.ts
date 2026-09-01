@@ -4,7 +4,7 @@ import type { ApiEnvironment } from "./runtime-config";
 import { normalizeQuestActionRoute } from "@/lib/quest-presentation";
 
 export type QuestLayer = "DAY_ONE" | "WEEKLY_T1" | "WEEKLY_T2";
-export type QuestStatus = "PENDING" | "COMPLETED" | "CLAIMABLE" | "CLAIMED";
+export type QuestStatus = "PENDING" | "COMPLETED" | "CLAIMABLE" | "CLAIMED" | "EXPIRED";
 export type QuestTaskCategory = "wallet" | "explore" | "recommend" | "identity" | "social";
 
 export interface CanonicalQuest {
@@ -15,6 +15,10 @@ export interface CanonicalQuest {
   status: QuestStatus;
   category: QuestTaskCategory;
   actionRoute: string;
+  instanceKey: string;
+  eligibleFrom: string;
+  eligibleUntil: string;
+  eligible: boolean;
 }
 
 export interface CanonicalPromoBanner {
@@ -43,6 +47,7 @@ export interface QuestClaimResult {
   questId: string;
   rewardNex: number;
   status: "CLAIMED";
+  instanceKey: string;
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string;
@@ -88,12 +93,21 @@ function parseQuest(value: unknown): CanonicalQuest {
   const status = text(row?.status)?.toUpperCase() as QuestStatus;
   const category = text(row?.category)?.toLowerCase() as QuestTaskCategory;
   const rawActionRoute = text(row?.actionRoute);
+  const instanceKey = text(row?.instanceKey);
+  const eligibleFrom = instant(row?.eligibleFrom);
+  const eligibleUntil = instant(row?.eligibleUntil);
+  const eligible = boolean(row?.eligible);
   if (!row || !questCode || !name
       || !["DAY_ONE", "WEEKLY_T1", "WEEKLY_T2"].includes(layer)
       || rewardNex === null
-      || !["PENDING", "COMPLETED", "CLAIMABLE", "CLAIMED"].includes(status)
+      || !["PENDING", "COMPLETED", "CLAIMABLE", "CLAIMED", "EXPIRED"].includes(status)
       || !["wallet", "explore", "recommend", "identity", "social"].includes(category)
-      || !rawActionRoute) {
+      || !rawActionRoute || !instanceKey || !eligibleFrom || !eligibleUntil || eligible === null
+      || Date.parse(eligibleUntil) <= Date.parse(eligibleFrom)
+      || (layer === "DAY_ONE" ? !instanceKey.startsWith("DAY_ONE:") : !instanceKey.startsWith("WEEK:"))
+      || (layer !== "DAY_ONE" && !eligible)
+      || (status === "EXPIRED" && eligible)
+      || (!eligible && !["EXPIRED", "CLAIMED"].includes(status))) {
     return invalid();
   }
   let actionRoute: string;
@@ -102,7 +116,20 @@ function parseQuest(value: unknown): CanonicalQuest {
   } catch {
     return invalid();
   }
-  return { questCode, name, layer, rewardNex, status, category, actionRoute };
+  return { questCode, name, layer, rewardNex, status, category, actionRoute,
+    instanceKey, eligibleFrom, eligibleUntil, eligible };
+}
+
+function boolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  return null;
+}
+
+function instant(value: unknown): string | null {
+  const parsed = text(value);
+  return parsed && Number.isFinite(Date.parse(parsed)) ? parsed : null;
 }
 
 function parsePromo(value: unknown): CanonicalPromoBanner | null {
@@ -164,13 +191,16 @@ export function parseQuestClaim(value: unknown, mode: ApiEnvironment = "prod"): 
   const row = record(value);
   const questId = text(row?.questId);
   const rewardNex = number(row?.rewardNex);
-  if (!row || !validAuthority(row, mode) || !questId || rewardNex === null || row.status !== "CLAIMED") {
+  const instanceKey = text(row?.instanceKey);
+  if (!row || !validAuthority(row, mode) || !questId || rewardNex === null || row.status !== "CLAIMED"
+      || !instanceKey || (!instanceKey.startsWith("DAY_ONE:") && !instanceKey.startsWith("WEEK:"))) {
     return invalid("QUEST_CLAIM_RESPONSE_INVALID");
   }
   return {
     questId,
     rewardNex,
     status: "CLAIMED",
+    instanceKey,
     serverCanonical: true,
     sourceEnvironment: row.sourceEnvironment as "PRODUCTION" | "SANDBOX",
     runId: row.runId as string,

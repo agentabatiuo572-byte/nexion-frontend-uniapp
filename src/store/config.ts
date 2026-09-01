@@ -75,6 +75,7 @@ export const useConfig = defineStore("config", () => {
       networkConfirmFeeUsd: { trc20: 0, bep20: 0, erc20: 0 },
     },
     rewards: {
+      enabled: false,
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
       inviterReward: { nexAmount: 0 },
     },
@@ -165,6 +166,11 @@ export const useConfig = defineStore("config", () => {
     config.value = {
       ...config.value,
       publicStats: { ...unavailableServerConfig.publicStats },
+      rewards: {
+        enabled: false,
+        welcomeGift: { ...unavailableServerConfig.rewards.welcomeGift },
+        inviterReward: { ...unavailableServerConfig.rewards.inviterReward },
+      },
     };
     syncFailed.value = true;
   }

@@ -18,6 +18,10 @@ const weeklyQuest: CanonicalQuest = {
   status: "PENDING",
   category: "explore",
   actionRoute: "/pages/learn/courses",
+  instanceKey: "WEEK:2026-W36",
+  eligibleFrom: "2026-08-31T00:00:00+08:00",
+  eligibleUntil: "2026-09-07T00:00:00+08:00",
+  eligible: true,
 };
 
 const pausedPromo: CanonicalPromoBanner = {

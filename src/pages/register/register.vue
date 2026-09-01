@@ -194,6 +194,7 @@ import { completeSignIn } from "@/auth/complete-sign-in";
 import { restoreActivatedRegistrationSession } from "@/auth/complete-registration";
 import { stageRemoteRegistrationReceipt, clearRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
 import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
+import { visibleReferralGift } from "@/lib/referral-reward-gate";
 
 const t = useT();
 const app = useApp();
@@ -203,12 +204,13 @@ const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 // 礼包金额单源派生自 platform config(禁本地常量镜像)。
 const remotePreview = ref<PublicSponsorPreview | null>(null);
+const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
 const giftUsdt = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.usdtAmount ?? 0
-  : cfg.config.rewards.welcomeGift.usdtAmount);
+  : localGift.value.usdtAmount);
 const giftNex = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.nexAmount ?? 0
-  : cfg.config.rewards.welcomeGift.nexAmount);
+  : localGift.value.nexAmount);
 
 type Step = 1 | 2 | 3;
 
@@ -757,12 +759,12 @@ async function finish() {
     }
     if (registration.sponsorCode) {
       if (!sponsorship?.bind(registration.sponsorCode)) throw new Error("sponsor_bind_unavailable");
-      const gift = sponsorship.ensureGiftClaim(createdIdentity, {
-        usdt: registration.giftUsdt,
-        nex: registration.giftNex,
-      });
-      if (!gift) throw new Error("gift_claim_unavailable");
-      {
+      if (cfg.config.rewards.enabled) {
+        const gift = sponsorship.ensureGiftClaim(createdIdentity, {
+          usdt: registration.giftUsdt,
+          nex: registration.giftNex,
+        });
+        if (!gift) throw new Error("gift_claim_unavailable");
         const posted = app.creditRewardBucketOnce(registration.giftRef, registration.giftRoute, gift.usdt, gift.nex);
         if (!posted) throw new Error("gift_credit_unavailable");
         const giftRef = registration.giftRef;

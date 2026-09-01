@@ -157,6 +157,41 @@ describe("PC-managed H3 quest catalogue", () => {
     expect(quest.remoteQuests).toHaveLength(2);
   });
 
+  it("scopes a claim idempotency key and readback to the current mission instance", async () => {
+    const current = {
+      questCode: "visit_store",
+      name: "Visit store",
+      layer: "WEEKLY_T1",
+      rewardNex: 50,
+      status: "CLAIMABLE",
+      category: "explore",
+      actionRoute: "/pages/store/store",
+      instanceKey: "WEEK:2026-W36",
+      eligibleFrom: "2026-08-31T00:00:00+08:00",
+      eligibleUntil: "2026-09-07T00:00:00+08:00",
+      eligible: true,
+    };
+    state.mockResolvedValueOnce({ quests: [current] }).mockResolvedValueOnce({
+      quests: [{ ...current, status: "CLAIMED" }],
+    });
+    claim.mockResolvedValueOnce({
+      questId: current.questCode,
+      status: "CLAIMED",
+      rewardNex: current.rewardNex,
+      instanceKey: current.instanceKey,
+    });
+    const quest = useQuest();
+    await quest.refreshRemote();
+
+    await expect(quest.claimRemote(current.questCode)).resolves.toBe(true);
+
+    expect(claim).toHaveBeenCalledWith(
+      current.questCode,
+      `h3-quest-claim:${current.questCode}:${current.instanceKey}`,
+    );
+    expect(quest.remoteQuests[0]).toMatchObject({ status: "CLAIMED", instanceKey: current.instanceKey });
+  });
+
   it("still discards the previous account catalogue when the account binding changes", async () => {
     state.mockResolvedValueOnce({
       quests: [

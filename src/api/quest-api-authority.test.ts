@@ -9,6 +9,10 @@ const quest = {
   status: "CLAIMABLE",
   category: "identity",
   actionRoute: "/pages/me/profile",
+  instanceKey: "DAY_ONE:20260901T000000",
+  eligibleFrom: "2026-09-01T00:00:00+08:00",
+  eligibleUntil: "2026-09-04T00:00:00+08:00",
+  eligible: true,
 };
 
 describe("quest API authority", () => {
@@ -44,6 +48,7 @@ describe("quest API authority", () => {
         questId: "setup_profile",
         rewardNex: 80,
         status: "CLAIMED",
+        instanceKey: quest.instanceKey,
         serverCanonical: true,
         sourceEnvironment: "PRODUCTION",
         runId: "",
@@ -73,6 +78,9 @@ describe("quest API authority", () => {
     [{ category: "unknown" }, "unknown category"],
     [{ actionRoute: undefined }, "missing route"],
     [{ actionRoute: "https://example.com/phish" }, "external route"],
+    [{ instanceKey: "WEEK:2026-W36" }, "wrong instance kind"],
+    [{ eligibleUntil: "2026-08-31T23:59:59+08:00" }, "reversed eligibility window"],
+    [{ eligible: false, status: "PENDING" }, "ineligible pending state"],
   ])("rejects a quest with %s", async (override, _reason) => {
     const payload = {
       quests: [{ ...quest, ...override }],
@@ -86,5 +94,20 @@ describe("quest API authority", () => {
     };
     await expect(createQuestApi({ request: async () => payload } as never, "prod").state())
       .rejects.toMatchObject({ message: "QUEST_RESPONSE_INVALID" });
+  });
+
+  it("accepts an expired Day-One instance as a visible but ineligible row", async () => {
+    const payload = {
+      quests: [{ ...quest, status: "EXPIRED", eligible: false }],
+      promoBanner: {},
+      questBonusMultiplier: 1,
+      rhythmMonth: 1,
+      serverCanonical: true,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      source: "nx_mission + nx_user_mission",
+    };
+    await expect(createQuestApi({ request: async () => payload } as never, "prod").state())
+      .resolves.toMatchObject({ quests: [{ status: "EXPIRED", eligible: false }] });
   });
 });

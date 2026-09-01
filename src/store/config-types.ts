@@ -111,6 +111,8 @@ export interface WithdrawRulesConfig {
 export type WelcomeGiftLockMode = "risk_bucket" | "direct";
 
 export interface RewardsConfig {
+  // H8 总闸门；关闭时分享功能保留，但所有公开金额必须为 0，服务端拒绝结算。
+  enabled: boolean;
   welcomeGift: {
     lockMode: WelcomeGiftLockMode;
     // 注册礼包金额(运营可调;admin K.rewards.welcomeGift.* 同键,CGM-F-020)。
