@@ -54,7 +54,7 @@
             <view class="min-w-0">
               <text class="block" :style="pairingLabelStyle">{{ t.computeShare.pairingLabel }}</text>
               <text v-if="enrollment.pairingCode" class="block" :style="pairingCodeStyle">{{ enrollment.pairingCode }}</text>
-              <text v-else class="block" :style="pairingCodeStyle">{{ enrollment.status }}</text>
+              <text v-else class="block" :style="pairingCodeStyle">{{ pairingStatusLabel }}</text>
             </view>
             <view v-if="enrollment.pairingCode" :style="copyCodeStyle" @click="copyPairingCode">
               <text>{{ t.computeShare.copyPairingCode }}</text>
@@ -95,6 +95,7 @@ import { computeShareApi, remoteApiEnabled } from "@/api/runtime";
 import type { ComputeShareEnrollment } from "@/api/compute-share-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { createComputeShareEnrollmentJournal } from "./enrollment-recovery";
+import { enrollmentStatusLabel } from "./enrollment-status-view";
 import {
   preserveInMemoryPairingCode,
   runComputeShareEnrollmentFlow,
@@ -160,6 +161,9 @@ const pairingStatusText = computed(() => enrollment.value?.status === "CONNECTED
   : enrollment.value?.status === "EXPIRED"
     ? t.value.computeShare.pairingExpired
     : t.value.computeShare.pairingPending);
+const pairingStatusLabel = computed(() => enrollment.value
+  ? enrollmentStatusLabel(enrollment.value.status, t.value.computeShare)
+  : "");
 const connectButtonText = computed(() => {
   if (slotsFull.value) return t.value.computeShare.slotsFullCta;
   if (connecting.value) return t.value.computeShare.connectingCta;
