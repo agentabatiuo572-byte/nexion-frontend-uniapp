@@ -7,6 +7,8 @@ const quest = {
   layer: "DAY_ONE",
   rewardNex: 80,
   status: "CLAIMABLE",
+  category: "identity",
+  actionRoute: "/pages/me/profile",
 };
 
 describe("quest API authority", () => {
@@ -63,6 +65,26 @@ describe("quest API authority", () => {
     await expect(createQuestApi({ request: async () => sandbox } as never, "prod").state())
       .rejects.toMatchObject({ message: "QUEST_RESPONSE_INVALID" });
     await expect(createQuestApi({ request: async () => sandbox } as never, "dev").state())
+      .rejects.toMatchObject({ message: "QUEST_RESPONSE_INVALID" });
+  });
+
+  it.each([
+    [{ category: undefined }, "missing category"],
+    [{ category: "unknown" }, "unknown category"],
+    [{ actionRoute: undefined }, "missing route"],
+    [{ actionRoute: "https://example.com/phish" }, "external route"],
+  ])("rejects a quest with %s", async (override, _reason) => {
+    const payload = {
+      quests: [{ ...quest, ...override }],
+      promoBanner: {},
+      questBonusMultiplier: 1,
+      rhythmMonth: 1,
+      serverCanonical: true,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      source: "nx_mission + nx_user_mission",
+    };
+    await expect(createQuestApi({ request: async () => payload } as never, "prod").state())
       .rejects.toMatchObject({ message: "QUEST_RESPONSE_INVALID" });
   });
 });
