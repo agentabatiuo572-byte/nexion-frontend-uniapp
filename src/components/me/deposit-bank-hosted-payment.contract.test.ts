@@ -13,4 +13,7 @@ test("hosted bank orders open the provider page and do not expose manual bank in
   expect(source).toContain("findResumablePaymentIntent");
   expect(source).toContain('v-if="intent.paymentMode !== \'hosted\'"');
   expect(source).toContain('v-if="intent.paymentMode !== \'hosted\'" class="nx-bank-cancel-cta');
+  expect(source).toContain("const pageActive = ref(false)");
+  expect(source).toContain('if (pageActive.value && it.paymentMode === "hosted")');
+  expect(source).toContain("pageActive.value = false");
 });
