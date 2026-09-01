@@ -111,8 +111,6 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       return true;
     } catch (cause) {
       if (isCurrentRequest()) {
-        snapshot.value = null;
-        scheduleRollover(null);
         error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_LOAD_FAILED";
       }
       return false;

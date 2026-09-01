@@ -21,14 +21,14 @@
       <!-- Balance hero — de-carded: balance + actions sit on the page floor. -->
       <view :style="heroStyle">
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
-        <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
-        <view class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
+        <text class="block tabular-nums" :style="heroNumStyle">{{ usdtBalanceReadable ? `$${usdt.toFixed(2)}` : "—" }}</text>
+        <view v-if="fundsReadable" class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
           <text style="font-size: 13px; color: var(--v5-ink-3)">{{ nexLabel }} NEX</text>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
 
-        <view class="grid grid-cols-3" style="margin-top: 20px; gap: 8px">
+        <view v-if="fundsReadable" class="grid grid-cols-3" style="margin-top: 20px; gap: 8px">
           <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" @click="goTopup">
             <view class="grid place-items-center" :style="actionIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
@@ -55,15 +55,17 @@
         <text class="block" :style="syncFailTitleStyle">{{ t.wallet.syncFailedTitle }}</text>
         <text class="block" :style="syncFailBodyStyle">{{ t.wallet.syncFailedBody }}</text>
       </view>
-      <view v-if="fundsAuthorityError" :style="syncFailBoxStyle">
-        <!-- i18n-en-ok: 资金权威同步失败的工程话标题,下一行直接吐后端错误串,受众是排障的人 -->
-        <text class="block" :style="syncFailTitleStyle">{{ t.wallet.syncFailedTitle }}</text>
-        <text class="block break-all" :style="syncFailBodyStyle">{{ fundsAuthorityError }}</text>
+      <view v-if="fundsAuthorityUnavailable" :style="syncFailBoxStyle">
+        <text class="block" :style="syncFailTitleStyle">{{ t.wallet.fundsUnavailableTitle }}</text>
+        <text class="block" :style="syncFailBodyStyle">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : app.remoteWalletReceiptHasSnapshot ? t.wallet.fundsReceiptOnlyBody : t.wallet.fundsUnavailableBody }}</text>
+        <view role="button" tabindex="0" :aria-label="t.wallet.retryFunds" :style="retryFundsStyle" @click="retryFundsAuthority">
+          <text>{{ t.wallet.retryFunds }}</text>
+        </view>
       </view>
 
       <!-- Earnings list -->
-      <text class="block" :style="listTitleStyle">{{ t.wallet.earningsSection }}</text>
-      <view :style="listCardStyle">
+      <text v-if="fundsReadable" class="block" :style="listTitleStyle">{{ t.wallet.earningsSection }}</text>
+      <view v-if="fundsReadable" :style="listCardStyle">
         <WalletListRow icon-bg="var(--v5-success-soft)" :first="true" :label="t.wallet.todayLabel">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
           <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
@@ -101,7 +103,7 @@
       </view>
 
       <!-- NEX boost footer callout -->
-      <view :style="nexCalloutStyle">
+      <view v-if="fundsReadable" :style="nexCalloutStyle">
         <text class="block" :style="nexCalloutLabelStyle">{{ t.wallet.nexBoostActive }}</text>
         <view :style="nexCalloutBodyStyle">
           <text>{{ fmt(t.wallet.nexBoostPrefix, { nex: nexLabel }) }}</text>
@@ -147,9 +149,13 @@ onShow(() => {
 });
 
 const configSyncFailed = computed(() => cfg.syncFailed);
-const fundsAuthorityError = computed(() => app.remoteFleetStatus === "error"
-  ? app.remoteFleetError
-  : "");
+const fundsAuthorityUnavailable = computed(() => remoteApiEnabled && app.remoteFleetStatus === "error");
+const fundsReadable = computed(() => !remoteApiEnabled || app.remoteFleetHasSnapshot);
+const usdtBalanceReadable = computed(() => fundsReadable.value || app.remoteWalletReceiptHasSnapshot);
+
+function retryFundsAuthority() {
+  void app.refreshRemoteFleet();
+}
 
 // SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要
 // (reason code → i18n 业务话术,工程码不直出;R5: 原因现算不读缓存)。
@@ -351,5 +357,18 @@ const syncFailBodyStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.45,
+};
+const retryFundsStyle: CSSProperties = {
+  marginTop: "10px",
+  minHeight: "44px",
+  padding: "0 16px",
+  borderRadius: "999px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "var(--v5-surface)",
+  color: "var(--v5-ink-2)",
+  fontSize: "13px",
+  fontWeight: 600,
 };
 </script>

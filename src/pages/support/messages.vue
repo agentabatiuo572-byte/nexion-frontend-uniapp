@@ -50,7 +50,25 @@
             <text class="nx-conv-contact-t">{{ t.conversations.contactSupport }}</text>
           </view>
 
-          <EmptyState v-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="emptyHint" :cta-label="startConversationLabel" emphasis compact @cta="onStartConversation" />
+          <view
+            v-if="selectedType !== 'ai' && convStore.error && rows.length > 0"
+            class="nx-conv-refresh-warning"
+          >
+            <text class="nx-conv-refresh-warning__text">{{ t.conversations.staleSnapshot }}</text>
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations">
+              <text>{{ t.conversations.retry }}</text>
+            </view>
+          </view>
+          <EmptyState
+            v-if="selectedType !== 'ai' && convStore.error && rows.length === 0"
+            kind="recoverable-error"
+            :title="t.conversations.loadError"
+            :desc="t.conversations.loadErrorDesc"
+            :cta-label="t.conversations.retry"
+            compact
+            @cta="retryConversations"
+          />
+          <EmptyState v-else-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="emptyHint" :cta-label="startConversationLabel" emphasis compact @cta="onStartConversation" />
           <view
             v-for="r in rows"
             :key="r.id"
@@ -109,8 +127,12 @@ const selectedType = ref<ConversationType>("advisor");
 // closes server-side and pushes the status).
 onShow(async () => {
   if (remoteApiEnabled) nova.bindRemoteAccount(app.accountKey);
-  try { await convStore.refresh(); } catch { /* honest empty state is rendered */ }
+  try { await convStore.refresh(); } catch { /* store error drives the retryable state */ }
 });
+
+function retryConversations() {
+  void convStore.refresh().catch(() => undefined);
+}
 
 // Contact-support entry shows only when no live session exists.
 const hasActiveSupport = computed(() =>
@@ -329,6 +351,33 @@ function avaStyle(tint: string): CSSProperties {
   font-size: 13px;
   font-weight: 600;
   color: var(--v5-tech-cyan);
+}
+.nx-conv-refresh-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v5-warning-soft);
+}
+.nx-conv-refresh-warning__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--v5-ink-3);
+}
+.nx-conv-refresh-warning__retry {
+  min-height: 44px;
+  padding: 0 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--v5-surface);
+  color: var(--v5-ink-2);
+  font-size: 12px;
+  font-weight: 600;
 }
 .nx-conv-listempty {
   padding: 40px 20px;

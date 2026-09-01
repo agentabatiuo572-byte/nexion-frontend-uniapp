@@ -207,4 +207,19 @@ describe("weekly quest remote claim recovery", () => {
     expect(store.snapshot?.quests[0]?.name).toBe("Account B quest");
     expect(peekWeeklyQuestCommandKey("user:a", current.questCode, current.instanceKey)).toBeTruthy();
   });
+
+  it("keeps the last confirmed weekly snapshot when a refresh fails", async () => {
+    remote.questApi.state.mockResolvedValueOnce(snapshot());
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+    const confirmed = store.snapshot;
+
+    remote.questApi.state.mockRejectedValueOnce(new Error("weekly service unavailable"));
+    await expect(store.refresh()).resolves.toBe(false);
+
+    expect(store.snapshot).toBe(confirmed);
+    expect(store.snapshot?.quests[0]?.status).toBe("CLAIMABLE");
+    expect(store.error).toBe("weekly service unavailable");
+  });
 });

@@ -125,4 +125,39 @@ describe("App remote fleet refresh wiring", () => {
     await expect(oldRead).resolves.toBe(false);
     expect(app.user.usdtBalance).toBe(420);
   });
+
+  it("keeps the last confirmed wallet and fleet snapshot when a later fleet read fails", async () => {
+    remote.deviceE3Api.fleet
+      .mockResolvedValueOnce(fleet(680))
+      .mockRejectedValueOnce(new Error("fleet unavailable"));
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    await expect(app.refreshRemoteFleet()).resolves.toBe(true);
+    expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.user.usdtBalance).toBe(680);
+
+    await expect(app.refreshRemoteFleet()).resolves.toBe(false);
+    expect(app.remoteFleetStatus).toBe("error");
+    expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.user.usdtBalance).toBe(680);
+  });
+
+  it("retains an authenticated Genesis wallet receipt when the first fleet read fails", async () => {
+    remote.deviceE3Api.fleet.mockRejectedValueOnce(new Error("fleet unavailable"));
+    const app = useApp();
+    app.bindAccount("user:1001");
+    const receiptScope = app.captureRemoteAccountRequest();
+
+    expect(app.adoptDevelopmentGenesisWallet(315.5, receiptScope, "PRODUCTION")).toBe(true);
+    expect(app.remoteFleetHasSnapshot).toBe(false);
+    expect(app.remoteWalletReceiptHasSnapshot).toBe(true);
+    expect(app.user.usdtBalance).toBe(315.5);
+
+    await expect(app.refreshRemoteFleet()).resolves.toBe(false);
+    expect(app.remoteFleetStatus).toBe("error");
+    expect(app.remoteFleetHasSnapshot).toBe(false);
+    expect(app.remoteWalletReceiptHasSnapshot).toBe(true);
+    expect(app.user.usdtBalance).toBe(315.5);
+  });
 });
