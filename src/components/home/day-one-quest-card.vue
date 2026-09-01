@@ -110,6 +110,7 @@ import { useNow } from "@/composables/use-now";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { useQuest } from "@/store/quest";
 import { remoteApiEnabled } from "@/api/runtime";
+import { dayOneTaskCategory, type DayOneTaskCategory } from "@/lib/day-one-task-category";
 import { selectHomeQuestRows } from "./home-quest-source";
 
 interface QuestTask {
@@ -144,6 +145,14 @@ const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
 const mockReward = 500;
 
+const categoryLabel = (category: DayOneTaskCategory): string => ({
+  wallet: t.value.home.dayOneCatWallet,
+  explore: t.value.home.dayOneCatExplore,
+  recommend: t.value.home.dayOneCatRecommend,
+  identity: t.value.home.dayOneCatIdentity,
+  social: t.value.home.dayOneCatSocial,
+})[category];
+
 const fallbackTasks = computed<QuestTask[]>(() => [
   { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
   { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
@@ -166,7 +175,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
       label: row.name,
       nex: row.rewardNex,
       href: "/pages/missions/missions",
-      cat: t.value.home.dayOneCatExplore,
+      cat: categoryLabel(dayOneTaskCategory(row.questCode)),
       ...palette[index % palette.length],
     }));
 });
