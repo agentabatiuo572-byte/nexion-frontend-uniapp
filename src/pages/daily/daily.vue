@@ -201,6 +201,7 @@ import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 import { dailyLuckyHint, dailyMilestoneRewardText } from "./daily-reward-view";
+import { dailyCheckInSuccessCopy } from "./daily-success-copy";
 
 const ONE_DAY_MS = 86400 * 1000;
 
@@ -399,7 +400,8 @@ async function handleCheckIn() {
       toast.error(t.value.authOtp.errorServiceUnavailable);
       return;
     }
-    toast.success(`+${remote.gained} NEX`, `${remote.streak}-day streak`);
+    const successCopy = dailyCheckInSuccessCopy(remote, t.value.daily);
+    toast.success(successCopy.title, successCopy.body);
     return;
   }
   const r = faucet.signIn();
