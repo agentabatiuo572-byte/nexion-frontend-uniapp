@@ -15,4 +15,9 @@ describe("conversation-center refresh failure contract", () => {
     expect(source).toMatch(/v-if="selectedType !== 'ai' && convStore\.error && rows\.length === 0"/);
     expect(source).toMatch(/v-else-if="rows\.length === 0"/);
   });
+
+  it("loads Nova history on first entry so the AI row has a remote preview", () => {
+    expect(source).toContain('import { novaAiApi, remoteApiEnabled } from "@/api/runtime"');
+    expect(source).toContain("nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history())");
+  });
 });

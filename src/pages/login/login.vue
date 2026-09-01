@@ -176,6 +176,12 @@ interface RemoteTwoFactorAttemptContext {
   challengeNo: string;
 }
 
+interface PasswordResetAttemptContext {
+  version: number;
+  phone: string;
+  requestId: string;
+}
+
 const mode = ref<LoginMode>("password");
 const step = ref<Step>(1);
 const country = ref(dialCodeForLocale(useLocaleStore().code));
@@ -415,6 +421,15 @@ function isCurrentRemoteTwoFactorAttempt(context: RemoteTwoFactorAttemptContext)
     && remoteTwoFactorChallenge.value === context.challengeNo;
 }
 
+function isCurrentPasswordResetAttempt(context: PasswordResetAttemptContext): boolean {
+  return mounted
+    && context.version === otpFlowVersion
+    && mode.value === "reset"
+    && step.value === 3
+    && fullPhone.value === context.phone
+    && otpRequestId.value === context.requestId;
+}
+
 // A region-policy refusal arrives as a code on the same result objects as every
 // other sign-in failure. Translate it first; `null` means it wasn't one, and the
 // caller must fall through to its existing mapping — otherwise an unrelated
@@ -640,8 +655,24 @@ async function verifyCode() {
   loading.value = true;
   if (remoteApiEnabled) {
     if (mode.value === "reset") {
-      loading.value = false;
-      step.value = 3;
+      try {
+        await authApi.verifyPasswordResetOtp({
+          countryCode: country.value,
+          phone: phoneClean.value,
+          challengeNo: requestId,
+          code: code.value.join(""),
+        });
+        if (!isCurrentOtpFlow(context)) return;
+        loading.value = false;
+        step.value = 3;
+      } catch (cause) {
+        if (!isCurrentOtpFlow(context)) return;
+        loading.value = false;
+        const message = cause instanceof ApiError ? cause.message : "";
+        error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+          ? t.value.login.errorInvalidCode
+          : t.value.authOtp.errorServiceUnavailable;
+      }
       return;
     }
     try {
@@ -707,6 +738,11 @@ async function finishReset() {
   if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
   const challengeNo = otpRequestId.value;
   if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+  const resetAttempt: PasswordResetAttemptContext = {
+    version: otpFlowVersion,
+    phone: fullPhone.value,
+    requestId: challengeNo,
+  };
   loading.value = true;
   try {
     await authApi.completePasswordReset({
@@ -716,7 +752,9 @@ async function finishReset() {
       code: code.value.join(""),
       newPassword: newPassword.value,
     });
+    if (!isCurrentPasswordResetAttempt(resetAttempt)) return;
   } catch (cause) {
+    if (!isCurrentPasswordResetAttempt(resetAttempt)) return;
     loading.value = false;
     const message = cause instanceof ApiError ? cause.message : "";
     error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"

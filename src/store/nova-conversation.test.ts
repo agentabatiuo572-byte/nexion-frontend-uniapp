@@ -70,4 +70,62 @@ describe("Nova conversation scope", () => {
     expect(nova.messages.map((message) => [message.sender, message.text]))
       .toEqual([["user", "Question"], ["nova", "Answer"]]);
   });
+
+  it("loads remote history once and hydrates the conversation-center preview", async () => {
+    const nova = useNova();
+    const loader = vi.fn().mockResolvedValue({
+      conversationId: ids[1],
+      messages: [
+        { id: "turn:user", sender: "user" as const, text: "Question", ts: 100 },
+        { id: "turn:nova", sender: "nova" as const, text: "Answer", ts: 101 },
+      ],
+    });
+
+    await Promise.all([
+      nova.ensureRemoteHistory("account-a", loader),
+      nova.ensureRemoteHistory("account-a", loader),
+    ]);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(nova.historyLoaded).toBe(true);
+    expect(nova.conversationId).toBe(ids[1]);
+    expect(nova.messages.at(-1)?.text).toBe("Answer");
+  });
+
+  it("ignores a late history response after the account changes", async () => {
+    const nova = useNova();
+    let resolveHistory!: (value: {
+      conversationId: string;
+      messages: Array<{ id: string; sender: "user" | "nova"; text: string; ts: number }>;
+    }) => void;
+    const pending = new Promise<Parameters<typeof resolveHistory>[0]>((resolve) => {
+      resolveHistory = resolve;
+    });
+
+    const loading = nova.ensureRemoteHistory("account-a", () => pending);
+    nova.bindRemoteAccount("account-b");
+    resolveHistory({
+      conversationId: ids[2],
+      messages: [{ id: "late", sender: "nova", text: "Wrong account", ts: 100 }],
+    });
+    await loading;
+
+    expect(nova.messages).toEqual([]);
+    expect(nova.conversationId).toBe(ids[1]);
+    expect(nova.historyLoaded).toBe(false);
+  });
+
+  it("allows a failed history load to retry", async () => {
+    const nova = useNova();
+    const loader = vi.fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ conversationId: "", messages: [] });
+
+    await expect(nova.ensureRemoteHistory("account-a", loader)).rejects.toThrow("offline");
+    expect(nova.historyLoaded).toBe(false);
+    await nova.ensureRemoteHistory("account-a", loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+    expect(nova.historyLoaded).toBe(true);
+  });
 });

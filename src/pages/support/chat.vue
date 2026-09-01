@@ -446,16 +446,10 @@ async function refreshNovaAvailability() {
 
 async function refreshNovaHistory() {
   if (!remoteApiEnabled || !isAi.value || nova.historyLoaded || nova.pendingRemote.length) return;
-  const accountKey = app.accountKey;
-  const conversationId = nova.conversationId;
   const epoch = ++novaHistoryEpoch;
   novaHistoryLoading.value = true;
   try {
-    const history = await novaAiApi.history();
-    if (epoch !== novaHistoryEpoch || accountKey !== app.accountKey
-        || conversationId !== nova.conversationId || nova.pendingRemote.length) return;
-    if (history.conversationId) nova.hydrateRemote(accountKey, history.conversationId, history.messages);
-    nova.historyLoaded = true;
+    await nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history());
   } finally {
     if (epoch === novaHistoryEpoch) {
       novaHistoryLoading.value = false;
@@ -603,6 +597,22 @@ const AI_REPLY_MS = 1100;
 
 async function onSend(text: string, restore?: () => void) {
   if (isAi.value && remoteApiEnabled) {
+    const accountKey = app.accountKey;
+    const conversationBoundary = nova.conversationBoundary;
+    if (!nova.historyLoaded) {
+      try {
+        await refreshNovaHistory();
+      } catch {
+        restore?.();
+        toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
+        return;
+      }
+      if (!novaPageVisible || accountKey !== app.accountKey
+        || conversationBoundary !== nova.conversationBoundary || !nova.historyLoaded) {
+        restore?.();
+        return;
+      }
+    }
     if (!text.trim() || text.length > 2000) {
       restore?.(); toast.warn(t.value.nova.queue.invalid); return;
     }

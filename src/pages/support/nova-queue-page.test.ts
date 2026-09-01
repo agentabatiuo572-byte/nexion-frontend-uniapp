@@ -66,6 +66,54 @@ beforeEach(() => { setActivePinia(createPinia()); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("real Nova page queue worker", () => {
+  it("waits for canonical history before sending the first question", async () => {
+    const { page, hooks, api, nova } = mount();
+    const history = deferred<{ conversationId: string; messages: Array<{ id: string; sender: "nova"; text: string; ts: number }> }>();
+    api.history.mockReturnValue(history.promise as never);
+    api.chat.mockResolvedValue({ reply: "new answer" });
+
+    const showing = hooks.onShow();
+    const sending = page.onSend("new question");
+    expect(api.chat).not.toHaveBeenCalled();
+    expect(nova.messages).toEqual([]);
+
+    history.resolve({
+      conversationId: "8c12eaf3-744d-405e-b2fb-64b3d81267be",
+      messages: [{ id: "old:nova", sender: "nova", text: "old answer", ts: 100 }],
+    });
+    await showing;
+    await sending;
+
+    expect(api.chat).toHaveBeenCalledTimes(1);
+    expect(api.chat.mock.calls[0][0].conversationId)
+      .toBe("8c12eaf3-744d-405e-b2fb-64b3d81267be");
+    expect(nova.messages.map(message => message.text)).toEqual(["old answer", "new question"]);
+    page.cleanup();
+  });
+
+  it("does not move a draft into a new conversation while history is loading", async () => {
+    const { page, hooks, api, nova } = mount();
+    const history = deferred<{ conversationId: string; messages: Array<{ id: string; sender: "nova"; text: string; ts: number }> }>();
+    api.history.mockReturnValue(history.promise as never);
+    api.chat.mockResolvedValue({ reply: "new answer" });
+    const restore = vi.fn();
+
+    const showing = hooks.onShow();
+    const sending = page.onSend("old-conversation draft", restore);
+    await page.onStartNewConversation();
+    history.resolve({
+      conversationId: "8c12eaf3-744d-405e-b2fb-64b3d81267be",
+      messages: [{ id: "old:nova", sender: "nova", text: "old answer", ts: 100 }],
+    });
+    await showing;
+    await sending;
+
+    expect(restore).toHaveBeenCalledOnce();
+    expect(api.chat).not.toHaveBeenCalled();
+    expect(nova.messages).toEqual([]);
+    page.cleanup();
+  });
+
   it("limits actual dispatch while keeping input, and does not inherit another account's quota", async () => {
     const { page, hooks, api, nova, app } = mount();
     await hooks.onShow(); api.chat.mockResolvedValue({ reply: "answer" });

@@ -226,6 +226,10 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
     async sendPasswordResetOtp(request) {
       return { ...issueChallenge(), deliveryHint: maskedHint(request.phone) };
     },
+    async verifyPasswordResetOtp(request) {
+      assertSixDigit(request.code);
+      return { status: "PASSWORD_RESET_OTP_VERIFIED" };
+    },
     async completePasswordReset(request) {
       assertSixDigit(request.code);
       const reg = loadRegistry();
