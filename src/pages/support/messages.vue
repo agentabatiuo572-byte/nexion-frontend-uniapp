@@ -112,7 +112,7 @@ import { navTo } from "@/lib/route";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import type { ConversationType, ConvMessage } from "@/domain/support";
-import { remoteApiEnabled } from "@/api/runtime";
+import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 
 const t = useT();
@@ -126,8 +126,11 @@ const selectedType = ref<ConversationType>("advisor");
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
 onShow(async () => {
-  if (remoteApiEnabled) nova.bindRemoteAccount(app.accountKey);
-  try { await convStore.refresh(); } catch { /* store error drives the retryable state */ }
+  const tasks: Promise<unknown>[] = [convStore.refresh()];
+  if (remoteApiEnabled) {
+    tasks.push(nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history()));
+  }
+  await Promise.allSettled(tasks);
 });
 
 function retryConversations() {

@@ -49,6 +49,10 @@ export interface OAuthExchangeRequest {
   provider: OAuthProvider;
   displayName?: string;
 }
+
+export interface PasswordResetOtpVerifyResult {
+  status: "PASSWORD_RESET_OTP_VERIFIED";
+}
 export interface OAuthExchangeResult {
   user: UserSession;
   vaultRevision: number;
@@ -65,6 +69,10 @@ export interface AuthApi {
   sendLoginOtp(request: RegistrationOtpRequest): Promise<LoginOtpResult>;
   completeOtpLogin(request: RegistrationOtpRequest & { challengeNo: string; code: string }): Promise<LoginResult>;
   sendPasswordResetOtp(request: RegistrationOtpRequest): Promise<PasswordResetOtpResult>;
+  verifyPasswordResetOtp(request: RegistrationOtpRequest & {
+    challengeNo: string;
+    code: string;
+  }): Promise<PasswordResetOtpVerifyResult>;
   completePasswordReset(request: RegistrationOtpRequest & {
     challengeNo: string;
     code: string;
@@ -239,6 +247,14 @@ function oauthExchangeFromResponse(
   };
 }
 
+function passwordResetOtpVerifyFromResponse(value: unknown): PasswordResetOtpVerifyResult {
+  if (!value || typeof value !== "object"
+      || (value as Record<string, unknown>).status !== "PASSWORD_RESET_OTP_VERIFIED") {
+    throw new ApiError({ kind: "protocol", message: "PASSWORD_RESET_OTP_VERIFY_RESPONSE_INVALID" });
+  }
+  return { status: "PASSWORD_RESET_OTP_VERIFIED" };
+}
+
 function oauthDevelopmentChallengeFromResponse(value: unknown): string {
   if (!value || typeof value !== "object") {
     throw new ApiError({ kind: "protocol", message: "OAUTH_DEVELOPMENT_CHALLENGE_INVALID" });
@@ -331,6 +347,14 @@ export function createAuthApi(
     async sendPasswordResetOtp(request) {
       return passwordResetOtpFromResponse(await client.request<unknown>({
         path: "/auth/users/password-reset/otp/send",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      }));
+    },
+    async verifyPasswordResetOtp(request) {
+      return passwordResetOtpVerifyFromResponse(await client.request<unknown>({
+        path: "/auth/users/password-reset/otp/verify",
         method: "POST",
         body: request,
         authenticated: false,

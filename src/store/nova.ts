@@ -49,6 +49,11 @@ export interface NovaMessage {
   attempted?: boolean;
 }
 
+export interface NovaRemoteHistory {
+  conversationId: string | null;
+  messages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>;
+}
+
 let counter = 1;
 function nextId(): string {
   counter += 1;
@@ -64,11 +69,14 @@ export const useNova = defineStore("nova", () => {
   // throttle keys → last fire timestamp (prevents same auto-push firing too often).
   const cooldowns = ref<Record<string, number>>({});
   const conversationId = ref("");
+  const conversationBoundary = ref(0);
   // Pending text stays in memory, not browser storage. Reopening this page keeps
   // the same turn ID; a full app reload restores only server-confirmed history.
   const pendingRemote = computed(() => messages.value.filter(m => m.delivery));
   const historyLoaded = ref(false);
   let boundRemoteAccount = "";
+  let historyGeneration = 0;
+  let historyLoad: { accountKey: string; generation: number; promise: Promise<void> } | undefined;
 
   function bindRemoteAccount(accountKey: string) {
     const normalized = accountKey.trim();
@@ -76,8 +84,41 @@ export const useNova = defineStore("nova", () => {
     const nextConversationId = requireCryptoUuid();
     clearTranscript();
     historyLoaded.value = false;
+    conversationBoundary.value += 1;
+    historyGeneration += 1;
+    historyLoad = undefined;
     boundRemoteAccount = normalized;
     conversationId.value = nextConversationId;
+  }
+
+  async function ensureRemoteHistory(
+    accountKey: string,
+    loader: () => Promise<NovaRemoteHistory>,
+  ): Promise<void> {
+    const normalized = accountKey.trim();
+    bindRemoteAccount(normalized);
+    if (historyLoaded.value || pendingRemote.value.length) return;
+    const generation = historyGeneration;
+    const expectedConversationId = conversationId.value;
+    if (historyLoad?.accountKey === normalized && historyLoad.generation === generation) {
+      return historyLoad.promise;
+    }
+    const promise = (async () => {
+      const history = await loader();
+      if (generation !== historyGeneration || normalized !== boundRemoteAccount
+          || expectedConversationId !== conversationId.value || pendingRemote.value.length) return;
+      if (history.conversationId) {
+        hydrateRemote(normalized, history.conversationId, history.messages);
+      } else {
+        historyLoaded.value = true;
+      }
+    })();
+    historyLoad = { accountKey: normalized, generation, promise };
+    try {
+      await promise;
+    } finally {
+      if (historyLoad?.promise === promise) historyLoad = undefined;
+    }
   }
 
   function hydrateRemote(
@@ -238,20 +279,27 @@ export const useNova = defineStore("nova", () => {
   function startNewConversation() {
     const nextConversationId = requireCryptoUuid();
     clearTranscript();
+    conversationBoundary.value += 1;
+    historyGeneration += 1;
+    historyLoad = undefined;
     conversationId.value = nextConversationId;
     historyLoaded.value = true;
   }
 
   function reset() {
     clearTranscript();
+    conversationBoundary.value += 1;
+    historyGeneration += 1;
+    historyLoad = undefined;
+    boundRemoteAccount = "";
     conversationId.value = "";
     historyLoaded.value = false;
   }
 
   return {
-    messages, unread, isOpen, typing, cooldowns, conversationId,
+    messages, unread, isOpen, typing, cooldowns, conversationId, conversationBoundary,
     open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
-    bindRemoteAccount, hydrateRemote,
+    bindRemoteAccount, hydrateRemote, ensureRemoteHistory,
     pendingRemote, historyLoaded, enqueueRemote, claimRemote, completeRemote, failRemote,
     retryRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
   };
