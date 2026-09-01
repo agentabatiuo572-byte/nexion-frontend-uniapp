@@ -56,10 +56,14 @@ describe("quest API authority", () => {
     const api = createQuestApi({ request } as never, "dev");
 
     await expect(api.state()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
-    await expect(api.claim("setup_profile", "quest-claim-20260816")).resolves.toMatchObject({
+    await expect(api.claim("setup_profile", "quest-claim-20260816", quest.instanceKey)).resolves.toMatchObject({
       sourceEnvironment: "PRODUCTION",
       runId: "",
     });
+    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({
+      method: "POST",
+      body: { instanceKey: quest.instanceKey },
+    }));
   });
 
   it("rejects sandbox payloads in both development and production", async () => {

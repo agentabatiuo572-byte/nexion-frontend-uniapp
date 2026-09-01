@@ -188,6 +188,7 @@ describe("PC-managed H3 quest catalogue", () => {
     expect(claim).toHaveBeenCalledWith(
       current.questCode,
       `h3-quest-claim:${current.questCode}:${current.instanceKey}`,
+      current.instanceKey,
     );
     expect(quest.remoteQuests[0]).toMatchObject({ status: "CLAIMED", instanceKey: current.instanceKey });
   });
