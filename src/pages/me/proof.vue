@@ -45,10 +45,7 @@
         <view v-if="!remoteApiEnabled || remoteSnapshot" class="relative overflow-hidden" :style="shareCardStyle">
           <!-- brand -->
           <view class="flex items-center" style="gap: 8px">
-            <view class="grid place-items-center" :style="brandMarkStyle">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--v5-on-brand)" stroke="var(--v5-on-brand)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
-            </view>
-            <text class="font-display" :style="brandNameStyle">NexGrid</text>
+            <BrandLockup :height="40" />
             <text style="margin-left: auto; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-ink-3)">{{ t.uiChrome.proofOfContribution }}</text>
           </view>
 
@@ -196,6 +193,7 @@ import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onUnload } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
+import BrandLockup from "@/components/brand-lockup.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
@@ -590,8 +588,6 @@ const shareCardStyle = computed<CSSProperties>(() => {
   };
   return { marginTop: "12px", borderRadius: "16px", padding: "20px", background: grad[variant.value] };
 });
-const brandMarkStyle: CSSProperties = { width: "28px", height: "28px", borderRadius: "6px", background: "var(--v5-brand)" };
-const brandNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--v5-ink)" };
 const profileNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)" };
 const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function heroKickerStyle(color: string): CSSProperties {

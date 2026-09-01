@@ -15,7 +15,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="tos-brand">
-        <view class="tos-brand__n"><text class="tos-brand__n-t">N</text></view>
+        <BrandLockup variant="mark" :height="32" />
         <text class="tos-brand__name">{{ t.terms.navTitle }}</text>
       </view>
       <view class="tos-top__spacer" />
@@ -66,6 +66,7 @@
 import { computed, onMounted, ref } from "vue";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
+import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -265,21 +266,6 @@ async function confirmTerms() {
   align-items: center;
   gap: 6px;
   justify-self: center;
-}
-.tos-brand__n {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--v5-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tos-brand__n-t {
-  color: var(--v5-surface);
-  font-family: var(--font-v5);
-  font-weight: 600;
-  font-size: 12px;
 }
 .tos-brand__name {
   color: var(--v5-ink);
