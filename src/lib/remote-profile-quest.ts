@@ -1,7 +1,8 @@
-import type { QuestTaskId } from "@/store/quest";
+import type { CanonicalQuest } from "@/api/quest-api";
 
 export interface RemoteQuestClaimPort {
-  claimRemote(id: QuestTaskId): Promise<boolean>;
+  remoteQuests: ReadonlyArray<Pick<CanonicalQuest, "questCode" | "actionRoute" | "status">>;
+  claimRemote(id: string): Promise<boolean>;
 }
 
 /**
@@ -10,5 +11,11 @@ export interface RemoteQuestClaimPort {
  * page from ever reaching for markComplete or a local reward table.
  */
 export async function claimSetupProfileQuest(port: RemoteQuestClaimPort): Promise<boolean> {
-  return port.claimRemote("setup_profile");
+  const quest = port.remoteQuests.find((candidate) => (
+    candidate.actionRoute === "/pages/me/profile" && candidate.status !== "CLAIMED"
+  ));
+  // A paused/deleted profile mission is not a profile-save failure. With no
+  // active server projection there is simply no task reward to claim.
+  if (!quest) return true;
+  return port.claimRemote(quest.questCode);
 }

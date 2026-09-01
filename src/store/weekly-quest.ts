@@ -1,7 +1,8 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
+import { useLocaleStore } from "@/store/locale";
 
 function idempotencyKey(questCode: string): string {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -10,6 +11,7 @@ function idempotencyKey(questCode: string): string {
 
 /** Weekly quests are a read-through projection of the server mission and reward ledger. */
 export const useWeeklyQuest = defineStore("weeklyQuest", () => {
+  const locale = useLocaleStore();
   const snapshot = ref<QuestSnapshot | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -38,7 +40,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     loading.value = true;
     error.value = null;
     try {
-      const next = await questApi.state();
+      const next = await questApi.state(locale.code);
       if (!isCurrentRequest()) return false;
       snapshot.value = next;
       return true;
@@ -69,7 +71,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       const claimResult = await questApi.claim(quest.questCode, key);
       if (!isCurrentRequest()) return false;
       if (claimResult.questId !== quest.questCode) throw new Error("WEEKLY_QUEST_CLAIM_MISMATCH");
-      const readBack = await questApi.state();
+      const readBack = await questApi.state(locale.code);
       if (!isCurrentRequest()) return false;
       const authoritative = readBack.quests.find((row) => row.questCode === quest.questCode);
       if (!authoritative || authoritative.status !== "CLAIMED") {
@@ -99,6 +101,10 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     claimKeys.clear();
     void refresh();
   }
+
+  watch(() => locale.code, () => {
+    if (remoteApiEnabled) void refresh();
+  });
 
   return { snapshot, loading, error, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
 });

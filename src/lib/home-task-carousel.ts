@@ -1,4 +1,4 @@
-import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
+import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot, QuestTaskCategory } from "@/api/quest-api";
 
 export type HomeTaskCardId = "newcomer" | "weekly";
 
@@ -19,7 +19,8 @@ export interface HomeWeeklyCardView {
   subtitle: string | null;
   targetDevice: string | null;
   targetDaily: number | null;
-  action: "missions" | "store" | null;
+  category: QuestTaskCategory | null;
+  actionRoute: string | null;
 }
 
 export function deriveHomeTaskCards(
@@ -66,7 +67,8 @@ export function presentHomeWeeklyCard(
       subtitle: null,
       targetDevice: null,
       targetDaily: null,
-      action: null,
+      category: null,
+      actionRoute: null,
     };
   }
 
@@ -85,7 +87,8 @@ export function presentHomeWeeklyCard(
         : source.quest.name,
       targetDevice: metadata?.targetDevice ?? null,
       targetDaily: metadata?.targetDaily ?? null,
-      action: "missions",
+      category: source.quest.category,
+      actionRoute: source.quest.actionRoute,
     };
   }
 
@@ -97,7 +100,8 @@ export function presentHomeWeeklyCard(
     subtitle: source.promo.targetDevice,
     targetDevice: source.promo.targetDevice,
     targetDaily: source.promo.targetDaily,
-    action: "store",
+    category: null,
+    actionRoute: "/pages/store/store",
   };
 }
 

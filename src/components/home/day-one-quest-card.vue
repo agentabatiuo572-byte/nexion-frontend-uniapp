@@ -110,7 +110,7 @@ import { useNow } from "@/composables/use-now";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { useQuest } from "@/store/quest";
 import { remoteApiEnabled } from "@/api/runtime";
-import { dayOneTaskCategory, dayOneTaskRoute, type DayOneTaskCategory } from "@/lib/day-one-task-category";
+import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
 
 interface QuestTask {
@@ -145,7 +145,7 @@ const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
 const mockReward = 500;
 
-const categoryLabel = (category: DayOneTaskCategory): string => ({
+const categoryLabel = (category: QuestTaskCategory): string => ({
   wallet: t.value.home.dayOneCatWallet,
   explore: t.value.home.dayOneCatExplore,
   recommend: t.value.home.dayOneCatRecommend,
@@ -174,8 +174,8 @@ const remoteTasks = computed<QuestTask[]>(() => {
       order: index + 1,
       label: row.name,
       nex: row.rewardNex,
-      href: dayOneTaskRoute(row.questCode),
-      cat: categoryLabel(dayOneTaskCategory(row.questCode)),
+      href: row.actionRoute,
+      cat: categoryLabel(row.category),
       ...palette[index % palette.length],
     }));
 });

@@ -1,9 +1,11 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
+import { normalizeQuestActionRoute } from "@/lib/quest-presentation";
 
 export type QuestLayer = "DAY_ONE" | "WEEKLY_T1" | "WEEKLY_T2";
 export type QuestStatus = "PENDING" | "COMPLETED" | "CLAIMABLE" | "CLAIMED";
+export type QuestTaskCategory = "wallet" | "explore" | "recommend" | "identity" | "social";
 
 export interface CanonicalQuest {
   questCode: string;
@@ -11,6 +13,8 @@ export interface CanonicalQuest {
   layer: QuestLayer;
   rewardNex: number;
   status: QuestStatus;
+  category: QuestTaskCategory;
+  actionRoute: string;
 }
 
 export interface CanonicalPromoBanner {
@@ -82,13 +86,23 @@ function parseQuest(value: unknown): CanonicalQuest {
   const layer = text(row?.layer)?.toUpperCase() as QuestLayer;
   const rewardNex = number(row?.rewardNex);
   const status = text(row?.status)?.toUpperCase() as QuestStatus;
+  const category = text(row?.category)?.toLowerCase() as QuestTaskCategory;
+  const rawActionRoute = text(row?.actionRoute);
   if (!row || !questCode || !name
       || !["DAY_ONE", "WEEKLY_T1", "WEEKLY_T2"].includes(layer)
       || rewardNex === null
-      || !["PENDING", "COMPLETED", "CLAIMABLE", "CLAIMED"].includes(status)) {
+      || !["PENDING", "COMPLETED", "CLAIMABLE", "CLAIMED"].includes(status)
+      || !["wallet", "explore", "recommend", "identity", "social"].includes(category)
+      || !rawActionRoute) {
     return invalid();
   }
-  return { questCode, name, layer, rewardNex, status };
+  let actionRoute: string;
+  try {
+    actionRoute = normalizeQuestActionRoute(rawActionRoute);
+  } catch {
+    return invalid();
+  }
+  return { questCode, name, layer, rewardNex, status, category, actionRoute };
 }
 
 function parsePromo(value: unknown): CanonicalPromoBanner | null {

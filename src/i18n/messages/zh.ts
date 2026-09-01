@@ -5214,6 +5214,7 @@ export const zh: Messages = {
     rewardReady: "奖励已准备好,可领取。",
     refreshing: "正在刷新…",
     refreshStatus: "刷新进度",
+    goComplete: "去完成",
     bonusCta: "领取 Weekly Champion 奖 · +{n} NEX",
     bonusClaimed: "Weekly Champion · {n} NEX + 勋章已到账",
 
