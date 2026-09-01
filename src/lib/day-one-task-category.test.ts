@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dayOneTaskCategory } from "./day-one-task-category";
+import { dayOneTaskCategory, dayOneTaskRoute } from "./day-one-task-category";
 
 describe("dayOneTaskCategory", () => {
   it.each([
@@ -16,5 +16,20 @@ describe("dayOneTaskCategory", () => {
 
   it("keeps unknown PC-defined tasks visible under explore", () => {
     expect(dayOneTaskCategory("future_task")).toBe("explore");
+  });
+
+  it.each([
+    ["bind_bank_card", "/pages/me/wallet-cards-new"],
+    ["visit_earn", "/pages/earn/earn"],
+    ["visit_store", "/pages/store/store"],
+    ["view_product_roi", "/pages/store/detail?id=stellarbox-s1"],
+    ["setup_profile", "/pages/me/profile"],
+    ["invite_friend", "/pages/team/team"],
+  ] as const)("routes %s directly to its completion page", (questCode, expectedRoute) => {
+    expect(dayOneTaskRoute(questCode)).toBe(expectedRoute);
+  });
+
+  it("keeps unknown PC-defined tasks recoverable through the task center", () => {
+    expect(dayOneTaskRoute("future_task")).toBe("/pages/missions/missions");
   });
 });
