@@ -180,6 +180,24 @@ const H = 460;
 // 海报 = 恒定深色画稿:全部颜色为画稿常量,不读运行时主题 token
 // (主人 2026-07-08 拍板浅/深模式同一张海报;canvas 本就不解析 CSS var)。
 const BRAND_ON_DARK = "#9EDC1D";
+
+// 海报是深底,取品牌包的深底横版(与 App 内 BrandLockup 同一份资产)。
+// canvas 画不了 <image> 组件,只能 drawImage;路径要先过 getImageInfo 拿本地 path(跨端一致做法),
+// 拿到后**模块级缓存**,免得每次生成海报都重来一遍。
+const BRAND_LOGO_SRC = "/static/img/brand/header-logo-dark.png";
+let brandLogoPath = "";
+
+/** 确保标已就绪。拿不到就 resolve —— 海报照出,品牌行走文字兜底,不因为一张图卡死。 */
+function ensureBrandLogo(): Promise<void> {
+  if (brandLogoPath) return Promise.resolve();
+  return new Promise((resolve) => {
+    uni.getImageInfo({
+      src: BRAND_LOGO_SRC,
+      success: (r) => { brandLogoPath = r.path; resolve(); },
+      fail: () => resolve(),
+    });
+  });
+}
 const ON_BRAND_DARK = "#0A0A0A";
 const CYAN_ON_DARK = "#8E72FF";
 const INK_ON_DARK = "#F5F7FA";
@@ -274,7 +292,6 @@ function ts(): string {
 function paint(link: string, myToken: number) {
   const ctx = uni.createCanvasContext("sharePosterCv", inst?.proxy);
   const brand = BRAND_ON_DARK;
-  const onBrand = ON_BRAND_DARK;
   const cyan = CYAN_ON_DARK;
 
   // 底:暗色画稿渐变
@@ -309,22 +326,19 @@ function paint(link: string, myToken: number) {
   ctx.setFillStyle("rgba(245, 247, 250, 0.08)");
   ctx.fillRect(16, H - 112, W - 32, 1);
 
-  // 品牌行
-  ctx.setFillStyle(brand);
-  roundRect(ctx, 16, 14, 20, 20, 6);
-  ctx.fill();
-  ctx.setFillStyle(onBrand);
-  ctx.setFontSize(11);
-  ctx.setTextAlign("center");
-  ctx.fillText("N", 26, 28);
-  ctx.setTextAlign("left");
-  ctx.setFillStyle(INK_ON_DARK);
-  ctx.setFontSize(13);
-  ctx.fillText("NexGrid", 42, 28);
+  // 品牌行 —— 官方横版标(与 App 内 BrandLockup 同一份资产)。canvas 只能 drawImage,
+  // 图没就绪就退回字标文字:海报照出、品牌名仍在,不因为一张图开天窗。
+  if (brandLogoPath) {
+    ctx.drawImage(brandLogoPath, 16, 12, 120, 40);
+  } else {
+    ctx.setFillStyle(INK_ON_DARK);
+    ctx.setFontSize(15);
+    ctx.fillText("NexGrid", 16, 38);
+  }
   ctx.setFillStyle(FAINT_ON_DARK);
   ctx.setFontSize(9);
   ctx.setTextAlign("right");
-  ctx.fillText(ts(), W - 16, 27);
+  ctx.fillText(ts(), W - 16, 36);
   ctx.setTextAlign("left");
 
   // 模板中段
@@ -431,11 +445,16 @@ function regenerate() {
     // canvas 挂载/尺寸就绪缓冲;绘制异常一律落 failed(异常1,不白屏)。
     setTimeout(() => {
       if (myToken !== genToken || !props.open) return;
-      try {
-        paint(link, myToken);
-      } catch {
-        if (myToken === genToken) genState.value = "failed";
-      }
+      // 标先备好再画:paint 是同步的,中途插异步会打乱绘制顺序。
+      // 异步回来要重新核 token —— 这期间用户可能已经切模板/关面板(沿用既有防竞态口径)。
+      void ensureBrandLogo().then(() => {
+        if (myToken !== genToken || !props.open) return;
+        try {
+          paint(link, myToken);
+        } catch {
+          if (myToken === genToken) genState.value = "failed";
+        }
+      });
     }, 80);
   });
 }
