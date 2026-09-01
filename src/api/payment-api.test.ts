@@ -168,6 +168,20 @@ test("accepts a terminal hosted order only after its payment URL is withheld", a
   });
 });
 
+test("fails closed if a hosted response leaks compatibility bank instructions", async () => {
+  const api = createPaymentApi({ request: async () => ({
+    ...intent,
+    paymentMode: "hosted",
+    paymentUrl: "https://api.hdpayadmin.com/placeAnOrder?orderId=1",
+    providerStatus: "created",
+  }) } as never);
+
+  await expect(api.getVietQrIntent("VQR-12345678")).rejects.toMatchObject({
+    kind: "protocol",
+    message: "VIETQR_INTENT_RESPONSE_INVALID",
+  });
+});
+
 test("accepts an operational VietQR rail whose daily capacity is below the minimum", async () => {
   const response = {
     serverCanonical: true,

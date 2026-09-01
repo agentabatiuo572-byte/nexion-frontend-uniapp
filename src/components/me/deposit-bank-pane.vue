@@ -280,6 +280,7 @@ const viewIntentId = ref<string | null>(null);
 const paidPressed = ref(false);
 const autoResumePending = ref(true);
 const openingHosted = ref(false);
+const pageActive = ref(false);
 
 const intent = computed<DepositIntent | null>(
   () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
@@ -297,6 +298,7 @@ const paneView = computed<PaneView>(() => {
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
+  pageActive.value = true;
   if (remoteApiEnabled) {
     // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
     //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
@@ -464,7 +466,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
-        if (it.paymentMode === "hosted") openHostedOrder(it);
+        if (pageActive.value && it.paymentMode === "hosted") openHostedOrder(it);
       },
       failure: (reason) => {
         const userFacingReason = approvedBusinessFailureCopy || reason;
@@ -501,6 +503,7 @@ onMounted(() => {
   }, 1000);
 });
 onUnmounted(() => {
+  pageActive.value = false;
   if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
   if (hostedOpenTimer) clearTimeout(hostedOpenTimer);

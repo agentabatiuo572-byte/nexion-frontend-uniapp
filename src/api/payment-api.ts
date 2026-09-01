@@ -280,8 +280,12 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
   const providerStatus = providerStatusText && providerStatuses.has(providerStatusText)
     ? providerStatusText as VietQrIntentSnapshot["providerStatus"] : undefined;
   const manualFieldsValid = Boolean(account && memoCode && accountName && accountNumber && bankName);
+  const hostedSensitiveFieldsAbsent = source?.memoCode === undefined
+    && source?.bankAccount === undefined
+    && source?.qrPayload === undefined;
   const hostedStateValid = paymentMode === "hosted"
     && Boolean(providerStatus)
+    && hostedSensitiveFieldsAbsent
     && (providerStatus === "created"
       ? (status === "awaiting_payment" ? Boolean(paymentUrl) : !paymentUrl)
       : !paymentUrl);
