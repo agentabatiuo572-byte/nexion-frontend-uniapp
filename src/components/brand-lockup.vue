@@ -15,7 +15,9 @@
   本轮不动以免把风险面扩大;后续可收编进本组件。
 -->
 <template>
-  <view class="nx-brand-lockup" :style="boxStyle">
+  <!-- role/aria-label:换成图片后读屏就读不到品牌名了(换之前是 <text>NexGrid</text>)。
+       页眉那处是装饰(页面另有上下文),调用方传 aria-hidden 覆盖即可,后来的属性优先。 -->
+  <view class="nx-brand-lockup" :style="boxStyle" role="img" aria-label="NexGrid">
     <image class="nx-brand-lockup__img nx-brand-lockup__img--light" :src="src.light" mode="aspectFit" />
     <image class="nx-brand-lockup__img nx-brand-lockup__img--dark" :src="src.dark" mode="aspectFit" />
   </view>
