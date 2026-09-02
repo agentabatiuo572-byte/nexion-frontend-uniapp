@@ -16,6 +16,17 @@ const state = {
   },
   dailyMilestones: [],
   earningMilestones: [],
+  badgeAchievements: [{
+    achievementCode: "FIRST_DEVICE",
+    name: "First device",
+    description: "Activate a device",
+    category: "HARDWARE",
+    iconKey: "hardware_owner",
+    accentColor: "#00C48C",
+    rewardPoints: 0,
+    status: "UNLOCKED",
+    unlockedAt: "2026-08-16T01:00:00Z",
+  }],
   powerUps: [],
   rules: [],
   topStreakers: [],
@@ -28,6 +39,11 @@ const state = {
 const production = { ...state, sourceEnvironment: "PRODUCTION", runId: "", source: "nx_user_streak" };
 
 describe("points API provenance", () => {
+  it("parses canonical H4 badge achievements from the server projection", async () => {
+    await expect(createPointsApi({ request: async () => production } as never, "prod").state())
+      .resolves.toMatchObject({ badgeAchievements: [{ achievementCode: "FIRST_DEVICE", status: "UNLOCKED" }] });
+  });
+
   it("accepts the Java canonical production response in development mode", async () => {
     await expect(createPointsApi({ request: async () => production } as never, "dev").state())
       .resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });

@@ -1235,6 +1235,7 @@ export const en = {
   },
 
   tickets: {
+    historyTruncated: "Only the most recent 100 messages are shown. Earlier messages remain on the server.",
     slaStatisticsUnavailable: "No response statistics are available yet.",
     slaTargetLabel: "Service target",
     slaTargetValue: "First-response target {firstResponseMins} min; resolution target {resolutionHours} h.",
@@ -2193,6 +2194,7 @@ export const en = {
     orShareVia: "or share via",
   },
   wallet: {
+    loadingTransactions: "Loading transaction history…",
     title: "Wallet",
     usdtBalance: "USDT balance",
     nexBalance: "NEX Balance",
@@ -2671,6 +2673,7 @@ export const en = {
       newConfirmAction: "Start new conversation",
     },
     localSafetyNotice: "AI answers may contain mistakes and cannot see or change your account. Never share a password, OTP, seed phrase, private key, full card number, or identity document.",
+    historyTruncated: "Only the most recent part of this conversation is shown.",
     localQOrder: "How do I check an order?",
     localQTicket: "How do I open a ticket?",
     localQSecurity: "How do I protect my account?",
@@ -2951,6 +2954,7 @@ export const en = {
     deleteAccountPendingReason: "pending financial or order settlement",
   },
   help: {
+    faqLanguageFallback: "This FAQ is shown in the published default language because this translation is not available yet.",
     title: "Help center",
     back: "Back",
     searchPlaceholder: "Search topics, questions or keywords…",
@@ -3001,6 +3005,7 @@ export const en = {
     chLiveChatHint: "Chat with your advisor & support team",
   },
   conversations: {
+    historyTruncated: "Only the most recent 100 messages are shown. Earlier messages remain on the server.",
     sessionTransferred: "This conversation was transferred and can no longer receive replies. Start a new conversation.",
     title: "Messages",
     back: "Back",
@@ -3385,6 +3390,7 @@ export const en = {
     retry: "Reload",
     serverDailyMilestones: "Daily streak milestones",
     serverEarningMilestones: "Lifetime earning milestones",
+    serverBadgeAchievements: "Badges",
     dailyMilestone: "Streak day",
     earningMilestone: "Lifetime earnings",
     streakProgress: "Current streak",

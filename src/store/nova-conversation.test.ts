@@ -92,6 +92,20 @@ describe("Nova conversation scope", () => {
     expect(nova.messages.at(-1)?.text).toBe("Answer");
   });
 
+  it("preserves the server truncation marker so the UI can disclose an incomplete transcript", async () => {
+    const nova = useNova();
+
+    await nova.ensureRemoteHistory("account-a", async () => ({
+      conversationId: ids[1],
+      messages: [{ id: "recent", sender: "nova", text: "Recent answer", ts: 101 }],
+      truncated: true,
+    }));
+
+    expect(nova.historyTruncated).toBe(true);
+    nova.startNewConversation();
+    expect(nova.historyTruncated).toBe(false);
+  });
+
   it("ignores a late history response after the account changes", async () => {
     const nova = useNova();
     let resolveHistory!: (value: {

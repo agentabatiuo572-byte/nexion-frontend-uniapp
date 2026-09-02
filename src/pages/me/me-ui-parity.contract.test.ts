@@ -12,6 +12,8 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "devices.vue",
   "goals.vue",
   "help.vue",
+  // Production language choices only advertise locales with complete bundled copy.
+  "language.vue",
   "me.vue",
   "preferences.vue",
   "profile.vue",
@@ -54,7 +56,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
   // R3: preserve layout while enabling keyboard FAQ and category controls.
-  "help.vue": "c7e130659141b96a10c901bc70bb6c7970f8735932d6a49b04ad3e2957a026b2",
+  "help.vue": "4f57ab133938b32401dd83a590021679eda4c68d26f05ecf1010201433f1e6da",
+  "language.vue": "0288060a450b97e9712f9c48d80f0ef6416038c380cec422157f1d52746a064a",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
@@ -69,21 +72,21 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "receipts.vue": "f8bc3661a5ec95dbba6b6a2fe193d91b206dc13a4fb92c77f569b20df1fed1df",
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
-  "security.vue": "e4893b7bad073ec5bacdd1c79a6db63648dacd0e2f1449937cf9feec2d6d091d",
+  "security.vue": "d931bb1e41ba29b945b4b9d13ae16362d2c717f0ae90753609963f06895e23bb",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
-  "support-tickets.vue": "9454b7413765e6aec2a4ea010984786e5a2d0d4b838666dc7c19ea0079036f57",
-  "support.vue": "6f1d1582608f17177bb3c902a2849db742f410da016e66dcf6e602cb7c43f714",
+  "support-tickets.vue": "b1fc360599a54ef4ad094ac2a7601b96c3fb8b22d1ae85470b70fc110c534154",
+  "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",
-  "wallet-bills.vue": "289a982f94511e9bee5917d67b735f720935f4b58ed41666e67c2429c8794033",
+  "wallet-bills.vue": "b2479f2aa783f980f4e04db1dbc133a5b2f4588330d66395f0222fdacde425af",
   "wallet-cards-new.vue": "d0134756c231552e9068b064b664c5ef1cc7ee3242272f03d4ed1744f9696c97",
   "wallet-cards.vue": "3d1ab2de2b31a61e95bf2a388ba334b6d785a977421f7de75d9ab6e147171622",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   "wallet-exchange.vue": "56d32953f04a0c8ed538ed9caa55642867bcf0be02cd7892776dcc34bfc3a3a5",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
-  "wallet-nex.vue": "e3cb6933ab8f85a035f63e68f6e74de3ed10e0143d20713881ced423ae753a87",
+  "wallet-nex.vue": "50f0cd137035f0f0bc3ee3eb69e6c033b1c2a7c45a671b2f0c8b07eab9c9c0d9",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.

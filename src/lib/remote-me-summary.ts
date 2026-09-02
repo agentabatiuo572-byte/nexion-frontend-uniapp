@@ -13,6 +13,7 @@ export interface RemoteAchievementProjection {
 export interface RemotePointsProjection {
   dailyMilestones?: readonly RemoteAchievementProjection[] | null;
   earningMilestones?: readonly RemoteAchievementProjection[] | null;
+  badgeAchievements?: readonly RemoteAchievementProjection[] | null;
 }
 
 /**
@@ -44,10 +45,11 @@ export function countRemoteReceipts(
 export function summarizeRemoteAchievements(
   snapshot: RemotePointsProjection | null | undefined,
 ): { unlocked: number; total: number } | null {
-  if (!snapshot || !Array.isArray(snapshot.dailyMilestones) || !Array.isArray(snapshot.earningMilestones)) return null;
-  const rows = [...snapshot.dailyMilestones, ...snapshot.earningMilestones];
+  if (!snapshot || !Array.isArray(snapshot.dailyMilestones)
+      || !Array.isArray(snapshot.earningMilestones) || !Array.isArray(snapshot.badgeAchievements)) return null;
+  const rows = [...snapshot.dailyMilestones, ...snapshot.earningMilestones, ...snapshot.badgeAchievements];
   return {
-    unlocked: rows.filter((row) => row.status === "CLAIMED" || row.status === "FIRED").length,
+    unlocked: rows.filter((row) => row.status === "CLAIMED" || row.status === "FIRED" || row.status === "UNLOCKED").length,
     total: rows.length,
   };
 }

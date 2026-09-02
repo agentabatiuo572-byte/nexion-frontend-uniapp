@@ -114,4 +114,29 @@ describe("quest API authority", () => {
     await expect(createQuestApi({ request: async () => payload } as never, "prod").state())
       .resolves.toMatchObject({ quests: [{ status: "EXPIRED", eligible: false }] });
   });
+
+  it("accepts a disabled weekly instance as visible read-only history", async () => {
+    const payload = {
+      quests: [{
+        ...quest,
+        questCode: "weekly_device_activation_legacy",
+        layer: "WEEKLY_T1",
+        status: "EXPIRED",
+        instanceKey: "WEEK:2026-W35",
+        eligibleFrom: "2026-08-24T00:00:00+08:00",
+        eligibleUntil: "2026-08-31T00:00:00+08:00",
+        eligible: false,
+      }],
+      promoBanner: {},
+      questBonusMultiplier: 1,
+      rhythmMonth: 1,
+      serverCanonical: true,
+      sourceEnvironment: "PRODUCTION",
+      runId: "",
+      source: "nx_mission + nx_user_mission",
+    };
+
+    await expect(createQuestApi({ request: async () => payload } as never, "prod").state())
+      .resolves.toMatchObject({ quests: [{ status: "EXPIRED", eligible: false }] });
+  });
 });

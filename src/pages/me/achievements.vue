@@ -141,7 +141,7 @@ import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
 import { pointsApi, remoteApiEnabled } from "@/api/runtime";
-import type { DailySnapshot, DailyMilestoneStatus, EarningMilestoneStatus } from "@/api/points-api";
+import type { BadgeAchievementStatus, DailySnapshot, DailyMilestoneStatus, EarningMilestoneStatus } from "@/api/points-api";
 
 const t = useT();
 const w = computed(() => t.value.achievements);
@@ -162,10 +162,10 @@ watch(() => app.accountKey, () => {
   if (remoteApiEnabled) void refreshRemote();
 });
 
-type RemoteStatus = DailyMilestoneStatus | EarningMilestoneStatus;
+type RemoteStatus = DailyMilestoneStatus | EarningMilestoneStatus | BadgeAchievementStatus;
 interface RemoteMilestoneRow {
   key: string;
-  kind: "daily" | "earning";
+  kind: "daily" | "earning" | "badge";
   id: number | string;
   label: string;
   description: string;
@@ -250,9 +250,20 @@ const remoteGroups = computed(() => {
     status: row.status,
     iconId: "first_dollar",
   }));
+  const badges: RemoteMilestoneRow[] = snapshot.badgeAchievements.map((row) => ({
+    key: `badge:${row.achievementCode}`,
+    kind: "badge",
+    id: row.achievementCode,
+    label: row.name,
+    description: row.description,
+    reward: row.rewardPoints > 0 ? `+${row.rewardPoints} PTS` : row.category,
+    status: row.status,
+    iconId: row.iconKey || "power_user",
+  }));
   return [
     { key: "daily", label: w.value.serverDailyMilestones, rows: daily },
     { key: "earning", label: w.value.serverEarningMilestones, rows: earnings },
+    { key: "badges", label: w.value.serverBadgeAchievements, rows: badges },
   ].filter((group) => group.rows.length > 0);
 });
 
@@ -265,7 +276,7 @@ const groups = computed(() => {
 
 const unlocked = computed<number | null>(() => remoteApiEnabled
   ? remoteSnapshot.value
-    ? remoteGroups.value.flatMap((group) => group.rows).filter((row) => row.status === "CLAIMED" || row.status === "FIRED").length
+    ? remoteGroups.value.flatMap((group) => group.rows).filter((row) => row.status === "CLAIMED" || row.status === "FIRED" || row.status === "UNLOCKED").length
     : null
   : ach.records.length);
 const total = computed<number | null>(() => remoteApiEnabled

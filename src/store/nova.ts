@@ -75,6 +75,7 @@ export const useNova = defineStore("nova", () => {
   // the same turn ID; a full app reload restores only server-confirmed history.
   const pendingRemote = computed(() => messages.value.filter(m => m.delivery));
   const historyLoaded = ref(false);
+  const historyTruncated = ref(false);
   let boundRemoteAccount = "";
   let historyGeneration = 0;
   let historyLoad: { accountKey: string; generation: number; promise: Promise<void> } | undefined;
@@ -109,8 +110,9 @@ export const useNova = defineStore("nova", () => {
       if (generation !== historyGeneration || normalized !== boundRemoteAccount
           || expectedConversationId !== conversationId.value || pendingRemote.value.length) return;
       if (history.conversationId) {
-        hydrateRemote(normalized, history.conversationId, history.messages);
+        hydrateRemote(normalized, history.conversationId, history.messages, history.truncated === true);
       } else {
+        historyTruncated.value = history.truncated === true;
         historyLoaded.value = true;
       }
     })();
@@ -126,6 +128,7 @@ export const useNova = defineStore("nova", () => {
     accountKey: string,
     remoteConversationId: string,
     remoteMessages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>,
+    truncated = false,
   ) {
     const normalized = accountKey.trim();
     if (!normalized || normalized !== boundRemoteAccount || pendingRemote.value.length) return;
@@ -140,6 +143,7 @@ export const useNova = defineStore("nova", () => {
     }));
     unread.value = 0;
     typing.value = false;
+    historyTruncated.value = truncated;
     historyLoaded.value = true;
   }
 
@@ -275,6 +279,7 @@ export const useNova = defineStore("nova", () => {
     unread.value = 0;
     cooldowns.value = {};
     typing.value = false;
+    historyTruncated.value = false;
   }
 
   function startNewConversation() {
@@ -301,7 +306,7 @@ export const useNova = defineStore("nova", () => {
     messages, unread, isOpen, typing, cooldowns, conversationId, conversationBoundary,
     open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
     bindRemoteAccount, hydrateRemote, ensureRemoteHistory,
-    pendingRemote, historyLoaded, enqueueRemote, claimRemote, completeRemote, failRemote,
+    pendingRemote, historyLoaded, historyTruncated, enqueueRemote, claimRemote, completeRemote, failRemote,
     retryRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
   };
 });

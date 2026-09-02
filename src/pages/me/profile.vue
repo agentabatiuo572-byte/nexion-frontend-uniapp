@@ -137,6 +137,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { formatJoinedDate } from "@/lib/profile-date";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
@@ -252,13 +253,7 @@ const tierProgressLine = computed(() => {
   return t.value.profile.tierProgress.replace("{next}", t.value.profile.tierLabels[nextTier]);
 });
 
-const joinedDate = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(dateLocale(), {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }),
-);
+const joinedDate = computed(() => formatJoinedDate(app.user.joinedAt, dateLocale()));
 
 const dirty = computed(() => name.value !== profile.displayName);
 

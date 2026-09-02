@@ -24,7 +24,11 @@ describe("remote Me summary", () => {
         { status: "FIRED" },
         { status: "CLAIMABLE" },
       ],
-    })).toEqual({ unlocked: 2, total: 4 });
+      badgeAchievements: [
+        { status: "UNLOCKED" },
+        { status: "LOCKED" },
+      ],
+    })).toEqual({ unlocked: 3, total: 6 });
   });
 
   it("keeps achievements unavailable when the points projection is missing", () => {

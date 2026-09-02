@@ -20,6 +20,8 @@
           tabindex="0"
           :aria-label="c.label"
           @click="onChannel(c)"
+          @keydown.enter.prevent="onChannel(c)"
+          @keydown.space.prevent="onChannel(c)"
         >
           <view class="grid place-items-center shrink-0" :style="iconBoxStyle(c.tintSoft)">
             <view v-html="c.icon" />
@@ -56,6 +58,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
+import { openExternalSupportChannel, type ExternalSupportChannel } from "@/lib/external-support-channel";
 
 const t = useT();
 const w = computed(() => t.value.support);
@@ -67,6 +70,7 @@ interface Channel {
   icon: string;
   tintSoft: string;
   href?: string;
+  externalId?: ExternalSupportChannel;
 }
 
 const CHAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" /></svg>`;
@@ -77,10 +81,10 @@ const MAIL_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" st
 
 const channels = computed<Channel[]>(() => [
   { id: "lc", label: w.value.chLiveChat, hint: w.value.chLiveChatHint, icon: CHAT_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", href: "/pages/support/messages" },
-  { id: "tg", label: w.value.chTelegram, hint: w.value.chTelegramHint, icon: SEND_SVG, tintSoft: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)" },
-  { id: "ds", label: w.value.chDiscord, hint: w.value.chDiscordHint, icon: DISCORD_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" },
+  { id: "tg", externalId: "telegram", label: w.value.chTelegram, hint: w.value.chTelegramHint, icon: SEND_SVG, tintSoft: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)" },
+  { id: "ds", externalId: "discord", label: w.value.chDiscord, hint: w.value.chDiscordHint, icon: DISCORD_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" },
   { id: "tk", label: w.value.chTicket, hint: w.value.chTicketHint, icon: TICKET_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", href: "/pages/me/support-tickets?mode=create" },
-  { id: "em", label: w.value.chEmail, hint: w.value.chEmailHint, icon: MAIL_SVG, tintSoft: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" },
+  { id: "em", externalId: "email", label: w.value.chEmail, hint: w.value.chEmailHint, icon: MAIL_SVG, tintSoft: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" },
 ]);
 
 const pinned = computed(() => [w.value.pinnedItem1, w.value.pinnedItem2, w.value.pinnedItem3, w.value.pinnedItem4]);
@@ -90,6 +94,7 @@ function onChannel(c: Channel) {
     navTo(c.href);
     return;
   }
+  if (c.externalId && openExternalSupportChannel(c.externalId)) return;
   toast.info(c.label, c.hint);
 }
 

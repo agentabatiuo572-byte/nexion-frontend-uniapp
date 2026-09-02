@@ -13,6 +13,11 @@ describe("Nova new-conversation control", () => {
     expect(source).toContain('@keydown.enter.prevent="onStartNewConversation"');
     expect(source).toContain('@keydown.space.prevent="onStartNewConversation"');
   });
+
+  it("discloses when the server returned only the recent part of the transcript", () => {
+    expect(source).toContain('v-if="isAi && remoteApiEnabled && nova.historyTruncated"');
+    expect(source).toContain("t.nova.historyTruncated");
+  });
 });
 
 describe("Nova visible thinking cadence", () => {

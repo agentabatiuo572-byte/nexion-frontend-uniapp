@@ -110,6 +110,7 @@
         </view>
 
         <text class="block" :style="messagesLabelStyle">{{ t.tickets.detail.messagesLabel }}</text>
+        <text v-if="detailTicket.historyTruncated" class="block" role="status" aria-live="polite" :style="historyTruncatedStyle">{{ t.tickets.historyTruncated }}</text>
         <view style="display: flex; flex-direction: column; gap: 8px">
           <view v-for="m in detailTicket.messages" :key="m.id" :style="msgBubbleStyle(m.author === 'user')">
             <view class="flex items-center" :style="msgHeadStyle">
@@ -181,6 +182,16 @@ const reply = ref("");
 const filterFeedback = ref("");
 const slaTargets = ref<SupportSlaTarget[]>([]);
 const ticketSuggestions = ref<SupportFaq[]>([]);
+
+const historyTruncatedStyle: CSSProperties = {
+  color: "var(--v5-warning)",
+  fontSize: "12px",
+  lineHeight: "18px",
+  padding: "8px 10px",
+  border: "1px solid color-mix(in srgb, var(--v5-warning) 38%, transparent)",
+  borderRadius: "8px",
+  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+};
 
 onLoad((query) => {
   if (query?.mode === "create") mode.value = { kind: "create" };
