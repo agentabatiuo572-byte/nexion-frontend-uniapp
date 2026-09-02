@@ -63,7 +63,7 @@ describe("genesis remote truth contract", () => {
       },
       listings: [], transactions: [], tiers: [{ id: "tier-1", from: 0, to: 1000, priceUSDT: 9999 }],
       tiersVersion: 1, marketOpenState: "open", marketOpenStateVersion: 1,
-      closedNoticeKey: "default", catalogAvailable: true, tradeAvailable: true,
+      closedNoticeKey: "default", showcaseEnabled: true, catalogAvailable: true, tradeAvailable: true,
       tradeBlockedReason: "NONE", marketStats: {
         floorUsdt: null, volume24hUsdt: null, owners: null,
         floorDeltaPct: -12.5, lastSaleUsdt: null,
@@ -100,7 +100,7 @@ describe("genesis remote truth contract", () => {
       },
       listings: [], transactions: [], tiers: [{ id: "t1", from: 0, to: 1000, priceUSDT: 9999 }], tiersVersion: 1,
       marketOpenState: "closed", marketOpenStateVersion: 1,
-      closedNoticeKey: "default", catalogAvailable: true, tradeAvailable: false,
+      closedNoticeKey: "default", showcaseEnabled: true, catalogAvailable: true, tradeAvailable: false,
       tradeBlockedReason: "SALE_POLICY_UNAVAILABLE",
       marketStats: { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null },
     }, "dev")).toMatchObject({
@@ -176,7 +176,7 @@ describe("genesis remote truth contract", () => {
   });
 
   it("rejects retired isolated Genesis accounts after migration", async () => {
-    const runId = "nexion-local-dev";
+    const runId = "nexgrid-local-dev";
     const eligibility = {
       eligible: true, reasons: ["NO_ACTIVE_HOLDINGS"],
       qualificationReasonCodes: ["NO_ACTIVE_HOLDINGS", "POLICY_CONFIRMED"],
@@ -261,7 +261,7 @@ describe("genesis remote truth contract", () => {
       series: { seriesCode: "GENESIS-SANDBOX-HOLD", name: "Genesis Sandbox (HOLD)", totalSupply: 0, soldSupply: 0, remainingSupply: 0, priceUsdt: 1, royaltyPct: 0, dailyEmissionRatePct: 0 },
       market: { enabled: false }, emission: { open: false }, listings: [], transactions: [],
       tiers: [], tiersVersion: 1, marketOpenState: "closed", marketOpenStateVersion: 1,
-      closedNoticeKey: "GENESIS_MARKET_HOLD", catalogAvailable: false, tradeAvailable: false,
+      closedNoticeKey: "GENESIS_MARKET_HOLD", showcaseEnabled: false, catalogAvailable: false, tradeAvailable: false,
       tradeBlockedReason: "GENESIS_MARKET_HOLD", sale: {
         serverCanonical: true, available: false, eligibilityEnabled: true, maxPerUser: 0,
         minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 1, open: false,

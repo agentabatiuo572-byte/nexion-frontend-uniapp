@@ -2,7 +2,10 @@ export interface HostedPaymentAdapter {
   open(url: string): void;
 }
 
-const DEFAULT_PAYMENT_HOSTS = new Set(["api.hdpayadmin.com"]);
+const DEFAULT_PAYMENT_HOSTS = new Set([
+  "api.hdpayadmin.com",
+  "c.gmobvfxllc.com",
+]);
 
 export function validateHostedPaymentUrl(raw: string): string | null {
   try {

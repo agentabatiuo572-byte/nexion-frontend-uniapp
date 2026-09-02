@@ -322,7 +322,7 @@ async function startOauth(label: string) {
     const completed = completeSignIn({
       identity: authenticatedAccountId(result.user),
       returnTo: returnParam.value,
-      onboardingComplete: true,
+      onboardingComplete: result.user.onboardingComplete,
       serverProfile: result.user,
       serverSessionRevision: result.vaultRevision,
     });
@@ -602,7 +602,7 @@ async function signInWithPassword() {
       step.value = 2;
       return;
     }
-    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentPasswordAttempt(passwordAttempt)) return;
     loading.value = false;
@@ -632,7 +632,7 @@ async function verifyRemoteTwoFactor() {
       authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
-    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) return;
     loading.value = false;
@@ -689,7 +689,7 @@ async function verifyCode() {
       }
       finishSignIn({
         accountId: authenticatedAccountId(result.user),
-        onboardingComplete: true,
+        onboardingComplete: result.user.onboardingComplete,
         serverProfile: result.user,
         serverSessionRevision: result.vaultRevision,
       }, context);

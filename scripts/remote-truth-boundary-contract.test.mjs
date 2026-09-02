@@ -103,9 +103,9 @@ test("server runtimes never hydrate or mutate the legacy local receipt store", (
   assert.doesNotMatch(page, /remoteApiEnabled\s*&&\s*!developmentFundsEnabled/);
   assert.match(store, /remoteApiEnabled \? \[\] : hydrate\(boundKey\)/);
   assert.match(store, /if \(remoteApiEnabled\) return false/);
-  assert.match(page, /refreshFundsSandboxDeposits/);
-  assert.match(deposits, /receiptNo: ledger\.ledgerNo/);
-  assert.match(deposits, /entryRole === "TOPUP_CREDIT"/);
+  assert.match(page, /depositsStore\.refreshRemoteVietQrDeposits\(\)/);
+  assert.match(deposits, /paymentApi\.listVietQrReceipts\(50, 0\)/);
+  assert.match(deposits, /succeedVietQrReceiptPageRead\([\s\S]*receiptPage\.items/);
 });
 
 test("VietQR limits, availability and fees stay server-configured in sandbox and production", () => {

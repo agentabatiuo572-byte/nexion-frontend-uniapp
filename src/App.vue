@@ -526,7 +526,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
       returnTo: protectedRoute ? `/${route}` : "/pages/index/index",
-      onboardingComplete: true,
+      onboardingComplete: restored.user.onboardingComplete,
       serverProfile: restored.user,
       serverSessionRevision: sessionVault.revision(),
       deferNavigation: protectedRoute,

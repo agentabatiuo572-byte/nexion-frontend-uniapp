@@ -44,7 +44,7 @@ test("retired KYC deep link migrates to the current security page with an explan
   assert.match(migration, /"pages\/me\/kyc"/);
   assert.match(migration, /"\/pages\/me\/security\?from=retired-flow"/);
   assert.match(app, /resolveRetiredRoute\(readCurrentRoute\(\)\)/);
-  assert.match(app, /uni\.reLaunch\(\{\s*url:\s*retiredRoute/);
+  assert.match(app, /navReset\(\{\s*url:\s*retiredRoute/);
   assert.match(security, /from === "retired-flow"/);
   assert.match(security, /flowRetired/);
   assert.match(security, /data-qa="retired-flow-notice"/);

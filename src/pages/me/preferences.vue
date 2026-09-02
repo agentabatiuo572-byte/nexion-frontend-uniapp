@@ -9,7 +9,16 @@
       <SubPageHeader back="/pages/me/me" />
       <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
         <text>{{ preferenceError }}</text>
-        <text class="block" style="margin-top: 6px;" @click="prefs.refreshRemote()">{{ t.ui.retry }}</text>
+        <text
+          class="block"
+          style="margin-top: 6px;"
+          role="button"
+          tabindex="0"
+          :aria-label="t.ui.retry"
+          @click="prefs.refreshRemote()"
+          @keydown.enter.prevent="prefs.refreshRemote()"
+          @keydown.space.prevent="prefs.refreshRemote()"
+        >{{ t.ui.retry }}</text>
       </view>
 
       <!-- Sound + haptics -->

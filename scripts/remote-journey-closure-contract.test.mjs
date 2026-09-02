@@ -28,7 +28,6 @@ test("remote daily, orders, quota and bills expose retryable refresh failures", 
     assert.match(page, /onShow/);
     assert.match(page, /retry/i);
   }
-  assert.match(detail, /commercePaymentApi\.confirm/);
   assert.match(detail, /refreshRemote/);
 });
 

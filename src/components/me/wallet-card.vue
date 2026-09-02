@@ -100,7 +100,6 @@ import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
 import { useMarket } from "@/store/market";
 import { fundsServerEnabled } from "@/api/runtime";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
 import SectionHeader from "@/components/me/section-header.vue";
@@ -144,7 +143,7 @@ const nexMarketLabel = computed(() => {
 
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const emptySlots = computed(() => Math.max(0, MAX_DEVICES - activeCount.value - trialSlot.value));
+const emptySlots = computed(() => Math.max(0, app.slotCap - activeCount.value - trialSlot.value));
 const onlineCount = computed(
   () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length + trialSlot.value,
 );

@@ -75,7 +75,7 @@ test("all support snapshots are account-epoch guarded and a visible human thread
   for (const source of [tickets, conversations]) {
     assert.match(source, /const epoch = accountEpoch;/);
     assert.match(source, /if \(epoch === accountEpoch\) replace/);
-    assert.match(source, /if \(epoch === accountEpoch\) loading\.value = false;/);
+    assert.match(source, /if \(epoch === accountEpoch(?: && requestGeneration === listRequestGeneration)?\) loading\.value = false;/);
   }
   assert.match(scope, /useConversations\(\)\.bindAccount\(accountKey\)/);
   assert.match(chat, /const HUMAN_THREAD_POLL_MS = 5_000/);
@@ -214,7 +214,7 @@ test("conversation list and detail localize an unassigned server owner after ref
     read("src/i18n/messages/en.ts"),
     read("src/i18n/messages/zh.ts"),
   ]);
-  assert.match(messages, /await convStore\.refresh\(\)/);
+  assert.match(messages, /convStore\.refresh\(\)/);
   assert.match(messages, /displayAgentName\(c\.agentName\)/);
   assert.match(messages, /t\.value\.conversations\.unassignedAgent/);
   assert.match(chat, /displayAgentName\(conv\.value\.agentName\)/);

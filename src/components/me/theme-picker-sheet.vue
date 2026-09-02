@@ -11,7 +11,7 @@
   Device-local preference — no backend call.
 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="nx-theme-picker-root" role="dialog" aria-modal="true" :aria-label="t.me.themePickerTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
       <view class="nx-sheet-fade-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
@@ -52,14 +52,16 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useTheme, type ThemeMode } from "@/store/theme";
 
-defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
 const theme = useTheme();
+useDialogA11y(computed(() => props.open), ".nx-theme-picker-root", () => emit("close"));
 
 const SUN = ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8"];
 const MOON = ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"];

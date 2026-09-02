@@ -47,6 +47,16 @@ const FILE_EXEMPTIONS = [
     why: "mock 后端载荷:真后台会按 language 下发本地化文本(platform-config 的 zhTitle/zhGuide),faq 是中文查询词匹配,都不是客户端文案",
     match: (file) => file.startsWith("src/mock/"),
   },
+  {
+    id: "test-fixtures",
+    why: "Vitest/contract test 的输入、断言与用例标题不进入生产包；仅按 .test.ts 文件类别放行，生产源码仍逐字检查",
+    match: (file) => file.endsWith(".test.ts"),
+  },
+  {
+    id: "localized-content-builders",
+    why: "两份纯函数同时维护 zh/en/vi 状态词表并按 locale 选择，业务正文仍只读服务端发布内容；精确文件作用域避免扩大豁免",
+    match: (file) => ["src/lib/commissions-how-content.ts", "src/lib/rank-how-content.ts"].includes(file),
+  },
 ];
 
 const VALUE_EXEMPTIONS = [
@@ -76,6 +86,12 @@ const VALUE_EXEMPTIONS = [
       line.replace(/(["'])([^"']*)\1/g, (m, q, inner) =>
         LEGACY_CONFIG_TOKENS.includes(inner) ? `${q}${q}` : m
       ),
+  },
+  {
+    id: "fullwidth-percent-token",
+    why: "服务端奖励文案兼容解析的全角百分号字节，不是客户端展示文案；仅在归一化函数定义面授权该 token",
+    files: ["src/pages/daily/daily-reward-view.ts"],
+    strip: (line) => line.replace(/％/g, "%"),
   },
 ];
 
@@ -199,6 +215,10 @@ function selftest() {
     ["豁免:i18n 层放行(en.ts —— 英文词典里也可能存在中文品牌名/语言名)", "src/i18n/messages/en.ts", 'export const en = { a: "简体中文" };', 0],
     ["豁免:i18n 层放行(vi.ts)", "src/i18n/messages/vi.ts", 'export const vi = { a: "简体中文" };', 0],
     ["豁免:mock 载荷放行", "src/mock/platform-config.ts", 'const a = { zhTitle: "电脑显卡算力共享" };', 0],
+    ["豁免:test fixture 不进入生产包", "src/lib/example.test.ts", 'expect(value).toBe("测试值");', 0],
+    ["🔴 test 豁免不扩到生产源码", "src/lib/example.ts", 'const value = "测试值";', 1],
+    ["豁免:精确作用域三语内容构建器", "src/lib/rank-how-content.ts", 'const copy = { zh: "等级说明", en: "Rank guide" };', 0],
+    ["🔴 内容构建器豁免不扩到普通文件", "src/lib/other-content.ts", 'const copy = { zh: "等级说明" };', 1],
     ["豁免:cnTitle 字段在定义面放行", "src/store/v-rank.ts", 'v: 0, title: "Cadet", cnTitle: "学员",', 0],
     ["豁免:cnTitle 单引号写法同样放行(宽严不许取决于引号风格)", "src/store/v-rank.ts", "cnTitle: '学员',", 0],
     ["同文件里非 cnTitle 的中文照抓", "src/store/v-rank.ts", 'v: 0, title: "学员", cnTitle: "学员",', 1],
@@ -210,6 +230,8 @@ function selftest() {
     ["🔴 同文件里非授权取值的中文照抓(不是整文件豁免)", "src/lib/trial-config-enum.ts", 'throw new Error("试用配置无效");', 1],
     ["🔴 只认整串相等:授权 token 作子串不逃逸", "src/lib/trial-config-enum.ts", 'const a = "开放试用";', 1],
     ["🔴 legacy 豁免带文件作用域:消费面写同样的字照抓", "src/pages/x/a.vue", "<template><view>开放</view></template>", 1],
+    ["豁免:全角百分号只作解析 token", "src/pages/daily/daily-reward-view.ts", 'const sign = text.endsWith("％") ? "％" : "%";', 0],
+    ["🔴 全角百分号豁免带文件作用域", "src/pages/x/a.vue", '<template><text>％</text></template>', 1],
     ["🔴 \\u 转义绕过被解码后照抓", "src/pages/x/a.ts", 'const a = "\\u6559\\u7a0b\\u4e2d\\u5fc3";', 1],
     ["🔴 纯 CJK 标点文案照抓(只判汉字块会整段免疫)", "src/pages/x/a.vue", "<template><view>「」、。</view></template>", 1],
     ["pages.json 的导航栏标题是用户可见文案面", "src/pages.json", '{"path":"pages/x/a","style":{"navigationBarTitleText":"教程中心"}}', 1],

@@ -18,8 +18,8 @@ describe("password reset session and error contract", () => {
     expect(page).toContain('mode.value = "password"');
     expect(page).toContain("t.value.login.resetSuccess");
     for (const source of Object.values(messages)) {
-      expect(source).not.toMatch(/resetSuccess:\s*["'][^"']*(已登录|signed in|đã đăng nhập)/i);
-      expect(source).not.toMatch(/finishReset:\s*["'][^"']*(并登录|and sign in|và đăng nhập)/i);
+      expect(source).not.toMatch(/resetSuccess:\s*["'][^"']*(\u5df2\u767b\u5f55|signed in|đã đăng nhập)/i);
+      expect(source).not.toMatch(/finishReset:\s*["'][^"']*(\u5e76\u767b\u5f55|and sign in|và đăng nhập)/i);
     }
   });
 

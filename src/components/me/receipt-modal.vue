@@ -12,10 +12,11 @@
   prop/emit — no chassis-level overlay host).
 -->
 <template>
-  <view v-if="receipt" class="nx-receipt-scrim" :style="scrimStyle" @click="emit('close')">
+  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute">
+    <view class="nx-receipt-scrim" :style="scrimStyle" @click="emit('close')">
     <view class="nx-step-in" :style="sheetStyle" @click.stop>
       <!-- Close -->
-      <view class="grid place-items-center active:opacity-60" :style="closeBtnStyle" @click="emit('close')">
+      <view class="grid place-items-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -46,7 +47,12 @@
             v-else-if="row.copyValue"
             class="flex items-center active:opacity-60"
             :style="copyRowStyle"
+            role="button"
+            tabindex="0"
+            :aria-label="row.k"
             @click="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
+            @keydown.enter.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
+            @keydown.space.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
             <text class="truncate" style="color: var(--v5-brand)">{{ row.v }}</text>
             <text v-if="row.hint" style="color: var(--v5-ink-4); font-size: 12px">({{ row.hint }})</text>
@@ -67,10 +73,12 @@
       </view>
     </view>
   </view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
@@ -82,6 +90,7 @@ const props = defineProps<{ receipt: Receipt | CanonicalComputeReceipt | null }>
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
+useDialogA11y(computed(() => props.receipt !== null), ".nx-receipt-modal-root", () => emit("close"));
 // "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
 function isCanonicalComputeReceipt(
   receipt: Receipt | CanonicalComputeReceipt,

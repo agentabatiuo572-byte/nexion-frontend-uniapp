@@ -42,7 +42,7 @@ export function productCopy(t: Messages, p: Product): ProductCopy {
  * Every render of those fields goes through here; `spec-sentinel-render-gate.mjs`
  * fails the build on any unwrapped read in the store render face.
  */
-export function specText(t: Messages, value: string | undefined): string {
+export function specText(t: Messages, value: string | null | undefined): string {
   return !value || value === SPEC_UNAVAILABLE ? t.store.specValueUnavailable : value;
 }
 

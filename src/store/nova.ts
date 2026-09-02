@@ -52,6 +52,7 @@ export interface NovaMessage {
 export interface NovaRemoteHistory {
   conversationId: string | null;
   messages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>;
+  truncated?: boolean;
 }
 
 let counter = 1;

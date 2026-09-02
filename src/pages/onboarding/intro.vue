@@ -24,6 +24,8 @@
         tabindex="0"
         :aria-label="t.language.pageTitle"
         @click="langOpen = true"
+        @keydown.enter.prevent="langOpen = true"
+        @keydown.space.prevent="langOpen = true"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -146,6 +148,8 @@
           tabindex="0"
           :aria-label="l.nativeName"
           @click="pick(l.code)"
+          @keydown.enter.prevent="pick(l.code)"
+          @keydown.space.prevent="pick(l.code)"
         >
           <text class="intro-lang-row__flag">{{ l.flag }}</text>
           <view class="intro-lang-row__names">
@@ -205,7 +209,10 @@ const fleetNow = () => (fleetOk() && !cfg.syncFailed ? fleetDevicesOf(cfg.config
 //   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
 const paidNow = () => remoteApiEnabled ? app.homeTruth?.onboarding.cumulativePaidUsdt ?? null : paidCumulativeNow();
 const paid = ref(paidNow());
-const devices = ref(remoteApiEnabled ? app.homeTruth?.onboarding.activeDevices ?? null : fleetNow());
+// Intro is public and is often shown before a user session exists. H9 public
+// stats are the server authority here; the authenticated home projection must
+// not turn an already-loaded public fleet count into a dash.
+const devices = ref(fleetNow());
 
 function fmtNum(n: number | null): string {
   return n === null ? "—" : n.toLocaleString("en-US");
@@ -247,7 +254,7 @@ onMounted(() => {
     // steps, so a reload can never show a smaller total than a longer session.
     paid.value = paidNow();
     if (remoteApiEnabled) {
-      devices.value = app.homeTruth?.onboarding.activeDevices ?? null;
+      devices.value = fleetNow();
       return;
     }
     const drift = Math.random();

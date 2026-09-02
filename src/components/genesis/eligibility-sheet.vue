@@ -1,8 +1,8 @@
 <!-- 创世认购资格：只展示服务端新策略，不在客户端拼装资格条件。 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="nx-elig-root" role="dialog" aria-modal="true" :aria-label="t.genesisEligibility.title">
     <transition name="nx-elig-fade">
-      <view v-if="open" class="nx-elig-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-elig-backdrop" @click="emitClose" />
     </transition>
     <transition name="nx-elig-slide">
       <view v-if="open" class="nx-elig-panel" :style="panelStyle" @click.stop>
@@ -11,7 +11,7 @@
             <text class="block" :style="titleStyle">{{ t.genesisEligibility.title }}</text>
             <text class="block" :style="subtitleStyle">{{ t.genesisEligibility.subtitlePolicy }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -45,9 +45,13 @@
         <text v-if="hasPolicyFacts && gate.capReached" class="block" :style="capNoteStyle">{{ capNoteText }}</text>
         <view
           v-if="gate.eligible && !gate.capReached"
-          class="w-full inline-flex items-center justify-center active:opacity-85"
-          :style="subscribeStyle"
-          @click="emitSubscribe"
+           class="w-full inline-flex items-center justify-center active:opacity-85"
+           :style="subscribeStyle"
+           role="button"
+           tabindex="0"
+           @click="emitSubscribe"
+           @keydown.enter.prevent="emitSubscribe"
+           @keydown.space.prevent="emitSubscribe"
         >
           <text>{{ t.genesisEligibility.unlockedCta }}</text>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -122,7 +126,7 @@ const reasonTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-
 const capNoteStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", textAlign: "center", lineHeight: 1.45 };
 const subscribeStyle: CSSProperties = { marginTop: "14px", height: "50px", padding: "0 28px", borderRadius: "999px", gap: "6px", background: "var(--v5-brand)", boxShadow: "var(--v5-spotlight-brand)", color: "var(--v5-on-brand)", fontFamily: "var(--font-v5)", fontWeight: 500, fontSize: "15px" };
 
-useDialogA11y(computed(() => props.open), ".nx-elig-backdrop", emitClose);
+useDialogA11y(computed(() => props.open), ".nx-elig-root", emitClose);
 </script>
 
 <style scoped>

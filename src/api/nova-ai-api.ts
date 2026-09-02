@@ -28,6 +28,7 @@ export interface NovaAiHistoryMessage {
 export interface NovaAiHistoryResponse {
   conversationId: string | null;
   messages: NovaAiHistoryMessage[];
+  truncated: boolean;
 }
 
 export interface NovaAiApi {
@@ -74,7 +75,7 @@ function parseHistory(value: unknown): NovaAiHistoryResponse {
   const row = record(value);
   const rawMessages = row && Array.isArray(row.messages) ? row.messages : null;
   if (!row || (row.conversationId !== null && !conversationId(row.conversationId))
-      || !rawMessages || rawMessages.length > 400) {
+      || !rawMessages || rawMessages.length > 400 || typeof row.truncated !== "boolean") {
     throw new ApiError({ kind: "protocol", message: "NOVA_AI_HISTORY_RESPONSE_INVALID" });
   }
   const messages = rawMessages.map((value): NovaAiHistoryMessage => {
@@ -93,6 +94,7 @@ function parseHistory(value: unknown): NovaAiHistoryResponse {
   return {
     conversationId: row.conversationId,
     messages,
+    truncated: row.truncated,
   };
 }
 

@@ -4,8 +4,8 @@ import type { AuthApi, RegistrationRequest } from "@/api/auth-api";
 import { registerAndLogin } from "./registration-auto-login";
 
 const request: RegistrationRequest = {
-  countryCode: "+81",
-  phone: "81987654321",
+  countryCode: "+84",
+  phone: "912345678",
   challengeNo: "REG-0123456789abcdef0123456789abcdef",
   code: "123456",
   password: "NexPass9a",
@@ -44,7 +44,7 @@ test("successful registration keeps the single server-issued session without a c
   const authApi = api({
     register: vi.fn().mockResolvedValue({
       kind: "authenticated",
-      user: { userId: 7101, countryCode: "+81", phone: "81987654321", nickname: "New" },
+      user: { userId: 7101, countryCode: "+84", phone: "912345678", nickname: "New" },
       vaultRevision: 4,
       registrationReceipt: receipt,
     }),
@@ -66,7 +66,7 @@ test("unknown registration outcome performs one authoritative password-login rec
     })),
     login: vi.fn().mockResolvedValue({
       kind: "authenticated",
-      user: { userId: 7102, countryCode: "+81", phone: "81987654321", nickname: "Recovered" },
+      user: { userId: 7102, countryCode: "+84", phone: "912345678", nickname: "Recovered" },
       vaultRevision: 1,
     }),
   });
@@ -96,7 +96,7 @@ test("a stale registration flow discards only its issued session and does not lo
   const authApi = api({
     register: vi.fn().mockResolvedValue({
       kind: "authenticated",
-      user: { userId: 7103, countryCode: "+81", phone: "81987654321", nickname: "Stale" },
+      user: { userId: 7103, countryCode: "+84", phone: "912345678", nickname: "Stale" },
       vaultRevision: 9,
     }),
   });
@@ -117,7 +117,7 @@ test("an unexpected recovery-login challenge never claims the App as signed in",
     })),
     login: vi.fn().mockResolvedValue({
       kind: "challenge",
-      user: { userId: 7104, countryCode: "+81", phone: "81987654321", nickname: "Challenge" },
+      user: { userId: 7104, countryCode: "+84", phone: "912345678", nickname: "Challenge" },
       challengeNo: "LOGIN-0123456789abcdef0123456789abcdef",
       deliveryHint: "***4321",
     }),

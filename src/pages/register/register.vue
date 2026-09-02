@@ -360,7 +360,7 @@ async function startOauth(label: string) {
     }
     const completed = completeSignIn({
       identity: `user:${result.user.userId}`,
-      onboardingComplete: true,
+      onboardingComplete: result.user.onboardingComplete,
       serverProfile: result.user,
       serverSessionRevision: result.vaultRevision,
     });
@@ -672,7 +672,7 @@ async function finish() {
     }
     const completed = completeSignIn({
       identity: `user:${registration.user.userId}`,
-      onboardingComplete: true,
+      onboardingComplete: registration.user.onboardingComplete,
       serverProfile: registration.user,
       serverSessionRevision: registration.vaultRevision,
       deferNavigation: true,

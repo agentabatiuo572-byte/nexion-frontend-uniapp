@@ -10,10 +10,10 @@
   client never pre-debits the wallet or writes a synthetic receipt.
 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="nx-genesis-purchase-root" role="dialog" aria-modal="true" :aria-label="t.genesis.confirmTitle">
     <!-- Backdrop -->
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
     </transition>
     <!-- Panel -->
     <transition name="nx-sheet-slide">
@@ -24,7 +24,7 @@
             <text class="block" :style="titleStyle">{{ t.genesis.confirmTitle }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -417,7 +417,7 @@ const submitStyle = computed<CSSProperties>(() => ({
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
+useDialogA11y(computed(() => props.open), ".nx-genesis-purchase-root", emitClose);
 </script>
 
 <style scoped>

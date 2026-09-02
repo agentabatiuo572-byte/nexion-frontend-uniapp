@@ -11,10 +11,76 @@
 import { chromium } from "playwright";
 import { scopeRoutes, mapRoutes, settleNetwork } from "./lib/probe-routes.mjs";
 import { collectAppConsoleErrors, isThirdPartyResourceError } from "./lib/console-origin-filter.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 
 // 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 统一名)——只认前者会在非 5173 端口静默打到别的工程树。
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
+
+function formalEmptyResponse(url) {
+  const eligibility = {
+    eligible: false,
+    reasons: ["NO_ACTIVE_HOLDINGS"],
+    qualificationReasonCodes: ["NO_ACTIVE_HOLDINGS"],
+    ownedCount: 0,
+    maxPerUser: 20,
+    remainingCap: 20,
+    minAccountAgeDays: 0,
+    accountAgeDays: 1,
+    halted: false,
+    status: "NOT_ELIGIBLE",
+    reservedAllocation: 0,
+    reservedAllocationUnit: "NEX",
+    priorityRank: null,
+    priorityTier: "NONE",
+    policyVersion: "formal-empty-v1",
+    effectiveAt: "2026-09-01T00:00:00Z",
+    asOf: "2026-09-02T00:00:00Z",
+    serverTime: "2026-09-02T00:00:01Z",
+    provenance: { source: "nx_genesis_holding+nx_config_item", environment: "PRODUCTION", runId: "" },
+    serverCanonical: true,
+    source: "nx_genesis_holding+nx_config_item",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+  };
+  if (url.pathname === "/api/app/wallet/bills") return {
+    source: "server", sourceEnvironment: "PRODUCTION", bills: [], page: 1, pageSize: 50, total: 0, nextPage: null, nextCursor: null,
+  };
+  if (url.pathname === "/api/app/wallet/bills/summary") return {
+    source: "server", sourceEnvironment: "PRODUCTION", timeZone: "UTC", asOf: "2026-09-02T00:00:00Z",
+    rewardsUsdt: 0, rewardsNex: 0, latestRewardAt: null, todayNexEarn: 0, pendingNex: 0, monthBillCount: 0, recentNexBills: [],
+  };
+  if (url.pathname === "/api/orders") return {
+    source: "server", sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true, orders: [],
+  };
+  if (url.pathname === "/api/genesis/account") return {
+    sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, source: "nx_genesis_holding+nx_config_item",
+    series: { seriesCode: "GENESIS-MAIN", name: "Genesis", totalSupply: 1000, soldSupply: 0, remainingSupply: 1000, priceUsdt: 10, royaltyPct: 0, dailyEmissionRatePct: 0 },
+    sale: { serverCanonical: true, available: false, eligibilityEnabled: true, maxPerUser: 20, minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 10, open: false },
+    marketEnabled: false, emissionOpen: false, holdings: [], emissions: [], orders: [], walletBalanceUsdt: 0, eligibility,
+  };
+  if (url.pathname === "/api/genesis/eligibility") return eligibility;
+  if (url.pathname === "/api/genesis/state") return {
+    serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", halted: false, revision: "formal-empty-v1",
+    source: "nx_emergency_control_setting:killswitch.genesis",
+    series: { seriesCode: "genesis-main", name: "Genesis", totalSupply: 1000, soldSupply: 0, remainingSupply: 1000, priceUsdt: 10, royaltyPct: 0, dailyEmissionRatePct: 0 },
+    market: { enabled: false }, emission: { open: false },
+    sale: { serverCanonical: true, available: false, eligibilityEnabled: true, maxPerUser: 20, minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 10, open: false },
+    listings: [], transactions: [], tiers: [{ id: "tier-1", from: 0, to: 1000, priceUSDT: 10 }], tiersVersion: 1,
+    marketOpenState: "closed", marketOpenStateVersion: 1, closedNoticeKey: "default", showcaseEnabled: true,
+    catalogAvailable: true, tradeAvailable: false, tradeBlockedReason: "SALE_POLICY_UNAVAILABLE",
+    marketStats: { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null },
+  };
+  if (url.pathname === "/api/store/catalog") return {
+    source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: null, products: [],
+  };
+  if (url.pathname === "/api/store/bundle-discount") return {
+    source: "server", serverCanonical: true, policyVersion: 1,
+    tiers: [{ minItems: 2, rate: 0.05 }, { minItems: 3, rate: 0.08 }, { minItems: 4, rate: 0.1 }],
+  };
+  if (url.pathname === "/api/product/phase") return { phase: "P1", source: "H1_GROWTH_RHYTHM", devOverrideAllowed: false };
+  return undefined;
+}
 
 // 接了 EmptyState 的页面(与 docs/changes/2026-07-23-c5-empty-states.md 的映射表一致)
 // 多数页面的列表数据在 pinia store 里,清空数组就够。但有几个页面的数据源是**代码常量**
@@ -124,6 +190,7 @@ const SCOPE = scopeRoutes(ROUTES, "空状态探针", (spec) => spec.r);
 const SPECS = SCOPE.routes;
 // 包 ax:N 条 lane(各自独立 context / 渲染进程)并行各扫一页(PROBE_CONCURRENCY,默认 3);每页仍是原节奏,判据不动;console error 按 lane page 各记各的。
 const errorsOf = new WeakMap();
+const formalSessionSet = new WeakSet();
 const consoleErrorsFor = (page) => {
   if (!errorsOf.has(page)) {
     const arr = []; errorsOf.set(page, arr);
@@ -136,6 +203,7 @@ const consoleErrorsFor = (page) => {
 };
 
 const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
+  if (!formalSessionSet.has(page)) { await installFormalProbeSession(page, { responseFor: formalEmptyResponse }); formalSessionSet.add(page); }
   const i = ROUTES.indexOf(spec);
   const route = spec.r;
   const consoleErrors = consoleErrorsFor(page);

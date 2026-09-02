@@ -10,13 +10,13 @@
   海报,不随 app 主题变),全部颜色为画稿常量,不读运行时 token。
 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="ps-root" role="dialog" aria-modal="true" :aria-label="t.share.posterTitle">
     <view class="ps-mask" @click="emit('close')" />
     <view class="ps-sheet">
       <view class="ps-grab" />
       <view class="ps-head">
         <text class="ps-head__t">{{ t.share.posterTitle }}</text>
-        <view class="ps-head__x active:opacity-70" @click="emit('close')">
+        <view class="ps-head__x active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -30,7 +30,7 @@
         <view v-else-if="genState === 'failed'" class="ps-fail">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <text class="ps-fail__t">{{ t.share.genFailed }}</text>
-          <view class="ps-fail__btn active:opacity-80" @click="regenerate">
+          <view class="ps-fail__btn active:opacity-80" role="button" tabindex="0" @click="regenerate" @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
             <text class="ps-fail__btn-t">{{ t.share.retry }}</text>
           </view>
         </view>
@@ -46,7 +46,11 @@
           :key="tp.key"
           class="ps-thumb active:scale-95"
           :class="{ 'ps-thumb--on': tpl === tp.key }"
+          role="button"
+          tabindex="0"
           @click="pickTpl(tp.key)"
+          @keydown.enter.prevent="pickTpl(tp.key)"
+          @keydown.space.prevent="pickTpl(tp.key)"
         >
           <view class="ps-thumb__dot" :style="{ background: tp.tint }" />
           <text class="ps-thumb__t">{{ tp.label }}</text>
@@ -55,24 +59,25 @@
 
       <view class="ps-reward">
         <text class="ps-reward__t">{{ posterRewardLine }}</text>
+        <text v-if="rewardEffectiveAtText" class="ps-reward__t">{{ rewardEffectiveAtText }}</text>
       </view>
 
       <view class="ps-toggle">
         <text class="ps-toggle__lb">{{ t.share.showUsername }}</text>
-        <view class="ps-sw active:opacity-70" :class="{ 'ps-sw--on': showUsername }" @click="toggleUsername">
+        <view class="ps-sw active:opacity-70" :class="{ 'ps-sw--on': showUsername }" role="switch" tabindex="0" :aria-checked="showUsername" :aria-label="t.share.showUsername" @click="toggleUsername" @keydown.enter.prevent="toggleUsername" @keydown.space.prevent="toggleUsername">
           <view class="ps-sw__knob" />
         </view>
       </view>
 
       <!-- 渠道行:保存 / 复制 + 链接渠道(与渠道面板同一 intent 实现) -->
       <view class="ps-chrow">
-        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" @click="saveImage">
+        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="saveImage" @keydown.enter.prevent="saveImage" @keydown.space.prevent="saveImage">
           <view class="ps-ch__ic ps-ch__ic--hl">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /><path d="m7 10 5 5 5-5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
           </view>
           <text class="ps-ch__lb">{{ t.share.saveImage }}</text>
         </view>
-        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" @click="copyLinkAction">
+        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="copyLinkAction" @keydown.enter.prevent="copyLinkAction" @keydown.space.prevent="copyLinkAction">
           <view class="ps-ch__ic ps-ch__ic--hl">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
@@ -83,7 +88,11 @@
           :key="c.key"
           class="ps-ch active:scale-95"
           :class="{ 'ps-ch--off': genState !== 'ready' }"
+          role="button"
+          :tabindex="genState === 'ready' ? 0 : -1"
           @click="onChannel(c)"
+          @keydown.enter.prevent="onChannel(c)"
+          @keydown.space.prevent="onChannel(c)"
         >
           <view class="ps-ch__ic">
             <view v-html="channelIcon(c.key)" />
@@ -99,13 +108,14 @@
 import { computed, getCurrentInstance, nextTick, ref, watch } from "vue";
 import qrcode from "qrcode-generator";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
 import { toast } from "@/store/ui";
 import { activateChannel, buildShareLink, copyText, currentShareReferralCode, recordShareEvent } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -130,6 +140,12 @@ const giftNex = computed(() => rewardEnabled.value ? cfg.config.rewards.welcomeG
 const posterRewardLine = computed(() => rewardEnabled.value
   ? fmt(t.value.share.posterRewardLine, { usd: giftUsdt.value, nex: giftNex.value })
   : t.value.team.sharingStillAvailable);
+const rewardEffectiveAtText = computed(() => {
+  if (!rewardEnabled.value || !cfg.config.rewards.effectiveAt) return "";
+  const at = new Date(cfg.config.rewards.effectiveAt);
+  if (Number.isNaN(at.getTime())) return "";
+  return fmt(t.value.share.posterRewardEffectiveAt, { date: at.toLocaleDateString(dateLocale()) });
+});
 
 // yield 模板依赖用户真设备数据；gift 模板仅在 H8 奖励开启时可用。
 const availableTpls = computed(() => {
@@ -545,6 +561,8 @@ async function onChannel(c: ShareChannelDef) {
   if (genState.value !== "ready") return;
   await activateChannel(c, "poster_sheet", channelLabel(c.key));
 }
+
+useDialogA11y(computed(() => props.open), ".ps-root", () => emit("close"));
 </script>
 
 <style scoped>

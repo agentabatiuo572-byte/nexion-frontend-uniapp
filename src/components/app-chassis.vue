@@ -250,7 +250,7 @@ const voucherPopupScheduler = createVoucherPopupScheduler<VoucherPopupRequestSco
   tryAutoPush: (options) => {
     if (!popupArbiter.acquire("voucher-claim")) return false;
     const opened = voucherClaimSheet.tryAutoPush({ surface: "home", ...options });
-    if (!opened) popupArbiter.release("voucher-claim");
+    if (!opened) popupArbiter.release("voucher-claim"); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语
     else stopAutoPush();
     return opened;
   },

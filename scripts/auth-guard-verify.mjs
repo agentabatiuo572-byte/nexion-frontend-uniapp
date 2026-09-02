@@ -40,7 +40,13 @@ async function installServerSessionBoundary(page, authenticated) {
                 accessToken: "auth-guard-access-token",
                 refreshToken: null,
                 tokenType: "Bearer",
-                user: { userId: 900001, countryCode: "+86", phone: "13800000000", nickname: "Guard Witness" },
+                user: {
+                  userId: 900001,
+                  countryCode: "+86",
+                  phone: "13800000000",
+                  nickname: "Guard Witness",
+                  onboardingComplete: true,
+                },
               },
             }
           : { code: 401, message: "AUTH_REQUIRED", data: null }),
@@ -126,7 +132,20 @@ async function sameDocumentRoute(target, authenticated = true, initialRoute = ""
   await page.goto(`${BASE}/?nx_device=off#${startRoute}`, { waitUntil: "load", timeout: 30000 });
   await wait(1200);
   await page.evaluate((hash) => { window.location.hash = hash; }, target);
-  await wait(2200); // one guard tick sees the live hash even when the page stack is stale
+  // A busy dev server can delay the one-second repair tick. Observe the
+  // final guard destination instead of stopping at an intermediate retired-
+  // route migration or assuming 2.2s is enough.
+  const expectedRoute = !authenticated
+    ? "/pages/onboarding/intro"
+    : target === "/pages/me/kyc"
+      ? "/pages/me/security?from=retired-flow"
+      : "/pages/earn/earn";
+  await page.waitForFunction(
+    (expected) => (location.hash || "").replace(/^#/, "") === expected,
+    expectedRoute,
+    { timeout: 10_000 },
+  ).catch(() => {});
+  await wait(300);
   const witness = await page.evaluate(() => ({
     actualRoute: (location.hash || "").replace(/^#/, ""),
     appChildren: document.querySelector("#app")?.childElementCount ?? 0,

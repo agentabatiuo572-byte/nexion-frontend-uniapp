@@ -14,7 +14,7 @@
           <text class="block truncate" style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ latestOrder.productName }}</text>
           <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">${{ latestOrder.total.toFixed(0) }} · {{ latestOrder.dataCenter }}</text>
         </view>
-        <text class="shrink-0 font-mono-tabular" :style="statusPillStyle(latestOrder.status)">{{ latestOrder.status }}</text>
+        <text class="shrink-0 font-mono-tabular" :style="statusPillStyle(latestOrder.status)">{{ statusLabel(latestOrder.status) }}</text>
       </view>
       <view v-else class="flex items-center justify-between" style="gap: 12px">
         <text class="flex-1 min-w-0" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.empty }}</text>
@@ -72,6 +72,21 @@ function statusPillStyle(status: string): CSSProperties {
     fontSize: "12px",
     fontWeight: 500,
   };
+}
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    placed: t.value.orders.statusPlaced,
+    paid: t.value.orders.statusPaid,
+    provisioning: t.value.orders.statusProvisioning,
+    activated: t.value.orders.statusActivated,
+    payment_failed: t.value.orders.statusPaymentFailed,
+    expired: t.value.orders.statusExpired,
+    provisioning_failed: t.value.orders.statusProvisioningFailed,
+    refunded: t.value.orders.statusRefunded,
+    chargeback: t.value.orders.statusChargeback,
+    cancelled: t.value.orders.statusFailedShort,
+  };
+  return labels[status] ?? t.value.orders.statusFailedShort;
 }
 
 const cardStyle: CSSProperties = {

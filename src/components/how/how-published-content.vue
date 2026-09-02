@@ -1,10 +1,10 @@
 <template>
   <view>
     <SubPageHeader :back="back" />
-    <view v-if="loading" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status">{{ t.howPublished.loading }}</view>
+    <view v-if="loading" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <view v-else-if="error" class="mx-4" style="padding: 28px 0;" role="alert">
       <view style="padding: 14px; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-ink-2);">
-        <text class="block" style="font-size: 14px; font-weight: 600;">{{ t.howPublished.unavailableTitle }}</text>
+        <text class="block" style="font-size: 15px; font-weight: 600;">{{ t.howPublished.unavailableTitle }}</text>
         <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">{{ t.howPublished.unavailableBody }}</text>
         <view class="flex items-center justify-center" style="margin-top: 12px; height: 40px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand);" role="button" tabindex="0" @click="load">
           <text>{{ t.ui.retry }}</text>
@@ -24,7 +24,7 @@
         </HowSection>
         <HowCalloutBox v-else class="mx-4" :title="block.title" :body="renderBody(block)" tone="purple" />
       </template>
-      <view class="mx-4" style="margin-top: 24px; padding: 10px 12px; border-radius: 10px; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 11px;">
+      <view class="mx-4" style="margin-top: 24px; padding: 10px 12px; border-radius: 10px; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 12px;">
         <text>{{ fmt(t.howPublished.versionMeta, { version: content.version, locale: content.locale }) }}</text>
       </view>
     </view>

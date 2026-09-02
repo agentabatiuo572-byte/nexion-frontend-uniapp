@@ -30,7 +30,7 @@
         <view class="flex-1 min-w-0">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">{{ t.walletV3.withdrawAmbiguousExitTitle }}</text>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px; line-height: 1.4">{{ t.walletV3.withdrawAmbiguousExitBody }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px" @click="abandonPendingAttempt">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="abandoningAttempt" :aria-label="t.walletV3.withdrawAbandonAttemptCta" @click="abandonPendingAttempt" @keydown.enter.prevent="abandonPendingAttempt" @keydown.space.prevent="abandonPendingAttempt">
             <text style="font-size: 12px; color: var(--v5-danger); text-decoration: underline">{{ abandoningAttempt ? `${t.walletV3.withdrawAbandonAttemptCta}…` : t.walletV3.withdrawAbandonAttemptCta }}</text>
           </view>
         </view>
@@ -38,7 +38,7 @@
 
       <!-- dev-only tester reset(?dev=1):清空当前账号提现地址簿,复现空态引导 -->
       <view v-if="devMode" class="mx-4 mb-3 flex items-center justify-end">
-        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetAddresses">
+        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" role="button" tabindex="0" :aria-label="t.walletV3.resetAddrLabel" @click="handleResetAddresses" @keydown.enter.prevent="handleResetAddresses" @keydown.space.prevent="handleResetAddresses">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
           <text style="margin-left: 4px">{{ t.walletV3.resetAddrLabel }}</text>
         </view>
@@ -69,13 +69,13 @@
       <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" @click="useMax">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked" :aria-label="t.wallet.useMax" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
         <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
           <text style="font-family: var(--font-v5); font-size: 26px; color: var(--v5-ink-3)" class="shrink-0">$</text>
-          <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :disabled="inputsLocked" @input="onAmount" />
+          <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
@@ -130,15 +130,19 @@
       <!-- 提现网络 — 可选(每网络各有独立当前地址;RM01a ③) -->
       <view class="mx-4 mt-4" style="padding: 0 2px">
         <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.networkLabel }}</text>
-        <view class="flex" style="gap: 8px; margin-top: 8px">
+        <view class="flex" style="gap: 8px; margin-top: 8px" role="radiogroup" :aria-label="t.wallet.networkLabel">
           <view
             v-for="nw in NETWORKS"
             :key="nw.id"
-            :class="['flex-1 grid place-items-center active:opacity-85', `nx-withdraw-net-${nw.id.slice(5)}`]"
+            :class="['flex-1 grid place-items-center active:opacity-85 nx-withdraw-network-radio', `nx-withdraw-net-${nw.id.slice(5)}`]"
             :style="netChipStyle(nw.id)"
-            role="button" tabindex="0"
-            :aria-selected="network === nw.id"
+            role="radio" :tabindex="network === nw.id ? 0 : -1"
+            :aria-checked="network === nw.id"
             @click="pickNetwork(nw.id)"
+            @keydown.enter.prevent="pickNetwork(nw.id)"
+            @keydown.space.prevent="pickNetwork(nw.id)"
+            @keydown.left.prevent="moveNetwork(-1)"
+            @keydown.right.prevent="moveNetwork(1)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
           </view>
@@ -157,7 +161,10 @@
             class="nx-withdraw-manage-entry grid place-items-center shrink-0 active:opacity-80"
             :style="manageEntryStyle"
             role="button" tabindex="0"
+            :aria-label="t.addrRebind.manageCta"
             @click="goManage"
+            @keydown.enter.prevent="goManage"
+            @keydown.space.prevent="goManage"
           >
             <text :style="manageEntryTextStyle">{{ t.addrRebind.manageCta }}</text>
           </view>
@@ -173,7 +180,7 @@
               <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.addrRebind.emptyGuideBody }}</text>
             </view>
           </view>
-          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" @click="goManage">
+          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage" @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 600">{{ t.addrRebind.addCta }}</text>
           </view>
         </view>
@@ -221,7 +228,7 @@
         <view class="flex items-center justify-between">
           <view class="inline-flex items-center" style="gap: 2px">
             <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feeConfirmRow }}</text>
-            <view class="grid place-items-center active:opacity-60" style="min-width: 32px; min-height: 32px; margin: -10px 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true">
+            <view class="grid place-items-center active:opacity-60" style="min-width: 32px; min-height: 32px; margin: -10px 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true" @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
             </view>
           </view>
@@ -303,19 +310,19 @@
         </view>
         <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ offsetHintText }}</text>
         <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
-        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex">
+        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex" @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.walletV3.earnNexCta }} →</text>
         </view>
       </view>
 
       <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
            范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
-      <view v-if="feeWhyOpen">
+      <view v-if="feeWhyOpen" class="nx-withdraw-fee-dialog" role="dialog" aria-modal="true" :aria-label="t.walletV3.feeWhyTitle">
         <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
         <view class="nx-sheet-slide-up" :style="feeWhySheetStyle">
           <view class="flex items-start justify-between" style="gap: 12px">
             <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
-            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false">
+            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false" @keydown.enter.prevent="feeWhyOpen = false" @keydown.space.prevent="feeWhyOpen = false">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             </view>
           </view>
@@ -329,7 +336,7 @@
       <!-- Sticky submit -->
       <view class="mx-4 mt-4" style="padding-bottom: 12px">
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
-        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :style="submitBtnStyle" @click="handleSubmit">
+        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="submitting" :style="submitBtnStyle" @click="handleSubmit" @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <template v-if="submitting">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -353,7 +360,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -394,6 +401,7 @@ import {
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
@@ -640,6 +648,16 @@ watch([amountNum, network, boundAddress, () => app.accountKey], async () => {
 function pickNetwork(id: Withdrawal["network"]) {
   if (inputsLocked.value) return;
   network.value = id;
+}
+function moveNetwork(delta: number) {
+  if (inputsLocked.value || NETWORKS.value.length < 2) return;
+  const index = NETWORKS.value.findIndex((item) => item.id === network.value);
+  const next = NETWORKS.value[(index + delta + NETWORKS.value.length) % NETWORKS.value.length];
+  if (!next) return;
+  pickNetwork(next.id);
+  void nextTick(() => {
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".nx-withdraw-network-radio[tabindex=\"0\"]")?.focus();
+  });
 }
 
 // ── 地址管理入口 + 换址后 24h 冻结(RM01a ⑤)──────────────────────
@@ -1601,6 +1619,7 @@ const feeWhyBodyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.5,
 };
+useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () => { feeWhyOpen.value = false; });
 const submitBtnStyle = computed<CSSProperties>(() => ({
   height: "48px",
   borderRadius: "999px",

@@ -87,8 +87,10 @@ const declRe = (fn) => new RegExp(
   `(?:async function ${fn}\\s*\\(`
   + `|(?:const|let)\\s+${fn}\\s*=\\s*async\\s*\\(`
   + `|\\b${fn}\\s*:\\s*async\\s*\\(`
-  + `|function ${fn}\\s*\\([^)]*\\)\\s*:\\s*Promise`
-  + `|(?:const|let)\\s+${fn}\\s*=\\s*\\([^)]*\\)\\s*:\\s*Promise)`);
+  // 参数默认值可以含调用表达式（例如 epoch.snapshot()）；用同一行内的贪婪参数面
+  // 找最后一个右括号，避免 [^)]* 在内层调用处提前截断而把真实刷新缝漏掉。
+  + `|function ${fn}\\s*\\([^\\n]*\\)\\s*:\\s*Promise`
+  + `|(?:const|let)\\s+${fn}\\s*=\\s*\\([^\\n]*\\)\\s*:\\s*Promise)`);
 // 宽判据:本文件以任何形式声明过这个标识符。只用来**交叉验 declRe 的表达力**,不参与选缝 ——
 // 宽的命中而四族没命中 = 出现了第五族写法,必红(而不是像 ② 那样静默漏掉一条缝)。
 const looseDeclRe = (fn) => new RegExp(
@@ -218,7 +220,7 @@ function throwingRuntimeStub(mode) {
     // matching in-memory session. Give the harness a coherent non-secret
     // identity so this remains an authority-unavailable test instead of a
     // caller-precondition test; bindAccount below uses the same user:42 key.
-    sessionVault: `export const sessionVault = { read: () => ({ accessToken: "probe", refreshToken: "probe", tokenType: "Bearer", user: { userId: 42, countryCode: "+1", phone: "0000000000", nickname: "probe" } }), revision: () => 1, clear: () => {}, clearIfUnchanged: () => true, save: () => {}, saveIfUnchanged: () => true };`,
+    sessionVault: `export const sessionVault = { read: () => ({ accessToken: "probe", refreshToken: "probe", tokenType: "Bearer", user: { userId: 42, countryCode: "+86", phone: "13800138000", nickname: "probe" } }), revision: () => 1, clear: () => {}, clearIfUnchanged: () => true, save: () => {}, saveIfUnchanged: () => true };`,
   };
   const body = names
     // 🔴 每次 API 调用记一笔:这是「这条缝真的跑了」的唯一硬凭据(z1 R2 对抗审计:

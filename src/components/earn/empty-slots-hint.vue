@@ -70,7 +70,6 @@
 import { computed, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import type { DeviceKind } from "@/store/types";
@@ -89,7 +88,7 @@ type SlotCell =
   | { kind: "empty" };
 
 const slotCells = computed<SlotCell[]>(() =>
-  Array.from({ length: MAX_DEVICES }).map((_, i): SlotCell => {
+  Array.from({ length: app.slotCap }).map((_, i): SlotCell => {
     const device = activeDevices.value[i];
     if (device) return { kind: "filled", deviceKind: device.kind };
     if (trialSlot.value && i === realCount.value) return { kind: "trial" };

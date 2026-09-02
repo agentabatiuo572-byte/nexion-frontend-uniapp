@@ -13,10 +13,11 @@ export interface CreatedBundleOrder {
   paymentStatus: "PENDING";
   orderStatus: "PENDING_PAYMENT";
   idSource: "server";
+  policyVersion: number;
 }
 
 export interface BundleOrderApi {
-  create(productNos: string[], idempotencyKey: string): Promise<CreatedBundleOrder>;
+  create(productNos: string[], policyVersion: number, idempotencyKey: string): Promise<CreatedBundleOrder>;
 }
 
 function invalid(): never {
@@ -38,33 +39,38 @@ function parse(value: unknown): CreatedBundleOrder {
       || new Set(row.productNos).size !== row.productNos.length || row.paymentStatus !== "PENDING"
       || row.orderStatus !== "PENDING_PAYMENT"
       || row.idSource !== "server"
+      || !Number.isSafeInteger(row.policyVersion) || (row.policyVersion as number) < 1
       || row.source !== undefined || row.sourceEnvironment !== undefined || row.runId !== undefined) return invalid();
   const subtotalUsdt = finite(row.subtotalUsdt);
   const discountRate = finite(row.discountRate);
   const discountUsdt = finite(row.discountUsdt);
   const amountUsdt = finite(row.amountUsdt);
-  if (![0.05, 0.08, 0.12].includes(discountRate)
+  if (discountRate <= 0 || discountRate > 0.5
       || Math.abs((subtotalUsdt * discountRate) - discountUsdt) > 0.00001
       || Math.abs((subtotalUsdt - discountUsdt) - amountUsdt) > 0.00001) return invalid();
   return {
     orderNo: row.orderNo.trim(), orderType: "BUNDLE", itemCount: row.itemCount as number,
     productNos: (row.productNos as string[]).map((item) => item.trim()), subtotalUsdt, discountRate,
     discountUsdt, amountUsdt, paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT", idSource: "server",
+    policyVersion: row.policyVersion as number,
   };
 }
 
 export function createBundleOrderApi(client: ApiClient): BundleOrderApi {
   return {
-    async create(productNos, idempotencyKey) {
+    async create(productNos, policyVersion, idempotencyKey) {
       const normalized = productNos.map((value) => value.trim());
       if (normalized.length < 2 || normalized.length > 8 || normalized.some((value) => !value)
-          || new Set(normalized).size !== normalized.length || !idempotencyKey.trim()) return invalid();
-      return parse(await client.request<unknown>({
+          || new Set(normalized).size !== normalized.length || !Number.isSafeInteger(policyVersion)
+          || policyVersion < 1 || !idempotencyKey.trim()) return invalid();
+      const created = parse(await client.request<unknown>({
         method: "POST",
         path: "/api/orders/bundle",
         idempotencyKey,
-        body: { productNos: normalized },
+        body: { productNos: normalized, policyVersion },
       }));
+      if (created.policyVersion !== policyVersion) return invalid();
+      return created;
     },
   };
 }

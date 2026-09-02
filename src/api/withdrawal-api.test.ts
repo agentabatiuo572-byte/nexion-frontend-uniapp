@@ -26,6 +26,15 @@ test("hydrates the durable withdrawal list and sends the server eligibility snap
   expect(requests[1].path).toBe("/api/withdrawals/eligibility");
 });
 
+test("accepts the server strong-review receipt before mapping it to the client manual route", async () => {
+  const api = createWithdrawalApi({ request: async () => ({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
+    withdrawals: [{ ...row, riskRoute: "strong-review" }],
+  }) } as never);
+
+  await expect(api.list()).resolves.toMatchObject([{ withdrawalNo: "WD-1", riskRoute: "strong-review" }]);
+});
+
 test("abandons an ambiguous attempt through the server fence instead of deleting local proof first", async () => {
   let request: any;
   const api = createWithdrawalApi({ request: async (value: any) => {

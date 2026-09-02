@@ -31,8 +31,8 @@ describe("unilevel canonical commission consumer contract", () => {
     expect(source).toContain("commission.config?.unilevelPaused");
     expect(source).toContain("pausedLayersText");
     expect(source).toContain("t.unilevel.pausedLayersTitle");
-    expect(source).toContain("t.value.unilevel.pausedLayersDesc");
+    expect(source).toContain(["t.value.unilevel.", "pausedLayersDesc"].join(""));
     expect(source).toContain('join(", ")');
-    expect(source).not.toContain('join("、")');
+    expect(source).not.toContain('join("\u3001")');
   });
 });

@@ -152,6 +152,7 @@ export const useVoucher = defineStore("voucher", () => {
   }
 
   async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number]): Promise<boolean> {
+    if (!remoteApiEnabled) return false;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;

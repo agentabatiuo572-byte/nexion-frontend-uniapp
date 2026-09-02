@@ -7,13 +7,13 @@
   cancel 为 ghost 弱权重(转化场景 cancel 必弱于渠道,nexgrid-design)。
 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="ss-root" role="dialog" aria-modal="true" :aria-label="t.share.channelTitle">
     <view class="ss-mask" @click="emit('close')" />
     <view class="ss-sheet">
       <view class="ss-grab" />
       <view class="ss-head">
         <text class="ss-head__t">{{ t.share.channelTitle }}</text>
-        <view class="ss-head__x active:opacity-70" @click="emit('close')">
+        <view class="ss-head__x active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -21,12 +21,12 @@
         <text class="ss-reward__t">{{ rewardLineText }}</text>
       </view>
       <view class="ss-grid">
-        <view v-for="c in channels" :key="c.key" class="ss-ch active:scale-95" @click="onChannel(c)">
+        <view v-for="c in channels" :key="c.key" class="ss-ch active:scale-95" role="button" :tabindex="channelBusy ? -1 : 0" :aria-busy="channelBusy" :aria-disabled="channelBusy" @click="onChannel(c)" @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)">
           <view class="ss-ch__ic" :class="{ 'ss-ch__ic--hl': c.intentType === 'copy' || c.intentType === 'poster' }" v-html="channelMeta(c.key).svg" />
           <text class="ss-ch__lb">{{ channelMeta(c.key).label }}</text>
         </view>
       </view>
-      <view class="ss-cancel active:opacity-70" @click="emit('close')">
+      <view class="ss-cancel active:opacity-70" role="button" tabindex="0" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
         <text class="ss-cancel__t">{{ t.share.cancel }}</text>
       </view>
     </view>
@@ -43,8 +43,9 @@ import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useReferralReward } from "@/store/referral-reward";
 import { useConfig } from "@/store/config";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
-defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "openPoster"): void }>();
 
 const t = useT();
@@ -146,6 +147,8 @@ async function onChannel(c: ShareChannelDef) {
     channelBusy.value = false;
   }
 }
+
+useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 </script>
 
 <style scoped>

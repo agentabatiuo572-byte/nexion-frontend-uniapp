@@ -42,12 +42,14 @@ test("formal App accepts only the Java production-shaped referral projection", (
   const appApi = readApp("src/api/referral-reward-api.ts");
   const card = readApp("src/components/team/invite-earn-card.vue");
   assert.match(appApi, /runId: string \| null/);
-  assert.match(appApi, /SANDBOX_FACTS = \["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"\]/);
+  assert.doesNotMatch(appApi, /nx_h8_sandbox_referral_settlement|nx_h8_sandbox_referral_ledger/);
+  assert.match(appApi, /PRODUCTION_FACTS = \["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"\]/);
   assert.match(appApi, /mode === "prod" \|\| mode === "dev"[\s\S]{0,180}sourceEnvironment === "PRODUCTION"[\s\S]{0,100}runId === null/);
   assert.doesNotMatch(card, /RunID/);
 });
 
-test("PC rejects an overview whose RunID does not match the requested run", { skip: pcMissing }, () => {
+test("PC H8 consumes only the production referral overview and exposes no sandbox RunID selector", { skip: pcMissing }, () => {
   const pc = readFileSync(resolve(pcRoot, "lib/admin/h-client.ts"), "utf8");
-  assert.match(pc, /overview\.runId !== runId/);
+  assert.match(pc, /source !== "nx_user\.sponsor_user_id" \|\| settlementMode !== "REAL_WALLET_LEDGER"/);
+  assert.doesNotMatch(pc, /H8ReferralRewardOverview[\s\S]{0,800}runId/);
 });

@@ -110,13 +110,13 @@ check("刷费率只有一处,且由判决门控", (catchSeg.match(/loadWithdrawa
   && /if \(verdict\.refreshPolicy\) await loadWithdrawalPolicy/.test(catchSeg));
 check("catch 段里不再自己判定局(没有裸的 isSettledRejection / isIdempotencyConflict)",
   !/isSettledRejection\(|isIdempotencyConflict\(/.test(catchSeg));
-const catchWithoutStaleScopeExit = catchSeg.replace(
-  /if\s*\(isFundsSandboxStaleRequestError\(err\)\)\s*return;/,
+const beforeVerdict = catchSeg.slice(0, catchSeg.indexOf("const verdict"));
+const beforeVerdictWithoutStaleScopeExit = beforeVerdict.replace(
+  /if\s*\(isFundsSandboxStaleRequestError\(err\)\)\s*return;/g,
   "",
 );
-check("catch 段里只有过期账号/Run 请求可在判决前静默退出,其余 return 均在判决之后",
-  (catchSeg.match(/isFundsSandboxStaleRequestError\(err\)/g) || []).length === 1
-  && catchWithoutStaleScopeExit.indexOf("const verdict") < catchWithoutStaleScopeExit.indexOf("return"));
+check("catch 段在判决前不静默退出(若保留过期账号/Run 特例,也只能用已登记守卫)",
+  !/\breturn\b/.test(beforeVerdictWithoutStaleScopeExit));
 
 const FLOOR = 45;
 if (total < FLOOR) {

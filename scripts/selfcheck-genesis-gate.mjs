@@ -73,7 +73,9 @@ function allSources(dir = SRC, out = []) {
     const p = path.join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) allSources(p, out);
-    else if (/\.(ts|vue)$/.test(name)) out.push(path.relative(root, p).replaceAll("\\", "/"));
+    else if (/\.(ts|vue)$/.test(name) && !/\.(test|spec)\.ts$/.test(name)) {
+      out.push(path.relative(root, p).replaceAll("\\", "/"));
+    }
   }
   return out;
 }

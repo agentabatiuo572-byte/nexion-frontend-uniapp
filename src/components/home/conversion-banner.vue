@@ -280,7 +280,7 @@ function onCardAction() {
   border-radius: 999px;
   background: var(--v5-brand-soft);
   font-family: var(--font-v5);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--v5-brand);
   white-space: nowrap;

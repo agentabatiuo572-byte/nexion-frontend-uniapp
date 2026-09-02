@@ -42,7 +42,6 @@ const rowStyle: CSSProperties = {
   gap: "10px",
   padding: "14px",
   background: "var(--v5-warning-soft)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 20%, transparent)",
   borderRadius: "12px",
 };
 const iconStyle: CSSProperties = {
@@ -73,6 +72,8 @@ const bodyStyle: CSSProperties = {
 const linkStyle: CSSProperties = {
   gap: "4px",
   marginTop: "8px",
+  minHeight: "44px",
+  paddingRight: "12px",
   color: "var(--v5-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,

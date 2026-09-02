@@ -15,15 +15,19 @@ export function homeEarningsSubtitle(
   if (status === "error") return unavailable;
   if (todayUsdt === null || jobCount === null || jobCount < 1) return empty;
   const arrow = todayVsYesterdayPct === null
-    ? ""
-    : todayVsYesterdayPct > 0 ? "↑" : todayVsYesterdayPct < 0 ? "↓" : "→";
-  const delta = todayVsYesterdayPct === null
     ? "—"
+    : todayVsYesterdayPct > 0
+      ? "↑"
+      : todayVsYesterdayPct < 0
+        ? "↓"
+        : "→";
+  const delta = todayVsYesterdayPct === null
+    ? ""
     : `${todayVsYesterdayPct > 0 ? "+" : ""}${todayVsYesterdayPct.toFixed(1)}%`;
   return settled
-    .replace("{arrow}", arrow)
-    .replace("{delta}", delta)
-    .replace("{count}", String(jobCount))
+    .replace(/\{arrow\}/g, arrow)
+    .replace(/\{delta\}/g, delta)
+    .replace(/\{count\}/g, String(jobCount))
     .replace(/\s{2,}/g, " ")
     .trim();
 }

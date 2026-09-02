@@ -405,7 +405,7 @@ function bubbleTextStyle(isUser: boolean): CSSProperties {
 function bubbleMetaStyle(isUser: boolean): CSSProperties {
   return {
     marginTop: "5px",
-    fontSize: "10px",
+    fontSize: "12px",
     color: isUser ? "var(--v5-ink-3)" : "var(--v5-ink-4)",
     lineHeight: 1.35,
   };

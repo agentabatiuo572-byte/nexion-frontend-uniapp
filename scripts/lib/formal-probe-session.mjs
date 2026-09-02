@@ -29,6 +29,7 @@ export async function installFormalProbeSession(page, { authenticated = true, re
                   countryCode: "+86",
                   phone: "13800000000",
                   nickname: "Formal Probe",
+                  onboardingComplete: true,
                 },
               },
             }

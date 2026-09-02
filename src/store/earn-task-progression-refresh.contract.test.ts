@@ -5,7 +5,7 @@ import earnSource from "../pages/earn/earn.vue?raw";
 describe("Earn server task progression refresh", () => {
   it("keeps every client environment read-only while refreshing task and earnings projections", () => {
     const start = appSource.indexOf("async function syncRemoteTaskAssignments()");
-    const end = appSource.indexOf("// 权威不可达是常态输入", start);
+    const end = appSource.indexOf("// \u6743\u5a01\u4e0d\u53ef\u8fbe\u662f\u5e38\u6001\u8f93\u5165", start);
     const sync = appSource.slice(start, end);
 
     expect(sync).not.toContain("taskAssignmentApi.claim");

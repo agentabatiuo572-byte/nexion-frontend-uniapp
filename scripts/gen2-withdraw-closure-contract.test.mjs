@@ -23,10 +23,10 @@ test("remote checkout refreshes server Gen-2 eligibility before any order comman
 
 test("withdrawal abandon receives a server verdict before the local attempt is retired", () => {
   const page = read("src/pages/me/wallet-withdraw.vue");
-  const abandon = slice(page, "async function abandonPendingAttempt()", "const sandboxWithdrawalPolicy");
+  const abandon = slice(page, "async function abandonPendingAttempt()", "// Server policy owns the network allow-list");
   const request = abandon.indexOf("await withdrawalApi.abandonAttempt");
   const retire = abandon.indexOf("forgetWithdrawAttempt", request);
   assert.ok(request >= 0 && retire > request, "production attempt must be retired only after server readback");
   assert.match(abandon, /result\.state === "COMMITTED"/);
-  assert.match(abandon, /remoteApiEnabled && !developmentFundsEnabled/);
+  assert.match(abandon, /if \(remoteApiEnabled\)/);
 });

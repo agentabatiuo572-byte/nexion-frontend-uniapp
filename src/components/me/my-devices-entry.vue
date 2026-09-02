@@ -32,7 +32,7 @@
 
       <!-- 6 slot pills -->
       <view style="display: flex; gap: 4px">
-        <view v-for="i in MAX_DEVICES" :key="i" :style="pillStyle(i - 1 < slotsUsed)" />
+        <view v-for="i in app.slotCap" :key="i" :style="pillStyle(i - 1 < slotsUsed)" />
       </view>
 
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -47,7 +47,6 @@ import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
 
@@ -57,12 +56,12 @@ const app = useApp();
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
-const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);
+const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const onlineCount = computed(
   () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
 );
 
-const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: MAX_DEVICES }));
+const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
 const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 

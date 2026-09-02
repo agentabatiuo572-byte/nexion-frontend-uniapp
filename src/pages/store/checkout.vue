@@ -193,6 +193,9 @@
           <view v-if="remoteApiEnabled && remoteOrderPollError && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="restartRemoteOrderPolling">
             <text>{{ t.store.coRetryStatus }}</text>
           </view>
+          <view v-if="remoteApiEnabled && orderId && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 10px" @click.stop="reopenRemoteHostedPayment">
+            <text>{{ t.bankPane.hostedContinueCta }}</text>
+          </view>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
@@ -305,9 +308,9 @@ import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
+import { openHostedPaymentPage as openTrustedHostedPaymentPage } from "@/lib/hosted-payment";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
-const MAX_DEVICES = 6;
 
 type Step =
   | "select-payment"
@@ -337,6 +340,13 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
+  if (remoteApiEnabled) return [{
+    id: "bankqr-vn",
+    label: t.value.bankPane.hostedContinueCta,
+    hint: t.value.bankPane.hostedSecureNote,
+    iconPath: WALLET_PATH,
+    iconPath2: WALLET_PATH2,
+  }];
   const methods: PaymentMethod[] = [
     { id: "usdt-trc20", label: "USDT (TRC20)", hint: t.value.store.coHintTrc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
     { id: "usdt-bep20", label: "USDT (BEP20)", hint: t.value.store.coHintBep20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
@@ -818,7 +828,7 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>("usdt-trc20");
+const payment = ref<string>(remoteApiEnabled ? "bankqr-vn" : "usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
@@ -834,6 +844,43 @@ let confirming = false;
 const remoteOrderCommandKey = new StableCommandKey();
 const REMOTE_CHECKOUT_COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
 type RemoteCheckoutCommands = { commands?: Record<string, string> };
+const REMOTE_HOSTED_PAYMENT_KEY = "nexgrid-remote-hosted-payment-v1";
+type RemoteHostedPayment = {
+  accountKey: string;
+  orderNo: string;
+  productId: string;
+};
+
+function persistRemoteHostedPayment(orderNo: string): boolean {
+  const accountKey = orders.currentAccountKey();
+  return writeAccountRow<RemoteHostedPayment>(REMOTE_HOSTED_PAYMENT_KEY, accountKey, {
+    accountKey,
+    orderNo,
+    productId: productId.value,
+  });
+}
+
+function restoreRemoteHostedPayment(): void {
+  if (!remoteApiEnabled || orderId.value) return;
+  const accountKey = orders.currentAccountKey();
+  const stored = readAccountRow<RemoteHostedPayment>(REMOTE_HOSTED_PAYMENT_KEY, accountKey);
+  if (!stored || stored.accountKey !== accountKey || stored.productId !== productId.value
+      || !stored.orderNo) return;
+  orderId.value = stored.orderNo;
+  remoteOrderFailure.value = null;
+  step.value = "awaiting";
+}
+
+function clearRemoteHostedPayment(): boolean {
+  return writeAccountRow<RemoteHostedPayment | null>(
+    REMOTE_HOSTED_PAYMENT_KEY, orders.currentAccountKey(), null);
+}
+
+function openHostedPaymentPage(paymentUrl: string): void {
+  if (!openTrustedHostedPaymentPage(paymentUrl)) {
+    throw new Error("HDPAY_HOSTED_PAGE_OPEN_UNAVAILABLE");
+  }
+}
 // Freeze the canonical quote and endpoint after any remote mutation attempt;
 // an ambiguous-success retry must never switch from trade-in to /api/orders.
 const remoteTradeinRecoveryRequired = ref(false);
@@ -891,13 +938,13 @@ function retryReceiptWrite() {
 
 const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const cappedRaw = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
+const cappedRaw = computed(() => app.activeSlotCount + reservedSlots.value >= app.slotCap);
 const targetOccupiesPhysicalSlot = computed(() => product.value?.productType !== "SHARE");
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
 const capped = computed(() => targetOccupiesPhysicalSlot.value && (
-  trialConversionMode.value ? app.activeSlotCount >= MAX_DEVICES : cappedRaw.value
+  trialConversionMode.value ? app.activeSlotCount >= app.slotCap : cappedRaw.value
 ));
 
 // ── derived text ──
@@ -920,7 +967,7 @@ const paybackLine = computed(() => {
     roi: annualRoiPct(p),
   });
 });
-const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: MAX_DEVICES }));
+const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 const activatingSubText = computed(() => {
   const p = product.value;
   const dc = p?.tier === "Flagship" ? t.value.store.coDcFrankfurt : t.value.store.coDcSingapore;
@@ -1289,6 +1336,7 @@ async function submitRemoteOrder(): Promise<void> {
     step.value = "select-payment";
     return;
   }
+  let canonicalOrderCommitted = false;
   try {
     const tradeinContext = appliedTradeinView.value;
     if (tradein.appliedTradein && !tradeinContext) {
@@ -1389,7 +1437,20 @@ async function submitRemoteOrder(): Promise<void> {
         || Math.abs(persisted.discountUsdt - created.discountUsdt) > 0.000001) {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
+    canonicalOrderCommitted = true;
+    const paymentSession = await orderApi.createPaymentSession(
+      created.orderNo,
+      `hdpay-session:${created.orderNo}`,
+    );
+    if (!scopeIsCurrent()) return;
+    if (paymentSession.orderNo !== created.orderNo
+        || Math.abs(paymentSession.amountUsdt - created.amountUsdt) > 0.000001) {
+      throw new Error("HDPAY_COMMERCE_SESSION_READBACK_MISMATCH");
+    }
     orderId.value = created.orderNo;
+    if (!persistRemoteHostedPayment(created.orderNo)) {
+      throw new Error("HDPAY_PAYMENT_SESSION_PERSIST_FAILED");
+    }
     remoteOrderFailure.value = null;
     remoteOrderPollError.value = false;
     if (requestedVoucherId) await voucher.refreshRemote();
@@ -1406,6 +1467,7 @@ async function submitRemoteOrder(): Promise<void> {
     // provisioning or activation; wait for a real provider callback/readback.
     retireRemoteOrderKey();
     step.value = "awaiting";
+    openHostedPaymentPage(paymentSession.paymentUrl);
   } catch (error) {
     if (!scopeIsCurrent()) return;
     // Keep only outcome-unknown errors: transport, malformed response, 5xx and
@@ -1415,12 +1477,35 @@ async function submitRemoteOrder(): Promise<void> {
     const keepForReadback = apiError.kind === "network" || apiError.kind === "protocol"
       || (apiError.kind === "http" && (apiError.status ?? 0) >= 500)
       || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN";
-    if (!keepForReadback) retireRemoteOrderKey();
+    if (!keepForReadback && !canonicalOrderCommitted) retireRemoteOrderKey();
     // No local order, balance debit, or voucher redemption mirror in remote mode.
     step.value = "confirm";
     toast.warn(t.value.tradein.errPurchaseFailed);
   } finally {
     confirming = false;
+  }
+}
+
+let reopeningHostedPayment = false;
+async function reopenRemoteHostedPayment(): Promise<void> {
+  const requestOrderNo = orderId.value;
+  const requestAccount = auth.accountId;
+  if (!remoteApiEnabled || !requestOrderNo || reopeningHostedPayment) return;
+  reopeningHostedPayment = true;
+  try {
+    const session = await orderApi.createPaymentSession(
+      requestOrderNo, `hdpay-session:${requestOrderNo}`);
+    if (requestAccount !== auth.accountId || requestOrderNo !== orderId.value) return;
+    if (!persistRemoteHostedPayment(requestOrderNo)) {
+      throw new Error("HDPAY_PAYMENT_SESSION_PERSIST_FAILED");
+    }
+    openHostedPaymentPage(session.paymentUrl);
+  } catch {
+    if (requestAccount === auth.accountId && requestOrderNo === orderId.value) {
+      toast.warn(t.value.bankPane.hostedOpenFailed);
+    }
+  } finally {
+    reopeningHostedPayment = false;
   }
 }
 
@@ -1467,6 +1552,11 @@ async function pollRemoteOrder(requestEpoch: number) {
         step.value = "activating";
         return;
       case "activated":
+        if (!clearRemoteHostedPayment()) {
+          remoteOrderPollError.value = true;
+          scheduleRemoteOrderPoll(requestEpoch, 5000);
+          return;
+        }
         stopRemoteOrderPolling();
         step.value = "live";
         void orders.refreshRemote().catch(() => undefined); // orders 契约保持 reject;此处纯展示刷新
@@ -1536,6 +1626,7 @@ onShow(() => {
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
   restoreReceiptRecovery();
+  restoreRemoteHostedPayment();
   restartRemoteOrderPolling();
 });
 onHide(() => {

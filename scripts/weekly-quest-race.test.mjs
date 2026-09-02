@@ -5,7 +5,7 @@ import test from "node:test";
 import ts from "typescript";
 
 const source = fs.readFileSync("src/store/weekly-quest.ts", "utf8")
-  .replace(/^import .*;\r?\n/gm, "")
+  .replace(/^import[\s\S]*?;\r?\n/gm, "")
   .replace("export const useWeeklyQuest", "const useWeeklyQuest");
 
 function deferred() {

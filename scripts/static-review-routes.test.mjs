@@ -92,7 +92,7 @@ test("App repairs non-canonical H5 hashes instead of leaving an authenticated wh
   assert.match(app, /canonicalH5RouteUrl\(/);
   assert.match(app, /routeFromH5Location\(/);
   assert.match(app, /pendingCanonicalRouteRepair/);
-  assert.match(app, /uni\.reLaunch\(\{\s*url:\s*canonicalUrl/);
+  assert.match(app, /navReset\(\{\s*url:\s*canonicalUrl/);
   assert.match(app, /ROUTE_REPAIR_RETRY_MS/);
   assert.match(app, /pendingCanonicalRouteRepairAt/);
   assert.match(app, /canonicalH5RouteUrl\(hashRoute\)\s*\|\|\s*INVALID_H5_ROUTE_FALLBACK/);

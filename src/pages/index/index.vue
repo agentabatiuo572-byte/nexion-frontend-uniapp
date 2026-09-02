@@ -164,11 +164,11 @@ const taskCarouselAnnouncement = ref("");
 let taskTouchStart: TouchPoint | null = null;
 let touchCollapsedExpandedCard = false;
 
+// The weekly slot stays visible while its authoritative projection loads,
+// fails, or is empty; ConversionBanner owns those explicit states.
 const visibleTaskCards = computed<TaskCardId[]>(() =>
   deriveHomeTaskCards(platformConfig.syncFailed, {
     homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
-    // The weekly slot stays visible while its authoritative projection loads,
-    // fails, or is empty; ConversionBanner owns those explicit states.
     homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
   }),
 );

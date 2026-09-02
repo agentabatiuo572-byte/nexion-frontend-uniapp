@@ -42,7 +42,7 @@ describe("PC-managed H3 quest catalogue", () => {
     state.mockResolvedValueOnce({
       quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
     }).mockResolvedValueOnce({
-      quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "开始首笔订单", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
+      quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "Start first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
     });
     const quest = useQuest();
     const locale = useLocaleStore();
@@ -51,7 +51,7 @@ describe("PC-managed H3 quest catalogue", () => {
     locale.setLocale("zh");
 
     await vi.waitFor(() => expect(state).toHaveBeenLastCalledWith("zh"));
-    expect(quest.remoteQuests[0]?.name).toBe("开始首笔订单");
+    expect(quest.remoteQuests[0]?.name).toBe("Start first order");
   });
 
   it("keeps the last confirmed catalogue visible while a background refresh is pending", async () => {

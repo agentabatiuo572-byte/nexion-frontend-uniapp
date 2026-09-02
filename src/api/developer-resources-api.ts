@@ -9,7 +9,6 @@ export interface DeveloperWebhook { id: number; name: string; url: string; event
 export interface DeveloperWebhookDelivery { id: number; eventId: string; eventType: string; status: DeveloperWebhookDeliveryStatus; attemptCount: number; maxAttempts: number; lastStatusCode: number | null; lastError: string | null; nextRetryAt: string; createdAt: string; updatedAt: string }
 export interface DeveloperResourcesApi {
   listKeys(): Promise<DeveloperApiKey[]>;
-  createKey(name: string, idempotencyKey: string): Promise<DeveloperApiKey>;
   revokeKey(id: number, idempotencyKey: string): Promise<DeveloperApiKey>;
   listWebhooks(): Promise<DeveloperWebhook[]>;
   createWebhook(input: { name: string; url: string; events: string[] }, idempotencyKey: string): Promise<DeveloperWebhook>;
@@ -27,7 +26,6 @@ function webhook(value: unknown, mode: ApiEnvironment): DeveloperWebhook { if (!
 function delivery(value: unknown): DeveloperWebhookDelivery { if (!value || typeof value !== "object" || Array.isArray(value)) return invalid("DEVELOPER_WEBHOOK_DELIVERY_RESPONSE_INVALID"); const row = value as Record<string, unknown>; if (!Number.isSafeInteger(row.id) || typeof row.eventId !== "string" || !EVENTS.has(row.eventType as string) || typeof row.status !== "string" || !DELIVERY_STATUSES.has(row.status as DeveloperWebhookDeliveryStatus) || !Number.isSafeInteger(row.attemptCount) || (row.attemptCount as number) < 0 || !Number.isSafeInteger(row.maxAttempts) || (row.maxAttempts as number) < 1 || ((row.lastStatusCode !== null) && !Number.isSafeInteger(row.lastStatusCode)) || ((row.lastError !== null) && typeof row.lastError !== "string") || typeof row.nextRetryAt !== "string" || typeof row.createdAt !== "string" || typeof row.updatedAt !== "string") return invalid("DEVELOPER_WEBHOOK_DELIVERY_RESPONSE_INVALID"); return row as unknown as DeveloperWebhookDelivery; }
 export function createDeveloperResourcesApi(client: ApiClient, mode: ApiEnvironment = "prod"): DeveloperResourcesApi { return {
   async listKeys() { const value = await client.request<unknown>({ path: "/api/app/developer/api-keys" }); if (!Array.isArray(value)) return invalid(); return value.map(item => key(item, mode)); },
-  async createKey(name, idempotencyKey) { return key(await client.request<unknown>({ path: "/api/app/developer/api-keys", method: "POST", body: { name }, idempotencyKey }), mode); },
   async revokeKey(id, idempotencyKey) { return key(await client.request<unknown>({ path: `/api/app/developer/api-keys/${id}`, method: "DELETE", idempotencyKey }), mode); },
   async listWebhooks() { const value = await client.request<unknown>({ path: "/api/app/developer/webhooks" }); if (!Array.isArray(value)) return invalid("DEVELOPER_WEBHOOK_RESPONSE_INVALID"); return value.map(item => webhook(item, mode)); },
   async createWebhook(input, idempotencyKey) { return webhook(await client.request<unknown>({ path: "/api/app/developer/webhooks", method: "POST", body: { ...input, eventsJson: JSON.stringify(input.events) }, idempotencyKey }), mode); },

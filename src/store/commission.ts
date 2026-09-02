@@ -170,6 +170,9 @@ export const useCommission = defineStore("commission", () => {
   const config = ref<CanonicalCommissionConfig | null>(null);
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
   const eventsStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const eventsLoadMoreStatus = ref<"idle" | "loading" | "error">("idle");
+  const eventsPage = ref(0);
+  const eventsTotalRows = ref(remoteApiEnabled ? 0 : events.value.length);
   const configStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const binaryStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
 
@@ -189,6 +192,9 @@ export const useCommission = defineStore("commission", () => {
     eventsEvidence.value = null;
     configStatus.value = "idle";
     eventsStatus.value = "idle";
+    eventsLoadMoreStatus.value = "idle";
+    eventsPage.value = 0;
+    eventsTotalRows.value = 0;
     binaryStatus.value = "idle";
   });
   onScopeDispose(unsubscribeCommerceRun);
@@ -210,6 +216,9 @@ export const useCommission = defineStore("commission", () => {
       eventsEvidence.value = null;
       configStatus.value = "idle";
       eventsStatus.value = "idle";
+      eventsLoadMoreStatus.value = "idle";
+      eventsPage.value = 0;
+      eventsTotalRows.value = 0;
       binaryStatus.value = "idle";
       const scope = requestScope();
       void Promise.allSettled([refreshCanonicalConfig(scope), refreshCanonicalBinary(scope), refreshCanonicalEvents(scope)]);
@@ -254,14 +263,39 @@ export const useCommission = defineStore("commission", () => {
     events.value = [];
     eventsEvidence.value = null;
     eventsStatus.value = "loading";
+    eventsLoadMoreStatus.value = "idle";
+    eventsPage.value = 0;
+    eventsTotalRows.value = 0;
     try {
-      const snapshot = await teamInsightsApi.commissions();
+      const snapshot = await teamInsightsApi.commissions(1, 20);
       if (!isCurrentScope(scope)) return;
       eventsEvidence.value = snapshot;
       events.value = snapshot.events;
+      eventsPage.value = snapshot.page;
+      eventsTotalRows.value = snapshot.totalRows;
       eventsStatus.value = "ready";
     } catch {
       if (isCurrentScope(scope)) eventsStatus.value = "error";
+    }
+  }
+
+  async function loadMoreCanonicalEvents(scope = requestScope()) {
+    if (!remoteApiEnabled || eventsStatus.value !== "ready"
+        || eventsLoadMoreStatus.value === "loading" || events.value.length >= eventsTotalRows.value) return;
+    const nextPage = eventsPage.value + 1;
+    eventsLoadMoreStatus.value = "loading";
+    try {
+      const snapshot = await teamInsightsApi.commissions(nextPage, 20, eventsEvidence.value?.snapshotAt);
+      if (!isCurrentScope(scope) || snapshot.page !== nextPage) return;
+      const seen = new Set(events.value.map((event) => event.id));
+      const appended = [...events.value, ...snapshot.events.filter((event) => !seen.has(event.id))];
+      events.value = appended;
+      eventsEvidence.value = { ...snapshot, events: appended };
+      eventsPage.value = snapshot.page;
+      eventsTotalRows.value = snapshot.totalRows;
+      eventsLoadMoreStatus.value = "idle";
+    } catch {
+      if (isCurrentScope(scope)) eventsLoadMoreStatus.value = "error";
     }
   }
 
@@ -356,8 +390,9 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, binaryStatus, bindAccount,
-    refreshCanonicalConfig, refreshCanonicalBinary, refreshCanonicalEvents, unilevelRate,
+    events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, eventsLoadMoreStatus,
+    eventsPage, eventsTotalRows, binaryStatus, bindAccount,
+    refreshCanonicalConfig, refreshCanonicalBinary, refreshCanonicalEvents, loadMoreCanonicalEvents, unilevelRate,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

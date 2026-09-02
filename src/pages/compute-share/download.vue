@@ -85,7 +85,6 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { matchGpuTier } from "@/lib/gpu-tiers";
@@ -160,7 +159,7 @@ const tierLabels = computed(() => ({
 }));
 const selectedTierLabel = computed(() => tierLabels.value[selectedTier.value.id]);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsFull = computed(() => app.activeSlotCount + trialSlot.value >= MAX_DEVICES);
+const slotsFull = computed(() => app.activeSlotCount + trialSlot.value >= app.slotCap);
 const tierSummary = computed(() =>
   fmt(t.value.computeShare.tierSummary, {
     tier: selectedTierLabel.value,
@@ -351,7 +350,7 @@ function connectDemoComputer() {
     return;
   }
   if (slotsFull.value) {
-    toast.warn(fmt(t.value.computeShare.slotsFullToast, { max: MAX_DEVICES }));
+    toast.warn(fmt(t.value.computeShare.slotsFullToast, { max: app.slotCap }));
     return;
   }
   if (connecting.value || enrollment.value?.status === "PENDING") return;
@@ -360,7 +359,7 @@ function connectDemoComputer() {
     if (!result.ok) {
       const msg = result.reason === "disabled"
         ? t.value.computeShare.disabledToast
-        : fmt(t.value.computeShare.slotsFullToast, { max: MAX_DEVICES });
+        : fmt(t.value.computeShare.slotsFullToast, { max: app.slotCap });
       toast.warn(msg);
       return;
     }

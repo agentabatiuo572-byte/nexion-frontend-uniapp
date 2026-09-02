@@ -237,4 +237,21 @@ describe("legal terms runtime gate", () => {
     expect(state.current).toHaveBeenCalledTimes(2);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
   });
+
+  it("rechecks the same user after an access-token rotation during verification", async () => {
+    let resolveOld!: (value: LegalTermsCurrent) => void;
+    state.current
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce(snapshot(true));
+    const runtime = await loadRuntime();
+
+    runtime.scheduleLegalTermsGate("/pages/index/index");
+    state.session = { accessToken: "token-b", user: { userId: 7 } };
+    resolveOld(snapshot(true));
+    await settleGate();
+    await settleGate();
+
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
 });

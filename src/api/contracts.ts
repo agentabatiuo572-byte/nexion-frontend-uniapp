@@ -1,3 +1,5 @@
+import { isSelectablePhoneDialCode } from "@/auth/phone-number";
+
 export interface ApiResult<T> {
   code: number;
   message: string;
@@ -9,6 +11,7 @@ export interface UserSession {
   countryCode: string;
   phone: string;
   nickname: string;
+  onboardingComplete: boolean;
 }
 
 export interface RegistrationReceipt {
@@ -55,10 +58,11 @@ export function isUserSession(value: unknown): value is UserSession {
     && Number.isSafeInteger(user.userId)
     && user.userId > 0
     && typeof user.countryCode === "string"
-    && user.countryCode.length > 0
+    && isSelectablePhoneDialCode(user.countryCode)
     && typeof user.phone === "string"
     && user.phone.length > 0
     && typeof user.nickname === "string"
+    && typeof user.onboardingComplete === "boolean"
   );
 }
 

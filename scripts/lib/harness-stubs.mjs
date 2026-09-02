@@ -12,16 +12,25 @@ import path from "node:path";
 // PLAIN:裸 { value } —— 配 `defineStore = (_id, setup) => setup` 直取 setup 返回值的脚本。
 export const VUE_STUB_PLAIN = `export const ref = (v) => ({ value: v });
 export const shallowRef = ref;
-export const computed = (f) => ({ get value() { return f(); } });
+export const computed = (fn) => ({
+  get value() { return typeof fn === "function" ? fn() : fn.get(); },
+  set value(v) { if (typeof fn !== "function" && fn.set) fn.set(v); },
+});
 export const watch = () => {};
+export const onScopeDispose = () => {};
 export const reactive = (v) => v;`;
 
 // NXREF:带 __nxRef 标记 —— 配 Proxy 解包版 pinia-stub 的脚本。
 export const VUE_STUB_NXREF = `export const ref = (v) => ({ __nxRef: true, value: v });
 export const shallowRef = ref;
-export const computed = (fn) => ({ __nxRef: true, get value() { return typeof fn === "function" ? fn() : fn.get(); } });
+export const computed = (fn) => ({
+  __nxRef: true,
+  get value() { return typeof fn === "function" ? fn() : fn.get(); },
+  set value(v) { if (typeof fn !== "function" && fn.set) fn.set(v); },
+});
 export const reactive = (v) => v;
-export const watch = () => {};`;
+export const watch = () => {};
+export const onScopeDispose = () => {};`;
 
 // runtime-stub 不手列导出 —— 从 src/api/runtime.ts 磁盘真相扫出口清单,新增 API 永不掉队
 // (手列清单正是本次 pointsApi / i18nApi 掉队的根因)。

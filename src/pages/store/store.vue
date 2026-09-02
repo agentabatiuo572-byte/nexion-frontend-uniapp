@@ -198,7 +198,7 @@ const catalogStateBodyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const catalogRetryStyle: CSSProperties = {
-  minHeight: "36px",
+  minHeight: "44px",
   alignItems: "center",
   padding: "0 14px",
   borderRadius: "9999px",

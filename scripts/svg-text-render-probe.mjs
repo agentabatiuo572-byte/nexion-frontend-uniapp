@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { isThirdPartyResourceError } from "./lib/console-origin-filter.mjs";
 import { analyzeTemplate, listVueFiles } from "./lib/svg-text-predicate.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
@@ -284,6 +285,27 @@ async function main() {
     try { localStorage.setItem("nexgrid-locale-v1", JSON.stringify({ type: "object", data: { code, userSet: true } })); } catch {}
   }, LANG);
   const page = await context.newPage();
+  await installFormalProbeSession(page, { responseFor: (url) => {
+    if (url.pathname === "/api/app/network/regions") return {
+      source: "server",
+      generatedAt: "2026-09-02T00:00:00Z",
+      activeNodes: 12,
+      activeJobs: 4,
+      countryCount: 1,
+      regions: [{ id: "probe-user-region", displayName: "Probe region", location: "Probe DC", activeNodes: 12, activeJobs: 4, jobsPerHour: 8, latitude: 1.35, longitude: 103.82, isUserRegion: true }],
+    };
+    if (url.pathname === "/api/store/catalog") return {
+      source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: null,
+      products: [{
+        id: "cloud-share", name: "Cloud Share", tier: "Share", tagline: "Distributed compute", badge: null,
+        productType: "SHARE", inventoryMode: "UNLIMITED", gpu: null, vram: null, power: null, datacenter: null,
+        warranty: null, hashRate: null, dailyEarn: 0.19, dailyEarnNEX: 3, price: 19.9, sold: 0, stock: null,
+        features: [], ai: null, status: "active", available: true, releaseState: null, releasePhaseId: null,
+        unlocksAtPhase: null, purchaseGate: null,
+      }],
+    };
+    return undefined;
+  } });
   const consoleErrors = [];
   page.on("console", (m) => {
     const text = m.text();

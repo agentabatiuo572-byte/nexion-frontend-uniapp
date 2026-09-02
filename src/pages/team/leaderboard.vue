@@ -25,7 +25,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
           <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
-          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" @click="loadRemote">
+          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemote()" @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()">
             <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.leaderboard.retry }}</text>
           </view>
         </view>
@@ -51,8 +51,8 @@
         </view>
 
         <!-- Period tabs -->
-        <view class="flex" :style="segWrapStyle">
-          <view v-for="p in PERIODS" :key="p" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(p)" @click="period = p">
+        <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.leaderboard.pageTitle">
+          <view v-for="p in PERIODS" :key="p" class="nx-leader-period-tab flex-1 grid place-items-center active:opacity-70" :style="pillStyle(p)" role="tab" :tabindex="p === period ? 0 : -1" :aria-selected="p === period" @click="selectPeriod(p)" @keydown.enter.prevent="selectPeriod(p)" @keydown.space.prevent="selectPeriod(p)" @keydown.left.prevent="movePeriod(-1)" @keydown.right.prevent="movePeriod(1)">
             <text :style="pillLabelStyle(p)">{{ t.leaderboard.periods[p] }}</text>
           </view>
         </view>
@@ -65,14 +65,14 @@
               <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-brand-2)')">{{ t.leaderboard.myRank.label }}</text>
               <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
                 <text class="font-display tabular-nums" :style="myRankBigStyle">#{{ myRankDisplay }}</text>
-                <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">/ {{ rows.length.toLocaleString() }}+</text>
+                <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">/ {{ totalRows.toLocaleString() }}+</text>
               </view>
               <view class="flex items-center" style="margin-top: 8px; gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
                 <text :style="{ fontSize: '12px', color: 'var(--v5-warning)' }">{{ gapText }}</text>
               </view>
             </view>
-            <view class="flex items-center active:scale-[0.97]" :style="climbCtaStyle" @click="go('/pages/team/team')">
+            <view class="flex items-center active:scale-[0.97]" :style="climbCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
               <text :style="{ color: 'var(--v5-on-brand)' }">{{ t.leaderboard.myRank.climb }}</text>
             </view>
@@ -136,8 +136,8 @@
         <!-- View more — explicit user click, not scroll-auto: fully
              predictable regardless of viewport size (the scroll-triggered
              IntersectionObserver version misfired on wide desktop windows). -->
-        <view v-if="hasMore" class="flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" @click="loadMore">
-          <text :style="loadMoreLabelStyle">{{ t.leaderboard.cta.loadMore }}</text>
+        <view v-if="hasMore" class="flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="remoteLoadingMore" @click="loadMore" @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
+          <text :style="loadMoreLabelStyle">{{ remoteLoadMoreError ? t.leaderboard.loadError : t.leaderboard.cta.loadMore }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
         </view>
 
@@ -147,7 +147,7 @@
              escape the px-4 parent; 26px bottom offset mirrors AppChassis's
              sub-route safe-area inset (SUB_BOTTOM) so it clears the home indicator. -->
         <view :style="shareStickyStyle">
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="shareCtaStyle" @click="go('/pages/team/team')">
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="shareCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
             <text :style="{ color: 'var(--v5-on-brand)' }">{{ t.leaderboard.cta.share }}</text>
           </view>
@@ -163,7 +163,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -182,16 +182,18 @@ const PERIODS: LeaderPeriod[] = ["today", "week", "month", "all"];
 const period = ref<LeaderPeriod>("week");
 const remoteSnapshot = ref<TeamLeaderboardSnapshot | null>(null);
 const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+const remoteLoadingMore = ref(false);
+const remoteLoadMoreError = ref(false);
 let remoteRequest = 0;
 let mounted = true;
 // One screen's worth per load — reduces initial render + (future) server load.
 const PAGE_SIZE = 20;
 const visibleCount = ref(PAGE_SIZE);
-watch(period, () => { visibleCount.value = PAGE_SIZE; if (remoteApiEnabled) void loadRemote(); });
+watch(period, () => { visibleCount.value = PAGE_SIZE; if (remoteApiEnabled) void loadRemote(1, false); });
 watch(() => app.accountKey, () => {
   if (!remoteApiEnabled) return;
   remoteSnapshot.value = null;
-  void loadRemote();
+  void loadRemote(1, false);
 });
 
 const rows = computed(() => remoteApiEnabled ? (remoteSnapshot.value?.period === period.value ? remoteSnapshot.value.rows : []) : LEADERBOARD[period.value]);
@@ -201,40 +203,69 @@ const prize = computed(() => remoteApiEnabled ? { poolUSD: remoteSnapshot.value?
   : { poolUSD: 0, topN: 0, resetsIn: "—", label: period.value });
 const me = computed(() => remoteApiEnabled ? { rank: remoteSnapshot.value?.myRank ?? null,
   gapToNext: remoteSnapshot.value?.gapToNext ?? 0 } : MY_RANK[period.value]);
+const totalRows = computed(() => remoteApiEnabled ? remoteSnapshot.value?.totalRows ?? 0 : rows.value.length);
 const myRankDisplay = computed(() => me.value.rank === null ? "—" : String(me.value.rank));
 const top3 = computed(() => rows.value.slice(0, 3));
 const rest = computed(() => rows.value.slice(3));
-const visibleRest = computed(() => rest.value.slice(0, visibleCount.value));
-const hasMore = computed(() => visibleCount.value < rest.value.length);
+const visibleRest = computed(() => remoteApiEnabled ? rest.value : rest.value.slice(0, visibleCount.value));
+const hasMore = computed(() => remoteApiEnabled
+  ? rows.value.length < (remoteSnapshot.value?.totalRows ?? 0)
+  : visibleCount.value < rest.value.length);
 
 function loadMore() {
+  if (remoteApiEnabled) {
+    if (remoteLoadingMore.value || !hasMore.value || !remoteSnapshot.value) return;
+    void loadRemote(remoteSnapshot.value.page + 1, true);
+    return;
+  }
   visibleCount.value = Math.min(rest.value.length, visibleCount.value + PAGE_SIZE);
 }
 
-async function loadRemote() {
+async function loadRemote(page = 1, append = false) {
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const requestedPeriod = period.value;
-  remoteState.value = "loading";
-  remoteSnapshot.value = null;
+  remoteLoadMoreError.value = false;
+  if (append) remoteLoadingMore.value = true;
+  else {
+    remoteState.value = "loading";
+    remoteSnapshot.value = null;
+  }
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope)
     && requestedPeriod === period.value;
   try {
-    const snapshot = await teamInsightsApi.leaderboard(requestedPeriod);
-    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
-    remoteSnapshot.value = snapshot;
+    const snapshot = await teamInsightsApi.leaderboard(requestedPeriod, page, PAGE_SIZE,
+      append ? remoteSnapshot.value?.snapshotAt : null);
+    if (!current()) { if (request === remoteRequest && !append) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
+    if (append) {
+      const previous = remoteSnapshot.value;
+      const expectedFirstRank = previous ? previous.rows.length + 1 : -1;
+      if (!previous || previous.period !== requestedPeriod || snapshot.page !== page
+        || snapshot.snapshotAt !== previous.snapshotAt
+        || snapshot.pageSize !== PAGE_SIZE || snapshot.rows[0]?.rank !== expectedFirstRank) {
+        throw new Error("TEAM_LEADERBOARD_PAGE_SEQUENCE_INVALID");
+      }
+      remoteSnapshot.value = { ...snapshot, rows: [...previous.rows, ...snapshot.rows] };
+    } else {
+      remoteSnapshot.value = snapshot;
+    }
     remoteState.value = "ready";
   } catch {
-    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
-    remoteSnapshot.value = null;
-    remoteState.value = "error";
+    if (!current()) { if (request === remoteRequest && !append) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
+    if (append) remoteLoadMoreError.value = true;
+    else {
+      remoteSnapshot.value = null;
+      remoteState.value = "error";
+    }
+  } finally {
+    if (request === remoteRequest) remoteLoadingMore.value = false;
   }
 }
 
-onShow(() => { if (remoteApiEnabled) void loadRemote(); });
+onShow(() => { if (remoteApiEnabled) void loadRemote(1, false); });
 onUnmounted(() => { mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
 
 // Podium display order: #2 (left) / #1 (center, raised) / #3 (right)
@@ -269,6 +300,19 @@ function fmtCompactUSD(n: number): string {
 
 function go(url: string) {
   navTo(url);
+}
+
+function selectPeriod(next: LeaderPeriod) {
+  period.value = next;
+}
+
+function movePeriod(delta: -1 | 1) {
+  const currentIndex = PERIODS.indexOf(period.value);
+  period.value = PERIODS[(currentIndex + delta + PERIODS.length) % PERIODS.length];
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('.nx-leader-period-tab[tabindex="0"]')?.focus();
+  });
 }
 
 // ─── styles ───

@@ -23,7 +23,7 @@
         </view>
       </view>
 
-      <view class="flex items-center justify-between w-full active:opacity-85" :style="ctaStyle" @click="goStaking">
+      <view class="flex items-center justify-between w-full active:opacity-85" :style="ctaStyle" role="button" tabindex="0" @click="goStaking" @keydown.enter.prevent="goStaking" @keydown.space.prevent="goStaking">
         <text>{{ ctaText }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>

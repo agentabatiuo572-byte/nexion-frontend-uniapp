@@ -5,6 +5,7 @@ import { referralShareText, visibleReferralGift } from "@/lib/referral-reward-ga
 function rewards(enabled: boolean): PlatformConfig["rewards"] {
   return {
     enabled,
+    effectiveAt: "2026-09-02T00:00:00Z",
     welcomeGift: { lockMode: "risk_bucket", usdtAmount: 5, nexAmount: 20 },
     inviterReward: { nexAmount: 200 },
   };

@@ -3,7 +3,7 @@ import test from "node:test";
 
 const backendBaseUrl = process.env.NX_GENESIS_BACKEND_URL || "http://127.0.0.1:8110";
 
-test("Genesis production data matches the approved 5174 baseline without fake purchases", async () => {
+test("Genesis production data keeps the approved 5174 policy while sales remain server-owned", async () => {
   const response = await fetch(`${backendBaseUrl}/api/genesis/state`);
   assert.equal(response.status, 200, "GENESIS_STATE_HTTP_NOT_200");
 
@@ -16,21 +16,19 @@ test("Genesis production data matches the approved 5174 baseline without fake pu
   assert.deepEqual(
     {
       totalSupply: state.series.totalSupply,
-      soldSupply: state.series.soldSupply,
-      remainingSupply: state.series.remainingSupply,
       priceUsdt: state.series.priceUsdt,
       royaltyPct: state.series.royaltyPct,
       dailyEmissionRatePct: state.series.dailyEmissionRatePct,
     },
     {
       totalSupply: 1_000,
-      soldSupply: 0,
-      remainingSupply: 1_000,
       priceUsdt: 9_999,
       royaltyPct: 2.5,
       dailyEmissionRatePct: 0.1,
     },
   );
+  assert.ok(Number.isSafeInteger(state.series.soldSupply) && state.series.soldSupply >= 0);
+  assert.equal(state.series.remainingSupply, state.series.totalSupply - state.series.soldSupply);
 
   assert.deepEqual(
     state.tiers.map(({ from, to, priceUSDT }) => ({ from, to, priceUSDT })),
@@ -71,8 +69,14 @@ test("Genesis production data matches the approved 5174 baseline without fake pu
     },
   );
 
-  assert.deepEqual(state.listings, [], "GENESIS_FAKE_LISTINGS_PRESENT");
-  assert.deepEqual(state.transactions, [], "GENESIS_FAKE_TRANSACTIONS_PRESENT");
-  assert.equal(state.marketStats.owners, 0, "GENESIS_FAKE_OWNER_PRESENT");
-  assert.equal(state.marketStats.volume24hUsdt, 0, "GENESIS_FAKE_VOLUME_PRESENT");
+  assert.ok(state.sources.includes("nx_genesis_holding"), "GENESIS_HOLDING_SOURCE_MISSING");
+  assert.ok(state.sources.includes("nx_genesis_order"), "GENESIS_ORDER_SOURCE_MISSING");
+  for (const transaction of state.transactions) {
+    assert.match(transaction.orderNo, /\S/);
+    assert.ok(["PRIMARY", "SECONDARY"].includes(transaction.orderType));
+    assert.ok(Number.isSafeInteger(transaction.quantity) && transaction.quantity > 0);
+    assert.ok(Number.isFinite(transaction.amountUsdt) && transaction.amountUsdt > 0);
+  }
+  assert.ok(Number.isSafeInteger(state.marketStats.owners) && state.marketStats.owners >= 0);
+  assert.ok(Number.isFinite(state.marketStats.volume24hUsdt) && state.marketStats.volume24hUsdt >= 0);
 });

@@ -397,7 +397,7 @@
         "scripts/**"
       ]
     },
-    "build:h5": {
+    "build:h5:prod": {
       "kind": "build",
       "always": true,
       "fullOnly": true,
@@ -455,6 +455,7 @@
         "src/pages/entry-surfaces/index.vue",
         "src/pages/index/index.vue",
         "src/pages/me/me.vue",
+        "src/pages/me/security.vue",
         "src/pages/onboarding/intro.vue"
       ],
       "inputs": [
@@ -522,10 +523,14 @@
     "pending-checkout-runtime": {
       "kind": "runtime",
       "pages": [
+        "src/pages/onboarding/intro.vue",
         "src/pages/store/checkout.vue",
         "src/pages/store/store.vue"
       ],
       "inputs": [
+        "src/App.vue",
+        "src/lib/route.ts",
+        "src/store/auth.ts",
         "scripts/pending-checkout-runtime.mjs"
       ]
     },

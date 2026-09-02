@@ -8,14 +8,14 @@ import {
 import { remoteEventView, type EventActionLabels } from "./remote-event-view";
 
 const labels: EventActionLabels = {
-  claimDiscount: "领取折扣",
-  checkIn: "去打卡",
-  reinvest: "去复投",
-  spin: "立即抽奖",
-  leaderboard: "查看排行",
-  viewDetails: "查看详情",
-  progress: "进度",
-  wheelPool: "转盘奖池",
+  claimDiscount: "Claim discount",
+  checkIn: "Check in",
+  reinvest: "Reinvest",
+  spin: "Spin now",
+  leaderboard: "View leaderboard",
+  viewDetails: "View details",
+  progress: "Progress",
+  wheelPool: "Wheel prize pool",
 };
 
 function canonicalEvent(overrides: Partial<CanonicalEvent> = {}): CanonicalEvent {
@@ -43,11 +43,11 @@ function canonicalEvent(overrides: Partial<CanonicalEvent> = {}): CanonicalEvent
 
 describe("remoteEventView", () => {
   it.each([
-    ["discount", "/pages/store/store", "领取折扣"],
-    ["boost", "/pages/daily/daily", "去打卡"],
-    ["boost", "/pages/me/wallet-repurchase", "去复投"],
-    ["regional", "/pages/team/leaderboard", "查看排行"],
-    ["seasonal", "/pages/store/store", "查看详情"],
+    ["discount", "/pages/store/store", "Claim discount"],
+    ["boost", "/pages/daily/daily", "Check in"],
+    ["boost", "/pages/me/wallet-repurchase", "Reinvest"],
+    ["regional", "/pages/team/leaderboard", "View leaderboard"],
+    ["seasonal", "/pages/store/store", "View details"],
   ] as const)("maps %s activity at %s to its business CTA", (kind, href, expectedLabel) => {
     const view = remoteEventView(canonicalEvent({ kind, href }), labels);
 
@@ -59,14 +59,14 @@ describe("remoteEventView", () => {
   it("keeps a wheel actionable even when the canonical event has no href", () => {
     const view = remoteEventView(canonicalEvent({ kind: "wheel", href: "" }), labels);
 
-    expect(view.ctaLabel).toBe("立即抽奖");
+    expect(view.ctaLabel).toBe("Spin now");
     expect(view.href).toBeUndefined();
     expect(view.useHref).toBeUndefined();
   });
 
   it("does not present a wheel as a zero-value generic reward", () => {
     expect(remoteEventView(canonicalEvent({ kind: "wheel", rewardAmount: 0, rewardName: "Wheel pool award" }), labels).reward)
-      .toBe("转盘奖池");
+      .toBe("Wheel prize pool");
   });
 
   it("does not render a dead decorative CTA when neither an href nor an in-app action exists", () => {
@@ -162,14 +162,14 @@ describe("remoteEventView", () => {
     expect(shouldShowDecorativeAction({
       kind: "wheel",
       status: "ongoing",
-      ctaLabel: "立即抽奖",
+      ctaLabel: "Spin now",
       _trackable: false,
       _claimed: true,
     })).toBe(false);
     expect(shouldShowDecorativeAction({
       kind: "discount",
       status: "ongoing",
-      ctaLabel: "领取折扣",
+      ctaLabel: "Claim discount",
       runtimeSource: "remote",
       _trackable: false,
       _claimed: false,
@@ -177,7 +177,7 @@ describe("remoteEventView", () => {
     expect(shouldShowDecorativeAction({
       kind: "discount",
       status: "ongoing",
-      ctaLabel: "领取折扣",
+      ctaLabel: "Claim discount",
       runtimeSource: "mock",
       _trackable: false,
       _claimed: false,

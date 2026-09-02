@@ -227,6 +227,7 @@ async function onSave() {
         targetUSDT: target.value,
         days: days.value,
         deadlineMs: Date.now() + days.value * ONE_DAY_MS,
+        // IDEMPOTENCY-FRESH-OK:首次创建后立即写入 retryableSaveIntents；失败重试按同一 intentKey 复用，成功才删除。
         idempotencyKey: `goal-save-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`,
       };
   retryableSaveIntents.set(intentKey, intent);

@@ -68,6 +68,7 @@ const REGISTRY = {
   "market-board-visual-contract.test.mjs": { how: "chain" },
   "onboarding-estimator-fail-closed.contract.test.mjs": { how: "chain" },
   "phone-activation-defer-contract.test.mjs": { how: "chain" },
+  "p1-audit-regression.contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
   "country-code-selector-contract.test.mjs": { how: "chain" },
   "e18-e20-runtime-consumer-contract.test.mjs": { how: "chain" },

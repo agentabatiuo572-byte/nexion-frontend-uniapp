@@ -9,9 +9,9 @@ import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-accou
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
-import { authApi, remoteApiEnabled } from "@/api/runtime";
+import { authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
-import { scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
+import { hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
 
 interface CompleteSignInOptions {
@@ -168,20 +168,23 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     // the account preference merely because the user signed in.
     hydrateCurrentProfileLocale();
   }
-  // App.onShow is not guaranteed after an H5 reLaunch. Complete the canonical
-  // catalogue/fleet bootstrap here as well.
-  if (remoteApiEnabled) {
-    void app.refreshHomeTruth();
-    void refreshRemoteFleetAfterCatalog(options.identity);
-  }
-  // reLaunch does not reliably emit App.onShow in an existing H5 document.
-  // Fetch the new account's server buckets here; a failed request leaves the
-  // snapshot unavailable and the withdrawal endpoint still fails closed.
-  void refreshEarningsReleaseStatus(options.identity).catch(() => {});
   // Login completion is a re-ack checkpoint. The helper fences its request to
-  // this exact bearer/account and only redirects when the server says the
-  // published Terms version is unacknowledged.
-  if (remoteApiEnabled) scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index");
+  // this exact bearer/account and only starts business reads after the server
+  // confirms the current version is acknowledged.
+  if (remoteApiEnabled && options.serverProfile && auth.onboardingComplete) {
+    const expectedUserId = options.serverProfile.userId;
+    void scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index").then(() => {
+      const current = sessionVault.read();
+      if (!current || current.user.userId !== expectedUserId || hasPendingLegalTermsRequirement()) return;
+      // App.onShow is not guaranteed after an H5 reLaunch. Complete the
+      // canonical catalogue/fleet bootstrap only after the legal boundary.
+      void app.refreshHomeTruth();
+      void refreshRemoteFleetAfterCatalog(options.identity);
+      // A failed request leaves the snapshot unavailable and withdrawal still
+      // fails closed at the server endpoint.
+      void refreshEarningsReleaseStatus(options.identity).catch(() => {});
+    });
+  }
   if (options.deferNavigation) return { ok: true };
   if (!auth.onboardingComplete) {
     void navReset("/pages/onboarding/estimator");

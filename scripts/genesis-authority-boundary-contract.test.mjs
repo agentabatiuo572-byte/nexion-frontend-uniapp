@@ -8,13 +8,13 @@ const root = path.resolve(import.meta.dirname, "..");
 test("only a run-fenced Sandbox account projection may overlay its isolated supply", () => {
   const source = fs.readFileSync(path.join(root, "src/store/genesis.ts"), "utf8");
   const start = source.indexOf("function applyAccountState(");
-  const end = source.indexOf("function clearRemoteAccountFacts(", start);
+  const end = source.indexOf("function applyCommittedPurchaseReceipt(", start);
   assert.ok(start >= 0 && end > start, "applyAccountState boundary is unavailable");
   const accountProjection = source.slice(start, end);
-  assert.match(accountProjection,
-    /if \(state\.sourceEnvironment === "SANDBOX"\) \{[\s\S]*?totalSlots\.value\s*=\s*state\.series\.totalSupply;[\s\S]*?soldSlots\.value\s*=\s*state\.series\.soldSupply;[\s\S]*?\}/);
+  assert.doesNotMatch(accountProjection, /\b(?:totalSlots|soldSlots)\.value\s*=/);
   assert.doesNotMatch(accountProjection, /\b(?:nexListed|remoteHalted)\.value\s*=/);
   assert.doesNotMatch(accountProjection, /sourceEnvironment\s*===\s*"PRODUCTION"/);
+  assert.match(source, /function applyCommittedPurchaseReceipt[\s\S]*totalSlots\.value = state\.series\.totalSupply;[\s\S]*soldSlots\.value = state\.series\.soldSupply;/);
 });
 
 test("eligibility projection cannot overwrite the public Genesis halt state", () => {

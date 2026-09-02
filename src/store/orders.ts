@@ -143,11 +143,12 @@ export const useOrders = defineStore("orders", () => {
   let refreshGeneration = 0;
   const orders = ref<Order[]>([]);
 
-  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
+  function clearOrdersForCommerceRunChange() {
     if (!remoteApiEnabled) return;
     refreshGeneration += 1;
     orders.value = [];
-  });
+  }
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(clearOrdersForCommerceRunChange);
   onScopeDispose(unsubscribeCommerceRun);
 
   /**

@@ -493,7 +493,7 @@ const discStyle: CSSProperties = {
 };
 const serverFactStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.45,
 };
@@ -597,7 +597,7 @@ const ringPctStyle: CSSProperties = {
   lineHeight: 1,
 };
 const ringLabelStyle: CSSProperties = {
-  fontSize: "9.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   marginTop: "2px",
 };

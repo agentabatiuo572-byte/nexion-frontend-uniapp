@@ -50,14 +50,14 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "939b5668f4f8dffc104856476b69b53375f6b3a4b056f63f19a9e901d2c3fcbd",
   // Existing formal phone-calibration entry, trial state and physical-slot guard.
-  "devices.vue": "23fea78987f10dfcdcabb8d6a176eda307e087fdbacb28678b8674a11d4bc716",
+  "devices.vue": "eef17485a1a19178f62b0d85c6c940497c149aa04993deba62e30e46a13f52b0",
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
   // R3: preserve layout while enabling keyboard FAQ and category controls.
   "help.vue": "c7e130659141b96a10c901bc70bb6c7970f8735932d6a49b04ad3e2957a026b2",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
   // Translate the closed error category instead of showing protocol identifiers.
-  "preferences.vue": "7542b5f017a2c86127c8009c659a74868b6b02793d689ad3dc1bc66b76053ba0",
+  "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // the formal page also uses the shared BrandLockup without changing the surrounding layout.
@@ -69,7 +69,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "receipts.vue": "f8bc3661a5ec95dbba6b6a2fe193d91b206dc13a4fb92c77f569b20df1fed1df",
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
-  "security.vue": "d2ee24d1b0833bda99c89e316f49c223f867a3e419f979e27a630d5a7ca661aa",
+  "security.vue": "e4893b7bad073ec5bacdd1c79a6db63648dacd0e2f1449937cf9feec2d6d091d",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   "support-tickets.vue": "9454b7413765e6aec2a4ea010984786e5a2d0d4b838666dc7c19ea0079036f57",
@@ -90,7 +90,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-repurchase.vue": "876bc068892e35c026ac750a8e723388d328a04bb6aca02f1e342534b89dd560",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
-  "wallet-withdraw.vue": "7e7767300871771fdbd248bcbbb36b965c4165288c2b1c33dc447329a0514cf2",
+  "wallet-withdraw.vue": "98351cedecc19ce13fe2fe0b7dd601872916d894a2ce714e6d51f22760aa4e11",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "9231b2983d0e21f6e6cbd38a8cc1c7fa8037f693b339c689dc05b14cff2f0fe4",
 };

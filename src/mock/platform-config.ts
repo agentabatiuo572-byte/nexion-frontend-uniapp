@@ -47,6 +47,7 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfigSeed = {
   },
   rewards: {
     enabled: false,
+    effectiveAt: null,
     // 奖励关闭时 seed 也必须为零，避免非 remote 分支绕过 H8 闸门展示或入账。
     welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
     inviterReward: { nexAmount: 0 },

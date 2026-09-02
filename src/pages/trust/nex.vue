@@ -87,11 +87,11 @@
       </HowSection>
 
       <view class="mx-4" style="margin-top: 24px; display: flex; flex-direction: column; gap: 10px">
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaExchangeStyle" @click="goExchange">
+        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaExchangeStyle" role="button" tabindex="0" @click="goExchange" @keydown.enter.prevent="goExchange" @keydown.space.prevent="goExchange">
           <text>{{ w.ctaExchange }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaBackStyle" @click="goBack">
+        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaBackStyle" role="button" tabindex="0" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
           <text>{{ w.ctaBack }}</text>
         </view>
       </view>
@@ -101,7 +101,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
@@ -112,19 +112,26 @@ import CalloutBox from "@/components/how/how-callout-box.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
+import { useMarket } from "@/store/market";
 
 const t = useT();
 const w = computed(() => t.value.nexHowItWorks);
 const cfg = useConfig();
+const market = useMarket();
+onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
 // 礼包 NEX 数量单源派生自 platform config。
 const src4Body = computed(() => fmt(w.value.src4Body, { nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const tableRows = computed(() => [
   { k: w.value.rowType, usdt: w.value.usdtType, nex: w.value.nexType },
-  { k: w.value.rowPrice, usdt: `$1.00 (${w.value.fixed})`, nex: `$0.17 (${w.value.variable})` },
+  { k: w.value.rowPrice, usdt: `$1.00 (${w.value.fixed})`, nex: `${nexPriceText.value} (${w.value.variable})` },
   { k: w.value.rowVolatility, usdt: w.value.usdtVolatility, nex: w.value.nexVolatility },
   { k: w.value.rowUse, usdt: w.value.usdtUse, nex: w.value.nexUse },
 ]);
+
+const nexPriceText = computed(() => market.remoteReady && market.nexPriceUSDT > 0
+  ? `$${market.nexPriceUSDT.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
+  : "—");
 
 function goExchange() {
   navTo("/pages/me/wallet-exchange");

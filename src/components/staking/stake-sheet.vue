@@ -7,9 +7,9 @@
   postMoneyBill,见 lib/money-receipt.ts),不在 store 里;不裸调资金原语 / 账单写入。
 -->
 <template>
-  <view v-if="open && term !== null && selectedPool">
+  <view v-if="open && term !== null && selectedPool" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.staking.title">
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
     </transition>
     <transition name="nx-sheet-slide">
       <view v-if="open" class="nx-sheet-panel" :style="panelStyle" @click.stop>
@@ -19,7 +19,7 @@
             <text class="block" :style="titleStyle">{{ titleText }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -29,12 +29,12 @@
           <text class="block" :style="amountLabelStyle">{{ t.stakingV3.sheet.amount }}</text>
           <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
             <text class="shrink-0" :style="dollarStyle">$</text>
-            <input class="nx-staking-sheet-amount-input flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="decimal" :value="String(amount)" @input="onAmountInput" />
+            <input class="nx-staking-sheet-amount-input flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="decimal" :aria-label="t.stakingV3.sheet.amount" :value="String(amount)" @input="onAmountInput" />
             <text class="shrink-0" :style="usdtStyle">USDT</text>
           </view>
           <!-- Presets -->
           <view class="grid grid-cols-4" style="margin-top: 16px; gap: 8px">
-            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" @click="amount = p">
+            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" role="button" tabindex="0" @click="amount = p" @keydown.enter.prevent="amount = p" @keydown.space.prevent="amount = p">
               <text>${{ p.toLocaleString() }}</text>
             </view>
           </view>
@@ -44,7 +44,7 @@
               <text>{{ t.stakingV3.sheet.balance }} </text>
               <text style="color: var(--v5-ink); font-weight: 500">${{ balanceText }}</text>
             </text>
-            <text class="nx-staking-sheet-max-cta" :style="maxStyle" @click="setMax">{{ t.stakingV3.sheet.max }}</text>
+            <text class="nx-staking-sheet-max-cta" :style="maxStyle" role="button" tabindex="0" @click="setMax" @keydown.enter.prevent="setMax" @keydown.space.prevent="setMax">{{ t.stakingV3.sheet.max }}</text>
           </view>
         </view>
 
@@ -70,7 +70,7 @@
         </view>
 
         <!-- Submit -->
-        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" @click="submit">
+        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" role="button" tabindex="0" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <text>{{ ctaText }}</text>
         </view>
@@ -78,8 +78,16 @@
       </view>
     </transition>
   </view>
-  <view v-else-if="open && term !== null" class="nx-staking-sheet-panel" :style="panelStyle">
-    <text class="block" :style="titleStyle">{{ t.staking.remoteUnavailableClosed }}</text>
+  <view v-else-if="open && term !== null" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.staking.remoteUnavailableClosed">
+    <view class="nx-sheet-backdrop" @click="emitClose" />
+    <view class="nx-staking-sheet-panel" :style="panelStyle" @click.stop>
+      <view class="flex items-start justify-between" style="gap: 12px">
+        <text class="block" :style="titleStyle">{{ t.staking.remoteUnavailableClosed }}</text>
+        <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -408,7 +416,7 @@ const noticeStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color:
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
+useDialogA11y(computed(() => props.open), ".nx-staking-sheet-root", emitClose);
 </script>
 
 <style scoped>

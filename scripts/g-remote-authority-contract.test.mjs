@@ -70,16 +70,16 @@ test("G1 remote mutations use instance pending locks, stable keys and authority 
   const sheet = read("src/components/staking/stake-sheet.vue");
   const page = read("src/pages/staking/staking.vue");
   assert.match(sheet, /const remotePending = ref\(false\)/);
-  assert.match(sheet, /const remoteIntent = ref/);
+  assert.match(sheet, /const remoteGate = createRemoteIntentGate/);
   assert.match(sheet, /if \(remotePending\.value\) return/);
   assert.match(sheet, /staking\.syncRemote\(\)/);
   assert.match(page, /const pendingRemoteMutations = ref/);
   assert.match(page, /if \(pendingRemoteMutations\.value\.has\(intent\)\) return/);
   assert.match(page, /await staking\.syncRemote\(\)/);
-  assert.match(sheet, /intentKey\(.*tierKey.*amount/);
-  assert.match(page, /intentKey\(.*positionNo/);
-  assert.match(sheet, /fingerprint = `\$\{tierKey\}:\$\{amountUsdt\.toFixed\(2\)\}`/);
-  assert.match(page, /remoteMutationKeys\.get\(intent\)/);
+  assert.match(sheet, /remoteGate\.acquire\(app\.accountKey, "open", \{ tierKey, amountUsdt \}\)/);
+  assert.match(page, /remoteMutationGate\.acquire\(app\.accountKey, kind, \{ positionNo \}\)/);
+  assert.match(sheet, /remoteGate\.complete\(lease,/);
+  assert.match(page, /remoteMutationGate\.complete\(lease,/);
 });
 
 test("G3 remote mode uses only the canonical market snapshot and clears stale facts", () => {

@@ -29,14 +29,14 @@
       <!-- Remote and explicit sandbox catalogs start empty. Do not render the
            compatibility PRODUCTS array until the authoritative snapshot is
            ready; a cold first frame must never look like a real quote. -->
-      <view v-if="catalogStatus === 'loading'" data-testid="bundle-catalog-loading" class="mx-4" :style="catalogStateStyle">
+      <view v-if="catalogStatus === 'loading' || policyStatus === 'loading'" data-testid="bundle-catalog-loading" class="mx-4" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
-      <view v-else-if="catalogStatus === 'error'" data-testid="bundle-catalog-error" class="mx-4" :style="catalogStateStyle">
+      <view v-else-if="catalogStatus === 'error' || policyStatus === 'error'" data-testid="bundle-catalog-error" class="mx-4" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
+        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog" @keydown="activate($event, retryCatalog)">
           <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
@@ -45,7 +45,7 @@
       <view v-if="receiptWriteFailure" class="mx-4 rounded-2xl text-center" :style="receiptFailureCardStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.errors.billMissingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.errors.billMissingMsg }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" :aria-disabled="receiptRetrying" @click="retryReceiptWrite">
+        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" :aria-disabled="receiptRetrying" @click="retryReceiptWrite" @keydown="activate($event, retryReceiptWrite)">
           <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
         </view>
       </view>
@@ -74,7 +74,7 @@
       <view class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
         <view class="px-4 py-2.5 flex items-center justify-between" style="border-bottom: 1px solid var(--v5-border)">
           <text :style="itemsHeadingStyle">{{ t.bundle.itemsHeading }}</text>
-          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 12px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear">{{ t.bundle.clear }}</text>
+          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 12px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear" @keydown="activate($event, clear)">{{ t.bundle.clear }}</text>
         </view>
 
         <!-- Empty state -->
@@ -94,7 +94,7 @@
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
             </text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: p.name })" @click.stop="remove(p.id)">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: p.name })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -113,6 +113,7 @@
             tabindex="0"
             :aria-label="fmt(t.uiChrome.addItem, { name: p.name })"
             @click.stop="onAddSuggestion(p)"
+            @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
               <text class="block truncate" :style="suggestionNameStyle">{{ p.name }}</text>
@@ -164,6 +165,7 @@
             :aria-disabled="checkoutUnavailable"
             :aria-label="ctaText"
             @click.stop="onCheckout"
+            @keydown="activate($event, onCheckout)"
           >
             <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
             <text :style="ctaLabelStyle">{{ ctaText }}</text>
@@ -186,7 +188,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useCart, bundleDiscountForCount, BUNDLE_DISCOUNT_TIERS, type BundleDiscountTier } from "@/store/cart";
+import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { isProductAvailable } from "@/store/product-availability";
@@ -195,8 +197,9 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { toast } from "@/store/ui";
-import { bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
-import { isAmbiguousOutcome } from "@/api/errors";
+import { bundleDiscountApi, bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
+import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
+import { ApiError, isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -214,15 +217,30 @@ const orders = useOrders();
 const pending = usePendingCheckout();
 
 const catalogStatus = computed(() => productCatalogState.status);
-const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
+const policy = ref<BundleDiscountSnapshot | null>(null);
+const policyStatus = ref<"loading" | "ready" | "error">("loading");
+const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value)
+  && policyStatus.value === "ready" && policy.value?.serverCanonical === true);
+
+async function refreshBundlePolicy(): Promise<void> {
+  policyStatus.value = "loading";
+  try {
+    policy.value = await bundleDiscountApi.current();
+    policyStatus.value = "ready";
+  } catch {
+    policy.value = null;
+    policyStatus.value = "error";
+  }
+}
 
 onLoad(async () => {
-  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 });
 
 onShow(() => {
   void refreshProductCatalog(true);
   void refreshServerProductPhase(true);
+  void refreshBundlePolicy();
   restoreReceiptRecovery();
 });
 
@@ -243,7 +261,8 @@ const products = computed<Product[]>(() =>
     : [],
 );
 const subtotal = computed(() => products.value.reduce((s, p) => s + p.price, 0));
-const discountPct = computed(() => bundleDiscountForCount(products.value.length));
+const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
+const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
 const discountUSD = computed(() => subtotal.value * discountPct.value);
 const total = computed(() => subtotal.value - discountUSD.value);
 const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + p.dailyEarn, 0));
@@ -262,6 +281,8 @@ const suggestions = computed(() =>
 
 function retryCatalog() {
   void refreshProductCatalog(true);
+  void refreshServerProductPhase(true);
+  void refreshBundlePolicy();
 }
 
 function retryReceiptWrite() {
@@ -287,7 +308,13 @@ function retryReceiptWrite() {
   }
 }
 
-const tiersReversed = computed(() => BUNDLE_DISCOUNT_TIERS.slice().reverse());
+const tiersReversed = computed(() => activeDiscountTiers.value.slice().reverse());
+
+function activate(event: KeyboardEvent, action: () => void | Promise<void>) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  void action();
+}
 
 const totalText = computed(() => total.value.toLocaleString(undefined, { maximumFractionDigits: 0 }));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
@@ -375,22 +402,41 @@ async function onCheckout() {
   if (remoteApiEnabled) {
     const accountKey = orders.currentAccountKey();
     submitting.value = true;
-    const key = acquireBundleKey(list, accountKey);
     try {
-      const created = await bundleOrderApi.create(list.map((item) => item.id), key);
-      retireBundleKey(list, accountKey);
-      if (orders.currentAccountKey() !== accountKey) return;
-      cart.clear();
-      const successBody = t.value.bundle.checkoutPendingBody;
-      toast.success(t.value.bundle.checkoutSuccessTitle,
-        fmt(successBody, { count: created.itemCount }));
-      navTo("/pages/store/orders");
-    } catch (error) {
-      if (!isAmbiguousOutcome(error)) retireBundleKey(list, accountKey);
-      if (orders.currentAccountKey() !== accountKey) return;
-      toast.warn(isAmbiguousOutcome(error)
-        ? t.value.bundle.checkoutOutcomeUnknown
-        : t.value.tradein.errPurchaseFailed);
+      const latestPolicy = await bundleDiscountApi.current();
+      if (!policy.value || latestPolicy.policyVersion !== policy.value.policyVersion) {
+        policy.value = latestPolicy;
+        policyStatus.value = "ready";
+        toast.warn(t.value.bundle.policyChanged);
+        return;
+      }
+      const key = acquireBundleKey(list, accountKey);
+      try {
+        const created = await bundleOrderApi.create(
+          list.map((item) => item.id), latestPolicy.policyVersion, key);
+        retireBundleKey(list, accountKey);
+        if (orders.currentAccountKey() !== accountKey) return;
+        cart.clear();
+        const successBody = t.value.bundle.checkoutPendingBody;
+        toast.success(t.value.bundle.checkoutSuccessTitle,
+          fmt(successBody, { count: created.itemCount }));
+        navTo("/pages/store/orders");
+      } catch (error) {
+        const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
+        if (policyStale || !isAmbiguousOutcome(error)) retireBundleKey(list, accountKey);
+        if (orders.currentAccountKey() !== accountKey) return;
+        if (policyStale) {
+          await refreshBundlePolicy();
+          toast.warn(t.value.bundle.policyChanged);
+          return;
+        }
+        toast.warn(isAmbiguousOutcome(error)
+          ? t.value.bundle.checkoutOutcomeUnknown
+          : t.value.tradein.errPurchaseFailed);
+      }
+    } catch {
+      policyStatus.value = "error";
+      toast.warn(t.value.store.catalogErrorBody);
     } finally {
       submitting.value = false;
     }

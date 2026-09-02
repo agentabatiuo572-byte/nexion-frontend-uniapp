@@ -14,8 +14,8 @@ test("remote security center consumes the authoritative account API", () => {
   assert.match(page, /accountApi\.revokeSession\(/);
   assert.match(page, /accountApi\.revokeOtherSessions\(\)/);
   assert.match(page, /accountApi\.requestAccountDeletion\(/);
-  assert.match(page, /if \(remoteApiEnabled\) \{[\s\S]{0,180}accountApi\.changePassword\([\s\S]{0,180}else \{[\s\S]{0,80}security\.changePassword\(/);
-  assert.match(page, /if \(remoteApiEnabled\) \{[\s\S]{0,180}accountApi\.updateTwoFactor\(/);
+  assert.match(page, /if \(remoteApiEnabled\) \{[\s\S]{0,320}accountApi\.changePassword\([\s\S]{0,320}else \{[\s\S]{0,120}security\.changePassword\(/);
+  assert.match(page, /accountApi\.updateTwoFactor\(target, twoFactorPassword\.value, twoFactorChallengeNo\.value, twoFactorCode\.value\)/);
   assert.doesNotMatch(page, /ACCOUNT_DELETION_PROVIDER_HOLD/);
 });
 

@@ -33,6 +33,6 @@ test("back navigation also closes transient overlays before popping the stack", 
   const navToStart = route.indexOf("/** Navigate to", navBackStart);
   assert.ok(navBackStart >= 0 && navToStart > navBackStart);
   const navBackBody = route.slice(navBackStart, navToStart);
-  assert.match(navBackBody, /useTrialClaimSheet\(\)\.closeTransient\(\)/);
-  assert.match(navBackBody, /useVoucherClaimSheet\(\)\.closeTransient\(\)/);
+  assert.match(navBackBody, /closeTransientNavigationSheets\(\)/);
+  assert.match(route, /function closeTransientNavigationSheets\(\)[\s\S]*useTrialClaimSheet\(\)\.closeTransient\(\)[\s\S]*useVoucherClaimSheet\(\)\.closeTransient\(\)/);
 });

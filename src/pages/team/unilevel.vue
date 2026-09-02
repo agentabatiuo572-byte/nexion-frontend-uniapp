@@ -180,6 +180,18 @@
             <view class="text-right"><text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ event.amountUSDT.toFixed(2) }}</text><text v-if="event.amountNEX > 0" class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand-2)' }">+{{ event.amountNEX.toLocaleString() }} NEX</text></view>
           </view>
           <EmptyState v-if="remoteFilteredEvents.length === 0" kind="empty-list" :title="t.empty.commissionsTitle" :desc="t.empty.commissionsDesc" />
+          <view
+            v-if="remoteSnapshot && remoteSnapshot.events.length < remoteSnapshot.totalRows"
+            class="nx-unilevel-load-more flex items-center justify-center active:opacity-70"
+            :style="loadMoreBtnStyle"
+            role="button"
+            tabindex="0"
+            :aria-disabled="remoteLoadMoreStatus === 'loading'"
+            @click="loadMoreRemote"
+            @keydown="activateRemoteLoadMore"
+          >
+            <text :style="loadMoreLabelStyle">{{ remoteLoadMoreStatus === "loading" ? "…" : remoteLoadMoreStatus === "error" ? t.network.retry : t.unilevel.loadMore }}</text>
+          </view>
         </view>
         <view v-else-if="!remoteApiEnabled" :style="memberGroupStyle">
           <EmptyState v-if="filteredMembers.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" compact />
@@ -210,7 +222,7 @@
               </view>
             </view>
             <!-- View more — explicit user click (leaderboard idiom), 44px ghost. -->
-            <view v-if="hasMoreMembers" class="nx-unilevel-load-more flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" @click="loadMoreMembers">
+            <view v-if="hasMoreMembers" class="nx-unilevel-load-more flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" @click="loadMoreMembers" @keydown.enter.prevent="loadMoreMembers" @keydown.space.prevent="loadMoreMembers">
               <text :style="loadMoreLabelStyle">{{ t.unilevel.loadMore }}</text>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </view>
@@ -275,6 +287,7 @@ const network = useNetwork();
 const commission = useCommission();
 const remoteSnapshot = ref<TeamUnilevelSnapshot | null>(null);
 const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+const remoteLoadMoreStatus = ref<"idle" | "loading" | "error">("idle");
 let remoteRequest = 0;
 let mounted = true;
 onMounted(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void network.refreshCanonicalNetwork(); void loadRemote(); } });
@@ -292,11 +305,12 @@ async function loadRemote() {
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   remoteState.value = "loading";
+  remoteLoadMoreStatus.value = "idle";
   remoteSnapshot.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
-    const snapshot = await teamInsightsApi.unilevel("month");
+    const snapshot = await teamInsightsApi.unilevel("month", 1, 20);
     if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
     remoteSnapshot.value = snapshot;
     remoteState.value = "ready";
@@ -305,6 +319,36 @@ async function loadRemote() {
     remoteSnapshot.value = null;
     remoteState.value = "error";
   }
+}
+async function loadMoreRemote() {
+  const currentSnapshot = remoteSnapshot.value;
+  if (!remoteApiEnabled || remoteState.value !== "ready" || !currentSnapshot
+      || remoteLoadMoreStatus.value === "loading"
+      || currentSnapshot.events.length >= currentSnapshot.totalRows) return;
+  const accountKey = app.accountKey;
+  const accountScope = captureAccountScope();
+  const runScope = captureRuntimeRevision();
+  const nextPage = currentSnapshot.page + 1;
+  remoteLoadMoreStatus.value = "loading";
+  try {
+    const next = await teamInsightsApi.unilevel("month", nextPage, currentSnapshot.pageSize, currentSnapshot.snapshotAt);
+    if (!mounted || accountKey !== app.accountKey || !isCurrentAccountScope(accountScope)
+        || !isCurrentRuntimeRevision(runScope) || next.page !== nextPage) return;
+    const seen = new Set(currentSnapshot.events.map((event) => event.id));
+    remoteSnapshot.value = {
+      ...next,
+      events: [...currentSnapshot.events, ...next.events.filter((event) => !seen.has(event.id))],
+    };
+    remoteLoadMoreStatus.value = "idle";
+  } catch {
+    if (mounted && accountKey === app.accountKey && isCurrentAccountScope(accountScope)
+        && isCurrentRuntimeRevision(runScope)) remoteLoadMoreStatus.value = "error";
+  }
+}
+function activateRemoteLoadMore(event: KeyboardEvent) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  void loadMoreRemote();
 }
 onUnmounted(() => { mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
 function retryRemote() { void Promise.all([commission.refreshCanonicalConfig(), network.refreshCanonicalNetwork(), loadRemote()]); }

@@ -126,7 +126,6 @@ import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
 import { useVoucher } from "@/store/voucher";
 import { useRewardsSeen } from "@/store/rewards-seen";
-import { MAX_DEVICES } from "@/store/device-types";
 import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
 import { useBills } from "@/store/bills";
@@ -244,11 +243,11 @@ const localeUpper = computed(() => locale.code.toUpperCase());
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
-const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);
+const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const onlineCount = computed(
   () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
 );
-const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: MAX_DEVICES }));
+const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
 const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));

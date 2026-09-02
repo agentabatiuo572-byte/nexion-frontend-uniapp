@@ -17,7 +17,7 @@ test("checkout maps remote denial/error copy from server eligibility state only"
   assert.match(page, /remotePurchaseEligibilityStatus\.value = "error"/);
   assert.match(page, /function remotePurchaseEligibilityFailureCopy\(\)/);
 
-  const onLoadGate = slice(page, "if (!(await refreshPurchaseEligibility()))", "// Trade-in intercept");
+  const onLoadGate = slice(page, "if (!trialConversion && !(await refreshPurchaseEligibility()))", "// Resuming a pending session");
   assert.match(onLoadGate, /purchaseEligibilityFailureCopy\(\)/);
   assert.doesNotMatch(onLoadGate, /purchaseGate\.value\.soldOut/);
 

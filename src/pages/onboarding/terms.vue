@@ -45,7 +45,7 @@
           <text class="tos-block__body">{{ b.body }}</text>
         </view>
       </view>
-      <view v-else class="tos-fail">{{ t.terms.loading }}</view>
+      <view v-else class="tos-fail"><text>{{ t.terms.loading }}</text></view>
 
       <!-- Risk disclosure cross-link -->
       <view class="tos-risk active:opacity-80" role="link" tabindex="0" @click="goRisk" @keydown.enter.prevent="goRisk" @keydown.space.prevent="goRisk">

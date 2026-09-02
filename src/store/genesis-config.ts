@@ -213,7 +213,7 @@ export const DEFAULT_GENESIS_CONFIG: GenesisConfig = {
   closedNoticeKey: "default",
   saleStartAt: null, // 默认已开售(不阻断现状)
   showCountdown: true,
-  showcaseEnabled: true,
+  showcaseEnabled: false,
   perks: emptyPerks(),
   // 运营挂单默认用高位 token 段(≥900)避免与用户持仓 token 撞号。
   opsListings: [
@@ -362,6 +362,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
   initial.opsListings = [];
   initial.fomoActivity = [];
   initial.fomoEnabled = false;
+  initial.showcaseEnabled = false;
   const config = ref<GenesisConfig>(initial);
   /** 配置是否可用 —— 由**最近一次读源的真实结果**驱动,不写死。
    *  false 时 `genesisPurchaseBlock` 返回 `configUnavailable` 保守锁购;
@@ -404,6 +405,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
           : "default",
         saleStartAt: state.sale.startAt,
         showCountdown: state.sale.showCountdown,
+        showcaseEnabled: state.showcaseEnabled,
       };
       loaded.value = true;
     } catch {
@@ -414,6 +416,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
         killSwitchSource: "remote-unavailable",
         marketOpenState: "closed",
         tiers: [],
+        showcaseEnabled: false,
       };
       loaded.value = false;
     }
