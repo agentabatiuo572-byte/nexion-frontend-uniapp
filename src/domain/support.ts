@@ -25,6 +25,8 @@ export interface Ticket {
   unread: number;
   owner: string;
   messages: TicketMessage[];
+  /** True when the server intentionally returned only the newest message window. */
+  historyTruncated?: boolean;
 }
 
 export const CATEGORY_LABEL: Record<TicketCategory, string> = {
@@ -65,6 +67,8 @@ export interface Conversation {
   lastTs: number;
   lastMessage: string;
   sessionStatus: ConvSessionStatus;
+  /** True when the server intentionally returned only the newest message window. */
+  historyTruncated?: boolean;
 }
 
 export interface SupportFaq {

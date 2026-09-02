@@ -19,7 +19,7 @@
       </view>
       <view v-if="remoteApiEnabled && !remoteSecurity" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
         <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
-        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity">
+        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity" @keydown.enter.prevent="loadRemoteSecurity" @keydown.space.prevent="loadRemoteSecurity">
           <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -36,7 +36,7 @@
 
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="mx-4" :style="cardStyle">
-        <view class="flex items-center active:opacity-90" :style="rowStyle" @click="editingPwd = !editingPwd">
+        <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0" :aria-expanded="editingPwd ? 'true' : 'false'" @click="editingPwd = !editingPwd" @keydown.enter.prevent="editingPwd = !editingPwd" @keydown.space.prevent="editingPwd = !editingPwd">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           </view>
@@ -52,10 +52,10 @@
           <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onConfirmPwd" />
           <text v-if="err" class="block" :style="errStyle">{{ err }}</text>
           <view class="flex" style="gap: 8px; margin-top: 4px">
-            <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" @click="cancelPwd">
+            <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd" @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
               <text :style="pwdCancelLabelStyle">{{ t.ui.cancel }}</text>
             </view>
-            <view class="flex-1 flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" @click="submitPasswordChange">
+            <view class="flex-1 flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="submitPasswordChange" @keydown.enter.prevent="submitPasswordChange" @keydown.space.prevent="submitPasswordChange">
               <text :style="pwdSaveLabelStyle">{{ t.ui.save }}</text>
             </view>
           </view>
@@ -76,7 +76,7 @@
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
             <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
-            <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge">
+            <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
               <text :style="pwdSaveLabelStyle">{{ t.addrRebind.otpConfirmCta }}</text>
             </view>
           </view>
@@ -106,11 +106,11 @@
             <text class="block truncate" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
-          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" @click="handleRevoke(s)">
+          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevoke(s)" @keydown.enter.prevent="handleRevoke(s)" @keydown.space.prevent="handleRevoke(s)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
-        <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" @click="handleRevokeAll">
+        <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll" @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
       </view>
@@ -118,7 +118,7 @@
 
       <!-- ───── Danger zone ───── -->
       <view class="mx-4" :style="[cardStyle, groupGap]">
-        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" @click="handleDeleteAccount">
+        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="handleDeleteAccount" @keydown.enter.prevent="handleDeleteAccount" @keydown.space.prevent="handleDeleteAccount">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
           </view>
@@ -131,7 +131,7 @@
         </view>
         <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
           :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
-          @click="handleCancelAccountDeletion">
+          @click="handleCancelAccountDeletion" @keydown.enter.prevent="handleCancelAccountDeletion" @keydown.space.prevent="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>

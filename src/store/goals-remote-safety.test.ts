@@ -120,4 +120,30 @@ describe("earning-goal remote safety", () => {
     await expect(pending).resolves.toBe("stale");
     expect(store.goals).toEqual([]);
   });
+
+  it("retains the last valid server snapshot when a refresh fails", async () => {
+    remote.goalsApi.list.mockResolvedValueOnce({
+      serverCanonical: true,
+      source: "nx_earning_goal",
+      lifetimeEarningsUsdt: 25,
+      goals: [{
+        id: 9,
+        targetUsdt: 500,
+        deadlineAt: 1_900_000_000_000,
+        createdAt: 1_800_000_000_000,
+        achieved: false,
+        progressPct: 5,
+      }],
+    });
+    const store = useGoals();
+    await store.refresh();
+    remote.goalsApi.list.mockRejectedValueOnce(new Error("temporary outage"));
+
+    await store.refresh();
+
+    expect(store.status).toBe("error");
+    expect(store.goals).toHaveLength(1);
+    expect(store.goals[0]?.id).toBe("9");
+    expect(store.lifetimeEarningsUsdt).toBe(25);
+  });
 });

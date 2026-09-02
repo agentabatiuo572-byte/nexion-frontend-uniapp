@@ -1171,6 +1171,7 @@ export const zh: Messages = {
   },
 
   tickets: {
+    historyTruncated: "这里只显示最近 100 条消息，更早的消息仍保存在服务器。",
     slaStatisticsUnavailable: "暂无可展示的响应统计",
     slaTargetLabel: "服务目标",
     slaTargetValue: "首次回复目标 {firstResponseMins} 分钟；解决目标 {resolutionHours} 小时",
@@ -2120,6 +2121,7 @@ export const zh: Messages = {
     orShareVia: "或通过",
   },
   wallet: {
+    loadingTransactions: "正在加载交易记录…",
     title: "钱包",
     usdtBalance: "USDT 余额",
     nexBalance: "NEX 余额",
@@ -2594,6 +2596,7 @@ export const zh: Messages = {
       newConfirmAction: "开始新会话",
     },
     localSafetyNotice: "AI 回答可能出错,也不能查看或修改你的账号。请勿发送密码、验证码、助记词、私钥、完整卡号或身份证件。",
+    historyTruncated: "这里只显示了本次会话最近的一部分记录。",
     localQOrder: "怎么查看订单?",
     localQTicket: "怎么创建客服工单?",
     localQSecurity: "怎么保护账号安全?",
@@ -2855,6 +2858,7 @@ export const zh: Messages = {
     deleteAccountPendingReason: "财务或订单仍在结算",
   },
   help: {
+    faqLanguageFallback: "当前语言版本尚未发布，以下内容为已发布的默认语言版本。",
     title: "帮助中心",
     back: "返回",
     searchPlaceholder: "搜索话题、问题或关键字…",
@@ -2900,6 +2904,7 @@ export const zh: Messages = {
     chLiveChatHint: "和你的顾问、客服团队聊聊",
   },
   conversations: {
+    historyTruncated: "这里只显示最近 100 条消息，更早的消息仍保存在服务器。",
     sessionTransferred: "此会话已转接，不能继续回复。请新建会话。",
     title: "会话中心",
     back: "返回",
@@ -3275,6 +3280,7 @@ export const zh: Messages = {
     retry: "重新加载",
     serverDailyMilestones: "连续签到里程碑",
     serverEarningMilestones: "累计收益里程碑",
+    serverBadgeAchievements: "徽章成就",
     dailyMilestone: "连续签到第",
     earningMilestone: "累计收益达",
     streakProgress: "当前连续签到",

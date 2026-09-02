@@ -27,6 +27,10 @@
         />
       </view>
 
+      <view v-if="faqLanguageFallback" class="mx-4" :style="faqFallbackStyle" role="status" aria-live="polite">
+        <text>{{ w.faqLanguageFallback }}</text>
+      </view>
+
       <!-- Category chips -->
       <scroll-view scroll-x class="mx-4" style="margin-bottom: 12px; white-space: nowrap">
         <view
@@ -165,6 +169,9 @@ const query = ref("");
 const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
+const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US");
+const faqLanguageFallback = computed(() => faqs.value.length > 0
+  && faqs.value.some((faq) => faq.language.toLowerCase() !== requestedFaqLanguage.value.toLowerCase()));
 
 async function loadFaqs() {
   faqLoadError.value = false;
@@ -365,6 +372,15 @@ const faqWrapStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "0 2px",
   borderTop: "1px solid var(--v5-border)",
+};
+const faqFallbackStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "9px 12px",
+  borderRadius: "10px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface))",
+  color: "var(--v5-ink-2)",
+  fontSize: "12px",
+  lineHeight: 1.45,
 };
 const emptyStyle: CSSProperties = { padding: "24px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };

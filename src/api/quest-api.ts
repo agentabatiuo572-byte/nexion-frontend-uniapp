@@ -105,7 +105,6 @@ function parseQuest(value: unknown): CanonicalQuest {
       || !rawActionRoute || !instanceKey || !eligibleFrom || !eligibleUntil || eligible === null
       || Date.parse(eligibleUntil) <= Date.parse(eligibleFrom)
       || (layer === "DAY_ONE" ? !instanceKey.startsWith("DAY_ONE:") : !instanceKey.startsWith("WEEK:"))
-      || (layer !== "DAY_ONE" && !eligible)
       || (status === "EXPIRED" && eligible)
       || (!eligible && !["EXPIRED", "CLAIMED"].includes(status))) {
     return invalid();

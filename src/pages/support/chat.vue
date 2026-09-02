@@ -48,6 +48,12 @@
     <view v-if="isAi && remoteApiEnabled" class="cp-ai-safety" role="note">
       <text class="cp-ai-safety-t">{{ t.nova.localSafetyNotice }}</text>
     </view>
+    <view v-if="isAi && remoteApiEnabled && nova.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
+      <text class="cp-ai-history-t">{{ t.nova.historyTruncated }}</text>
+    </view>
+    <view v-if="!isAi && conv?.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
+      <text class="cp-ai-history-t">{{ t.conversations.historyTruncated }}</text>
+    </view>
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
@@ -813,6 +819,17 @@ function goBack() {
   font-size: 12px;
   line-height: 1.45;
   color: var(--v5-ink-3);
+}
+.cp-ai-history {
+  padding: 7px 16px;
+  background: color-mix(in srgb, var(--v5-warning) 9%, var(--v5-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--v5-warning) 22%, var(--v5-border));
+}
+.cp-ai-history-t {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--v5-ink-2);
 }
 .cp-back {
   /* 《07》tap≥44:原 36×36。负 margin 由 -6 调到 -10,图标视觉位置不动、只有热区变大 */

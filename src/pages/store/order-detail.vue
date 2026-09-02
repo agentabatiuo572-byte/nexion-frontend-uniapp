@@ -117,8 +117,22 @@
           </view>
         </view>
 
-        <!-- Cancel action (only while placed) -->
+        <!-- Pending remote orders can safely reopen the same idempotent HDPay session. -->
         <view v-if="cancellable" class="mx-4" style="margin-top: 12px; margin-bottom: 24px">
+          <view
+            v-if="canOpenHostedPayment"
+            class="w-full grid place-items-center active:opacity-80"
+            :style="hostedPaymentBtnStyle"
+            role="button"
+            tabindex="0"
+            :aria-disabled="openingHostedPayment ? 'true' : 'false'"
+            :aria-label="t.bankPane.hostedContinueCta"
+            @click.stop="handleHostedPayment"
+            @keydown.enter.prevent.stop="handleHostedPayment"
+            @keydown.space.prevent.stop="handleHostedPayment"
+          >
+            <text @click.stop="handleHostedPayment">{{ t.bankPane.hostedContinueCta }}</text>
+          </view>
           <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.orders.cancelOrder" @click.stop="handleCancel">
             <text>{{ t.orders.cancelOrder }}</text>
           </view>
@@ -141,7 +155,8 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
-import { remoteApiEnabled } from "@/api/runtime";
+import { orderApi, remoteApiEnabled } from "@/api/runtime";
+import { openHostedPaymentPage } from "@/lib/hosted-payment";
 
 const t = useT();
 const orders = useOrders();
@@ -222,6 +237,8 @@ const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.valu
 // Cancellable ONLY before payment settles ("placed"). Checkout settles to
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
 const cancellable = computed(() => order.value?.status === "placed");
+const canOpenHostedPayment = computed(() => remoteApiEnabled && cancellable.value);
+const openingHostedPayment = ref(false);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
 const STATUS_COLORS: Record<OrderStatus, string> = {
   placed: "var(--v5-ink-3)",
@@ -314,6 +331,32 @@ async function handleCancel() {
     } else {
       toast.warn(t.value.orders.cancelPendingServer);
     }
+  }
+}
+
+async function handleHostedPayment() {
+  if (!canOpenHostedPayment.value || openingHostedPayment.value || !order.value) return;
+  const scope = captureDetailScope();
+  const requestOrderNo = order.value.id;
+  const requestAmountUsdt = order.value.total;
+  openingHostedPayment.value = true;
+  try {
+    const session = await orderApi.createPaymentSession(
+      requestOrderNo,
+      `hdpay-session:${requestOrderNo}`,
+    );
+    if (!isCurrentDetailScope(scope)) return;
+    if (session.orderNo !== requestOrderNo
+        || Math.abs(session.amountUsdt - requestAmountUsdt) > 0.000001) {
+      throw new Error("HDPAY_COMMERCE_SESSION_READBACK_MISMATCH");
+    }
+    if (!openHostedPaymentPage(session.paymentUrl)) {
+      throw new Error("HDPAY_PAYMENT_URL_REJECTED");
+    }
+  } catch {
+    if (isCurrentDetailScope(scope)) toast.warn(t.value.bankPane.hostedOpenFailed);
+  } finally {
+    if (isCurrentDetailScope(scope)) openingHostedPayment.value = false;
   }
 }
 
@@ -426,6 +469,16 @@ const cancelBtnStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
   fontSize: "13px",
   fontWeight: 500,
+};
+const hostedPaymentBtnStyle: CSSProperties = {
+  height: "44px",
+  marginBottom: "8px",
+  borderRadius: "12px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
+  boxShadow: "var(--v5-spotlight-brand)",
 };
 const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",

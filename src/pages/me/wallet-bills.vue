@@ -39,7 +39,7 @@
       </view>
 
       <!-- Empty -->
-      <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
+      <view v-else-if="initialLoading" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
       <EmptyState v-else-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
 
       <!-- Grouped list -->
@@ -86,7 +86,7 @@
           </view>
         </view>
         <view ref="scrollAnchor" style="height: 1px" />
-        <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" aria-live="polite" aria-busy="true"><text>…</text></view>
+        <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
         <view v-if="refreshErrorWithRows" :style="appendErrorStyle">
           <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
           <view class="inline-flex items-center active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger">

@@ -51,6 +51,20 @@ export interface CanonicalEarningMilestone {
   achievedAt: string | null;
 }
 
+export type BadgeAchievementStatus = "LOCKED" | "UNLOCKED";
+
+export interface CanonicalBadgeAchievement {
+  achievementCode: string;
+  name: string;
+  description: string;
+  category: string;
+  iconKey: string;
+  accentColor: string;
+  rewardPoints: number;
+  status: BadgeAchievementStatus;
+  unlockedAt: string | null;
+}
+
 export interface DailySnapshot {
   rewardAsset: "NEX";
   serverDate: string;
@@ -58,6 +72,7 @@ export interface DailySnapshot {
   streak: DailyStreakState;
   dailyMilestones: CanonicalDailyMilestone[];
   earningMilestones: CanonicalEarningMilestone[];
+  badgeAchievements: CanonicalBadgeAchievement[];
   powerUps: CanonicalDailyPowerUp[];
   rules: Array<{ key: string; value: string }>;
   topStreakers: CanonicalTopStreaker[];
@@ -263,6 +278,26 @@ function parseEarningMilestone(value: unknown): CanonicalEarningMilestone {
   return { milestoneId, thresholdUsdt, rewardNex, lifetimeEarningsUsdt, status, achievedAt };
 }
 
+function parseBadgeAchievement(value: unknown): CanonicalBadgeAchievement {
+  const row = record(value);
+  const achievementCode = text(row?.achievementCode);
+  const name = text(row?.name);
+  const description = typeof row?.description === "string" ? row.description : null;
+  const category = text(row?.category)?.toUpperCase();
+  const iconKey = typeof row?.iconKey === "string" ? row.iconKey : null;
+  const accentColor = typeof row?.accentColor === "string" ? row.accentColor : null;
+  const rewardPoints = whole(row?.rewardPoints);
+  const status = text(row?.status)?.toUpperCase() as BadgeAchievementStatus;
+  const unlockedAt = optionalText(row?.unlockedAt);
+  if (!row || !achievementCode || !name || description === null || !category
+      || iconKey === null || accentColor === null || rewardPoints === null
+      || !["LOCKED", "UNLOCKED"].includes(status)
+      || (unlockedAt !== null && Number.isNaN(Date.parse(unlockedAt)))) {
+    return invalid("BADGE_ACHIEVEMENT_RESPONSE_INVALID");
+  }
+  return { achievementCode, name, description, category, iconKey, accentColor, rewardPoints, status, unlockedAt };
+}
+
 function parseSnapshot(value: unknown, mode: ApiEnvironment): DailySnapshot {
   const row = record(value);
   if (!row) return invalid("DAILY_RESPONSE_INVALID");
@@ -279,7 +314,8 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): DailySnapshot {
       || longestStreak === null || streakSavers === null || checkedInToday === null
       || !serverDate || Number.isNaN(Date.parse(`${serverDate}T00:00:00Z`))
       || !nextResetAtUtc || Number.isNaN(Date.parse(nextResetAtUtc))
-      || !Array.isArray(row.dailyMilestones) || !Array.isArray(row.earningMilestones) || !Array.isArray(row.powerUps)
+      || !Array.isArray(row.dailyMilestones) || !Array.isArray(row.earningMilestones)
+      || !Array.isArray(row.badgeAchievements) || !Array.isArray(row.powerUps)
       || !Array.isArray(row.topStreakers) || !source) {
     return invalid();
   }
@@ -306,6 +342,10 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): DailySnapshot {
   if (new Set(earningMilestones.map((item) => item.milestoneId)).size !== earningMilestones.length) {
     return invalid("EARNING_MILESTONE_DUPLICATED");
   }
+  const badgeAchievements = row.badgeAchievements.map(parseBadgeAchievement);
+  if (new Set(badgeAchievements.map((item) => item.achievementCode)).size !== badgeAchievements.length) {
+    return invalid("BADGE_ACHIEVEMENT_DUPLICATED");
+  }
   return {
     rewardAsset: "NEX",
     serverDate,
@@ -319,6 +359,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): DailySnapshot {
     },
     dailyMilestones,
     earningMilestones,
+    badgeAchievements,
     powerUps,
     rules,
     topStreakers,

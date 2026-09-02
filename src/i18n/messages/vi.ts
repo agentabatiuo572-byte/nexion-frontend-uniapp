@@ -1191,6 +1191,7 @@ export const vi: Messages = {
   },
 
   tickets: {
+    historyTruncated: "Chỉ hiển thị 100 tin nhắn gần nhất. Các tin nhắn cũ hơn vẫn được lưu trên máy chủ.",
     slaStatisticsUnavailable: "Chưa có số liệu phản hồi để hiển thị.",
     slaTargetLabel: "Mục tiêu dịch vụ",
     slaTargetValue: "Mục tiêu phản hồi đầu tiên {firstResponseMins} phút; mục tiêu xử lý {resolutionHours} giờ.",
@@ -2110,6 +2111,7 @@ export const vi: Messages = {
     orShareVia: "hoặc chia sẻ qua",
   },
   wallet: {
+    loadingTransactions: "Đang tải lịch sử giao dịch…",
     title: "Ví",
     usdtBalance: "Số dư USDT",
     nexBalance: "Số dư NEX",
@@ -2576,6 +2578,7 @@ export const vi: Messages = {
       newConfirmAction: "Bắt đầu cuộc trò chuyện mới",
     },
     localSafetyNotice: "Câu trả lời của AI có thể sai và AI không thể xem hay thay đổi tài khoản. Không gửi mật khẩu, OTP, cụm từ khôi phục, khóa riêng, số thẻ đầy đủ hoặc giấy tờ tùy thân.",
+    historyTruncated: "Chỉ phần gần đây nhất của cuộc trò chuyện này được hiển thị.",
     localQOrder: "Làm sao kiểm tra đơn hàng?",
     localQTicket: "Làm sao tạo phiếu hỗ trợ?",
     localQSecurity: "Làm sao bảo vệ tài khoản?",
@@ -2834,6 +2837,7 @@ export const vi: Messages = {
     deleteAccountPendingReason: "đang chờ quyết toán tài chính hoặc đơn hàng",
   },
   help: {
+    faqLanguageFallback: "FAQ này đang hiển thị bằng ngôn ngữ mặc định đã xuất bản vì bản dịch hiện chưa có.",
     title: "Trung tâm trợ giúp",
     back: "Quay lại",
     searchPlaceholder: "Tìm chủ đề, câu hỏi hoặc từ khóa…",
@@ -2883,6 +2887,7 @@ export const vi: Messages = {
     chLiveChatHint: "Trò chuyện với cố vấn & đội hỗ trợ của bạn",
   },
   conversations: {
+    historyTruncated: "Chỉ hiển thị 100 tin nhắn gần nhất. Các tin nhắn cũ hơn vẫn được lưu trên máy chủ.",
     sessionTransferred: "Cuộc trò chuyện này đã được chuyển tiếp và không thể nhận thêm trả lời. Hãy bắt đầu cuộc trò chuyện mới.",
     title: "Tin nhắn",
     back: "Quay lại",
@@ -3257,6 +3262,7 @@ export const vi: Messages = {
     retry: "Tải lại",
     serverDailyMilestones: "Cột mốc chuỗi điểm danh",
     serverEarningMilestones: "Cột mốc thu nhập tích lũy",
+    serverBadgeAchievements: "Huy hiệu",
     dailyMilestone: "Ngày chuỗi",
     earningMilestone: "Thu nhập tích lũy",
     streakProgress: "Chuỗi hiện tại",

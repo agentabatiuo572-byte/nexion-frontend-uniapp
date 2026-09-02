@@ -119,7 +119,7 @@
             <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
             <view role="button" tabindex="0" class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="refreshNexSummary"><text>{{ t.store.catalogRetry }}</text></view>
           </view>
-          <view v-else-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" :style="activityEmptyStyle"><text>…</text></view>
+          <view v-else-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" :style="activityEmptyStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
           <EmptyState v-else-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">

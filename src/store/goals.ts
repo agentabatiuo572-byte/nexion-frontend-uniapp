@@ -84,7 +84,8 @@ export const useGoals = defineStore("goals", () => {
       if (expectedEpoch !== scopeEpoch) return;
       status.value = "error";
       error.value = cause instanceof Error ? cause.message : "GOALS_UNAVAILABLE";
-      goals.value = [];
+      // Keep the last server-confirmed snapshot visible. The error status tells
+      // the page that the data may be stale and offers an explicit retry.
     }
   }
 

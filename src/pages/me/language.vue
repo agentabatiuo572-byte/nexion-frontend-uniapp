@@ -24,7 +24,12 @@
                   :key="l.code"
                   :class="['flex items-center active:opacity-80', `nx-language-row-${l.code}`]"
                   :style="rowStyle(i !== 0, l.code === code)"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="l.code === code ? 'true' : 'false'"
                   @click="pick(l.code)"
+                  @keydown.enter.prevent="pick(l.code)"
+                  @keydown.space.prevent="pick(l.code)"
                 >
                   <text :style="flagStyle">{{ l.flag }}</text>
                   <view class="min-w-0" style="flex: 1">
@@ -48,11 +53,11 @@
         <view v-if="profileLocaleSyncState === 'syncing'" class="text-center" :style="syncNoteStyle">
           <text>{{ t.language.preferenceSyncing }}</text>
         </view>
-        <view v-else-if="profileLocaleSyncState === 'failed'" class="text-center active:opacity-70" :style="syncNoteStyle" @click="retryCurrentProfileLocale">
+        <view v-else-if="profileLocaleSyncState === 'failed'" class="text-center active:opacity-70" :style="syncNoteStyle" role="button" tabindex="0" @click="retryCurrentProfileLocale" @keydown.enter.prevent="retryCurrentProfileLocale" @keydown.space.prevent="retryCurrentProfileLocale">
           <text>{{ t.language.preferenceSyncFailed }} · {{ t.language.preferenceSyncRetry }}</text>
         </view>
 
-        <view class="flex items-center justify-center active:opacity-70 transition-opacity" :style="backLinkStyle" @click="goAccount">
+        <view class="flex items-center justify-center active:opacity-70 transition-opacity" :style="backLinkStyle" role="button" tabindex="0" @click="goAccount" @keydown.enter.prevent="goAccount" @keydown.space.prevent="goAccount">
           <text>{{ t.language.backToAccount }}</text>
         </view>
       </view>

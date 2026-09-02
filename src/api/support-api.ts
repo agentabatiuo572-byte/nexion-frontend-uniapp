@@ -48,7 +48,7 @@ function parseTicketHeader(value: unknown): Ticket {
   const createdAt = time(v?.createdAt); const updatedAt = time(v?.updatedAt); const lastReplyAt = time(v?.lastMessageAt);
   const messageCount = integer(v?.messageCount); const unread = integer(v?.userUnreadCount); const owner = text(v?.assignedAdminName, true);
   if (!v || !id || !subject || !category || !status || !priority || version === null || createdAt === null || updatedAt === null || lastReplyAt === null || messageCount === null || unread === null || owner === null) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
-  return { id, subject, category, status, priority, version, createdAt, updatedAt, lastReplyAt, messageCount, unread, owner: owner || "Unassigned", messages: [] };
+  return { id, subject, category, status, priority, version, createdAt, updatedAt, lastReplyAt, messageCount, unread, owner: owner || "Unassigned", messages: [], historyTruncated: false };
 }
 function parseTicketMessage(value: unknown): TicketMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
@@ -58,10 +58,10 @@ function parseTicketMessage(value: unknown): TicketMessage {
   return { id: String(id), ts, body, author, agentName };
 }
 function parseTicketDetail(value: unknown): Ticket {
-  const v = row(value); if (!v || !Array.isArray(v.messages)) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
+  const v = row(value); if (!v || !Array.isArray(v.messages) || typeof v.historyTruncated !== "boolean") invalid("SUPPORT_TICKET_RESPONSE_INVALID");
   const ticket = parseTicketHeader(v.ticket); const messages = v.messages.map(parseTicketMessage);
   if (messages.length > ticket.messageCount) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
-  return { ...ticket, messages };
+  return { ...ticket, messages, historyTruncated: v.historyTruncated };
 }
 function parseTicketPage(value: unknown): Page<Ticket> {
   const v = row(value); const total = integer(v?.total); if (!v || !Array.isArray(v.records) || total === null) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
@@ -74,7 +74,7 @@ function parseConversationHeader(value: unknown): Conversation {
   const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt); const unread = integer(v?.unreadCount); const agentName = text(v?.ownerAgentName, true);
   const lastMessage = text(v?.lastMessage, true);
   if (!v || !id || !type || !status || version === null || lastTs === null || unread === null || agentName === null || lastMessage === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed" };
+  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false };
 }
 function parseConversationMessage(value: unknown): ConvMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
@@ -84,8 +84,8 @@ function parseConversationMessage(value: unknown): ConvMessage {
   return { id: String(id), sender, text: body, ts, status };
 }
 function parseConversationDetail(value: unknown): Conversation {
-  const v = row(value); if (!v || !Array.isArray(v.messages)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { ...parseConversationHeader(v.conversation), messages: v.messages.map(parseConversationMessage) };
+  const v = row(value); if (!v || !Array.isArray(v.messages) || typeof v.historyTruncated !== "boolean") invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+  return { ...parseConversationHeader(v.conversation), messages: v.messages.map(parseConversationMessage), historyTruncated: v.historyTruncated };
 }
 function parseConversationPage(value: unknown): Page<Conversation> {
   const v = row(value); const total = integer(v?.total); if (!v || !Array.isArray(v.records) || total === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
