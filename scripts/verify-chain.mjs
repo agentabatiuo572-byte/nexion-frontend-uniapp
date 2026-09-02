@@ -25,6 +25,7 @@ import { ROOT, CACHE_DIR, LAST_RUN_PATH, loadManifest, plan, treeFingerprint, h5
 import { ensureServer } from "./lib/dev-server-pool.mjs";
 import { findBash } from "./lib/find-bash.mjs";
 import { acquireVerifyRunLock } from "./lib/verify-run-lock.mjs";
+import { loadKnownRed, applyKnownRedToSteps } from "./lib/known-red.mjs";
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -66,6 +67,7 @@ const fpStart = treeFingerprint();
 try { fs.writeFileSync(LAST_RUN_PATH, JSON.stringify({ mode, verdict: "running", startedAt: new Date().toISOString(), tree: null, headTree: null, dirty: fpStart?.dirty ?? null, head: fpStart?.head || null, steps: [] }, null, 1)); } catch { /* 写不了占位不影响跑 */ }
 say(`${C.c}━━ verify-chain · mode=${mode}${P.upgraded ? `(请求 ${P.requested} → ${P.upgraded})` : ""} · ${STEPS.length} 步 · tree ${fpStart ? fpStart.fingerprint.slice(0, 10) : "?"}${fpStart?.dirty ? "(dirty)" : ""} ━━${C.n}`);
 if (P.changed) say(`${C.d}  改动集 ${P.changed.files.length} 个文件(base ${P.changed.base.slice(0, 10)} · ${P.changed.baseReason})${P.changed.files.length ? ":" + P.changed.files.slice(0, 12).join(", ") + (P.changed.files.length > 12 ? " …" : "") : ""}${C.n}`);
+if (P.additiveExempt && P.additiveExempt.length) say(`${C.d}  全局清单命中但只增不删(globalsAdditiveOk,i18n 纯加 key):${P.additiveExempt.join(", ")} → 不升档,只跑声明了它们为输入的门${C.n}`);
 
 // ── 子探针缩范围(h5Probes)────────────────────────────────────────────────────
 const h5Only = mode === "scoped"
@@ -181,10 +183,14 @@ for (const step of STEPS) {
     (picked.length ? picked : tail.slice(-12)).forEach((l) => say(`    ${C.d}${l.slice(0, 200)}${C.n}`));
   }
 }
-if (pool) { pool.mock.stop(); pool.remote.stop(); }
+if (pool) { try { pool.development.stop(); } catch { /* 起服子进程可能已退出 */ } try { pool.production.stop(); } catch { /* 同上 */ } }
 
 // ── 汇总 + 产物 ──────────────────────────────────────────────────────────────
 const fpEnd = treeFingerprint();
+// 已知红(Tier 1-C):FAIL 步命中 scripts/known-red.json 未到期条目 → KNOWN-RED,不进 verdict;到期 → 仍 FAIL 并写明;清单本身坏了 → 追加一条 FAIL(门的门)。
+const knownRed = loadKnownRed();
+if (knownRed.problems.length) results.push({ step: "known-red.json", status: "FAIL", ms: 0, code: 2, reason: `已知红清单不可用:${knownRed.problems[0]}(node scripts/lib/known-red.mjs lint 看全部)` });
+else applyKnownRedToSteps(results, knownRed.steps);
 const count = (s) => results.filter((r) => r.status === s).length;
 const totalMs = results.reduce((a, r) => a + r.ms, 0);
 const treeMoved = !!(fpStart && fpEnd && fpStart.fingerprint !== fpEnd.fingerprint);
@@ -192,10 +198,11 @@ const failed = results.filter((r) => r.status === "FAIL" || r.status === "NOT-RU
 const verdict = failed.length ? "fail" : "pass";
 say(`\n${C.c}━━ verify-chain result · mode=${mode} · ${(totalMs / 1000 / 60).toFixed(1)} min ━━${C.n}`);
 for (const r of results) {
-  const col = r.status === "PASS" || r.status === "CACHED" ? C.g : r.status === "FAIL" || r.status === "NOT-RUN" ? C.r : C.y;
+  const col = r.status === "PASS" || r.status === "CACHED" ? C.g : r.status === "FAIL" || r.status === "NOT-RUN" ? C.r : C.y; // KNOWN-RED / SCOPED-SKIP 黄
   say(`  ${col}${r.status.padEnd(11)}${C.n} ${r.step.padEnd(34)} ${r.ms ? (r.ms / 1000).toFixed(1).padStart(7) + "s" : "".padStart(8)}${r.reason ? `  ${C.d}${String(r.reason).split(/\r?\n/)[0].slice(0, 120)}${C.n}` : ""}`);
 }
-say(`  ${C.g}PASS ${count("PASS")}${C.n} · ${C.g}CACHED ${count("CACHED")}${C.n} · ${C.r}FAIL ${count("FAIL")}${C.n} · ${C.y}SCOPED-SKIP ${count("SCOPED-SKIP")}${C.n} · ${C.r}NOT-RUN ${count("NOT-RUN")}${C.n} / ${STEPS.length} 步` +
+say(`  ${C.g}PASS ${count("PASS")}${C.n} · ${C.g}CACHED ${count("CACHED")}${C.n} · ${C.r}FAIL ${count("FAIL")}${C.n} · ${C.y}KNOWN-RED ${count("KNOWN-RED")}${C.n} · ${C.y}SCOPED-SKIP ${count("SCOPED-SKIP")}${C.n} · ${C.r}NOT-RUN ${count("NOT-RUN")}${C.n} / ${STEPS.length} 步` +
+    (count("KNOWN-RED") ? `${C.y} —— ${count("KNOWN-RED")} 步是已知红(scripts/known-red.json 有理由有到期日,不进 verdict;到期未清自动回红)${C.n}` : "") +
     (mode !== "full" ? `${C.y} —— 这是 ${mode} 档,不等于全量绿;宣布 done / 合并主线前仍须 full 一次${C.n}` : "") +
     (treeMoved ? `${C.r} —— ⚠ 跑的过程中工作树变了(${fpStart.fingerprint.slice(0, 10)} → ${fpEnd.fingerprint.slice(0, 10)}),本次结论不锚定任何一棵树,合并守卫不认${C.n}` : ""));
 
@@ -205,9 +212,10 @@ const record = {
   tree: !treeMoved && fpEnd ? fpEnd.fingerprint : null, headTree: !treeMoved && fpEnd ? fpEnd.headTree : null, dirty: fpEnd ? fpEnd.dirty : null,
   head: fpEnd?.head || null, at: new Date().toISOString(), totalMs,
   changed: P.changed ? { base: P.changed.base, count: P.changed.files.length } : null,
+  knownRed: results.filter((r) => r.status === "KNOWN-RED").map((r) => ({ step: r.step, until: r.knownRed?.until, why: r.knownRed?.why })),
   steps: results,
 };
 fs.writeFileSync(LAST_RUN_PATH, JSON.stringify(record, null, 1));
 const exitCode = verdict === "pass" ? 0 : 1;
-fs.writeFileSync(path.join(ROOT, ".verify-chain.code"), `${exitCode}\nmode=${mode} pass=${count("PASS") + count("CACHED")} fail=${count("FAIL")} scoped_skip=${count("SCOPED-SKIP")} not_run=${count("NOT-RUN")} tree=${record.tree || "moved"}\n`);
+fs.writeFileSync(path.join(ROOT, ".verify-chain.code"), `${exitCode}\nmode=${mode} pass=${count("PASS") + count("CACHED")} fail=${count("FAIL")} scoped_skip=${count("SCOPED-SKIP")} not_run=${count("NOT-RUN")} known_red=${count("KNOWN-RED")} tree=${record.tree || "moved"}\n`);
 process.exit(exitCode);

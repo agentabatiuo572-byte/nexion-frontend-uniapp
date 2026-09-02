@@ -30,6 +30,7 @@ node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 
 runner 各步自起「本树」隔离 server 并先核树身份（`VITE_ROOT_DIR`），不再需要手起 5399（`--pool` 可选共享 development / production 一对，默认关）。裸跑 `bash scripts/verify.sh` 仍可（需 `BASE_URL` 指向本树 development server；`[2.5]` 树身份 preflight 探不到 / 别的树 / 非 development 都判红——同一提交对着错靶子曾跑出 10 红假象）；`VERIFY_MODE=static bash scripts/verify.sh` 不需要 server。
 
+🔴 **主线两道 git 门（2026-09-02 Tier 1-B）**：`.githooks/pre-commit` 只放 S 级直提（暂存 ≤5 文件 · 无 docs/changes · 无未推提交），`.githooks/pre-push` 推 `UniApp` 前要求被推提交有 full 绿（读 `.verify-cache/last-run.json`，KNOWN-RED 不计红）。逃生阀走带留痕的环境变量 `ALLOW_MAIN_COMMIT` / `ALLOW_UNVERIFIED_PUSH`，禁 `--no-verify`。挂载靠 `npm install`（prepare）或 `git config core.hooksPath .githooks`；自测 `npm run test:githooks`。
 verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有哨兵文件：`.verify-exit.code`（verify.sh）与 `.verify-chain.code` / `.verify-cache/last-run.json`（runner）—— `| tail` 会吞掉真实退出码，**外部判定读文件不读管道**。
 
 ## 完成门（宣布 module done 前必走）
