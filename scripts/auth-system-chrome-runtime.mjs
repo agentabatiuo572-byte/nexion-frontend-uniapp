@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 import fs from "node:fs";
 
 const baseUrl = process.env.BASE_URL || "http://localhost:5173";
@@ -60,6 +61,7 @@ try {
   for (const viewport of viewports) {
     if (page) await page.close();
     page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+    await installFormalProbeSession(page, { authenticated: false });
     page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
     page.on("pageerror", (error) => consoleErrors.push(error.message));
     results[viewport.name] = {};
@@ -67,13 +69,22 @@ try {
       const { name, route, delay } = pages[index];
       const deviceParam = viewport.devicePreview ? "" : "&nx_device=off&nx_device_inner=1";
       await page.goto(`${baseUrl}/?systemChrome=${runId}-${viewport.name}-${index}${deviceParam}#${route}`, { waitUntil: "domcontentloaded" });
-      const frame = await appFrame(".nx-standalone-page");
+      const frame = await appFrame("[data-system-chrome-primary]").catch(async (error) => {
+        const frameBodies = await Promise.all(page.frames().map(async (candidate) => ({
+          url: candidate.url(),
+          body: (await candidate.locator("body").innerText().catch(() => "")).slice(0, 240),
+        })));
+        throw new Error(`${viewport.name}/${name}: ${error.message}; url=${page.url()}; frames=${JSON.stringify(frameBodies)}`);
+      });
       await frame.locator(".nx-statusbar__inner").waitFor({ state: "visible", timeout: 30_000 }).catch((error) => {
         throw new Error(`${viewport.name}/${name}: status bar did not render at ${page.url()}: ${error.message}`);
       });
       await frame.locator(".nx-standalone-home .nx-home-indicator").waitFor({ state: "visible" });
       const control = frame.locator("[data-system-chrome-primary]").first();
-      await control.waitFor({ state: "attached" });
+      await control.waitFor({ state: "attached", timeout: 30_000 }).catch(async (error) => {
+        const body = (await frame.locator("body").innerText().catch(() => "")).slice(0, 500);
+        throw new Error(`${viewport.name}/${name}: primary chrome control missing at ${page.url()}; body=${body}; ${error.message}`);
+      });
       if (delay) await frame.waitForTimeout(delay);
       let initialReachability;
       for (let attempt = 0; attempt < 5; attempt += 1) {

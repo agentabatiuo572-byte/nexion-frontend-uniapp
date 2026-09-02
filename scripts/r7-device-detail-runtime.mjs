@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -24,6 +25,7 @@ async function waitUntil(check, message, timeoutMs = 30_000) {
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await installFormalProbeSession(page);
 // 🔴 首页 1300ms 会自动弹代金券领取层(z=800 全屏遮罩),本探针随后要点首页设备格 ——
 // 谁先到全看机器负载:空闲时探针先点到(绿),套件满载时弹层先弹出(红)。这不是断言
 // 该管的变量,与上面 12s→30s 那次同源。按 chrome-baseline / trial-check 的既有家法预置
@@ -75,7 +77,7 @@ async function goto(route, selector) {
 }
 
 try {
-  const home = await goto("#/pages/index/index", ".nx-device-slot");
+  const home = await goto("#/pages/index/index", ".nx-page-enter");
   const logic = await home.evaluate(async () => {
     const { createDevice } = await import("/src/store/device-types.ts");
     const { settleDeviceBatch, useApp } = await import("/src/store/app.ts");
@@ -93,6 +95,8 @@ try {
     const bonus = { h5BaseFactor: 0.6, continuityFullHours: 2 };
     const makePhone = (beat) => ({
       ...createDevice("phone", `r7-${beat ?? "none"}`),
+      baseRate: 0.06,
+      baseRateNEX: 10,
       activatedAt: now - sixHours,
       purchasedAt: now - sixHours,
       miningSince: now - sixHours,
@@ -168,6 +172,35 @@ try {
       check(onlineLive.effectiveTops > offlineLive.effectiveTops, "online display factor did not exceed hosted baseline");
 
       const app = useApp();
+      if (app.visibleDevices.length < 2) {
+        const uiNow = Date.now();
+        const activePatch = {
+          activatedAt: uiNow - sixHours,
+          purchasedAt: uiNow - sixHours,
+          miningSince: uiNow - sixHours,
+          lastSettledAt: uiNow - sixHours,
+          todayEarnings: 0,
+          todayEarningsNEX: 0,
+          cumulativeEarningsUsdt: 0,
+          status: "online",
+          pausedReason: null,
+          thermalState: "nominal",
+        };
+        app.$patch({
+          devices: [
+            {
+              ...createDevice("phone", "r7-ui-phone"),
+              ...activePatch,
+              onlineHeartbeatAt: uiNow - ONLINE_HEARTBEAT_TIMEOUT_MS - 1,
+            },
+            {
+              ...createDevice("stellarbox-s1", "r7-ui-hardware"),
+              ...activePatch,
+              onlineHeartbeatAt: null,
+            },
+          ],
+        });
+      }
       const seed = clone(app.visibleDevices[0]);
       const snapshot = (beat) => ({
         schema: 1,

@@ -42,9 +42,9 @@ const browser = await chromium.launch();
 // old seven-scenario harness below only as a tripwire should that retired rail
 // ever be re-enabled; the active runtime proof now verifies that an anonymous
 // deep link cannot manufacture a local invoice or expose checkout controls.
-const formalFundsRailDisabled = /developmentFundsEnabled\s*=\s*false/.test(
-  fs.readFileSync(new URL("../src/api/runtime.ts", import.meta.url), "utf8"),
-);
+const formalRuntimeSource = fs.readFileSync(new URL("../src/api/runtime.ts", import.meta.url), "utf8");
+const formalFundsRailDisabled = !/\bdevelopmentFundsEnabled\s*=/.test(formalRuntimeSource)
+  || /developmentFundsEnabled\s*=\s*false/.test(formalRuntimeSource);
 if (formalFundsRailDisabled) {
   const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, colorScheme: "dark" });
   const page = await ctx.newPage();
@@ -70,7 +70,14 @@ if (formalFundsRailDisabled) {
     return route.continue();
   });
   await page.goto(directAppUrl(BASE, CHECKOUT), { waitUntil: "load", timeout: 30000 });
-  await page.waitForTimeout(2500);
+  // The isolated H5 runner starts several Chromium probes together. Wait for
+  // the guard's observable destination instead of assuming its startup tick
+  // always runs within 2.5s on a busy Windows host.
+  await page.waitForFunction(
+    () => location.hash.includes("/pages/onboarding/intro"),
+    undefined,
+    { timeout: 12_000 },
+  ).catch(() => {});
   const witness = await page.evaluate((pendingKey) => {
     let sessions = [];
     try {

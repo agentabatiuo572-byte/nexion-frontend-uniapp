@@ -233,9 +233,10 @@ export const useBills = defineStore("bills", () => {
     if (/(REFERRAL|COMMISSION|UNILEVEL|BINARY|LEADERSHIP)/.test(value)) return "refer";
     if (/(STAKE|STAKING)/.test(value)) return direction === "IN" ? "unstake" : "stake";
     if (/(EXCHANGE|SWAP)/.test(value)) return "swap";
-    if (/(PURCHASE|ORDER|REPURCHASE|GENESIS|TRADE_IN)/.test(value)) return direction === "IN" ? "earn" : "purchase";
     if (/(ACHIEVEMENT|MILESTONE|QUEST)/.test(value)) return "achievement";
-    if (/(EARN|REWARD|RELEASE|TASK|TRIAL)/.test(value)) return "earn";
+    if (/(REWARD|BONUS)/.test(value)) return "bonus";
+    if (/(PURCHASE|ORDER|REPURCHASE|GENESIS|TRADE_IN)/.test(value)) return direction === "IN" ? "earn" : "purchase";
+    if (/(EARN|RELEASE|TASK|TRIAL)/.test(value)) return "earn";
     return "other";
   }
 

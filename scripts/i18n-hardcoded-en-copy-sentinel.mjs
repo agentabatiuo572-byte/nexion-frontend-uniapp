@@ -56,7 +56,7 @@ const TECH_TOKENS = [
     why: "币种代码 / 品牌名 / 产品型号 / 支付服务商名:全球单一写法,翻译过去反而是错的",
     // 🔴 `CertiK` 曾在这里,被本门自己的「0 命中即失效」判据赶走 —— 那行原文是 `CertiK audited`,
     //    `audited` 是要翻译的动词,整句收进 t.ref.certikAudited 之后判定面上再没有这个词。
-    tokens: ["NEX", "USDT", "NexGrid", "NexGridBox", "Cregis", "BEP", "GEN", "REF", "RunID", "Visa", "Mastercard"],
+    tokens: ["NEX", "USDT", "NexGrid", "NexGridBox", "GEN", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
   },
   {
     id: "cert-acronym",
@@ -123,8 +123,8 @@ const NON_COPY_ATTRS = [
     id: "element-mechanics",
     why: "元素机制类属性:类型 / 模式 / 资源地址 / 表单取值 / 画布 id / 无障碍**状态**(取值是 ARIA 规定的枚举,不是文案)",
     names: ["type", "mode", "name", "id", "src", "href", "value", "min", "maxlength", "rows", "role", "tabindex", "inputmode", "canvas-id",
-      "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-describedby", "aria-atomic", "aria-haspopup", "aria-busy",
-      "disabled", "checked", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
+      "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-describedby", "aria-controls", "aria-labelledby", "aria-atomic", "aria-haspopup", "aria-busy",
+      "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {
     id: "data-hook",
@@ -142,7 +142,7 @@ const NON_COPY_ATTRS = [
     why: "本仓组件的**枚举型 / 路由型** prop(色调 · 变体 · 对齐 · 图标名 · 当前 tab · 目标路由):取值来自组件自身的联合类型或 pages.json 的路径,不是文案",
     // `to` 归到上面的 SMIL 动画组(那才是它在本仓的真实用途);这里不再重复列,
     // 否则逐名存活判定对它失效(跨组重复 = 永不判死)。
-    names: ["tone", "kind", "icon", "color", "accent-bg", "accent-text", "size", "status", "back", "link", "active", "surface", "context"],
+    names: ["tone", "kind", "icon", "color", "accent-bg", "accent-text", "size", "status", "back", "link", "active", "surface", "context", "content-key", "variant"],
   },
 ];
 

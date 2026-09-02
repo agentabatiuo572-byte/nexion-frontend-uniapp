@@ -263,12 +263,11 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { productCopy, specRow, type SpecRow } from "@/lib/product-copy";
+import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
-import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import type { TrustLocale } from "@/api/trust-section-api";
@@ -457,8 +456,8 @@ function openTrustUrl(raw: string) {
 }
 const faqs = computed(() => {
   const f = t.value.store.faq;
-  const datacenter = product.value?.datacenter;
-  return [{ ...f.location, a: datacenter && datacenter !== SPEC_UNAVAILABLE ? datacenter : t.value.store.specValueUnavailable }, f.withdraw, f.demand, f.refund];
+  const datacenter = specText(t.value, product.value?.datacenter);
+  return [{ ...f.location, a: datacenter }, f.withdraw, f.demand, f.refund];
 });
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──

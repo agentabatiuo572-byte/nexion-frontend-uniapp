@@ -11,7 +11,7 @@ test("weekly quest UI has no mock dispatch or local reward writes", () => {
     "src/components/home/weekly-quest-list.vue",
   ].map(read).join("\n");
   assert.doesNotMatch(files, /@\/mock\/weekly-quests|postMoneyBillsOnce|markTier|claimTier|claimBonus/);
-  assert.match(files, /questApi\.state\(\)/);
+  assert.match(files, /questApi\.state\(locale\.code\)/);
   assert.match(files, /authoritative\.status !== "CLAIMED"/);
 });
 

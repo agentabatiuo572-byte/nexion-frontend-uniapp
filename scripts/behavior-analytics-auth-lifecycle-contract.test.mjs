@@ -26,27 +26,25 @@ test("App telemetry contract never sends server-owned environment or sampling fi
   assert.match(api, /body: event/);
 });
 
-test("a server-issued Sandbox receipt stays explicit and never interrupts the user", async () => {
+test("analytics receipts reject retired environment credentials and never interrupt the user", async () => {
   const api = await readFile(new URL("../src/api/behavior-analytics-api.ts", import.meta.url), "utf8");
   const rememberStart = service.indexOf("function rememberAcceptanceObservationCredential");
   const rememberEnd = service.indexOf("function clearAcceptanceObservationCredential", rememberStart);
   const remember = service.slice(rememberStart, rememberEnd);
-  assert.match(api, /observationToken/);
-  assert.match(api, /sourceEnvironment !== "SANDBOX"/);
-  assert.match(service, /rememberAcceptanceObservationCredential/);
+  assert.match(api, /row\.sourceEnvironment !== undefined/);
+  assert.match(api, /row\.observationToken !== undefined/);
   assert.match(service, /getAcceptanceObservationCredential/);
-  assert.match(service, /copyAcceptanceObservationCredential[\s\S]*?uni\.setClipboardData/);
+  assert.match(service, /copyAcceptanceObservationCredential\(\): void \{\s*return;/);
   assert.doesNotMatch(remember, /uni\.setClipboardData/);
   assert.doesNotMatch(remember, /uni\.showModal/);
 });
 
-test("a delayed A receipt cannot project a credential after logout or an A-to-B rotation", () => {
-  assert.match(service, /const receipt = await options\.transport\.ingest\(event\)/);
-  assert.match(service, /const receipt = await options\.transport\.ingest\(event\)[\s\S]*?if \(queuedEpoch !== epoch\) return/);
-  assert.match(service, /if \(options\.enabled && !options\.enabled\(\)\) return;[\s\S]*?rememberAcceptanceObservationCredential\(receipt, options\.credentialScope/);
+test("a delayed receipt cannot project state after logout or an account rotation", () => {
+  assert.match(service, /await options\.transport\.ingest\(event\)/);
+  assert.match(service, /await options\.transport\.ingest\(event\)\.catch\(\(\) => undefined\);[\s\S]*?if \(queuedEpoch !== epoch\) return/);
+  assert.doesNotMatch(service, /rememberAcceptanceObservationCredential\(receipt/);
   assert.match(service, /clearAcceptanceObservationCredential\(\);/);
   assert.match(service, /credentialScope: subject/);
-  assert.match(service, /acceptanceObservationCredentialScope/);
 });
 
 test("a server-sampled production event without an eventId remains a valid receipt", async () => {

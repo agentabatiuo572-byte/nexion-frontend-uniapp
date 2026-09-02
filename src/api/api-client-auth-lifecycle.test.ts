@@ -25,7 +25,7 @@ describe("API client session lifecycle", () => {
       accessToken: "expired-access",
       refreshToken: "",
       tokenType: "Bearer",
-      user: { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "Nexion 3775" },
+      user: { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "NexGrid 3775", onboardingComplete: true },
       refreshCredentialMode: "cookie",
     });
     const request = vi.fn()
@@ -43,7 +43,7 @@ describe("API client session lifecycle", () => {
             accessToken: "rotated-access",
             refreshToken: null,
             tokenType: "Bearer",
-            user: { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "Nexion 3775" },
+            user: { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "NexGrid 3775", onboardingComplete: true },
           },
         },
         headers: {},

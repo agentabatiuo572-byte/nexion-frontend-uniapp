@@ -794,10 +794,10 @@ function functionBody(src, opener) {
     const PAGE_DEBITS_LOCALLY = withdrawPageCode.includes("app.applyWithdrawalDebit(wd)");
     // 🔴 远端档标志的**等价类**,从 runtime.ts 解析出来 —— 不手写名字。
     //    手写的那一刻它就只是个字符串,而实现随时能换个同义词绕过去,且绕过去的方式恰好是**报绿**。
-    //    今为 remoteApiEnabled / fundsServerEnabled(两者同为 `mode !== "mock"`,app.ts 亦注明「≡」)。
+    //    正式 App 的远端档可直接钉成字面量 true；旧分支也可能仍由 `mode !== "mock"` 派生。
     //    解析面为空 = 判据失效,由下面的 `REMOTE_RAIL.length > 0` fail-closed 判红。
     const REMOTE_RAIL = [...readSrc("src/api/runtime.ts")
-      .matchAll(/export const (\w+) = apiRuntimeConfig\.mode !== "mock";/g)].map((m) => m[1]);
+      .matchAll(/export const (\w+) = (?:apiRuntimeConfig\.mode !== "mock"|true);/g)].map((m) => m[1]);
     // 「这条腿被远端档闸挡住了吗」——钉**正向定型串** `if (<flag>) return`,不用词元正则:
     // 词元式对「守卫被取反」和「只剩装饰性提及」双双判绿(P-104),而这里两种都要抓。
     const railGated = (code) => REMOTE_RAIL.some((flag) => code.includes(`if (${flag}) return`));

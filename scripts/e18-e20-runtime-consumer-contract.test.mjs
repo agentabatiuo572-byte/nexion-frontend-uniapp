@@ -13,11 +13,11 @@ test("OPS-E-18 active task center consumes server task pricing and routing", () 
   assert.match(taskCenter, /prepareEarnConfig/);
   assert.match(taskCenter, /useEarnConfig/);
   assert.match(api, /\/api\/tasks\/route/);
-  assert.match(assignmentApi, /assignments\/claim/);
-  assert.match(assignmentApi, /assignments\/.+complete/);
-  assert.match(app, /taskAssignmentApi\.claim/);
-  assert.match(app, /taskAssignmentApi\.complete/);
-  assert.match(app, /__NEXION_TRUSTED_TASK_PROOF__/);
+  assert.match(assignmentApi, /\/api\/tasks\/assignments/);
+  assert.match(assignmentApi, /\/api\/tasks\/receipts/);
+  assert.match(app, /taskAssignmentApi\.state/);
+  assert.doesNotMatch(app, /taskAssignmentApi\.(?:claim|complete)/);
+  assert.match(app, /Task creation, completion,[\s\S]*server jobs/);
   assert.doesNotMatch(app, /subtle\.digest\(["']SHA-256["']/);
   assert.doesNotMatch(app, /function tick\(deltaMs: number\) \{\s*if \(remoteApiEnabled\) return;/);
   assert.match(app, /lockUntil/);

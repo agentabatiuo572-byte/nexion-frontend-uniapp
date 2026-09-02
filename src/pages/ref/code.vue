@@ -78,7 +78,15 @@
 
       <view v-if="!authed" class="text-center" style="margin-top: 8px">
         <text :style="signinStyle">{{ t.ref.signinInstead }} </text>
-        <text :style="signinLinkStyle" @click="goLogin">{{ t.ref.continue }}</text>
+        <text
+          :style="signinLinkStyle"
+          role="button"
+          tabindex="0"
+          :data-system-chrome-primary="remoteApiEnabled && !remotePreview ? '' : undefined"
+          @click="goLogin"
+          @keydown.enter.prevent="goLogin"
+          @keydown.space.prevent="goLogin"
+        >{{ t.ref.continue }}</text>
       </view>
 
       <!-- Network social proof -->

@@ -5,7 +5,17 @@
   replica white pill (intentional, both themes).
 -->
 <template>
-  <view class="flex items-start active:bg-[var(--v5-surface-2)] transition" :style="rowStyle" @click="emit('toggle')">
+  <view
+    class="flex items-start active:bg-[var(--v5-surface-2)] transition"
+    :style="rowStyle"
+    role="switch"
+    tabindex="0"
+    :aria-label="label"
+    :aria-checked="value ? 'true' : 'false'"
+    @click="emit('toggle')"
+    @keydown.enter.prevent="emit('toggle')"
+    @keydown.space.prevent="emit('toggle')"
+  >
     <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
       <slot name="icon" />
     </view>
@@ -13,7 +23,7 @@
       <text class="block" :style="labelStyle">{{ label }}</text>
       <text v-if="hint" class="block" :style="hintStyle">{{ hint }}</text>
     </view>
-    <view class="shrink-0 relative" :style="switchTrackStyle">
+    <view class="shrink-0 relative" :style="switchTrackStyle" aria-hidden="true">
       <view :style="knobStyle" />
     </view>
   </view>

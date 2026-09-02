@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAuthApi } from "./auth-api";
 import { createSessionVault } from "./session-vault";
 
-const user = { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "Nexion 3775" };
+const user = { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "NexGrid 3775", onboardingComplete: true };
 const cookieSession = { accessToken: "access", refreshToken: null, tokenType: "Bearer", user };
 
 describe("H5 HttpOnly refresh-cookie session", () => {
@@ -33,6 +33,20 @@ describe("H5 HttpOnly refresh-cookie session", () => {
       headers: { "X-Nexion-Refresh-Mode": "cookie" },
     });
     expect(vault.read()?.accessToken).toBe("access");
+  });
+
+  it("preserves an incomplete-onboarding server session during cookie restore", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ...cookieSession,
+      user: { ...user, onboardingComplete: false },
+    });
+    const vault = createSessionVault();
+    const auth = createAuthApi({ request } as never, vault, { refreshCredentialMode: "cookie" });
+
+    await expect(auth.restore()).resolves.toMatchObject({
+      user: { userId: user.userId, onboardingComplete: false },
+    });
+    expect(vault.read()?.user.onboardingComplete).toBe(false);
   });
 
   it("logs out through the cookie and never copies a refresh token into the request body", async () => {

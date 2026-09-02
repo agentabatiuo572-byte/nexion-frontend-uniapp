@@ -44,11 +44,11 @@
     - Path B keep+buy:  POST /api/orders (new device lands inactive)
 -->
 <template>
-  <view v-if="state.kind !== 'none'" class="tis-root" role="dialog" aria-modal="true">
+  <view v-if="state.kind !== 'none'" class="tis-root" role="dialog" aria-modal="true" :aria-label="t.tradein.choiceTitle">
     <view class="tis-backdrop" @click="hide" />
 
     <view class="tis-panel" @click.stop>
-      <view class="tis-close" @click="hide">
+      <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -62,12 +62,16 @@
             v-for="src in choiceSources"
             :key="src.id"
             class="tis-opt"
+            role="button"
+            tabindex="0"
             @click="onChooseTradein(src.id)"
+            @keydown.enter.prevent="onChooseTradein(src.id)"
+            @keydown.space.prevent="onChooseTradein(src.id)"
           >
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></svg>
             <text class="tis-opt-text">{{ src.label }}</text>
           </view>
-          <view class="tis-opt" @click="onChooseFullPrice">
+          <view class="tis-opt" role="button" tabindex="0" @click="onChooseFullPrice" @keydown.enter.prevent="onChooseFullPrice" @keydown.space.prevent="onChooseFullPrice">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18 8 4A2 2 0 0 1 22 8v8a2 2 0 0 1-1.17 1.82l-8 4a2 2 0 0 1-1.66 0l-8-4A2 2 0 0 1 2 16V8a2 2 0 0 1 1.17-1.82l8-4a2 2 0 0 1 1.66 0z" /><path d="m7 4.5 10 5" /></svg>
             <text class="tis-opt-text">{{ t.tradein.choiceFullPriceOption }}</text>
           </view>
@@ -81,7 +85,7 @@
           <text class="tis-subtitle">{{ retireView.subtitle }}</text>
         </view>
         <view class="tis-opt-list">
-          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" @click="onPickTarget(p.id)">
+          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" role="button" tabindex="0" @click="onPickTarget(p.id)" @keydown.enter.prevent="onPickTarget(p.id)" @keydown.space.prevent="onPickTarget(p.id)">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
             <text class="tis-opt-text">{{ p.label }}</text>
           </view>
@@ -147,14 +151,24 @@
         <view
           class="tis-cta"
           :class="{ 'tis-cta-disabled': replaceView.insufficient }"
+          role="button"
+          :tabindex="replaceView.insufficient ? -1 : 0"
+          :aria-disabled="replaceView.insufficient ? 'true' : 'false'"
           @click="onReplace"
+          @keydown.enter.prevent="onReplace"
+          @keydown.space.prevent="onReplace"
         >
           <text class="tis-cta-text">{{ replaceView.replaceCta }}</text>
         </view>
         <view
           class="tis-secondary"
           :class="{ 'tis-cta-disabled': replaceView.insufficient }"
+          role="button"
+          :tabindex="replaceView.insufficient ? -1 : 0"
+          :aria-disabled="replaceView.insufficient ? 'true' : 'false'"
           @click="onKeepBuy"
+          @keydown.enter.prevent="onKeepBuy"
+          @keydown.space.prevent="onKeepBuy"
         >
           <text class="tis-secondary-text">{{ replaceView.keepCta }}</text>
         </view>
@@ -221,7 +235,6 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
 import {
-  MAX_DEVICES,
   DEVICE_SPECS,
   createDevice,
 } from "@/store/device-types";
@@ -399,7 +412,7 @@ function onChooseFullPrice() {
   }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
   // checkout flow proceeds normally to payment).
-  if (app.activeSlotCount + reservedSlots.value >= MAX_DEVICES) {
+  if (app.activeSlotCount + reservedSlots.value >= app.slotCap) {
     sheet.showReplace(s.targetKind, s.newPrice);
   } else {
     hide();
@@ -623,6 +636,7 @@ async function submitCanonicalCapacityReplacement(
 function onReplace() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (replaceView.value?.insufficient) return;
   if (remoteApiEnabled) {
     if (!s.canonicalCapacityQuote) {
       toast.warn(t.value.tradein.errPleaseRetry);
@@ -652,7 +666,7 @@ function onReplace() {
   }
   // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(审计 R9 P1:事后失败再回滚,回滚里的再激活撞的是
   // 同一个槽位谓词,必然连环失败,把一台已付费旧机甩进库存)。
-  if (app.activeSlotCount - 1 + reservedSlots.value >= MAX_DEVICES) {
+  if (app.activeSlotCount - 1 + reservedSlots.value >= app.slotCap) {
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;
@@ -732,6 +746,7 @@ async function submitCanonicalKeepBuy(newKind: DeviceKind): Promise<void> {
 function onKeepBuy() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (replaceView.value?.insufficient) return;
   if (remoteApiEnabled) {
     confirming.value = true;
     void submitCanonicalKeepBuy(s.newKind);
@@ -821,7 +836,7 @@ function onForce() {
   //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
   // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(与 onReplace 同一条;审计 R9 P1)。
-  if (app.activeSlotCount - 1 + reservedSlots.value >= MAX_DEVICES) {
+  if (app.activeSlotCount - 1 + reservedSlots.value >= app.slotCap) {
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;

@@ -12,12 +12,51 @@ function commissionAggregate(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+function commissionEvent(id: string) {
+  return { id, kind: "unilevel", sourceUserName: "Alice", layer: 1,
+    orderId: `ORD-${id}`, orderAmountUSD: 99, amountUSDT: 1, amountNEX: 0,
+    ts: 1755043200000, unlockAt: 1757635200000, status: "cooling" };
+}
 
 describe("team unilevel API", () => {
+  it("requests and validates a concrete leaderboard page", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      period: "week", page: 2, pageSize: 20, totalRows: 21,
+      rows: [{ rank: 21, handle: "A***e", flag: "🌐", cc: "--", directs: 1,
+        teamSize: 2, earnedUSDT: 3, delta: 0, vRank: 1, hasDevice: true }],
+      myRank: 21, gapToNext: 1, poolUsd: 100, topN: 21,
+      generatedAt: "2026-08-13T00:00:00Z",
+    });
+
+    const api = createTeamInsightsApi({ request } as unknown as ApiClient);
+    await expect(api.leaderboard("week", 2, 20)).resolves.toMatchObject({
+      page: 2, pageSize: 20, totalRows: 21, rows: [{ rank: 21 }],
+    });
+    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/leaderboard?period=week&page=2&pageSize=20" });
+  });
+
+  it("rejects a leaderboard page with duplicate or out-of-window ranks", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      period: "week", page: 2, pageSize: 20, totalRows: 21,
+      rows: [
+        { rank: 20, handle: "A", flag: "🌐", cc: "--", directs: 1, teamSize: 2, earnedUSDT: 3, delta: 0, vRank: 1, hasDevice: true },
+        { rank: 20, handle: "B", flag: "🌐", cc: "--", directs: 1, teamSize: 2, earnedUSDT: 2, delta: 0, vRank: 1, hasDevice: false },
+      ],
+      myRank: null, gapToNext: 0, poolUsd: 100, topN: 21,
+      generatedAt: "2026-08-13T00:00:00Z",
+    });
+
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).leaderboard("week", 2, 20))
+      .rejects.toMatchObject({ message: "TEAM_INSIGHTS_RESPONSE_INVALID" });
+  });
+
   it("keeps server-wide commission totals and real contributors separate from the recent event feed", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-      events: [], generatedAt: "2026-08-13T00:00:00Z",
+      events: [commissionEvent("CM-101")], page: 6, pageSize: 20, totalRows: 101,
+      generatedAt: "2026-08-13T00:00:00Z",
       aggregate: commissionAggregate({
         totalUSDT: 150, totalNEX: 20, directUSDT: 30, extendedUSDT: 120, contributorCount: 4,
         monthUSDT: 30, monthNEX: 5, todayUSDT: 5, unlockedUSDT: 30, unlockedNEX: 10, coolingUSDT: 120,
@@ -30,15 +69,17 @@ describe("team unilevel API", () => {
       }),
     });
 
-    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).commissions()).resolves.toMatchObject({
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).commissions(6, 20)).resolves.toMatchObject({
       aggregate: { totalUSDT: 150, extendedUSDT: 120, contributorCount: 4 },
+      page: 6, totalRows: 101,
     });
   });
 
   it("keeps a full-history aggregate when the recent event feed is capped below it", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-      events: [], generatedAt: "2026-08-13T00:00:00Z",
+      events: [commissionEvent("CM-101")], page: 6, pageSize: 20, totalRows: 101,
+      generatedAt: "2026-08-13T00:00:00Z",
       aggregate: commissionAggregate({
         totalUSDT: 150, totalNEX: 20, directUSDT: 30, extendedUSDT: 120, contributorCount: 4,
         monthUSDT: 30, monthNEX: 5, todayUSDT: 5, eventCount: 101,
@@ -50,15 +91,15 @@ describe("team unilevel API", () => {
       }),
     });
 
-    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).commissions()).resolves.toMatchObject({
-      events: [], aggregate: { eventCount: 101, monthUSDT: 30, byKind: { unilevel: { count: 100 } } },
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient).commissions(6, 20)).resolves.toMatchObject({
+      events: [{ id: "CM-101" }], aggregate: { eventCount: 101, monthUSDT: 30, byKind: { unilevel: { count: 100 } } },
     });
   });
 
   it("fails closed when full-history totals and kind buckets disagree", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-      events: [], generatedAt: "2026-08-13T00:00:00Z",
+      events: [], page: 1, pageSize: 20, totalRows: 0, generatedAt: "2026-08-13T00:00:00Z",
       aggregate: commissionAggregate({ totalUSDT: 1, directUSDT: 1, eventCount: 1 }),
     });
 
@@ -87,13 +128,14 @@ describe("team unilevel API", () => {
         currency: "USDT", status: "cooling", ts: 1755043200000, unlockAt: 1757635200000 }],
       split: { direct: { amountUSDT: 9.9, amountNEX: 50, count: 1 },
         extended: { amountUSDT: 0, amountNEX: 0, count: 0 } },
+      page: 1, pageSize: 20, totalRows: 1,
       generatedAt: "2026-08-13T00:00:00Z",
     });
     const api = createTeamInsightsApi({ request } as unknown as ApiClient);
     await expect(api.unilevel("week")).resolves.toMatchObject({
       period: "week", events: [{ cycle: "2026-W33", layer: 1 }], split: { direct: { count: 1 } },
     });
-    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/unilevel?period=week" });
+    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/unilevel?period=week&page=1&pageSize=20" });
   });
 
   it("rejects unilevel events that expose source user ids", async () => {
@@ -125,6 +167,7 @@ describe("team unilevel API", () => {
           leadership: { usdt: 0, nex: 0, count: 0 }, genesis: { usdt: 0, nex: 0, count: 0 },
         },
       }),
+      page: 1, pageSize: 20, totalRows: 1,
       generatedAt: "2026-08-13T00:00:00Z",
     });
     const api = createTeamInsightsApi({ request } as unknown as ApiClient, "dev");
@@ -133,7 +176,7 @@ describe("team unilevel API", () => {
       sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
       events: [{ id: "CM-1", status: "unlocked", withdrawable: true }],
     });
-    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/commissions" });
+    expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/commissions?page=1&pageSize=20" });
   });
 
   it("rejects team facts without explicit server canonical provenance", async () => {

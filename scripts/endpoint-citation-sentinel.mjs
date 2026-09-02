@@ -67,6 +67,8 @@ const LEDGER = {
   "GET /api/config/genesis": "PRD §9.11c.1",
   "GET /api/config/gpu-tiers": "PRD §9.11c.1",
   "GET /api/config/release-gates": "PRD §9.11c.1",
+  "/api/config/commission/guide": "BACKEND: AppCommissionGuideController 已实现;佣金说明发布投影,PC 管理内容后由 App 读取",
+  "/api/config/v-rank-policy": "BACKEND: PublishedRankHowPolicyController 已实现;V 等级说明策略由 PC 管理后下发",
 
   // ── genesis ───────────────────────────────────────────────────────────
   "POST /api/genesis/secondary/fulfill": "PRD §10.2.4",
@@ -85,20 +87,20 @@ const LEDGER = {
   "/api/trial/state": "HOLD: 同上;注释未带 method 的候选引用",
   "POST /api/trial/start": "PRD §9.11a.2",
   "POST /api/trial/convert": "PRD §9.11a.2 / §9.11e",
+  "/api/trial/convert": "PRD §9.11a.2 / §9.11e(注释未带 method 的同一原子转换接口)",
   "POST /api/trial/cancel": "PRD §9.11a.2",
 
   // ── orders / store ────────────────────────────────────────────────────
   "POST /api/orders": "PRD §7.5 / §9.10 / §9.11e",
   "POST /api/orders/bundle": "TBD: 2026-08-13 服务端权威组合定价与原子建单契约;PRD §7.5 / §9.10 待同步 bundle 资源",
-  "/api/orders/:param/pay": "BACKEND: AppOrderCommandController 已实现;订单支付/捕获命令,前端 PRD 待同步",
   "GET /api/orders": "TBD-NAME: PRD §7.4 只定义了按 id 读单;列表读回路已由 order-api.ts 的 list() 实现(store/order-canonical.ts 在用),PRD 同步时补条目",
   "GET /api/orders/:id": "PRD §7.4(SSE)",
-  "POST /api/orders/:param/pay": "TBD-NAME: 订单支付确认(commerce-payment-api.confirm,幂等键随请求);PRD §7.5 / §9.10 是下单与支付域但没定义该路径 —— 与已登记的同族命令 /api/orders/:param/cancel 同口径,接线以后端为准",
   "POST /api/orders/{orderNo}/pay": "TBD-NAME: 与上一条同一端点、花括号参数写法(后端 commerce sandbox 验收记录 2026-08-16 用 {orderNo});store/pending-checkout.ts 文件头引用为发票的服务端完成腿",
   "GET /api/store/catalog": "PRD §7.1",
   "/api/store/purchase-eligibility": "当前文档: PC 管理端开发落地规格 §3 API E1/E3; PRD v2 §E1/E3（Gen-2 E1 purchaseGate COMPLETE）",
   "/api/store/notifications": "TBD-NAME: BACKEND AppProductNotificationController 已实现;当前账号商品到货/上架通知订阅列表与创建资源,商城 PRD 路径待同步",
   "/api/store/notifications/:param": "TBD-NAME: 同上(取消单个商品通知订阅)",
+  "/api/store/bundle-discount": "BACKEND: AppCanonicalBoundaryController 已实现;PC E1 套餐折扣配置的 App 只读投影,后台 PRD v2 §176",
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────
   "GET /api/withdrawals": "PRD §9.4",
@@ -120,7 +122,6 @@ const LEDGER = {
   "GET /api/bills": "PRD §9.3",
   "GET /api/me/bills": "PRD §11.5a",
   "GET /api/me/vouchers": "PRD §9.11c.2",
-  "PATCH /api/me/rewards/seen": "PRD §11.5a",
   "GET /api/earnings/release-status": "TBD-NAME: PRD 未定名 —— 收益放行桶(可提现 / 待审 / 赠金锁定)的读取端点,概念见 PRD §9.3「提现只认可提现桶」;实现在 src/api/earnings-release-api.ts。🔴 它**只回锁定桶,不回总余额**:全仓没有任何余额端点,所以「提现后回拉服务端余额」这条路不成立(见 app.ts applyWithdrawalDebit 头注)。PRD 同步时定名",
   "GET /api/me/earnings": "PRD §9.11c.1",
   // (这里原有 `/api/devices/earnings` 与 `/api/app/wallet/sandbox` 两条 `TBD:`,与下方
@@ -148,7 +149,6 @@ const LEDGER = {
   "GET /api/quests/state": "PRD §9.11c.2(⚠️ PRD 写的是 /api/quests/weekly,实现用 state,已交底 U-16)",
   "POST /api/quests/{questCode}/claim": "TBD-NAME: 周任务按 questCode 原子领取的服务端权威命令;后端已实现,PRD §9.11c.2 待同步资源形状",
   // 2026-08-13 对齐轮补登(逐个回源核实过:5 个在 src/api 下都有真实现,不是笔误也不是虚构)
-  "/api/app/wallet/sandbox": "NOT-PRD: 沙箱资金档的钱包面,PRD 未定义;仅在 developmentFundsEnabled 档可达",
   "/api/orders": "PRD §9.11d(单品下单;组合购尚无整单定价契约,见 bundle.vue 注释)",
   "/api/devices/earnings": "TBD-NAME: 设备收益投影,PRD 未单列章节",
   "/api/product/phase": "BACKEND: AppCanonicalBoundaryController#getProductPhase 已实现;前端 PRD 待同步",
@@ -184,6 +184,8 @@ const LEDGER = {
   "/api/gate/logout": "NOT-PRD: 退役 prototype 的 Next middleware reviewer-cookie 路由,uni 端已弃用(非 PROD 契约)",
   "GET /api/onboarding/calibrate/result": "PRD §12.2",
   "/api/onboarding/calibrate": "TBD-NAME: BACKEND OnboardingCalibrationController 已实现;手机/设备校准请求与结果由服务端统一返回,前端 PRD 路径待同步",
+  "/api/onboarding/calibrate/activate": "PRD §4.7.3 / App 落地规格 §393;服务端原子激活 canonical 手机设备",
+  "/api/onboarding/calibrate/defer": "PRD §4.7.3 / App 落地规格 §393;服务端持久化 DEFERRED",
   "GET /api/users/me": "PRD §12.2",
 
   // ── social / network / misc ───────────────────────────────────────────
@@ -205,7 +207,6 @@ const LEDGER = {
   // 🗑 2026-08-13 删除 `/api/market/nex`(原出处 PRD §10.3 WebSocket 推送):
   //   代码注释里已无该引用 —— 回源确认是 c37e642 / 82d4f51 两笔服务端权威化改造里去掉的,
   //   不是笔误也不是被误删。台账只反映**代码真实引用**,留着过期条目会让本门变成只增不减的垃圾场。
-  "GET /api/market/tokens": "PRD §11.9.3",
   "GET /api/admin/platform/phase-config": "PRD §9.11d",
   "PUT /api/admin/tradein/config": "NOT-PRD: PRD 未定义置换配置写接口(admin 侧,候选名)",
 
@@ -224,6 +225,7 @@ const LEDGER = {
   "/api/app/security": "TBD-NAME: /api/app/* 后端契约族(账号安全读),前端 PRD 未定义",
   "/api/app/security/password": "TBD-NAME: 同上(改密)",
   "/api/app/security/two-factor": "TBD-NAME: 同上(两步验证开关)",
+  "/api/app/security/two-factor/challenge": "BACKEND: AppUserSecurityController 已实现;高敏操作前两步验证挑战",
   "/api/app/security/sessions/:param/revoke": "TBD-NAME: 同上(踢单个会话);另见 PRD §4.7 的 /api/account/sessions/:id/revoke —— 两个候选名并存,接线时以后端为准",
   "/api/app/security/sessions/revoke-others": "TBD-NAME: 同上(踢其余会话)",
   "/api/app/analytics/events": "NOT-PRD: /api/app/* 族,行为埋点上报;PRD 未定义埋点接口",
@@ -245,10 +247,12 @@ const LEDGER = {
   "/api/app/developer/api-keys/:param": "TBD-NAME: 同上(撤销单个 API key)",
   "/api/app/developer/webhooks": "TBD-NAME: 同上(当前账号 webhook 列表/创建资源)",
   "/api/app/developer/webhooks/:param": "TBD-NAME: 同上(轮换密钥/删除单个 webhook)",
+  "/api/app/developer/webhooks/:param/:param": "BACKEND: AppDeveloperWebhookController 已实现;单个 webhook enable/disable 命令",
+  "/api/app/developer/webhooks/:param/deliveries": "BACKEND: AppDeveloperWebhookController 已实现;当前账号 webhook 投递记录",
+  "/api/app/developer/webhooks/:param/rotate-secret": "BACKEND: AppDeveloperWebhookController 已实现;幂等轮换 webhook 密钥",
   "/api/app/wallet/bills": "TBD-NAME: /api/app/* 族,生产钱包账单权威投影;概念见 PRD §9.3,该路径待同步",
-  "/api/app/wallet/sandbox/topups": "NOT-PRD: /api/app/* 族,沙箱资金档专用;仅 developmentFundsEnabled 档可达",
-  "/api/app/wallet/sandbox/withdrawals": "NOT-PRD: 同上",
-  "/api/app/wallet/sandbox/orders/:param/callbacks": "NOT-PRD: 同上(沙箱回调注入)",
+  "/api/app/wallet/bills/summary": "BACKEND: AppWalletBillsController 已实现;钱包总览只读汇总投影",
+  "GET /api/app/wallet/bills/summary": "BACKEND: AppWalletBillsController 已实现;PRD §9.3 钱包账单汇总",
   "/api/app/janus/reports": "NOT-PRD: /api/app/* 族,Janus 双面 demo 专用,前端 PRD 不覆盖该工程",
   "/api/app/janus/commands/pending": "NOT-PRD: 同上",
   "/api/app/janus/commands/ack": "NOT-PRD: 同上",
@@ -258,24 +262,33 @@ const LEDGER = {
   "/api/app/deposits/vietqr/intents": "TBD-NAME: /api/app/* 族,越南 VietQR 入金;概念见 PRD §9.2.8,该路径未定义",
   "/api/app/deposits/vietqr/intents/:param": "TBD-NAME: 同上(单据回查)",
   "/api/app/deposits/vietqr/intents/:param/cancel": "TBD-NAME: 同上(取消)",
-  "/api/app/support/acceptance/projection": "TBD-NAME: /api/app/* 族,客服受理投影",
-  "/api/app/support/acceptance": "TBD-NAME: 同上(受理)",
   "/api/device/:param/deactivate": "TBD-NAME: 设备实例停用命令;后端 E3 用户设备契约已实现,前端 PRD 待同步",
   "/api/app/support": "TBD-NAME: 同上(工单读写)",
   "/api/app/support/faqs": "TBD-NAME: 同上(FAQ)",
   "/api/app/referral-rewards": "TBD-NAME: /api/app/* 族,推荐奖励发放面;另有 /api/config/referral-rewards 读配置",
+  "/api/app/support/ai/:param": "BACKEND: AppNovaAiController 已实现;status/chat 动态动作段,PRD §11.0A Nova AI 顾问",
+  "/api/app/profile/language": "BACKEND: AppUserProfileController 已实现;账户语言跨设备同步",
 
   // ── PRD 里找得到的(7 条,逐条核过原文不是正则假命中)──────────────
   "/api/devices/activate": "PRD §9.11d.2(server enforce 活跃槽位上限,client 限制纯 UI)",
   "/api/config/task-pricing": "PRD §9.11c.1(Task pricing 表 server 下发)",
   "/api/genesis/state": "PRD §9.11c.1(供应 / 单价 / 排放比例)",
+  "GET /api/genesis/state": "PRD §9.11c.1(注释带 method 的同一 canonical 投影)",
   "/api/notifications": "PRD §11.2.4(分页拉取,支持按优先级过滤)",
   "/api/notifications/:param/read": "PRD §11.2.4(原文写作 /api/notifications/:id/read)",
   "/api/legal/risk-disclosure/current": "PRD §9.11d.1(按 jurisdiction 返 {version, body})",
+  "/api/legal/privacy-policy/current": "BACKEND: PublishedPrivacyPolicyController 已实现;PC 发布后 App 按法域/语言读取",
+  "/api/legal/terms/current": "后台法律条款 CMS 规格 NEXION-LEGAL-TERMS-CMS-v1;服务端发布版本只读",
+  "/api/legal/terms/acknowledgment": "后台法律条款 CMS 规格 NEXION-LEGAL-TERMS-CMS-v1;版本化幂等确认",
   "/api/points/sign-in": "APP规格 §4.6 积分域(每日签到,server roll lucky multiplier)",
 
   // ── 其余:PRD 搜不到,逐条写明为什么 ─────────────────────────────────
   "/api/team/binary": "TBD-NAME: 双轨团队读;PRD §8 有业务规则但未定义该端点",
+  "/api/goals": "BACKEND: AppEarningGoalController 已实现;PRD §11.12.3 收益目标读写",
+  "/api/goals/:param": "BACKEND: AppEarningGoalController 已实现;单个收益目标更新/删除",
+  "/api/content/how-it-works/:param": "BACKEND: PublishedHowContentController 已实现;PC 发布说明内容后 App 只读",
+  "/api/developer/docs": "BACKEND: PublishedDeveloperDocsController 已实现;PC 发布开发者文档后 App 只读",
+  "/api/me/notification-preferences": "BACKEND: AppNotificationPreferenceController 已实现;当前账号通知偏好读写",
 // ── 2026-08-14 并入远端主线(9db1d5d)带来的新端点 ────────────────────
   // 同事那批(Nova AI 客服 / 用户自助资料 / 注销账号 / 里程碑评估)。逐条回根 PRD 核过。
   "/api/app/profile": "PRD §11.0B(个人资料:整页无自由文本输入,昵称走预置候选)",
@@ -288,8 +301,8 @@ const LEDGER = {
   "/api/team/rank": "TBD-NAME: 团队等级读;同上",
   "/api/tasks/route": "TBD-NAME: 按显存派发任务路由;PRD §6.8 有容量概念,未定义该端点",
   "/api/tasks/assignments": "TBD-NAME: 任务派单读;PRD 未定义",
-  "/api/tasks/assignments/claim": "TBD-NAME: 同上(领取)",
-  "/api/tasks/assignments/:param/complete": "TBD-NAME: 同上(完成)",
+  "/api/tasks/receipts": "BACKEND: AppTaskAssignmentController 已实现;后台 PRD v2 §457 Proof-of-Compute 收据列表",
+  "/api/tasks/receipts/:param": "BACKEND: AppTaskAssignmentController 已实现;后台 PRD v2 §457 单条收据详情",
   // 🔴 裸 /api/exchange ≠ PRD 的 /api/exchange/swap(§9.4.3)。回源核过:PRD 只定义了
   //    带 /swap 的那条,裸路径全 PRD 零命中。**别把它当成 §9.4.3 登记** —— 那是假引用。
   "/api/exchange": "TBD-NAME: 兑换单读/建;PRD §9.4.3 只定义了 POST /api/exchange/swap,裸路径未定义",
@@ -317,6 +330,8 @@ const LEDGER = {
   "/api/payment-methods/bind": "TBD-NAME: 同上(绑定)",
   "/api/payment-methods/:param/unbind": "TBD-NAME: BACKEND AppPaymentMethodController 已实现;支付方式解绑命令带幂等键 + expectedVersion 乐观并发,回执 CARD_UNBOUND;PRD §9.10 为绑卡域但未定义该路径,待同步",
   "/api/payment-methods/:param/default": "TBD-NAME: BACKEND AppPaymentMethodController 已实现;默认支付方式命令带幂等键 + expectedVersion 乐观并发,回执 CARD_DEFAULT_SET;PRD §9.10 为绑卡域但未定义该路径,待同步",
+  "/api/orders/:param/payment-session": "BACKEND: Hosted-payment checkout 为已创建订单申请/恢复支付会话;服务端订单状态回读仍是激活权威,前端 PRD 待同步",
+  "/api/vouchers/:param/popup-seen": "BACKEND: AppGrowthEngagementController 已实现;优惠券弹窗曝光幂等回写",
   "/api/payout-addresses/otp/send": "TBD-NAME: 换绑收款地址的验证码;与已登记的 /api/payout-addresses 同族",
   "/api/points/state": "TBD-NAME: 积分状态读;APP规格只列了 sign-in",
   "/api/points/milestones/:param/claim": "TBD-NAME: 积分里程碑领奖;PRD §11.3a 是 /api/me/milestones/:id/claim,两个候选名并存",

@@ -14,13 +14,14 @@
           v-for="(item, index) in COUNTRIES"
           :key="item.code"
           ref="rowRefs"
-          class="cc-row active:opacity-70"
-          :class="{ 'cc-row--selected': item.code === modelValue }"
+          class="cc-row"
+          :class="{ 'cc-row--selected': item.code === modelValue, 'cc-row--disabled': !item.selectable }"
           role="option"
-          tabindex="0"
+          :tabindex="item.selectable ? 0 : -1"
           :aria-selected="item.code === modelValue"
-          @click="select(item.code)"
-          @keydown="onRowKeydown($event, item.code, index)"
+          :aria-disabled="!item.selectable"
+          @click="select(item)"
+          @keydown="onRowKeydown($event, item, index)"
         >
           <view class="cc-row__identity">
             <text class="cc-row__iso">{{ item.iso }}</text>
@@ -41,7 +42,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
-import { SUPPORTED_PHONE_COUNTRIES, type PhoneCountryProfile } from "@/auth/phone-number";
+import { PHONE_COUNTRIES, type PhoneCountryProfile } from "@/auth/phone-number";
 
 const props = defineProps<{ open: boolean; modelValue: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "select", code: string): void }>();
@@ -76,15 +77,15 @@ function onCloseKeydown(e: KeyboardEvent) {
     emit("close");
   } else if (e.key === "Tab" && e.shiftKey) {
     e.preventDefault();
-    focusElement(rowRefs.value[rowRefs.value.length - 1]);
+    focusElement(rowRefs.value[lastSelectableIndex.value]);
   }
 }
 
-function onRowKeydown(e: KeyboardEvent, code: string, index: number) {
+function onRowKeydown(e: KeyboardEvent, item: CountryRow, index: number) {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
-    select(code);
-  } else if (e.key === "Tab" && !e.shiftKey && index === COUNTRIES.value.length - 1) {
+    select(item);
+  } else if (e.key === "Tab" && !e.shiftKey && index === lastSelectableIndex.value) {
     e.preventDefault();
     focusElement(closeRef.value);
   }
@@ -111,14 +112,22 @@ function countryName(iso: PhoneCountryProfile["iso"]): string {
   }
 }
 
-const COUNTRIES = computed(() => SUPPORTED_PHONE_COUNTRIES.map((item) => ({
+type CountryRow = { iso: PhoneCountryProfile["iso"]; code: string; name: string; selectable: boolean };
+
+const COUNTRIES = computed<CountryRow[]>(() => PHONE_COUNTRIES.map((item) => ({
   iso: item.iso,
   code: item.dialCode,
   name: countryName(item.iso),
+  selectable: item.selectable,
 })));
+const lastSelectableIndex = computed(() => COUNTRIES.value.reduce(
+  (last, item, index) => item.selectable ? index : last,
+  -1,
+));
 
-function select(code: string) {
-  emit("select", code);
+function select(item: CountryRow) {
+  if (!item.selectable) return;
+  emit("select", item.code);
   emit("close");
 }
 </script>
@@ -134,9 +143,11 @@ function select(code: string) {
 .cc-list { flex: 1; min-height: 0; max-height: calc(min(74vh, 620px) - 68px); padding: 0 16px 12px; box-sizing: border-box; scrollbar-width: none; }
 .cc-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .cc-row { min-height: 56px; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
+.cc-row:not(.cc-row--disabled):active { opacity: 0.7; }
 .cc-row + .cc-row { border-top: 1px solid var(--v5-border); }
 .cc-row--selected { background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .cc-row--selected + .cc-row { border-top-color: transparent; }
+.cc-row--disabled { cursor: not-allowed; opacity: 0.38; }
 .cc-row__identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
 .cc-row__iso { flex: 0 0 30px; height: 24px; border-radius: 7px; background: var(--v5-surface-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-v5); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--v5-ink-3); }
 .cc-row__name { font-size: 15px; font-weight: 500; color: var(--v5-ink-2); }

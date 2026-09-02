@@ -3,14 +3,13 @@ import type { ApiClient } from "./api-client";
 import { createDeveloperResourcesApi } from "./developer-resources-api";
 
 describe("developer resources API", () => {
-  it("lists server API keys and passes idempotency on create", async () => {
+  it("does not expose API-key creation before the OpenAPI capability is released", async () => {
     const request = vi.fn()
-      .mockResolvedValueOnce([{ id: 1, keyId: "key-1", name: "build", prefix: "sk_live_abc", last4: "wxyz", status: "ACTIVE", source: "server", sourceEnvironment: "PRODUCTION", runId: "", createdAt: "2026-08-16T00:00:00Z" }])
-      .mockResolvedValueOnce({ id: 1, keyId: "key-1", name: "build", prefix: "sk_live_abc", last4: "wxyz", status: "ACTIVE", source: "server", sourceEnvironment: "PRODUCTION", runId: "", createdAt: "2026-08-16T00:00:00Z", secret: "sk_live_secret" });
+      .mockResolvedValueOnce([{ id: 1, keyId: "key-1", name: "build", prefix: "sk_live_abc", last4: "wxyz", status: "ACTIVE", source: "server", sourceEnvironment: "PRODUCTION", runId: "", createdAt: "2026-08-16T00:00:00Z" }]);
     const api = createDeveloperResourcesApi({ request } as unknown as ApiClient);
     await expect(api.listKeys()).resolves.toHaveLength(1);
-    await expect(api.createKey("build", "idem-1")).resolves.toMatchObject({ secret: "sk_live_secret" });
-    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ idempotencyKey: "idem-1" }));
+    expect(api).not.toHaveProperty("createKey");
+    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/api/app/developer/api-keys" }));
   });
 
   it("rejects malformed webhook response instead of showing success", async () => {

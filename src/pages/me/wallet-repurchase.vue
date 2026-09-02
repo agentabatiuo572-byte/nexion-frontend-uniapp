@@ -166,7 +166,9 @@ const canSubmit = computed(() => {
   return amount.value > 0 && amount.value <= user.value.usdtBalance;
 });
 
-const ctaLabel = computed(() => fmt(recovering.value ? w.value.recoveryCta : w.value.cta, { amount: formatCommandAmount(amount.value) }));
+const ctaLabel = computed(() => recovering.value
+  ? fmt(w.value.recoveryCta, { amount: formatCommandAmount(amount.value) })
+  : fmt(w.value.cta, { amount: formatCommandAmount(amount.value) }));
 const unavailableTitle = computed(() => w.value.unavailableTitle);
 const unavailableBody = computed(() => w.value.unavailableBody);
 const retryLabel = computed(() => w.value.retry);
@@ -247,11 +249,17 @@ async function handleRepurchase() {
       const config = repurchase.config;
       confirmed = await uiConfirm({
         title: w.value.confirmTitle,
-        message: fmt(recovering.value ? w.value.recoveryHint : w.value.confirmMessage, {
-          amount: formatCommandAmount(quoteAmount),
-          days: config?.lockDays ?? 0,
-          penalty: config?.earlyPenaltyPct ?? 0,
-        }),
+        message: recovering.value
+          ? fmt(w.value.recoveryHint, {
+              amount: formatCommandAmount(quoteAmount),
+              days: config?.lockDays ?? 0,
+              penalty: config?.earlyPenaltyPct ?? 0,
+            })
+          : fmt(w.value.confirmMessage, {
+              amount: formatCommandAmount(quoteAmount),
+              days: config?.lockDays ?? 0,
+              penalty: config?.earlyPenaltyPct ?? 0,
+            }),
         confirmLabel: w.value.confirmLabel,
         cancelLabel: w.value.cancelLabel,
         icon: "warn",

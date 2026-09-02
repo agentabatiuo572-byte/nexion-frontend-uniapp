@@ -128,15 +128,17 @@ test("remote configuration loads are authoritative and remote writes do not revi
   assert.match(earnConfig, /catch \(cause\) \{[\s\S]*?phoneTiers\.value = null;[\s\S]*?applyCanonicalPhoneTierYields\(\[\]\);/);
   assert.match(phoneTiers, /\?\? \{ baseRateUsdt: 0, baseRateNex: 0 \}/);
   assert.match(app, /if \(remoteApiEnabled\) \{[\s\S]*?void refreshEarnConfig\(\)[\s\S]*?void useMarket\(\)\.syncRemote\(\)/);
-  assert.match(accountScope, /useRepurchase\(\)\.bindAccount\(\);/);
+  assert.match(accountScope, /useRepurchase\(\)\.bindAccount\(accountKey\);/);
   assert.match(repurchase, /async function refresh\(\) \{[\s\S]*?if \(!remoteApiEnabled\) \{[\s\S]*?config\.value = null[\s\S]*?orders\.value = \[\][\s\S]*?return null;/);
   assert.match(repurchase, /async function open\(amountUsdt: number\) \{[\s\S]*?if \(!remoteApiEnabled\) throw new Error\("REPURCHASE_REMOTE_AUTHORITY_REQUIRED"\);/);
   {
     const block = fnBlock(repurchase, "bindAccount");
-    const iClear = block.indexOf("pendingKeys.clear();");
+    const iClear = block.indexOf("pendingOpenAmount.value = null;");
+    const iRestore = block.indexOf("restorePendingOpen()");
     const iRefresh = block.search(/if \(remoteApiEnabled\) void refresh\(\)/);
-    assert.ok(iClear >= 0, "repurchase rebind must clear pending keys (in bindAccount itself)");
-    assert.ok(iRefresh > iClear, "repurchase rebind must re-pull after clearing (in bindAccount itself)");
+    assert.ok(iClear >= 0, "repurchase rebind must clear the prior account pending projection");
+    assert.ok(iRestore > iClear, "repurchase rebind must restore only the newly bound account's durable intent");
+    assert.ok(iRefresh > iRestore, "repurchase rebind must re-pull after restoring the account scope");
   }
 });
 
@@ -162,5 +164,6 @@ test("remote policy branches use dedicated server contracts or stay fail-closed"
   assert.match(share, /export function buildShareLink[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?location\.origin[\s\S]*?return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
   assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled\)/);
-  assert.match(share, /const text = remoteApiEnabled[\s\S]*?def\.textTemplate\?\.replace\("\{link\}", link\)/);
+  assert.match(share, /const text = remoteApiEnabled[\s\S]*?referralShareText\([\s\S]*?def\.textTemplate \?\? "\{link\}"/);
+  assert.match(share, /const effectiveDef = remoteApiEnabled && !remoteRewardEnabled[\s\S]*?textTemplate: undefined/);
 });

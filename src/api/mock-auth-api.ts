@@ -95,7 +95,7 @@ function snapshotFor(user: UserSession): SessionSnapshot {
 }
 
 function sessionUser(countryCode: string, phone: string, rec: MockUserRecord): UserSession {
-  return { userId: rec.userId, countryCode, phone, nickname: rec.nickname };
+  return { userId: rec.userId, countryCode, phone, nickname: rec.nickname, onboardingComplete: true };
 }
 
 function accountIdForIdentity(identity: string): string {

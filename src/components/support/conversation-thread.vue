@@ -54,15 +54,15 @@
           <view v-if="m.queue.state === 'editing'" class="nx-conv-edit">
             <textarea class="nx-conv-edit-input" :value="edits[m.queue.turnId] ?? m.text" :maxlength="2000" :aria-label="queueLabels.edit" auto-height @input="onEditInput(m.queue.turnId, $event)" />
             <view class="nx-conv-queue-actions">
-              <button class="nx-conv-queue-action" @click="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)">{{ queueLabels.save }}</button>
-              <button class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'cancel-edit')">{{ queueLabels.cancelEdit }}</button>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)" @keydown.enter.prevent="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)" @keydown.space.prevent="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)"><text>{{ queueLabels.save }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'cancel-edit')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'cancel-edit')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'cancel-edit')"><text>{{ queueLabels.cancelEdit }}</text></view>
             </view>
           </view>
           <view v-else class="nx-conv-queue-actions">
-            <button v-if="m.queue.state === 'failed'" class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'retry')">{{ queueLabels.retry }}</button>
+            <view v-if="m.queue.state === 'failed'" class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'retry')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'retry')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'retry')"><text>{{ queueLabels.retry }}</text></view>
             <template v-if="m.queue.state === 'queued' && m.queue.editable">
-              <button class="nx-conv-queue-action" @click="startEdit(m)">{{ queueLabels.edit }}</button>
-              <button class="nx-conv-queue-action" @click="emit('queue-action', m.queue.turnId, 'cancel')">{{ queueLabels.cancel }}</button>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="startEdit(m)" @keydown.enter.prevent="startEdit(m)" @keydown.space.prevent="startEdit(m)"><text>{{ queueLabels.edit }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'cancel')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'cancel')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'cancel')"><text>{{ queueLabels.cancel }}</text></view>
             </template>
           </view>
         </view>
@@ -305,9 +305,8 @@ const sendStyle = computed<CSSProperties>(() => ({
 .nx-conv-queue-status { display: block; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
 .nx-conv-queue[data-state="failed"] .nx-conv-queue-status { color: var(--v5-danger, #b42318); }
 .nx-conv-queue-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.nx-conv-queue-action { margin: 0; padding: 0 12px; min-height: 44px; line-height: 44px; font-size: 12px; color: var(--v5-brand); background: transparent; }
-.nx-conv-queue-action::after { border: 0; }
-.nx-conv-edit-input { box-sizing: border-box; width: 100%; padding: 10px; margin-top: 8px; border: 1px solid var(--v5-border); border-radius: 10px; text-align: left; color: var(--v5-ink); background: var(--v5-surface); font-size: 14px; }
+.nx-conv-queue-action { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 0 12px; min-height: 44px; line-height: 44px; font-size: 12px; color: var(--v5-brand); background: transparent; }
+.nx-conv-edit-input { box-sizing: border-box; width: 100%; padding: 10px; margin-top: 8px; border: 1px solid var(--v5-border); border-radius: 10px; text-align: left; color: var(--v5-ink); background: var(--v5-surface); font-size: 13px; }
 .nx-conv-sys {
   text-align: center;
   padding: 4px 0;

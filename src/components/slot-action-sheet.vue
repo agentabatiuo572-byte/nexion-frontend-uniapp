@@ -13,7 +13,7 @@
   when open (mounted once at chassis level).
 -->
 <template>
-  <view v-if="sheet.open" class="sas-root" role="dialog" aria-modal="true">
+  <view v-if="sheet.open" class="sas-root" role="dialog" aria-modal="true" :aria-label="t.slotSheet.title">
     <view class="sas-backdrop" @click="hide" />
 
     <view class="sas-panel" @click.stop>
@@ -23,20 +23,20 @@
           <text class="sas-title">{{ t.slotSheet.title }}</text>
           <text class="sas-desc">{{ t.slotSheet.desc }}</text>
         </view>
-        <view class="sas-close" :aria-label="closeAria" @click="hide">
+        <view class="sas-close" role="button" tabindex="0" :aria-label="closeAria" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
 
       <!-- primary (recommended): buy a new device — always present -->
-      <view class="sas-store-cta" @click="onGoStore">
+      <view class="sas-store-cta" role="button" tabindex="0" @click="onGoStore" @keydown.enter.prevent="onGoStore" @keydown.space.prevent="onGoStore">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
         <text class="sas-store-cta-t">{{ t.slotSheet.goStoreCta }}</text>
       </view>
 
       <!-- secondary (de-emphasized): collapsed row → tap to reveal inactive devices -->
       <view v-if="inactiveDevices.length > 0" class="sas-activate">
-        <view class="sas-activate-toggle" :class="{ 'is-open': expanded }" @click="expanded = !expanded">
+        <view class="sas-activate-toggle" :class="{ 'is-open': expanded }" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded" @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
           <text class="sas-activate-toggle-t">{{ activateRowText }}</text>
           <svg class="sas-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
@@ -46,7 +46,11 @@
             v-for="d in inactiveDevices"
             :key="d.id"
             class="sas-device"
+            role="button"
+            tabindex="0"
             @click="onActivate(d)"
+            @keydown.enter.prevent="onActivate(d)"
+            @keydown.space.prevent="onActivate(d)"
           >
             <view class="sas-device-ico">
               <svg v-if="d.kind === 'phone'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
@@ -71,7 +75,6 @@ import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useApp } from "@/store/app";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -115,8 +118,8 @@ function onActivate(d: Device) {
     navTo("/pages/onboarding/connect?mode=recalibrate");
     return;
   }
-  if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= MAX_DEVICES) {
-    toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: MAX_DEVICES }));
+  if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= app.slotCap) {
+    toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: app.slotCap }));
     return;
   }
   const ok = app.activateDevice(d.id, reservedSlots.value);

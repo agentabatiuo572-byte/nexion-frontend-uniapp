@@ -111,6 +111,7 @@ export interface GenesisPublicState {
   tiersVersion: number;
   marketOpenState: "open" | "closed";
   marketOpenStateVersion: number;
+  showcaseEnabled: boolean;
   closedNoticeKey: string;
   catalogAvailable: boolean;
   tradeAvailable: boolean;
@@ -388,6 +389,7 @@ export function parseGenesisPublicState(value: unknown, mode: ApiEnvironment = "
       || !Array.isArray(row.listings) || !Array.isArray(row.transactions) || !Array.isArray(row.tiers)
       || (marketOpenState !== "open" && marketOpenState !== "closed")
       || tiersVersion === null || marketOpenStateVersion === null || !closedNoticeKey
+      || typeof row.showcaseEnabled !== "boolean"
       || typeof row.catalogAvailable !== "boolean" || typeof row.tradeAvailable !== "boolean"
       || tradeBlockedReason === null
       || (marketOpenState === "closed" && market.enabled)) return invalid();
@@ -416,6 +418,7 @@ export function parseGenesisPublicState(value: unknown, mode: ApiEnvironment = "
     tiersVersion,
     marketOpenState,
     marketOpenStateVersion,
+    showcaseEnabled: row.showcaseEnabled,
     closedNoticeKey,
     catalogAvailable: row.catalogAvailable,
     tradeAvailable: row.tradeAvailable,

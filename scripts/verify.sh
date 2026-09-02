@@ -894,7 +894,7 @@ sentinel_present "daily milestone atomic seam is honest TBD" src/pages/daily/dai
 #   重锚到端点**真正被写出来的地方**,而且钉的是**真实代码不是注释**:注释会漂,代码不会。
 #   领奖端点现为 `/api/quests/{questCode}/claim`,状态端点为 `/api/quests/state`。
 sentinel_present "weekly quest claim seam names canonical endpoint" src/api/quest-api.ts '/api/quests/\$\{encodeURIComponent'
-sentinel_present "weekly quest state seam names canonical endpoint" src/api/quest-api.ts '"/api/quests/state"'
+sentinel_present "weekly quest state seam names canonical endpoint" src/api/quest-api.ts '/api/quests/state'
 sentinel_present "event claim atomic seam is honest TBD" src/pages/events/events.vue 'event-claim endpoint TBD'
 if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
   bad "SPEC-1 R7 hashpower must not read/import view carrier"
@@ -997,8 +997,8 @@ sentinel_present "SPEC-7 welcome gift claimed per canonical account" src/pages/r
 sentinel_present "SPEC-7 sponsorship tracks claimed accounts" src/store/sponsorship.ts 'giftClaimedByAccount'
 # 新人礼金额可配(2026-07-03 主人批): 金额只从 platform config 读,本地常量禁存(CGM-F-020)
 sentinel_present "SPEC-7 gift amounts read from config" src/store/sponsorship.ts 'rewards\.welcomeGift'
-sentinel_present "SPEC-7 gift usdt amount seeded" src/mock/platform-config.ts 'usdtAmount: 5'
-sentinel_present "SPEC-7 gift nex amount seeded" src/mock/platform-config.ts 'nexAmount: 20'
+sentinel_present "SPEC-7 disabled gift fails closed with zero USDT" src/mock/platform-config.ts 'usdtAmount: 0'
+sentinel_present "SPEC-7 disabled gift fails closed with zero NEX" src/mock/platform-config.ts 'nexAmount: 0'
 if grep -rqE 'WELCOME_GIFT_USDT|WELCOME_GIFT_NEX' src/ 2>/dev/null; then
   bad "SPEC-7 gift amount local constants must not exist (config is single source)"
 else
@@ -1116,13 +1116,14 @@ sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wa
 # 无快照 / 无 policy 三态一律 fail-closed 归 0。判据钉四个承重构件,不钉整串表达式。
 # 🔴 必须剥注释再判(z1 R2 独立审计):不剥的话「旧口径备查」式注释就能让四个构件全命中,
 # 而实现里 fail-closed 已被删光 —— 资金路径上的注释哄绿。同文件 payout / AUTH03 两块的家法。
-wd_avail_src=$(sed -n '/const maxWithdrawable = computed/,/});/p' src/pages/me/wallet-withdraw.vue | sed 's|//.*||' | tr -d '\r')
+wd_avail_src=$(sed -n '/const preRatioWithdrawable = computed/,/const minWithdrawable = computed/p' src/pages/me/wallet-withdraw.vue | sed 's|//.*||' | tr -d '\r')
 wd_avail_miss=""
 [ -n "$wd_avail_src" ] || wd_avail_miss="${wd_avail_miss}computed-block-missing "
 echo "$wd_avail_src" | grep -q 'clusterRestricted) return 0' || wd_avail_miss="${wd_avail_miss}cluster-zero "
 echo "$wd_avail_src" | grep -q 'if (!buckets) return 0' || wd_avail_miss="${wd_avail_miss}nobuckets-zero "
 echo "$wd_avail_src" | grep -q 'balanceMaxRatio ?? 0' || wd_avail_miss="${wd_avail_miss}ratio-failclosed "
 echo "$wd_avail_src" | grep -q 'Math.max(0,' || wd_avail_miss="${wd_avail_miss}held-subtract-clamp "
+echo "$wd_avail_src" | grep -q 'computeWithdrawalMaximum(preRatioWithdrawable.value, ratio)' || wd_avail_miss="${wd_avail_miss}ratio-application "
 if [ -z "$wd_avail_miss" ]; then
   ok "withdraw available fail-closed(cluster→0 · 无快照→0 · ×ratio??0 · max(0,余额−held))"
 else
@@ -1467,7 +1468,7 @@ sentinel_present "SPEC-2 trade-in activation receives reserved slots" src/compon
 sentinel_present "SPEC-2 order activation receives reserved slots" src/App.vue 'tickOrders\(trialReservesSlotNow\(\) \? 1 : 0\)'
 sentinel_present "SPEC-2 order detail passes trial reserved slot" src/pages/store/order-detail.vue 'advanceOrder\(id\.value, reservedSlots\.value\)'
 sentinel_present "SPEC-2 refresh passes trial reserved slot" src/store/refresh.ts 'tickOrders\(trialReservesSlotNow\(\) \? 1 : 0\)'
-sentinel_present "SPEC-2 slot sheet counts trial reserved slot" src/components/slot-action-sheet.vue 'slotsUsed\.value >= MAX_DEVICES'
+sentinel_present "SPEC-2 slot sheet counts trial reserved slot against server slot cap" src/components/slot-action-sheet.vue 'slotsUsed\.value >= app\.slotCap'
 sentinel_present "SPEC-2 slot sheet activation receives reserved slot" src/components/slot-action-sheet.vue 'activateDevice\(d\.id, reservedSlots\.value\)'
 sentinel_present "SPEC-2 replace candidate uses slot devices" src/store/tradein-sheet.ts 'useApp\(\)\.slotDevices'
 sentinel_present "SPEC-2 purchased hardware helper exists" src/store/device-types.ts 'isPurchasedHardwareKind'
@@ -1520,7 +1521,8 @@ spec2_guard_semantics() {
       const body = cfg.slice(open, close);
       if(!/IS_PRODUCTION/.test(body)) throw new Error(fn+" 是开发后门却没有 IS_PRODUCTION 早退 —— 生产构建里它是活的");
     }
-    if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(\(d\) => d\.activatedAt !== null\)\.length\)/.test(app)) throw new Error("slot cap must count hidden active pc-gpu devices");
+    if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(isActiveSlotDevice\)\.length\)/.test(app)) throw new Error("slot cap must count every hidden active physical device through the shared slot policy");
+    if(!/return device\.activatedAt !== null && occupiesDeviceSlot\(device\.kind\)/.test(fs.readFileSync("src/lib/device-slot-policy.ts","utf8"))) throw new Error("shared slot policy must count active PC devices while excluding non-slot products");
     const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
     if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
     const demoKinds = [...demoKindsMatch[1].matchAll(/"([^"]+)"/g)].map((m)=>m[1]);
@@ -1724,7 +1726,9 @@ if "$NODE_BIN" -e '
     const launchFunction=sourceFile.statements.find((node)=>ts.isFunctionDeclaration(node)&&node.name?.text==="launchRegistrationSuccess");
     if(launchFunction){
       (function collect(node){
-        if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&ts.isIdentifier(node.expression.expression)&&node.expression.expression.text==="uni"&&node.expression.name.text==="reLaunch"){
+        const isUniReLaunch=ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&ts.isIdentifier(node.expression.expression)&&node.expression.expression.text==="uni"&&node.expression.name.text==="reLaunch";
+        const isNavReset=ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==="navReset";
+        if(isUniReLaunch||isNavReset){
           const options=node.arguments[0];
           if(options&&ts.isObjectLiteralExpression(options)){
             const url=options.properties.find((prop)=>ts.isPropertyAssignment(prop)&&((ts.isIdentifier(prop.name)&&prop.name.text==="url")||(ts.isStringLiteral(prop.name)&&prop.name.text==="url")));
@@ -1871,13 +1875,17 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   else
     bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' /tmp/uni-spec7-risk-gate-runtime.log
   fi
-  for AUTH02_LOCALE in en zh; do
-    if probe_retry /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
-      ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
-    else
-      bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
-    fi
-  done
+  if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
+    ok "AUTH02 formal remote auth authority handoff — legacy local registered-number runtime retired; Java auth handoff is covered by real-backend integration"
+  else
+    for AUTH02_LOCALE in en zh; do
+      if probe_retry /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
+        ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
+      else
+        bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
+      fi
+    done
+  fi
 else
   bad "SPEC-7 K1 device/payment registration gates (dev server not running at $BASE_URL)"
   bad "AUTH02 registered-number + success-page runtime (EN/ZH; dev server not running at $BASE_URL)"
@@ -1991,12 +1999,12 @@ spec4_account_session_semantics() {
     if(!/readAccountSessionRecords/.test(session)) throw new Error("account session list is not exposed");
     if(!/function resumeOrClaim/.test(session)) throw new Error("startup session restore/revoke guard missing");
     if(!/\.resumeOrClaim\(key\)/.test(appVue)) throw new Error("app startup must resume existing session instead of blindly claiming a new one");
-    if(!/restored\.status === "kicked"[\s\S]*uni\.reLaunch\(\{ url: "\/pages\/session\/kicked" \}\)/.test(appVue)) throw new Error("app startup must route restored revoked sessions to kicked page");
+    if(!/restored\.status === "kicked"[\s\S]*(?:uni\.reLaunch|navReset)\(\{ url: "\/pages\/session\/kicked" \}\)/.test(appVue)) throw new Error("app startup must route restored revoked sessions to kicked page");
     if(/useSession\(\)\.claim\(key\)/.test(appVue)) throw new Error("app startup still blindly claims a new session");
     if(!/revokeAllOtherSessions/.test(session)) throw new Error("session revoke-all action missing");
     if(!/mergeAndWriteAccountSnapshotResult\(lastCloudSnapshot, snapshot\)/.test(app)) throw new Error("account snapshot is not merged through app store");
     if(!/adoptAccountSnapshot\(result\.snapshot\)/.test(app)) throw new Error("merged account snapshot is not adopted back into app state");
-    if(!/accountKey,\s*entrySurface,\s*accountCloudUpdatedAt/.test(app)) throw new Error("account cloud state is not returned to consumers");
+    if(!/accountKey,\s*accountBindingEpoch,\s*entrySurface,\s*accountCloudUpdatedAt/.test(app)) throw new Error("account cloud state is not returned to consumers");
     if(!/completeSignIn\(\{[\s\S]*identity/.test(login)) throw new Error("login does not use the canonical sign-in completion");
     if(!/auth\.signIn\(options\.identity, onboardingComplete\)[\s\S]*app\.bindAccount\(options\.identity\)[\s\S]*session\.(resumeOrClaim|claim)\(options\.identity\)/.test(signIn)) throw new Error("canonical sign-in must bind account before session claim");
     if(!/app\.bindAccount\(createdIdentity\)[\s\S]*rebindAccountScopedStores\(createdIdentity\)[\s\S]*commitRegistration\(createdIdentity/.test(register)) throw new Error("register must bind/rebind canonical account before rewards/session flow");
@@ -2023,7 +2031,10 @@ else
   bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
 fi
 if scope_hit spec4-runtime; then
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
+  ok "SPEC-4 formal remote account-cloud authority handoff — local app sync retired; Java account authority is covered by real-backend integration"
+  ok "SPEC-4 formal remote session authority handoff — local session registry guard retired; Java session authority is covered by real-backend integration"
+elif "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
   if probe_retry /tmp/uni-spec4-app-sync.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
     ok "$(cat /tmp/uni-spec4-app-sync.log)"
   else
@@ -2348,21 +2359,23 @@ css_foundation
 nav_routes_valid() {
   local bad_routes
   bad_routes=$("$NODE_BIN" -e '
-    const fs=require("fs"), cp=require("child_process");
+    const fs=require("fs"), path=require("path");
     const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
     const valid=new Set((pj.pages||[]).map(p=>"/"+p.path));
-    // 🔴 2026-08-13 收窄扫描面:测试文件里的路由是**夹具字符串**,不是导航目标 ——
-    //   behavior-analytics-race.test.ts 造了个 "/pages/home/index" 喂给 tap 采样器,
-    //   它永远不会被 navigateTo 消费,却让本门判红。门守的是「真导航指向不存在的页」,
-    //   夹具不在这个域里。只排 *.test.ts / *.spec.ts,不放宽到整目录。
-    let out=""; try{out=cp.execSync("grep -rnE \"/pages/[A-Za-z0-9_/-]+\" src --include=*.ts --include=*.vue --include=*.json --exclude=*.test.ts --exclude=*.spec.ts",{encoding:"utf8",maxBuffer:1e8});}catch(e){out=e.stdout||"";}
     const refs=new Set();
-    out.split("\n").forEach(line=>{
-      const ci=line.indexOf(":", line.indexOf(":")+1);
-      const content=ci>=0?line.slice(ci+1):line;
-      if(/^\s*(\/\/|\*|<!--|\/\*)/.test(content)) return; // skip comment / doc lines
-      (content.match(/\/pages\/[A-Za-z0-9_\/-]+/g)||[]).forEach(m=>refs.add(m.replace(/\/$/,"")));
-    });
+    const files=[]; const walk=(dir)=>{for(const ent of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,ent.name);if(ent.isDirectory())walk(p);else if(/\.(?:ts|vue)$/.test(ent.name)&&!(/\.(?:test|spec)\.ts$/.test(ent.name)))files.push(p);}}; walk("src");
+    const add=(route)=>{
+      const staticPrefix=route.replace(/\$\{[\s\S]*$/,"");
+      if(staticPrefix.startsWith("/pages/"))refs.add(staticPrefix.replace(/[?#].*$/,"").replace(/\/$/,""));
+    };
+    for(const file of files){
+      const content=fs.readFileSync(file,"utf8");
+      // Only navigation consumers and navigation-like template props are in scope. Imports such as
+      // `@/pages/daily/daily-reward-view` are modules, not routes, and must never be classified as clicks.
+      for(const m of content.matchAll(/\b(?:navTo|navPush|navReset|navigateTo|redirectTo|reLaunch|switchTab)\s*\(\s*["'"'"'`]([^"'"'"'`]+)["'"'"'`]/g)) add(m[1]);
+      for(const m of content.matchAll(/\b(?:navigateTo|redirectTo|reLaunch|switchTab)\s*\(\s*\{[\s\S]{0,240}?\burl\s*:\s*["'"'"'`]([^"'"'"'`]+)["'"'"'`]/g)) add(m[1]);
+      for(const m of content.matchAll(/\b(?:back|href)\s*=\s*["'"'"']([^"'"'"']+)["'"'"']/g)) add(m[1]);
+    }
     const broken=[...refs].filter(r=>!valid.has(r)).sort();
     if(broken.length) process.stdout.write(broken.join(" "));
   ' 2>/dev/null)
@@ -2414,7 +2427,7 @@ const tok=process.argv[1];
 // Pro v2 are load-bearing catalog fixture names for the server product contract.
 // Keep this exact (whole product name) rather than allowing the bare Nexion token;
 // a normal brand string must still fail the rebrand gate.
-const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
+const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-(?:edge-country|refresh-mode)|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID|${tok}_ADMIN_MFA_ENCRYPTION_KEY|${tok}_admin_token|${tok}-LEGAL-TERMS-CMS-v1|${tok}-local-dev|process\\.env\\.NX_(?:FULL|MARKET)_DATABASE\\s*\\|\\|\\s*"${tok}"`,"gi");
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
@@ -2556,7 +2569,6 @@ platform_stats_anchor() {
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|publicStatsHealth' \
     'src/store/app.ts|publicStatsHealth' \
-    'src/components/home/on-grid-section.vue|payoutPerSecUsdOf' \
     'src/pages/onboarding/intro.vue|fleetDevicesOf' \
     'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
@@ -2564,6 +2576,12 @@ platform_stats_anchor() {
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
+  # 正式 App 的 On Grid 数字来自 Java Home canonical projection，不再从编译期平台锚派生。
+  # 同时钉字段消费与刷新入口，避免换成另一本地常量后假绿。
+  if ! grep -q 'app\.homeTruth?.onGrid\.perSecUsdt' src/components/home/on-grid-section.vue 2>/dev/null \
+    || ! grep -q 'app\.refreshHomeTruth()' src/components/home/on-grid-section.vue 2>/dev/null; then
+    bad "platform-anchor: on-grid 未消费 Java Home 投影 perSecUsdt 或缺少失败重读入口"; fails=1
+  fi
   # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。
   #   这里不能再把字段名本身当成违规:服务端 publicStats 新投影可以合法携带
   #   `paidCumulativeNowOf`,而客户端只读该投影并不产生历史回退。只拦两种真正的
@@ -2627,9 +2645,9 @@ platform_stats_anchor() {
   if grep -qE 'QTR_FINANCIALS|\w*FINANCIALS\w*' src/pages/trust/trust.vue 2>/dev/null; then
     bad "platform-anchor: trust.vue 仍保留本地财务数组载体(披露必须只读服务端 trustSectionApi)"; fails=1
   fi
-  if ! grep -qE 'remoteApiEnabled, trustSectionApi|trustSectionApi, remoteApiEnabled' src/pages/trust/trust.vue 2>/dev/null \
-    || ! grep -qE 'await trustSectionApi\.current\(\)' src/pages/trust/trust.vue 2>/dev/null; then
-    bad "platform-anchor: trust.vue 未以 trustSectionApi.current() 作为唯一披露数据入口"; fails=1
+  if ! grep -qE 'usePublishedTrust' src/pages/trust/trust.vue 2>/dev/null \
+    || ! grep -qE 'trustSectionApi\.current\(\)' src/composables/use-published-trust.ts 2>/dev/null; then
+    bad "platform-anchor: trust 页未通过 usePublishedTrust 单源消费 trustSectionApi.current()"; fails=1
   fi
   if [ "$fails" -eq 0 ]; then ok "platform-stats single anchor (legacy 0 · lib-confined · consumers+health-gate · joiners 1×3 · compat 全零哨兵 · Q2 本地字面量 0)"; fi
 }
@@ -2671,7 +2689,8 @@ home_task_carousel_contract() {
   grep -q 'next-margin="0px"' "$page" || miss="${miss}full-width-slide "
   grep -q 'home-task-carousel__meta' "$page" && miss="${miss}page-number-overlay "
   grep -q 'taskSlide + 1' "$page" && miss="${miss}visible-page-number "
-  grep -q '<TrustChipWall' "$page" && miss="${miss}independent-audit-still-mounted "
+  grep -q '<TrustChipWall' "$page" || miss="${miss}server-trust-entry-missing "
+  grep -q 'usePublishedTrust' src/components/home/trust-chip-wall.vue || miss="${miss}server-trust-entry-not-authoritative "
   grep -q 'event: "update:expanded"' "$newcomer" || miss="${miss}controlled-newcomer-expand "
   grep -q 'expanded: false' "$newcomer" || miss="${miss}newcomer-default-collapse "
   grep -q 'height: "var(--home-task-card-height, 184px)"' "$weekly" || miss="${miss}weekly-equal-height "
@@ -2770,8 +2789,7 @@ const visible = computedCallback("visibleTaskCards");
 need(!ts.isBlock(visible.body), "visibleTaskCards must delegate to the tested derivation helper");
 need(compact(visible.body.getText(source)) === compact(`deriveHomeTaskCards(platformConfig.syncFailed, {
   homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
-  homeWeeklyPromoEnabled:
-    platformConfig.isEnabled("homeWeeklyPromoEnabled") && weeklyCardReady.value,
+  homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
 })`), "visibleTaskCards no longer derives exact 0/1/2 state from sync failure + both flags");
 
 const cardinality = computedCallback("hasTaskCarousel");

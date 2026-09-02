@@ -1,6 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
+import { validateHostedPaymentUrl } from "@/lib/hosted-payment";
 
 export const ORDER_STATUSES = [
   "placed",
@@ -77,6 +78,22 @@ export interface CancelledOrder {
   idempotent: boolean;
 }
 
+export interface HostedPaymentSession {
+  orderNo: string;
+  intentNo: string;
+  paymentMode: "hosted";
+  providerStatus: "created";
+  paymentUrl: string;
+  paymentUrlTrusted: true;
+  status: "awaiting_payment";
+  amountUsdt: number;
+  vndAmount: number;
+  serverCanonical: true;
+  source: "server";
+  sourceEnvironment: "PRODUCTION";
+  runId: "";
+}
+
 export interface CreateOrderRequest {
   productNo: string;
   quantity: number;
@@ -88,6 +105,7 @@ export interface OrderApi {
   list(): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
+  createPaymentSession(orderNo: string, idempotencyKey: string): Promise<HostedPaymentSession>;
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
@@ -287,6 +305,32 @@ function cancelledOrder(value: unknown): CancelledOrder {
     idempotent: source.idempotent };
 }
 
+function hostedPaymentSession(value: unknown): HostedPaymentSession {
+  const source = record(value);
+  if (source.paymentMode !== "hosted" || source.providerStatus !== "created"
+      || source.paymentUrlTrusted !== true || source.status !== "awaiting_payment"
+      || source.serverCanonical !== true || source.source !== "server"
+      || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") return invalid();
+  const paymentUrl = nonEmptyString(source.paymentUrl);
+  const trustedPaymentUrl = validateHostedPaymentUrl(paymentUrl);
+  if (!trustedPaymentUrl) return invalid();
+  return {
+    orderNo: nonEmptyString(source.orderNo),
+    intentNo: nonEmptyString(source.intentNo),
+    paymentMode: "hosted",
+    providerStatus: "created",
+    paymentUrl: trustedPaymentUrl,
+    paymentUrlTrusted: true,
+    status: "awaiting_payment",
+    amountUsdt: finiteNumber(source.amountUsdt, Number.MIN_VALUE),
+    vndAmount: finiteNumber(source.vndAmount, Number.MIN_VALUE),
+    serverCanonical: true,
+    source: "server",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+  };
+}
+
 export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod"): OrderApi {
   return {
     async list(): Promise<CanonicalOrderList> {
@@ -338,6 +382,18 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
         idempotencyKey,
       }));
+    },
+
+    async createPaymentSession(orderNo, idempotencyKey): Promise<HostedPaymentSession> {
+      const normalized = orderNo.trim();
+      if (!normalized || !idempotencyKey.trim()) return invalid();
+      const parsed = hostedPaymentSession(await client.request<unknown>({
+        method: "POST",
+        path: `/api/orders/${encodeURIComponent(normalized)}/payment-session`,
+        idempotencyKey,
+      }));
+      if (parsed.orderNo !== normalized) return invalid();
+      return parsed;
     },
   };
 }

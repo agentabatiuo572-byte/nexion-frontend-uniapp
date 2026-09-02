@@ -46,6 +46,7 @@ import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
 import { createDeveloperResourcesApi } from "./developer-resources-api";
 import { createBundleOrderApi } from "./bundle-order-api";
+import { createBundleDiscountApi } from "./bundle-discount-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
 import { createTeamInsightsApi } from "./team-insights-api";
 import { createWalletBillsApi } from "./wallet-bills-api";
@@ -148,6 +149,7 @@ export const teamNetworkApi = createTeamNetworkApi(apiClient, expectedApiEnviron
 export const developerAccessApi = createDeveloperAccessApi(apiClient, expectedApiEnvironment);
 export const developerResourcesApi = createDeveloperResourcesApi(apiClient, expectedApiEnvironment);
 export const bundleOrderApi = createBundleOrderApi(apiClient);
+export const bundleDiscountApi = createBundleDiscountApi(apiClient);
 export const ambassadorApplicationApi = createAmbassadorApplicationApi(
   apiClient, "PRODUCTION",
 );

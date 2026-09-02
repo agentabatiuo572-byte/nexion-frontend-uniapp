@@ -5,12 +5,19 @@ import { ApiError } from "./errors";
 export interface AccountApi {
   securityOverview(): Promise<SecurityState>;
   changePassword(currentPassword: string, newPassword: string): Promise<SecurityMutation>;
-  updateTwoFactor(enabled: boolean, currentPassword: string): Promise<SecurityMutation>;
+  sendTwoFactorChallenge(enabled: boolean, currentPassword: string): Promise<TwoFactorChallenge>;
+  updateTwoFactor(enabled: boolean, currentPassword: string, challengeNo: string, code: string): Promise<SecurityMutation>;
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
   accountDeletionStatus(): Promise<AccountDeletionStatus>;
   requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
   cancelAccountDeletion(expectedVersion: number, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
+}
+
+export interface TwoFactorChallenge {
+  challengeNo: string;
+  expiresInSeconds: number;
+  phoneMasked: string;
 }
 
 export interface AccountDeletionRequest {
@@ -104,6 +111,16 @@ function parseMutation(value: unknown): SecurityMutation {
   return source as SecurityMutation;
 }
 
+function parseTwoFactorChallenge(value: unknown): TwoFactorChallenge {
+  const source = record(value);
+  if (!source || typeof source.challengeNo !== "string" || !source.challengeNo.startsWith("SEC2FA-")
+      || typeof source.expiresInSeconds !== "number" || !Number.isSafeInteger(source.expiresInSeconds)
+      || source.expiresInSeconds <= 0 || typeof source.phoneMasked !== "string") {
+    throw new ApiError({ kind: "protocol", message: "SECURITY_CHALLENGE_RESPONSE_INVALID" });
+  }
+  return source as unknown as TwoFactorChallenge;
+}
+
 function parseAccountDeletion(value: unknown): AccountDeletionRequest {
   const source = record(value);
   const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
@@ -147,10 +164,16 @@ export function createAccountApi(client: ApiClient): AccountApi {
       body: { currentPassword, newPassword },
       idempotencyKey: mutationKey("password"),
     })),
-    updateTwoFactor: async (enabled, currentPassword) => parseMutation(await client.request({
+    sendTwoFactorChallenge: async (enabled, currentPassword) => parseTwoFactorChallenge(await client.request({
+      method: "POST",
+      path: "/api/app/security/two-factor/challenge",
+      body: { enabled, currentPassword },
+      idempotencyKey: mutationKey("two-factor-challenge"),
+    })),
+    updateTwoFactor: async (enabled, currentPassword, challengeNo, code) => parseMutation(await client.request({
       method: "PUT",
       path: "/api/app/security/two-factor",
-      body: { enabled, currentPassword },
+      body: { enabled, currentPassword, challengeNo, code },
       idempotencyKey: mutationKey("two-factor"),
     })),
     revokeSession: async (sessionId) => parseMutation(await client.request({

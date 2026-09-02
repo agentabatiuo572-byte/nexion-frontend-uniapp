@@ -36,13 +36,14 @@ function sessionKey(value: LegalTermsSessionFence): string {
   return `${value.userId}:${value.accessToken}:${value.runEpoch ?? 0}`;
 }
 
-function rescheduleAfterEpochChange(expected: LegalTermsSessionFence, returnTo: string): void {
+function rescheduleAfterEpochChange(expected: LegalTermsSessionFence, returnTo: string): Promise<void> {
   const current = fence();
   if (!current
       || current.userId !== expected.userId
-      || current.accessToken !== expected.accessToken
-      || current.runEpoch === expected.runEpoch) return;
-  scheduleLegalTermsGate(returnTo);
+      || (current.accessToken === expected.accessToken && current.runEpoch === expected.runEpoch)) {
+    return Promise.resolve();
+  }
+  return scheduleLegalTermsGate(returnTo);
 }
 
 function currentPendingRequirement(): typeof pendingRequirement {
@@ -116,22 +117,22 @@ export function recordLegalTermsAcknowledged(snapshot: Parameters<typeof isLegal
  * once to the Terms page and retains a fail-closed in-memory obligation until
  * the server confirms the current account has acknowledged its current terms.
  */
-export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
-  if (!remoteApiEnabled) return;
+export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise<void> {
+  if (!remoteApiEnabled) return Promise.resolve();
   // The Terms page owns its own snapshot/ack flow.  Re-running the global
   // gate while that page is visible loses its query return target because the
   // App route reader intentionally strips query strings.
   const path = `/${returnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
-  if (path === LEGAL_TERMS_ROUTE) return;
+  if (path === LEGAL_TERMS_ROUTE) return Promise.resolve();
   const requestFence = fence();
-  if (!requestFence) return;
+  if (!requestFence) return Promise.resolve();
   const key = sessionKey(requestFence);
   // A known obligation is authoritative until acknowledgement succeeds. Do
   // not let browser history or a repeated failed check downgrade it to the
   // non-redirecting verification state or replace its original return target.
   if (pendingRequirement?.key === key
-      && pendingRequirement.reason === "acknowledgement") return;
-  if (inFlight?.key === key) return;
+      && pendingRequirement.reason === "acknowledgement") return Promise.resolve();
+  if (inFlight?.key === key) return inFlight.promise;
   // Every authoritative recheck is fail-closed, including a previously
   // acknowledged session: a newly published version must not gain a network
   // response window in which business activity can continue.
@@ -140,8 +141,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
   const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
     .then((snapshot) => {
       if (!sameLegalTermsSession(requestFence, fence())) {
-        rescheduleAfterEpochChange(requestFence, returnTo);
-        return;
+        return rescheduleAfterEpochChange(requestFence, returnTo);
       }
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
@@ -157,8 +157,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
     })
     .catch(() => {
       if (!sameLegalTermsSession(requestFence, fence())) {
-        rescheduleAfterEpochChange(requestFence, returnTo);
-        return;
+        return rescheduleAfterEpochChange(requestFence, returnTo);
       }
       if (failedKeys.has(key)) return;
       finishVerification(key);
@@ -171,4 +170,5 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): void {
       if (inFlight?.key === key) inFlight = null;
     });
   inFlight = { key, promise };
+  return promise;
 }

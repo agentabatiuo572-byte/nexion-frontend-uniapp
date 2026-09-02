@@ -9,7 +9,7 @@ describe("API multipart upload", () => {
       accessToken: "access",
       refreshToken: "refresh",
       tokenType: "Bearer",
-      user: { userId: 42, countryCode: "+81", phone: "9012345678", nickname: "NexGrid 5678" },
+      user: { userId: 42, countryCode: "+84", phone: "912345678", nickname: "NexGrid 5678", onboardingComplete: true },
     });
     const upload = vi.fn().mockResolvedValue({
       status: 200,

@@ -36,7 +36,7 @@ function dailySnapshot(currentStreak = 3, serverDate = "2026-08-22", checkedInTo
     }],
     powerUps: [],
     rules: [{ key: "baseNex", value: "2" }],
-    topStreakers: [{ rank: 1, nickname: "Nexion User", streakDays: 5 }],
+    topStreakers: [{ rank: 1, nickname: "NexGrid User", streakDays: 5 }],
   };
 }
 

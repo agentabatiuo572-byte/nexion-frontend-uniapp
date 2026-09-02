@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FLEET_DEVICES } from "@/lib/platform-stats";
 
 const { platformConfig } = vi.hoisted(() => ({
   platformConfig: vi.fn(),
@@ -13,7 +14,7 @@ vi.mock("@/api/runtime", () => ({
 
 import { useConfig } from "./config";
 
-function snapshot(fleetDevices = 28_432, referralRewardsEnabled = false) {
+function snapshot(fleetDevices = FLEET_DEVICES, referralRewardsEnabled = false) {
   return {
     featureFlags: {
       computeShareEnabled: true,
@@ -40,6 +41,7 @@ function snapshot(fleetDevices = 28_432, referralRewardsEnabled = false) {
     onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 },
     rewards: {
       enabled: referralRewardsEnabled,
+      effectiveAt: referralRewardsEnabled ? "2026-09-01T00:00:00Z" : null,
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: referralRewardsEnabled ? 5 : 0, nexAmount: referralRewardsEnabled ? 20 : 0 },
       inviterReward: { nexAmount: referralRewardsEnabled ? 200 : 0 },
     },
@@ -66,7 +68,7 @@ describe("H9 public stats canonical authority", () => {
 
     await config.load();
     expect(config.syncFailed).toBe(false);
-    expect(config.config.publicStats.fleetDevices).toBe(28_432);
+    expect(config.config.publicStats.fleetDevices).toBe(FLEET_DEVICES);
     expect(config.publicStatsAuthority).toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });
   });
 
@@ -74,7 +76,7 @@ describe("H9 public stats canonical authority", () => {
     platformConfig.mockResolvedValueOnce(snapshot());
     const config = useConfig();
     await config.load();
-    expect(config.config.publicStats.fleetDevices).toBe(28_432);
+    expect(config.config.publicStats.fleetDevices).toBe(FLEET_DEVICES);
 
     platformConfig.mockResolvedValueOnce(snapshot(31_000));
     await config.load();
@@ -101,7 +103,7 @@ describe("H9 public stats canonical authority", () => {
   });
 
   it("clears a previously enabled referral reward projection when the remote authority fails", async () => {
-    platformConfig.mockResolvedValueOnce(snapshot(28_432, true));
+    platformConfig.mockResolvedValueOnce(snapshot(FLEET_DEVICES, true));
     const config = useConfig();
     await config.load();
     expect(config.config.rewards.enabled).toBe(true);
@@ -112,6 +114,7 @@ describe("H9 public stats canonical authority", () => {
     expect(config.syncFailed).toBe(true);
     expect(config.config.rewards).toEqual({
       enabled: false,
+      effectiveAt: null,
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
       inviterReward: { nexAmount: 0 },
     });

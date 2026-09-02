@@ -69,6 +69,7 @@ describe("Nova AI API", () => {
   it("restores the latest canonical server transcript", async () => {
     const client = fakeClient({
       conversationId: "6f0b5c55-0ec5-4a31-85eb-1d4531c1e8df",
+      truncated: true,
       messages: [
         { id: "8c12eaf3-744d-405e-b2fb-64b3d81267be:user", sender: "user", text: "Question", ts: 1_777_000_000_000 },
         { id: "8c12eaf3-744d-405e-b2fb-64b3d81267be:nova", sender: "nova", text: "Answer", ts: 1_777_000_000_001 },
@@ -78,6 +79,7 @@ describe("Nova AI API", () => {
 
     await expect(api.history()).resolves.toMatchObject({
       conversationId: "6f0b5c55-0ec5-4a31-85eb-1d4531c1e8df",
+      truncated: true,
       messages: [{ sender: "user", text: "Question" }, { sender: "nova", text: "Answer" }],
     });
     expect(client.request).toHaveBeenCalledWith(expect.objectContaining({

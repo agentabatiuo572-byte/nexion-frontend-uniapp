@@ -241,6 +241,7 @@ const activatedOrder = {
   productNo: "stellarbox-pro-v2",
   productName: "StellarBox Pro v2",
   quantity: 1,
+  subtotalUsdt: 1000,
   unitPriceUsdt: 1000,
   discountUsdt: 0,
   amountUsdt: 1000,

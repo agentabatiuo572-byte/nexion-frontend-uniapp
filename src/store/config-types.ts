@@ -113,6 +113,8 @@ export type WelcomeGiftLockMode = "risk_bucket" | "direct";
 export interface RewardsConfig {
   // H8 总闸门；关闭时分享功能保留，但所有公开金额必须为 0，服务端拒绝结算。
   enabled: boolean;
+  // 服务端奖励政策的起算时间。null 仅用于本地 mock/远端配置未就绪的 fail-closed 状态。
+  effectiveAt: string | null;
   welcomeGift: {
     lockMode: WelcomeGiftLockMode;
     // 注册礼包金额(运营可调;admin K.rewards.welcomeGift.* 同键,CGM-F-020)。

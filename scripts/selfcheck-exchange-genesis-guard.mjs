@@ -36,9 +36,11 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const EXCHANGE = path.join(root, "src", "pages", "me", "wallet-exchange.vue");
 const SHEET = path.join(root, "src", "components", "genesis", "purchase-sheet.vue");
 const RECEIPT = path.join(root, "src", "lib", "money-receipt.ts");
+const EXCHANGE_INPUT = path.join(root, "src", "lib", "exchange-input-amount.ts");
 const exRaw = readFileSync(EXCHANGE, "utf8");
 const shRaw = readFileSync(SHEET, "utf8");
 const receiptRaw = readFileSync(RECEIPT, "utf8");
+const exchangeInputRaw = readFileSync(EXCHANGE_INPUT, "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -103,6 +105,10 @@ const ts2js = (src) => transformSync(src, { loader: "ts" }).code;
  * MONEY_SRC 单独拎出来是因为 quoteTo 与 handleConfirm 都依赖它,注入哪边都得带上。
  */
 const MONEY_SRC = ts2js(grabStatement(exRaw, "const money = "));
+const EXCHANGE_INPUT_SRC = ts2js([
+  grabBlock(exchangeInputRaw, "export function sanitizeExchangeAmountInput(").replace(/^export /, ""),
+  grabBlock(exchangeInputRaw, "export function canonicalExchangeAmount(").replace(/^export /, ""),
+].join("\n"));
 const pageMath = new Function(
   `${MONEY_SRC}\n${ts2js([
     grabStatement(exRaw, "const amtLabel = "),
@@ -383,7 +389,7 @@ function makeV3(capUsd = 50) {
 
 /** 把兑换页的 quoteTo + handleConfirm 原文注入执行(改坏它这里必红)。 */
 function buildHandleConfirm(env) {
-  const src = `${MONEY_SRC}\n${ts2js(grabBlock(exRaw, "function quoteTo("))}\n${ts2js(grabBlock(exRaw, "async function handleConfirm()"))}\n; return handleConfirm;`;
+  const src = `${MONEY_SRC}\n${EXCHANGE_INPUT_SRC}\n${ts2js(grabBlock(exRaw, "function quoteTo("))}\n${ts2js(grabBlock(exRaw, "async function handleConfirm()"))}\n; return handleConfirm;`;
   const names = Object.keys(env);
   // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
   return new Function(...names, src)(...names.map((n) => env[n]));
@@ -440,6 +446,7 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     // authority contract tests.
     captureCommerceSandboxRun: () => ({ environment: "SANDBOX", runId: "legacy-exchange-guard" }),
     captureAccountScope: () => ({ accountKey: app.accountKey, epoch: 0 }),
+    captureRuntimeRevision: () => ({ revision: 1 }),
     remoteScopeCurrent: () => true,
     toastIfRemoteScopeCurrent: (_scope, _runScope, action) => action(),
     exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },

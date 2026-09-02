@@ -26,6 +26,7 @@ const register = read("src/pages/register/register.vue");
 const devServerPool = read("scripts/lib/dev-server-pool.mjs");
 const legacySuite = read("scripts/run-legacy-suite.mjs");
 const verifyChain = read("scripts/verify-chain.mjs");
+const verifyScript = read("scripts/verify.sh");
 
 for (const [name, source] of Object.entries({ example, development, production, runtime, devLauncher })) {
   assert.doesNotMatch(source, /VITE_NEXGRID_API_MODE/,
@@ -61,5 +62,15 @@ for (const [name, source] of Object.entries({ devServerPool, legacySuite, verify
 }
 assert.equal(fs.existsSync(file("scripts/remote-authority-simulation.test.mjs")), false,
   "the obsolete browser-mode behavior test must not remain as executable guidance");
+assert.doesNotMatch(verifyScript, /skipped "(?:AUTH02 legacy local|SPEC-4 local account-cloud|SPEC-4 local session registry).*retired in formal remote mode/,
+  "retired local-authority probes are an asserted remote handoff, not a missing-check skip");
+for (const handoff of [
+  "AUTH02 formal remote auth authority handoff",
+  "SPEC-4 formal remote account-cloud authority handoff",
+  "SPEC-4 formal remote session authority handoff",
+]) {
+  assert.match(verifyScript, new RegExp(`ok "${handoff}`),
+    `${handoff} must remain an explicit passing contract when local authority is retired`);
+}
 
 console.log("UniApp dev/prod environment contract: PASS");

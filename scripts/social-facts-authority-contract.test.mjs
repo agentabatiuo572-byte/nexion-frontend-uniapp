@@ -116,8 +116,8 @@ test("account-scoped event, event-page, and V-rank reads reject stale responses"
     assert.match(source, /createRemoteAccountEpoch/);
     assert.match(source, /isCurrent\(/);
   }
-  assert.match(eventsPage, /watch\(\(\) => app\.accountKey/);
-  assert.match(missionsPage, /watch\(\(\) => app\.accountKey/);
+  assert.match(eventsPage, /watch\(\[\(\) => String\(app\.accountKey\)/);
+  assert.match(missionsPage, /watch\(\[\(\) => String\(app\.accountKey\)/);
   assert.match(eventQuest, /clearRemoteFacts\(\)/);
   assert.match(vRank, /ladder\.value = \[\]/);
 });

@@ -442,8 +442,9 @@ function hw(kind, over = {}) {
   check("🔴 H5 种子账号(没补过心跳)每台已激活设备仍有正贡献",
     h5Seed.filter((d) => d.activatedAt !== null).every((d) => one(d) > 0),
     h5Seed.filter((d) => d.activatedAt !== null).map((d) => `${d.kind}=${one(d).toFixed(1)}`).join(" | "));
-  check("🔴 H5 种子账号那台手机单独看也 > 0(它正在按 hosted 档真给钱)",
-    !!h5Phone && one(h5Phone) > 0, `手机 = ${h5Phone ? one(h5Phone) : "找不到"}`);
+  check("🔴 H5 种子账号的待激活手机单独看 = 0(服务端激活前不能产出)",
+    !!h5Phone && h5Phone.activatedAt === null && one(h5Phone) === 0,
+    `手机 = ${h5Phone ? `activatedAt:${h5Phone.activatedAt}, power:${one(h5Phone)}` : "找不到"}`);
 }
 
 // ── 🔴 ⑥ publicStats 合成种子 = 故意非法哨兵;名次固定靶改喂 fixture 表 ────────

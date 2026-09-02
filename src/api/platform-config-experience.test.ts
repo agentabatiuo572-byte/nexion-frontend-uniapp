@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { parsePlatformExperienceConfig } from "./platform-config-api";
+import { describe, expect, it, vi } from "vitest";
+import { createPlatformConfigApi, parsePlatformExperienceConfig } from "./platform-config-api";
 
 const valid = {
   featureFlags: {
@@ -24,6 +24,61 @@ const valid = {
       source: "official",
     },
   },
+};
+
+const validPlatform = {
+  ...valid,
+  featureFlags: {
+    ...valid.featureFlags,
+    computeShareEnabled: true,
+  },
+  publicStats: {
+    version: 1,
+    serverCanonical: true,
+    source: "server:nx_config_item,nx_user",
+    sourceEnvironment: "PRODUCTION",
+    runId: "",
+    realUserCount: 2_000,
+    values: {
+      fleetDevices: 20_000,
+      onlineRatePct: 90,
+      onlineJitter: 20,
+      registeredUsersBase: 10_000,
+      registeredUsersMonthlyGrowthPct: 2,
+      registeredUsersAnchorAt: 1_756_684_800_000,
+      virtualUserCount: 8_000,
+      hashratePercentileTable: [{ tops: 0, cumPct: 0 }, { tops: 100, cumPct: 100 }],
+    },
+  },
+  onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 },
+  computerCompute: {
+    domain: "E6",
+    flags: [{ key: "computeShareEnabled", enabled: true }],
+    coefficients: [
+      { key: "h5BaseFactor", value: 0.6 },
+      { key: "continuityFullHours", value: 24 },
+    ],
+    yieldEstimate: [
+      { key: "topsBaseline", value: 100 },
+      { key: "dailyUsdtPerBaseline", value: 0.24 },
+      { key: "nexPerUsdt", value: 10 },
+    ],
+    gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, index) => ({
+      id,
+      label: `Tier ${id}`,
+      tops: (index + 1) * 100,
+      keywords: [{ slot: "keyword1", value: `kw-${id}` }],
+    })),
+    download: {
+      url: "",
+      zhTitle: "",
+      zhGuide: "",
+      enTitle: "",
+      enGuide: "",
+    },
+    sources: ["e6.compute_config"],
+  },
+  updatedAt: "2026-09-01T00:00:00Z",
 };
 
 describe("platform experience config contract", () => {
@@ -74,5 +129,18 @@ describe("platform experience config contract", () => {
         },
       },
     })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  });
+});
+
+describe("referral reward public effective boundary", () => {
+  it("keeps the server effectiveAt together with the reward values", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({
+        ...validPlatform,
+      })
+      .mockResolvedValueOnce({ enabled: true, welcomeGift: { lockMode: "direct", usdtAmount: 1, nexAmount: 2 }, inviterReward: { nexAmount: 3 }, rhythmMonth: 1, newcomerMultiplier: 1, inviterMultiplier: 1, effectiveAt: "2026-09-01T00:00:00Z", sources: ["nx_user.sponsor_user_id"] });
+    await expect(createPlatformConfigApi({ request } as never).platformConfig()).resolves.toMatchObject({
+      rewards: { effectiveAt: "2026-09-01T00:00:00Z" },
+    });
   });
 });

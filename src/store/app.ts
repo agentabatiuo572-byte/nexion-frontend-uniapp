@@ -385,6 +385,7 @@ export const useApp = defineStore("app", () => {
     earningBuckets: createEarningBuckets(0, 0),
   } : bootSnapshot.user);
   const devices = ref<Device[]>(remoteApiEnabled ? [] : bootSnapshot.devices);
+  const slotCap = ref(MAX_DEVICES);
   const earnings = ref<EarningsState>(remoteApiEnabled
     ? { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] }
     : bootSnapshot.earnings);
@@ -852,6 +853,7 @@ export const useApp = defineStore("app", () => {
         }
         if (fleetResult.status === "rejected") throw fleetResult.reason;
         const fleet = fleetResult.value;
+        slotCap.value = fleet.slotCap;
         installCanonicalLifecycleConfig(fleet.capacitySchedule);
         const capacitySnapshotReceivedAt = readMonotonicNowMs();
         const canonicalDevices = fleet.devices.map((device) => canonicalDevice(
@@ -911,6 +913,7 @@ export const useApp = defineStore("app", () => {
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
       remoteFleetHasSnapshot.value = false;
+      slotCap.value = MAX_DEVICES;
       remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
       remoteAssignmentError.value = "";
@@ -1350,7 +1353,7 @@ export const useApp = defineStore("app", () => {
     reason?: "disabled" | "slots-full" | "activation-failed";
   } {
     if (!computeShareEnabled.value) return { ok: false, reason: "disabled" };
-    if (activeSlotCount.value + reservedSlots >= MAX_DEVICES) return { ok: false, reason: "slots-full" };
+    if (activeSlotCount.value + reservedSlots >= slotCap.value) return { ok: false, reason: "slots-full" };
 
     const normalizedModel = gpuModel.trim() || "NVIDIA GeForce RTX 4070";
     const gpuTier = matchGpuTier(normalizedModel, cfg.config.computeShare.gpuTiers);
@@ -1376,7 +1379,7 @@ export const useApp = defineStore("app", () => {
     const device = devices.value.find((d) => d.id === id);
     if (!device || device.activatedAt !== null) return false;
     if (device.kind === "pc-gpu" && !computeShareEnabled.value) return false;
-    if (occupiesDeviceSlot(device.kind) && activeSlotCount.value + reservedSlots >= MAX_DEVICES) return false;
+    if (occupiesDeviceSlot(device.kind) && activeSlotCount.value + reservedSlots >= slotCap.value) return false;
     devices.value = devices.value.map((d) =>
       d.id === id
         ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), onlineHeartbeatAt: null, pendingDeactivate: false }
@@ -2293,7 +2296,7 @@ export const useApp = defineStore("app", () => {
 
   return {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
-    user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
+    user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,

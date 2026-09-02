@@ -242,7 +242,7 @@ try {
   const seedServerSession = () => page.evaluate(async () => {
     const [rt, authMod] = await Promise.all([import("/src/api/runtime.ts"), import("/src/store/auth.ts")]);
     const auth = authMod.useAuth();
-    const user = { userId: 900001, countryCode: "84", phone: "900000001", nickname: "Gate" };
+    const user = { userId: 900001, countryCode: "+84", phone: "900000001", nickname: "Gate", onboardingComplete: true };
     rt.sessionVault.save({
       accessToken: "gate-access", refreshToken: "gate-refresh", tokenType: "Bearer", user,
     });

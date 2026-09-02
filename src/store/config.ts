@@ -76,6 +76,7 @@ export const useConfig = defineStore("config", () => {
     },
     rewards: {
       enabled: false,
+      effectiveAt: null,
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
       inviterReward: { nexAmount: 0 },
     },
@@ -168,6 +169,7 @@ export const useConfig = defineStore("config", () => {
       publicStats: { ...unavailableServerConfig.publicStats },
       rewards: {
         enabled: false,
+        effectiveAt: null,
         welcomeGift: { ...unavailableServerConfig.rewards.welcomeGift },
         inviterReward: { ...unavailableServerConfig.rewards.inviterReward },
       },

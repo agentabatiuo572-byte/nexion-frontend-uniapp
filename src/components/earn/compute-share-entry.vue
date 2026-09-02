@@ -28,7 +28,6 @@ import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
-import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 
@@ -40,7 +39,7 @@ const t = useT();
 
 const enabled = computed(() => cfg.isEnabled("computeShareEnabled"));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsFull = computed(() => app.activeSlotCount + trialSlot.value >= MAX_DEVICES);
+const slotsFull = computed(() => app.activeSlotCount + trialSlot.value >= app.slotCap);
 
 function goDownload() {
   navTo("/pages/compute-share/download");

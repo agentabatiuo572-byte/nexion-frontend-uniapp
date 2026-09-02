@@ -15,9 +15,24 @@ test("login and registration share country-aware phone validation", async () => 
     assert.match(page, /phoneFormatHint/);
     assert.match(page, /data-testid="auth-phone-hint"/);
   }
-  assert.match(countrySheet, /SUPPORTED_PHONE_COUNTRIES/);
+  assert.match(countrySheet, /PHONE_COUNTRIES/);
   assert.match(countrySheet, /cc-row__iso/);
   assert.match(countrySheet, /item\.iso/);
+});
+
+test("registered-number runtime fixtures stay on the selectable development country code", async () => {
+  const runtime = await read("scripts/auth-register-existing-runtime.mjs");
+  assert.doesNotMatch(runtime, /\+1/);
+  assert.match(runtime, /const fullPhone = `\+86\$\{phoneDigits\}`/);
+  assert.match(runtime, /hasText: "\+86"/);
+  assert.match(runtime, /solveCaptchaSlider\(frame, `\+86\$\{digits\}`\)/);
+});
+
+test("keyboard auth regression uses valid phones for both selectable country codes", async () => {
+  const keyboardRuntime = await read("scripts/keyboard-submit-h5.e2e.mjs");
+  assert.match(keyboardRuntime, /countryCode === "\+84" \? "912345678"/);
+  assert.match(keyboardRuntime, /countryCode === "\+86" \? "13800138000"/);
+  assert.doesNotMatch(keyboardRuntime, /\+81|4155550123/);
 });
 
 test("four auth providers use one stable grid with visible icons", async () => {

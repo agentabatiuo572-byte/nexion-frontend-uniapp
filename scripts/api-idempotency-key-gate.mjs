@@ -81,6 +81,16 @@ function isMemoized(body) {
     const holder = m[1].replace(/[.$]/g, "\\$&");
     if (new RegExp(`return\\s+${holder}\\b`).test(body.slice(0, m.index))) return true;
   }
+  // Map-backed intent memory: `const intent = holder.get(key) ?? fresh; holder.set(key, intent)`.
+  // This is the same freeze invariant as the early-return form, expressed as a nullish cache fill.
+  const cached = body.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$.]*)\.get\(([^)]+)\)\s*\?\?/);
+  if (cached) {
+    const [, value, holder, key] = cached;
+    const escapedHolder = holder.replace(/[.$]/g, "\\$&");
+    const escapedValue = value.replace(/[$]/g, "\\$&");
+    const escapedKey = key.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`${escapedHolder}\\.set\\(\\s*${escapedKey}\\s*,\\s*${escapedValue}\\s*\\)`).test(body)) return true;
+  }
   return false;
 }
 

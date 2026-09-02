@@ -101,10 +101,10 @@
           </view>
           <view v-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
           <template v-else-if="!remoteApiEnabled || docs">
-            <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }} · server-canonical</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ docs.endpoints.length }} endpoints · {{ docs.events.length }} events</text></view>
+            <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
             <view v-if="!remoteApiEnabled" class="mt-3 rounded-lg" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
-            <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-ink-3)">Events: {{ docs.events.join(" · ") }}</text></view>
+            <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.developer.docsEvents, { events: docs.events.join(" · ") }) }}</text></view>
           </template>
         </view>
       </view>
@@ -122,10 +122,8 @@
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
-            <view v-if="!apiKeys.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
-            <input v-model="keyName" :maxlength="100" :placeholder="t.developer.keyName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-key')" role="button" tabindex="0" @click="createApiKey"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text></view>
-            <view v-if="newKeySecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newKeySecret }}</text></view>
+            <view class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text></view>
+            <view v-if="!apiKeys.length && !resourcesLoading" class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
           </view>
         </view>
       </view>
@@ -169,7 +167,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { confirm, toast, useUI } from "@/store/ui";
 import { developerAccessApi, developerResourcesApi, remoteApiEnabled } from "@/api/runtime";
 import type { DeveloperAccessReceipt } from "@/api/developer-access-api";
@@ -186,7 +184,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-ap
 import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
-import { validateDeveloperAccess, validateDeveloperKeyName, validateDeveloperWebhook } from "./developer-form-validation";
+import { validateDeveloperAccess, validateDeveloperWebhook } from "./developer-form-validation";
 import { developerAccessReviewReasonKey, developerAccessState, type DeveloperAccessCopyKey } from "./developer-access-state";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
@@ -211,8 +209,6 @@ const resourcesLoading = ref(false);
 const resourcesLoadFailed = ref(false);
 const resourceBusyKeys = ref(new Set<string>());
 const resourceIntentKeys = new Map<string, string>();
-const keyName = ref("");
-const newKeySecret = ref<string | null>(null);
 const webhookName = ref("");
 const webhookUrl = ref("");
 const webhookEvents = ref("order.updated");
@@ -369,7 +365,6 @@ function resetResourceScope(): void {
   apiKeys.value = [];
   webhooks.value = [];
   webhookDeliveries.value = {};
-  newKeySecret.value = null;
   newWebhookSecret.value = null;
   resourcesLoading.value = false;
   resourcesLoadFailed.value = false;
@@ -512,27 +507,6 @@ async function loadDocs() {
   }
 }
 function retryLoadResources(): void { void loadResources(); }
-async function createApiKey() {
-  if (resourceBusy("create-key")) return;
-  const name = keyName.value.trim();
-  const issue = validateDeveloperKeyName(name);
-  if (issue) return toast.warn(t.value.developer[issue]);
-  const fence = resourceFence();
-  const intent = `create-key:${name}`;
-  setResourceBusy("create-key", true);
-  try {
-    const value = await developerResourcesApi.createKey(name, resourceKey(intent));
-    if (!resourceFenceCurrent(fence)) return;
-    newKeySecret.value = value.secret ?? null;
-    keyName.value = "";
-    completeResourceIntent(intent);
-    await loadResources(fence);
-  } catch {
-    if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionFailed);
-  } finally {
-    if (resourceFenceCurrent(fence)) setResourceBusy("create-key", false);
-  }
-}
 async function revokeApiKey(id: number) {
   const intent = `revoke-key:${id}`;
   if (resourceBusy(intent)) return;

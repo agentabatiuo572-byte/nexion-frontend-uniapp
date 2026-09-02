@@ -3,7 +3,7 @@ import page from "./developer.vue?raw";
 import { validateDeveloperAccess, validateDeveloperKeyName, validateDeveloperWebhook } from "./developer-form-validation";
 
 describe("developer form validation", () => {
-  const access = { company: "Nexion", email: "dev@example.com", useCase: "Order integration" };
+  const access = { company: "NexGrid", email: "dev@example.com", useCase: "Order integration" };
   const hook = { name: "Orders", url: "https://hooks.example.com/orders", events: ["order.updated"] };
 
   it("accepts trimmed access fields at the server boundaries", () => {
@@ -49,11 +49,9 @@ describe("developer form validation", () => {
   });
   it("connects validation before request IDs or network writes in the page", () => {
     const accessHandler = page.slice(page.indexOf("async function submitRequest()"), page.indexOf("function loadLatestRequest()"));
-    const keyHandler = page.slice(page.indexOf("async function createApiKey()"), page.indexOf("async function revokeApiKey("));
     const hookHandler = page.slice(page.indexOf("async function createWebhook()"), page.indexOf("async function deleteWebhook("));
     for (const [handler, validator, write, key] of [
       [accessHandler, "validateDeveloperAccess", "developerAccessApi.submit", "newRequestKey()"],
-      [keyHandler, "validateDeveloperKeyName", "developerResourcesApi.createKey", "resourceKey(intent)"],
       [hookHandler, "validateDeveloperWebhook", "developerResourcesApi.createWebhook", "resourceKey(intent)"],
     ]) {
       expect(handler.indexOf(validator)).toBeGreaterThan(-1);

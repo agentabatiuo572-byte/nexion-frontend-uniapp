@@ -7,13 +7,13 @@
   emit pick(name) → 页面回填 edit buffer,持久化仍走页面 Save bar。
 -->
 <template>
-  <view v-if="open">
+  <view v-if="open" class="nx-nickname-sheet-root" role="dialog" aria-modal="true" :aria-label="t.profile.nicknameSheetTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
       <view class="nx-sheet-fade-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px">
           <text class="block" :style="titleStyle">{{ t.profile.nicknameSheetTitle }}</text>
-          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameSheetClose" @click="emit('close')">
+          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameSheetClose" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -29,6 +29,8 @@
           tabindex="0"
           :aria-label="c"
           @click="picked = c"
+          @keydown.enter.prevent="picked = c"
+          @keydown.space.prevent="picked = c"
         >
           <text class="flex-1 truncate" :style="candidateTextStyle(c)">{{ c }}</text>
           <svg v-if="picked === c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -36,10 +38,10 @@
 
         <!-- Footer: reroll (secondary) + confirm (primary, disabled until picked) -->
         <view class="flex" style="gap: 10px; margin-top: 16px">
-          <view class="grid place-items-center active:opacity-80" :style="rerollBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameReroll" @click="reroll">
+          <view class="grid place-items-center active:opacity-80" :style="rerollBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameReroll" @click="reroll" @keydown.enter.prevent="reroll" @keydown.space.prevent="reroll">
             <text :style="rerollTextStyle">{{ t.profile.nicknameReroll }}</text>
           </view>
-          <view class="grid place-items-center" :class="picked ? 'active:opacity-90' : ''" :style="confirmBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameConfirm" @click="confirm">
+          <view class="grid place-items-center" :class="picked ? 'active:opacity-90' : ''" :style="confirmBtnStyle" role="button" :tabindex="picked ? 0 : -1" :aria-disabled="picked ? 'false' : 'true'" :aria-label="t.profile.nicknameConfirm" @click="confirm" @keydown.enter.prevent="confirm" @keydown.space.prevent="confirm">
             <text :style="confirmTextStyle">{{ t.profile.nicknameConfirm }}</text>
           </view>
         </view>
@@ -50,6 +52,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { generateNicknameCandidates } from "@/lib/nickname";
 
@@ -60,6 +63,7 @@ const props = withDefaults(defineProps<{ open: boolean; serverCandidates?: strin
 const emit = defineEmits<{ (e: "close"): void; (e: "pick", name: string): void; (e: "reroll"): void }>();
 
 const t = useT();
+useDialogA11y(computed(() => props.open), ".nx-nickname-sheet-root", () => emit("close"));
 const candidates = ref<string[]>(generateNicknameCandidates());
 const picked = ref("");
 const displayedCandidates = computed(() => props.authoritative ? props.serverCandidates : candidates.value);

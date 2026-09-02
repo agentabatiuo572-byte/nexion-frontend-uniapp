@@ -115,7 +115,7 @@ describe("product catalog strict specification contract", () => {
   });
 
   it("accepts a server-issued product image URL and drops unsafe media URLs without voiding the catalog", () => {
-    const signedImage = "https://minio.example.test/nexion/admin/e/sku-image/20260831/product.webp?X-Amz-Signature=token";
+    const signedImage = "https://minio.example.test/nexgrid/admin/e/sku-image/20260831/product.webp?X-Amz-Signature=token";
     expect(parseProductCatalogPayload({
       source: "nx_product", ...proof, serverCanonical: true, revision: null,
       products: [{ ...product, imageUrl: signedImage }],
@@ -130,7 +130,7 @@ describe("product catalog strict specification contract", () => {
   });
 
   it("keeps a separately typed server-issued product video URL and drops unsafe video URLs", () => {
-    const signedVideo = "https://minio.example.test/nexion/admin/e/sku-video/20260831/product.mp4?X-Amz-Signature=token";
+    const signedVideo = "https://minio.example.test/nexgrid/admin/e/sku-video/20260831/product.mp4?X-Amz-Signature=token";
     expect(parseProductCatalogPayload({
       source: "nx_product", ...proof, serverCanonical: true, revision: null,
       products: [{ ...product, videoUrl: signedVideo }],

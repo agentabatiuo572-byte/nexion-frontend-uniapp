@@ -43,6 +43,7 @@ import { useT } from "@/i18n/use-t";
 import { selectHomepageProductTrust } from "@/lib/home-data-presenters";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { specText } from "@/lib/product-copy";
 
 const t = useT();
 const selected = computed(() => {
@@ -50,9 +51,9 @@ const selected = computed(() => {
   return selectHomepageProductTrust(PRODUCTS);
 });
 const specs = computed(() => selected.value ? [
-  { label: t.value.home.productTrustGpu, value: selected.value.gpu },
-  { label: t.value.home.productTrustDatacenter, value: selected.value.datacenter },
-  { label: t.value.home.productTrustWarranty, value: selected.value.warranty },
+  { label: t.value.home.productTrustGpu, value: specText(t.value, selected.value.gpu) },
+  { label: t.value.home.productTrustDatacenter, value: specText(t.value, selected.value.datacenter) },
+  { label: t.value.home.productTrustWarranty, value: specText(t.value, selected.value.warranty) },
 ] : []);
 
 function retry() {
@@ -69,16 +70,16 @@ onMounted(() => {
 });
 
 const cardStyle: CSSProperties = { padding: "14px", borderRadius: "16px", background: "var(--v5-surface)" };
-const titleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
+const titleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const subtitleStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const linkStyle: CSSProperties = { flexShrink: 0, fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
+const linkStyle: CSSProperties = { display: "inline-flex", alignItems: "center", minHeight: "44px", padding: "0 12px", flexShrink: 0, fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
 const mutedStyle: CSSProperties = { flexShrink: 0, fontSize: "12px", color: "var(--v5-ink-3)" };
 const emptyStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const productNameStyle: CSSProperties = { fontSize: "16px", fontWeight: 600, color: "var(--v5-ink)" };
+const productNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const taglineStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const pricePillStyle: CSSProperties = { flexShrink: 0, padding: "5px 9px", borderRadius: "999px", background: "var(--v5-brand-soft)" };
 const priceStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
 const specStyle: CSSProperties = { minWidth: 0, padding: "9px", borderRadius: "10px", background: "var(--v5-surface-2)" };
-const specLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-4)" };
-const specValueStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", lineHeight: 1.35, color: "var(--v5-ink-2)", overflowWrap: "anywhere" };
+const specLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
+const specValueStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.35, color: "var(--v5-ink-2)", overflowWrap: "anywhere" };
 </script>

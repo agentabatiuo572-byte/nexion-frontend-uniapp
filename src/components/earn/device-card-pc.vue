@@ -227,7 +227,7 @@
          this list only mirrors settled task previews returned for this device. -->
     <view class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
-        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}（{{ deviceTodayCompleted.length }}）</text>
+        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }} ({{ deviceTodayCompleted.length }})</text>
         <view
           class="active:opacity-60"
           style="min-height: 44px; padding-left: 16px; display: flex; align-items: center"

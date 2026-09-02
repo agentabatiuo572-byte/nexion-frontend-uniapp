@@ -30,8 +30,8 @@ describe("trial card server config", () => {
       trialPriceUSD: "1299",
       shadowDailyUSD: "7",
       shadowDailyNEX: "40",
-      phaseOpen: "开放",
-      autoPushEnabled: "开",
+      phaseOpen: true,
+      autoPushEnabled: true,
       autoPushDelayMs: "1500",
       autoPushCooldownHours: "24",
       autoPushMaxPerSession: "1",
@@ -47,7 +47,7 @@ describe("trial card server config", () => {
       trialDays: "3", graceDays: "7", discountRate: "15", discountCapUSD: "50",
       trialOffsetCapUSD: "50", trialProductId: "device-trial-standard", trialPriceUSD: "1299",
       trialProductName: "NexGridBox S1",
-      shadowDailyUSD: "7", shadowDailyNEX: "40", phaseOpen: "开放", autoPushEnabled: "开",
+      shadowDailyUSD: "7", shadowDailyNEX: "40", phaseOpen: true, autoPushEnabled: true,
       autoPushDelayMs: "1500", autoPushCooldownHours: "24", autoPushMaxPerSession: "1",
       seatsLeftToday: quota,
     })).toThrow("TRIAL_CONFIG_RESPONSE_INVALID");
@@ -59,7 +59,7 @@ describe("trial card server config", () => {
       trialDays: "3", graceDays: "7", discountRate: "15", discountCapUSD: "50",
       trialOffsetCapUSD: "50", trialProductId: "stellarbox-pro-v2", trialProductName: "NexGridBox Pro V2",
       trialPriceUSD: "2499", shadowDailyUSD: "7", shadowDailyNEX: "40",
-      phaseOpen: "开放", autoPushEnabled: "开", autoPushDelayMs: "1500",
+      phaseOpen: true, autoPushEnabled: true, autoPushDelayMs: "1500",
       autoPushCooldownHours: "24", autoPushMaxPerSession: "1", seatsLeftToday: "47",
     });
 

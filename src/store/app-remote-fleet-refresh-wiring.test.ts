@@ -96,6 +96,7 @@ describe("App remote fleet refresh wiring", () => {
     freshFleet.resolve(fleet(720));
     await expect(mutationReadback).resolves.toBe(true);
     expect(app.user.usdtBalance).toBe(720);
+    expect(app.slotCap).toBe(1);
 
     staleFleet.resolve(fleet(900));
     await expect(lifecycle).resolves.toBe(false);

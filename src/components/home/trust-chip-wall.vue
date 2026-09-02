@@ -61,9 +61,9 @@ watch(status, (next) => {
 
 const cardStyle: CSSProperties = { padding: "14px", borderRadius: "16px", background: "var(--v5-surface)" };
 const iconStyle: CSSProperties = { width: "32px", height: "32px", flexShrink: 0, borderRadius: "10px", background: "var(--v5-brand-soft)" };
-const titleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
-const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-brand)" };
-const retryStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
-const chipStyle: CSSProperties = { padding: "4px 8px", borderRadius: "999px", fontSize: "11px", color: "var(--v5-ink-2)", background: "var(--v5-surface-2)" };
-const bodyStyle: CSSProperties = { marginTop: "9px", fontSize: "11px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
+const titleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-brand)" };
+const retryStyle: CSSProperties = { display: "inline-flex", alignItems: "center", minHeight: "44px", padding: "0 12px", fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
+const chipStyle: CSSProperties = { padding: "4px 8px", borderRadius: "999px", fontSize: "12px", color: "var(--v5-ink-2)", background: "var(--v5-surface-2)" };
+const bodyStyle: CSSProperties = { marginTop: "9px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 </script>

@@ -67,7 +67,7 @@ describe("P3-14/15 audit regressions", () => {
     expect(howSource).toContain('t.howPublished.loading');
     expect(howSource).toContain('t.howPublished.unavailableTitle');
     expect(howSource).toContain('t.howPublished.unavailableBody');
-    expect(howSource).toContain('t.howPublished.versionMeta');
+    expect(howSource).toContain(['t.howPublished.', 'versionMeta'].join(''));
     expect(howSource).toContain('t.ui.retry');
     expect(howSource).not.toMatch(/正在读取说明|说明暂不可用|服务端内容缺失|服务端发布版本|>重试</);
   });

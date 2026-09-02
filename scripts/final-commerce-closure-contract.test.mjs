@@ -37,7 +37,8 @@ test("security mutations fail closed when overview readback fails", async () => 
   const security = await source("src/pages/me/security.vue");
   assert.match(security, /async function loadRemoteSecurity\(\): Promise<boolean>/);
   assert.match(security, /if \(!\(await loadRemoteSecurity\(\)\)\) throw new Error\("SECURITY_READBACK_FAILED"\)/g);
-  assert.match(security, /cause\.message === "SECURITY_READBACK_FAILED"[\s\S]*t\.value\.security\.opFailed/);
+  assert.match(security, /function securityErrorMessage\(cause: unknown\)[\s\S]*default: return t\.value\.security\.opFailed/);
+  assert.match(security, /catch \(cause\)[\s\S]*securityErrorMessage\(cause\)/);
 });
 
 test("catalog detail retry and bundle order item count remain visible", async () => {
@@ -46,14 +47,15 @@ test("catalog detail retry and bundle order item count remain visible", async ()
   const orders = await source("src/store/orders.ts");
   const orderDetail = await source("src/pages/store/order-detail.vue");
   const bundle = await source("src/pages/store/bundle.vue");
+  const freeTrial = await source("src/store/free-trial.ts");
   assert.match(detail, /data-testid="detail-catalog-retry"/);
   assert.match(detail, /refreshServerProductPhase\(true\)/);
   assert.match(api, /itemCount: number \| null/);
   assert.match(orders, /itemCount: row\.itemCount/);
   assert.match(orderDetail, /order\.itemCount \?\? order\.quantity/);
-  assert.match(bundle, /developmentFundsEnabled\s*\?\s*t\.value\.bundle\.checkoutSuccessBody/);
-  assert.match(bundle, /await orderApi\.list\(\)/);
-  assert.match(bundle, /isCanonicalPaidOrder\(readback, created\.orderNo, created\.itemCount\)/);
+  assert.match(bundle, /const successBody = t\.value\.bundle\.checkoutPendingBody/);
+  assert.match(bundle, /bundleOrderApi\.create\([\s\S]*created\.itemCount/);
   const checkout = await source("src/pages/store/checkout.vue");
-  assert.match(checkout, /isCanonicalPaidOrder\(readback, conversion\.orderNo\)/);
+  assert.match(checkout, /freeTrial\.convert\(p\.id, quotedTotal\)/);
+  assert.match(freeTrial, /const confirmed = await refreshRemote\(true\)[\s\S]*status\.value !== "converted"/);
 });

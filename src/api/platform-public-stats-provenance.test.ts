@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { FLEET_DEVICES } from "@/lib/platform-stats";
 import { parsePlatformPublicStats } from "./platform-config-api";
 
 const values = {
-  fleetDevices: 28_432,
+  fleetDevices: FLEET_DEVICES,
   onlineRatePct: 100,
   onlineJitter: 20,
   registeredUsersBase: 1_420_000,

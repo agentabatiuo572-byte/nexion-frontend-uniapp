@@ -10,7 +10,7 @@ test("zero-stock S1 stays visible but every trial and purchase CTA is disabled",
   const stickyCta = read("src/components/sticky-cta-bar.vue");
   const trialHero = read("src/components/trial-hero-banner.vue");
   const trialPage = read("src/pages/me/trial.vue");
-  const zh = read("src/i18n/messages/zh.ts");
+  const locales = ["zh", "en", "vi"].map((locale) => read(`src/i18n/messages/${locale}.ts`));
 
   assert.match(card, /stockUnavailable/);
   assert.match(card, /temporarilyOutOfStock/);
@@ -38,6 +38,8 @@ test("zero-stock S1 stays visible but every trial and purchase CTA is disabled",
   assert.match(trialPage, /:tabindex="canStartNow \? 0 : -1"/);
   assert.match(trialPage, /:aria-disabled="trialProductUnavailable \? 'true' : 'false'"/);
   assert.match(trialPage, /if \(trialProductUnavailable\.value\) return/);
-  assert.match(zh, /temporarilyOutOfStock:\s*"暂时缺货"/);
-  assert.match(zh, /heroProductUnavailable:\s*"试用设备暂时缺货"/);
+  for (const locale of locales) {
+    assert.match(locale, /temporarilyOutOfStock:\s*"[^"]+"/);
+    assert.match(locale, /heroProductUnavailable:\s*"[^"]+"/);
+  }
 });

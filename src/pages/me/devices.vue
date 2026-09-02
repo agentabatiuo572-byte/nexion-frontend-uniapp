@@ -33,11 +33,11 @@
             <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
             <view class="flex items-baseline" style="gap: 4px">
               <text :style="meterCountStyle">{{ slotsUsed }}</text>
-              <text :style="meterMaxStyle">/ {{ MAX_DEVICES }}</text>
+              <text :style="meterMaxStyle">/ {{ app.slotCap }}</text>
             </view>
           </view>
           <view class="flex" style="gap: 6px; margin-top: 8px">
-            <view v-for="i in MAX_DEVICES" :key="i" :style="segStyle(i - 1)" />
+            <view v-for="i in app.slotCap" :key="i" :style="segStyle(i - 1)" />
           </view>
         </view>
 
@@ -76,7 +76,7 @@
           </view>
           <!-- Spec ④: user cancel exists on the active edge only — grace has
                nothing running to cancel (production already stopped). -->
-          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" @click="handleCancelTrial">
+          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" role="button" tabindex="0" @click="handleCancelTrial" @keydown.enter.prevent="handleCancelTrial" @keydown.space.prevent="handleCancelTrial">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>
             <text :style="trialCancelLabelStyle">{{ t.trial.cancelCta }}</text>
           </view>
@@ -149,7 +149,7 @@
         />
 
         <!-- Add-device CTA -->
-        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" @click="goStore">
+        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text>
         </view>
@@ -184,7 +184,6 @@ import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTradeinSheet } from "@/store/tradein-sheet";
-import { MAX_DEVICES } from "@/store/device-types";
 import { PRODUCTS } from "@/mock/products";
 import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
@@ -231,10 +230,10 @@ const phoneNeedsActivation = computed(() => {
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
 const slotsUsed = computed(() => app.activeSlotCount + trialReserved.value);
-const slotsFull = computed(() => slotsUsed.value >= MAX_DEVICES);
+const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
 
 const slotMeterLabel = computed(() =>
-  fmt(t.value.myDevices.inventorySlotMeter, { active: slotsUsed.value, max: MAX_DEVICES }),
+  fmt(t.value.myDevices.inventorySlotMeter, { active: slotsUsed.value, max: app.slotCap }),
 );
 
 // Deactivate sheet (running-task branch) — page-driven (no chassis store).
@@ -322,7 +321,7 @@ async function handleActivate(d: Device) {
     return;
   }
   if (occupiesDeviceSlot(d.kind) && slotsFull.value) {
-    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
+    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: app.slotCap }));
     return;
   }
   if (remoteApiEnabled) {
@@ -334,7 +333,7 @@ async function handleActivate(d: Device) {
   if (ok) {
     toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) }));
   } else {
-    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
+    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: app.slotCap }));
   }
 }
 
@@ -488,7 +487,7 @@ async function runRemoteDeviceCommand(d: Device, operation: "activate" | "deacti
   };
   try {
     if (operation === "activate") {
-      await deviceE3Api.activate(Number(d.id), version, MAX_DEVICES, key);
+      await deviceE3Api.activate(Number(d.id), version, app.slotCap, key);
     } else {
       await deviceE3Api.deactivate(Number(d.id), version, key);
     }
@@ -684,7 +683,7 @@ const phoneActivationIconStyle: CSSProperties = {
 };
 const phoneActivationTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };

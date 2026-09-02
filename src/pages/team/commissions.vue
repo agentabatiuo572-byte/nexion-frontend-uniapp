@@ -127,6 +127,18 @@
                 <text v-else-if="e.status === 'rejected'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.rejectedTag }}</text>
               </view>
             </view>
+            <view
+              v-if="remoteApiEnabled && commission.events.length < commission.eventsTotalRows"
+              class="flex items-center justify-center active:opacity-70"
+              :style="loadMoreStyle"
+              role="button"
+              tabindex="0"
+              :aria-disabled="commission.eventsLoadMoreStatus === 'loading'"
+              @click="commission.loadMoreCanonicalEvents()"
+              @keydown="activateLoadMore"
+            >
+              <text>{{ commission.eventsLoadMoreStatus === "loading" ? "…" : commission.eventsLoadMoreStatus === "error" ? t.network.retry : t.unilevel.loadMore }}</text>
+            </view>
         </view>
         </template>
       </view>
@@ -239,6 +251,12 @@ function go(url: string) {
   navTo(url);
 }
 
+function activateLoadMore(event: KeyboardEvent) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  void commission.loadMoreCanonicalEvents();
+}
+
 // ─── styles ───
 // Soft tint pill — chip idiom, fill only (no border, single visual difference).
 const howItWorksStyle: CSSProperties = {
@@ -328,6 +346,7 @@ function pillTextStyle(active: boolean, color: string): CSSProperties {
 const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Transparent hairline group — border-top opens the group, rows separate with hairlines.
 const listGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+const loadMoreStyle: CSSProperties = { minHeight: "44px", color: "var(--v5-ink-3)", fontSize: "13px" };
 function eventRowStyle(isLast: boolean): CSSProperties {
   return {
     padding: "12px 0",

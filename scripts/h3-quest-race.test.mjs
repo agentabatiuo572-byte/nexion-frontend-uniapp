@@ -11,7 +11,7 @@ const rawSource = fs.readFileSync("src/store/quest.ts", "utf8");
 // 而报错长得像实现坏了(实测 6d93739 加了 `ref`,三条静默全灭)。名单是开放集合,不能靠人记。
 // 判据改成构造性的:把剥掉的具名导入与注入名单求差,有差就 exit 2 指名报出来,而不是等运行时炸。
 const INJECTED_NAMES = [
-  "reactive", "ref", "defineStore", "questApi", "remoteApiEnabled",
+  "reactive", "ref", "watch", "defineStore", "questApi", "remoteApiEnabled", "useLocaleStore",
   "normalizeAccountKey", "readAccountRow", "writeAccountRow",
 ];
 const importedNames = new Set();
@@ -73,9 +73,11 @@ function createStore(replies) {
   const INJECT = {
     reactive: (value) => value,
     ref: (value) => ({ value }),
+    watch: () => undefined,
     defineStore: (_name, setup) => setup,
     questApi,
     remoteApiEnabled: true,
+    useLocaleStore: () => ({ code: "zh" }),
     normalizeAccountKey: (key) => key,
     readAccountRow: () => null,
     writeAccountRow: () => undefined,

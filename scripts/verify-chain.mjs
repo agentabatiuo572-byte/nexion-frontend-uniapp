@@ -17,12 +17,14 @@
 // 读那一行,不读本文件;本文件只负责「怎么跑」。
 // 产物:.verify-cache/last-run.json(mode/tree/steps/verdict,给 Stop hook / 合并守卫读)、
 //       .verify-chain.code(第 1 行退出码,第 2 行摘要;老读法一个字不用改)、.verify-cache/logs/<step>.log。
+//       同一时间只允许一条链写这些固定路径；后来者在写入前以 exit 2 退出，避免假绿/假红。
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT, CACHE_DIR, LAST_RUN_PATH, loadManifest, plan, treeFingerprint, h5ProbeRoutesMap } from "./lib/verify-scope.mjs";
 import { ensureServer } from "./lib/dev-server-pool.mjs";
 import { findBash } from "./lib/find-bash.mjs";
+import { acquireVerifyRunLock } from "./lib/verify-run-lock.mjs";
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -31,6 +33,17 @@ const requestedMode = flag("--static") ? "static" : flag("--scoped") ? "scoped" 
 const only = (opt("--only") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const forceTypecheck = flag("--force-typecheck");
 const usePool = flag("--pool"); // 默认关:见头注释 ③
+const runLock = acquireVerifyRunLock(ROOT);
+if (!runLock.acquired) {
+  const owner = runLock.owner;
+  console.error(`VERIFY_CHAIN_BUSY: 已有 verify-chain 正在持有互斥锁${owner ? ` (pid=${owner.pid}, startedAt=${owner.startedAt || "?"})` : ""}；为防止覆写 .verify-cache/last-run.json、.verify-chain.code 与 logs，本次未执行。`);
+  process.exit(2);
+}
+// exit 回调是同步的；SIGKILL/断电留下的锁会由下一次基于已死 PID 的恢复逻辑接管。
+process.once("exit", () => runLock.release());
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.once(signal, () => process.exit(130));
+}
 const LOG_DIR = path.join(CACHE_DIR, "logs");
 fs.mkdirSync(LOG_DIR, { recursive: true });
 

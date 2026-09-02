@@ -153,6 +153,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   }
 
   async function checkInRemote(): Promise<{ ok: boolean; gained: number; streak: number; multiplier: number }> {
+    if (!remoteApiEnabled) return { ok: false, gained: 0, streak: 0, multiplier: 1 };
     const request = remoteAccountEpoch.snapshot();
     try {
       // 签到的幂等日必须来自 Java 的权威业务日；浏览器 UTC 日在 H5 业务时区边界会产生错键。
@@ -180,6 +181,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   }
 
   async function claimMilestoneRemote(day: number): Promise<boolean> {
+    if (!remoteApiEnabled) return false;
     const request = remoteAccountEpoch.snapshot();
     const milestoneId = remoteMilestoneIds.value[day];
     if (!milestoneId) return false;
@@ -201,6 +203,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   }
 
   async function useSaverRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return false;
     const request = remoteAccountEpoch.snapshot();
     try {
       if (!await refreshRemote(request)) return false;

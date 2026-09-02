@@ -4,7 +4,7 @@ import { createSessionVault } from "./session-vault";
 
 const response = (overrides: Record<string, unknown> = {}) => ({
   accessToken: "access", refreshToken: "refresh", tokenType: "Bearer",
-  user: { userId: 8101, countryCode: "+86", phone: "18708173775", nickname: "Development User" },
+  user: { userId: 8101, countryCode: "+86", phone: "18708173775", nickname: "Development User", onboardingComplete: true },
   source: "development", sandbox: false, ...overrides,
 });
 
@@ -58,6 +58,23 @@ test("OAuth exchange rejects a response that attempts to masquerade as a Sandbox
   })).rejects.toThrow("OAUTH_RESPONSE_INVALID");
 });
 
+test("OAuth exchange rejects and does not persist a legacy phone-country session", async () => {
+  const vault = createSessionVault();
+  const api = createAuthApi({ request: async () => response({
+    source: "provider",
+    user: {
+      userId: 8103,
+      countryCode: "+1",
+      phone: "4155552671",
+      nickname: "Legacy User",
+      onboardingComplete: true,
+    },
+  }) } as never, vault);
+
+  await expect(api.oauthExchange({ provider: "GOOGLE" })).rejects.toThrow("OAUTH_RESPONSE_INVALID");
+  expect(vault.read()).toBeNull();
+});
+
 test("a late OAuth response cannot overwrite a newer session epoch", async () => {
   let resolve: ((value: unknown) => void) | undefined;
   let markExchangeStarted: (() => void) | undefined;
@@ -72,7 +89,7 @@ test("a late OAuth response cannot overwrite a newer session epoch", async () =>
   await exchangeStarted;
   vault.save({
     accessToken: "new-access", refreshToken: "new-refresh", tokenType: "Bearer",
-    user: { userId: 8102, countryCode: "+1", phone: "900999999999", nickname: "New" },
+    user: { userId: 8102, countryCode: "+86", phone: "13800138001", nickname: "New", onboardingComplete: true },
   });
   resolve?.(response());
   await expect(pending).rejects.toThrow("SESSION_CHANGED_DURING_AUTH");

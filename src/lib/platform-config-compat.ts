@@ -76,6 +76,7 @@ export function completePlatformConfigSeed(seed: PlatformConfigSeed): PlatformCo
     },
     rewards: {
       enabled: seed.rewards.enabled,
+      effectiveAt: seed.rewards.effectiveAt,
       welcomeGift: { ...seed.rewards.welcomeGift },
       inviterReward: { ...seed.rewards.inviterReward },
     },

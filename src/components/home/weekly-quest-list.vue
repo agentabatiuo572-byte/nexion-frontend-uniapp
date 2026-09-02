@@ -207,13 +207,13 @@ const pendingLabelStyle: CSSProperties = {
 const periodStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const pendingRewardStyle: CSSProperties = {

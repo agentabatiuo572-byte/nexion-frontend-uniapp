@@ -247,6 +247,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     "manual",
     "high-manual",
     "escalated-manual",
+    "strong-review",
     "freeze",
   ]);
   if (!row || !withdrawalNo || !status || !holdUntil || !riskRoute

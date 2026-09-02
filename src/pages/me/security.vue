@@ -68,12 +68,19 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text>
           </view>
           <text v-if="twoFactorEnabled === null" :style="unavailableValueStyle">—</text>
-          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" @click="toggleTwoFactor(!twoFactorEnabled)">
+          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" role="switch" tabindex="0" :aria-checked="twoFactorEnabled" @click="toggleTwoFactor(!twoFactorEnabled)" @keydown.enter.prevent="toggleTwoFactor(!twoFactorEnabled)" @keydown.space.prevent="toggleTwoFactor(!twoFactorEnabled)">
             <view :style="toggleThumbStyle" />
           </view>
         </view>
         <view :style="pwdFormStyle">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
+          <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
+            <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
+            <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge">
+              <text :style="pwdSaveLabelStyle">{{ t.addrRebind.otpConfirmCta }}</text>
+            </view>
+          </view>
+          <text v-if="remoteApiEnabled && twoFactorChallengeNo" class="block" :style="rowSubStyle">{{ fmt(t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
         </view>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.twoFactorHint }}</text>
@@ -191,6 +198,10 @@ const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUES
   || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED");
 const securityBusy = ref(false);
 const twoFactorPassword = ref("");
+const twoFactorCode = ref("");
+const twoFactorChallengeNo = ref("");
+const twoFactorPhoneMasked = ref("");
+const twoFactorTarget = ref<boolean | null>(null);
 const deletionPassword = ref("");
 const deletionCommandKey = ref("");
 const remoteSecurityLoading = ref(false);
@@ -254,6 +265,10 @@ function clearSecurityAccountState() {
   next.value = "";
   confirmPwd.value = "";
   twoFactorPassword.value = "";
+  twoFactorCode.value = "";
+  twoFactorChallengeNo.value = "";
+  twoFactorPhoneMasked.value = "";
+  twoFactorTarget.value = null;
   deletionPassword.value = "";
   deletionCommandKey.value = "";
   err.value = "";
@@ -329,6 +344,9 @@ function onConfirmPwd(e: Event) {
 }
 function onTwoFactorPassword(e: Event) {
   twoFactorPassword.value = detailVal(e);
+}
+function onTwoFactorCode(e: Event) {
+  twoFactorCode.value = detailVal(e).replace(/\D/g, "").slice(0, 6);
 }
 function onDeletionPassword(e: Event) {
   deletionPassword.value = detailVal(e);
@@ -440,7 +458,8 @@ async function toggleTwoFactor(value: boolean) {
     err.value = t.value.login.errorInvalidPassword;
     return;
   }
-  if (!value && twoFactorEnabled.value) {
+  if (value === twoFactorEnabled.value) return;
+  if (!value) {
     const ok = await uiConfirm({
       title: t.value.security.twoFactorDisable,
       message: t.value.security.twoFactorConfirmDisable,
@@ -448,48 +467,60 @@ async function toggleTwoFactor(value: boolean) {
       confirmLabel: t.value.security.twoFactorDisable,
       owner: securityConfirmOwner,
     });
+    if (!ok || !isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  }
+  if (!remoteApiEnabled) {
+    security.setTwoFactor(value, twoFactorPassword.value);
+    twoFactorPassword.value = "";
+    value ? toast.success(t.value.security.twoFactorEnabledToast) : toast.warn(t.value.security.twoFactorDisabledToast);
+    return;
+  }
+  securityBusy.value = true;
+  try {
+    const challenge = await accountApi.sendTwoFactorChallenge(value, twoFactorPassword.value);
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (ok) {
-      securityBusy.value = true;
-      try {
-        if (remoteApiEnabled) {
-          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          await accountApi.updateTwoFactor(false, twoFactorPassword.value);
-          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-          if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          twoFactorPassword.value = "";
-        } else security.setTwoFactor(false, twoFactorPassword.value);
-        twoFactorPassword.value = "";
-        toast.warn(t.value.security.twoFactorDisabledToast);
-      } catch (cause) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        console.warn("[security] 2FA update failed:", cause);
-        err.value = securityErrorMessage(cause);
-      } finally {
-        if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
-      }
-    }
-  } else if (value && !twoFactorEnabled.value) {
-    securityBusy.value = true;
-    try {
-      if (remoteApiEnabled) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        await accountApi.updateTwoFactor(true, twoFactorPassword.value);
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        twoFactorPassword.value = "";
-      } else security.setTwoFactor(true, twoFactorPassword.value);
-      twoFactorPassword.value = "";
-      toast.success(t.value.security.twoFactorEnabledToast);
-    } catch (cause) {
-      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      console.warn("[security] 2FA update failed:", cause);
-      err.value = securityErrorMessage(cause);
-    } finally {
-      if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
-    }
+    twoFactorTarget.value = value;
+    twoFactorChallengeNo.value = challenge.challengeNo;
+    twoFactorPhoneMasked.value = challenge.phoneMasked;
+    twoFactorCode.value = "";
+    toast.success(t.value.addrRebind.otpSendCta);
+  } catch (cause) {
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    console.warn("[security] 2FA challenge failed:", cause);
+    err.value = securityErrorMessage(cause);
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
+  }
+}
+
+async function confirmTwoFactorChallenge() {
+  if (securityBusy.value || twoFactorTarget.value === null || !twoFactorChallengeNo.value) return;
+  if (!/^\d{6}$/.test(twoFactorCode.value)) {
+    err.value = t.value.addrRebind.otpExpired;
+    return;
+  }
+  const pageScope = securityPageFence.capture("two-factor-confirm");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  const target = twoFactorTarget.value;
+  securityBusy.value = true;
+  try {
+    await accountApi.updateTwoFactor(target, twoFactorPassword.value, twoFactorChallengeNo.value, twoFactorCode.value);
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    twoFactorPassword.value = "";
+    twoFactorCode.value = "";
+    twoFactorChallengeNo.value = "";
+    twoFactorPhoneMasked.value = "";
+    twoFactorTarget.value = null;
+    target ? toast.success(t.value.security.twoFactorEnabledToast) : toast.warn(t.value.security.twoFactorDisabledToast);
+  } catch (cause) {
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    console.warn("[security] 2FA update failed:", cause);
+    err.value = securityErrorMessage(cause);
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
 }
 
