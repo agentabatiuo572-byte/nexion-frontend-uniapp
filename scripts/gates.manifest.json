@@ -3,6 +3,7 @@
   "globals": [
     "scripts/verify.sh",
     "scripts/gates.manifest.json",
+    "scripts/known-red.json",
     "scripts/lib/**",
     "scripts/verify-chain.mjs",
     "scripts/typecheck-cached.mjs",
@@ -31,6 +32,8 @@
     "src/api/runtime-config.ts",
     ".claude/hooks/**"
   ],
+  "$globalsAdditiveOk": "命中 globals 但相对主线只增不删(git diff 无 '-' 行)的文件不升档 —— i18n 只加 key 的最常见任务形态;改/删/重排 key 仍升 full(Tier 1-C,2026-09-02)",
+  "globalsAdditiveOk": ["src/i18n/messages/*.ts"],
   "gates": {
     "route-http": {
       "kind": "server",
@@ -301,6 +304,21 @@
       "always": true,
       "$why": "走 typecheck-cached(指纹缓存;真跑 = 裸 vue-tsc,--incremental 因假绿禁用)"
     },
+    "test:verify-harness": {
+      "kind": "test",
+      "inputs": ["scripts/lib/**", "scripts/known-red.json", "scripts/known-red.test.mjs", "scripts/known-red-shell.test.mjs", "scripts/verify-chain.mjs"],
+      "$why": "验证链自身的红测:已知红清单 lint/到期/接线 + 全局清单只增不删豁免(Tier 1-C,2026-09-02)"
+    },
+    "test:githooks": {
+      "kind": "test",
+      "inputs": [".githooks/**", "package.json"],
+      "$why": "git 层门自测(pre-commit S 级门 + pre-push full 门,2026-09-02 Tier 1-B);static 档同其它 test 步跳过,scoped 按输入缩范围"
+    },
+    "test:country-code-contracts": {
+      "kind": "test",
+      "inputs": ["src/**", "scripts/**"],
+      "$why": "国家码契约测试(2026-09-02 登记;原未声明 = 三档照跑,现同其它 test 步按输入缩范围)"
+    },
     "test:contract-registry": {
       "kind": "test",
       "inputs": [
@@ -402,6 +420,12 @@
       "always": true,
       "fullOnly": true,
       "$why": "生产构建只在 full 档;scoped/static 不跑"
+    },
+    "test:prod-artifact": {
+      "kind": "build",
+      "always": true,
+      "fullOnly": true,
+      "$why": "断言生产构建产物;依赖 build:h5:prod,同为 full 档(2026-09-02 登记;原未声明 = static/scoped 也跑,拿的是上一次 full 的旧 dist)"
     },
     "test:h5-runtime": {
       "kind": "runtime",
