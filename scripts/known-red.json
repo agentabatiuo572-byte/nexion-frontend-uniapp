@@ -1,0 +1,20 @@
+{
+  "$comment": "已知红清单(Tier 1-C,2026-09-02)。每条必须有 why + since + until(≤ since+90 天);未到期的链步骤 / verify.sh 格记 KNOWN-RED 不进 fail,到期未清自动回红。改本文件 = 改门定义(在 manifest.globals 里)。格式与校验见 scripts/lib/known-red.mjs;`node scripts/lib/known-red.mjs lint` 守格式。续期规则:改 until 必须同时改 since 并把新理由写进 why。",
+  "steps": [
+    {
+      "step": "test:contract-registry",
+      "why": "scripts/genesis-5174-data-contract.test.mjs 直连 127.0.0.1:8110(创世/Genesis 数据服务)取产品数据,链没起该服务 → fetch ECONNREFUSED。其余 224 条契约全绿(2026-09-02 基线,tree b826261c+Tier0)。修法:该测试改成缺服务时显式 SKIP 并点名,或由链在 full 档自起 8110;两者都属产品线,待主人排期。",
+      "since": "2026-09-02",
+      "until": "2026-10-01",
+      "owner": "主人/产品线"
+    },
+    {
+      "step": "test:real-backend-integration",
+      "why": "vitest src/pages/me/me-button-parity.contract.test.ts 通过 ../../../../NX1.0-Prototype/src/ 读原型线的 me.vue 做双端按钮 parity,本机没有 NX1.0-Prototype 检出 → ENOENT。node --test 侧 56 条全绿。修法:跨仓半边缺席时显式 SKIP 并点名(同 test:cross-repo 的做法),或按 2026-08-16 停更决议摘除对原型线的采样;待主人拍板。",
+      "since": "2026-09-02",
+      "until": "2026-10-01",
+      "owner": "主人/产品线"
+    }
+  ],
+  "cells": []
+}

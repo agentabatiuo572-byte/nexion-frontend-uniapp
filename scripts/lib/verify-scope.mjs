@@ -14,7 +14,7 @@
 //   node scripts/lib/verify-scope.mjs changed [--base REF]   → JSON {base,files,reason}
 //   node scripts/lib/verify-scope.mjs plan --mode scoped|static|full [--format json|shell]
 //   node scripts/lib/verify-scope.mjs lint                    → manifest ↔ verify.sh 接线一致性(门的门)
-import { execFileSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -131,6 +131,7 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
   const requested = mode;
   let upgraded = null;
   let changedInfo = null;
+  let additiveExemptFiles = [];
   // static 与 scoped 都按改动集缩范围;区别只在 static 一律不碰需要 server 的门。
   // static 下改动集算不出 / 命中全局清单 → 「静态门全跑」(staticAll),仍不起 server(保守方向,不升 full)。
   let staticAll = false;
@@ -140,7 +141,11 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
       if (mode === "scoped") { upgraded = "改动集算不出(非 git / 无主线 / merge-base 失败)→ 升 full(保守方向)"; mode = "full"; }
       else { upgraded = "改动集算不出 → 静态门全跑(不起 server)"; staticAll = true; }
     } else {
-      const hit = changedInfo.files.filter((f) => matchAny(f, manifest.globals));
+      const hitAll = changedInfo.files.filter((f) => matchAny(f, manifest.globals));
+      // 只增不删的全局文件(globalsAdditiveOk,典型 = i18n 只加 key)不升档:加 key 不会让任何既有页面丢 key,
+      //   声明了它们为输入的门(i18n 镜像 / 硬编码哨兵)照跑。改 / 删 / 重排 key 仍升 full。
+      const hit = additiveExempt(hitAll, manifest, changedInfo.base);
+      additiveExemptFiles = hitAll.filter((f) => !hit.includes(f));
       if (hit.length) {
         const list = `${hit.slice(0, 5).join(", ")}${hit.length > 5 ? " …" : ""}`;
         if (mode === "scoped") { upgraded = `改动命中全局不变量清单:${list} → 升 full`; mode = "full"; }
@@ -221,12 +226,32 @@ export function plan({ mode = "full", manifest = loadManifest(), changed = undef
     return [id, d];
   }));
   return {
-    requested, mode, upgraded,
+    requested, mode, upgraded, additiveExempt: additiveExemptFiles,
     changed: changedInfo ? { base: changedInfo.base, baseReason: changedInfo.baseReason, files: changedInfo.files } : null,
     routes: mode === "full" ? { all: allPages.map((p) => p.route), affected: "*", reason: "full:全部路由" } : (routes || { all: allPages.map((p) => p.route), affected: "*", reason: "改动集不可用:全部路由" }),
     gates: withUmbrella(manifest.gates), steps: withUmbrella(manifest.steps), h5Probes: h5Table,
     cells: Object.fromEntries(Object.entries(manifest.gates || {}).map(([id, e]) => [id, Number.isInteger(e.cells) && e.cells >= 1 ? e.cells : 1])), // 每门在 verify.sh 里出几格(跳过时按格计数,deep 判据 ③ 守恒)
   };
+}
+
+/**
+ * 文件相对 base 是否「只增不删」:git diff --unified=0 <base> -- file 的正文里没有任何 '-' 行(含未提交改动)。
+ * base 里没有的新文件 = 纯新增。git 失败 → false(保守:按会升档处理)。
+ */
+export function isAdditiveOnly(file, base, cwd = ROOT) {
+  if (!base) return false;
+  const inBase = spawnSync("git", ["cat-file", "-e", `${base}:${file}`], { cwd, stdio: "ignore" }).status === 0;
+  if (!inBase) return fs.existsSync(path.join(cwd, file)); // 新增文件(且仍存在)
+  const r = spawnSync("git", ["diff", "--unified=0", "--no-color", base, "--", file], { cwd, encoding: "utf8" });
+  if (r.status !== 0) return false;
+  const body = (r.stdout || "").split(/\r?\n/).filter((l) => !/^(---|\+\+\+|@@|diff |index )/.test(l));
+  return !body.some((l) => l.startsWith("-"));
+}
+/** 全局清单命中里,匹配 manifest.globalsAdditiveOk 且只增不删的文件剔除;其余原样返回。 */
+export function additiveExempt(hits, manifest, base, isAdditive = isAdditiveOnly) {
+  const ok = manifest.globalsAdditiveOk || [];
+  if (!ok.length || !base) return hits;
+  return hits.filter((f) => !(matchAny(f, ok) && isAdditive(f, base)));
 }
 
 /** pages 声明展开:"*" → 全部页面文件;含 * 的条目按 glob 匹配 pages.json 页面文件;其余按字面。 */
@@ -298,6 +323,7 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
     }
   };
   checkGlobs("globals", manifest.globals);
+  if (manifest.globalsAdditiveOk) checkGlobs("globalsAdditiveOk", manifest.globalsAdditiveOk);
   // routeScoped 门 ↔ verify.sh 里的 route_scope <id> 必须双向配对(tester-F F-07:route_scope 漏调 = 探针跑在别的门的路由集里)
   const routeScopeCalls = new Set([...verifySh.matchAll(/(?:^|[;&|(\s])route_scope\s+([A-Za-z0-9_.:-]+)/gm)].map((m) => m[1]).filter((id) => id !== "<门id>"));
   for (const [k, e] of Object.entries(manifest.gates || {})) {

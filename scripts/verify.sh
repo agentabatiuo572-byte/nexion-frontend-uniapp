@@ -43,7 +43,7 @@ cd "$PROJECT_DIR"
 export LC_ALL=C
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0; skip=0; retried=0
+pass=0; fail=0; skip=0; retried=0; known=0
 
 # 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
 # admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
@@ -69,7 +69,7 @@ _write_exit_sentinel() {
   if [ -n "$tree_end" ]; then
     if [ -z "${VERIFY_TREE_START:-}" ] || [ "$tree_end" = "$VERIFY_TREE_START" ]; then tree_tag="$tree_end"; else tree_tag="moved"; fi
   fi
-  printf '%s\npass=%s fail=%s skip=%s mode=%s scoped_skip=%s tree=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" "${SCOPE_MODE:-full}" "${scoped_skip:-0}" "$tree_tag" > "$VERIFY_EXIT_SENTINEL.tmp$" 2>/dev/null \
+  printf '%s\npass=%s fail=%s skip=%s mode=%s scoped_skip=%s known_red=%s tree=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" "${SCOPE_MODE:-full}" "${scoped_skip:-0}" "${known:-0}" "$tree_tag" > "$VERIFY_EXIT_SENTINEL.tmp$" 2>/dev/null \
     && mv -f "$VERIFY_EXIT_SENTINEL.tmp$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
   return $rc
 }
@@ -104,9 +104,31 @@ resolve_admin_root() {
 }
 if admin_root_resolved=$(resolve_admin_root); then ADMIN_ROOT="$admin_root_resolved"; fi
 
+# ── 已知红(Tier 1-C):scripts/known-red.json 里登记的格(FAIL 标题固定前缀)未到期记 KNOWN-RED 不进 fail;到期回红。
+#    清单由 scripts/lib/known-red.mjs 校验(静态段有「已知红清单门」);这里只读它吐出的 TSV(prefix / until / why / active|expired)。
+KNOWN_RED_TSV="${TMPDIR:-/tmp}/uniapp-known-red.$$.tsv"
+"${NODE_BIN:-node}" scripts/lib/known-red.mjs cells > "$KNOWN_RED_TSV" 2>/dev/null || : > "$KNOWN_RED_TSV"
+known_red_match() {   # $1=FAIL 标题 → 命中则打印 "until<TAB>why<TAB>status" 并返回 0
+  local title="$1" prefix until why status
+  [ -s "$KNOWN_RED_TSV" ] || return 1
+  while IFS=$'\t' read -r prefix until why status; do
+    [ -n "$prefix" ] || continue
+    case "$title" in "$prefix"*) printf '%s\t%s\t%s\n' "$until" "$why" "$status"; return 0;; esac
+  done < "$KNOWN_RED_TSV"
+  return 1
+}
 # ⚠ 标记放格式串不放 %s 参数位:POSIX printf 只在格式串里解释 \033 色码(P2-1);消息位禁 %(无用户输入)
 ok()   { local mark=""; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}⚠ after-retry${N}"; PROBE_RETRIED_LAST=0; retried=$((retried+1)); fi; printf "  ${G}PASS${N}  %s$mark\n" "$1"; pass=$((pass+1)); }
-bad()  { local mark=""; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}(重试后仍失败,首败明细在 *.attempt1)${N}"; PROBE_RETRIED_LAST=0; fi; printf "  ${R}FAIL${N}  %s$mark\n" "$1"; fail=$((fail+1)); }
+bad()  {
+  local mark="" kr until why status
+  if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}(重试后仍失败,首败明细在 *.attempt1)${N}"; PROBE_RETRIED_LAST=0; fi
+  if kr=$(known_red_match "$1"); then
+    IFS=$'\t' read -r until why status <<< "$kr"
+    if [ "$status" = "active" ]; then printf "  ${Y}KNOWN-RED${N}  %s$mark ${Y}(已知红,到期 %s:%s)${N}\n" "$1" "$until" "$why"; known=$((known+1)); return 0; fi
+    printf "  ${R}FAIL${N}  %s$mark ${R}(已知红已到期 %s,须处理:%s)${N}\n" "$1" "$until" "$why"; fail=$((fail+1)); return 0
+  fi
+  printf "  ${R}FAIL${N}  %s$mark\n" "$1"; fail=$((fail+1))
+}
 # 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
 # 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
 skipped() { PROBE_RETRIED_LAST=0; printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
@@ -242,6 +264,12 @@ if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > /tmp/uni-scope-lint.log 2>&1;
   ok "gates.manifest 接线门 — $(tail -1 /tmp/uni-scope-lint.log)"
 else
   bad "gates.manifest 接线门失败 — node scripts/lib/verify-scope.mjs lint 看明细"; sed 's/^/        /' /tmp/uni-scope-lint.log | head -12
+fi
+# 已知红清单门(Tier 1-C):清单格式 / 日期 / 90 天上限 / 重复;到期条目点名(它们在链上已回红)。清单坏 = 整链红,不许静默当 0 条。
+if "$NODE_BIN" scripts/lib/known-red.mjs lint > /tmp/uni-known-red-lint.log 2>&1; then
+  ok "已知红清单门 — $(tail -1 /tmp/uni-known-red-lint.log)"
+else
+  bad "已知红清单门失败 — node scripts/lib/known-red.mjs lint 看明细"; sed 's/^/        /' /tmp/uni-known-red-lint.log | head -12
 fi
 
 # ── (1) type-check ──
@@ -3830,5 +3858,5 @@ if [ -n "${HEALTH_T1:-}" ] && [ -n "${HEALTH_T2:-}" ]; then
     echo "server health 首尾延迟:preflight ${HEALTH_T1}s/${HEALTH_T2}s → 收尾 ${HEALTH_T_END}s(均 ≤ ${HEALTH_MAX_S}s)"
   fi
 fi
-echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" )$( [ "$SCOPE_MODE" != "full" ] && echo -e ", ${Y}$scoped_skip scoped-skip${N} · mode=$SCOPE_MODE(≠ 全量绿:宣布 done / 合并前仍须 full)" ) ━━"
+echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" )$( [ $known -gt 0 ] && echo -e ", ${Y}$known known-red${N}(已登记有到期日,不进 fail)" )$( [ "$SCOPE_MODE" != "full" ] && echo -e ", ${Y}$scoped_skip scoped-skip${N} · mode=$SCOPE_MODE(≠ 全量绿:宣布 done / 合并前仍须 full)" ) ━━"
 [ $fail -eq 0 ] && [ $skip -eq 0 ]
