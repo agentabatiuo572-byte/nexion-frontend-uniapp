@@ -301,6 +301,11 @@
       "always": true,
       "$why": "走 typecheck-cached(指纹缓存;真跑 = 裸 vue-tsc,--incremental 因假绿禁用)"
     },
+    "test:country-code-contracts": {
+      "kind": "test",
+      "inputs": ["src/**", "scripts/**"],
+      "$why": "国家码契约测试(2026-09-02 登记;原未声明 = 三档照跑,现同其它 test 步按输入缩范围)"
+    },
     "test:contract-registry": {
       "kind": "test",
       "inputs": [
@@ -402,6 +407,12 @@
       "always": true,
       "fullOnly": true,
       "$why": "生产构建只在 full 档;scoped/static 不跑"
+    },
+    "test:prod-artifact": {
+      "kind": "build",
+      "always": true,
+      "fullOnly": true,
+      "$why": "断言生产构建产物;依赖 build:h5:prod,同为 full 档(2026-09-02 登记;原未声明 = static/scoped 也跑,拿的是上一次 full 的旧 dist)"
     },
     "test:h5-runtime": {
       "kind": "runtime",
