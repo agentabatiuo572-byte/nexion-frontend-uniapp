@@ -3,6 +3,7 @@
   "globals": [
     "scripts/verify.sh",
     "scripts/gates.manifest.json",
+    "scripts/known-red.json",
     "scripts/lib/**",
     "scripts/verify-chain.mjs",
     "scripts/typecheck-cached.mjs",
@@ -31,6 +32,8 @@
     "src/api/runtime-config.ts",
     ".claude/hooks/**"
   ],
+  "$globalsAdditiveOk": "命中 globals 但相对主线只增不删(git diff 无 '-' 行)的文件不升档 —— i18n 只加 key 的最常见任务形态;改/删/重排 key 仍升 full(Tier 1-C,2026-09-02)",
+  "globalsAdditiveOk": ["src/i18n/messages/*.ts"],
   "gates": {
     "route-http": {
       "kind": "server",
@@ -300,6 +303,11 @@
       "kind": "static",
       "always": true,
       "$why": "走 typecheck-cached(指纹缓存;真跑 = 裸 vue-tsc,--incremental 因假绿禁用)"
+    },
+    "test:verify-harness": {
+      "kind": "test",
+      "inputs": ["scripts/lib/**", "scripts/known-red.json", "scripts/known-red.test.mjs", "scripts/known-red-shell.test.mjs", "scripts/verify-chain.mjs"],
+      "$why": "验证链自身的红测:已知红清单 lint/到期/接线 + 全局清单只增不删豁免(Tier 1-C,2026-09-02)"
     },
     "test:githooks": {
       "kind": "test",
