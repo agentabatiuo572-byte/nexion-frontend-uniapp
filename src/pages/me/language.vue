@@ -26,7 +26,7 @@
                   :style="rowStyle(i !== 0, l.code === code)"
                   role="button"
                   tabindex="0"
-                  :aria-pressed="l.code === code ? 'true' : 'false'"
+                  :aria-pressed="l.code === code"
                   @click="pick(l.code)"
                   @keydown.enter.prevent="pick(l.code)"
                   @keydown.space.prevent="pick(l.code)"

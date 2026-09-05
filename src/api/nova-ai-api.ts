@@ -14,6 +14,7 @@ export interface NovaAiChatRequest {
 
 export interface NovaAiChatResponse {
   reply: string;
+  handoffReason?: string;
   conversationId: string;
   turnId: string;
 }
@@ -29,12 +30,14 @@ export interface NovaAiHistoryResponse {
   conversationId: string | null;
   messages: NovaAiHistoryMessage[];
   truncated: boolean;
+  nextCursor: string | null;
 }
 
 export interface NovaAiApi {
+  confirmHandoff(conversationId: string, turnId: string, idempotencyKey: string): Promise<string>;
   status(): Promise<NovaAiStatus>;
   chat(request: NovaAiChatRequest, signal?: AbortSignal): Promise<NovaAiChatResponse>;
-  history(conversationId?: string): Promise<NovaAiHistoryResponse>;
+  history(conversationId?: string, beforeTurnId?: string): Promise<NovaAiHistoryResponse>;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -66,6 +69,7 @@ function parseChat(value: unknown): NovaAiChatResponse {
   }
   return {
     reply: row.reply.trim(),
+    ...(typeof row.handoffReason === "string" ? { handoffReason: row.handoffReason } : {}),
     conversationId: row.conversationId,
     turnId: row.turnId,
   };
@@ -75,7 +79,8 @@ function parseHistory(value: unknown): NovaAiHistoryResponse {
   const row = record(value);
   const rawMessages = row && Array.isArray(row.messages) ? row.messages : null;
   if (!row || (row.conversationId !== null && !conversationId(row.conversationId))
-      || !rawMessages || rawMessages.length > 400 || typeof row.truncated !== "boolean") {
+      || !rawMessages || rawMessages.length > 400 || typeof row.truncated !== "boolean"
+      || (row.nextCursor !== null && row.nextCursor !== undefined && !conversationId(row.nextCursor))) {
     throw new ApiError({ kind: "protocol", message: "NOVA_AI_HISTORY_RESPONSE_INVALID" });
   }
   const messages = rawMessages.map((value): NovaAiHistoryMessage => {
@@ -95,6 +100,7 @@ function parseHistory(value: unknown): NovaAiHistoryResponse {
     conversationId: row.conversationId,
     messages,
     truncated: row.truncated,
+    nextCursor: row.nextCursor == null ? null : String(row.nextCursor).toLowerCase(),
   };
 }
 
@@ -119,6 +125,17 @@ function safeRequest(request: NovaAiChatRequest): NovaAiChatRequest {
 
 export function createNovaAiApi(client: ApiClient): NovaAiApi {
   return {
+    confirmHandoff: async (requestedConversationId, turnId, idempotencyKey) => {
+      if (!conversationId(requestedConversationId) || !conversationId(turnId)) throw new ApiError({ kind: "protocol", message: "NOVA_HANDOFF_INPUT_INVALID" });
+      const data = record(await client.request({
+        method: "POST", path: "/api/app/support/ai/handoffs", idempotencyKey,
+        body: { conversationId: requestedConversationId, turnId }, timeoutMs: 30_000,
+      }));
+      const conversation = record(data?.conversation);
+      const id = conversation?.conversationNo;
+      if (typeof id !== "string" || !/^CV-[A-Za-z0-9-]{1,80}$/.test(id)) throw new ApiError({ kind: "protocol", message: "NOVA_HANDOFF_RESPONSE_INVALID" });
+      return id;
+    },
     status: async () => parseStatus(await client.request({
       method: "GET",
       path: "/api/app/support/ai/status",
@@ -141,13 +158,18 @@ export function createNovaAiApi(client: ApiClient): NovaAiApi {
       }
       return response;
     },
-    history: async (requestedConversationId) => {
+    history: async (requestedConversationId, beforeTurnId) => {
       if (requestedConversationId !== undefined && !conversationId(requestedConversationId)) {
         throw new ApiError({ kind: "protocol", message: "NOVA_AI_CONVERSATION_INVALID" });
       }
-      const suffix = requestedConversationId
-        ? `?conversationId=${encodeURIComponent(requestedConversationId.toLowerCase())}`
-        : "";
+      if (beforeTurnId !== undefined && !conversationId(beforeTurnId)) {
+        throw new ApiError({ kind: "protocol", message: "NOVA_AI_HISTORY_CURSOR_INVALID" });
+      }
+      const params = new URLSearchParams();
+      if (requestedConversationId) params.set("conversationId", requestedConversationId.toLowerCase());
+      if (beforeTurnId) params.set("beforeTurnId", beforeTurnId.toLowerCase());
+      const query = params.toString();
+      const suffix = query ? `?${query}` : "";
       return parseHistory(await client.request({
         method: "GET",
         path: `/api/app/support/ai/history${suffix}`,

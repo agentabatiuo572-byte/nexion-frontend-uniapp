@@ -36,7 +36,7 @@
         </view>
       </view>
 
-      <view v-if="remoteApiEnabled && projectionStatus !== 'ready'" class="mx-4 mt-4">
+      <view v-if="showProjectionBlockingState" class="mx-4 mt-4">
         <EmptyState
           :kind="projectionStatus === 'error' ? 'recoverable-error' : 'empty-list'"
           :title="projectionStateTitle"
@@ -49,6 +49,16 @@
       </view>
 
       <template v-else>
+      <view v-if="showProjectionInlineError" class="mx-4 mb-3">
+        <EmptyState
+          kind="recoverable-error"
+          :title="t.globe.regionProjectionErrorTitle"
+          :desc="t.globe.regionProjectionErrorDesc"
+          :cta-label="t.ui.retry"
+          compact
+          @cta="loadRegions"
+        />
+      </view>
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
       <view class="mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
@@ -91,7 +101,7 @@
           />
 
           <!-- Region nodes -->
-          <g v-for="r in regions" :key="r.id" class="cursor-pointer" @click="select(r)">
+          <g v-for="r in regions" :key="r.id" class="cursor-pointer" role="button" tabindex="0" :aria-label="regionName(r)" @click="select(r)" @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
             <circle :cx="r.cx * W" :cy="r.cy * H" r="18" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
             <circle :cx="r.cx * W" :cy="r.cy * H" r="5" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
             <!-- Pulse ring -->
@@ -130,7 +140,11 @@
           :key="r.id"
           class="w-full flex items-center active:opacity-80"
           :style="regionRowStyle(i === regions.length - 1)"
+          role="button"
+          tabindex="0"
           @click="select(r)"
+          @keydown.enter.prevent="select(r)"
+          @keydown.space.prevent="select(r)"
         >
           <view class="grid place-items-center shrink-0" :style="regionIconBox(r.isYou)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
@@ -150,7 +164,7 @@
       <view v-if="selected" class="nx-globe-drawer" role="dialog" aria-modal="true">
         <view class="nx-globe-scrim" @click="selected = null" />
         <view class="relative border rounded-2xl" :style="drawerCardStyle">
-          <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" @click="selected = null">
+          <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="selected = null" @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
           <view class="flex items-center" style="gap: 12px">
@@ -202,6 +216,8 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
 import type { NetworkRegionProjection } from "@/api/network-regions-api";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const app = useApp();
@@ -284,6 +300,13 @@ const projectionStateDesc = computed(() => projectionStatus.value === "error"
   : projectionStatus.value === "empty"
     ? t.value.globe.regionProjectionEmptyDesc
     : t.value.globe.regionProjectionLoadingDesc);
+const hasUsableProjection = computed(() => (networkProjection.value?.regions.length ?? 0) > 0);
+const showProjectionBlockingState = computed(() => remoteApiEnabled
+  && !hasUsableProjection.value
+  && projectionStatus.value !== "ready");
+const showProjectionInlineError = computed(() => remoteApiEnabled
+  && hasUsableProjection.value
+  && projectionStatus.value === "error");
 
 const dots = computed(() => generateDotMap(W, H));
 
@@ -319,17 +342,26 @@ async function loadRegions() {
     projectionStatus.value = next.regions.length > 0 ? "ready" : "empty";
   } catch {
     if (request !== projectionRequest || accountKey !== String(app.accountKey)) return;
-    networkProjection.value = null;
     projectionStatus.value = "error";
   }
 }
 
+let releaseActiveRefresh = () => {};
+function activatePageRefresh() {
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(loadRegions);
+}
+
 onMounted(() => {
-  void loadRegions();
   pulseTimer = setInterval(() => {
     pulseTick.value += 1;
   }, 1800) as unknown as number;
 });
+onShow(() => {
+  activatePageRefresh();
+  void loadRegions();
+});
+onHide(() => releaseActiveRefresh());
 watch(() => String(app.accountKey), () => {
   projectionRequest += 1;
   selected.value = null;
@@ -339,6 +371,7 @@ watch(() => String(app.accountKey), () => {
 });
 onUnmounted(() => {
   projectionRequest += 1;
+  releaseActiveRefresh();
   if (pulseTimer) clearInterval(pulseTimer);
 });
 

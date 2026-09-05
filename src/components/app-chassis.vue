@@ -24,10 +24,10 @@
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
-        <view class="nx-icon-btn active:opacity-60" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch" @keydown.enter.prevent="goSearch" @keydown.space.prevent="goSearch">
+	        <view class="nx-icon-btn active:opacity-60" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch" @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </view>
-        <view class="nx-icon-btn nx-bell active:opacity-60" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="goNotifications" @keydown.space.prevent="goNotifications">
+	        <view class="nx-icon-btn nx-bell active:opacity-60" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
@@ -39,7 +39,7 @@
          content behind it, mirroring the prototype Header nav row. Tab pages never
          set pageHeader, so this never shows for them (brand row stays untouched). -->
     <view v-if="!isTabRoute && navHeader" class="nx-navheader" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
-      <view class="nx-nav-side" @click="navBack">
+	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack" @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
         <view class="nx-nav-glass">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
@@ -48,7 +48,7 @@
         <text class="nx-nav-title">{{ navHeader.title }}</text>
         <text v-if="navHeader.subtitle" class="nx-nav-sub">{{ navHeader.subtitle }}</text>
       </view>
-      <view class="nx-nav-side" @click="goNotifications">
+	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
         <view class="nx-nav-glass">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view class="nx-nav-belldot" />
@@ -120,8 +120,8 @@
           :aria-selected="tab.key === activeTab ? 'true' : 'false'"
           :aria-label="tab.label"
           @click="go(tab)"
-          @keydown.enter.prevent="go(tab)"
-          @keydown.space.prevent="go(tab)"
+	          @keydown.enter.prevent="onKeyboardActivate($event, () => go(tab))"
+	          @keydown.space.prevent="onKeyboardActivate($event, () => go(tab))"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
             :stroke="tab.key === activeTab ? 'var(--v5-brand)' : 'var(--v5-ink-3)'"
@@ -600,6 +600,11 @@ function navBack() {
   // Stack-aware back: pop real history (restores prev page + scroll), else fall
   // back to the declared backHref. navigateBack alone no-ops on cold-open (P-054).
   navBackTo(navHeader.value?.backHref);
+}
+
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
+  if (event.repeat) return;
+  action();
 }
 
 const unread = computed(() => notifications.unread);

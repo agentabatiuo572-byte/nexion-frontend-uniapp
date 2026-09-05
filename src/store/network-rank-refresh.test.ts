@@ -56,4 +56,22 @@ describe("network rank refresh single-flight", () => {
     await vi.waitFor(() => expect(store.snapshot?.currentRank).toBe(9));
     expect(store.status).toBe("ready");
   });
+
+  it("keeps the last successful rank visible and reports a retryable error when a later read is offline", async () => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    remote.networkRankApi.snapshot
+      .mockResolvedValueOnce({ currentRank: 4, rankChange24h: null })
+      .mockRejectedValueOnce(new Error("NETWORK_OFFLINE"));
+    const store = useNetworkRank();
+    store.bindAccount("user:7");
+
+    await expect(store.refresh()).resolves.toBe(true);
+    clock.mockReturnValue(now + 10_001);
+    await expect(store.refresh()).resolves.toBe(false);
+
+    expect(store.snapshot).toEqual({ currentRank: 4, rankChange24h: null });
+    expect(store.status).toBe("error");
+    clock.mockRestore();
+  });
 });

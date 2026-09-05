@@ -67,6 +67,9 @@
               <text class="block" :style="suggestionQuestionStyle">{{ faq.question }}</text>
               <text class="block" :style="suggestionAnswerStyle">{{ faq.answer }}</text>
             </view>
+            <view v-if="canLoadMoreTicketSuggestions" :style="ticketSuggestionLoadMoreStyle" role="button" tabindex="0" :aria-disabled="ticketSuggestionLoading ? 'true' : 'false'" @click="loadMoreTicketSuggestions" @keydown.enter.prevent="loadMoreTicketSuggestions" @keydown.space.prevent="loadMoreTicketSuggestions">
+              <text>{{ ticketSuggestionLoading ? t.help.loadingMore : t.help.loadMore }}</text>
+            </view>
           </view>
         </view>
         <view>
@@ -111,6 +114,9 @@
 
         <text class="block" :style="messagesLabelStyle">{{ t.tickets.detail.messagesLabel }}</text>
         <text v-if="detailTicket.historyTruncated" class="block" role="status" aria-live="polite" :style="historyTruncatedStyle">{{ t.tickets.historyTruncated }}</text>
+        <view v-if="detailTicket.historyNextCursor" class="active:opacity-70" :style="historyLoadEarlierStyle" role="button" tabindex="0" :aria-label="t.tickets.loadEarlier" @click="loadEarlierTicket" @keydown.enter.prevent="loadEarlierTicket" @keydown.space.prevent="loadEarlierTicket">
+          <text>{{ t.tickets.loadEarlier }}</text>
+        </view>
         <view style="display: flex; flex-direction: column; gap: 8px">
           <view v-for="m in detailTicket.messages" :key="m.id" :style="msgBubbleStyle(m.author === 'user')">
             <view class="flex items-center" :style="msgHeadStyle">
@@ -151,6 +157,8 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
+import { useApp } from "@/store/app";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { supportApi } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import {
@@ -168,6 +176,7 @@ type Tab = "all" | "open" | "resolved" | "closed";
 
 const t = useT();
 const ticketsStore = useTickets();
+const app = useApp();
 const locale = useLocaleStore();
 const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
@@ -179,9 +188,22 @@ const newCat = ref<TicketCategory>("withdrawal");
 const subject = ref("");
 const desc = ref("");
 const reply = ref("");
+watch(() => app.accountKey, () => {
+  mode.value = { kind: "list" };
+  subject.value = "";
+  desc.value = "";
+  reply.value = "";
+}, { flush: "sync" });
 const filterFeedback = ref("");
 const slaTargets = ref<SupportSlaTarget[]>([]);
 const ticketSuggestions = ref<SupportFaq[]>([]);
+const TICKET_SUGGESTION_PAGE_SIZE = 20;
+const ticketSuggestionPage = ref(0);
+const ticketSuggestionTotal = ref(0);
+const ticketSuggestionLoading = ref(false);
+const ticketSuggestionCache = new Map<string, SupportFaq[]>();
+const ticketSuggestionTotalCache = new Map<string, number>();
+const canLoadMoreTicketSuggestions = computed(() => ticketSuggestions.value.length < ticketSuggestionTotal.value);
 
 const historyTruncatedStyle: CSSProperties = {
   color: "var(--v5-warning)",
@@ -191,6 +213,10 @@ const historyTruncatedStyle: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--v5-warning) 38%, transparent)",
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+};
+const historyLoadEarlierStyle: CSSProperties = {
+  color: "var(--v5-brand)", fontSize: "13px", lineHeight: "20px", textAlign: "center",
+  padding: "8px", border: "1px solid var(--v5-border)", borderRadius: "8px",
 };
 
 onLoad((query) => {
@@ -216,11 +242,70 @@ async function loadSlaTargets() {
   slaTargets.value = await supportApi.slaTargets();
 }
 
-async function loadTicketSuggestions() {
-  ticketSuggestions.value = await supportApi.faqs(locale.code, newCat.value, "Ticket Create");
+let ticketSuggestionGeneration = 0;
+function ticketSuggestionKey(requestedLocale: string, requestedCategory: TicketCategory) {
+  return `${requestedLocale}:${requestedCategory}`;
 }
 
-watch(newCat, () => { void loadTicketSuggestions().catch(() => { ticketSuggestions.value = []; }); });
+async function loadTicketSuggestions() {
+  const requestGeneration = ++ticketSuggestionGeneration;
+  const requestedLocale = locale.code;
+  const requestedCategory = newCat.value;
+  const scopeKey = ticketSuggestionKey(requestedLocale, requestedCategory);
+  ticketSuggestions.value = ticketSuggestionCache.get(scopeKey) ?? [];
+  ticketSuggestionTotal.value = ticketSuggestionTotalCache.get(scopeKey) ?? ticketSuggestions.value.length;
+  ticketSuggestionPage.value = ticketSuggestions.value.length > 0
+    ? Math.ceil(ticketSuggestions.value.length / TICKET_SUGGESTION_PAGE_SIZE) : 0;
+  ticketSuggestionLoading.value = true;
+  try {
+    const next = await supportApi.faqPage(requestedLocale, requestedCategory, "Ticket Create", 1, TICKET_SUGGESTION_PAGE_SIZE);
+    if (requestGeneration === ticketSuggestionGeneration
+        && requestedLocale === locale.code && requestedCategory === newCat.value) {
+      ticketSuggestionCache.set(scopeKey, next.items);
+      ticketSuggestionTotalCache.set(scopeKey, next.total);
+      ticketSuggestions.value = next.items;
+      ticketSuggestionPage.value = next.pageNum;
+      ticketSuggestionTotal.value = next.total;
+    }
+  } catch {
+    if (requestGeneration === ticketSuggestionGeneration
+        && requestedLocale === locale.code && requestedCategory === newCat.value) {
+      ticketSuggestions.value = ticketSuggestionCache.get(scopeKey) ?? [];
+    }
+  } finally {
+    if (requestGeneration === ticketSuggestionGeneration
+        && requestedLocale === locale.code && requestedCategory === newCat.value) ticketSuggestionLoading.value = false;
+  }
+}
+
+async function loadMoreTicketSuggestions() {
+  if (ticketSuggestionLoading.value || !canLoadMoreTicketSuggestions.value) return;
+  const requestGeneration = ++ticketSuggestionGeneration;
+  const requestedLocale = locale.code;
+  const requestedCategory = newCat.value;
+  const scopeKey = ticketSuggestionKey(requestedLocale, requestedCategory);
+  const nextPage = ticketSuggestionPage.value + 1;
+  ticketSuggestionLoading.value = true;
+  try {
+    const next = await supportApi.faqPage(requestedLocale, requestedCategory, "Ticket Create", nextPage, TICKET_SUGGESTION_PAGE_SIZE);
+    if (requestGeneration === ticketSuggestionGeneration
+        && requestedLocale === locale.code && requestedCategory === newCat.value) {
+      const combined = [...new Map([...ticketSuggestions.value, ...next.items].map(item => [item.id, item])).values()];
+      ticketSuggestionCache.set(scopeKey, combined);
+      ticketSuggestionTotalCache.set(scopeKey, next.total);
+      ticketSuggestions.value = combined;
+      ticketSuggestionPage.value = next.pageNum;
+      ticketSuggestionTotal.value = next.total;
+    }
+  } catch {
+    // Keep the last good bounded snapshot; the load-more control remains retryable.
+  } finally {
+    if (requestGeneration === ticketSuggestionGeneration
+        && requestedLocale === locale.code && requestedCategory === newCat.value) ticketSuggestionLoading.value = false;
+  }
+}
+
+watch(() => [newCat.value, locale.code] as const, () => { void loadTicketSuggestions(); });
 
 async function reloadTickets() {
   try { await ticketsStore.refresh(); }
@@ -229,19 +314,30 @@ async function reloadTickets() {
 
 async function openTicket(id: string) {
   if (ticketsStore.mutating) return;
+  const scope = captureAccountScope();
   try {
     const ticket = await ticketsStore.load(id);
+    if (!isCurrentAccountScope(scope)) return;
     mode.value = { kind: "detail", id };
     await nextTick();
-    if (mode.value.kind === "detail" && mode.value.id === id) {
+    if (isCurrentAccountScope(scope) && mode.value.kind === "detail" && mode.value.id === id) {
       // The detail is already available. A stale read acknowledgement has its
       // own store-side readback and must not turn opening the ticket into an
       // erroneous user-facing failure toast.
       await ticketsStore.markRead(ticket).catch(() => undefined);
     }
   } catch {
+    if (!isCurrentAccountScope(scope)) return;
+    if (mode.value.kind === "detail" && !detailTicket.value) mode.value = { kind: "list" };
     toast.warn(t.value.security.opFailed);
   }
+}
+
+async function loadEarlierTicket() {
+  const current = detailTicket.value;
+  if (!current?.historyNextCursor) return;
+  try { await ticketsStore.loadEarlier(current.id); }
+  catch { toast.warn(t.value.security.opFailed); }
 }
 
 const alertIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>`;
@@ -375,6 +471,7 @@ const suggestionsStyle: CSSProperties = { marginTop: "12px", borderTop: "1px sol
 const suggestionRowStyle: CSSProperties = { padding: "10px 0", borderBottom: "1px solid var(--v5-border)" };
 const suggestionQuestionStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const suggestionAnswerStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.625, color: "var(--v5-ink-3)" };
+const ticketSuggestionLoadMoreStyle: CSSProperties = { minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--v5-brand)", fontSize: "13px", fontWeight: 600 };
 // Segmented control — filled container, no border (single visual difference).
 // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
 const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)" };

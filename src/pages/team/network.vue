@@ -180,6 +180,7 @@ import { rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
+import { onShow } from "@dcloudio/uni-app";
 
 const VIEW = 360;
 const CENTER = VIEW / 2;
@@ -220,6 +221,9 @@ onMounted(() => {
     pulseCursor += 1;
     pulseId.value = pick.id;
   }, 1200);
+});
+onShow(() => {
+  if (remoteApiEnabled) void network.refreshCanonicalNetwork();
 });
 onUnmounted(() => {
   if (pulseTimer) clearInterval(pulseTimer);

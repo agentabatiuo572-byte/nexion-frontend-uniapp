@@ -26,7 +26,9 @@ function list(label: string): CanonicalOrderList {
     quantity: 1, subtotalUsdt: 100, unitPriceUsdt: 100, discountUsdt: 0, amountUsdt: 100,
     paymentMethod: "USDT", paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT",
     activationStatus: "WAITING_PAYMENT", canonicalStatus: "placed", orderType: "SINGLE",
-    placedAt: 1, paidAt: null, activatedAt: null, dataCenter: null, tradeinNo: null,
+    placedAt: 1, expiresAt: 2, paidAt: null, activatedAt: null,
+    refundedAt: null, refundAmountUsdt: null, refundChannel: null, refundBillNo: null,
+    dataCenter: null, tradeinNo: null,
     sourceDeviceId: null, targetDeviceId: null, targetDeviceInstanceNo: null, itemCount: null,
   };
   return { source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [order] };

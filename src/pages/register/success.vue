@@ -74,7 +74,6 @@
           tabindex="0"
           @click="openOfficialDownload"
           @keydown.enter.prevent="openOfficialDownload"
-          @keydown.space.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
           <text class="rs-h5-download__arrow">↗</text>

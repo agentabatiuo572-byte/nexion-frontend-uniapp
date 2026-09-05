@@ -168,6 +168,9 @@
                 <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
               </view>
+              <button v-if="genesis.emissionPage.cursor" :disabled="genesis.emissionPage.busy" @click="genesis.loadMoreEmissions()">
+                {{ genesis.emissionPage.error ? t.orders.retry : t.orders.loadMore }}
+              </button>
             </view>
           </view>
         </template>
@@ -347,22 +350,19 @@ const progressUnlockText = computed(() => remoteApiEnabled
 
 // ── 上所后：排放快照（server-canonical mock）──
 const snap = computed(() => genesis.emissionSnapshot());
-const remotePaidUsdt = computed(() => genesis.remoteEmissions
-  .filter((entry) => entry.status === "PAID")
-  .reduce((sum, entry) => sum + entry.amountUsdt, 0));
-const remotePendingUsdt = computed(() => genesis.remoteEmissions
-  .filter((entry) => entry.status === "PENDING")
-  .reduce((sum, entry) => sum + entry.amountUsdt, 0));
+const remotePaidUsdt = computed(() => genesis.remoteEmissionTotals?.paidUsdt ?? null);
+const remotePendingUsdt = computed(() => genesis.remoteEmissionTotals?.pendingUsdt ?? null);
 const pctText = computed(() => {
   if (!remoteApiEnabled) return Math.round(snap.value.pctReleased * 100);
+  if (remotePaidUsdt.value === null || remotePendingUsdt.value === null) return "—";
   const total = remotePaidUsdt.value + remotePendingUsdt.value;
   return total > 0 ? Math.round((remotePaidUsdt.value / total) * 100) : 0;
 });
 const emittedText = computed(() => remoteApiEnabled
-  ? remotePaidUsdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  ? remotePaidUsdt.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) ?? "—"
   : Math.round(snap.value.emittedNEX).toLocaleString());
 const lockedText = computed(() => remoteApiEnabled
-  ? remotePendingUsdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  ? remotePendingUsdt.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) ?? "—"
   : Math.round(snap.value.lockedNEX).toLocaleString());
 const emissionUnit = computed(() => remoteApiEnabled ? "USDT" : "NEX");
 const refUsdText = computed(() => `$${Math.round(snap.value.emittedNEX * NEX_REF_USDT).toLocaleString()}`);
@@ -580,7 +580,7 @@ const ringStyle = computed<CSSProperties>(() => ({
   width: "92px",
   height: "92px",
   borderRadius: "50%",
-  background: `conic-gradient(var(--v5-brand) ${pctText.value}%, color-mix(in srgb, var(--v5-surface-2) 70%, transparent) 0)`,
+  background: `conic-gradient(var(--v5-brand) ${typeof pctText.value === "number" ? pctText.value : 0}%, color-mix(in srgb, var(--v5-surface-2) 70%, transparent) 0)`,
 }));
 const ringInnerStyle: CSSProperties = {
   width: "70px",

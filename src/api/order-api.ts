@@ -1,7 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
-import { validateHostedPaymentUrl } from "@/lib/hosted-payment";
+import { parseOrderLineItems, type OrderLineItem } from "@/lib/order-line-items";
 
 export const ORDER_STATUSES = [
   "placed",
@@ -35,8 +35,13 @@ export interface CanonicalOrder {
   canonicalStatus: CanonicalOrderStatus;
   orderType: string;
   placedAt: number;
+  expiresAt: number | null;
   paidAt: number | null;
   activatedAt: number | null;
+  refundedAt: number | null;
+  refundAmountUsdt: number | null;
+  refundChannel: string | null;
+  refundBillNo: string | null;
   dataCenter: string | null;
   tradeinNo: string | null;
   sourceDeviceId: number | null;
@@ -45,6 +50,8 @@ export interface CanonicalOrder {
   paymentNo?: string | null;
   /** Bundle composition count; a bundle order's quantity is still one order. */
   itemCount: number | null;
+  /** Server-authoritative composition, required for every bundle detail. */
+  lineItems?: OrderLineItem[] | null;
 }
 
 export interface CanonicalOrderList {
@@ -53,6 +60,7 @@ export interface CanonicalOrderList {
   runId: string | null;
   serverCanonical?: true;
   orders: CanonicalOrder[];
+  nextCursor?: string | null;
 }
 
 export interface CreatedOrder {
@@ -78,16 +86,17 @@ export interface CancelledOrder {
   idempotent: boolean;
 }
 
-export interface HostedPaymentSession {
+export interface PaidOrderReceipt {
   orderNo: string;
-  intentNo: string;
-  paymentMode: "hosted";
-  providerStatus: "created";
-  paymentUrl: string;
-  paymentUrlTrusted: true;
-  status: "awaiting_payment";
+  paymentNo: string;
+  paymentStatus: "PAID";
+  orderStatus: "COMPLETED";
+  activationStatus: "ACTIVATED";
+  canonicalStatus: "activated";
   amountUsdt: number;
-  vndAmount: number;
+  paymentMethod: "WALLET" | "VOUCHER";
+  walletBalanceAfterUsdt: number | null;
+  idempotent: boolean;
   serverCanonical: true;
   source: "server";
   sourceEnvironment: "PRODUCTION";
@@ -102,10 +111,10 @@ export interface CreateOrderRequest {
 }
 
 export interface OrderApi {
-  list(): Promise<CanonicalOrderList>;
+  list(beforeOrderNo?: string | null, pageSize?: number): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
-  createPaymentSession(orderNo: string, idempotencyKey: string): Promise<HostedPaymentSession>;
+  pay(orderNo: string, idempotencyKey: string): Promise<PaidOrderReceipt>;
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
@@ -186,6 +195,15 @@ function canonicalOrder(value: unknown): CanonicalOrder {
   const source = record(value);
   const status = nonEmptyString(source.canonicalStatus);
   if (!STATUS_SET.has(status)) return invalid();
+  const orderType = nonEmptyString(source.orderType);
+  let lineItems: OrderLineItem[] | null = null;
+  if (orderType.toUpperCase() === "BUNDLE") {
+    try {
+      lineItems = parseOrderLineItems(source.lineItems);
+    } catch {
+      return invalid();
+    }
+  }
   const parsed: CanonicalOrder = {
     orderNo: nonEmptyString(source.orderNo),
     productId: integer(source.productId, 1),
@@ -201,28 +219,41 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     orderStatus: nonEmptyString(source.orderStatus),
     activationStatus: nonEmptyString(source.activationStatus),
     canonicalStatus: status as CanonicalOrderStatus,
-    orderType: nonEmptyString(source.orderType),
+    orderType,
     placedAt: integer(source.placedAt, 0),
+    expiresAt: nullableTimestamp(source.expiresAt),
     paidAt: nullableTimestamp(source.paidAt),
     activatedAt: nullableTimestamp(source.activatedAt),
+    refundedAt: nullableTimestamp(source.refundedAt),
+    refundAmountUsdt: source.refundAmountUsdt === null || source.refundAmountUsdt === undefined
+      ? null : finiteNumber(source.refundAmountUsdt),
+    refundChannel: nullableString(source.refundChannel),
+    refundBillNo: nullableString(source.refundBillNo),
     dataCenter: nullableString(source.dataCenter),
     tradeinNo: nullableString(source.tradeinNo),
     sourceDeviceId: nullableInteger(source.sourceDeviceId),
     targetDeviceId: nullableInteger(source.targetDeviceId),
     targetDeviceInstanceNo: nullableString(source.targetDeviceInstanceNo),
     itemCount: nullableInteger(source.itemCount),
+    lineItems,
     ...(source.paymentNo === null || source.paymentNo === undefined
       ? {} : { paymentNo: nonEmptyString(source.paymentNo) }),
   };
   const paymentStatus = parsed.paymentStatus.toUpperCase();
   const orderStatus = parsed.orderStatus.toUpperCase();
   const activationStatus = parsed.activationStatus.toUpperCase();
+  const refundFacts = [parsed.refundedAt, parsed.refundAmountUsdt, parsed.refundChannel, parsed.refundBillNo];
+  const hasAnyRefundFact = refundFacts.some((value) => value !== null);
+  const hasCompleteRefundFacts = parsed.refundedAt !== null
+    && parsed.refundAmountUsdt !== null && parsed.refundAmountUsdt > 0
+    && parsed.refundChannel !== null && parsed.refundBillNo !== null;
   const coherentStatus = (() => {
     switch (parsed.canonicalStatus) {
       case "placed":
         return paymentStatus === "PENDING" && orderStatus === "PENDING_PAYMENT"
           && activationStatus === "WAITING_PAYMENT" && parsed.paidAt === null
-          && parsed.activatedAt === null;
+          && parsed.activatedAt === null && parsed.expiresAt !== null
+          && parsed.expiresAt > parsed.placedAt;
       case "paid":
         return paymentStatus === "PAID" && orderStatus === "PAID"
           && activationStatus === "WAITING_PROVISIONING" && parsed.paidAt !== null
@@ -245,7 +276,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
           && activationStatus === "PROVISIONING_FAILED";
       case "refunded":
         return paymentStatus === "REFUNDED" && orderStatus === "REFUNDED"
-          && activationStatus === "REFUNDED";
+          && activationStatus === "REFUNDED" && (!hasAnyRefundFact || hasCompleteRefundFacts);
       case "chargeback":
         return paymentStatus === "CHARGEBACK" && orderStatus === "CHARGEBACK"
           && activationStatus === "DEACTIVATED";
@@ -305,25 +336,31 @@ function cancelledOrder(value: unknown): CancelledOrder {
     idempotent: source.idempotent };
 }
 
-function hostedPaymentSession(value: unknown): HostedPaymentSession {
+function paidOrderReceipt(value: unknown): PaidOrderReceipt {
   const source = record(value);
-  if (source.paymentMode !== "hosted" || source.providerStatus !== "created"
-      || source.paymentUrlTrusted !== true || source.status !== "awaiting_payment"
+  if (source.paymentStatus !== "PAID" || source.orderStatus !== "COMPLETED"
+      || source.activationStatus !== "ACTIVATED" || source.canonicalStatus !== "activated"
       || source.serverCanonical !== true || source.source !== "server"
       || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") return invalid();
-  const paymentUrl = nonEmptyString(source.paymentUrl);
-  const trustedPaymentUrl = validateHostedPaymentUrl(paymentUrl);
-  if (!trustedPaymentUrl) return invalid();
+  const amountUsdt = finiteNumber(source.amountUsdt);
+  if (amountUsdt < 0) return invalid();
+  const paymentMethod = source.paymentMethod === "NEXGRID_WALLET" || source.paymentMethod === "WALLET"
+    ? "WALLET" : source.paymentMethod === "VOUCHER" ? "VOUCHER" : invalid();
+  if ((paymentMethod === "VOUCHER") !== (amountUsdt === 0)) return invalid();
+  const walletBalanceAfterUsdt = paymentMethod === "WALLET"
+    ? finiteNumber(source.walletBalanceAfterUsdt)
+    : source.walletBalanceAfterUsdt === null ? null : invalid();
   return {
     orderNo: nonEmptyString(source.orderNo),
-    intentNo: nonEmptyString(source.intentNo),
-    paymentMode: "hosted",
-    providerStatus: "created",
-    paymentUrl: trustedPaymentUrl,
-    paymentUrlTrusted: true,
-    status: "awaiting_payment",
-    amountUsdt: finiteNumber(source.amountUsdt, Number.MIN_VALUE),
-    vndAmount: finiteNumber(source.vndAmount, Number.MIN_VALUE),
+    paymentNo: nonEmptyString(source.paymentNo),
+    paymentStatus: "PAID",
+    orderStatus: "COMPLETED",
+    activationStatus: "ACTIVATED",
+    canonicalStatus: "activated",
+    amountUsdt,
+    paymentMethod,
+    walletBalanceAfterUsdt,
+    idempotent: typeof source.idempotent === "boolean" ? source.idempotent : invalid(),
     serverCanonical: true,
     source: "server",
     sourceEnvironment: "PRODUCTION",
@@ -333,10 +370,15 @@ function hostedPaymentSession(value: unknown): HostedPaymentSession {
 
 export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod"): OrderApi {
   return {
-    async list(): Promise<CanonicalOrderList> {
+    async list(beforeOrderNo = null, pageSize = 50): Promise<CanonicalOrderList> {
+      const cursor = beforeOrderNo?.trim() || null;
+      if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) return invalid();
+      const query = cursor
+        ? `beforeOrderNo=${encodeURIComponent(cursor)}&pageSize=${pageSize}`
+        : `pageSize=${pageSize}`;
       const payload = record(await client.request<unknown>({
         method: "GET",
-        path: "/api/orders",
+        path: `/api/orders?${query}`,
       }));
       if (!Array.isArray(payload.orders)) return invalid();
       const source = nonEmptyString(payload.source);
@@ -352,6 +394,7 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         sourceEnvironment: "PRODUCTION",
         runId: null,
         serverCanonical: true,
+        nextCursor: nullableString(payload.nextCursor),
         orders: payload.orders.map(canonicalOrder),
       };
     },
@@ -384,12 +427,12 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
       }));
     },
 
-    async createPaymentSession(orderNo, idempotencyKey): Promise<HostedPaymentSession> {
+    async pay(orderNo, idempotencyKey): Promise<PaidOrderReceipt> {
       const normalized = orderNo.trim();
       if (!normalized || !idempotencyKey.trim()) return invalid();
-      const parsed = hostedPaymentSession(await client.request<unknown>({
+      const parsed = paidOrderReceipt(await client.request<unknown>({
         method: "POST",
-        path: `/api/orders/${encodeURIComponent(normalized)}/payment-session`,
+        path: `/api/orders/${encodeURIComponent(normalized)}/pay`,
         idempotencyKey,
       }));
       if (parsed.orderNo !== normalized) return invalid();

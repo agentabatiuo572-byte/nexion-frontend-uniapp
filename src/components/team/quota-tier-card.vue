@@ -68,9 +68,12 @@
 
     <!-- CTA -->
     <view style="margin-top: 12px">
-      <view v-if="unlocked" class="flex items-center justify-center active:opacity-90" :style="buyCtaStyle" role="button" tabindex="0" :aria-label="fmt(t.quota.buyCta, { name: tier.name })" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
+      <view v-if="unlocked && stockLeft > 0 && tier.available !== false" class="flex items-center justify-center active:opacity-90" :style="buyCtaStyle" role="button" tabindex="0" :aria-label="fmt(t.quota.buyCta, { name: tier.name })" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
         <text :style="{ color: 'var(--v5-on-brand)' }" style="pointer-events: none">{{ fmt(t.quota.buyCta, { name: tier.name }) }}</text>
+      </view>
+      <view v-else-if="stockLeft <= 0 || tier.available === false" class="flex items-center justify-center" :style="lockedCtaStyle" aria-disabled="true">
+        <text>{{ t.quota.stockUnavailable }}</text>
       </view>
       <view v-else class="flex items-center justify-center active:opacity-80" :style="lockedCtaStyle" role="button" tabindex="0" :aria-label="t.quota.inviteToUnlock" @click="emit('navigate', '/pages/team/team')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -94,6 +97,7 @@ export interface QuotaCondition {
   kind: "invites" | "volume";
 }
 export interface QuotaTier {
+  available?: boolean;
   productId: string;
   name: string;
   price: number;
@@ -115,8 +119,8 @@ const unlocked = computed(() => {
   const met = props.tier.conditions.map((c) => c.current >= c.required);
   return props.tier.unlockKind === "either" ? met.some(Boolean) : met.every(Boolean);
 });
-const stockPct = computed(() => props.tier.soldThisMonth / props.tier.monthlyStock);
-const stockLeft = computed(() => props.tier.monthlyStock - props.tier.soldThisMonth);
+const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, props.tier.soldThisMonth / props.tier.monthlyStock) : 1);
+const stockLeft = computed(() => Math.max(0, props.tier.monthlyStock - props.tier.soldThisMonth));
 const stockLineText = computed(() =>
   fmt(t.value.quota.priceLine, { price: props.tier.price.toLocaleString(), left: stockLeft.value, stock: props.tier.monthlyStock }),
 );

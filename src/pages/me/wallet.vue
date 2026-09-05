@@ -22,26 +22,26 @@
       <view :style="heroStyle">
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">{{ usdtBalanceReadable ? `$${usdt.toFixed(2)}` : "—" }}</text>
-        <view v-if="fundsReadable" class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
+        <view v-if="fundsReadable" class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" role="button" tabindex="0" :aria-label="t.wallet.nexBalance" @click="goNex">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
           <text style="font-size: 13px; color: var(--v5-ink-3)">{{ nexLabel }} NEX</text>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
 
         <view v-if="fundsReadable" class="grid grid-cols-3" style="margin-top: 20px; gap: 8px">
-          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" @click="goTopup">
+          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" role="button" tabindex="0" :aria-label="t.wallet.topUp" @click="goTopup">
             <view class="grid place-items-center" :style="actionIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
             </view>
             <text :style="actionLabelStyle">{{ t.wallet.topUp }}</text>
           </view>
-          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" @click="goWithdraw">
+          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" role="button" tabindex="0" :aria-label="t.wallet.withdraw" @click="goWithdraw">
             <view class="grid place-items-center" :style="actionIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14" /><path d="m6 9 6-6 6 6" /><path d="M19 21H5" /></svg>
             </view>
             <text :style="actionLabelStyle">{{ t.wallet.withdraw }}</text>
           </view>
-          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" @click="goExchange">
+          <view class="flex flex-col items-center active:opacity-60" style="gap: 6px" role="button" tabindex="0" :aria-label="t.wallet.exchange" @click="goExchange">
             <view class="grid place-items-center" :style="actionIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>
             </view>

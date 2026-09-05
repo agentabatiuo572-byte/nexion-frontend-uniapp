@@ -16,7 +16,7 @@
         <InviteEarnCard />
 
         <!-- V3+ royalty hero -->
-        <view v-if="!remoteApiEnabled && myRank >= 3" class="rounded-2xl relative overflow-hidden active:opacity-95" :style="royaltyHeroStyle" @click="go('/pages/team/unilevel')">
+        <view v-if="!remoteApiEnabled && myRank >= 3" class="rounded-2xl relative overflow-hidden active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.royaltyHeroLabel" :style="royaltyHeroStyle" @click="go('/pages/team/unilevel')">
           <view class="flex items-center font-mono-tabular" :style="royaltyCapStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
             <text>{{ t.teamV3.royaltyHeroLabel }}</text>
@@ -30,7 +30,7 @@
         </view>
 
         <!-- My V-rank summary -->
-        <view class="nx-team-rank-link relative overflow-hidden rounded-2xl active:opacity-95" :style="rankCardStyle" @click="go('/pages/team/rank')">
+        <view class="nx-team-rank-link relative overflow-hidden rounded-2xl active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.yourRank" :style="rankCardStyle" @click="go('/pages/team/rank')">
           <NetworkOrbBackdrop :opacity="0.32" />
           <view class="relative" :style="rankContentStyle">
             <view :style="rankHeaderStyle">
@@ -56,7 +56,7 @@
         <!-- Unified quick nav -->
         <view class="nx-team-quick-panel rounded-2xl overflow-hidden" :style="quickPanelStyle">
           <!-- Leaderboard -->
-          <view class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
+          <view class="nx-team-leaderboard-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.leaderboardCard.title" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
@@ -74,7 +74,7 @@
           <view :style="quickDividerStyle" />
 
           <!-- Royalty network -->
-          <view class="nx-team-royalty-network-link" :class="remoteApiEnabled ? '' : 'active:opacity-95'" :style="quickRowStyle" @click="openReferralNetwork">
+          <view class="nx-team-royalty-network-link" :class="remoteApiEnabled ? '' : 'active:opacity-95'" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" :style="quickRowStyle" @click="openReferralNetwork">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-brand)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -93,7 +93,7 @@
           <view :style="quickDividerStyle" />
 
           <!-- Binary -->
-          <view class="nx-team-binary-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/binary')">
+          <view class="nx-team-binary-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.todayMatch" :style="quickRowStyle" @click="go('/pages/team/binary')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
@@ -112,7 +112,7 @@
           <view :style="quickDividerStyle" />
 
           <!-- Leadership pool -->
-          <view class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
+          <view class="nx-team-leadership-pool-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.weeklyPool" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-tech-cyan)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
@@ -142,14 +142,14 @@
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
         />
-        <view v-else :style="toolCellStyle(0)">
+        <view v-else :style="toolCellStyle(0)" role="button" tabindex="0" :aria-label="t.network.retry" @click="refreshRemoteLedger" @keydown.enter.prevent="refreshRemoteLedger" @keydown.space.prevent="refreshRemoteLedger">
           <text class="block" :style="toolTitleStyle">{{ t.network.projectionErrorDesc }}</text>
           <text class="block" :style="toolSubStyle">{{ t.network.retry }}</text>
         </view>
 
         <!-- Team tools -->
         <view class="grid" :style="toolGridStyle">
-          <view class="nx-team-quota-link active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
+          <view class="nx-team-quota-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.hardwareQuota" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-warning-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
@@ -159,7 +159,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.hardwareQuota }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.quotaSubtitle }}</text>
           </view>
-          <view class="nx-team-agent-link active:opacity-95" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
+          <view class="nx-team-agent-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.ambassador" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-brand-2-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
@@ -169,7 +169,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.ambassador }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.ambassadorSubtitle }}</text>
           </view>
-          <view class="nx-team-network-link active:opacity-95" :style="toolCellStyle(2)" @click="go('/pages/team/network')">
+          <view class="nx-team-network-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.visualizations.influenceNetwork" :style="toolCellStyle(2)" @click="go('/pages/team/network')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-tech-cyan-soft)')">
                 <view class="rounded-full" :style="orbDotStyle" />
@@ -179,7 +179,7 @@
             <text class="block" :style="toolTitleStyle">{{ t.teamV3.visualizations.influenceNetwork }}</text>
             <text class="block" :style="toolSubStyle">{{ t.teamV3.visualizations.orbitLiveMap }}</text>
           </view>
-          <view class="nx-team-tree-link active:opacity-95" :style="toolCellStyle(3)" @click="go('/pages/team/tree')">
+          <view class="nx-team-tree-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.visualizations.genealogy" :style="toolCellStyle(3)" @click="go('/pages/team/tree')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-brand-soft)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -198,6 +198,7 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import InviteEarnCard from "@/components/team/invite-earn-card.vue";
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
@@ -211,6 +212,7 @@ import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
+import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
 import { useReferralReward } from "@/store/referral-reward";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -229,7 +231,7 @@ const commission = useCommission();
 const pool = useLeadershipPool();
 const referralRewards = useReferralReward();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
-const remotePoolState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+const remotePoolState = ref<"idle" | "loading" | "ready" | "error" | "hold">(remoteApiEnabled ? "idle" : "ready");
 let remotePoolRequest = 0;
 let remotePoolMounted = true;
 
@@ -332,10 +334,10 @@ const leadershipPoolPrimary = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value.toFixed(1)}K`,
 );
 const leadershipPoolLineA = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.projectionErrorDesc : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHold : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const leadershipPoolLineB = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.retry : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "error" ? t.value.network.retry : "") : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
 );
 
 function go(url: string) {
@@ -348,16 +350,17 @@ function openReferralNetwork() {
 // unlockMatured at mount + every 60s.
 let unlockTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
-  if (remoteApiEnabled) {
-    void vrank.refreshCanonicalVRank();
-    void commission.refreshCanonicalBinary();
-    void commission.refreshCanonicalEvents();
-    void network.refreshCanonicalNetwork();
-    void refreshRemotePool();
-    return;
-  }
+  if (remoteApiEnabled) return;
   commission.unlockMatured();
   unlockTimer = setInterval(() => commission.unlockMatured(), 60_000);
+});
+onShow(() => {
+  if (!remoteApiEnabled) return;
+  void vrank.refreshCanonicalVRank();
+  void commission.refreshCanonicalBinary();
+  void commission.refreshCanonicalEvents();
+  void network.refreshCanonicalNetwork();
+  void refreshRemotePool();
 });
 async function refreshRemotePool() {
   if (!remoteApiEnabled) return;
@@ -375,11 +378,14 @@ async function refreshRemotePool() {
     if (!current()) return;
     remotePool.value = snapshot;
     remotePoolState.value = "ready";
-  } catch {
+  } catch (cause) {
     if (!current()) return;
     remotePool.value = null;
-    remotePoolState.value = "error";
+    remotePoolState.value = leadershipPoolFailureState(cause);
   }
+}
+async function refreshRemoteLedger() {
+  await Promise.allSettled([network.refreshCanonicalNetwork(), commission.refreshCanonicalEvents()]);
 }
 watch(() => app.accountKey, () => { if (remoteApiEnabled) { remotePool.value = null; void refreshRemotePool(); } });
 const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => {

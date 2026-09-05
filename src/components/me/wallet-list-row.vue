@@ -9,7 +9,7 @@
   <!-- 可交互 = 自带 href(内部导航)**或**父层挂了 @click(如 wallet 的「锁定收益」开弹层)。
        原先两个判定都只看 href:纯展示行照样绑 click(点了没反应 = 死控件),
        而用 @click 的行有监听器却拿不到按下反馈。现在统一由 interactive 决定两件事。 -->
-  <view class="flex items-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': interactive }" :style="rowStyle" v-on="href ? { click: go } : {}">
+  <view class="flex items-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': interactive }" :style="rowStyle" :role="interactive ? (href ? 'link' : 'button') : undefined" :tabindex="interactive ? 0 : undefined" v-on="href ? { click: go } : {}">
     <view class="grid place-items-center shrink-0" :style="iconChipStyle">
       <slot name="icon" />
     </view>

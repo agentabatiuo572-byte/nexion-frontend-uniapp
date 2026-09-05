@@ -63,12 +63,15 @@ const REGISTRY = {
   "how-entry-access.contract.test.mjs": { how: "chain" },
   "how-entry-navigation.contract.test.mjs": { how: "chain" },
   "legal-terms-gate-navigation.contract.test.mjs": { how: "chain" },
+  "login-registration-flow-separation.contract.test.mjs": { how: "chain" },
   "keyboard-submit-contract.test.mjs": { how: "chain" },
   "leadership-pool-consumers.test.mjs": { how: "chain" },
   "market-board-visual-contract.test.mjs": { how: "chain" },
   "onboarding-estimator-fail-closed.contract.test.mjs": { how: "chain" },
   "phone-activation-defer-contract.test.mjs": { how: "chain" },
   "p1-audit-regression.contract.test.mjs": { how: "chain" },
+  "learning-empty-state-contract.test.mjs": { how: "chain" },
+  "shared-keyboard-activation-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
   "country-code-selector-contract.test.mjs": { how: "chain" },
   "e18-e20-runtime-consumer-contract.test.mjs": { how: "chain" },
@@ -121,6 +124,8 @@ const REGISTRY = {
   "janus-stop-cancellation.test.mjs": { how: "elsewhere", by: "npm run test:janus-stop-cancellation + verify.sh" },
   "a11y-activate-behavior.test.mjs": { how: "elsewhere", by: "npm run test:a11y-activate + verify.sh 的 a11y_activate_gate(import .ts 源,需 type stripping)" },
   "learning-submission.test.mjs": { how: "elsewhere", by: "npm run test:learning-contracts(import .ts 源,需 type stripping)" },
+  "known-red.test.mjs": { how: "elsewhere", by: "npm run test:verify-harness(known-red 判定与到期行为自测)" },
+  "known-red-shell.test.mjs": { how: "elsewhere", by: "npm run test:verify-harness(跨 shell known-red 行为自测)" },
   // ── excluded:写清原因 ──
   "learning-api-contract.test.mjs": { how: "chain" },
   "h-remote-authority-contract.test.mjs": {

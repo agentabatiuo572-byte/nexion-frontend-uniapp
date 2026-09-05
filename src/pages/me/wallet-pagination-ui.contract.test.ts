@@ -45,6 +45,9 @@ describe("wallet pagination UI contracts", () => {
     expect(nex).toContain('v-if="remoteApiEnabled && bills.summaryStatus === \'error\'"');
     expect(nex).toContain('@click="refreshNexSummary"');
     expect(nex).toContain('v-else-if="remoteApiEnabled && bills.summaryStatus !== \'ready\'"');
+    expect(nex).toContain("t.wallet.loadingTransactions");
+    expect(nex).not.toContain('<text>…</text>');
+    expect(read("wallet-bills.vue")).toContain("t.wallet.loadingTransactions");
   });
 
   it("keeps rows visible for append failures, while initial refresh failures retry the first page", () => {

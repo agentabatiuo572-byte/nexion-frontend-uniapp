@@ -57,7 +57,7 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <EmptyState v-if="faqLoadError" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
+        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
         <EmptyState v-else-if="filtered.length === 0" :kind="query.trim() ? 'no-search-results' : 'empty-list'" :title="query.trim() ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
@@ -76,6 +76,22 @@
             </view>
           </view>
         </template>
+        <view v-if="faqLoadError && faqs.length > 0" :style="faqFallbackStyle" role="status" aria-live="polite">
+          <text>{{ t.empty.errorDesc }}</text>
+        </view>
+        <view
+          v-if="canLoadMoreFaqs"
+          class="flex items-center justify-center active:opacity-80"
+          :style="faqLoadMoreStyle"
+          role="button"
+          tabindex="0"
+          :aria-disabled="faqLoading ? 'true' : 'false'"
+          @click="loadMoreFaqs"
+          @keydown.enter.prevent="loadMoreFaqs"
+          @keydown.space.prevent="loadMoreFaqs"
+        >
+          <text>{{ faqLoading ? w.loadingMore : w.loadMore }}</text>
+        </view>
       </view>
 
       <!-- NexGridBot -->
@@ -162,6 +178,10 @@ const locale = useLocaleStore();
 const app = useApp();
 type FaqCategory = "getting-started" | "earnings" | "devices" | "payments" | "technical";
 const faqs = ref<SupportFaq[]>([]);
+const FAQ_PAGE_SIZE = 20;
+const faqPageNum = ref(0);
+const faqTotal = ref(0);
+const faqLoading = ref(false);
 
 const catOrder: FaqCategory[] = ["getting-started", "earnings", "devices", "payments", "technical"];
 
@@ -169,14 +189,62 @@ const query = ref("");
 const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
+let faqRequestGeneration = 0;
+const canLoadMoreFaqs = computed(() => faqs.value.length < faqTotal.value);
 const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US");
 const faqLanguageFallback = computed(() => faqs.value.length > 0
   && faqs.value.some((faq) => faq.language.toLowerCase() !== requestedFaqLanguage.value.toLowerCase()));
 
 async function loadFaqs() {
+  const requestGeneration = ++faqRequestGeneration;
+  const requestedLanguage = locale.code;
+  const requestScope = remoteAccountScope.snapshot();
   faqLoadError.value = false;
-  try { faqs.value = await supportApi.faqs(locale.code); }
-  catch { faqs.value = []; faqLoadError.value = true; }
+  faqLoading.value = true;
+  try {
+    const next = await supportApi.faqPage(requestedLanguage, undefined, "Help Center", 1, FAQ_PAGE_SIZE);
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      faqs.value = next.items;
+      faqPageNum.value = next.pageNum;
+      faqTotal.value = next.total;
+    }
+  } catch {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } finally {
+    if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
+  }
+}
+
+async function loadMoreFaqs() {
+  if (faqLoading.value || !canLoadMoreFaqs.value) return;
+  const requestGeneration = ++faqRequestGeneration;
+  const requestedLanguage = locale.code;
+  const requestScope = remoteAccountScope.snapshot();
+  const nextPage = faqPageNum.value + 1;
+  faqLoadError.value = false;
+  faqLoading.value = true;
+  try {
+    const next = await supportApi.faqPage(requestedLanguage, undefined, "Help Center", nextPage, FAQ_PAGE_SIZE);
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      faqs.value = [...new Map([...faqs.value, ...next.items].map(item => [item.id, item])).values()];
+      faqPageNum.value = next.pageNum;
+      faqTotal.value = next.total;
+    }
+  } catch {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } finally {
+    if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
+  }
+}
+
+function resetFaqProjection() {
+  faqRequestGeneration += 1;
+  faqs.value = [];
+  faqPageNum.value = 0;
+  faqTotal.value = 0;
+  openId.value = null;
+  faqLoadError.value = false;
+  faqLoading.value = false;
 }
 
 onShow(() => {
@@ -248,7 +316,11 @@ function syncBotAccountScope() {
   thinking.value = false;
 }
 
-watch(() => String(app.accountKey), syncBotAccountScope);
+watch(() => String(app.accountKey), () => {
+  syncBotAccountScope();
+  resetFaqProjection();
+  void loadFaqs();
+});
 
 function bumpScroll() {
   // Nudge scroll-top to jump to the latest message (uni scroll-view).
@@ -308,8 +380,10 @@ async function sendToBot() {
         ...errorMessage,
       }];
     } finally {
-      thinking.value = false;
-      if (helpScope.isCurrent(request)) bumpScroll();
+      if (helpScope.isCurrent(request)) {
+        thinking.value = false;
+        bumpScroll();
+      }
     }
     return;
   }
@@ -392,6 +466,7 @@ function chevStyle(open: boolean): CSSProperties {
 }
 const faqBodyStyle: CSSProperties = { padding: "0 0 14px" };
 const faqAStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 };
+const faqLoadMoreStyle: CSSProperties = { minHeight: "44px", color: "var(--v5-brand)", fontSize: "13px", fontWeight: 600, borderTop: "1px solid var(--v5-border)" };
 // NexGridBot — a contained chat widget (single surface container, no border).
 const botCardStyle: CSSProperties = {
   marginBottom: "12px",

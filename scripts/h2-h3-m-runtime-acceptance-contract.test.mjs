@@ -29,6 +29,6 @@ test("H3 and M distinguish an unavailable authority read from a real empty resul
   assert.ok(weekly.indexOf("Weekly quests unavailable") < weekly.indexOf("{{ completedCount }} / {{ tier2Quests.length }}"));
   assert.match(help, /faqLoadError/);
   assert.match(help, /@cta="loadFaqs"/);
-  assert.match(help, /supportApi\.faqs/);
+  assert.match(help, /supportApi\.faqPage/);
   assert.doesNotMatch(help, /@\/mock\/faq/);
 });

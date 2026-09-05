@@ -25,7 +25,13 @@ describe("market backend-canonical provenance", () => {
   it("accepts production facts in development without a run id", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce({ ...stakingSource, pools: stakingPools() })
-      .mockResolvedValueOnce({ ...stakingSource, positions: [], walletBalanceUsdt: 1000, serverTime: "2026-08-17T00:00:00Z" });
+      .mockResolvedValueOnce({
+        ...stakingSource,
+        positions: [],
+        positionsPage: { pageNum: 1, pageSize: 50, total: 0, hasMore: false },
+        walletBalanceUsdt: 1000,
+        serverTime: "2026-08-17T00:00:00Z",
+      });
     const api = createStakingApi({ request } as never, "dev");
     await expect(api.fetchStakingPools()).resolves.toHaveLength(4);
     await expect(api.fetchStakingPositions()).resolves.toMatchObject({ sourceEnvironment: "PRODUCTION", runId: "" });

@@ -163,12 +163,12 @@ describe("genesis remote truth contract", () => {
       provenance: { source: "nx_genesis_holding+nx_config_item", environment: "PRODUCTION", runId: "" },
       serverCanonical: true, source: "nx_genesis_holding+nx_config_item", sourceEnvironment: "PRODUCTION", runId: "",
     };
-    const request = vi.fn().mockResolvedValue({
+    const request = vi.fn().mockResolvedValueOnce({
       sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, source: "nx_genesis_holding+nx_config_item",
       series: { seriesCode: "GENESIS-MAIN", name: "Genesis", totalSupply: 1000, soldSupply: 0, remainingSupply: 1000, priceUsdt: 10, royaltyPct: 0, dailyEmissionRatePct: 0 },
       sale: { serverCanonical: true, available: true, eligibilityEnabled: true, maxPerUser: 20, minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 10, open: true },
       marketEnabled: true, emissionOpen: false, holdings: [holder], emissions: [], orders: [], walletBalanceUsdt: 1000, eligibility,
-    });
+    }).mockResolvedValue({ serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", items: [], nextCursor: null });
     await expect(createGenesisApi({ request } as never, "dev").account()).resolves.toMatchObject({
       holdings: [{ holdingNo: "G4-FIX-1", acquiredPriceUsdt: 0 }],
       eligibility: { holderStatus: "READY", reservedAllocation: 80000.25 },

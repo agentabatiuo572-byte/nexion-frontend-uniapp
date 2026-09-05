@@ -1,5 +1,12 @@
 # Project Instructions
 
+## Main-only owner decision (2026-09-05)
+
+- The only retained branch is `main`, locally and on GitHub. This supersedes the `UniApp` branch name and the package-branch workflow below.
+- The owner explicitly authorized publishing the current local source directly over remote `main` for the 2026-09-05 consolidation. Back up old refs and dirty files first; use an exact `--force-with-lease`, never an unconditional force.
+- This consolidation is an explicitly authorized mainline-commit exception. Keep the existing audited exception mechanism, secret checks, and verification requirements; do not use `--no-verify`.
+- Do not recreate `UniApp`, `pkg/*`, or `codex/*` branches without a new explicit owner instruction.
+
 ## UniApp GitHub Sync Rules
 
 - After each completed task, sync (commit + push) to GitHub automatically without asking; state the pushed range in the wrap-up report. (Owner decision 2026-08-15 — supersedes the old ask-first rule.)

@@ -61,6 +61,8 @@ export interface CanonicalTradeinConfig {
   creditRatesPct: number[];
   requireHigherPrice: boolean;
   maxDevicesPerOrder: number;
+  earlyAccessEnabled: boolean;
+  earlyAccessLeadDays: number;
   source: string;
 }
 
@@ -117,6 +119,16 @@ export interface CanonicalTradeinResult {
   walletBalanceAfterUsdt: number;
 }
 
+export interface CanonicalCapacityKeepResult {
+  operationNo: string;
+  orderNo: string;
+  targetDeviceId: number;
+  deviceStatus: "INACTIVE";
+  orderStatus: "PAID";
+  walletDebitUsdt: number;
+  walletBalanceAfterUsdt: number;
+}
+
 export interface CanonicalDeviceCommandResult {
   deviceId: number;
   instanceNo: string;
@@ -155,6 +167,11 @@ export interface DeviceE3Api {
     idempotencyKey: string,
     expectedQuote: CanonicalCapacityReplaceQuote,
   ): Promise<CanonicalTradeinResult>;
+  capacityKeep(
+    targetProductNo: string,
+    idempotencyKey: string,
+    expectedQuote: CanonicalCapacityReplaceQuote,
+  ): Promise<CanonicalCapacityKeepResult>;
   submit(
     sourceDeviceId: number,
     targetProductNo: string,
@@ -309,6 +326,8 @@ function config(value: unknown): CanonicalTradeinConfig {
   const credits = numberArray(source.creditRatesPct, 5);
   if (!cuts.every((entry, index) => index === 0 || cuts[index - 1] < entry)) return invalid();
   if (!credits.every((entry, index) => index === 0 || credits[index - 1] > entry)) return invalid();
+  const earlyAccessLeadDays = integer(source.earlyAccessLeadDays, 7);
+  if (![7, 14, 30, 60, 90].includes(earlyAccessLeadDays)) return invalid();
   return {
     enabled: boolean(source.enabled),
     eligibility: string(source.eligibility),
@@ -316,6 +335,8 @@ function config(value: unknown): CanonicalTradeinConfig {
     creditRatesPct: credits,
     requireHigherPrice: boolean(source.requireHigherPrice),
     maxDevicesPerOrder: integer(source.maxDevicesPerOrder, 1),
+    earlyAccessEnabled: boolean(source.earlyAccessEnabled),
+    earlyAccessLeadDays,
     source: string(source.source),
   };
 }
@@ -369,6 +390,22 @@ function result(value: unknown): CanonicalTradeinResult {
   };
   if (parsed.applicationStatus !== "COMPLETED" || parsed.orderStatus !== "COMPLETED") return invalid();
   return parsed;
+}
+
+function capacityKeepResult(value: unknown): CanonicalCapacityKeepResult {
+  const source = record(value);
+  const deviceStatus = string(source.deviceStatus).toUpperCase();
+  const orderStatus = string(source.orderStatus).toUpperCase();
+  if (deviceStatus !== "INACTIVE" || orderStatus !== "PAID") return invalid();
+  return {
+    operationNo: string(source.operationNo),
+    orderNo: string(source.orderNo),
+    targetDeviceId: integer(source.targetDeviceId, 1),
+    deviceStatus: "INACTIVE",
+    orderStatus: "PAID",
+    walletDebitUsdt: number(source.walletDebitUsdt),
+    walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
+  };
 }
 
 function eligibility(value: unknown): CanonicalTradeinEligibility {
@@ -579,6 +616,30 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
         payableUsdt: expectedQuote.payableUsdt,
         walletBalanceUsdt: expectedQuote.walletBalanceUsdt,
       });
+    },
+    async capacityKeep(targetProductNo, idempotencyKey, expectedQuote) {
+      const key = idempotencyKey.trim();
+      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+      if (expectedQuote.decision !== "REPLACE_REQUIRED"
+          || expectedQuote.targetProductNo !== targetProductNo
+          || expectedQuote.decisionSource !== "server") {
+        throw new ApiError({ kind: "configuration", message: "CAPACITY_KEEP_QUOTE_CONTEXT_INVALID" });
+      }
+      const parsed = capacityKeepResult(await client.request<unknown>({
+        method: "POST",
+        path: "/api/app/trade-in/capacity-keep",
+        body: {
+          targetProductNo: validTargetNo(targetProductNo),
+          expectedPayableUsdt: number(expectedQuote.payableUsdt),
+        },
+        idempotencyKey: key,
+      }));
+      if (!sameMoney(parsed.walletDebitUsdt, expectedQuote.payableUsdt)
+          || !sameMoney(parsed.walletBalanceAfterUsdt,
+            expectedQuote.walletBalanceUsdt - expectedQuote.payableUsdt)) {
+        return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
+      }
+      return parsed;
     },
     async submit(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
       const key = idempotencyKey.trim();

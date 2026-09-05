@@ -18,7 +18,7 @@
         <view v-if="remoteApiEnabled && remoteError" :style="remoteErrorStyle">
           <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
+          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof" @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
         </view>
 
       <view :style="bodyStyle">
@@ -34,7 +34,10 @@
               role="button"
               tabindex="0"
               :aria-label="t.proof.variants[v]"
+              :aria-pressed="variant === v"
               @click="variant = v"
+              @keydown.enter.stop.prevent="variant = v"
+              @keydown.space.stop.prevent="variant = v"
             >
               <text :style="variantPillTextStyle(v)" style="pointer-events: none">{{ t.proof.variants[v] }}</text>
             </view>
@@ -121,6 +124,8 @@
                 tabindex="0"
                 :aria-label="t.proof.shareDestinations.copy"
                 @click="copyLink"
+                @keydown.enter.stop.prevent="copyLink"
+                @keydown.space.stop.prevent="copyLink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                 <text style="margin-left: 4px; pointer-events: none">{{ referralLink }}</text>
@@ -143,6 +148,8 @@
             tabindex="0"
             :aria-label="t.proof.shareNative"
             @click="nativeShare"
+            @keydown.enter.stop.prevent="nativeShare"
+            @keydown.space.stop.prevent="nativeShare"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
             <text style="margin-left: 8px; pointer-events: none" :style="nativeBtnTextStyle">{{ t.proof.shareNative }}</text>
@@ -161,6 +168,8 @@
             tabindex="0"
             :aria-label="d.label"
             @click="d.onClick"
+            @keydown.enter.stop.prevent="d.onClick"
+            @keydown.space.stop.prevent="d.onClick"
           >
             <view class="grid place-items-center" :style="destIconStyle(d.color)" style="pointer-events: none">
               <view v-html="d.icon" />
@@ -211,6 +220,7 @@ import { useNexFaucet } from "@/store/nex-faucet";
 import { proofApi, remoteApiEnabled } from "@/api/runtime";
 import type { ProofSnapshot } from "@/api/proof-api";
 import { proofStreakFacts } from "@/lib/proof-streak";
+import { proofPosterText } from "@/lib/proof-poster-values";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
   captureRuntimeRevision,
@@ -434,9 +444,9 @@ function drawProofPoster(): Promise<void> {
 
       ctx.setFillStyle("#9cabbd");
       ctx.setFontSize(24);
-      ctx.fillText(`${t.value.proof.activeDays}: ${activeDays.value}`, 124, 660);
-      ctx.fillText(`${t.value.proof.devices}: ${onlineDevices.value}`, 124, 706);
-      ctx.fillText(`${t.value.proof.teamMembers}: ${totalMembers.value}`, 124, 752);
+      ctx.fillText(`${t.value.proof.activeDays}: ${proofPosterText(activeDays.value)}`, 124, 660);
+      ctx.fillText(`${t.value.proof.devices}: ${proofPosterText(onlineDevices.value)}`, 124, 706);
+      ctx.fillText(`${t.value.proof.teamMembers}: ${proofPosterText(totalMembers.value)}`, 124, 752);
 
       drawPosterQr(ctx, 634, 438, 300);
       ctx.setFillStyle("#b7ff3c");
@@ -465,8 +475,8 @@ function posterMetricLabel(): string {
 }
 
 function posterMetricValue(): string {
-  if (variant.value === "streak") return `${longestOrCurrent.value} ${t.value.proof.daysShort}`;
-  if (variant.value === "network") return String(totalMembers.value);
+  if (variant.value === "streak") return `${proofPosterText(longestOrCurrent.value)} ${t.value.proof.daysShort}`;
+  if (variant.value === "network") return proofPosterText(totalMembers.value);
   return `$${earningsTotalText.value}`;
 }
 

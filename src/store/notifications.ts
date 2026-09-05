@@ -36,6 +36,9 @@ export const useNotifications = defineStore("notifications", () => {
   const error = ref<string | null>(null);
   const nextCursor = ref<string | null>(null);
   const seenIds = new Set<string>();
+  let refreshGeneration = 0;
+  let pendingRemoteMutations = 0;
+  let remoteMutationQueue: Promise<void> = Promise.resolve();
 
   function persist() {
     if (remoteApiEnabled) return;
@@ -60,33 +63,41 @@ export const useNotifications = defineStore("notifications", () => {
   async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     if (!remoteApiEnabled) return;
     if (!remoteAccountEpoch.isCurrent(request)) return;
+    while (pendingRemoteMutations > 0) {
+      await remoteMutationQueue;
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+    }
+    const generation = ++refreshGeneration;
+    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
     loading.value = true;
     error.value = null;
-    items.value = [];
-    unread.value = 0;
-    nextCursor.value = null;
     try {
       const page = await notificationApi.page();
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+      if (!isCurrent()) return;
       appendRemote(page, true);
     } catch (cause) {
-      if (!remoteAccountEpoch.isCurrent(request)) return;
-      items.value = [];
-      unread.value = 0;
+      if (!isCurrent()) return;
       error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
     } finally {
-      if (remoteAccountEpoch.isCurrent(request)) loading.value = false;
+      if (isCurrent()) loading.value = false;
     }
   }
   async function loadMoreRemote() {
     if (!remoteApiEnabled || !nextCursor.value || loading.value) return;
     const request = remoteAccountEpoch.snapshot();
+    while (pendingRemoteMutations > 0) {
+      await remoteMutationQueue;
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+    }
+    if (!nextCursor.value || loading.value) return;
     const requestedCursor = nextCursor.value;
+    const generation = ++refreshGeneration;
+    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
     loading.value = true;
     error.value = null;
     try {
       const page = await notificationApi.page(requestedCursor);
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+      if (!isCurrent()) return;
       if (page.nextCursor === requestedCursor) {
         nextCursor.value = null;
         error.value = "NOTIFICATION_PAGE_CURSOR_OVERLAP";
@@ -95,16 +106,31 @@ export const useNotifications = defineStore("notifications", () => {
       appendRemote(page, false);
     }
     catch (cause) {
-      if (remoteAccountEpoch.isCurrent(request)) error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
+      if (isCurrent()) error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
     }
     finally {
-      if (remoteAccountEpoch.isCurrent(request)) loading.value = false;
+      if (isCurrent()) loading.value = false;
     }
   }
   async function retryRemote() { await refreshRemote(); }
+  function enqueueRemoteMutation<T>(request: RemoteAccountRequest, operation: () => Promise<T>): Promise<T | undefined> {
+    pendingRemoteMutations += 1;
+    // The queued command represents a newer intent than any read already in flight.
+    // Later reads wait for the queue; earlier reads lose ownership immediately.
+    refreshGeneration += 1;
+    loading.value = false;
+    const queued = remoteMutationQueue.then(async () => {
+      if (!remoteAccountEpoch.isCurrent(request)) return undefined;
+      return operation();
+    });
+    const settled = queued.finally(() => { pendingRemoteMutations -= 1; });
+    remoteMutationQueue = settled.then(() => undefined, () => undefined);
+    return settled;
+  }
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     remoteAccountEpoch.bind(boundKey);
+    refreshGeneration += 1;
     if (remoteApiEnabled) {
       items.value = [];
       unread.value = 0;
@@ -125,46 +151,62 @@ export const useNotifications = defineStore("notifications", () => {
     recount(); persist();
   }
   async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
-    const item = items.value.find((value) => value.id === id);
-    if (!item || item.readAt) return;
     if (remoteApiEnabled) {
-      try {
-        await notificationApi.markRead(Number(id));
-      } catch (cause) {
+      return enqueueRemoteMutation(request, async () => {
+        const item = items.value.find((value) => value.id === id);
+        if (!item || item.readAt) return;
+        try {
+          await notificationApi.markRead(Number(id));
+        } catch (cause) {
+          if (!remoteAccountEpoch.isCurrent(request)) return;
+          error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          return false;
+        }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
-        return false;
-      }
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+        error.value = null;
+        items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value);
+        recount();
+      });
     }
-    if (!remoteAccountEpoch.isCurrent(request)) return;
+    const item = items.value.find((value) => value.id === id);
+    if (!item || item.readAt || !remoteAccountEpoch.isCurrent(request)) return;
     items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value); recount(); persist();
   }
   async function markAllRead() {
     const request = remoteAccountEpoch.snapshot();
     if (remoteApiEnabled) {
-      try {
-        await notificationApi.markAllRead();
-      } catch (cause) {
+      return enqueueRemoteMutation(request, async () => {
+        try {
+          await notificationApi.markAllRead();
+        } catch (cause) {
+          if (!remoteAccountEpoch.isCurrent(request)) return;
+          error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          return false;
+        }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
-        return false;
-      }
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+        error.value = null;
+        items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() });
+        recount();
+      });
     }
     items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() }); recount(); persist();
   }
   async function clearRead() {
     const request = remoteAccountEpoch.snapshot();
     if (remoteApiEnabled) {
-      try {
-        await notificationApi.clearRead();
-      } catch (cause) {
+      return enqueueRemoteMutation(request, async () => {
+        try {
+          await notificationApi.clearRead();
+        } catch (cause) {
+          if (!remoteAccountEpoch.isCurrent(request)) return;
+          error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          return false;
+        }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
-        return false;
-      }
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+        error.value = null;
+        items.value = items.value.filter((item) => !item.readAt);
+        recount();
+      });
     }
     items.value = items.value.filter((item) => !item.readAt); recount(); persist();
   }
@@ -173,19 +215,40 @@ export const useNotifications = defineStore("notifications", () => {
     const numericId = Number(id);
     if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
     const request = remoteAccountEpoch.snapshot();
-    try {
-      const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
-      if (!remoteAccountEpoch.isCurrent(request)) return null;
-      await markRead(id, request);
-      if (!remoteAccountEpoch.isCurrent(request)) return null;
-      return result.route;
-    } catch (cause) {
-      if (!remoteAccountEpoch.isCurrent(request)) return null;
+    type ActionResult =
+      | { kind: "done"; route: string | null }
+      | { kind: "uncertain"; cause: unknown };
+    const queued = await enqueueRemoteMutation(request, async (): Promise<ActionResult> => {
+      try {
+        const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
+        if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
+        try {
+          await notificationApi.markRead(numericId);
+        } catch (cause) {
+          if (remoteAccountEpoch.isCurrent(request)) {
+            error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          }
+          // The primary action is already confirmed. Keep its route even when the
+          // secondary read acknowledgement needs a later retry.
+          return { kind: "done", route: remoteAccountEpoch.isCurrent(request) ? result.route : null };
+        }
+        if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
+        error.value = null;
+        items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value);
+        recount();
+        return { kind: "done", route: result.route };
+      } catch (cause) {
+        return { kind: "uncertain", cause };
+      }
+    });
+    if (!queued || !remoteAccountEpoch.isCurrent(request)) return null;
+    if (queued.kind === "uncertain") {
       await refreshRemote(request);
       if (!remoteAccountEpoch.isCurrent(request)) return null;
-      error.value = cause instanceof Error ? cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
+      error.value = queued.cause instanceof Error ? queued.cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
       return null;
     }
+    return queued.route;
   }
   async function recordCta(id: string) { return recordRemoteAction(id, "cta"); }
   async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }

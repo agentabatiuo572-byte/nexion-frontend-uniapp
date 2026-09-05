@@ -291,7 +291,7 @@ const remoteLoadMoreStatus = ref<"idle" | "loading" | "error">("idle");
 let remoteRequest = 0;
 let mounted = true;
 onMounted(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void network.refreshCanonicalNetwork(); void loadRemote(); } });
-onShow(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void loadRemote(); } });
+onShow(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void network.refreshCanonicalNetwork(); void loadRemote(); } });
 watch(() => app.accountKey, () => {
   if (!remoteApiEnabled) return;
   remoteSnapshot.value = null;

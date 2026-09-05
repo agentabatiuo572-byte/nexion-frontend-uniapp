@@ -11,7 +11,7 @@
 <template>
   <AppChassis active="team">
     <view class="pb-6" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" />
+      <SubPageHeader back="/pages/team/team" :title="vState.prizeName || t.rank.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- My status — de-carded: sits directly on the page floor (card shell +
@@ -114,6 +114,7 @@ import { useVRank, nextRankProgress, type VRank, type VRankDef, type VRankReward
 import { rankGapText, rankConditionsText, rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
+import { onShow } from "@dcloudio/uni-app";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
@@ -141,6 +142,9 @@ const prog = computed(() =>
 
 onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.
+  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+});
+onShow(() => {
   if (remoteApiEnabled) void vState.refreshCanonicalVRank();
 });
 

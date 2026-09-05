@@ -210,7 +210,7 @@
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Label }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Body }}</text>
               </view>
-              <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle" @click="openTrustUrl(row.Url)">
+              <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle" role="button" tabindex="0" :aria-label="row.Primary" @click="openTrustUrl(row.Url)">
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
                 <text v-if="row.Url" class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
@@ -218,7 +218,7 @@
             </template>
             <template v-else>
               <text class="block" :style="trustBodyStyle">{{ t.trust.errorUnavailable }}</text>
-              <text class="block active:opacity-70" :style="trustRetryStyle" @click="refreshTrustMaterial">{{ t.ui.retry }}</text>
+              <text class="block active:opacity-70" :style="trustRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="refreshTrustMaterial">{{ t.ui.retry }}</text>
             </template>
           </view>
         </template>

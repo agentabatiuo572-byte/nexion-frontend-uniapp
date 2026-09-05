@@ -36,4 +36,9 @@ describe("earn history Proof-of-Compute interaction", () => {
     expect(receiptsPage).toContain('@keydown.enter.stop.prevent="loadMoreRemoteReceipts"');
     expect(receiptsPage).toContain('@keydown.space.stop.prevent="loadMoreRemoteReceipts"');
   });
+
+  it("uses the same 8 GB routing capacity as the server for Cloud Share", () => {
+    expect(taskCenter).toContain("const CLOUD_SHARE_ROUTING_VRAM_GB = 8");
+    expect(taskCenter).toMatch(/d\.kind === "cloud-share" \? CLOUD_SHARE_ROUTING_VRAM_GB : d\.vramTotal/);
+  });
 });

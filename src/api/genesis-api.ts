@@ -1,6 +1,7 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
+import { readGenesisHistoryPages } from "./genesis-history-pages";
 
 export type GenesisSourceEnvironment = "PRODUCTION";
 
@@ -107,6 +108,7 @@ export interface GenesisPublicState {
   emissionOpen: boolean;
   listings: GenesisListing[];
   transactions: GenesisTransaction[];
+  transactionsNextCursor?: string | null;
   tiers: GenesisTier[];
   tiersVersion: number;
   marketOpenState: "open" | "closed";
@@ -137,6 +139,9 @@ export interface GenesisAccountState {
   holdings: GenesisHolding[];
   emissions: GenesisEmission[];
   orders: GenesisTransaction[];
+  ordersNextCursor?: string | null;
+  emissionsNextCursor?: string | null;
+  emissionTotals?: { paidUsdt: number; pendingUsdt: number } | null;
   eligibility: GenesisEligibility;
   walletBalanceUsdt: number;
   billNo?: string;
@@ -449,6 +454,10 @@ export function parseGenesisAccountState(
     holdings: row.holdings.map(parseHolding),
     emissions: row.emissions.map(parseEmission),
     orders: orders.map(parseTransaction),
+    emissionTotals: row.emissionTotals == null ? null : {
+      paidUsdt: number(record(row.emissionTotals)?.paidUsdt) ?? invalid(),
+      pendingUsdt: number(record(row.emissionTotals)?.pendingUsdt) ?? invalid(),
+    },
     eligibility: parseEligibility(row.eligibility, mode),
     walletBalanceUsdt,
     billNo: text(row.billNo) ?? undefined,
@@ -457,13 +466,54 @@ export function parseGenesisAccountState(
 }
 
 export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod") {
+  async function accountHistoryPage<T>(kind: "orders" | "emissions", parser: (v: unknown) => T, cursor?: string) {
+    if (cursor !== undefined && !/^[1-9][0-9]{0,18}$/.test(cursor)) return invalid();
+    const row = record(await client.request({ method: "GET", authenticated: true,
+      path: `/api/genesis/account?history=${kind}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}` }));
+    if (!row || !validAuthority(row, mode) || !Array.isArray(row.items)
+        || !(row.nextCursor === null || (typeof row.nextCursor === "string" && /^[1-9][0-9]{0,18}$/.test(row.nextCursor)))) return invalid();
+    return { items: row.items.map(parser), nextCursor: row.nextCursor as string | null };
+  }
+  async function transactionPage(cursor?: string) {
+    if (cursor !== undefined && !/^[1-9][0-9]{0,18}$/.test(cursor)) return invalid();
+    const row = record(await client.request({ method: "GET", authenticated: false,
+      path: `/api/genesis/state?history=transactions${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    }));
+    if (!row || !validAuthority(row, mode) || !Array.isArray(row.items)
+        || !(row.nextCursor === null || (typeof row.nextCursor === "string" && /^[1-9][0-9]{0,18}$/.test(row.nextCursor)))) return invalid();
+    return { items: row.items.map(parseTransaction), nextCursor: row.nextCursor as string | null };
+  }
+  async function history<T>(kind: string, parser: (value: unknown) => T): Promise<T[]> {
+    const authenticated = kind === "orders" || kind === "emissions";
+    return readGenesisHistoryPages(async (cursor) => {
+      const row = record(await client.request({ method: "GET", authenticated,
+        path: `/api/genesis/${authenticated ? "account" : "state"}?history=${kind}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      }));
+      if (!row || !validAuthority(row, mode) || !Array.isArray(row.items)
+          || !(row.nextCursor === null || (typeof row.nextCursor === "string" && /^[1-9][0-9]{0,18}$/.test(row.nextCursor)))) return invalid();
+      return { items: row.items.map(parser), nextCursor: row.nextCursor as string | null };
+    });
+  }
   return {
-    state: async () => parseGenesisPublicState(await client.request({
+    transactionPage,
+    orderPage: (cursor?: string) => accountHistoryPage("orders", parseTransaction, cursor),
+    emissionPage: (cursor?: string) => accountHistoryPage("emissions", parseEmission, cursor),
+    state: async () => {
+      const state = parseGenesisPublicState(await client.request({
       method: "GET", path: "/api/genesis/state", authenticated: false,
-    }), mode),
-    account: async () => parseGenesisAccountState(await client.request({
+      }), mode);
+      const [listings, transactions] = await Promise.all([history("listings", parseListing), transactionPage()]);
+      return { ...state, listings, transactions: transactions.items, transactionsNextCursor: transactions.nextCursor };
+    },
+    account: async () => {
+      const state = parseGenesisAccountState(await client.request({
       method: "GET", path: "/api/genesis/account", authenticated: true,
-    }), mode),
+      }), mode);
+      const [orders, emissions] = await Promise.all([
+        accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission)]);
+      return { ...state, orders: orders.items, emissions: emissions.items,
+        ordersNextCursor: orders.nextCursor, emissionsNextCursor: emissions.nextCursor };
+    },
     eligibility: async () => parseEligibility(await client.request({
       method: "GET", path: "/api/genesis/eligibility", authenticated: true,
     }), mode),

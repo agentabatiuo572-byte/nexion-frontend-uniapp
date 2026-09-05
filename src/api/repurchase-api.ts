@@ -43,6 +43,7 @@ export interface RepurchaseOrder {
 
 export interface RepurchaseSnapshot {
   orders: RepurchaseOrder[];
+  ordersPage: { total: number; pageNum: number; pageSize: number };
   walletBalanceUsdt: number;
   serverTime: number;
   focusOrderNo?: string;
@@ -213,9 +214,16 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): RepurchaseSnapshot
   }
   const validRow = row;
   const orders = rawOrders.map(parseOrder);
+  const page = record(row.ordersPage);
+  const total = integer(page?.total);
+  const pageNum = integer(page?.pageNum, 1);
+  const pageSize = integer(page?.pageSize, 1);
   if (new Set(orders.map((order) => order.orderNo)).size !== orders.length) return invalid();
+  if (!page || total === null || pageNum === null || pageSize === null
+      || orders.length > pageSize || orders.length > total) return invalid();
   return {
     orders,
+    ordersPage: { total, pageNum, pageSize },
     walletBalanceUsdt,
     serverTime,
     focusOrderNo: optionalText(validRow, "focusOrderNo"),
@@ -235,16 +243,36 @@ function requireKey(value: string): string {
 }
 
 export function createRepurchaseApi(client: ApiClient, mode: ApiEnvironment = "prod"): RepurchaseApi {
+  const fetchAllOrders = async (): Promise<RepurchaseSnapshot> => {
+    const first = parseSnapshot(await client.request({
+      method: "GET", path: "/api/repurchase/orders?pageNum=1&pageSize=50",
+    }), mode);
+    if (first.ordersPage.pageNum !== 1 || first.ordersPage.pageSize !== 50) return invalid();
+    const orders = [...first.orders];
+    const ids = new Set(orders.map((order) => order.orderNo));
+    let pageNum = first.ordersPage.pageNum;
+    while (orders.length < first.ordersPage.total) {
+      pageNum += 1;
+      const next = parseSnapshot(await client.request({
+        method: "GET", path: `/api/repurchase/orders?pageNum=${pageNum}&pageSize=${first.ordersPage.pageSize}`,
+      }), mode);
+      if (next.ordersPage.pageNum !== pageNum || next.ordersPage.pageSize !== first.ordersPage.pageSize
+          || next.ordersPage.total !== first.ordersPage.total || next.orders.length === 0) return invalid();
+      for (const order of next.orders) {
+        if (ids.has(order.orderNo)) return invalid();
+        ids.add(order.orderNo);
+        orders.push(order);
+      }
+    }
+    return { ...first, orders, ordersPage: { ...first.ordersPage, pageNum } };
+  };
   return {
     fetchConfig: async () => parseConfig(await client.request({
       method: "GET",
       path: "/api/config/repurchase",
       authenticated: false,
     }), mode),
-    fetchOrders: async () => parseSnapshot(await client.request({
-      method: "GET",
-      path: "/api/repurchase/orders",
-    }), mode),
+    fetchOrders: fetchAllOrders,
     open: async (amountUsdt, idempotencyKey) => parseSnapshot(await client.request({
       method: "POST",
       path: "/api/repurchase/orders",

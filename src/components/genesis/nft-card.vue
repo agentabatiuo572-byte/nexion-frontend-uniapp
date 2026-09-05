@@ -2,9 +2,9 @@
 <template>
   <view class="relative overflow-hidden" :style="cardStyle">
     <view class="flex items-center justify-center" :style="artStyle">
-      <text>#{{ id }}</text>
+      <text :title="String(id)" :aria-label="String(id)">#{{ displayGenesisHoldingId(id) }}</text>
     </view>
-    <text class="block" :style="idLineStyle">NEX-GEN-{{ paddedId }}</text>
+    <text class="block" :style="idLineStyle" :title="String(id)" :aria-label="String(id)">{{ displayGenesisHoldingId(id) }}</text>
     <view class="flex items-baseline justify-between" style="margin-top: 6px">
       <text class="tabular-nums" :style="priceStyle">${{ price }}K</text>
       <text :style="agoStyle">{{ agoText }}</text>
@@ -13,14 +13,14 @@
 </template>
 
 <script setup lang="ts">
+import { displayGenesisHoldingId } from "@/lib/genesis-holding-id";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
-const props = defineProps<{ id: number; price: number; ago: string }>();
+const props = defineProps<{ id: string | number; price: number; ago: string }>();
 
 const t = useT();
-const paddedId = computed(() => props.id.toString().padStart(4, "0"));
 const agoText = computed(() => fmt(t.value.genesis.agoLabel, { t: props.ago }));
 
 // Collectible tile — filled surface, no border (single visual difference); the

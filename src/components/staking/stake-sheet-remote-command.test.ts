@@ -23,6 +23,7 @@ function harness(storage?: RemoteIntentStorage) {
     props: { term: 30 },
     amount: { value: 100.001 },
     minAmount: { value: 10 },
+    canOpen: { value: true },
     app: { accountKey: "user:1", accountBindingEpoch: 1 },
     remotePending: { value: false },
     remoteGate: new RemoteIntentKeyRegistry("G1", persistent),
@@ -46,6 +47,13 @@ function harness(storage?: RemoteIntentStorage) {
 }
 
 describe("stake sheet remote command boundaries", () => {
+  it("never dispatches a stopped pool", async () => {
+    const h = harness();
+    h.canOpen.value = false;
+    await h.submit();
+    expect(h.risk.checkGate).not.toHaveBeenCalled();
+    expect(h.staking.openRemote).not.toHaveBeenCalled();
+  });
   it("uses the exact original amount when the input changes during risk verification", async () => {
     const h = harness();
     const pending = h.submit();

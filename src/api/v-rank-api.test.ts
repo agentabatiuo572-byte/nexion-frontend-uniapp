@@ -9,6 +9,7 @@ const row = (v: number) => ({
 it("preserves every configured reward type for App display without issuing a reward", async () => {
   const request = vi.fn().mockResolvedValue({
     source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    prizeName: "NexGrid V-Rank",
     ranks: ladder().map((item) => item.v === 3 ? { ...item, rewards: [
       { type: "USDT", amount: 10 }, { type: "VOUCHER", voucherId: "WELCOME-10" },
       { type: "SKU", skuId: "SKU-PRO" }, { type: "CUSTOM", customLabel: "Event access" },
@@ -33,7 +34,7 @@ const current = {
 describe("v-rank API authority provenance", () => {
   it("requires canonical production provenance in remote mode", async () => {
     const request = vi.fn().mockResolvedValue({
-      source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", ranks: ladder(),
+      source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank", ranks: ladder(),
     });
     await expect(createVRankApi({ request } as never, "prod").ladder()).resolves.toMatchObject({
       serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
@@ -42,7 +43,7 @@ describe("v-rank API authority provenance", () => {
 
   it("rejects missing canonical marker or a cross-environment response", async () => {
     const request = vi.fn().mockResolvedValue({
-      source: "nx_v_rank_config", sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260816", ranks: ladder(),
+      source: "nx_v_rank_config", sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260816", prizeName: "NexGrid V-Rank", ranks: ladder(),
     });
     await expect(createVRankApi({ request } as never, "prod").ladder())
       .rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
@@ -50,7 +51,7 @@ describe("v-rank API authority provenance", () => {
 
   it("uses the Java production authority rail in development mode", async () => {
     const request = vi.fn()
-      .mockResolvedValueOnce({ source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", ranks: ladder() })
+      .mockResolvedValueOnce({ source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank", ranks: ladder() })
       .mockResolvedValueOnce(current);
     const api = createVRankApi({ request } as never, "dev");
 

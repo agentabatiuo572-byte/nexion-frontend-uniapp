@@ -51,7 +51,7 @@
               <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.lockedReq }}</text>
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ lockedSubText }}</text>
             </view>
-            <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" @click="go('/pages/team/rank')">
+            <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" role="button" tabindex="0" @click="go('/pages/team/rank')">
               <text>{{ t.agent.pathCta }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </view>
@@ -136,7 +136,7 @@
             </view>
           </view>
 
-          <view class="rounded-full flex items-center justify-center active:scale-[0.98]" :style="submitStyle" @click="submit">
+          <view class="rounded-full flex items-center justify-center active:scale-[0.98]" :style="submitStyle" role="button" tabindex="0" :aria-disabled="unlocked ? 'false' : 'true'" @click="submit">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="unlocked ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             <text>{{ unlocked ? t.agent.submitForReview : t.agent.lockedV5 }}</text>
           </view>
@@ -145,16 +145,16 @@
         </view>
 
         <!-- approved cases — transparent hairline rows -->
-        <view v-if="remoteApiEnabled && latestApplication.status !== 'NONE'" :style="casesBlockStyle">
+        <view v-if="remoteApiEnabled && applications.length > 0" :style="casesBlockStyle">
           <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.serverApplication }}</text>
           <view :style="casesGroupStyle">
-            <view :style="caseRowStyle(true)">
+            <view v-for="(application, index) in applications" :key="application.applicationId ?? index" :style="caseRowStyle(index === applications.length - 1)">
               <view class="flex items-start justify-between">
                 <view>
-                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ latestApplication.city }} · {{ latestApplication.eventDate }}</text>
-                  <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ applicationProof }}</text>
+                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ application.city }} · {{ application.eventDate }}</text>
+                  <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ applicationProof(application) }}</text>
                 </view>
-                <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ applicationStatusText }}</text>
+                <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ applicationStatusText(application) }}</text>
               </view>
             </view>
           </view>
@@ -257,9 +257,10 @@ const submitting = ref(false);
 const latestApplication = ref<AmbassadorApplication>({ applicationId: null, status: "NONE", city: null,
   eventDate: null, budgetUsdt: null, bucket: null, submittedAt: null, source: "server",
   sourceEnvironment: "PRODUCTION", runId: "" });
+const applications = ref<AmbassadorApplication[]>([]);
 
-const applicationStatusText = computed(() => t.value.agent.applicationStatuses[latestApplication.value.status]);
-const applicationProof = computed(() => "PRODUCTION · server");
+const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
+const applicationProof = (application: AmbassadorApplication) => `${application.sourceEnvironment} · ${application.source}`;
 
 let agentMounted = true;
 let agentRequestGeneration = 0;
@@ -298,6 +299,7 @@ function resetAgentPageState(): void {
   invalidateAgentRequests();
   clearAgentFormState();
   latestApplication.value = emptyApplication();
+  applications.value = [];
   policy.value = null;
   submitting.value = false;
 }
@@ -321,6 +323,12 @@ function payloadIdentity(input: AmbassadorApplicationInput): string {
 async function refreshLatest(requestScope = captureAgentRequest()): Promise<AmbassadorApplication> {
   const value = await ambassadorApplicationApi.latest();
   if (requestIsCurrent(requestScope)) latestApplication.value = value;
+  return value;
+}
+
+async function refreshHistory(requestScope = captureAgentRequest()): Promise<AmbassadorApplication[]> {
+  const value = await ambassadorApplicationApi.history();
+  if (requestIsCurrent(requestScope)) applications.value = value;
   return value;
 }
 
@@ -365,6 +373,7 @@ async function submit() {
       if (!requestIsCurrent(requestScope)) return;
       latestApplication.value = result;
       finishAmbassadorCommand(requestScope.accountKey, identity);
+      void refreshHistory(requestScope).catch(() => undefined);
     } catch (error) {
       if (!requestIsCurrent(requestScope)) return;
       const recovery = ambassadorSubmitErrorRecovery(isSettledRejection(error));
@@ -396,6 +405,7 @@ function refreshAgentPage(): void {
   const requestScope = captureAgentRequest();
   void Promise.all([
     refreshLatest(requestScope).catch(() => undefined),
+    refreshHistory(requestScope).catch(() => undefined),
     ambassadorApplicationApi.policy().then((value) => {
       if (!requestIsCurrent(requestScope)) return;
       policy.value = value;

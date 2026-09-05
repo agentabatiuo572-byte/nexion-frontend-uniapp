@@ -32,8 +32,8 @@
 
       <!-- Tabs — SegmentedControl (HIG 44pt, accent = tech-cyan) -->
       <view class="mx-4 mt-3">
-        <view class="grid" :style="segWrapStyle">
-          <view v-for="o in tabOptions" :key="o.value" class="grid place-items-center active:opacity-70" :style="pillStyle(o.value)" @click="tab = o.value">
+        <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.developer.headline">
+          <view v-for="o in tabOptions" :key="o.value" class="grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" tabindex="0" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value">
             <text :style="pillLabelStyle(o.value)">{{ o.label }}</text>
           </view>
         </view>
@@ -41,6 +41,9 @@
 
       <!-- Overview -->
       <template v-if="tab === 'overview'">
+        <view v-if="remoteApiEnabled" class="mx-4 mt-3 rounded-xl" :style="requestStatusStyle">
+          <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.capabilityRoadmap }}</text>
+        </view>
         <view class="mx-4 mt-3" :style="apiListStyle">
           <view v-for="(c, i) in apiCards" :key="c.title" class="flex items-start" :style="apiRowStyle(i === apiCards.length - 1)">
             <view class="grid place-items-center shrink-0" :style="apiIconBoxStyle(c.color)">
@@ -78,14 +81,14 @@
           </view>
           <view v-if="remoteApiEnabled && latestLoadFailed" class="rounded-xl" :style="requestStatusStyle">
             <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
-            <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
+            <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
           </view>
           <view v-if="canSubmitAccessRequest" class="space-y-2">
             <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph" />
           </view>
-          <view v-if="canSubmitAccessRequest" class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
+          <view v-if="canSubmitAccessRequest" class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" role="button" tabindex="0" :aria-label="t.developer.formSubmit" :aria-busy="submitting ? 'true' : 'false'" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ submitting ? "…" : t.developer.formSubmit }}</text>
           </view>
@@ -99,7 +102,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
-          <view v-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
+          <view v-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
@@ -116,7 +119,7 @@
           <view v-else>
             <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
             <view v-for="item in apiKeys" :key="item.id" class="flex items-center" :style="resourceRowStyle">
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
@@ -135,7 +138,7 @@
           <view v-else>
             <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
             <view v-for="item in webhooks" :key="item.id" :style="resourceRowStyle">
               <view class="flex items-center">
@@ -290,7 +293,7 @@ interface ApiCardDef {
   ellipses?: Array<{ cx: number; cy: number; rx: number; ry: number }>;
   lines?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
 }
-const apiCards: ApiCardDef[] = [
+const apiCards = computed<ApiCardDef[]>(() => [
   {
     title: t.value.developer.apiCompute,
     desc: t.value.developer.apiComputeD,
@@ -317,7 +320,7 @@ const apiCards: ApiCardDef[] = [
     color: "var(--v5-tech-cyan)",
     icon: ["M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18", "m21 12-3-3 3-3", "M3 12a9 9 0 0 0 9 9"],
   },
-];
+]);
 
 function newRequestKey(): string { return `developer-access:${requireCryptoUuid()}`; }
 function resourceBusy(intent: string): boolean { return resourceBusyKeys.value.has(intent); }

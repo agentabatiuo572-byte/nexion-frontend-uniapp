@@ -4,13 +4,13 @@
   纯展示层:两段说明 + 升级 CTA;不读写任何业务状态。
 -->
 <template>
-  <view v-if="visible" class="fixed inset-0" style="z-index: 900">
+  <view v-if="visible" class="nx-capacity-explainer-root fixed inset-0" style="z-index: 900" role="dialog" aria-modal="true" :aria-label="t.earn.capExplainTitle" @click.stop>
     <!-- 仅 @click(uni 编译器小程序端自动映射 tap;H5 双绑会双触发) -->
     <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="close" />
     <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
-        <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" @click.stop="close">
+        <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click.stop="close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -31,7 +31,7 @@
         <view style="margin-top: 6px"><text :style="secBodyStyle">{{ t.earn.capExplainS2Body }}</text></view>
       </view>
 
-      <view class="mt-5 w-full grid place-items-center active:scale-[0.98]" :style="ctaStyle" @click.stop="goStore">
+      <view class="mt-5 w-full grid place-items-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" :aria-label="t.earn.capExplainCta" @click.stop="goStore">
         <text :style="ctaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
@@ -39,13 +39,16 @@
 </template>
 
 <script setup lang="ts">
-import type { CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const { visible, close } = useCapacityExplainer();
+
+useDialogA11y(computed(() => visible.value), ".nx-capacity-explainer-root", close);
 
 function goStore() {
   close();

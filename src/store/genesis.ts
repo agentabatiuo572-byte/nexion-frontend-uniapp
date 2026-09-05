@@ -16,6 +16,7 @@ import { hasGenesisAuthorityForAccount } from "@/lib/genesis-auth-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { resolveRemoteGenesisPurchase } from "@/lib/genesis-remote-purchase";
 import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
+import { genesisHoldingId } from "@/lib/genesis-holding-id";
 import type {
   GenesisAccountState,
   GenesisEmission,
@@ -120,7 +121,7 @@ export function evaluateGenesisSalePolicy(
 
 /** A user's active secondary-market listing */
 export interface MyListing {
-  tokenId: number;
+  tokenId: string | number;
   askPriceUSDT: number;
   listedAt: number;
 }
@@ -136,7 +137,7 @@ interface GenesisGlobalData {
 /** 用户持仓片(per-account 行,随账号走;P2-8 设备级泄漏修复)。 */
 interface GenesisUserData {
   myOwned: number;
-  ownedTokenIds: number[];
+  ownedTokenIds: Array<string | number>;
   myListings: MyListing[];
   idempotencyKeys?: Record<string, string>;
 }
@@ -245,6 +246,8 @@ export function retireGenesisPurchaseIntent(
   return next;
 }
 
+import { createGenesisActivityPager } from "@/lib/genesis-activity-pager";
+
 export const useGenesis = defineStore("genesis", () => {
   const cfg = useGenesisConfig(); // 单向读配置(档位定价);同 free-trial→trial-config 先例
   const initGlobal = remoteApiEnabled ? remoteDefaults() : hydrateGlobal();
@@ -255,16 +258,18 @@ export const useGenesis = defineStore("genesis", () => {
   const totalSlots = ref(remoteApiEnabled ? 0 : TOTAL_SLOTS);
   const soldSlots = ref(initGlobal.soldSlots);
   const myOwned = ref(initUser.myOwned);
-  const ownedTokenIds = ref<number[]>(initUser.ownedTokenIds);
+  const ownedTokenIds = ref<Array<string | number>>(initUser.ownedTokenIds);
   const myListings = ref<MyListing[]>(initUser.myListings);
   const nexListed = ref(initGlobal.nexListed);
   const nexListedAt = ref<number | null>(initGlobal.nexListedAt);
   const lastTickTs = ref(0);
-  const holdingNoByTokenId = ref<Record<number, string>>({});
-  const listingNoByTokenId = ref<Record<number, string>>({});
-  const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
-  const remoteTransactions = ref<GenesisPublicState["transactions"]>([]);
-  const remoteOrders = ref<GenesisAccountState["orders"]>([]);
+  const holdingNoByTokenId = ref<Record<string, string>>({});
+  const listingNoByTokenId = ref<Record<string, string>>({});
+  const remoteListings = ref<Array<{ tokenId: string; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
+  const activityPager = createGenesisActivityPager((cursor) => genesisApi.transactionPage(cursor));
+  const remoteTransactions = computed(() => activityPager.state.items);
+  const orderPager = createGenesisActivityPager((cursor) => genesisApi.orderPage(cursor));
+  const remoteOrders = computed(() => orderPager.state.items);
   const remoteMarketStats = ref<GenesisMarketStats>({
     floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null,
   });
@@ -272,24 +277,23 @@ export const useGenesis = defineStore("genesis", () => {
   const remoteEligibilityError = ref<string | null>(null);
   const remoteHalted = ref(remoteApiEnabled);
   const remoteHoldings = ref<GenesisHolding[]>([]);
-  const remoteEmissions = ref<GenesisEmission[]>([]);
+  const emissionPager = createGenesisActivityPager((cursor) => genesisApi.emissionPage(cursor), (item) => `${item.batchNo}:${item.holdingNo}`);
+  const remoteEmissions = computed(() => emissionPager.state.items);
+  const remoteEmissionTotals = ref<GenesisAccountState["emissionTotals"]>(null);
   const intentKeys = ref<Record<string, string>>(initUser.idempotencyKeys ?? {});
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
+  let remoteReadGeneration = 0;
 
-  function tokenIdFor(value: string): number {
-    let hash = 0;
-    for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) % 900_000;
-    return hash + 1;
-  }
+  const tokenIdFor = genesisHoldingId;
 
   function applyPublicState(state: GenesisPublicState): void {
     totalSlots.value = state.series.totalSupply;
     soldSlots.value = state.series.soldSupply;
     nexListed.value = state.emissionOpen;
-    remoteTransactions.value = [...state.transactions];
+    activityPager.reset(state.transactions, state.transactionsNextCursor ?? null);
     remoteMarketStats.value = state.marketStats;
     remoteHalted.value = state.halted;
-    const listingMap: Record<number, string> = {};
+    const listingMap: Record<string, string> = Object.create(null);
     remoteListings.value = state.listings.map((listing) => {
       const tokenId = tokenIdFor(listing.holdingNo);
       listingMap[tokenId] = listing.holdingNo;
@@ -301,7 +305,7 @@ export const useGenesis = defineStore("genesis", () => {
   function applyAccountState(state: GenesisAccountState): void {
     // Account responses are canonical development/production facts. Supply is
     // still owned by GET /api/genesis/state; account reads cannot replace it.
-    const holdingMap: Record<number, string> = {};
+    const holdingMap: Record<string, string> = Object.create(null);
     const ids = state.holdings.map((holding) => {
       const tokenId = tokenIdFor(holding.holdingNo);
       holdingMap[tokenId] = holding.holdingNo;
@@ -309,8 +313,9 @@ export const useGenesis = defineStore("genesis", () => {
     });
     holdingNoByTokenId.value = holdingMap;
     remoteHoldings.value = [...state.holdings];
-    remoteEmissions.value = [...state.emissions];
-    remoteOrders.value = [...state.orders];
+    emissionPager.reset(state.emissions, state.emissionsNextCursor ?? null);
+    orderPager.reset(state.orders, state.ordersNextCursor ?? null);
+    remoteEmissionTotals.value = state.emissionTotals ?? null;
     ownedTokenIds.value = ids;
     myOwned.value = ids.length;
     remoteEligibility.value = state.eligibility;
@@ -330,8 +335,9 @@ export const useGenesis = defineStore("genesis", () => {
 
   function clearRemoteAccountFacts(): void {
     remoteHoldings.value = [];
-    remoteEmissions.value = [];
-    remoteOrders.value = [];
+    emissionPager.reset([], null);
+    orderPager.reset([], null);
+    remoteEmissionTotals.value = null;
     holdingNoByTokenId.value = {};
     ownedTokenIds.value = [];
     myListings.value = [];
@@ -348,7 +354,7 @@ export const useGenesis = defineStore("genesis", () => {
     nexListed.value = false;
     nexListedAt.value = null;
     remoteListings.value = [];
-    remoteTransactions.value = [];
+    activityPager.reset([], null);
     listingNoByTokenId.value = {};
     clearRemoteAccountFacts();
     remoteHalted.value = true;
@@ -364,12 +370,16 @@ export const useGenesis = defineStore("genesis", () => {
     runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    const readGeneration = ++remoteReadGeneration;
+    activityPager.reset(activityPager.state.items, null);
+    orderPager.reset(orderPager.state.items, null);
+    emissionPager.reset(emissionPager.state.items, null);
     // Public supply/market facts are readable without a user session. The
     // orchestrator independently fences protected account/eligibility reads
     // by bearer authority and account/RunID epoch.
     return readGenesisRemoteFacts(genesisApi, {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
-      isCurrent: () => remoteScopeCurrent(request, runScope),
+      isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope),
       clear: clearRemoteFacts,
       clearAccount: clearRemoteAccountFacts,
       applyEligibilityError: (reason) => { remoteEligibilityError.value = reason; },
@@ -614,7 +624,7 @@ export const useGenesis = defineStore("genesis", () => {
     return { ok: true, cost };
   }
 
-  async function listNode(tokenId: number, askPriceUSDT: number): Promise<boolean> {
+  async function listNode(tokenId: string | number, askPriceUSDT: number): Promise<boolean> {
     // 🔴 守卫必须在 holdingNo 之前:holdingNo 由服务端状态派生,mock 下恒空 ——
     //   守卫放在 lookup 之后的话,本地路径照样被 `if (!holdingNo) return false` 挡死。
     if (remoteApiEnabled) {
@@ -664,7 +674,7 @@ export const useGenesis = defineStore("genesis", () => {
   //   若关闭态连撤单也拦,用户的席位就被困在一张永远卖不掉的单里,既不能撤回也无人承接
   //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
   //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
-  async function cancelListing(tokenId: number): Promise<boolean> {
+  async function cancelListing(tokenId: string | number): Promise<boolean> {
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
@@ -694,7 +704,7 @@ export const useGenesis = defineStore("genesis", () => {
    * 新资格策略固定覆盖一级与二级交易；生产端在原子成交事务内再次校验。
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
-  async function acquireSecondary(tokenId: number): Promise<boolean> {
+  async function acquireSecondary(tokenId: string | number): Promise<boolean> {
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
@@ -761,6 +771,9 @@ export const useGenesis = defineStore("genesis", () => {
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
     remoteListings, remoteTransactions, remoteMarketStats, remoteEligibility, remoteEligibilityError, remoteHalted,
+    activityPage: activityPager.state, loadMoreActivity: activityPager.more,
+    orderPage: orderPager.state, loadMoreGenesisOrders: orderPager.more,
+    emissionPage: emissionPager.state, loadMoreEmissions: emissionPager.more, remoteEmissionTotals,
     remoteHoldings, remoteEmissions, remoteOrders, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };

@@ -24,7 +24,7 @@ describe("VietQR live daily-capacity guard", () => {
   });
 
   it("returns credited users to the wallet while new top-up remains a separate reset action", () => {
-    expect(source).toMatch(/function finishCreditedFlow\(\)[\s\S]{0,250}navBack\("\/pages\/me\/wallet"\)/);
+    expect(source).toMatch(/async function finishCreditedFlow\(\)[\s\S]{0,600}await app\.refreshRemoteFleet[\s\S]{0,300}navBack\("\/pages\/me\/wallet"\)/);
     expect(source).toMatch(/function startNewTopup\(\)[\s\S]{0,250}viewIntentId\.value = null/);
   });
 

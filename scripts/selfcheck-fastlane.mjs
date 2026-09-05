@@ -1142,10 +1142,14 @@ function functionBody(src, opener) {
     check("🔴 提现页:日限事实来自服务端 policy + app.withdrawals,且文案与闸共用同一个数",
       pgCode.includes("limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,")
         && pgCode.includes("withdrawals: app.withdrawals,")
-        && pgCode.includes("fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) })")
-        // 🔴 说不说这句 ⟺ 闸拦不拦。limitCount ≤0 时判定按「不限制」走,这句必须消失 ——
-        // 否则后端不可达时页面会写「每日限额:0 笔/日」(实景实测过的原话)。
-        && pgCode.includes('<text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>'));
+        && pgCode.includes("const limitFacts = computed(() => withdrawalLimitFacts({")
+        && pgCode.includes("dailyLimitCount: dailyFacts.value.limitCount,")
+        && pgCode.includes("withdrawals: dailyFacts.value.withdrawals,")
+        && pgCode.includes("limit: String(dailyFacts.value.limitCount),")
+        // 🔴 说不说使用量 ⟺ 服务端是否配置了计数闸；未配置时必须明确显示未设，
+        // 不能把 0 伪装成每日额度。
+        && pgCode.includes('<text v-if="limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>')
+        && pgCode.includes('<text v-else-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>'));
     check("🔴 提现页:显示 / 降额 CTA / 提交前复检均走服务端事实或冻结快照",
       (() => {
         // mock 轨的纯函数评估必须吃 dailyFacts；remote 轨的显示与降额 CTA 使用

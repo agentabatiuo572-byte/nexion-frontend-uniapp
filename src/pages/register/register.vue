@@ -111,7 +111,7 @@
         <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
       <!-- Error -->
-      <view v-if="error" class="rg-error">
+      <view v-if="error" class="rg-error" role="alert" aria-live="assertive">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="rg-error__t">{{ error }}</text>
       </view>
@@ -136,20 +136,20 @@
       <text v-if="!ctaEnabled && !busy" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
-      <view v-if="step === 1" class="rg-oauth">
+      <view v-if="step === 1 && !remoteApiEnabled" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
         <AuthProviderGrid :busy="busy" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
       </view>
 
       <!-- Footer -->
       <view class="rg-footer">
-        <text v-if="step === 1" class="rg-footer__acc">{{ t.register.haveAccount }} <text class="rg-footer__link" role="link" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">{{ t.register.signIn }}</text></text>
-        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.register.termsServiceLink }}</text> · <text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy" @keydown.space.prevent="goPrivacy">{{ t.privacy.title }}</text></text>
+        <text v-if="step === 1" class="rg-footer__acc">{{ t.register.haveAccount }} <text class="rg-footer__link" role="link" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin">{{ t.register.signIn }}</text></text>
+        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms">{{ t.register.termsServiceLink }}</text> · <text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy">{{ t.privacy.title }}</text></text>
       </view>
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
-    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
+    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" :provider-hold="remoteApiEnabled" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </StandalonePageShell>
 </template>
@@ -448,7 +448,11 @@ async function requestCode(captchaTicket?: string) {
   verifying.value = true;
   if (remoteApiEnabled) {
     try {
-      const res = await authApi.sendRegistrationOtp({ countryCode: country.value, phone: phoneClean.value });
+      const res = await authApi.sendRegistrationOtp({
+        countryCode: country.value,
+        phone: phoneClean.value,
+        ...(captchaTicket ? { captchaTicket } : {}),
+      });
       if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
       verifying.value = false;
       otpRequestId.value = res.challengeNo;
@@ -460,7 +464,11 @@ async function requestCode(captchaTicket?: string) {
     } catch (cause) {
       if (!mounted || flowVersion !== otpFlowVersion) return;
       verifying.value = false;
-      error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
+      if (cause instanceof Error && cause.message === "USER_CAPTCHA_REQUIRED") {
+        showCaptcha.value = true;
+      } else {
+        error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
+      }
       // 开发构建里区分「产品坏了」与「本地后端没起」——网络级失败时亮工程横幅。
       if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev";
     }

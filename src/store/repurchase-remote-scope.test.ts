@@ -40,6 +40,7 @@ const config: RepurchaseConfig = {
 
 const snapshot: RepurchaseSnapshot = {
   orders: [],
+  ordersPage: { total: 0, pageNum: 1, pageSize: 50 },
   walletBalanceUsdt: 500,
   serverTime: Date.now(),
   sourceEnvironment: "PRODUCTION",

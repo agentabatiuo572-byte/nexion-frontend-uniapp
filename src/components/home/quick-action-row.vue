@@ -11,7 +11,11 @@
       :key="c.href"
       class="text-center active:opacity-70"
       :style="chipStyle(c.tone)"
+      role="link"
+      tabindex="0"
+      :aria-label="c.label"
       @click="go(c.href)"
+	      @keydown.enter.prevent="onKeyboardActivate($event, () => go(c.href))"
     >
       <view class="grid place-items-center" style="height: 24px">
         <!-- 质押 — gem (lucide) -->
@@ -45,6 +49,9 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
+import { isActionableQuest } from "@/lib/actionable-quest";
+import { useNow } from "@/composables/use-now";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
@@ -59,6 +66,10 @@ const faucet = useNexFaucet();
 const genesis = useGenesis();
 const quest = useQuest();
 const stakingApyPct = ref<number | null>(null);
+const stakingLoading = ref(true);
+const stakingFailed = ref(false);
+const now = useNow();
+let stakingRequest = 0;
 // 🔴 首页快捷入口的「剩 N 席」也是名额紧迫文案(独立验收 P2-14):创世页与商城卡都关了,
 //   这里没关,关闭态下首页仍在催「仅剩 153 席」。判据走同一个 composable,不另写。
 // 🔴 阻断说明走 blockText **唯一出口**(独立验收 P1-3):上一版这里写死 `.default`,
@@ -66,25 +77,38 @@ const stakingApyPct = ref<number | null>(null);
 //   同刻互相矛盾且首页是事实错误。售罄档落 `ctaSoldOut`(blockText 只管三档阻断说明)。
 const { showUrgency: genesisUrgencyOk, blockText: genesisBlockText } = useGenesisSaleGate();
 
-onMounted(async () => {
+async function refreshStakingRate() {
   if (!remoteApiEnabled) return;
+  const request = ++stakingRequest;
+  stakingLoading.value = true;
   try {
-    stakingApyPct.value = highestLiveStakingApyPct(await stakingApi.fetchStakingPools());
+    const rate = highestLiveStakingApyPct(await stakingApi.fetchStakingPools());
+    if (request !== stakingRequest) return;
+    stakingApyPct.value = rate;
+    stakingFailed.value = false;
   } catch {
+    if (request !== stakingRequest) return;
     stakingApyPct.value = null;
+    stakingFailed.value = true;
+  } finally {
+    if (request === stakingRequest) stakingLoading.value = false;
   }
-});
+}
+onMounted(refreshStakingRate);
+onShow(refreshStakingRate);
 
 const stakingSubtitle = computed(() => {
   if (!remoteApiEnabled) return t.value.home.quickStakeApy;
-  if (stakingApyPct.value === null) return t.value.home.quickStakeUnavailable;
+  if (stakingLoading.value) return t.value.home.quickStakeUnavailable;
+  if (stakingFailed.value) return t.value.home.quickStakeFailed;
+  if (stakingApyPct.value === null) return t.value.home.quickStakeStopped;
   return fmt(t.value.home.quickStakeApyFormat, { n: stakingApyPct.value.toLocaleString() });
 });
 
 const chips = computed(() => [
   { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: stakingSubtitle.value, tone: "brand" as const },
   { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : (genesisBlockText.value ?? t.value.genesis.ctaSoldOut), tone: "warm" as const },
-  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: fmt(t.value.home.quickMissionsActive, { n: quest.remoteQuests.filter((row) => row.status !== "CLAIMED").length }), tone: "brand" as const },
+  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: fmt(t.value.home.quickMissionsActive, { n: quest.remoteQuests.filter((row) => isActionableQuest(row, now.value * 1000)).length }), tone: "brand" as const },
   { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: fmt(t.value.home.quickDailyStreak, { n: faucet.signInStreak }), tone: "warm" as const },
 ]);
 
@@ -101,5 +125,10 @@ function chipStyle(tone: "brand" | "warm"): CSSProperties {
 }
 function go(href: string) {
   navTo(href);
+}
+
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
+  if (event.repeat) return;
+  action();
 }
 </script>

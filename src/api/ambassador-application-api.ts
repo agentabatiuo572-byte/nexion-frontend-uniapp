@@ -46,6 +46,7 @@ export interface AmbassadorApplicationInput {
 export interface AmbassadorApplicationApi {
   policy(): Promise<AmbassadorPolicy>;
   latest(): Promise<AmbassadorApplication>;
+  history(): Promise<AmbassadorApplication[]>;
   submit(input: AmbassadorApplicationInput, idempotencyKey: string): Promise<AmbassadorApplication>;
 }
 
@@ -114,6 +115,22 @@ function parse(value: unknown, expectedEnvironment?: AmbassadorEnvironment): Amb
     submittedAt, source: "server", ...proof };
 }
 
+export function parseAmbassadorApplicationPage(value: unknown, expectedEnvironment?: AmbassadorEnvironment): {
+  rows: AmbassadorApplication[]; pageNum: number; pageSize: number; total: number; hasMore: boolean;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
+  const row = value as Record<string, unknown>;
+  provenance(row, expectedEnvironment);
+  if (!Array.isArray(row.rows) || typeof row.pageNum !== "number" || !Number.isSafeInteger(row.pageNum) || row.pageNum < 1
+    || typeof row.pageSize !== "number" || !Number.isSafeInteger(row.pageSize) || row.pageSize < 1 || row.pageSize > 100
+    || typeof row.total !== "number" || !Number.isSafeInteger(row.total) || row.total < 0
+    || typeof row.hasMore !== "boolean") return invalid();
+  const rows = row.rows.map((entry) => parse(entry, expectedEnvironment));
+  if (rows.length > row.pageSize || (row.pageNum - 1) * row.pageSize + rows.length > row.total
+    || row.hasMore !== ((row.pageNum - 1) * row.pageSize + rows.length < row.total)) return invalid();
+  return { rows, pageNum: row.pageNum, pageSize: row.pageSize, total: row.total, hasMore: row.hasMore };
+}
+
 export function createAmbassadorApplicationApi(client: ApiClient, environment: AmbassadorEnvironment = "PRODUCTION"): AmbassadorApplicationApi {
   const path = "/api/app/team/ambassador-applications";
   return {
@@ -122,6 +139,31 @@ export function createAmbassadorApplicationApi(client: ApiClient, environment: A
     },
     async latest() {
       return parse(await client.request<unknown>({ path: `${path}/latest` }), environment);
+    },
+    async history() {
+      const rows: AmbassadorApplication[] = [];
+      const seen = new Set<number>();
+      let pageNum = 1;
+      let expectedTotal: number | null = null;
+      while (true) {
+        const page = parseAmbassadorApplicationPage(await client.request<unknown>({
+          path: `${path}?pageNum=${pageNum}&pageSize=50`,
+        }), environment);
+        if (page.pageNum !== pageNum || page.pageSize !== 50
+          || (expectedTotal !== null && page.total !== expectedTotal)) return invalid();
+        expectedTotal ??= page.total;
+        for (const application of page.rows) {
+          if (application.applicationId === null || seen.has(application.applicationId)) return invalid();
+          seen.add(application.applicationId);
+          rows.push(application);
+        }
+        if (!page.hasMore) {
+          if (rows.length !== page.total) return invalid();
+          return rows;
+        }
+        if (page.rows.length === 0) return invalid();
+        pageNum += 1;
+      }
     },
     async submit(input, idempotencyKey) {
       return parse(await client.request<unknown>({ path, method: "POST", body: input, idempotencyKey }), environment);

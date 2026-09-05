@@ -17,8 +17,17 @@ test("estimator only reveals a server-confirmed usable calibration", () => {
 test("estimator exposes retry and defer controls without inventing a result", () => {
   assert.match(estimator, /v-if="loadFailed"/);
   assert.match(estimator, /@click="retryCalibration"/);
-  assert.match(estimator, /@click="leaveEstimator"/);
+  assert.match(estimator, /@click="deferPhoneActivation"/);
   assert.match(estimator, /activationRewardGate/);
+  assert.match(estimator, /function retryCalibration\(\) \{\s*if \(deferBusy\.value\) return;/,
+    "retry cannot invalidate a DEFERRED command while it is in flight");
+  assert.match(estimator, /@click="leaveEstimator"/,
+    "the visual back control must be a non-mutating exit");
+  assert.match(estimator, /onBackPress\(\(\) => \{[\s\S]*?leaveEstimator\(\);[\s\S]*?return true;/,
+    "hardware and browser back must not reveal registration success or silently defer activation");
+  const leaveHandler = estimator.slice(estimator.indexOf("function leaveEstimator"), estimator.indexOf("async function deferPhoneActivation"));
+  assert.match(leaveHandler, /pages\/onboarding\/intro/);
+  assert.doesNotMatch(leaveHandler, /confirmDeferredPhoneActivation|onboardingCalibrationApi\.defer|pages\/register\/success/);
 });
 
 test("calibration comparison rows require strictly positive bounded values", () => {

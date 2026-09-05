@@ -4,7 +4,7 @@
   Click → emits `open` so the page opens the stake sheet for this term.
 -->
 <template>
-  <view :class="['nx-staking-vault-row', `nx-staking-vault-row-${term}`, 'active:opacity-70']" :style="rowStyle" role="button" tabindex="0" @click="emit('open')" @keydown.enter.prevent="emit('open')" @keydown.space.prevent="emit('open')">
+  <view :class="['nx-staking-vault-row', `nx-staking-vault-row-${term}`, 'active:opacity-70']" :style="rowStyle" role="button" :aria-disabled="disabled" :tabindex="disabled ? -1 : 0" @click="open" @keydown.enter.prevent="open" @keydown.space.prevent="open">
     <!-- Tier code-tag -->
     <text :style="tierChipStyle">{{ term }}D</text>
 
@@ -15,7 +15,7 @@
         <text :style="apyUnitStyle">APY</text>
         <text v-if="ribbon" :style="ribbonStyle">{{ ribbon.label }}</text>
       </view>
-      <text class="block" :style="blurbStyle">{{ blurb }}</text>
+      <text class="block" :style="blurbStyle">{{ disabled ? t.home.quickStakeStopped : blurb }}</text>
       <text class="block tabular-nums" :style="metaStyle">{{ fmt(t.stakingV3.vaultMin, { amount: `$${minText}` }) }} · {{ penaltyPct }}% {{ penaltySuffix }}</text>
     </view>
 
@@ -49,8 +49,10 @@ const props = defineProps<{
   penaltySuffix: string;
   ribbon?: Ribbon;
   isLast: boolean;
+  disabled?: boolean;
 }>();
 const emit = defineEmits<{ open: [] }>();
+function open() { if (!props.disabled) emit("open"); }
 const t = useT();
 
 const TIER_TONES: Record<StakingTerm, TierTone> = {

@@ -6,7 +6,7 @@
 -->
 <template>
   <view>
-    <SectionHeader :title="t.store.secNetworkLadder" :count="t.store.secNetworkLadderCount" />
+    <SectionHeader :title="t.store.secNetworkLadder" :count="t.store.secNetworkLadderCount.replace('5', String(tiers.length))" />
     <view class="flex flex-col-reverse" :style="frameStyle">
       <view
         v-for="tier in tiers"
@@ -41,7 +41,7 @@ import SectionHeader from "./section-header.vue";
 import { storefrontUsd, storefrontUsdFull, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
 
 const t = useT();
-const props = defineProps<{ authority: StoreYieldAuthority }>();
+const props = defineProps<{ authority: StoreYieldAuthority; owned: ReturnType<typeof import("@/lib/store-upgrade").highestOwnedHardware> }>();
 
 interface Tier {
   id: string;
@@ -49,13 +49,18 @@ interface Tier {
   y: string;
   yFull: string;
   width: number;
+  amount: number;
   you?: boolean;
   rack?: boolean;
   fill?: string;
   fillOpacity?: number;
 }
 
-const tiers = computed<Tier[]>(() => props.authority.ladder.map((row: StoreYieldLadderRow) => {
+const tiers = computed<Tier[]>(() => {
+  const kindForRow: Record<string, string> = { phone: "phone", share: "cloud-share", entry: "stellarbox-s1", pro: "stellarbox-pro", rack: "stellarrack-p1" };
+  const rows: Tier[] = props.authority.ladder.map((row: StoreYieldLadderRow) => {
+  const you = kindForRow[row.id] === props.owned?.kind;
+  const amount = you && props.owned ? { usd: props.owned.baseRate, nex: props.owned.baseRateNEX } : row.amount;
   const labels = {
     phone: t.value.store.ladderPhone,
     share: t.value.store.ladderShare,
@@ -66,15 +71,27 @@ const tiers = computed<Tier[]>(() => props.authority.ladder.map((row: StoreYield
   return {
     id: row.id,
     label: labels[row.id],
-    y: storefrontUsd(row.amount),
-    yFull: storefrontUsdFull(row.amount),
+    y: storefrontUsd(amount),
+    yFull: storefrontUsdFull(amount),
+    amount: amount?.usd ?? 0,
     width: row.widthPct,
-    you: row.id === "phone",
+    you,
     rack: row.id === "rack",
     fill: row.id === "share" ? "var(--v5-ink-4)" : "var(--v5-brand)",
     fillOpacity: row.id === "share" ? 0.25 : row.id === "entry" ? 0.35 : row.id === "pro" ? 0.55 : 0.75,
   };
-}));
+  });
+  if (props.owned && !rows.some((row) => row.you)) {
+    const amount = { usd: props.owned.baseRate, nex: props.owned.baseRateNEX };
+    const maximum = Math.max(amount.usd, ...props.authority.ladder.map((row) => row.amount?.usd ?? 0));
+    const ownedRow = { id: props.owned.kind, label: props.owned.name, y: storefrontUsd(amount),
+      yFull: storefrontUsdFull(amount), amount: amount.usd, width: maximum > 0 ? Math.max(1, amount.usd / maximum * 100) : 0,
+      you: true, rack: props.owned.kind === "stellarrack-p2", fill: "var(--v5-brand)", fillOpacity: 0.75 };
+    rows.splice(props.owned.kind === "stellarbox-pro-v2" ? 4 : rows.length, 0, ownedRow);
+  }
+  const maximum = Math.max(0, ...rows.map((row) => row.amount));
+  return rows.map((row) => ({ ...row, width: maximum > 0 && row.amount > 0 ? Math.max(1, row.amount / maximum * 100) : 0 }));
+});
 
 const frameStyle: CSSProperties = {
   paddingTop: "2px",

@@ -53,6 +53,7 @@ export interface NovaRemoteHistory {
   conversationId: string | null;
   messages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>;
   truncated?: boolean;
+  nextCursor?: string | null;
 }
 
 let counter = 1;
@@ -76,6 +77,7 @@ export const useNova = defineStore("nova", () => {
   const pendingRemote = computed(() => messages.value.filter(m => m.delivery));
   const historyLoaded = ref(false);
   const historyTruncated = ref(false);
+  const historyNextCursor = ref<string | null>(null);
   let boundRemoteAccount = "";
   let historyGeneration = 0;
   let historyLoad: { accountKey: string; generation: number; promise: Promise<void> } | undefined;
@@ -110,9 +112,10 @@ export const useNova = defineStore("nova", () => {
       if (generation !== historyGeneration || normalized !== boundRemoteAccount
           || expectedConversationId !== conversationId.value || pendingRemote.value.length) return;
       if (history.conversationId) {
-        hydrateRemote(normalized, history.conversationId, history.messages, history.truncated === true);
+        hydrateRemote(normalized, history.conversationId, history.messages, history.truncated === true, history.nextCursor ?? null);
       } else {
         historyTruncated.value = history.truncated === true;
+        historyNextCursor.value = history.nextCursor ?? null;
         historyLoaded.value = true;
       }
     })();
@@ -129,6 +132,7 @@ export const useNova = defineStore("nova", () => {
     remoteConversationId: string,
     remoteMessages: Array<{ id: string; sender: NovaSender; text: string; ts: number }>,
     truncated = false,
+    nextCursor: string | null = null,
   ) {
     const normalized = accountKey.trim();
     if (!normalized || normalized !== boundRemoteAccount || pendingRemote.value.length) return;
@@ -144,7 +148,32 @@ export const useNova = defineStore("nova", () => {
     unread.value = 0;
     typing.value = false;
     historyTruncated.value = truncated;
+    historyNextCursor.value = nextCursor;
     historyLoaded.value = true;
+  }
+
+  async function loadEarlierRemote(accountKey: string, loader: (cursor: string) => Promise<NovaRemoteHistory>): Promise<void> {
+    const normalized = accountKey.trim();
+    const cursor = historyNextCursor.value;
+    if (!cursor || normalized !== boundRemoteAccount || pendingRemote.value.length) return;
+    const generation = historyGeneration;
+    const expectedConversationId = conversationId.value;
+    const history = await loader(cursor);
+    if (generation !== historyGeneration || normalized !== boundRemoteAccount
+        || expectedConversationId !== conversationId.value || pendingRemote.value.length
+        || history.conversationId !== expectedConversationId) return;
+    const existing = new Map(messages.value.map(message => [message.id, message]));
+    for (const message of history.messages) {
+      if (!existing.has(message.id)) existing.set(message.id, {
+        id: message.id, sender: message.sender,
+        kind: message.sender === "user" ? "user-text" : "nova-reply",
+        status: message.sender === "user" ? "read" : undefined,
+        text: message.text, ts: message.ts,
+      });
+    }
+    messages.value = [...existing.values()].sort((left, right) => left.ts - right.ts || left.id.localeCompare(right.id));
+    historyTruncated.value = history.truncated === true;
+    historyNextCursor.value = history.nextCursor ?? null;
   }
 
   function enqueueRemote(turnId: string, text: string, language: "en" | "zh" | "vi"): boolean {
@@ -280,6 +309,7 @@ export const useNova = defineStore("nova", () => {
     cooldowns.value = {};
     typing.value = false;
     historyTruncated.value = false;
+    historyNextCursor.value = null;
   }
 
   function startNewConversation() {
@@ -305,8 +335,8 @@ export const useNova = defineStore("nova", () => {
   return {
     messages, unread, isOpen, typing, cooldowns, conversationId, conversationBoundary,
     open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
-    bindRemoteAccount, hydrateRemote, ensureRemoteHistory,
-    pendingRemote, historyLoaded, historyTruncated, enqueueRemote, claimRemote, completeRemote, failRemote,
+    bindRemoteAccount, hydrateRemote, ensureRemoteHistory, loadEarlierRemote,
+    pendingRemote, historyLoaded, historyTruncated, historyNextCursor, enqueueRemote, claimRemote, completeRemote, failRemote,
     retryRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
   };
 });

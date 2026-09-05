@@ -40,12 +40,13 @@ import { computed, type CSSProperties } from "vue";
 import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useOrders } from "@/store/orders";
+import { latestOrder as selectLatestOrder } from "@/lib/latest-order";
 
 const t = useT();
 const orders = useOrders();
 
 const orderCount = computed(() => orders.orders.length);
-const latestOrder = computed(() => orders.orders[orders.orders.length - 1] ?? null);
+const latestOrder = computed(() => selectLatestOrder(orders.orders));
 
 function goStore() {
   navReset({ url: "/pages/store/store", fail: () => {} });

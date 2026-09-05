@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type { StakingPool, StakingSnapshot } from "@/api/staking-api";
+import { ApiError } from "@/api/errors";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -62,6 +63,7 @@ function snapshot(account: string): StakingSnapshot {
       estimatedInterestUsdt: 1,
       status: "active",
     }],
+    positionsPage: { total: 1, pageNum: 1, pageSize: 50 },
     walletBalanceUsdt: account === "A" ? 1000 : 2000,
     serverTime: now,
     sourceEnvironment: "PRODUCTION",
@@ -155,5 +157,66 @@ describe("staking remote account scope", () => {
     await expect(pending).rejects.toThrow("G1_REMOTE_AUTHORITY_UNAVAILABLE");
     expect(store.pools[0]?.poolId).toBe(2);
     expect(store.positions[0]?.id).toBe("B-position");
+  });
+
+  it("does not let an older sync overwrite a confirmed mutation", async () => {
+    const store = useStaking();
+    await bindReady(store);
+    const stalePools = deferred<StakingPool[]>();
+    const staleSnapshot = deferred<StakingSnapshot>();
+    remote.stakingApi.fetchStakingPools.mockReturnValueOnce(stalePools.promise);
+    remote.stakingApi.fetchStakingPositions.mockReturnValueOnce(staleSnapshot.promise);
+    const staleRead = store.syncRemote();
+
+    const claimed = { ...snapshot("A"), positions: [] };
+    remote.stakingApi.claimStakingPosition.mockResolvedValue(claimed);
+    await expect(store.claimRemote("A-position", "claim-A")).resolves.toEqual(claimed);
+    stalePools.resolve([pool("A")]);
+    staleSnapshot.resolve(snapshot("A"));
+    await staleRead;
+
+    expect(store.positions).toEqual([]);
+    expect(store.remoteReady).toBe(true);
+  });
+
+  it("reconciles after reverse-order concurrent mutation responses", async () => {
+    const store = useStaking();
+    await bindReady(store);
+    const claim = deferred<StakingSnapshot>();
+    const withdraw = deferred<StakingSnapshot>();
+    remote.stakingApi.claimStakingPosition.mockReturnValue(claim.promise);
+    remote.stakingApi.earlyWithdrawStakingPosition.mockReturnValue(withdraw.promise);
+    const authoritative = { ...snapshot("A"), positions: [], walletBalanceUsdt: 1300 };
+    remote.stakingApi.fetchStakingPools.mockResolvedValue([pool("A")]);
+    remote.stakingApi.fetchStakingPositions.mockResolvedValue(authoritative);
+
+    const olderStarted = store.claimRemote("A-position", "claim-A");
+    const newerStarted = store.earlyWithdrawRemote("A-other-position", "withdraw-B");
+    withdraw.resolve({ ...snapshot("A"), walletBalanceUsdt: 1100 });
+    await newerStarted;
+    claim.resolve({ ...snapshot("A"), walletBalanceUsdt: 1200 });
+    await olderStarted;
+
+    expect(remote.stakingApi.fetchStakingPositions).toHaveBeenCalledTimes(2);
+    expect(store.positions).toEqual([]);
+    expect(store.walletBalanceUsdt).toBe(1300);
+  });
+
+  it("preserves a deterministic business rejection and the last good snapshot", async () => {
+    const store = useStaking();
+    await bindReady(store);
+    const rejection = new ApiError({
+      kind: "business",
+      status: 409,
+      message: "STAKING_POSITION_NOT_MATURE",
+    });
+    remote.stakingApi.claimStakingPosition.mockRejectedValue(rejection);
+
+    await expect(store.claimRemote("A-position", "claim-A")).rejects.toBe(rejection);
+
+    expect(store.positions[0]?.id).toBe("A-position");
+    expect(store.walletBalanceUsdt).toBe(1000);
+    expect(store.remoteError).toBe("STAKING_POSITION_NOT_MATURE");
+    expect(store.remoteReady).toBe(true);
   });
 });

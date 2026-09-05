@@ -39,7 +39,11 @@ function mount() {
     "@/lib/send-limiter": limiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/lib/hashpower": { isDeviceOnline: () => false },
-    "@/store/conversations": { useConversations: () => ({ get: () => undefined }) },
+    "@/store/conversations": { useConversations: () => ({
+      get: () => undefined,
+      refreshCategories: async () => "applied",
+      categoryEnabled: () => true,
+    }) },
     "@/store/nova": { useNova },
     "@/store/app": { useApp: () => app },
     "@/store/ui": { toast: { warn: vi.fn(), info: vi.fn(), error: vi.fn() }, confirm: async () => true,

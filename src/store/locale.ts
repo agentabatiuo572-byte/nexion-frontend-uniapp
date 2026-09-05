@@ -68,14 +68,14 @@ export const useLocaleStore = defineStore("locale", () => {
   }
 
   function setLocale(next: LocaleCode) {
-    code.value = next;
+    code.value = LOCALES.some((locale) => locale.code === next) ? next : DEFAULT_LOCALE;
     userSet.value = true;
     explicitRevision.value += 1;
     persist();
   }
 
   function applyServerLocale(next: LocaleCode) {
-    code.value = next;
+    code.value = LOCALES.some((locale) => locale.code === next) ? next : DEFAULT_LOCALE;
     persist();
   }
 

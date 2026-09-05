@@ -1,5 +1,5 @@
 <template>
-  <view class="block" :style="cardStyle" role="link" tabindex="0" @click="goTrust" @keydown.enter.stop.prevent="goTrust" @keydown.space.stop.prevent="goTrust">
+  <view class="block" :style="cardStyle" role="link" tabindex="0" @click="goTrust" @keydown.enter.stop.prevent="goTrust">
     <view class="flex items-start justify-between" style="gap: 12px">
       <view class="flex items-center" style="gap: 8px">
         <view class="grid place-items-center" :style="iconStyle">

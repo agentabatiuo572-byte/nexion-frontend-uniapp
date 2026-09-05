@@ -3,9 +3,9 @@
     <view class="px-4" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/learn/courses" />
       <view v-if="loading"><text>{{ t.learning.courseLoading }}</text></view>
-      <view v-else-if="error">
+      <view v-else-if="error" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
-        <text class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" @click="load">{{ t.ui.retry }}</text>
+        <text class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.courseUnavailable" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
       </view>
       <view v-else-if="course">
         <text class="block" style="font-size: 20px; font-weight: 600">{{ course.title }}</text>
@@ -14,7 +14,7 @@
 
         <view v-for="(question, index) in course.questions" :key="question.questionId" style="margin-top: 16px">
           <text>{{ question.question }}</text>
-          <view v-for="(option, optionIndex) in question.options" :key="option" :class="pendingAttempt ? '' : 'active:opacity-70'" style="margin-top: 8px" @click="selectAnswer(index, optionIndex)">
+          <view v-for="(option, optionIndex) in question.options" :key="option" :class="pendingAttempt ? '' : 'active:opacity-70'" style="margin-top: 8px" role="button" :tabindex="pendingAttempt ? -1 : 0" :aria-label="option" :aria-pressed="answers[index] === optionIndex" :aria-disabled="!!pendingAttempt" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))">
             <text>{{ answers[index] === optionIndex ? "●" : "○" }} {{ option }}</text>
           </view>
         </view>
@@ -23,10 +23,16 @@
           class="block"
           :class="canSubmit ? 'active:opacity-70' : ''"
           :style="{ marginTop: '20px', color: canSubmit ? 'var(--v5-brand)' : 'var(--v5-ink-4)' }"
+          role="button"
+          :tabindex="canSubmit ? 0 : -1"
+          :aria-label="course.questions.length ? t.learning.submitQuiz : t.learning.completeCourse"
+          :aria-disabled="canSubmit ? 'false' : 'true'"
           @click="finish"
+          @keydown.enter.prevent="onKeyboardActivate($event, finish)"
+          @keydown.space.prevent="onKeyboardActivate($event, finish)"
         >{{ course.questions.length ? t.learning.submitQuiz : t.learning.completeCourse }}</text>
         <text v-if="course.questions.length && !pendingAttempt && !allAnswered && !serverCompleted" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.learning.answerAllFirst }}</text>
-        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" @click="load">{{ pendingStatusText }}</text>
+        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" role="button" tabindex="0" :aria-label="pendingStatusText" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ pendingStatusText }}</text>
         <text v-if="resultDetails" data-testid="learning-result-details" class="block tabular-nums" style="margin-top: 12px; color: var(--v5-ink-2); text-wrap: pretty">{{ resultDetails.passed ? t.learning.resultPassed : t.learning.resultFailed }} · {{ scoreLine }} · {{ attemptsLine }} · {{ rewardStatusLine }}</text>
       </view>
     </view>
@@ -121,6 +127,7 @@ const fenceReader = createLearningPageFenceReader(
 
 function fence(): LearningPageFence { return fenceReader.capture(); }
 function current(scope: LearningPageFence): boolean { return fenceReader.isCurrent(scope); }
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
 function attemptIdentity(expectedCourse: LearningCourse): LearningAttemptIdentity | null {
   const accountKey = String(app.accountKey).trim();
   if (!accountKey) return null;

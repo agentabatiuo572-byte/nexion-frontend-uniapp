@@ -72,6 +72,7 @@
       </view>
 
       <LiveFeedCard />
+      <FeaturedLearningCard />
 
       <!-- ZONE 2: status — your fleet, the grid, network pulse -->
       <QuickActionRow />
@@ -107,6 +108,7 @@ import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import ConversionBanner from "@/components/home/conversion-banner.vue";
 import DayOneQuestCard from "@/components/home/day-one-quest-card.vue";
 import LiveFeedCard from "@/components/home/live-feed-card.vue";
+import FeaturedLearningCard from "@/components/home/featured-learning-card.vue";
 import QuickActionRow from "@/components/home/quick-action-row.vue";
 import MyFleetSection from "@/components/home/my-fleet-section.vue";
 import OnGridSection from "@/components/home/on-grid-section.vue";

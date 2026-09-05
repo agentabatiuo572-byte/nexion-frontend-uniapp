@@ -59,6 +59,25 @@ describe("device E3 eligibility API", () => {
     });
   });
 
+  it("projects the server-owned trade-in early-access policy", async () => {
+    const api = createDeviceE3Api(client({
+      enabled: true,
+      eligibility: "全部用户",
+      outputRatioCutsPct: [25, 50, 75, 100],
+      creditRatesPct: [75, 60, 45, 30, 15],
+      requireHigherPrice: true,
+      maxDevicesPerOrder: 1,
+      earlyAccessEnabled: true,
+      earlyAccessLeadDays: 30,
+      source: "nx_compute_e3_config",
+    }));
+
+    await expect(api.tradeinConfig()).resolves.toMatchObject({
+      earlyAccessEnabled: true,
+      earlyAccessLeadDays: 30,
+    });
+  });
+
   it("preserves the server-authored subsidy deadline and true remaining days", async () => {
     const payload = fleetPayload(100);
     payload.devices[0] = {

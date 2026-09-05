@@ -172,13 +172,15 @@ export function requestWithdrawalEligibility(
   address: string,
   withdrawableUsdt: number,
   daily: WithdrawalDailyFacts,
-  requestedUsdt?: number,
+  requestedUsdt: number | undefined,
+  policyVersion: string,
 ): Promise<WithdrawalEligibility> {
   if (remoteApiEnabled) {
     return withdrawalApi.eligibility({
       amount: requestedUsdt ?? 0,
       chain: network,
       address,
+      policyVersion,
     }).then((snapshot) => ({
       canSubmit: snapshot.canSubmit,
       maxWithdrawableUsdt: snapshot.maxWithdrawableUsdt,

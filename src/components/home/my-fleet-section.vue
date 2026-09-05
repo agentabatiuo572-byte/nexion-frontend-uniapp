@@ -1,7 +1,7 @@
 <!--
-  MyFleetSection — ZONE 2 active-device fleet. Header (My fleet · N of 6 ·
+  MyFleetSection — ZONE 2 active-device fleet. Header (My fleet · N of capacity ·
   Manage) over a horizontal slot rack (one icon bay per active device + an add
-  bay while under the 6-device cap), then a device list card below (status dot ·
+  bay while under the server capacity), then a device list card below (status dot ·
   name · today earnings). Shows ACTIVE devices only (inactive live in /me/devices).
 -->
 <template>
@@ -14,7 +14,7 @@
     <!-- Slot rack: icon bays -->
     <view class="flex items-center" style="gap: 9px; margin-bottom: 14px">
       <DeviceSlot v-for="d in slotDevices" :key="d.id" :device="d" />
-      <AddDeviceRow v-if="slotDevices.length < 6" />
+      <AddDeviceRow v-if="fleetReady && slotDevices.length < app.slotCap" />
     </view>
 
     <!-- Device list: status dot · name · today earnings -->
@@ -33,6 +33,7 @@ import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { remoteApiEnabled } from "@/api/runtime";
 import DeviceSlot from "./device-slot.vue";
 import DeviceRow from "./device-row.vue";
 import AddDeviceRow from "./add-device-row.vue";
@@ -43,9 +44,11 @@ const app = useApp();
 
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const slotDevices = computed(() => devices.value.filter(isActiveSlotDevice));
-const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, {
+const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
+const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
   n: slotDevices.value.length,
-}));
+  max: app.slotCap,
+}) : "— / —");
 
 function goManage() {
   navTo("/pages/earn/earn");

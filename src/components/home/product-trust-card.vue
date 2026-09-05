@@ -1,5 +1,5 @@
 <template>
-  <view class="block" :style="cardStyle" :role="selected ? 'link' : undefined" :tabindex="selected ? 0 : undefined" @click="openProduct" @keydown.enter.stop.prevent="openProduct" @keydown.space.stop.prevent="openProduct">
+  <view class="block" :style="cardStyle" :role="selected ? 'link' : undefined" :tabindex="selected ? 0 : undefined" @click="openProduct" @keydown.enter.stop.prevent="openProduct">
     <view class="flex items-start justify-between" style="gap: 12px">
       <view>
         <text class="block" :style="titleStyle">{{ t.home.productTrustTitle }}</text>

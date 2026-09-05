@@ -106,13 +106,18 @@
             <text class="block truncate" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
-          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevoke(s)" @keydown.enter.prevent="handleRevoke(s)" @keydown.space.prevent="handleRevoke(s)">
+          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)" @keydown.enter.prevent="handleRevoke(s)" @keydown.space.prevent="handleRevoke(s)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
         <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll" @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
+      </view>
+      <view v-if="remoteSecurity?.nextCursor" class="mx-4 flex justify-center" :style="revokeAllRowStyle"
+        role="button" :tabindex="sessionPageLoading ? -1 : 0" :aria-disabled="sessionPageLoading"
+        @click="loadMoreSessions" @keydown.enter.prevent="loadMoreSessions" @keydown.space.prevent="loadMoreSessions">
+        <text>{{ sessionPageLoading ? t.help.loadingMore : t.notifs.loadMore }}</text>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
 
@@ -163,7 +168,9 @@ import type { SecurityState } from "@/api/contracts";
 import type { AccountDeletionStatus } from "@/api/account-api";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 import { accountErrorMessageKey } from "@/lib/account-error-message";
+import { acquireAccountCommandKey, releaseAccountCommandKey } from "@/store/account-scoped-storage";
 
+const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
 
 const t = useT();
 const retiredFlow = ref(false);
@@ -205,6 +212,7 @@ const twoFactorTarget = ref<boolean | null>(null);
 const deletionPassword = ref("");
 const deletionCommandKey = ref("");
 const remoteSecurityLoading = ref(false);
+const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
@@ -258,6 +266,7 @@ function clearSecurityAccountState() {
   ui.clearConfirmsBy(securityConfirmOwner);
   securityBusy.value = false;
   remoteSecurityLoading.value = false;
+  sessionPageLoading.value = false;
   remoteSecurity.value = null;
   deletionStatus.value = { status: "NONE" };
   editingPwd.value = false;
@@ -310,6 +319,7 @@ async function loadRemoteSecurity(): Promise<boolean> {
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
   remoteSecurityLoading.value = true;
+  sessionPageLoading.value = false;
   remoteSecurity.value = null;
   try {
     const [securityState, accountDeletion] = await Promise.all([
@@ -327,6 +337,28 @@ async function loadRemoteSecurity(): Promise<boolean> {
     return false;
   } finally {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey)) remoteSecurityLoading.value = false;
+  }
+}
+
+async function loadMoreSessions(): Promise<void> {
+  const snapshot = remoteSecurity.value;
+  if (!snapshot?.nextCursor || sessionPageLoading.value || remoteSecurityLoading.value) return;
+  const pageScope = securityPageFence.capture("security-sessions-page");
+  const scope = captureAccountScope();
+  const accountKey = auth.accountId;
+  sessionPageLoading.value = true;
+  try {
+    const nextPage = await accountApi.securityOverview(snapshot.nextCursor);
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey) || remoteSecurity.value !== snapshot) return;
+    if (nextPage.nextCursor === snapshot.nextCursor) throw new Error("SECURITY_CURSOR_NOT_ADVANCING");
+    const existing = new Set(snapshot.sessions.map((row) => row.id));
+    remoteSecurity.value = { ...snapshot, nextCursor: nextPage.nextCursor,
+      sessions: [...snapshot.sessions, ...nextPage.sessions.filter((row) => !existing.has(row.id))] };
+  } catch (cause) {
+    if (isCurrentSecurityRequest(pageScope, scope, accountKey) && remoteSecurity.value === snapshot)
+      toast.error(securityErrorMessage(cause));
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, scope, accountKey)) sessionPageLoading.value = false;
   }
 }
 
@@ -418,19 +450,26 @@ async function submitPasswordChange() {
     return;
   }
   securityBusy.value = true;
+  let commandKey: string | null = null;
+  let recovered = false;
   try {
       if (remoteApiEnabled) {
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        await accountApi.changePassword(current.value, next.value);
+        commandKey = acquireAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", "password");
+        const priorReceipt = await accountApi.passwordCommandReceipt(commandKey);
+        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+        if (priorReceipt) recovered = true;
+        else await accountApi.changePassword(current.value, next.value, commandKey);
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+        releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", commandKey);
     } else {
       security.changePassword(current.value, next.value);
     }
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    console.warn("[security] password update failed:", cause);
+    // Keep the operation number until a committed receipt is confirmed; never store passwords.
     err.value = securityErrorMessage(cause);
     return;
   } finally {
@@ -441,7 +480,7 @@ async function submitPasswordChange() {
   next.value = "";
   confirmPwd.value = "";
   editingPwd.value = false;
-  toast.success(t.value.security.passwordSaved);
+  toast.success(recovered ? t.value.security.passwordRecovered : t.value.security.passwordSaved);
 }
 
 async function toggleTwoFactor(value: boolean) {
@@ -676,12 +715,17 @@ async function handleDeleteAccount() {
     if (ok) {
       if (remoteApiEnabled) {
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!deletionCommandKey.value) {
-          deletionCommandKey.value = `app-security:account-deletion:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-        }
+        const intent = "account-deletion-request";
+        deletionCommandKey.value = acquireAccountCommandKey(
+          SECURITY_COMMAND_TABLE,
+          accountKey,
+          intent,
+          "app-security:account-deletion",
+        );
         try {
           const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+          releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
           toast.success(t.value.security.deleteAccountToast, request.requestNo);
           deletionCommandKey.value = "";
           await authApi.logout();
@@ -733,11 +777,18 @@ async function handleCancelAccountDeletion() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     const current = deletionStatus.value;
     if (current.status === "NONE") return;
-    const key = `app-security:account-deletion-cancel:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+    const intent = `account-deletion-cancel:${current.requestNo}:${current.version}`;
+    const key = acquireAccountCommandKey(
+      SECURITY_COMMAND_TABLE,
+      accountKey,
+      intent,
+      "app-security:account-deletion-cancel",
+    );
     await accountApi.cancelAccountDeletion(current.version, key);
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;

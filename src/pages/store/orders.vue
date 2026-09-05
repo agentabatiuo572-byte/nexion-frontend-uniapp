@@ -60,6 +60,22 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
+        <view
+          v-if="remoteApiEnabled && orders.nextCursor"
+          class="grid place-items-center active:opacity-80"
+          :style="loadMoreBtnStyle"
+          role="button"
+          tabindex="0"
+          :aria-disabled="orders.loadingMore ? 'true' : 'false'"
+          @click.stop="loadMoreOrders"
+          @keydown.enter.prevent.stop="loadMoreOrders"
+          @keydown.space.prevent.stop="loadMoreOrders"
+        >
+          <text>{{ t.orders.loadMore }}{{ orders.loadingMore ? '…' : '' }}</text>
+        </view>
+        <button v-if="remoteApiEnabled && genesis.orderPage.cursor" :disabled="genesis.orderPage.busy" @click="genesis.loadMoreGenesisOrders()">
+          {{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}
+        </button>
       </view>
     </view>
   </AppChassis>
@@ -150,6 +166,16 @@ function requestOrdersRefresh() {
   if (remoteOrdersRefreshing.value) return;
   void refreshOrders();
 }
+async function loadMoreOrders() {
+  if (orders.loadingMore || !orders.nextCursor) return;
+  try {
+    await orders.loadMoreRemote();
+  } catch {
+    if (!ordersPageActive) return;
+    commerceOrdersUnavailable.value = true;
+    remoteOrderAvailability.value = "partial";
+  }
+}
 onShow(() => {
   ordersPageActive = true;
   void refreshOrders();
@@ -231,6 +257,15 @@ const retryBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
   fontSize: "12px",
+};
+const loadMoreBtnStyle: CSSProperties = {
+  minHeight: "44px",
+  marginTop: "8px",
+  borderRadius: "12px",
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink-2)",
+  fontSize: "13px",
+  fontWeight: 600,
 };
 
 // ─── styles ───

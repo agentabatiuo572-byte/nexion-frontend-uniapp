@@ -151,13 +151,15 @@ function attr(attrs, name, { numeric = false } = {}) {
   if (dyn) {
     const lits = [...dyn[1].matchAll(/'([^']*)'/g)].map((m) => m[1]);
     // 数字字面量走另一条路:`:tabindex="c ? 0 : -1"` 是标准 roving 写法,不该被当成判不出。
-    if (numeric && lits.length === 0) {
-      const nums = [...dyn[1].matchAll(/(?:^|[^\w.'"])(-?\d+)(?![\w.])/g)].map((m) => m[1]);
-      const set = [...new Set(nums)];
-      if (set.length && set.every((n) => n === "0" || n === "-1")) {
+    if (numeric) {
+      const expression = dyn[1].trim();
+      const values = /^(0|-1)$/.exec(expression)?.slice(1)
+        ?? /^[^?:]+\?\s*(0|-1)\s*:\s*(0|-1)$/.exec(expression)?.slice(1);
+      if (values) {
         // 含 0 即可进 Tab 序(另一支是 -1 = 非活动项),这是正确的 roving。
-        return { kind: "dynamic", value: set.includes("0") ? "0" : "-1", raw: dyn[1] };
+        return { kind: "dynamic", value: values.includes("0") ? "0" : "-1", raw: dyn[1] };
       }
+      return { kind: "opaque", raw: dyn[1] };
     }
     const uniq = [...new Set(lits.filter((v) => v && v !== "undefined" && v !== "null"))];
     if (uniq.length === 1) return { kind: "dynamic", value: uniq[0], raw: dyn[1] };
@@ -245,7 +247,8 @@ for (const file of files) {
     // C:手写激活键。keyup 上的 .prevent 对只监听 keydown 的平台层无效,单独判红。
     for (const k of a.matchAll(KEY_ACT_RE)) {
       const mods = `${k[2]}${k[4]}`;
-      if (k[1] === "up") findings.C.push(`${at} <${t.tag}> @keyup.${k[3]} —— 平台层只监听 keydown,keyup 的 .prevent 拦不住它,会双触发`);
+      if (role?.value === "link" && k[3] === "space") findings.C.push(`${at} <${t.tag}> role="link" 不得拦截 Space —— Space 应保留页面滚动`);
+      else if (k[1] === "up") findings.C.push(`${at} <${t.tag}> @keyup.${k[3]} —— 平台层只监听 keydown,keyup 的 .prevent 拦不住它,会双触发`);
       else if (!mods.includes(".prevent")) findings.C.push(`${at} <${t.tag}> @keydown.${k[3]} 缺 .prevent`);
     }
     // 裸 keydown:修饰符判据看不见,回查 handler 名在 script 里是否调了 preventDefault。

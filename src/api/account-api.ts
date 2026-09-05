@@ -3,8 +3,9 @@ import type { SecurityMutation, SecurityState } from "./contracts";
 import { ApiError } from "./errors";
 
 export interface AccountApi {
-  securityOverview(): Promise<SecurityState>;
-  changePassword(currentPassword: string, newPassword: string): Promise<SecurityMutation>;
+  securityOverview(cursor?: string): Promise<SecurityState>;
+  passwordCommandReceipt(key: string): Promise<SecurityMutation | null>;
+  changePassword(currentPassword: string, newPassword: string, idempotencyKey: string): Promise<SecurityMutation>;
   sendTwoFactorChallenge(enabled: boolean, currentPassword: string): Promise<TwoFactorChallenge>;
   updateTwoFactor(enabled: boolean, currentPassword: string, challengeNo: string, code: string): Promise<SecurityMutation>;
   revokeSession(sessionId: string): Promise<SecurityMutation>;
@@ -36,7 +37,7 @@ export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
 
 let idempotencySequence = 0;
 
-// IDEMPOTENCY-FRESH-OK: 这四个操作(改密 / 开关 2FA / 踢单个会话 / 踢其它会话)都是「把状态设成某个值」,
+// IDEMPOTENCY-FRESH-OK: 开关 2FA / 踢单个会话 / 踢其它会话是状态操作；改密使用调用方持久化的命令号。
 // 不是「新建一笔单据」—— 重放一次结果完全相同,不会多出东西。返回的 SecurityMutation 是状态
 // 快照(twoFactorEnabled / passwordChangedAt / revokedSessionCount),没有新铸的标识符可重复。
 // 与之相对:购买 / 提现那类每调一次就多一笔的,键必须冻结(见 genesis.ts purchaseIdempotencyKey)。
@@ -62,6 +63,7 @@ function parseSecurityState(value: unknown): SecurityState {
     || typeof source.twoFactorEnabled !== "boolean"
     || (source.passwordChangedAt !== null && !validDate(source.passwordChangedAt))
     || !Array.isArray(source.sessions)
+    || (source.nextCursor != null && (typeof source.nextCursor !== "string" || !/^[1-9][0-9]{0,18}$/.test(source.nextCursor)))
   ) {
     throw new ApiError({ kind: "protocol", message: "SECURITY_RESPONSE_INVALID" });
   }
@@ -90,6 +92,7 @@ function parseSecurityState(value: unknown): SecurityState {
     twoFactorEnabled: source.twoFactorEnabled,
     passwordChangedAt: source.passwordChangedAt,
     sessions,
+    nextCursor: source.nextCursor as string | null | undefined,
   };
 }
 
@@ -154,15 +157,19 @@ function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
 
 export function createAccountApi(client: ApiClient): AccountApi {
   return {
-    securityOverview: async () => parseSecurityState(await client.request({
+    passwordCommandReceipt: async (key) => {
+      const result = await client.request({ method: "GET", path: `/api/app/security/password/commands/${encodeURIComponent(key)}` });
+      return result === null ? null : parseMutation(result);
+    },
+    securityOverview: async (cursor) => parseSecurityState(await client.request({
       method: "GET",
-      path: "/api/app/security",
+      path: `/api/app/security${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
     })),
-    changePassword: async (currentPassword, newPassword) => parseMutation(await client.request({
+    changePassword: async (currentPassword, newPassword, idempotencyKey) => parseMutation(await client.request({
       method: "POST",
       path: "/api/app/security/password",
       body: { currentPassword, newPassword },
-      idempotencyKey: mutationKey("password"),
+      idempotencyKey,
     })),
     sendTwoFactorChallenge: async (enabled, currentPassword) => parseTwoFactorChallenge(await client.request({
       method: "POST",

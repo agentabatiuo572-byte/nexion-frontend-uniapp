@@ -34,7 +34,7 @@ test("bundle order detail uses the canonical subtotal and all-item projection", 
 test("Ticket Create reads its own PC-published knowledge surface", async () => {
   const page = await source("src/pages/me/support-tickets.vue");
   const api = await source("src/api/support-api.ts");
-  assert.match(page, /faqs\([^)]*"Ticket Create"/);
+  assert.match(page, /faqPage\([^)]*"Ticket Create"/);
   assert.match(api, /surface/);
 });
 

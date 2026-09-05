@@ -67,6 +67,16 @@ const validResult = {
   walletBalanceAfterUsdt: 500,
 };
 
+const validKeepResult = {
+  operationNo: "CPK-1",
+  orderNo: "CKO-1",
+  targetDeviceId: 44,
+  deviceStatus: "INACTIVE",
+  orderStatus: "PAID",
+  walletDebitUsdt: 1000,
+  walletBalanceAfterUsdt: 500,
+};
+
 const validFleet = {
   dailyUsdt: 12.5,
   dailyNex: 3.2,
@@ -211,6 +221,35 @@ test("E20 accepts a terminal replacement result only when every quote-linked fie
   assert.equal(accepted.walletBalanceAfterUsdt, 500);
 });
 
+test("E20 keep-and-buy uses the atomic capacity endpoint and validates the quoted debit", async () => {
+  let request;
+  const api = createDeviceE3Api({ request: async (options) => {
+    request = options;
+    return structuredClone(validKeepResult);
+  } });
+
+  const accepted = await api.capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote);
+
+  assert.equal(request.path, "/api/app/trade-in/capacity-keep");
+  assert.deepEqual(request.body, { targetProductNo: "stellarbox-pro-v2", expectedPayableUsdt: 1000 });
+  assert.equal(request.idempotencyKey, "keep-key");
+  assert.equal(accepted.deviceStatus, "INACTIVE");
+  assert.equal(accepted.targetDeviceId, 44);
+});
+
+test("E20 keep-and-buy rejects a pending order or a result whose debit drifted", async () => {
+  await assert.rejects(
+    apiReturning({ ...validKeepResult, orderStatus: "PENDING_PAYMENT" })
+      .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),
+    /E3_CANONICAL_RESPONSE_INVALID/,
+  );
+  await assert.rejects(
+    apiReturning({ ...validKeepResult, walletDebitUsdt: 999 })
+      .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),
+    /E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH/,
+  );
+});
+
 test("E20 rejects terminal replacement results with source or balance drift", async () => {
   await assert.rejects(
     apiReturning({ ...validResult, sourceDeviceId: 12 }).capacityReplace(
@@ -252,13 +291,19 @@ const activatedOrder = {
   canonicalStatus: "activated",
   orderType: "TRADE_IN",
   placedAt: 1,
+  expiresAt: null,
   paidAt: 2,
   activatedAt: 3,
+  refundedAt: null,
+  refundAmountUsdt: null,
+  refundChannel: null,
+  refundBillNo: null,
   dataCenter: null,
   tradeinNo: "CPR-1",
   sourceDeviceId: 11,
   targetDeviceId: 33,
   targetDeviceInstanceNo: "DEV-33",
+  itemCount: 1,
 };
 
 test("E20 order readback accepts only a coherent paid and activated terminal", async () => {
@@ -287,6 +332,7 @@ const placedOrder = {
   activationStatus: "WAITING_PAYMENT",
   canonicalStatus: "placed",
   orderType: "SINGLE",
+  expiresAt: 1_000,
   paidAt: null,
   activatedAt: null,
   tradeinNo: null,

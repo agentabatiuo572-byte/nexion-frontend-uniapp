@@ -29,7 +29,7 @@
         <view :style="heroWrapStyle">
           <!-- rules-intro pill hugs the top-right; 4px above the grid so no empty gap. -->
           <view class="flex items-center justify-end" style="margin-bottom: 4px">
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/commissions-how')">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="link" tabindex="0" @click="go('/pages/team/commissions-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.commissions.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>

@@ -152,6 +152,7 @@ import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
 import { remoteApiEnabled } from "@/api/runtime";
+import { onShow } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
 
 const t = useT();
@@ -293,6 +294,9 @@ function retryCanonicalData(): void {
 onMounted(() => {
   // The projection owns rule/settlement aggregates; the network projection
   // owns the actual A/B members shown inside each wing.
+  if (remoteApiEnabled) retryCanonicalData();
+});
+onShow(() => {
   if (remoteApiEnabled) retryCanonicalData();
 });
 

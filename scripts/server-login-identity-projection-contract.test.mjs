@@ -102,7 +102,8 @@ test("remote registration calls password login and enters the App with that auth
   assert.doesNotMatch(register, /registration\.kind !== "authenticated"/);
   assert.match(completion, /deferNavigation\?: boolean;/);
   assert.match(completion, /if \(remoteApiEnabled\) \{[\s\S]*?options\.serverProfile\.userId[\s\S]*?onboardingComplete = options\.onboardingComplete \?\? false;/);
-  assert.match(completion, /if \(options\.deferNavigation\) return \{ ok: true \};[\s\S]*?if \(!auth\.onboardingComplete\)/);
+  assert.match(completion, /resolvePostSignInRoute\(\{[\s\S]*?onboardingComplete: auth\.onboardingComplete,[\s\S]*?deferNavigation: options\.deferNavigation/);
+  assert.doesNotMatch(completion, /if \(!auth\.onboardingComplete\)[\s\S]*?pages\/onboarding\/estimator/);
 });
 
 test("a rejected server completion consumes only the issued vault epoch", () => {

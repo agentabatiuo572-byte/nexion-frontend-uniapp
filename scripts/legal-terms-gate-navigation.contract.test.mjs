@@ -34,6 +34,7 @@ test("the global route watcher re-enforces the pending Terms requirement after a
 });
 
 test("a failed Terms load keeps the gate closed but exposes an in-place retry", () => {
-  assert.match(source, /v-if="loadError"[\s\S]{0,350}@click="loadTerms"/);
-  assert.match(source, /\{\{ t\.ui\.retry \}\}/);
+  assert.match(source, /v-if="loadError"[\s\S]{0,500}@click="retryTerms"/);
+  assert.match(source, /function retryTerms[\s\S]{0,180}void loadTerms\(\)/);
+  assert.match(source, /loadingTerms \? "…" : t\.ui\.retry/);
 });

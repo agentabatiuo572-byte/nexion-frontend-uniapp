@@ -66,6 +66,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
+import { isCurrentQuest } from "@/lib/actionable-quest";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -91,7 +92,7 @@ onMounted(() => {
   void wq.refresh();
 });
 
-const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests[0] ?? null);
+const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) => isCurrentQuest(q, nowTick.value * 1000)) ?? null);
 const mult = computed(() => wq.multiplier);
 const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * mult.value) : 0));
 const rewardDisplay = computed(() => reward.value.toLocaleString());

@@ -39,14 +39,14 @@
                 <text v-if="line.length === 0" class="nx-conv-seg">{{ " " }}</text>
               </view>
             </view>
-            <view v-if="m.ctaLabel && m.ctaHref" class="nx-conv-cta-row" @click="onCta(m)">
+	            <view v-if="m.ctaLabel && m.ctaHref" class="nx-conv-cta-row" role="link" tabindex="0" :aria-label="m.ctaLabel" @click="onCta(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => onCta(m))">
               <text class="nx-conv-cta-t">{{ m.ctaLabel }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
             </view>
           </view>
         </view>
         <!-- delivery receipt (user messages only, pre-localised by the page) -->
-        <view v-if="m.receipt && !m.queue" class="nx-conv-receipt">
+        <view v-if="m.receipt && !m.queue" class="nx-conv-receipt" :class="m.side === 'left' ? 'nx-conv-receipt--left' : ''">
           <text class="nx-conv-receipt-t">{{ m.receipt }}</text>
         </view>
         <view v-if="m.queue && queueLabels" class="nx-conv-queue" :data-state="m.queue.state">
@@ -54,15 +54,15 @@
           <view v-if="m.queue.state === 'editing'" class="nx-conv-edit">
             <textarea class="nx-conv-edit-input" :value="edits[m.queue.turnId] ?? m.text" :maxlength="2000" :aria-label="queueLabels.edit" auto-height @input="onEditInput(m.queue.turnId, $event)" />
             <view class="nx-conv-queue-actions">
-              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)" @keydown.enter.prevent="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)" @keydown.space.prevent="emit('queue-save', m.queue.turnId, edits[m.queue.turnId] ?? m.text)"><text>{{ queueLabels.save }}</text></view>
-              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'cancel-edit')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'cancel-edit')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'cancel-edit')"><text>{{ queueLabels.cancelEdit }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="saveQueueEdit(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => saveQueueEdit(m))" @keydown.space.prevent="onKeyboardActivate($event, () => saveQueueEdit(m))"><text>{{ queueLabels.save }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="runQueueAction(m, 'cancel-edit')" @keydown.enter.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'cancel-edit'))" @keydown.space.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'cancel-edit'))"><text>{{ queueLabels.cancelEdit }}</text></view>
             </view>
           </view>
           <view v-else class="nx-conv-queue-actions">
-            <view v-if="m.queue.state === 'failed'" class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'retry')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'retry')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'retry')"><text>{{ queueLabels.retry }}</text></view>
+            <view v-if="m.queue.state === 'failed'" class="nx-conv-queue-action" role="button" tabindex="0" @click="runQueueAction(m, 'retry')" @keydown.enter.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'retry'))" @keydown.space.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'retry'))"><text>{{ queueLabels.retry }}</text></view>
             <template v-if="m.queue.state === 'queued' && m.queue.editable">
-              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="startEdit(m)" @keydown.enter.prevent="startEdit(m)" @keydown.space.prevent="startEdit(m)"><text>{{ queueLabels.edit }}</text></view>
-              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="emit('queue-action', m.queue.turnId, 'cancel')" @keydown.enter.prevent="emit('queue-action', m.queue.turnId, 'cancel')" @keydown.space.prevent="emit('queue-action', m.queue.turnId, 'cancel')"><text>{{ queueLabels.cancel }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="startEdit(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => startEdit(m))" @keydown.space.prevent="onKeyboardActivate($event, () => startEdit(m))"><text>{{ queueLabels.edit }}</text></view>
+              <view class="nx-conv-queue-action" role="button" tabindex="0" @click="runQueueAction(m, 'cancel')" @keydown.enter.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'cancel'))" @keydown.space.prevent="onKeyboardActivate($event, () => runQueueAction(m, 'cancel'))"><text>{{ queueLabels.cancel }}</text></view>
             </template>
           </view>
         </view>
@@ -87,7 +87,7 @@
     <!-- Quick reply chips (AI only) -->
     <scroll-view v-if="quickChips && quickChips.length" scroll-x class="nx-conv-chips" :show-scrollbar="false">
       <view class="nx-conv-chips-inner">
-        <view v-for="q in quickChips" :key="q.key" class="nx-conv-chip" @click="emit('chip', q.key)">
+	        <view v-for="q in quickChips" :key="q.key" class="nx-conv-chip" role="button" tabindex="0" :aria-label="q.label" @click="emit('chip', q.key)" @keydown.enter.prevent="onKeyboardActivate($event, () => emit('chip', q.key))" @keydown.space.prevent="onKeyboardActivate($event, () => emit('chip', q.key))">
           <text class="nx-conv-chip-emoji">{{ q.emoji }}</text>
           <text class="nx-conv-chip-t">{{ q.label }}</text>
         </view>
@@ -97,7 +97,7 @@
     <!-- Closed session → the input is retired; one CTA restarts with a fresh agent.
          The "why" (timeout notice) is already a system message inside the thread. -->
     <view v-if="closed" class="nx-conv-closedbar">
-      <view class="nx-conv-restart active:opacity-80" role="button" tabindex="0" :aria-label="restartLabel" @click="emit('restart')">
+	      <view class="nx-conv-restart active:opacity-80" role="button" tabindex="0" :aria-label="restartLabel" @click="emit('restart')" @keydown.enter.prevent="onKeyboardActivate($event, () => emit('restart'))" @keydown.space.prevent="onKeyboardActivate($event, () => emit('restart'))">
         <text class="nx-conv-restart-t">{{ restartLabel }}</text>
       </view>
     </view>
@@ -109,12 +109,13 @@
         :value="draft"
         :maxlength="maxInputLength ?? 140"
         :placeholder="inputPlaceholder"
+        :aria-label="inputPlaceholder"
         placeholder-class="nx-conv-input-ph"
         confirm-type="send"
         @input="onDraft"
         @confirm="onSend"
       />
-      <view class="nx-conv-send" :style="sendStyle" @click="onSend">
+	      <view class="nx-conv-send" :style="sendStyle" role="button" tabindex="0" :aria-label="sendLabel" :aria-disabled="!draft.trim()" @click="onSend" @keydown.enter.prevent="onKeyboardActivate($event, onSend)" @keydown.space.prevent="onKeyboardActivate($event, onSend)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="draft.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg>
       </view>
     </view>
@@ -128,6 +129,7 @@ import type { ThreadMsg, QuickChip } from "./thread-types";
 const props = defineProps<{
   messages: ThreadMsg[];
   inputPlaceholder: string;
+  sendLabel: string;
   quickChips?: QuickChip[];
   emptyHint?: string;
   /** "Agent is typing" indicator (pre-localised aria label via typingLabel). */
@@ -167,6 +169,16 @@ function startEdit(m: ThreadMsg) {
   if (!m.queue) return;
   edits.value[m.queue.turnId] = m.text;
   emit("queue-action", m.queue.turnId, "edit");
+}
+
+function runQueueAction(m: ThreadMsg, action: "cancel" | "retry" | "cancel-edit") {
+  if (!m.queue) return;
+  emit("queue-action", m.queue.turnId, action);
+}
+
+function saveQueueEdit(m: ThreadMsg) {
+  if (!m.queue) return;
+  emit("queue-save", m.queue.turnId, edits.value[m.queue.turnId] ?? m.text);
 }
 
 function onEditInput(turnId: string, e: Event) {
@@ -262,6 +274,11 @@ function formatLines(text: string): { text: string; bold: boolean }[][] {
 const sendStyle = computed<CSSProperties>(() => ({
   background: draft.value.trim() ? "var(--v5-brand)" : "var(--v5-surface)", // 输入条自身无底色,按钮贴页面底:原 surface-2 与页面底同色不可辨,改 L1
 }));
+
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
+  if (event.repeat) return;
+  action();
+}
 </script>
 
 <style scoped>
@@ -301,6 +318,7 @@ const sendStyle = computed<CSSProperties>(() => ({
 .nx-conv-msg-row {
   margin-bottom: 12px;
 }
+
 .nx-conv-queue { margin: 6px 0 0 auto; max-width: 90%; text-align: right; }
 .nx-conv-queue-status { display: block; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
 .nx-conv-queue[data-state="failed"] .nx-conv-queue-status { color: var(--v5-danger, #b42318); }
@@ -377,6 +395,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   padding: 10px 14px;
   background: var(--v5-surface-2);
 }
+.nx-conv-receipt--left { justify-content: flex-start; }
 .nx-conv-typing-dots {
   display: flex;
   gap: 4px;

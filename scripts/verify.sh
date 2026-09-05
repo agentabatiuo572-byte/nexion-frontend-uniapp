@@ -970,7 +970,7 @@ sentinel_present "home slot opens owned device id" src/components/home/device-sl
 sentinel_present "home row opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
 sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-slot.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
-sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="goBack"'
+sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="onKeyboardActivate\(\$event, goBack\)"'
 # ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
 # 2026-08-11 量面结果说明了枚举式判据的天花板 —— 它们守住 4 个控件,而当时全仓有 151 个
 # 自造控件键盘不可达(覆盖率 3%)。构造性判据见文件末尾的 a11y_activate_gate:那道门遍历

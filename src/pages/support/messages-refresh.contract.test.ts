@@ -20,4 +20,10 @@ describe("conversation-center refresh failure contract", () => {
     expect(source).toContain('import { novaAiApi, remoteApiEnabled } from "@/api/runtime"');
     expect(source).toContain("nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history())");
   });
+
+  it("uses the backend M5 availability read model before exposing category entry points", () => {
+    expect(source).toContain("convStore.refreshCategories()");
+    expect(source).toContain("convStore.categoryEnabled(row.key)");
+    expect(source).toContain("convStore.categoryEnabled(sel)");
+  });
 });

@@ -15,7 +15,8 @@
 
   结算分两档:
   - mock:余额直付——保留原型体验。
-  - 远端:POST /api/orders/bundle，由服务端锁库存、计算阶梯折扣并创建一张 BUNDLE 订单；
+  - 远端:POST /api/orders/bundle 由服务端锁库存、计算阶梯折扣并创建一张 BUNDLE 订单；
+    随后只能通过 NexGrid 钱包扣款接口完成支付与设备激活，不拉起第三方收银台。
     客户端只展示预估，最终金额以服务器回执为准，结果未知时复用同一幂等键。
 -->
 <template>
@@ -196,10 +197,10 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
-import { toast } from "@/store/ui";
-import { bundleDiscountApi, bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
+import { confirm, toast } from "@/store/ui";
+import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
-import { ApiError, isAmbiguousOutcome } from "@/api/errors";
+import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -207,7 +208,8 @@ import { postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft }
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
-import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 
 const t = useT();
 const cart = useCart();
@@ -241,6 +243,7 @@ onShow(() => {
   void refreshProductCatalog(true);
   void refreshServerProductPhase(true);
   void refreshBundlePolicy();
+  void refreshBundleWallet();
   restoreReceiptRecovery();
 });
 
@@ -320,9 +323,24 @@ const totalText = computed(() => total.value.toLocaleString(undefined, { maximum
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
 const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
 const submitting = ref(false);
-const checkoutUnavailable = computed(() => submitting.value || products.value.length < 2);
+const walletRefreshing = ref(false);
+let walletRefreshSequence = 0;
+
+async function refreshBundleWallet(): Promise<void> {
+  if (!remoteApiEnabled) return;
+  const request = app.captureRemoteAccountRequest();
+  const sequence = ++walletRefreshSequence;
+  walletRefreshing.value = true;
+  try {
+    await app.refreshRemoteFleet(request);
+  } finally {
+    if (sequence === walletRefreshSequence) walletRefreshing.value = false;
+  }
+}
+
+const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || products.value.length < 2);
 const ctaText = computed(() => (
-  submitting.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
+  submitting.value || walletRefreshing.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
 const checkoutHint = computed(() => products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
 const BUNDLE_RECEIPT_RECOVERY_KEY = "nexgrid-bundle-receipt-recovery-v1";
@@ -350,7 +368,10 @@ function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
   writeAccountRow<BundleReceiptRecovery | null>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey, null);
 }
 
-watch(() => app.accountKey, restoreReceiptRecovery);
+watch(() => app.accountKey, () => {
+  restoreReceiptRecovery();
+  void refreshBundleWallet();
+});
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -376,17 +397,7 @@ function bundleFingerprint(list: Product[]): string {
 }
 function acquireBundleKey(list: Product[], accountKey: string): string {
   const fingerprint = bundleFingerprint(list);
-  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
-  const existing = row?.commands?.[fingerprint];
-  if (existing) return existing;
-  const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const key = `bundle:${suffix}`;
-  // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
-  writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, {
-    commands: { ...(row?.commands ?? {}), [fingerprint]: key },
-  });
-  return key;
+  return acquireAccountCommandKey(BUNDLE_COMMAND_KEY, accountKey, fingerprint, "bundle");
 }
 function retireBundleKey(list: Product[], accountKey: string): void {
   const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
@@ -396,14 +407,40 @@ function retireBundleKey(list: Product[], accountKey: string): void {
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, { commands });
 }
 
+async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
+  const accountScope = captureAccountScope();
+  const accepted = await confirm({
+    title: t.value.errors.insufficientBalanceTitle,
+    message: fmt(t.value.errors.insufficientBalanceMsg, { amt: requiredUsdt.toLocaleString() }),
+    confirmLabel: t.value.me.topup,
+    cancelLabel: t.value.store.coCancel,
+    icon: "warn",
+  });
+  if (accepted && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
+}
+
 async function onCheckout() {
   const list = products.value;
-  if (list.length < 2 || submitting.value) return;
+  if (list.length < 2 || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
+    const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
+    const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
+      && orders.currentAccountKey() === accountKey;
+    const walletReceiptScope = app.captureRemoteAccountRequest();
+    const quotedTotal = total.value;
+    if (!Number.isFinite(quotedTotal) || quotedTotal < 0) {
+      toast.warn(t.value.store.coTotalQuoteChanged);
+      return;
+    }
+    if (app.user.usdtBalance + 0.000001 < quotedTotal) {
+      await offerBundleWalletTopup(quotedTotal);
+      return;
+    }
     submitting.value = true;
     try {
       const latestPolicy = await bundleDiscountApi.current();
+      if (!scopeIsCurrent()) return;
       if (!policy.value || latestPolicy.policyVersion !== policy.value.policyVersion) {
         policy.value = latestPolicy;
         policyStatus.value = "ready";
@@ -411,28 +448,67 @@ async function onCheckout() {
         return;
       }
       const key = acquireBundleKey(list, accountKey);
+      let canonicalOrderCommitted = false;
+      let paymentConfirmed = false;
+      let confirmedOrderNo = "";
       try {
         const created = await bundleOrderApi.create(
           list.map((item) => item.id), latestPolicy.policyVersion, key);
+        if (!scopeIsCurrent()) return;
+        canonicalOrderCommitted = true;
+        const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
+        if (!scopeIsCurrent()) return;
+        if (paid.orderNo !== created.orderNo
+            || (paid.paymentMethod === "WALLET"
+              && (paid.walletBalanceAfterUsdt === null
+                || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope)))) {
+          throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
+        }
+        paymentConfirmed = true;
+        confirmedOrderNo = created.orderNo;
         retireBundleKey(list, accountKey);
-        if (orders.currentAccountKey() !== accountKey) return;
         cart.clear();
-        const successBody = t.value.bundle.checkoutPendingBody;
+        await orders.refreshRemote();
+        if (!scopeIsCurrent()) return;
+        const settled = orders.orders.find((order) => order.id === created.orderNo);
+        if (!settled || settled.status !== "activated") {
+          throw new Error("BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH");
+        }
+        // Order + wallet receipt are already canonical. Fleet projection is
+        // best effort and must never cause a second payment submission.
+        void app.refreshRemoteFleet(walletReceiptScope);
+        const successBody = t.value.bundle.checkoutSuccessBody;
         toast.success(t.value.bundle.checkoutSuccessTitle,
           fmt(successBody, { count: created.itemCount }));
         navTo("/pages/store/orders");
       } catch (error) {
         const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
-        if (policyStale || !isAmbiguousOutcome(error)) retireBundleKey(list, accountKey);
-        if (orders.currentAccountKey() !== accountKey) return;
+        const apiError = asApiError(error);
+        if (!canonicalOrderCommitted && (policyStale || !isAmbiguousOutcome(error))) {
+          retireBundleKey(list, accountKey);
+        }
+        if (!scopeIsCurrent()) return;
+        if (paymentConfirmed) {
+          toast.warn(t.value.orders.walletPaymentConfirmedRefreshPending);
+          if (confirmedOrderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(confirmedOrderNo)}`);
+          return;
+        }
         if (policyStale) {
           await refreshBundlePolicy();
           toast.warn(t.value.bundle.policyChanged);
           return;
         }
-        toast.warn(isAmbiguousOutcome(error)
-          ? t.value.bundle.checkoutOutcomeUnknown
-          : t.value.tradein.errPurchaseFailed);
+        if (apiError.message === "ACCOUNT_COMMAND_STORAGE_UNAVAILABLE") {
+          toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        } else if (apiError.message === "ORDER_WALLET_INSUFFICIENT") {
+          await offerBundleWalletTopup(quotedTotal);
+        } else if (["ORDER_MONTHLY_QUOTA_PAUSED", "ORDER_MONTHLY_QUOTA_EXHAUSTED"].includes(apiError.message)) {
+          toast.warn(t.value.quota.stockUnavailable);
+        } else {
+          toast.warn(isAmbiguousOutcome(error)
+            ? t.value.bundle.checkoutOutcomeUnknown
+            : t.value.tradein.errPurchaseFailed);
+        }
       }
     } catch {
       policyStatus.value = "error";

@@ -44,8 +44,13 @@ function canonical(account: string): CanonicalOrder {
     canonicalStatus: "placed",
     orderType: "SINGLE",
     placedAt: 1,
+    expiresAt: 2,
     paidAt: null,
     activatedAt: null,
+    refundedAt: null,
+    refundAmountUsdt: null,
+    refundChannel: null,
+    refundBillNo: null,
     dataCenter: "Frankfurt DC",
     tradeinNo: null,
     sourceDeviceId: null,
@@ -60,7 +65,21 @@ function list(account: string): CanonicalOrderList {
     source: "server",
     sourceEnvironment: "PRODUCTION",
     runId: null,
+    nextCursor: null,
     orders: [canonical(account)],
+  };
+}
+
+function cancelledList(account: string): CanonicalOrderList {
+  return {
+    ...list(account),
+    orders: [{
+      ...canonical(account),
+      paymentStatus: "CANCELLED",
+      orderStatus: "CANCELLED",
+      activationStatus: "CANCELLED",
+      canonicalStatus: "cancelled",
+    }],
   };
 }
 
@@ -124,6 +143,81 @@ describe("orders remote account and commerce run scope", () => {
     await firstRefresh;
 
     expect(store.orders[0]?.id).toBe("ORD-new");
+  });
+
+  it("loads the next server page without replacing the first page", async () => {
+    remote.orderApi.list
+      .mockResolvedValueOnce({ ...list("new"), nextCursor: "ORD-new" })
+      .mockResolvedValueOnce(list("old"));
+    const store = useOrders();
+    store.bindAccount("A");
+
+    await store.refreshRemote();
+    await store.loadMoreRemote();
+
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(1, null, 50);
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 50);
+    expect(store.orders.map((order) => order.id)).toEqual(["ORD-new", "ORD-old"]);
+    expect(store.nextCursor).toBeNull();
+  });
+
+  it("clears a superseded load-more spinner when a newer refresh wins", async () => {
+    const latePage = deferred<CanonicalOrderList>();
+    remote.orderApi.list
+      .mockResolvedValueOnce({ ...list("first"), nextCursor: "ORD-first" })
+      .mockReturnValueOnce(latePage.promise)
+      .mockResolvedValueOnce(list("fresh"));
+    const store = useOrders();
+    store.bindAccount("A");
+
+    await store.refreshRemote();
+    const pendingMore = store.loadMoreRemote();
+    expect(store.loadingMore).toBe(true);
+    await store.refreshRemote();
+    expect(store.loadingMore).toBe(false);
+    latePage.resolve(list("late"));
+    await pendingMore;
+
+    expect(store.loadingMore).toBe(false);
+    expect(store.orders.map((order) => order.id)).toEqual(["ORD-fresh"]);
+  });
+
+  it("fails closed when the server repeats the requested order cursor", async () => {
+    remote.orderApi.list
+      .mockResolvedValueOnce({ ...list("new"), nextCursor: "ORD-new" })
+      .mockResolvedValueOnce({ ...list("old"), nextCursor: "ORD-new" });
+    const store = useOrders();
+    store.bindAccount("A");
+
+    await store.refreshRemote();
+    await expect(store.loadMoreRemote()).rejects.toThrow("ORDER_LIST_CURSOR_NOT_ADVANCING");
+
+    expect(store.loadingMore).toBe(false);
+    expect(store.nextCursor).toBeNull();
+    expect(store.orders.map((order) => order.id)).toEqual(["ORD-new"]);
+  });
+
+  it("walks server pages when a deep-linked order is not on the first page", async () => {
+    remote.orderApi.list
+      .mockResolvedValueOnce({ ...list("new"), nextCursor: "ORD-new" })
+      .mockResolvedValueOnce(list("target"));
+    const store = useOrders();
+    store.bindAccount("A");
+
+    const found = await store.ensureRemoteOrder("ORD-target");
+
+    expect(found?.id).toBe("ORD-target");
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 50);
+  });
+
+  it("accepts the canonical same-account readback after cancellation", async () => {
+    remote.orderApi.cancel.mockResolvedValue({});
+    remote.orderApi.list.mockResolvedValue(cancelledList("A"));
+    const store = useOrders();
+    store.bindAccount("A");
+
+    await expect(store.cancelOrderRemote("ORD-A")).resolves.toBe(true);
+    expect(store.orders[0]?.status).toBe("cancelled");
   });
 
   it("does not read back or mutate after a late cancel success from another account", async () => {
