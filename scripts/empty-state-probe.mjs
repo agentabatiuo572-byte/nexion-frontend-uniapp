@@ -18,6 +18,12 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  // History reads have a page envelope, not the account/public-state envelope.
+  // A malformed fixture must not turn a valid empty list into an outage screen.
+  if ((url.pathname === "/api/genesis/account" && ["orders", "emissions"].includes(url.searchParams.get("history")))
+      || (url.pathname === "/api/genesis/state" && ["listings", "transactions"].includes(url.searchParams.get("history")))) {
+    return { serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", items: [], nextCursor: null };
+  }
   const eligibility = {
     eligible: false,
     reasons: ["NO_ACTIVE_HOLDINGS"],
