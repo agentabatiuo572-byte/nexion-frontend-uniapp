@@ -1559,7 +1559,7 @@ spec2_guard_semantics() {
       if(!/IS_PRODUCTION/.test(body)) throw new Error(fn+" 是开发后门却没有 IS_PRODUCTION 早退 —— 生产构建里它是活的");
     }
     if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(isActiveSlotDevice\)\.length\)/.test(app)) throw new Error("slot cap must count every hidden active physical device through the shared slot policy");
-    if(!/return device\.activatedAt !== null && occupiesDeviceSlot\(device\.kind\)/.test(fs.readFileSync("src/lib/device-slot-policy.ts","utf8"))) throw new Error("shared slot policy must count active PC devices while excluding non-slot products");
+    require("node:child_process").execFileSync(process.execPath, ["scripts/lib/check-device-slot-policy.mjs"], {stdio:"pipe"});
     const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
     if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
     const demoKinds = [...demoKindsMatch[1].matchAll(/"([^"]+)"/g)].map((m)=>m[1]);

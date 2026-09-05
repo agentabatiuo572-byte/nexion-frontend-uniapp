@@ -486,8 +486,10 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
   async function history<T>(kind: string, parser: (value: unknown) => T): Promise<T[]> {
     const authenticated = kind === "orders" || kind === "emissions";
     return readGenesisHistoryPages(async (cursor) => {
+      const basePath = authenticated ? "/api/genesis/account" : "/api/genesis/state";
+      const query = `?history=${kind}` + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
       const row = record(await client.request({ method: "GET", authenticated,
-        path: `/api/genesis/${authenticated ? "account" : "state"}?history=${kind}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+        path: basePath + query,
       }));
       if (!row || !validAuthority(row, mode) || !Array.isArray(row.items)
           || !(row.nextCursor === null || (typeof row.nextCursor === "string" && /^[1-9][0-9]{0,18}$/.test(row.nextCursor)))) return invalid();

@@ -122,10 +122,10 @@
           </view>
           <!-- 同上:零事件时原样渲染 listCardStyle 会留一个零高度的空 surface 盒子。 -->
           <EmptyState v-else kind="empty-list" :title="t.empty.genesisActivityTitle" :desc="t.empty.genesisActivityDesc" />
-          <button v-if="genesis.activityPage.cursor" :disabled="genesis.activityPage.busy"
-            :aria-busy="genesis.activityPage.busy" @click="genesis.loadMoreActivity()">
-            {{ genesis.activityPage.error ? t.orders.retry : t.orders.loadMore }}
-          </button>
+          <view v-if="genesis.activityPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.activityPage.busy ? 'true' : 'false'"
+            :aria-busy="genesis.activityPage.busy ? 'true' : 'false'" style="padding:12px;text-align:center;color:var(--v5-brand)" @click="!genesis.activityPage.busy && genesis.loadMoreActivity()">
+            <text>{{ genesis.activityPage.error ? t.orders.retry : t.orders.loadMore }}</text>
+          </view>
         </template>
 
         <!-- MINE TAB -->

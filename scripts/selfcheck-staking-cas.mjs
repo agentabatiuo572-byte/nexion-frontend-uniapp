@@ -484,7 +484,7 @@ function diskRev() {
       isRemote: { value: false }, isSandboxHold: { value: false }, remoteReady: { value: false }, isMounted: { value: true },
       repurchase: { open: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
       intentKey: () => "MOCK_INTENT_UNUSED",
-      canSubmit: { value: true },
+      canOpen: { value: true }, canSubmit: { value: true },
       user: { value: app.user },
       STAKING_MIN, STAKING_APY,
       app, staking, postMoneyBill, geoPolicyUserMessage,

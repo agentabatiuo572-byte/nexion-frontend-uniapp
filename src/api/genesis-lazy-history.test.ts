@@ -18,6 +18,8 @@ describe("bounded Genesis history reads", () => {
       : { ...authority, items: [], nextCursor: path.includes("transactions") ? "999999" : null });
     const result = await createGenesisApi({ request } as never).state();
     expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledWith({ method: "GET", authenticated: false, path: "/api/genesis/state?history=listings" });
+    expect(request).toHaveBeenCalledWith({ method: "GET", authenticated: false, path: "/api/genesis/state?history=transactions" });
     expect(result.transactionsNextCursor).toBe("999999");
     expect(result.marketStats.volume24hUsdt).toBe(12345);
   });

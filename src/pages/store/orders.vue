@@ -73,9 +73,9 @@
         >
           <text>{{ t.orders.loadMore }}{{ orders.loadingMore ? '…' : '' }}</text>
         </view>
-        <button v-if="remoteApiEnabled && genesis.orderPage.cursor" :disabled="genesis.orderPage.busy" @click="genesis.loadMoreGenesisOrders()">
-          {{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}
-        </button>
+        <view v-if="remoteApiEnabled && genesis.orderPage.cursor" class="active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="genesis.orderPage.busy ? 'true' : 'false'" :aria-busy="genesis.orderPage.busy ? 'true' : 'false'" @click="!genesis.orderPage.busy && genesis.loadMoreGenesisOrders()">
+          <text>{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
+        </view>
       </view>
     </view>
   </AppChassis>

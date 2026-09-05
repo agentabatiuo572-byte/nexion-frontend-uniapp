@@ -1,7 +1,7 @@
 <template>
   <view v-if="featuredCourse" role="link" tabindex="0" style="padding:16px;border-radius:16px;background:var(--v5-surface)" @click="open" @keydown.enter.prevent="open">
-    <text class="block" style="font-size:12px;color:var(--v5-brand)">{{ label }}</text>
-    <text class="block" style="margin-top:6px;font-size:16px;font-weight:600">{{ featuredCourse.title }}</text>
+    <text class="block" style="font-size:12px;color:var(--v5-brand)">{{ t.learning.featuredLabel }}</text>
+    <text class="block" style="margin-top:6px;font-size:15px;font-weight:600">{{ featuredCourse.title }}</text>
     <text class="block" style="margin-top:4px;color:var(--v5-ink-3)">{{ featuredCourse.duration }} · {{ featuredCourse.rewardNex }} NEX</text>
   </view>
 </template>
@@ -15,12 +15,13 @@ import type { LearningCourse } from "@/api/learning-api";
 import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { navTo } from "@/lib/route";
+import { useT } from "@/i18n/use-t";
+const t = useT();
 const app = useApp();
 const locale = useLocaleStore();
 const courses = ref<LearningCourse[]>([]);
 const featuredCourse = computed(() => courses.value.find((course) => course.featured));
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
-const label = computed(() => language.value === "en" ? "Recommended course" : language.value === "vi" ? "Khóa học đề xuất" : "推荐课程");
 let visible = false;
 let generation = 0;
 async function refresh() {
