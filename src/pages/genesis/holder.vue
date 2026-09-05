@@ -168,9 +168,9 @@
                 <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
               </view>
-              <button v-if="genesis.emissionPage.cursor" :disabled="genesis.emissionPage.busy" @click="genesis.loadMoreEmissions()">
-                {{ genesis.emissionPage.error ? t.orders.retry : t.orders.loadMore }}
-              </button>
+              <view v-if="genesis.emissionPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.emissionPage.busy ? 'true' : 'false'" :aria-busy="genesis.emissionPage.busy ? 'true' : 'false'" style="padding:12px;text-align:center;color:var(--v5-brand)" @click="!genesis.emissionPage.busy && genesis.loadMoreEmissions()">
+                <text>{{ genesis.emissionPage.error ? t.orders.retry : t.orders.loadMore }}</text>
+              </view>
             </view>
           </view>
         </template>

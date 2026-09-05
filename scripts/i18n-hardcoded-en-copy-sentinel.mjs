@@ -56,7 +56,7 @@ const TECH_TOKENS = [
     why: "币种代码 / 品牌名 / 产品型号 / 支付服务商名:全球单一写法,翻译过去反而是错的",
     // 🔴 `CertiK` 曾在这里,被本门自己的「0 命中即失效」判据赶走 —— 那行原文是 `CertiK audited`,
     //    `audited` 是要翻译的动词,整句收进 t.ref.certikAudited 之后判定面上再没有这个词。
-    tokens: ["NEX", "USDT", "NexGrid", "NexGridBox", "GEN", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
+    tokens: ["NEX", "USDT", "NexGrid", "NexGridBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
   },
   {
     id: "cert-acronym",

@@ -2652,6 +2652,12 @@ export const en = {
     },
   },
   nova: {
+    handoff: {
+      action: "Contact human support",
+      recommend: "This issue may need a human agent.",
+      fresh: "Please describe your latest issue to the human agent; the failed question was not shared.",
+      confirm: "Share up to 5 recent questions (with detected credentials removed) with human support? Do not include passwords, codes or private keys.",
+    },
     name: "Nova",
     role: "AI compute advisor · online",
     inputPlaceholder: "Ask Nova anything about your earnings…",
@@ -5895,6 +5901,7 @@ export const en = {
   },
   learning: {
     centerTitle: "Learning center",
+    featuredLabel: "Recommended course",
     centerLoading: "Loading the learning center…",
     centerProgress: "{done}/{total} completed · {nex} NEX earned",
     courseMeta: "{duration} · {nex} NEX reward",

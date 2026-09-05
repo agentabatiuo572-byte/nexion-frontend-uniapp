@@ -2558,6 +2558,12 @@ export const vi: Messages = {
     },
   },
   nova: {
+    handoff: {
+      action: "Liên hệ nhân viên hỗ trợ",
+      recommend: "Vấn đề này có thể cần nhân viên hỗ trợ.",
+      fresh: "Vui lòng mô tả lại vấn đề với nhân viên; câu hỏi bị lỗi chưa được chia sẻ.",
+      confirm: "Chia sẻ tối đa 5 câu hỏi gần đây (đã lọc thông tin xác thực) với nhân viên? Không cung cấp mật khẩu, mã xác minh hoặc khóa riêng.",
+    },
     name: "Nova",
     role: "Cố vấn tính toán AI · trực tuyến",
     inputPlaceholder: "Hỏi Nova bất cứ điều gì về thu nhập của bạn…",
@@ -3393,7 +3399,7 @@ export const vi: Messages = {
     docsEvents: "Sự kiện: {events}",
     keysEmpty: "Chưa có API key · hãy yêu cầu quyền truy cập trước.",
     apiCapabilityUnavailable: "NexGrid OpenAPI chưa ra mắt: không thể tạo hoặc dùng API key; bạn vẫn có thể thu hồi key cũ.",
-    capabilityRoadmap: "Các khả năng dưới đây đang được lên kế hoạch, chưa phải dịch vụ hiện có. Điều khiển điện toán, hóa đơn thu nhập, dữ liệu thị trường và gửi sự kiện chưa được mở. Được duyệt truy cập không có nghĩa các API này đã hoạt động.",
+    capabilityRoadmap: "Các khả năng dưới đây đang được lên kế hoạch, chưa phải dịch vụ hiện có. Điều khiển điện toán, hóa đơn thu nhập, dữ liệu thị trường và gửi sự kiện chưa được mở. Có quyền truy cập không có nghĩa các API này đã hoạt động.",
     keysCreate: "Tạo key",
     webhooksEmpty: "Chưa cấu hình endpoint webhook nào.",
     webhooksAdd: "Thêm endpoint",
@@ -5747,6 +5753,7 @@ export const vi: Messages = {
   },
   learning: {
     centerTitle: "Trung tâm hướng dẫn",
+    featuredLabel: "Khóa học đề xuất",
     centerLoading: "Đang tải trung tâm hướng dẫn…",
     centerProgress: "Đã hoàn thành {done}/{total} · Đã nhận {nex} NEX",
     courseMeta: "{duration} · Thưởng {nex} NEX",

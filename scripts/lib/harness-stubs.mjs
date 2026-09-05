@@ -18,7 +18,8 @@ export const computed = (fn) => ({
 });
 export const watch = () => {};
 export const onScopeDispose = () => {};
-export const reactive = (v) => v;`;
+export const reactive = (v) => v;
+export const shallowReactive = reactive;`;
 
 // NXREF:带 __nxRef 标记 —— 配 Proxy 解包版 pinia-stub 的脚本。
 export const VUE_STUB_NXREF = `export const ref = (v) => ({ __nxRef: true, value: v });
@@ -29,6 +30,7 @@ export const computed = (fn) => ({
   set value(v) { if (typeof fn !== "function" && fn.set) fn.set(v); },
 });
 export const reactive = (v) => v;
+export const shallowReactive = reactive;
 export const watch = () => {};
 export const onScopeDispose = () => {};`;
 

@@ -163,7 +163,7 @@ export function createAccountApi(client: ApiClient): AccountApi {
     },
     securityOverview: async (cursor) => parseSecurityState(await client.request({
       method: "GET",
-      path: `/api/app/security${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      path: cursor ? `/api/app/security?cursor=${encodeURIComponent(cursor)}` : "/api/app/security",
     })),
     changePassword: async (currentPassword, newPassword, idempotencyKey) => parseMutation(await client.request({
       method: "POST",

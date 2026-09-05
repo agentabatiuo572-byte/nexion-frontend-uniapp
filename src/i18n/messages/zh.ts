@@ -2576,6 +2576,12 @@ export const zh: Messages = {
     },
   },
   nova: {
+    handoff: {
+      action: "转人工客服",
+      recommend: "此问题建议由人工客服协助处理。",
+      fresh: "请向人工客服重新描述最新问题，失败的提问尚未转交。",
+      confirm: "是否将最近最多 5 条提问（已过滤检测到的凭据）交给人工客服？请勿在提问中提供密码、验证码或私钥。",
+    },
     name: "Nova",
     role: "算力 AI 顾问 · 在线",
     inputPlaceholder: "随便问 Nova 关于你的收益…",
@@ -5728,6 +5734,7 @@ export const zh: Messages = {
   },
   learning: {
     centerTitle: "教程中心",
+    featuredLabel: "推荐课程",
     centerLoading: "正在加载教程中心…",
     centerProgress: "已完成 {done}/{total} · 已获 {nex} NEX",
     courseMeta: "{duration} · 奖励 {nex} NEX",

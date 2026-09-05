@@ -24,10 +24,11 @@ import path from "node:path";
 import { transformSync } from "esbuild";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-/** 全 src 的 .ts/.vue 扫描面。两处消费:扣款调用点集合等式、日限消费点集合等式。 */
+/** Production .ts/.vue only; vitest.config.ts owns the .test.ts fixtures under src. */
+const isProductionSource = (name) => /\.(ts|vue)$/.test(name) && !name.endsWith(".test.ts");
 const walkSrc = (dir = path.join(root, "src")) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
   const p = path.join(dir, e.name);
-  return e.isDirectory() ? walkSrc(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
+  return e.isDirectory() ? walkSrc(p) : (isProductionSource(e.name) ? [p] : []);
 });
 const src = readFileSync(path.join(root, "src", "store", "withdrawal-eligibility-core.ts"), "utf8");
 const { code } = transformSync(src, { loader: "ts", format: "esm" });
@@ -48,6 +49,9 @@ function check(name, cond, detail) {
 }
 
 const NOW = 1_800_000_000_000;
+check("production source scan excludes only Vitest test files, never test-named runtime consumers",
+  !isProductionSource("withdrawal-eligibility.test.ts")
+    && ["withdrawal-eligibility.ts", "new-consumer.vue", "test-wallet.ts", "wallet.spec.ts", "wallet.test.vue"].every(isProductionSource));
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
 

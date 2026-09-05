@@ -50,7 +50,7 @@
     </view>
     <view v-if="isAi && remoteApiEnabled" class="cp-ai-history">
       <text v-if="handoffRecommended" class="cp-ai-history-t">{{ handoffCopy.recommend }}</text>
-      <button :disabled="handoffBusy" @click="onHumanHandoff">{{ handoffCopy.action }}</button>
+      <view class="cp-ai-history-action active:opacity-70" role="button" tabindex="0" :aria-disabled="handoffBusy ? 'true' : 'false'" :aria-busy="handoffBusy ? 'true' : 'false'" @click="!handoffBusy && onHumanHandoff()"><text>{{ handoffCopy.action }}</text></view>
     </view>
     <view v-if="isAi && remoteApiEnabled && nova.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.nova.historyTruncated }}</text>
@@ -157,19 +157,7 @@ const handoffRecommended = ref(false);
 const handoffNeedsFreshQuestion = ref(false);
 let handoffAttemptEpoch = 0;
 let pendingHandoff: { account: string; epoch: number; conversation: string; turn: string; key: string } | null = null;
-const handoffCopy = computed(() => locale.code === "en" ? {
-  action: "Contact human support", recommend: "This issue may need a human agent.",
-  fresh: "Please describe your latest issue to the human agent; the failed question was not shared.",
-  confirm: "Share up to 5 recent questions (with detected credentials removed) with human support? Do not include passwords, codes or private keys.",
-} : locale.code === "vi" ? {
-  action: "Liên hệ nhân viên hỗ trợ", recommend: "Vấn đề này có thể cần nhân viên hỗ trợ.",
-  fresh: "Vui lòng mô tả lại vấn đề với nhân viên; câu hỏi bị lỗi chưa được chia sẻ.",
-  confirm: "Chia sẻ tối đa 5 câu hỏi gần đây (đã lọc thông tin xác thực) với nhân viên? Không cung cấp mật khẩu, mã xác minh hoặc khóa riêng.",
-} : {
-  action: "转人工客服", recommend: "此问题建议由人工客服协助处理。",
-  fresh: "请向人工客服重新描述最新问题，失败的提问尚未转交。",
-  confirm: "是否将最近最多 5 条提问（已过滤检测到的凭据）交给人工客服？请勿在提问中提供密码、验证码或私钥。",
-});
+const handoffCopy = computed(() => t.value.nova.handoff);
 watch(() => [app.accountKey, app.accountBindingEpoch, nova.conversationId], () => {
   ++handoffAttemptEpoch;
   handoffNeedsFreshQuestion.value = false;

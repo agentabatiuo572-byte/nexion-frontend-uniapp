@@ -5,7 +5,7 @@
     <view v-else><text class="block" style="font-size:20px;font-weight:600">{{ t.learning.centerTitle }}</text><text class="block" style="margin:8px 0;color:var(--v5-ink-3)">{{ progressLine }}</text>
       <EmptyState v-if="overview?.courses.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
       <view v-if="featuredCourse" role="link" tabindex="0" style="margin:12px 0;padding:16px;border:1px solid var(--v5-brand);border-radius:12px" @click="open(featuredCourse.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => featuredCourse && open(featuredCourse.id))">
-        <text class="block" style="color:var(--v5-brand)">{{ featuredLabel }}</text>
+        <text class="block" style="color:var(--v5-brand)">{{ t.learning.featuredLabel }}</text>
         <text class="block" style="font-weight:600">{{ featuredCourse?.title }}</text>
         <text class="block">{{ courseMeta(featuredCourse) }}</text>
       </view>
@@ -36,7 +36,6 @@ type LearningError = "" | "centerOffline" | "centerGeoUnresolved" | "centerUnava
 const t = useT(); const locale = useLocaleStore(); const app = useApp(); const overview = ref<LearningOverview | null>(null); const loading = ref(true); const error = ref<LearningError>("");
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
 const featuredCourse = computed(() => overview.value?.courses.find((course) => course.featured));
-const featuredLabel = computed(() => locale.code === "en" ? "Recommended course" : locale.code === "vi" ? "Khóa học đề xuất" : "推荐课程");
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
 const progressLine = computed(() => fmt(t.value.learning.centerProgress, { done: overview.value?.completedCourses ?? 0, total: overview.value?.totalCourses ?? 0, nex: overview.value?.earnedNex ?? 0 }));
 function courseMeta(course: LearningCourse) { return fmt(t.value.learning.courseMeta, { duration: course.duration, nex: course.rewardNex }); }

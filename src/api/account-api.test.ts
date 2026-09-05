@@ -15,6 +15,14 @@ const deletion = {
 };
 
 describe("account deletion authority contract", () => {
+  it("keeps the security endpoint exact and encodes pagination as a query value", async () => {
+    const request = vi.fn().mockResolvedValue({ twoFactorEnabled: false, passwordChangedAt: null, sessions: [], nextCursor: null });
+    const api = createAccountApi({ request } as never);
+    await api.securityOverview();
+    await api.securityOverview("cursor&extra=1");
+    expect(request).toHaveBeenNthCalledWith(1, { method: "GET", path: "/api/app/security" });
+    expect(request).toHaveBeenNthCalledWith(2, { method: "GET", path: "/api/app/security?cursor=cursor%26extra%3D1" });
+  });
   it("recovers a password receipt by GET without sending password input", async () => {
     const request = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ passwordChangedAt: "2026-09-05T01:02:03Z", revokedSessionCount: 2 });
     const api = createAccountApi({ request } as never);
