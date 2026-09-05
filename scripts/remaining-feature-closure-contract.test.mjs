@@ -144,7 +144,11 @@ test("remote leaderboard, leadership pool, and commission pages use self-scoped 
   assert.match(pool, /const runScope = captureRuntimeRevision\(\)/);
   assert.match(pool, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentRuntimeRevision\(runScope\)/);
   assert.match(pool, /remoteState !== 'ready'/);
-  assert.match(pool, /remoteState\.value = "error"/);
+  assert.match(pool, /remoteState\.value = leadershipPoolFailureState\(cause\)/);
+  const poolFailure = await read("src/lib/leadership-pool-state.ts");
+  assert.match(poolFailure, /cause instanceof ApiError/);
+  assert.match(poolFailure, /cause\.message === "F4_LEADERSHIP_POOL_HOLD"/);
+  assert.match(poolFailure, /\? "hold" : "error"/);
   assert.match(commission, /teamInsightsApi\.commissions/);
   assert.match(commission, /bindingEpoch \+= 1/);
   assert.match(commission, /if \(!isCurrentScope\(scope\)\) return/);

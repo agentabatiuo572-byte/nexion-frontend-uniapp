@@ -14,7 +14,16 @@ test("remote security center consumes the authoritative account API", () => {
   assert.match(page, /accountApi\.revokeSession\(/);
   assert.match(page, /accountApi\.revokeOtherSessions\(\)/);
   assert.match(page, /accountApi\.requestAccountDeletion\(/);
-  assert.match(page, /if \(remoteApiEnabled\) \{[\s\S]{0,320}accountApi\.changePassword\([\s\S]{0,320}else \{[\s\S]{0,120}security\.changePassword\(/);
+  const passwordChange = page.match(/async function submitPasswordChange\(\) \{([\s\S]*?)^\}/m)?.[1];
+  assert.ok(passwordChange, "password command boundary must exist");
+  const branches = passwordChange.match(/if \(remoteApiEnabled\) \{([\s\S]*?)\n\s*\} else \{([\s\S]*?)\n\s*\}/);
+  assert.ok(branches, "password command must separate server and local authority");
+  assert.match(branches[1], /accountApi\.passwordCommandReceipt\(commandKey\)/);
+  assert.match(branches[1], /else await accountApi\.changePassword\(current\.value, next\.value, commandKey\)/);
+  assert.match(branches[1], /await loadRemoteSecurity\(\)/);
+  assert.doesNotMatch(branches[1], /security\.changePassword\(/);
+  assert.match(branches[2], /security\.changePassword\(current\.value, next\.value\)/);
+  assert.doesNotMatch(branches[2], /accountApi\./);
   assert.match(page, /accountApi\.updateTwoFactor\(target, twoFactorPassword\.value, twoFactorChallengeNo\.value, twoFactorCode\.value\)/);
   assert.doesNotMatch(page, /ACCOUNT_DELETION_PROVIDER_HOLD/);
 });

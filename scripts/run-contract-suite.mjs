@@ -102,6 +102,7 @@ const REGISTRY = {
     why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。2026-08-16 复核补记:拍板的实现(16bddf0)已把 FUNDS_PRODUCTION_WITHDRAWAL_HOLD 从 src 删干净(全仓 0 命中),本门现在是**被测对象已不存在**的死门,单跑必红 —— 不是「能跑但结论相反」。若日后改回 HOLD,连同该常量一起恢复再移回 chain;否则按删除纪律 Move 到 .trash 更干净(留着待主人裁决)。",
   },
   // ── elsewhere:已有入口在跑 ──
+  "a11y-numeric-attribute.test.mjs": { how: "elsewhere", by: "npm run test:a11y-activate" },
   "dev-prod-environment-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "behavior-analytics-active-route-catalog-contract.test.mjs": {
     how: "elsewhere",
