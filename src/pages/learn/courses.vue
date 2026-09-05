@@ -1,9 +1,15 @@
 <template>
   <AppChassis active="me"><view class="px-4" style="padding-bottom:24px"><SubPageHeader back="/pages/me/me" />
     <view v-if="loading"><text>{{ t.learning.centerLoading }}</text></view>
-    <view v-else-if="error"><text class="block" style="text-wrap:pretty">{{ errorText }}</text><text class="block active:opacity-70" style="margin-top:12px;color:var(--v5-brand)" @click="load">{{ t.ui.retry }}</text></view>
+    <view v-else-if="error" role="alert" aria-live="assertive"><text class="block" style="text-wrap:pretty">{{ errorText }}</text><text class="block active:opacity-70" style="margin-top:12px;color:var(--v5-brand)" role="button" tabindex="0" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text></view>
     <view v-else><text class="block" style="font-size:20px;font-weight:600">{{ t.learning.centerTitle }}</text><text class="block" style="margin:8px 0;color:var(--v5-ink-3)">{{ progressLine }}</text>
-      <view v-for="course in overview?.courses" :key="course.id" class="active:opacity-70" style="margin-top:10px;padding:14px;border-radius:12px;background:var(--v5-surface)" @click="open(course.id)"><text class="block" style="font-weight:600">{{ course.title }}</text><text class="block" style="margin-top:5px;color:var(--v5-ink-3)">{{ courseMeta(course) }}</text></view>
+      <EmptyState v-if="overview?.courses.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
+      <view v-if="featuredCourse" role="link" tabindex="0" style="margin:12px 0;padding:16px;border:1px solid var(--v5-brand);border-radius:12px" @click="open(featuredCourse.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => featuredCourse && open(featuredCourse.id))">
+        <text class="block" style="color:var(--v5-brand)">{{ featuredLabel }}</text>
+        <text class="block" style="font-weight:600">{{ featuredCourse?.title }}</text>
+        <text class="block">{{ courseMeta(featuredCourse) }}</text>
+      </view>
+      <view v-for="course in overview?.courses" :key="course.id" class="active:opacity-70" style="margin-top:10px;padding:14px;border-radius:12px;background:var(--v5-surface)" role="link" tabindex="0" @click="open(course.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => open(course.id))"><text class="block" style="font-weight:600">{{ course.title }}</text><text class="block" style="margin-top:5px;color:var(--v5-ink-3)">{{ courseMeta(course) }}</text></view>
     </view>
   </view></AppChassis>
 </template>
@@ -12,6 +18,7 @@ import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { learningApi } from "@/api/learning-runtime";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -28,9 +35,12 @@ import type { LearningCourse, LearningOverview } from "@/api/learning-api";
 type LearningError = "" | "centerOffline" | "centerGeoUnresolved" | "centerUnavailable";
 const t = useT(); const locale = useLocaleStore(); const app = useApp(); const overview = ref<LearningOverview | null>(null); const loading = ref(true); const error = ref<LearningError>("");
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
+const featuredCourse = computed(() => overview.value?.courses.find((course) => course.featured));
+const featuredLabel = computed(() => locale.code === "en" ? "Recommended course" : locale.code === "vi" ? "Khóa học đề xuất" : "推荐课程");
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
 const progressLine = computed(() => fmt(t.value.learning.centerProgress, { done: overview.value?.completedCourses ?? 0, total: overview.value?.totalCourses ?? 0, nex: overview.value?.earnedNex ?? 0 }));
 function courseMeta(course: LearningCourse) { return fmt(t.value.learning.courseMeta, { duration: course.duration, nex: course.rewardNex }); }
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
 let accountEpoch = 0;
 let generation = 0;
 let mounted = false;

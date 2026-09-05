@@ -10,6 +10,8 @@ const remote = vi.hoisted(() => ({
     tickets: vi.fn(),
     ticket: vi.fn(),
     markTicketRead: vi.fn(),
+    commandResult: vi.fn(async () => null),
+    createTicket: vi.fn(),
   },
 }));
 
@@ -50,6 +52,21 @@ beforeEach(() => {
 });
 
 describe("ticket read acknowledgement", () => {
+  it("rejects a late detail response after an account switch instead of returning an unusable ticket", async () => {
+    const store = useTickets();
+    const response = deferred<Ticket>();
+    remote.supportApi.ticket.mockReturnValueOnce(response.promise);
+    store.bindAccount("A");
+    const pending = store.load("TK-A");
+    const assertion = expect(pending).rejects.toThrow("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    await vi.waitFor(() => expect(remote.supportApi.ticket).toHaveBeenCalledTimes(1));
+    store.bindAccount("B");
+    response.resolve(ticket("TK-A", 1, 1));
+    await assertion;
+    expect(store.tickets).toEqual([]);
+    expect(remote.supportApi.markTicketRead).not.toHaveBeenCalled();
+  });
+
   it("adopts the server read snapshot only for the ticket version the user opened", async () => {
     const store = useTickets();
     const opened = ticket("TK-A", 3, 1);
@@ -97,5 +114,19 @@ describe("ticket read acknowledgement", () => {
     await pending;
 
     expect(store.tickets).toEqual([accountB]);
+  });
+
+  it("rejects a create result that belongs to the previously signed-in account", async () => {
+    const created = deferred<Ticket>();
+    remote.supportApi.createTicket.mockReturnValue(created.promise);
+    const store = useTickets();
+    const pending = store.createTicket({ category: "technical", subject: "Subject", body: "Body" });
+    await vi.waitFor(() => expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1));
+
+    store.bindAccount("account-b");
+    created.resolve(ticket("TK-ACCOUNT-A", 1, 0));
+
+    await expect(pending).rejects.toThrow("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    expect(store.tickets).toEqual([]);
   });
 });

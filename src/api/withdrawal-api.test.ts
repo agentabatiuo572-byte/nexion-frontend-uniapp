@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { createWithdrawalApi } from "./withdrawal-api";
 
 const row = {
@@ -13,7 +13,10 @@ test("hydrates the durable withdrawal list and sends the server eligibility snap
   const requests: any[] = [];
   const api = createWithdrawalApi({ request: async (request: any) => {
     requests.push(request);
-    if (request.method === "GET") return { source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION", withdrawals: [row] };
+    if (request.method === "GET") return {
+      source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION", withdrawals: [row],
+      page: { pageNum: 1, pageSize: 50, total: 1, hasMore: false },
+    };
     return {
       canSubmit: true, maxWithdrawableUsdt: 100, route: "delay", riskReasons: ["K3_ROUTE:delay"],
       fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
@@ -21,15 +24,25 @@ test("hydrates the durable withdrawal list and sends the server eligibility snap
     };
   }} as never);
   await expect(api.list()).resolves.toMatchObject([{ withdrawalNo: "WD-1", targetAddress: row.targetAddress }]);
-  await expect(api.eligibility({ amount: 25, chain: "USDT-BEP20", address: row.targetAddress })).resolves.toMatchObject({ route: "delay" });
-  expect(requests[0].path).toBe("/api/withdrawals");
+  await expect(api.eligibility({ amount: 25, chain: "USDT-BEP20", address: row.targetAddress, policyVersion: "p1" })).resolves.toMatchObject({ route: "delay" });
+  expect(requests[0].path).toBe("/api/withdrawals?pageNum=1&pageSize=50");
   expect(requests[1].path).toBe("/api/withdrawals/eligibility");
+  expect(requests[1].body.policyVersion).toBe("p1");
+});
+
+test("does not send a preflight with a missing policy version", async () => {
+  const request = vi.fn();
+  const api = createWithdrawalApi({ request } as never);
+  await expect(api.eligibility({ amount: 20, chain: "USDT-BEP20", address: row.targetAddress,
+    policyVersion: " " })).rejects.toThrow("WITHDRAWAL_POLICY_VERSION_REQUIRED");
+  expect(request).not.toHaveBeenCalled();
 });
 
 test("accepts the server strong-review receipt before mapping it to the client manual route", async () => {
   const api = createWithdrawalApi({ request: async () => ({
     source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
     withdrawals: [{ ...row, riskRoute: "strong-review" }],
+    page: { pageNum: 1, pageSize: 50, total: 1, hasMore: false },
   }) } as never);
 
   await expect(api.list()).resolves.toMatchObject([{ withdrawalNo: "WD-1", riskRoute: "strong-review" }]);

@@ -12,6 +12,14 @@ export interface LocalStakingPoolValues {
   minAmountUsdt: number;
 }
 
+export function canOpenStakingPool(state: StakingConfigState, termDays: StakingTerm | null): boolean {
+  if (termDays === null) return false;
+  if (state.isMockMode) return true;
+  if (!state.remoteReady) return false;
+  const pool = state.pools.find((candidate) => candidate.termDays === termDays);
+  return !!pool && pool.enabled && !pool.killed && pool.status === "ACTIVE";
+}
+
 /**
  * Resolve display configuration with an explicit mock boundary.
  * Remote callers get no value until the parsed server snapshot is ready;

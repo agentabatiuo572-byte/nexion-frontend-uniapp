@@ -27,6 +27,9 @@
           </view>
         </template>
         <!-- ⑤ 报错/极限态:题面加载或校验网络失败 → 层内失败态 + 重试,不静默关闭 -->
+        <view v-else-if="providerHold" class="cs-fail" role="status">
+          <text class="cs-fail__t">{{ t.authOtp.captchaProviderUnavailable }}</text>
+        </view>
         <view v-else-if="loadFailed" class="cs-fail">
           <text class="cs-fail__t">{{ t.authOtp.captchaLoadFailed }}</text>
           <view class="cs-fail__btn" role="button" tabindex="0" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
@@ -34,7 +37,7 @@
       </view>
 
       <!-- 滑轨 -->
-      <view id="cs-track" class="cs-track" :class="trackCls">
+      <view v-if="!providerHold" id="cs-track" class="cs-track" :class="trackCls">
         <view class="cs-fill" :style="{ width: curX + 24 + 'px' }" />
         <view v-if="showHint" class="cs-hintwrap"><text class="cs-hint">{{ t.authOtp.captchaTrackHint }}</text></view>
         <!-- 🔴 滑柄此前只绑触摸与鼠标 —— 纯键盘用户拖不动它,而滑块是登录 / 注册 /
@@ -62,7 +65,7 @@
         </view>
       </view>
 
-      <view class="cs-meta">
+      <view v-if="!providerHold" class="cs-meta">
         <text class="cs-meta__fail">{{ failText }}</text>
         <text v-if="hintText" class="cs-meta__hint" :class="{ 'cs-meta__hint--err': hintIsError }">{{ hintText }}</text>
       </view>
@@ -78,7 +81,7 @@ import { toast } from "@/store/ui";
 import { captchaChallenge, captchaVerify, MAX_CAPTCHA_FAILS, type CaptchaChallenge, type CaptchaVerifyResult } from "@/store/auth-otp";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
-const props = defineProps<{ phone: string }>();
+const props = defineProps<{ phone: string; providerHold?: boolean }>();
 const emit = defineEmits<{ (e: "success", ticket: string): void; (e: "close"): void }>();
 
 const t = useT();
@@ -131,6 +134,15 @@ function clearSkeleton() {
 // mock 的 captchaChallenge 不会 reject,此分支为 PROD 真滑块 SDK 的网络失败预留。
 async function loadChallenge() {
   if (busy.value) return;
+  // Remote OTP flows must never turn this mock slider's locally minted value
+  // into a production assertion. Until a vendor SDK is wired, remain visibly
+  // unavailable and let the server fail closed.
+  if (props.providerHold) {
+    challenge.value = null;
+    loadFailed.value = false;
+    clearSkeleton();
+    return;
+  }
   challenge.value = null;
   loadFailed.value = false;
   clearSkeleton();

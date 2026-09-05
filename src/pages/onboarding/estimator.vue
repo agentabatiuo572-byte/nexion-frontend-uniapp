@@ -2,7 +2,7 @@
   <StandalonePageShell class="est-root" :top-inset="24">
     <!-- Progress -->
     <view class="est-bars">
-      <view class="est-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+      <view class="est-back active:opacity-60" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-label="t.login.back" @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="est-bar"><view class="est-bar__fill est-bar__fill--full" /></view>
@@ -24,12 +24,12 @@
           <text class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
           <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
           <view class="est-failed__actions">
-            <view class="est-failed__button est-failed__button--primary" role="button" tabindex="0"
+            <view class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
               @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
               <text>{{ t.onboarding.activationRetry }}</text>
             </view>
-            <view class="est-failed__button" role="button" tabindex="0"
-              @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+            <view class="est-failed__button" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
+              @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
               <text>{{ t.onboarding.activationDefer }}</text>
             </view>
           </view>
@@ -99,21 +99,29 @@
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
+import { onBackPress } from "@dcloudio/uni-app";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { getDeviceId } from "@/lib/device-id";
-import { onboardingCalibrationApi } from "@/api/runtime";
+import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { useSession } from "@/store/session";
+import { markAuthAccountOnboardingComplete } from "@/store/auth-account";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { createEstimatorScope, isCurrentEstimatorScope, type EstimatorScope } from "@/lib/estimator-scope";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
 const detected = ref(false);
 const loadFailed = ref(false);
+const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
 const phone = comparison("phone");
@@ -131,6 +139,7 @@ let mounted = false;
 let accountEpoch = 0;
 let generation = 0;
 let accountWatchKey = String(app.accountKey || "");
+let deferIntent: { revision: number; idempotencyKey: string } | null = null;
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
   return {
@@ -166,6 +175,7 @@ function loadCalibration() {
 }
 
 function retryCalibration() {
+  if (deferBusy.value) return;
   generation += 1;
   if (timer) clearTimeout(timer);
   detected.value = false;
@@ -186,6 +196,8 @@ watch(() => String(app.accountKey || ""), (next) => {
   accountWatchKey = next;
   accountEpoch += 1;
   generation += 1;
+  deferBusy.value = false;
+  deferIntent = null;
   detected.value = false;
   loadFailed.value = false;
   calibration.value = null;
@@ -202,12 +214,69 @@ onUnmounted(() => {
   generation += 1;
 });
 
+onBackPress(() => {
+  if (!mounted || deferBusy.value) return true;
+  leaveEstimator();
+  return true;
+});
+
 function goConnect() {
   if (!detected.value || !calibration.value?.calibrationAvailable) return;
   navReset({ url: "/pages/onboarding/connect", fail: () => {} });
 }
+
+function completeOnboardingLocally(): boolean {
+  if (!auth.completeOnboarding()) return false;
+  if (markAuthAccountOnboardingComplete(auth.email || auth.accountId || "default") || remoteApiEnabled) return true;
+  if (!auth.requireOnboarding()) auth.signOut();
+  return false;
+}
+
 function leaveEstimator() {
-  navReset({ url: "/pages/register/success", fail: () => navReset({ url: "/pages/onboarding/intro", fail: () => {} }) });
+  if (!mounted || deferBusy.value) return;
+  generation += 1;
+  navReset({ url: "/pages/onboarding/intro", fail: () => {} });
+}
+
+async function deferPhoneActivation() {
+  if (!mounted || deferBusy.value) return;
+  deferBusy.value = true;
+  const scope = scopePair();
+  const deviceId = getDeviceId();
+  try {
+    const deferred = await confirmDeferredPhoneActivation({
+      current: calibration.value,
+      deviceId,
+      command: (revision) => {
+        if (!deferIntent || deferIntent.revision !== revision) {
+          deferIntent = {
+            revision,
+            idempotencyKey: `phone-activation:deferred:${requireCryptoUuid()}`,
+          };
+        }
+        return deferIntent;
+      },
+      isCurrent: () => isCurrent(scope),
+      accept: (result) => isCurrent(scope) && result.sourceEnvironment === "PRODUCTION" && result.runId === "",
+    });
+    if (!isCurrent(scope) || deferred.activationStatus !== "DEFERRED") return;
+
+    calibration.value = deferred;
+    const phoneDevice = app.devices.find((device) => device.kind === "phone");
+    const localPhoneStateCommitted = (remoteApiEnabled || !phoneDevice || app.deactivateDevice(phoneDevice.id))
+      && useSession().markPhoneActivationDeferred(auth.email || auth.accountId || "default");
+    if (!localPhoneStateCommitted && !remoteApiEnabled) throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
+    if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
+
+    uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
+    navReset({ url: "/pages/index/index", fail: () => {} });
+  } catch {
+    if (isCurrent(scope)) {
+      uni.showToast({ title: t.value.onboarding.activationDeferFailed, icon: "none" });
+    }
+  } finally {
+    if (isCurrent(scope)) deferBusy.value = false;
+  }
 }
 </script>
 

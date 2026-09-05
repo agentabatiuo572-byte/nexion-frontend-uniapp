@@ -34,6 +34,7 @@ export interface CanonicalPromoBanner {
 
 export interface QuestSnapshot {
   quests: CanonicalQuest[];
+  dayOneRewardNex: number;
   promoBanner: CanonicalPromoBanner | null;
   questBonusMultiplier: number;
   rhythmMonth: number;
@@ -163,9 +164,11 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
 export function parseQuestSnapshot(value: unknown, mode: ApiEnvironment = "prod"): QuestSnapshot {
   const row = record(value);
   const multiplier = number(row?.questBonusMultiplier, 0.1);
+  const dayOneRewardNex = number(row?.dayOneRewardNex, 0, 100_000);
   const rhythmMonth = number(row?.rhythmMonth, 1);
   const source = text(row?.source);
   if (!row || !validAuthority(row, mode) || !Array.isArray(row.quests) || multiplier === null
+      || dayOneRewardNex === null
       || rhythmMonth === null || !Number.isInteger(rhythmMonth) || !source
       || !source.includes("nx_mission") || !source.includes("nx_user_mission")
       || source.toLowerCase().includes("mock")) {
@@ -176,6 +179,7 @@ export function parseQuestSnapshot(value: unknown, mode: ApiEnvironment = "prod"
   if (codes.size !== quests.length) return invalid("QUEST_CODE_DUPLICATED");
   return {
     quests,
+    dayOneRewardNex,
     promoBanner: parsePromo(row.promoBanner),
     questBonusMultiplier: multiplier,
     rhythmMonth,

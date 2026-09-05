@@ -113,7 +113,8 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { taskRelativeTime } from "@/lib/task-relative-time";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
@@ -129,6 +130,9 @@ import { toast } from "@/store/ui";
 
 const app = useApp();
 const t = useT();
+const relativeNow = ref(Date.now());
+let relativeTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => { relativeTimer = setInterval(() => { relativeNow.value = Date.now(); }, 30000); });
 const receipts = remoteApiEnabled ? null : useReceipts();
 const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
 let receiptRequestEpoch = 0;
@@ -176,6 +180,7 @@ watch(() => app.accountBindingEpoch, () => {
 
 onUnmounted(() => {
   receiptRequestEpoch += 1;
+  if (relativeTimer) clearInterval(relativeTimer);
 });
 
 // Model names are proper nouns (untranslated); the workload half is copy.
@@ -192,7 +197,13 @@ const allRecent = computed(() =>
     .slice(0, 20),
 );
 
-const maxVram = computed(() => app.visibleDevices.reduce((m, d) => Math.max(m, d.vramTotal), 0));
+// Cloud Share has no user-owned physical VRAM, but the server routes its
+// rented pool as an 8 GB equivalent for task eligibility and claim execution.
+const CLOUD_SHARE_ROUTING_VRAM_GB = 8;
+const maxVram = computed(() => app.visibleDevices.reduce(
+  (m, d) => Math.max(m, d.kind === "cloud-share" ? CLOUD_SHARE_ROUTING_VRAM_GB : d.vramTotal),
+  0,
+));
 const lockedTeasers = computed(() => earnConfig.lockedTeasers(maxVram.value, 3));
 watch(maxVram, (value) => { void earnConfig.refreshRoute(value); }, { immediate: true });
 
@@ -233,9 +244,6 @@ function retryAssignments() {
 }
 
 function shortTime(ts: number): string {
-  const m = Math.floor((Date.now() - ts) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ago`;
+  return taskRelativeTime(ts, relativeNow.value, t.value.security);
 }
 </script>

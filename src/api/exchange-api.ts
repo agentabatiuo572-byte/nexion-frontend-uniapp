@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { parseServerTimestamp } from "./server-time";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 
@@ -9,6 +10,7 @@ export type ExchangeOrderStatus =
   | "SUCCESS"
   | "QUEUED"
   | "CANCELLED"
+  | "FAILED"
   | "USER_CAP"
   | "PLATFORM_CAP"
   | "GEO_BLOCKED";
@@ -49,6 +51,7 @@ export interface ExchangeSnapshot {
   todayPlatformUsedUsdt: number;
   lifetimeExchangedUsdt: number;
   orders: ExchangeOrder[];
+  ordersPage: { total: number; pageNum: number; pageSize: number };
   order?: ExchangeOrder;
   gate?: "USER_CAP" | "PLATFORM_CAP" | "GEO_BLOCKED";
   feeUsdt?: number;
@@ -59,7 +62,7 @@ export interface ExchangeSnapshot {
 
 export interface ExchangeApi {
   fetchCaps(): Promise<ExchangeCaps>;
-  fetchState(): Promise<ExchangeSnapshot>;
+  fetchState(pageNum?: number, pageSize?: number): Promise<ExchangeSnapshot>;
   swap(
     direction: ExchangeDirection,
     fromAmount: number,
@@ -74,6 +77,7 @@ const ORDER_STATUSES = new Set<ExchangeOrderStatus>([
   "SUCCESS",
   "QUEUED",
   "CANCELLED",
+  "FAILED",
   "USER_CAP",
   "PLATFORM_CAP",
   "GEO_BLOCKED",
@@ -165,9 +169,8 @@ function parseOrder(value: unknown): ExchangeOrder {
   }
   let createdAt: number | undefined;
   if ("createdAt" in row && row.createdAt !== null) {
-    const raw = text(row.createdAt);
-    const parsed = raw ? Date.parse(raw) : Number.NaN;
-    if (!Number.isFinite(parsed)) return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
+    const parsed = parseServerTimestamp(row.createdAt);
+    if (parsed === null) return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
     createdAt = parsed;
   }
   return {
@@ -198,7 +201,16 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
   const orders = row.orders.map(parseOrder);
+  const ordersPage = record(row.ordersPage);
+  const total = number(ordersPage?.total);
+  const pageNum = number(ordersPage?.pageNum, 1);
+  const pageSize = number(ordersPage?.pageSize, 1);
   if (new Set(orders.map((order) => order.exchangeNo)).size !== orders.length) {
+    return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
+  }
+  if (!ordersPage || total === null || pageNum === null || pageSize === null
+      || !Number.isSafeInteger(pageNum) || !Number.isSafeInteger(pageSize)
+      || orders.length > pageSize || orders.length > total) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
   const gate = optionalText(row, "gate")?.toUpperCase();
@@ -216,6 +228,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
     todayPlatformUsedUsdt,
     lifetimeExchangedUsdt,
     orders,
+    ordersPage: { total, pageNum, pageSize },
     order: row.order === undefined ? undefined : parseOrder(row.order),
     gate: gate as ExchangeSnapshot["gate"],
     feeUsdt: optionalNumber(row, "feeUsdt"),
@@ -232,9 +245,9 @@ export function createExchangeApi(client: ApiClient, mode: ApiEnvironment = "pro
       path: "/api/config/exchange/caps",
       authenticated: false,
     }), mode),
-    fetchState: async () => parseSnapshot(await client.request({
+    fetchState: async (pageNum = 1, pageSize = 20) => parseSnapshot(await client.request({
       method: "GET",
-      path: "/api/exchange",
+      path: `/api/exchange?pageNum=${pageNum}&pageSize=${pageSize}`,
     }), mode),
     swap: async (direction, fromAmount, queueIfCapped, idempotencyKey) =>
       parseSnapshot(await client.request({

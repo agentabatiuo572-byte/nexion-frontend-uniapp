@@ -9,7 +9,7 @@
     <view class="relative grid gap-2.5 items-center" style="grid-template-columns: 1fr auto 1fr">
       <!-- Your phone -->
       <view>
-        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.store.vsYourPhone }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ comparison.base.name }}</text>
         <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.phone)" :style="phoneNumStyle">
           <text>{{ storefrontUsd(authority.phone) }}</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
@@ -23,7 +23,7 @@
       </view>
       <!-- S1 -->
       <view class="text-right">
-        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.store.vsPhoneS1 }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ comparison.target.name }}</text>
         <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.entry)" :style="s1NumStyle">
           <text>{{ storefrontUsd(authority.entry) }}</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
@@ -45,13 +45,16 @@ import {
 } from "@/lib/store-yield-authority";
 
 const t = useT();
-const props = defineProps<{ authority: StoreYieldAuthority }>();
-const authority = computed(() => props.authority);
-const multiplierText = computed(() => t.value.store.vsMore.replace(/\d+×/, props.authority.multiplier === null ? "—×" : `${props.authority.multiplier}×`));
-const phoneNexText = computed(() => props.authority.phone ? `+${storefrontNex(props.authority.phone)} NEX` : "— NEX");
-const entryNexText = computed(() => props.authority.entry ? `+${storefrontNex(props.authority.entry)} NEX` : "— NEX");
-const phoneNexFullText = computed(() => props.authority.phone ? `+${storefrontNexFull(props.authority.phone)}${t.value.store.vsPerDay}` : "— NEX");
-const entryNexFullText = computed(() => props.authority.entry ? `+${storefrontNexFull(props.authority.entry)}${t.value.store.vsPerDay}` : "— NEX");
+const props = defineProps<{ authority: StoreYieldAuthority; comparison: import("@/lib/store-upgrade").StoreUpgrade }>();
+const authority = computed(() => ({
+  phone: { usd: props.comparison.base.baseRate, nex: props.comparison.base.baseRateNEX },
+  entry: { usd: props.comparison.target.dailyEarn, nex: props.comparison.target.dailyEarnNEX },
+}));
+const multiplierText = computed(() => `${props.comparison.multiplier}×`);
+const phoneNexText = computed(() => `+${storefrontNex(authority.value.phone)} NEX`);
+const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)} NEX`);
+const phoneNexFullText = computed(() => `+${storefrontNexFull(authority.value.phone)}${t.value.store.vsPerDay}`);
+const entryNexFullText = computed(() => `+${storefrontNexFull(authority.value.entry)}${t.value.store.vsPerDay}`);
 
 const rootStyle: CSSProperties = {
   background: "var(--v5-surface)",

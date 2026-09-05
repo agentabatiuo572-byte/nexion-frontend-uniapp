@@ -174,7 +174,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
       id: row.questCode,
       order: index + 1,
       label: row.name,
-      nex: row.rewardNex,
+      nex: null,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
       eligible: row.eligible,
@@ -194,7 +194,8 @@ const completedCount = computed(() => tasks.value.filter((task) => quest.isCompl
 const progressPct = computed(() => total.value > 0 ? (completedCount.value / total.value) * 100 : 0);
 const nexEarned = computed(() => {
   const completed = tasks.value.filter((task) => quest.isComplete(task.id));
-  if (remoteApiEnabled && (quest.remoteStatus !== "ready" || completed.some((task) => task.nex === null))) return null;
+  if (remoteApiEnabled && quest.remoteStatus !== "ready") return null;
+  if (remoteApiEnabled) return total.value > 0 && completed.length === total.value ? quest.dayOneRewardNex : 0;
   return completed.reduce((sum, task) => sum + (task.nex ?? 0), 0);
 });
 const nexEarnedText = computed(() => nexEarned.value === null ? "—" : String(nexEarned.value));
@@ -208,8 +209,7 @@ const toggleLabel = computed(() => questUnavailable.value
 const rewardText = computed(() => {
   if (!remoteApiEnabled) return String(mockReward);
   if (quest.remoteStatus !== "ready") return "—";
-  const totalReward = tasks.value.reduce((sum, task) => sum + (task.nex ?? 0), 0);
-  return totalReward > 0 ? String(totalReward) : "—";
+  return quest.dayOneRewardNex > 0 ? String(quest.dayOneRewardNex) : "—";
 });
 const dayOneWindow = computed(() => quest.remoteQuests.find((row) => row.layer === "DAY_ONE") ?? null);
 

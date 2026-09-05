@@ -6,14 +6,14 @@
   <view data-home-section="network-pulse">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.networkPulseTitle }}</text>
-      <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan-ink)">{{ t.home.networkLive }}</text>
+      <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan-ink)">{{ t.home.networkPublished }}</text>
     </view>
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
       <view class="px-3.5 py-2.5 flex justify-between items-center font-mono-tabular" style="border-bottom: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <view class="inline-flex items-center gap-1.5">
           <PulseDot color="var(--v5-tech-cyan)" />
-          <text>{{ t.home.networkGlobalGrid }}</text>
+          <text>{{ t.home.networkPublishedScope }}</text>
         </view>
         <!-- 条头右侧刻意留空:实时支付流数字已删(FEAT-HOME02 定案,与「今日支付」同一笔钱两种表达)。 -->
       </view>
@@ -91,6 +91,8 @@ const app = useApp();
 const cfg = useConfig();
 const snap = useRankSnapshot();
 const remoteRank = useNetworkRank();
+const rankSnapshotStale = computed(() => remoteApiEnabled
+  && remoteRank.status === "error" && remoteRank.snapshot !== null);
 
 // 🔴 时间锚的真实机制(2026-08-06 审计纠正,上一版注释说的「下拉刷新带动重渲」不成立):
 //   挂载取一次 + **配置重拉完成沿再取一次**(下拉刷新会触发 cfg.load,见 store/refresh.ts)。
@@ -157,7 +159,7 @@ const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats,
 //   是它自己的输入坏了,同判 unavailable;ps 整段缺席(机器门最小桩)同理,不裸解引。
 const rank = computed(() => {
   if (remoteApiEnabled) {
-    if (remoteRank.status !== "ready" || remoteRank.snapshot === null) return { kind: "unavailable" } as const;
+    if (remoteRank.snapshot === null) return { kind: "unavailable" } as const;
     return remoteRank.snapshot.currentRank === null
       ? { kind: "unranked" } as const
       : { kind: "ranked", rank: remoteRank.snapshot.currentRank } as const;
@@ -235,12 +237,12 @@ const metrics = computed<Cell[]>(() => {
   // 格 2 在线设备 —— 值来自 store 的呼吸态(基线与带宽都由配置驱动,见 app.ts)
   const devicesBad = failed || !h.devicesOk;
   const devices: Cell = devicesBad
-    ? placeholderCell(t.value.home.networkDevices)
+    ? placeholderCell(t.value.home.networkEstimatedDevices)
     : {
-        k: t.value.home.networkDevices,
+        k: t.value.home.networkEstimatedDevices,
         v: compact(app.global.activeDevices),
         tone: "var(--v5-ink)",
-        sub: t.value.home.networkDevicesSub,
+        sub: t.value.home.networkPublished,
         data: ramp(app.global.activeDevices),
         color: "var(--v5-tech-cyan-ink)",
       };
@@ -268,7 +270,8 @@ const metrics = computed<Cell[]>(() => {
       k: t.value.home.networkYourRank,
       v: `#${compact(r.rank)}`,
       tone: "var(--v5-brand)",
-      sub: displayDelta.value !== null ? fmt(t.value.home.networkRankUp24h, { n: displayDelta.value }) : "",
+       sub: rankSnapshotStale.value ? t.value.home.networkStale
+         : displayDelta.value !== null ? fmt(t.value.home.networkRankUp24h, { n: displayDelta.value }) : "",
       // 名次越小越好:走势画成向下缓坡(视觉「在前进」),数据仍是确定性装饰
       data: Array.from({ length: 8 }, (_, i) => -r.rank * (1 + (7 - i) * 0.0004)),
       color: "var(--v5-brand)",

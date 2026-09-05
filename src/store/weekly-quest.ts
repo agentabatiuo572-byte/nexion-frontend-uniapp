@@ -8,6 +8,7 @@ import {
   finishWeeklyQuestCommand,
 } from "@/lib/weekly-quest-command-key";
 import { useLocaleStore } from "@/store/locale";
+import { isCurrentQuest } from "@/lib/actionable-quest";
 
 const UNKNOWN_IDEMPOTENCY_RESULTS = new Set([
   "IDEMPOTENCY_RESULT_UNKNOWN",
@@ -29,8 +30,8 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   let claimSequence = 0;
   let rolloverTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const tier1Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T1") ?? []);
-  const tier2Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T2") ?? []);
+  const tier1Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T1" && isCurrentQuest(q)) ?? []);
+  const tier2Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T2" && isCurrentQuest(q)) ?? []);
   const multiplier = computed(() => snapshot.value?.questBonusMultiplier ?? 1);
 
   function retireClaimedCommands(next: QuestSnapshot): void {

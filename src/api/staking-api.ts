@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { parseServerTimestamp } from "./server-time";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
@@ -45,6 +46,7 @@ export interface StakingPosition {
 
 export interface StakingSnapshot {
   positions: StakingPosition[];
+  positionsPage: { total: number; pageNum: number; pageSize: number };
   walletBalanceUsdt: number;
   serverTime: number;
   position?: StakingPosition;
@@ -99,10 +101,7 @@ function integer(value: unknown, min = 0): number | null {
 }
 
 function timestamp(value: unknown): number | null {
-  const raw = text(value);
-  if (!raw) return null;
-  const parsed = Date.parse(raw);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseServerTimestamp(value);
 }
 
 function canonicalStatus(value: unknown): StakingStatus | null {
@@ -232,11 +231,20 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): StakingSnapshot {
     return invalid("STAKING_POSITIONS_RESPONSE_INVALID");
   }
   const positions = row.positions.map(parsePosition);
+  const page = record(row.positionsPage);
+  const total = integer(page?.total);
+  const pageNum = integer(page?.pageNum, 1);
+  const pageSize = integer(page?.pageSize, 1);
   if (new Set(positions.map((position) => position.id)).size !== positions.length) {
+    return invalid("STAKING_POSITIONS_RESPONSE_INVALID");
+  }
+  if (!page || total === null || pageNum === null || pageSize === null
+      || positions.length > pageSize || positions.length > total) {
     return invalid("STAKING_POSITIONS_RESPONSE_INVALID");
   }
   return {
     positions,
+    positionsPage: { total, pageNum, pageSize },
     walletBalanceUsdt,
     serverTime,
     position: row.position === undefined ? undefined : parsePosition(row.position),
@@ -252,16 +260,39 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): StakingSnapshot {
 }
 
 export function createStakingApi(client: ApiClient, mode: ApiEnvironment = "prod"): StakingApi {
+  const fetchAllPositions = async (): Promise<StakingSnapshot> => {
+    const first = parseSnapshot(await client.request({ method: "GET", path: "/api/stakes?pageNum=1&pageSize=50" }), mode);
+    if (first.positionsPage.pageNum !== 1 || first.positionsPage.pageSize !== 50) {
+      return invalid("STAKING_POSITIONS_PAGINATION_INVALID");
+    }
+    const positions = [...first.positions];
+    const ids = new Set(positions.map((position) => position.id));
+    let pageNum = first.positionsPage.pageNum;
+    while (positions.length < first.positionsPage.total) {
+      pageNum += 1;
+      const next = parseSnapshot(await client.request({
+        method: "GET",
+        path: `/api/stakes?pageNum=${pageNum}&pageSize=${first.positionsPage.pageSize}`,
+      }), mode);
+      if (next.positionsPage.pageNum !== pageNum || next.positionsPage.total !== first.positionsPage.total
+          || next.positionsPage.pageSize !== first.positionsPage.pageSize || next.positions.length === 0) {
+        return invalid("STAKING_POSITIONS_PAGINATION_INVALID");
+      }
+      for (const position of next.positions) {
+        if (ids.has(position.id)) return invalid("STAKING_POSITIONS_PAGINATION_INVALID");
+        ids.add(position.id);
+        positions.push(position);
+      }
+    }
+    return { ...first, positions, positionsPage: { ...first.positionsPage, pageNum } };
+  };
   return {
     fetchStakingPools: async () => parsePools(await client.request({
       method: "GET",
       path: "/api/config/staking/pools",
       authenticated: false,
     }), mode),
-    fetchStakingPositions: async () => parseSnapshot(await client.request({
-      method: "GET",
-      path: "/api/stakes",
-    }), mode),
+    fetchStakingPositions: fetchAllPositions,
     openStakingPosition: async (tierKey, amountUsdt, idempotencyKey) =>
       parseSnapshot(await client.request({
         method: "POST",

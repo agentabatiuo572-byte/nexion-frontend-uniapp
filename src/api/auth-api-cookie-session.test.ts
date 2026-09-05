@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createApiClient } from "./api-client";
 import { createAuthApi } from "./auth-api";
 import { createSessionVault } from "./session-vault";
 
@@ -21,27 +22,52 @@ describe("H5 HttpOnly refresh-cookie session", () => {
   });
 
   it("restores an empty in-memory vault from the HttpOnly cookie", async () => {
-    const request = vi.fn().mockResolvedValue(cookieSession);
+    const request = vi.fn().mockResolvedValue({
+      status: 200,
+      data: { code: 0, message: "success", data: cookieSession },
+      headers: {},
+    });
     const vault = createSessionVault();
-    const auth = createAuthApi({ request } as never, vault, { refreshCredentialMode: "cookie" });
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:8110",
+      transport: { request },
+      vault,
+      refreshCredentialMode: "cookie",
+    });
+    const auth = createAuthApi(api, vault, { refreshCredentialMode: "cookie" });
 
     await expect(auth.restore()).resolves.toMatchObject({ accessToken: "access", user });
-    expect(request).toHaveBeenCalledWith({
-      path: "/auth/users/refresh",
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      url: "http://127.0.0.1:8110/auth/users/refresh",
       method: "POST",
-      authenticated: false,
-      headers: { "X-Nexion-Refresh-Mode": "cookie" },
-    });
+      withCredentials: true,
+      headers: expect.objectContaining({ "X-Nexion-Refresh-Mode": "cookie" }),
+    }));
+    expect(request.mock.calls[0]?.[0]).not.toHaveProperty("body");
     expect(vault.read()?.accessToken).toBe("access");
   });
 
   it("preserves an incomplete-onboarding server session during cookie restore", async () => {
     const request = vi.fn().mockResolvedValue({
-      ...cookieSession,
-      user: { ...user, onboardingComplete: false },
+      status: 200,
+      data: {
+        code: 0,
+        message: "success",
+        data: {
+          ...cookieSession,
+          user: { ...user, onboardingComplete: false },
+        },
+      },
+      headers: {},
     });
     const vault = createSessionVault();
-    const auth = createAuthApi({ request } as never, vault, { refreshCredentialMode: "cookie" });
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:8110",
+      transport: { request },
+      vault,
+      refreshCredentialMode: "cookie",
+    });
+    const auth = createAuthApi(api, vault, { refreshCredentialMode: "cookie" });
 
     await expect(auth.restore()).resolves.toMatchObject({
       user: { userId: user.userId, onboardingComplete: false },
@@ -53,7 +79,7 @@ describe("H5 HttpOnly refresh-cookie session", () => {
     const request = vi.fn().mockResolvedValue(cookieSession);
     const vault = createSessionVault();
     const auth = createAuthApi({ request } as never, vault, { refreshCredentialMode: "cookie" });
-    await auth.restore();
+    await auth.login({ countryCode: user.countryCode, phone: user.phone, password: "test-only" });
     request.mockClear();
 
     await auth.logout();

@@ -161,6 +161,7 @@ import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
+import { escapeSvgText } from "@/lib/svg-text";
 
 const R = 94; // wheel radius (viewBox 200)
 const CX = 100;
@@ -243,7 +244,7 @@ const slicesSvg = computed(() =>
         `<g opacity="${s.dim ? 0.32 : 1}">` +
         `<path d="${s.path}" fill="${s.fill}" stroke="var(--v5-bg)" stroke-width="1.5" />` +
         `<text x="${s.mid.x}" y="${s.mid.y}" text-anchor="middle" dominant-baseline="middle" ` +
-        `style="font-size:12px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${lsShort(s.sp)}</text>` +
+        `style="font-size:12px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${escapeSvgText(lsShort(s.sp))}</text>` +
         `</g>`,
     )
     .join(""),

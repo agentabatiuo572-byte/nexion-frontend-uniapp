@@ -6,6 +6,8 @@
     role="button"
     :tabindex="props.active ? 0 : -1"
     :aria-hidden="!props.active"
+    :aria-disabled="weeklyState === 'loading' || weeklyState === 'empty' ? 'true' : 'false'"
+    :aria-label="weeklyRetryAriaLabel"
     :data-copy-source="managedCopy.status[MANAGED_POSITION] ?? 'fallback'"
     :data-copy-key="managedCopy.deliveries[MANAGED_POSITION]?.copyKey ?? 'builtin'"
     :data-copy-version="managedCopy.deliveries[MANAGED_POSITION]?.version ?? 'builtin'"
@@ -48,10 +50,10 @@
         <text class="weekly-quest__state-copy">{{ t.weeklyQuest.loading }}</text>
       </view>
       <view v-else-if="weeklyState === 'error'" class="weekly-quest__state" role="alert">
-        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.loadError }}</text>
+        <text class="weekly-quest__state-copy">{{ weeklyRetryLabel }}</text>
       </view>
       <view v-else-if="weeklyState === 'empty'" class="weekly-quest__state" aria-live="polite">
-        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.empty }}</text>
+        <text class="weekly-quest__state-copy">{{ t.weeklyQuest.noTaskAction }}</text>
       </view>
       <view v-else class="weekly-quest__body">
         <view class="weekly-quest__reward">
@@ -81,6 +83,7 @@ import { refreshCanonicalOrders } from "@/store/order-canonical";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { presentHomeWeeklyCard, selectHomeWeeklySource } from "@/lib/home-task-carousel";
 import { navTo } from "@/lib/route";
+import { useNow } from "@/composables/use-now";
 
 const MANAGED_POSITION = "home.conversion-banner";
 
@@ -90,6 +93,7 @@ const props = withDefaults(defineProps<{ active?: boolean }>(), {
 const t = useT();
 const managedCopy = useContentCopy();
 const wq = useWeeklyQuest();
+const now = useNow();
 
 onMounted(() => {
   void managedCopy.refresh(MANAGED_POSITION).then(() => {
@@ -105,6 +109,7 @@ const weeklyCard = computed(() => presentHomeWeeklyCard(
   weeklySource.value,
   wq.snapshot?.promoBanner ?? null,
   wq.multiplier,
+  now.value * 1000,
 ));
 const weeklyState = computed<"loading" | "error" | "empty" | "ready">(() => {
   if (wq.error) return "error";
@@ -140,9 +145,20 @@ const categoryText = computed(() => {
     social: t.value.home.dayOneCatSocial,
   })[category];
 });
+const weeklyLoginRequired = computed(() => /(?:AUTH|LOGIN|SESSION|UNAUTHORIZED|401)/i.test(wq.error ?? ""));
+const weeklyRetryLabel = computed(() => weeklyLoginRequired.value
+  ? t.value.weeklyQuest.retryLogin
+  : t.value.weeklyQuest.retryNetwork);
+const weeklyRetryAriaLabel = computed(() => {
+  if (weeklyState.value === "loading") return t.value.weeklyQuest.loading;
+  if (weeklyState.value === "empty") return t.value.weeklyQuest.noTaskAction;
+  if (weeklyState.value === "error") return weeklyRetryLabel.value;
+  return ctaText.value;
+});
 const ctaText = computed(() => {
   if (weeklyState.value === "loading") return t.value.weeklyQuest.loading;
-  if (weeklyState.value === "error" || weeklyState.value === "empty") return t.value.ui.retry;
+  if (weeklyState.value === "error") return weeklyRetryLabel.value;
+  if (weeklyState.value === "empty") return t.value.weeklyQuest.noTaskAction;
   return weeklySource.value?.kind === "quest"
     ? t.value.weeklyQuest.goComplete
     : t.value.home.weeklyQuestGetNexGridBox;
@@ -176,8 +192,10 @@ const productStyle: CSSProperties = {
 };
 
 function onCardAction() {
-  if (weeklyState.value !== "ready") {
-    if (!wq.loading) void wq.refresh();
+  if (weeklyState.value === "loading" || weeklyState.value === "empty") return;
+  if (weeklyState.value === "error") {
+    if (weeklyLoginRequired.value) navTo("/pages/login/login");
+    else void wq.refresh();
     return;
   }
 

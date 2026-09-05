@@ -48,11 +48,11 @@
       </view>
 
       <!-- ACTION row -->
-      <view v-if="showClaim" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" tabindex="0" :aria-label="claimLabel" @click="emit('claim')">
+      <view v-if="showClaim" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="claimLabel" @click="emitUnlessBusy('claim')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
         <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
       </view>
-      <view v-else-if="showJoinAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="emit('join')">
+      <view v-else-if="showJoinAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" @click="emitUnlessBusy('join')">
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
@@ -92,10 +92,16 @@ import {
 
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
-const props = defineProps<{ ev: EnrichedEvent; rewardNex: number }>();
+const props = withDefaults(defineProps<{ ev: EnrichedEvent; rewardNex: number; busy?: boolean }>(), { busy: false });
 const emit = defineEmits<{ (e: "join"): void; (e: "claim"): void; (e: "cta"): void }>();
 
 const t = useT();
+const busy = computed(() => props.busy);
+function emitUnlessBusy(event: "join" | "claim") {
+  if (props.busy) return;
+  if (event === "join") emit("join");
+  else emit("claim");
+}
 const { elRef: barEl, inView: barInView } = useScrollGrowProgress();
 
 const dim = computed(() => props.ev.status === "ended");

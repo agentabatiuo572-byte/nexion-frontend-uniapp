@@ -94,6 +94,7 @@ export const useTickets = defineStore("tickets", () => {
       const result = await promise;
       scope.pending.delete(fingerprint);
       persistPending(scope.accountKey, scope.runId, scope.pending);
+      if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
       return result;
     } catch (cause) {
       if (recover && mustReadBack(cause) && scopeIsCurrent(scope)) {
@@ -101,6 +102,7 @@ export const useTickets = defineStore("tickets", () => {
         if (adopted !== null) {
           scope.pending.delete(fingerprint);
           persistPending(scope.accountKey, scope.runId, scope.pending);
+          if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
           return adopted;
         }
       }
@@ -120,6 +122,15 @@ export const useTickets = defineStore("tickets", () => {
 
   /** A delayed page is allowed to fill gaps, never to erase or regress a newer local snapshot. */
   function mergeTickets(items: Ticket[]) { for (const ticket of items) replace(ticket); }
+
+  /** Older pages only extend the visible timeline; a stale response cannot regress its header. */
+  function prependHistory(current: Ticket, older: Ticket): Ticket {
+    const messages = [...older.messages, ...current.messages]
+      .sort((left, right) => left.ts - right.ts || Number(left.id) - Number(right.id))
+      .filter((message, index, all) => index === 0 || all[index - 1].id !== message.id);
+    return { ...current, messages, historyTruncated: older.historyTruncated,
+      historyNextCursor: older.historyNextCursor ?? null };
+  }
 
   async function refresh(): Promise<void> {
     const epoch = accountEpoch;
@@ -153,8 +164,30 @@ export const useTickets = defineStore("tickets", () => {
     const requestGeneration = (ticketRequestGeneration.get(id) ?? 0) + 1;
     ticketRequestGeneration.set(id, requestGeneration);
     const ticket = await supportApi.ticket(id);
-    if (snapshotIsCurrent(scope) && ticketRequestGeneration.get(id) === requestGeneration) replace(ticket);
+    if (!snapshotIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    if (ticketRequestGeneration.get(id) !== requestGeneration) throw new Error("SUPPORT_TICKET_REQUEST_SUPERSEDED");
+    replace(ticket);
     return ticket;
+  }
+
+  async function loadEarlier(id: string): Promise<Ticket | undefined> {
+    const current = tickets.value.find(ticket => ticket.id === id);
+    const beforeMessageId = current?.historyNextCursor;
+    if (!current || !beforeMessageId) return current;
+    const epoch = accountEpoch;
+    const accountKey = accountKeyValue;
+    await preparePendingRun();
+    if (epoch !== accountEpoch || accountKey !== accountKeyValue) return tickets.value.find(ticket => ticket.id === id);
+    const scope = snapshotScope();
+    const requestGeneration = (ticketRequestGeneration.get(id) ?? 0) + 1;
+    ticketRequestGeneration.set(id, requestGeneration);
+    const older = await supportApi.ticket(id, beforeMessageId);
+    if (!snapshotIsCurrent(scope) || ticketRequestGeneration.get(id) !== requestGeneration) return tickets.value.find(ticket => ticket.id === id);
+    const latest = tickets.value.find(ticket => ticket.id === id);
+    if (!latest) return older;
+    const merged = prependHistory(latest, older);
+    replace(merged);
+    return merged;
   }
 
   async function markRead(ticket: Ticket): Promise<void> {
@@ -287,5 +320,5 @@ export const useTickets = defineStore("tickets", () => {
   }
   function reset() { clearAccount(); pendingKeys = new Map(); }
 
-  return { tickets, loading, mutating, error, refresh, load, markRead, createTicket, reply, close, reset, bindAccount };
+  return { tickets, loading, mutating, error, refresh, load, loadEarlier, markRead, createTicket, reply, close, reset, bindAccount };
 });

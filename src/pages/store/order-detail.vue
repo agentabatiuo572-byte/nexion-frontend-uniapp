@@ -78,6 +78,15 @@
           <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
           <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono />
           <DetailRow :label="t.orders.quantity" :value="`${order.itemCount ?? order.quantity}`" />
+          <view v-if="order.lineItems?.length" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border)">
+            <view v-for="item in order.lineItems" :key="item.sku" class="flex items-center justify-between" style="padding: 4px 0; gap: 12px">
+              <view class="flex-1 min-w-0">
+                <text class="block truncate" style="font-size: 12px; color: var(--v5-ink)">{{ item.name }}</text>
+                <text class="block tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ item.sku }} · {{ item.quantity }} × ${{ item.unitPriceUsdt.toLocaleString() }}</text>
+              </view>
+              <text class="shrink-0 tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">${{ item.lineAmountUsdt.toLocaleString() }}</text>
+            </view>
+          </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1" :label="t.orders.unitPrice" :value="`$${order.unitPrice.toLocaleString()}`" />
           <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`-$${order.discount.toLocaleString()}`" brand />
           <!-- FEAT-TRIAL02 conversion order: promo + trial credit as their own
@@ -86,10 +95,25 @@
           <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`-$${(order.trialOffsetUSD ?? 0).toLocaleString()}`" brand />
           <DetailRow :label="t.orders.subtotal" :value="`$${order.subtotal.toLocaleString()}`" />
           <DetailRow :label="t.orders.total" :value="`$${order.total.toLocaleString()}`" big />
+          <template v-if="order.status === 'refunded'">
+            <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="`$${order.refundAmountUsdt.toLocaleString()}`" brand />
+            <DetailRow v-if="order.refundChannel" :label="t.orders.refundChannel" :value="order.refundChannel" />
+            <DetailRow v-if="order.refundBillNo" :label="t.orders.refundBillNo" :value="order.refundBillNo" mono />
+            <view v-if="!order.refundedAt && order.refundAmountUsdt == null && !order.refundBillNo" role="status" style="padding: 8px 0; color: var(--v5-ink-3); font-size: 12px">
+              <text>{{ t.orders.refundDetailsUnavailable }}</text>
+            </view>
+          </template>
+          <view v-if="fullyVoucherSettled" role="status" aria-live="polite" style="margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--v5-brand-soft); color: var(--v5-ink-2)">
+            <text class="block" style="font-size: 12px; line-height: 1.5">{{ t.orders.voucherSettledNoWalletDebit }}</text>
+          </view>
           <view class="grid" :style="tsGridStyle">
             <view>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.placedAt }}</text>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.placedAt) }}</text>
+            </view>
+            <view v-if="order.status === 'placed' && order.expiresAt">
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.expiresAt }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-warning); margin-top: 2px">{{ dt(order.expiresAt) }}</text>
             </view>
             <view v-if="order.paidAt">
               <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.paidAt }}</text>
@@ -98,6 +122,10 @@
             <view v-if="order.activatedAt">
               <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.activatedAt }}</text>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.activatedAt) }}</text>
+            </view>
+            <view v-if="order.refundedAt">
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.refundedAt }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.refundedAt) }}</text>
             </view>
           </view>
         </view>
@@ -117,23 +145,32 @@
           </view>
         </view>
 
-        <!-- Pending remote orders can safely reopen the same idempotent HDPay session. -->
+        <!-- Pending remote orders can retry only the idempotent NexGrid wallet debit. -->
         <view v-if="cancellable" class="mx-4" style="margin-top: 12px; margin-bottom: 24px">
           <view
-            v-if="canOpenHostedPayment"
+            v-if="canPayFromWallet"
             class="w-full grid place-items-center active:opacity-80"
-            :style="hostedPaymentBtnStyle"
+            :style="walletPaymentBtnStyle"
             role="button"
             tabindex="0"
-            :aria-disabled="openingHostedPayment ? 'true' : 'false'"
-            :aria-label="t.bankPane.hostedContinueCta"
-            @click.stop="handleHostedPayment"
-            @keydown.enter.prevent.stop="handleHostedPayment"
-            @keydown.space.prevent.stop="handleHostedPayment"
+            :aria-disabled="payingFromWallet ? 'true' : 'false'"
+            :aria-label="t.store.coPayNow"
+            @click.stop="handleWalletPayment"
+            @keydown.enter.prevent.stop="handleWalletPayment"
+            @keydown.space.prevent.stop="handleWalletPayment"
           >
-            <text @click.stop="handleHostedPayment">{{ t.bankPane.hostedContinueCta }}</text>
+            <text @click.stop="handleWalletPayment">{{ t.store.coPayNow }}</text>
           </view>
-          <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.orders.cancelOrder" @click.stop="handleCancel">
+          <view
+            class="w-full grid place-items-center active:opacity-80"
+            :style="cancelBtnStyle"
+            role="button"
+            tabindex="0"
+            :aria-label="t.orders.cancelOrder"
+            @click.stop="handleCancel"
+            @keydown.enter.prevent.stop="handleCancel"
+            @keydown.space.prevent.stop="handleCancel"
+          >
             <text>{{ t.orders.cancelOrder }}</text>
           </view>
         </view>
@@ -151,15 +188,18 @@ import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
+import { useApp } from "@/store/app";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
-import { openHostedPaymentPage } from "@/lib/hosted-payment";
+import { asApiError } from "@/api/errors";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 
 const t = useT();
 const orders = useOrders();
+const app = useApp();
 
 const id = ref("");
 let detailMounted = true;
@@ -168,16 +208,18 @@ let detailEpoch = 0;
 interface DetailRequestScope {
   pageEpoch: number;
   orderNo: string;
+  accountScope: ReturnType<typeof captureAccountScope>;
 }
 
 function captureDetailScope(): DetailRequestScope {
-  return { pageEpoch: detailEpoch, orderNo: id.value };
+  return { pageEpoch: detailEpoch, orderNo: id.value, accountScope: captureAccountScope() };
 }
 
 function isCurrentDetailScope(scope: DetailRequestScope): boolean {
   return detailMounted
     && detailEpoch === scope.pageEpoch
-    && id.value === scope.orderNo;
+    && id.value === scope.orderNo
+    && isCurrentAccountScope(scope.accountScope);
 }
 
 onLoad((options) => {
@@ -186,13 +228,26 @@ onLoad((options) => {
 });
 const remoteOrderError = ref(false);
 const remoteOrderRefreshing = ref(false);
+const walletRefreshing = ref(false);
+let walletRefreshSequence = 0;
+async function refreshOrderWallet() {
+  if (!remoteApiEnabled) return;
+  const scope = captureDetailScope();
+  const sequence = ++walletRefreshSequence;
+  walletRefreshing.value = true;
+  try {
+    await app.refreshRemoteFleet(scope.accountScope);
+  } finally {
+    if (sequence === walletRefreshSequence) walletRefreshing.value = false;
+  }
+}
 async function refreshOrder() {
   if (!remoteApiEnabled || remoteOrderRefreshing.value) return;
   const scope = captureDetailScope();
   remoteOrderRefreshing.value = true;
   remoteOrderError.value = false;
   try {
-    await orders.refreshRemote();
+    await orders.ensureRemoteOrder(id.value);
     if (!isCurrentDetailScope(scope)) return;
   } catch {
     if (!isCurrentDetailScope(scope)) return;
@@ -205,9 +260,14 @@ onShow(() => {
   detailMounted = true;
   detailEpoch += 1;
   void refreshOrder();
+  void refreshOrderWallet();
 });
 
 const order = computed(() => orders.orders.find((o) => o.id === id.value));
+const fullyVoucherSettled = computed(() => order.value != null
+  && order.value.total === 0
+  && order.value.paymentMethod?.toUpperCase() === "VOUCHER"
+  && order.value.status !== "placed");
 
 // Sticky chassis nav header — back + order-id title + "Order ID" subtitle
 // (mirrors the prototype's <SetPageHeader title={order.id} subtitle={t.orders.orderId}
@@ -223,10 +283,12 @@ useSetPageHeader(() => ({
 // visibly. The global ORDER_TICK loop (App.vue, 6s) also advances orders; this
 // faster local tick just gives the detail view a tighter feel.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
+const detailNow = ref(Date.now());
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 function startTick() {
   if (tickTimer) clearInterval(tickTimer);
   tickTimer = setInterval(() => {
+    detailNow.value = Date.now();
     if (id.value) orders.advanceOrder(id.value, reservedSlots.value);
   }, 3000);
 }
@@ -236,9 +298,21 @@ const stages = computed(() => (order.value ? timelineFor(order.value.productId) 
 const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.value.status) : -1));
 // Cancellable ONLY before payment settles ("placed"). Checkout settles to
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
-const cancellable = computed(() => order.value?.status === "placed");
-const canOpenHostedPayment = computed(() => remoteApiEnabled && cancellable.value);
-const openingHostedPayment = ref(false);
+const walletPaymentConfirmed = ref(false);
+const payingFromWallet = ref(false);
+const cancellingOrder = ref(false);
+let cancelAttemptSequence = 0;
+function canCancelCurrentOrder(): boolean {
+  return order.value?.status === "placed"
+    && !walletPaymentConfirmed.value
+    && !payingFromWallet.value;
+}
+const cancellable = computed(() => canCancelCurrentOrder()
+  && !cancellingOrder.value);
+const paymentExpired = computed(() => order.value?.expiresAt != null
+  && order.value.expiresAt <= detailNow.value);
+const canPayFromWallet = computed(() => remoteApiEnabled
+  && cancellable.value && !walletRefreshing.value && !paymentExpired.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
 const STATUS_COLORS: Record<OrderStatus, string> = {
   placed: "var(--v5-ink-3)",
@@ -313,14 +387,18 @@ function dt(ts: number): string {
 }
 
 async function handleCancel() {
+  if (!cancellable.value) return;
   const scope = captureDetailScope();
-  const ok = await uiConfirm({
-    title: t.value.orders.cancelOrder,
-    message: t.value.orders.cancelConfirm,
-    danger: true,
-    icon: "warn",
-  });
-  if (ok && isCurrentDetailScope(scope) && order.value) {
+  const cancelAttempt = ++cancelAttemptSequence;
+  cancellingOrder.value = true;
+  try {
+    const ok = await uiConfirm({
+      title: t.value.orders.cancelOrder,
+      message: t.value.orders.cancelConfirm,
+      danger: true,
+      icon: "warn",
+    });
+    if (!ok || !canCancelCurrentOrder() || !isCurrentDetailScope(scope) || !order.value) return;
     const orderNo = order.value.id;
     const cancelled = remoteApiEnabled
       ? await orders.cancelOrderRemote(orderNo)
@@ -331,32 +409,71 @@ async function handleCancel() {
     } else {
       toast.warn(t.value.orders.cancelPendingServer);
     }
+  } finally {
+    if (cancelAttempt === cancelAttemptSequence) cancellingOrder.value = false;
   }
 }
 
-async function handleHostedPayment() {
-  if (!canOpenHostedPayment.value || openingHostedPayment.value || !order.value) return;
+async function offerWalletTopup(requiredUsdt: number): Promise<void> {
+  const scope = captureDetailScope();
+  const accepted = await uiConfirm({
+    title: t.value.errors.insufficientBalanceTitle,
+    message: t.value.errors.insufficientBalanceMsg.replace("{amt}", requiredUsdt.toLocaleString()),
+    confirmLabel: t.value.me.topup,
+    cancelLabel: t.value.store.coCancel,
+    icon: "warn",
+  });
+  if (accepted && isCurrentDetailScope(scope)) navTo("/pages/me/wallet-topup");
+}
+
+async function handleWalletPayment() {
+  if (!canPayFromWallet.value || payingFromWallet.value || !order.value) return;
   const scope = captureDetailScope();
   const requestOrderNo = order.value.id;
   const requestAmountUsdt = order.value.total;
-  openingHostedPayment.value = true;
+  const receiptScope = app.captureRemoteAccountRequest();
+  if (app.user.usdtBalance + 0.000001 < requestAmountUsdt) {
+    await offerWalletTopup(requestAmountUsdt);
+    return;
+  }
+  payingFromWallet.value = true;
+  let paymentConfirmed = false;
   try {
-    const session = await orderApi.createPaymentSession(
-      requestOrderNo,
-      `hdpay-session:${requestOrderNo}`,
-    );
+    const receipt = await orderApi.pay(requestOrderNo, `wallet-pay:${requestOrderNo}`);
     if (!isCurrentDetailScope(scope)) return;
-    if (session.orderNo !== requestOrderNo
-        || Math.abs(session.amountUsdt - requestAmountUsdt) > 0.000001) {
-      throw new Error("HDPAY_COMMERCE_SESSION_READBACK_MISMATCH");
+    if (receipt.orderNo !== requestOrderNo) {
+      throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");
     }
-    if (!openHostedPaymentPage(session.paymentUrl)) {
-      throw new Error("HDPAY_PAYMENT_URL_REJECTED");
+    if (receipt.paymentMethod === "WALLET"
+        && (receipt.walletBalanceAfterUsdt === null
+          || !app.adoptCommerceWallet(receipt.walletBalanceAfterUsdt, receiptScope))) {
+      throw new Error("WALLET_PAYMENT_RECEIPT_ACCOUNT_MISMATCH");
     }
-  } catch {
-    if (isCurrentDetailScope(scope)) toast.warn(t.value.bankPane.hostedOpenFailed);
+    paymentConfirmed = true;
+    walletPaymentConfirmed.value = true;
+    await orders.ensureRemoteOrder(requestOrderNo);
+    if (!isCurrentDetailScope(scope)) return;
+    if (order.value?.status !== "activated") {
+      throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
+    }
+    void app.refreshRemoteFleet(receiptScope);
+  } catch (error) {
+    if (!isCurrentDetailScope(scope)) return;
+    if (paymentConfirmed) {
+      remoteOrderError.value = true;
+      toast.warn(t.value.orders.walletPaymentConfirmedRefreshPending);
+    } else if (asApiError(error).message === "ORDER_WALLET_INSUFFICIENT") {
+      await offerWalletTopup(requestAmountUsdt);
+    } else if (["ORDER_MONTHLY_QUOTA_PAUSED", "ORDER_MONTHLY_QUOTA_EXHAUSTED"].includes(asApiError(error).message)) {
+      toast.warn(t.value.quota.stockUnavailable);
+    } else if (asApiError(error).message === "ORDER_PAYMENT_EXPIRED") {
+      toast.warn(t.value.orders.statusExpired);
+      await orders.ensureRemoteOrder(requestOrderNo);
+    } else {
+      toast.warn(t.value.tradein.errPurchaseFailed);
+    }
   } finally {
-    if (isCurrentDetailScope(scope)) openingHostedPayment.value = false;
+    if (isCurrentDetailScope(scope)) payingFromWallet.value = false;
   }
 }
 
@@ -470,7 +587,7 @@ const cancelBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 500,
 };
-const hostedPaymentBtnStyle: CSSProperties = {
+const walletPaymentBtnStyle: CSSProperties = {
   height: "44px",
   marginBottom: "8px",
   borderRadius: "12px",

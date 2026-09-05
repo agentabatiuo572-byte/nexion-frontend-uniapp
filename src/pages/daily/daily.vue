@@ -18,13 +18,17 @@
       <view v-if="remoteApiEnabled && remoteRefreshError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily">
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily" @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
       </view>
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+      <view v-if="remoteInitialLoading" class="px-4" role="status" aria-live="polite">
+        <text class="block text-center" style="padding: 48px 16px; color: var(--v5-ink-3); font-size: 13px">{{ t.daily.loading }}</text>
+      </view>
+
+      <view v-else class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Streak hero -->
         <view class="relative overflow-hidden text-center" :style="heroStyle">
           <text aria-hidden :style="fireStyle">🔥</text>
@@ -33,7 +37,7 @@
             <text class="block" :style="streakLblStyle">{{ t.daily.activeStreak }}</text>
             <text class="block" :style="streakPointsStyle">{{ heroLineText }}</text>
             <!-- Sign-in button -->
-            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" @click="handleCheckIn">
+            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
               <template v-if="lastSignedToday">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><path d="M20 6 9 17l-5-5" /></svg>
                 <text>{{ t.daily.checkedInToday }}</text>
@@ -78,7 +82,7 @@
                 </view>
                 <text class="block" v-if="!isMilestoneUnlocked(m)" :style="milestoneLeftStyle">{{ daysLeftText(m.day) }}</text>
               </view>
-              <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" @click="handleClaimMilestone(m)">
+              <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" role="button" tabindex="0" :aria-disabled="!isMilestoneUnlocked(m) || isMilestoneClaimed(m) ? 'true' : 'false'" @click="handleClaimMilestone(m)" @keydown.enter.prevent="handleClaimMilestone(m)" @keydown.space.prevent="handleClaimMilestone(m)">
                 <text>{{ isMilestoneClaimed(m) ? t.daily.milestones.claimed : t.daily.milestones.claim }}</text>
               </view>
             </view>
@@ -99,7 +103,7 @@
               <text class="block" :style="saverHeadlineStyle">{{ saverHeadlineText }}</text>
               <text class="block" :style="saverCountStyle">{{ saverCountText }}</text>
             </view>
-            <view class="active:opacity-80 transition-opacity" :style="saverBtnStyle" @click="handleUseSaver">
+            <view class="active:opacity-80 transition-opacity" :style="saverBtnStyle" role="button" tabindex="0" :aria-disabled="!streakBroken || remoteRefreshing || saverSubmitting ? 'true' : 'false'" @click="handleUseSaver" @keydown.enter.prevent="handleUseSaver" @keydown.space.prevent="handleUseSaver">
               <text>{{ t.daily.saver.use }}</text>
             </view>
           </view>
@@ -145,7 +149,7 @@
         </view>
 
         <!-- Withdrawal context -->
-        <view :style="withdrawCardStyle" class="active:scale-[0.98]" @click="goWithdraw">
+        <view :style="withdrawCardStyle" class="active:scale-[0.98]" role="button" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw" @keydown.space.prevent="goWithdraw">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="withdrawIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -258,6 +262,9 @@ const milestones = computed<Milestone[]>(() => remoteApiEnabled
 
 const remoteRefreshError = ref(false);
 const remoteRefreshing = ref(false);
+const checkInSubmitting = ref(false);
+const saverSubmitting = ref(false);
+const remoteInitialLoading = ref(remoteApiEnabled);
 let dailyRefreshRequest = 0;
 async function refreshDaily() {
   if (!remoteApiEnabled || remoteRefreshing.value) return;
@@ -270,7 +277,10 @@ async function refreshDaily() {
   } catch {
     if (request === dailyRefreshRequest) remoteRefreshError.value = true;
   } finally {
-    if (request === dailyRefreshRequest) remoteRefreshing.value = false;
+    if (request === dailyRefreshRequest) {
+      remoteRefreshing.value = false;
+      remoteInitialLoading.value = false;
+    }
   }
 }
 onShow(() => { void refreshDaily(); });
@@ -394,14 +404,20 @@ function signInRef(ts: number): string {
 
 
 async function handleCheckIn() {
+  if (lastSignedToday.value || remoteRefreshing.value || checkInSubmitting.value) return;
   if (remoteApiEnabled) {
-    const remote = await faucet.checkInRemote();
-    if (!remote.ok) {
-      toast.error(t.value.authOtp.errorServiceUnavailable);
-      return;
+    checkInSubmitting.value = true;
+    try {
+      const remote = await faucet.checkInRemote();
+      if (!remote.ok) {
+        toast.error(t.value.authOtp.errorServiceUnavailable);
+        return;
+      }
+      const successCopy = dailyCheckInSuccessCopy(remote, t.value.daily);
+      toast.success(successCopy.title, successCopy.body);
+    } finally {
+      checkInSubmitting.value = false;
     }
-    const successCopy = dailyCheckInSuccessCopy(remote, t.value.daily);
-    toast.success(successCopy.title, successCopy.body);
     return;
   }
   const r = faucet.signIn();
@@ -512,9 +528,15 @@ async function handleClaimMilestone(m: Milestone) {
 }
 
 async function handleUseSaver() {
+  if (!streakBroken.value || remoteRefreshing.value || saverSubmitting.value) return;
   if (remoteApiEnabled) {
-    if (await faucet.useSaverRemote()) toast.success(t.value.daily.saver.restored, "");
-    else toast.error(t.value.authOtp.errorServiceUnavailable);
+    saverSubmitting.value = true;
+    try {
+      if (await faucet.useSaverRemote()) toast.success(t.value.daily.saver.restored, "");
+      else toast.error(t.value.authOtp.errorServiceUnavailable);
+    } finally {
+      saverSubmitting.value = false;
+    }
     return;
   }
   const r = faucet.useSaver();

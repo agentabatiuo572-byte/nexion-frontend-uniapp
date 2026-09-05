@@ -784,7 +784,6 @@ export const useApp = defineStore("app", () => {
         return true;
       } catch (cause) {
         if (remoteAccountEpoch.isCurrent(request)) {
-          homeTruth.value = null;
           homeTruthStatus.value = "error";
           homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
         }
@@ -1964,12 +1963,12 @@ export const useApp = defineStore("app", () => {
     user.value = { ...user.value, email: `${identity.countryCode}${identity.phone}` };
   }
 
-  /** Apply only the authenticated Java payment receipt when fleet readback is temporarily unavailable. */
-  function adoptDevelopmentCommerceWallet(
+  /** Apply only an authenticated Java commerce receipt when fleet readback is temporarily unavailable. */
+  function adoptCommerceWallet(
     balanceAfterUsdt: number,
     receiptScope: RemoteAccountRequest,
   ): boolean {
-    if (!remoteApiEnabled || expectedApiEnvironment !== "dev"
+    if (!remoteApiEnabled || !["dev", "prod"].includes(expectedApiEnvironment)
         || !remoteAccountEpoch.isCurrent(receiptScope)
         || !Number.isFinite(balanceAfterUsdt) || balanceAfterUsdt < 0) return false;
     // A committed wallet receipt must make the next fleet read bypass any
@@ -1984,6 +1983,14 @@ export const useApp = defineStore("app", () => {
     };
     remoteWalletReceiptHasSnapshot.value = true;
     return true;
+  }
+
+  /** Compatibility alias for existing Genesis receipt projections. */
+  function adoptDevelopmentCommerceWallet(
+    balanceAfterUsdt: number,
+    receiptScope: RemoteAccountRequest,
+  ): boolean {
+    return adoptCommerceWallet(balanceAfterUsdt, receiptScope);
   }
 
   /** Canonical Genesis receipts must stay on the server-owned business rail. */
@@ -2300,7 +2307,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,

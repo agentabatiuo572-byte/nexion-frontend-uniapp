@@ -25,12 +25,12 @@
            it stays paired with the rate-refresh button (no de-carded hero here to
            merge into — owner 2026-07-09). -->
       <view class="flex items-center" :style="topRowStyle">
-        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" @click="goHowItWorks">
+        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" role="button" tabindex="0" @click="goHowItWorks">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
           <text style="margin: 0 6px">{{ t.exchange.howItWorksEntry }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
-        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" @click="onRefresh">
+        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" role="button" tabindex="0" @click="onRefresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
         </view>
       </view>
@@ -55,7 +55,7 @@
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
-          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" @click="setMax">
+          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" role="button" tabindex="0" @click="setMax">
             <text style="color: var(--v5-brand)">{{ fromSym }} </text>
             <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
             <text style="color: var(--v5-brand)"> · {{ t.uiChrome.max }}</text>
@@ -65,7 +65,7 @@
 
       <!-- Flip -->
       <view class="flex justify-center" style="margin: 8px 0">
-        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" @click="flip">
+        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" role="button" tabindex="0" @click="flip">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
         </view>
       </view>
@@ -150,6 +150,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
             <text style="margin-left: 6px">{{ queuedLabel }}</text>
           </view>
+          <text class="block" style="margin: 4px 0 6px; font-size: 12px; line-height: 1.4; color: var(--v5-ink-3)">{{ t.exchange.queuedReservation }}</text>
           <view v-for="q in displayQueue.slice(0, 3)" :key="q.id" class="flex items-center justify-between" style="padding: 4px 0">
             <view class="flex items-center min-w-0" style="gap: 8px">
               <text class="font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
@@ -175,7 +176,7 @@
         <text class="block" :style="historyTitleStyle">{{ t.exchange.historyTitle }}</text>
         <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-else :style="historyListStyle">
-          <view v-for="(h, i) in history.slice(0, 6)" :key="h.id" class="flex items-center" :style="historyRowStyle(i)">
+          <view v-for="(h, i) in history" :key="h.id" class="flex items-center" :style="historyRowStyle(i)">
             <view class="grid place-items-center shrink-0" :style="historyIconStyle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
             </view>
@@ -184,6 +185,9 @@
               <text class="block" :style="historySubStyle">@ {{ h.rate.toFixed(5) }} · {{ new Date(h.ts).toLocaleString(dateLocale()) }}</text>
             </view>
           </view>
+        </view>
+        <view v-if="canLoadMoreHistory" class="flex items-center justify-center active:opacity-70" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" :aria-disabled="historyLoadingMore" @click="loadMoreHistory" @keydown.enter.prevent="loadMoreHistory" @keydown.space.prevent="loadMoreHistory">
+          <text>{{ historyLoadingMore ? t.exchange.loadingMore : t.exchange.loadMore }}</text>
         </view>
       </view>
     </view>
@@ -221,6 +225,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
 import { canonicalExchangeAmount, sanitizeExchangeAmountInput } from "@/lib/exchange-input-amount";
+import { createRemoteAuthorityCoordinator } from "@/lib/remote-authority-coordinator";
 import { refreshWalletAfterCommittedExchange } from "@/lib/remote-commerce-refresh";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
@@ -244,6 +249,8 @@ const remoteError = ref<string | null>(null);
 const pendingExchangeMutations = createExchangePendingMutationStore();
 const exchangeCancelStorage = createExchangeCancelStorage();
 const cancellingOrderNo = ref<string | null>(null);
+const historyLoadingMore = ref(false);
+const remoteAuthority = createRemoteAuthorityCoordinator();
 let exchangeMounted = true;
 
 function remoteScopeCurrent(scope: ReturnType<typeof captureAccountScope>, runScope: RuntimeRevisionScope): boolean {
@@ -271,8 +278,14 @@ async function syncRemoteState(
   if (!remoteApiEnabled) return true;
   if (!remoteScopeCurrent(scope, runScope)) return false;
   try {
-    const snapshot = await exchangeApi.fetchState();
+    const snapshot = await remoteAuthority.guardedRead(scope.accountKey, () => exchangeApi.fetchState(1, 20));
+    if (!snapshot) return false;
     if (!remoteScopeCurrent(scope, runScope)) return false;
+    if (snapshot.ordersPage.pageNum !== 1
+        || snapshot.ordersPage.pageSize !== 20
+        || snapshot.orders.length > snapshot.ordersPage.total) {
+      throw new Error("EXCHANGE_HISTORY_PAGINATION_INVALID");
+    }
     remoteState.value = snapshot;
     remoteError.value = null;
     return true;
@@ -282,6 +295,38 @@ async function syncRemoteState(
     remoteState.value = null;
     remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
     throw new Error(remoteError.value);
+  }
+}
+
+const canLoadMoreHistory = computed(() => remoteApiEnabled
+  && !!remoteState.value
+  && remoteState.value.orders.length < remoteState.value.ordersPage.total);
+
+async function loadMoreHistory() {
+  if (!remoteState.value || !canLoadMoreHistory.value || historyLoadingMore.value) return;
+  const scope = captureAccountScope();
+  const runScope = captureRuntimeRevision();
+  const nextPage = remoteState.value.ordersPage.pageNum + 1;
+  historyLoadingMore.value = true;
+  try {
+    const next = await exchangeApi.fetchState(nextPage, remoteState.value.ordersPage.pageSize);
+    if (!remoteScopeCurrent(scope, runScope) || !remoteState.value) return;
+    if (next.ordersPage.pageNum !== nextPage
+        || next.ordersPage.pageSize !== remoteState.value.ordersPage.pageSize
+        || next.ordersPage.total !== remoteState.value.ordersPage.total
+        || next.orders.length === 0) {
+      throw new Error("EXCHANGE_HISTORY_PAGINATION_INVALID");
+    }
+    const merged = [...remoteState.value.orders, ...next.orders];
+    if (new Set(merged.map((order) => order.exchangeNo)).size !== merged.length) {
+      throw new Error("EXCHANGE_HISTORY_DUPLICATE");
+    }
+    if (merged.length > next.ordersPage.total) throw new Error("EXCHANGE_HISTORY_PAGINATION_INVALID");
+    remoteState.value = { ...next, orders: merged };
+  } catch {
+    if (remoteScopeCurrent(scope, runScope)) toast.error(t.value.exchange.remoteUnavailableToast);
+  } finally {
+    historyLoadingMore.value = false;
   }
 }
 
@@ -296,6 +341,7 @@ async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unk
     return "not-cancellable";
   }
   const key = acquireExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo);
+  const mutation = remoteAuthority.beginMutation(scope.accountKey);
   cancellingOrderNo.value = exchangeNo;
   try {
     const snapshot = await exchangeApi.cancel(exchangeNo, key);
@@ -345,6 +391,7 @@ async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unk
     ));
     return "unknown";
   } finally {
+    mutation.finish();
     if (cancellingOrderNo.value === exchangeNo) cancellingOrderNo.value = null;
   }
 }
@@ -555,6 +602,7 @@ function notifyRemoteSwapResult(
   }
   const reason = {
     CANCELLED: t.value.exchange.swapCancelledReason,
+    FAILED: t.value.exchange.swapFailedReason,
     USER_CAP: t.value.exchange.swapUserCapReason,
     PLATFORM_CAP: t.value.exchange.swapPlatformCapReason,
     GEO_BLOCKED: t.value.exchange.swapGeoBlockedReason,
@@ -630,14 +678,20 @@ async function handleConfirm() {
         fromAmount: snap.fromAmount,
         queueIfCapped: true,
       };
-      const result = await executeExchangeSwap<ExchangeSnapshot>({
-        pending: pendingExchangeMutations,
-        accountKey: snap.account,
-        intent,
-        baseline: snap.remoteBaseline,
-        swap: (idempotencyKey) => exchangeApi.swap(directionCode, snap.fromAmount, true, idempotencyKey),
-        fetchState: () => exchangeApi.fetchState(),
-      });
+      const mutation = remoteAuthority.beginMutation(snap.account);
+      let result;
+      try {
+        result = await executeExchangeSwap<ExchangeSnapshot>({
+          pending: pendingExchangeMutations,
+          accountKey: snap.account,
+          intent,
+          baseline: snap.remoteBaseline,
+          swap: (idempotencyKey) => exchangeApi.swap(directionCode, snap.fromAmount, true, idempotencyKey),
+          fetchState: () => exchangeApi.fetchState(),
+        });
+      } finally {
+        mutation.finish();
+      }
       if (!remoteScopeCurrent(requestScope, requestRunScope) || app.accountKey !== snap.account) {
         const applied = await syncRemoteState(requestScope, requestRunScope).catch(() => false);
         if (!applied) return;

@@ -42,7 +42,8 @@ import { useReferralReward } from "@/store/referral-reward";
 import { useRepurchase } from "@/store/repurchase";
 import { useNetwork } from "@/store/network";
 import { prepareProductCatalog } from "@/store/product-catalog";
-import { prepareServerProductPhase } from "@/store/server-product-phase";
+import { prepareServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
+import { remoteApiEnabled } from "@/api/runtime";
 import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useContentCopy } from "@/store/content-copy";
@@ -90,6 +91,9 @@ export function rebindAccountScopedStores(accountKey: string): void {
   // the successful sign-in flow refreshes this cleared slot immediately.
   prepareProductCatalog();
   prepareServerProductPhase();
+  if (remoteApiEnabled && accountKey !== "default") {
+    void refreshServerProductPhase(true);
+  }
   // Eligibility snapshots are server decisions scoped to the active account;
   // clear them before any next-account commerce request can start.
   purchaseEligibilityStore.clear();

@@ -32,6 +32,69 @@ export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T)
   }
 }
 
+interface AccountCommandRow {
+  commands: Record<string, string>;
+}
+
+/**
+ * Acquire a replay key only after it has been durably stored for this account
+ * and business intent. A remote mutation must never start with a memory-only
+ * key: if the response is lost and the App then restarts, that would mint a
+ * second key and could create a duplicate order.
+ */
+export function acquireAccountCommandKey(
+  tableKey: string,
+  accountKey: string,
+  intent: string,
+  prefix: string,
+  createId: () => string = () => globalThis.crypto?.randomUUID?.() ?? "",
+): string {
+  const normalizedIntent = intent.trim();
+  const normalizedPrefix = prefix.trim();
+  if (!tableKey.trim() || !normalizedIntent || !normalizedPrefix) {
+    throw new Error("ACCOUNT_COMMAND_SCOPE_INVALID");
+  }
+  const persisted = readAccountRow<AccountCommandRow>(tableKey, accountKey);
+  const commands = persisted?.commands && typeof persisted.commands === "object"
+    ? persisted.commands
+    : {};
+  const existing = commands[normalizedIntent];
+  if (typeof existing === "string" && existing.trim()) return existing;
+
+  const generatedId = createId().trim();
+  if (!generatedId) throw new Error("ACCOUNT_COMMAND_ID_UNAVAILABLE");
+  const key = `${normalizedPrefix}:${generatedId}`;
+  if (!writeAccountRow<AccountCommandRow>(tableKey, accountKey, {
+    commands: { ...commands, [normalizedIntent]: key },
+  })) {
+    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+  }
+  // Read-after-write also converges same-intent races on the key that is
+  // actually recoverable after a restart.
+  const committed = readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands?.[normalizedIntent];
+  if (typeof committed !== "string" || !committed.trim()) {
+    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+  }
+  return committed;
+}
+
+/** Forget a completed command without deleting a newer retry. */
+export function releaseAccountCommandKey(
+  tableKey: string,
+  accountKey: string,
+  intent: string,
+  expectedKey: string,
+): boolean {
+  const normalizedIntent = intent.trim();
+  if (!tableKey.trim() || !normalizedIntent || !expectedKey.trim()) return false;
+  const persisted = readAccountRow<AccountCommandRow>(tableKey, accountKey);
+  if (persisted?.commands?.[normalizedIntent] !== expectedKey) return false;
+  const commands = { ...persisted.commands };
+  delete commands[normalizedIntent];
+  if (!writeAccountRow<AccountCommandRow>(tableKey, accountKey, { commands })) return false;
+  return readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands?.[normalizedIntent] === undefined;
+}
+
 /**
  * Remove every local row owned by one mock account.  This is deliberately a
  * best-effort, key-scoped cleanup: remote mode never calls it, and unrelated

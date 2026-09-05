@@ -23,7 +23,7 @@ test("M App support production paths use the server API and never local support 
   assert.match(tickets, /supportApi\.(tickets|createTicket|replyTicket|closeTicket)/);
   assert.match(conversations, /supportApi\.(conversations|conversation|startConversation|replyConversation|convertConversationToTicket)/);
   assert.match(conversations, /markConversationRead/);
-  assert.match(helpPage, /supportApi\.faqs/);
+  assert.match(helpPage, /supportApi\.faqPage/);
 });
 
 test("support API parser is strict and every mutation carries idempotency plus CAS", async () => {
@@ -33,7 +33,7 @@ test("support API parser is strict and every mutation carries idempotency plus C
   assert.match(api, /expectedStatus/);
   assert.match(api, /expectedVersion/);
   assert.doesNotMatch(api, /fallbackTransfer/);
-  assert.match(api, /while \(items\.length < total\)/);
+  assert.match(api, /do \{[\s\S]*?beforeId = page\.nextCursor;[\s\S]*?\} while \(beforeId !== null\)/);
   assert.match(api, /markConversationRead/);
 });
 

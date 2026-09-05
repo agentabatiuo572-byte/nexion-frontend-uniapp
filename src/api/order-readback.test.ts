@@ -20,8 +20,13 @@ function order(overrides: Partial<CanonicalOrder> = {}): CanonicalOrder {
     canonicalStatus: "paid",
     orderType: "DIRECT",
     placedAt: 1,
+    expiresAt: null,
     paidAt: 2,
     activatedAt: null,
+    refundedAt: null,
+    refundAmountUsdt: null,
+    refundChannel: null,
+    refundBillNo: null,
     dataCenter: null,
     tradeinNo: null,
     sourceDeviceId: null,
@@ -29,7 +34,7 @@ function order(overrides: Partial<CanonicalOrder> = {}): CanonicalOrder {
     targetDeviceInstanceNo: null,
     itemCount: 2,
     ...overrides,
-  };
+  } as CanonicalOrder;
 }
 
 describe("canonical payment readback", () => {

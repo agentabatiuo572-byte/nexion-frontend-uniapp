@@ -21,7 +21,7 @@
 
     <!-- Header -->
     <view class="cp-head" :style="{ paddingTop: statusBarHeight + 10 + 'px' }">
-      <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack">
+      <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack" @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
 
@@ -37,10 +37,10 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
-      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation" @keydown.enter.prevent="onStartNewConversation" @keydown.space.prevent="onStartNewConversation">
+      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation" @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)">
         <text>{{ t.conversations.restartSession }}</text>
       </view>
-      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket">
+      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket" @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)">
         <text>{{ t.conversations.convertTicket }}</text>
       </view>
     </view>
@@ -48,17 +48,30 @@
     <view v-if="isAi && remoteApiEnabled" class="cp-ai-safety" role="note">
       <text class="cp-ai-safety-t">{{ t.nova.localSafetyNotice }}</text>
     </view>
+    <view v-if="isAi && remoteApiEnabled" class="cp-ai-history">
+      <text v-if="handoffRecommended" class="cp-ai-history-t">{{ handoffCopy.recommend }}</text>
+      <button :disabled="handoffBusy" @click="onHumanHandoff">{{ handoffCopy.action }}</button>
+    </view>
     <view v-if="isAi && remoteApiEnabled && nova.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.nova.historyTruncated }}</text>
     </view>
+    <view v-if="isAi && remoteApiEnabled && nova.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
+      :aria-label="t.nova.loadEarlier" @click="loadEarlierNovaHistory" @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)">
+      <text class="cp-ai-history-t">{{ t.nova.loadEarlier }}</text>
+    </view>
     <view v-if="!isAi && conv?.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.conversations.historyTruncated }}</text>
+    </view>
+    <view v-if="!isAi && conv?.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
+      :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
+      <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
     </view>
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
       :messages="threadMessages"
-      :input-placeholder="inputPlaceholder"
+	      :input-placeholder="inputPlaceholder"
+	      :send-label="t.conversations.send"
       :quick-chips="quickChips"
       :empty-hint="emptyHint"
       :typing="agentTyping"
@@ -105,7 +118,7 @@ import { navTo, navBack } from "@/lib/route";
 import { createSendLimiter } from "@/lib/send-limiter";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { isDeviceOnline } from "@/lib/hashpower";
-import { useConversations } from "@/store/conversations";
+import { useConversations, type CategoryRefreshOutcome } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
 import { toast, confirm, useUI } from "@/store/ui";
@@ -139,12 +152,39 @@ const novaProviderHold = ref(false);
 const novaStatusLoading = ref(false);
 const novaAiRequestInFlight = ref(false);
 const novaHistoryLoading = ref(false);
+const handoffBusy = ref(false);
+const handoffRecommended = ref(false);
+const handoffNeedsFreshQuestion = ref(false);
+let handoffAttemptEpoch = 0;
+let pendingHandoff: { account: string; epoch: number; conversation: string; turn: string; key: string } | null = null;
+const handoffCopy = computed(() => locale.code === "en" ? {
+  action: "Contact human support", recommend: "This issue may need a human agent.",
+  fresh: "Please describe your latest issue to the human agent; the failed question was not shared.",
+  confirm: "Share up to 5 recent questions (with detected credentials removed) with human support? Do not include passwords, codes or private keys.",
+} : locale.code === "vi" ? {
+  action: "Liên hệ nhân viên hỗ trợ", recommend: "Vấn đề này có thể cần nhân viên hỗ trợ.",
+  fresh: "Vui lòng mô tả lại vấn đề với nhân viên; câu hỏi bị lỗi chưa được chia sẻ.",
+  confirm: "Chia sẻ tối đa 5 câu hỏi gần đây (đã lọc thông tin xác thực) với nhân viên? Không cung cấp mật khẩu, mã xác minh hoặc khóa riêng.",
+} : {
+  action: "转人工客服", recommend: "此问题建议由人工客服协助处理。",
+  fresh: "请向人工客服重新描述最新问题，失败的提问尚未转交。",
+  confirm: "是否将最近最多 5 条提问（已过滤检测到的凭据）交给人工客服？请勿在提问中提供密码、验证码或私钥。",
+});
+watch(() => [app.accountKey, app.accountBindingEpoch, nova.conversationId], () => {
+  ++handoffAttemptEpoch;
+  handoffNeedsFreshQuestion.value = false;
+  pendingHandoff = null; handoffRecommended.value = false; handoffBusy.value = false;
+});
 let novaPageVisible = false;
 let novaHistoryEpoch = 0;
 let novaDispatchTimer: ReturnType<typeof setTimeout> | undefined;
 const dialogOwner = `nova-chat-${Date.now()}`;
 const novaThinkingStage = ref<NovaThinkingStage>("understanding");
 let novaStatusEpoch = 0;
+let categoryGate: {
+  category: ConversationType;
+  promise: Promise<CategoryRefreshOutcome>;
+} | null = null;
 const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
 const HUMAN_THREAD_POLL_MS = 5_000;
@@ -233,16 +273,34 @@ onShow(async () => {
   novaPageVisible = true;
   novaHistoryLoading.value = false;
   revealTick.value += 1;
-  if (isAi.value) {
-    if (remoteApiEnabled) {
-      try {
-        nova.bindRemoteAccount(app.accountKey);
-      } catch {
-        novaProviderHold.value = true;
-        novaStatusLoading.value = false;
-        return;
-      }
+  const requestedCategory = isAi.value ? "ai" : startType.value;
+  // Bind the local account boundary synchronously. Input can become interactive
+  // before the category request finishes, and must never capture the previous
+  // account/conversation generation during that await gap.
+  if (isAi.value && remoteApiEnabled) {
+    try {
+      nova.bindRemoteAccount(app.accountKey);
+    } catch {
+      novaProviderHold.value = true;
+      novaStatusLoading.value = false;
+      return;
     }
+  }
+  if (requestedCategory && remoteApiEnabled) {
+    const gate: NonNullable<typeof categoryGate> = {
+      category: requestedCategory,
+      promise: convStore.refreshCategories(),
+    };
+    categoryGate = gate;
+    const categoryOutcome = await gate.promise;
+    if (categoryGate !== gate || categoryOutcome === "stale") return;
+    if (categoryOutcome === "failed" || !convStore.categoryEnabled(requestedCategory)) {
+      toast.info(t.value.conversations.categoryDisabled, "");
+      navBack("/pages/support/messages");
+      return;
+    }
+  }
+  if (isAi.value) {
     nova.open(); // mark Nova as being viewed → clears + tracks unread
     if (remoteApiEnabled) {
       await Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
@@ -263,6 +321,8 @@ onShow(async () => {
 });
 onHide(() => {
   novaPageVisible = false;
+  ++handoffAttemptEpoch;
+  handoffBusy.value = false;
   novaStatusEpoch += 1;
   novaHistoryEpoch += 1;
   useUI().clearConfirmsBy(dialogOwner);
@@ -278,13 +338,27 @@ const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none
 
 watch(() => app.accountKey, () => {
   if (!isAi.value || !remoteApiEnabled) return;
+  categoryGate = null;
   cancelNovaThinking();
   novaStatusEpoch += 1;
   novaHistoryEpoch += 1;
   novaHistoryLoading.value = false;
   useUI().clearConfirmsBy(dialogOwner);
   try { nova.bindRemoteAccount(app.accountKey); } catch { novaProviderHold.value = true; return; }
-  if (novaPageVisible) void Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
+  if (novaPageVisible) {
+    const accountKey = app.accountKey;
+    const gate = { category: "ai" as const, promise: convStore.refreshCategories() };
+    categoryGate = gate;
+    void gate.promise.then(outcome => {
+      if (categoryGate !== gate || !novaPageVisible || accountKey !== app.accountKey || outcome === "stale") return;
+      if (outcome === "failed" || !convStore.categoryEnabled("ai")) {
+        toast.info(t.value.conversations.categoryDisabled, "");
+        navBack("/pages/support/messages");
+        return;
+      }
+      void Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
+    });
+  }
 }, { flush: "sync" });
 
 const conv = computed(() => (cid.value ? convStore.get(cid.value) : undefined));
@@ -377,10 +451,11 @@ const quickChips = computed<QuickChip[]>(() =>
     : [],
 );
 
-// Receipt shown on the LAST user-sent message only (iMessage convention — keeps
-// the column quiet while still answering "did they see it?").
-function receiptFor(status: "sent" | "read" | undefined, isLastUserMsg: boolean): string | undefined {
-  if (!status || !isLastUserMsg) return undefined;
+// The server records a receipt for each agent message when the authenticated user
+// sees it.  Show that same object under the last agent bubble; never pretend it
+// belongs to a user message.
+function receiptFor(status: "sent" | "read" | undefined, isLastAgentMsg: boolean): string | undefined {
+  if (!status || !isLastAgentMsg) return undefined;
   return status === "read" ? t.value.conversations.receiptRead : t.value.conversations.receiptSent;
 }
 
@@ -410,15 +485,25 @@ const threadMessages = computed<ThreadMsg[]>(() => {
   }
   const c = conv.value;
   if (!c) return [];
-  const lastUser = c.messages.map((m) => m.sender).lastIndexOf("user");
+  const lastAgent = c.messages.map((m) => m.sender).lastIndexOf("agent");
   return c.messages.map((m, i) => ({
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
     text: m.text,
-    receipt: receiptFor(m.status, i === lastUser),
+    receipt: receiptFor(m.status, i === lastAgent),
   }));
 });
+
+async function loadEarlierHumanHistory() {
+  const activeId = cid.value;
+  if (!activeId || !humanThreadVisible) return;
+  try {
+    await convStore.loadEarlier(activeId, () => humanThreadVisible && activeId === cid.value);
+  } catch {
+    toast.warn(t.value.security.opFailed);
+  }
+}
 
 // Restart returns to the same server-backed compose path. A durable conversation
 // is created only after the user submits the opening message.
@@ -428,6 +513,47 @@ function onRestart() {
     return;
   }
   navTo("/pages/support/chat?start=support");
+}
+
+async function onHumanHandoff() {
+  if (handoffBusy.value || !novaPageVisible) return;
+  if (handoffNeedsFreshQuestion.value) {
+    toast.info(handoffCopy.value.fresh, "");
+    navTo("/pages/support/chat?start=support");
+    return;
+  }
+  const lastReply = [...nova.messages].reverse().find(message => message.sender === "nova" && /^[0-9a-f-]{36}:nova$/i.test(message.id));
+  if (!lastReply) { navTo("/pages/support/chat?start=support"); return; }
+  const attemptEpoch = ++handoffAttemptEpoch;
+  const account = app.accountKey;
+  const bindingEpoch = app.accountBindingEpoch;
+  const conversation = nova.conversationId;
+  const current = () => novaPageVisible && attemptEpoch === handoffAttemptEpoch
+    && account === app.accountKey && bindingEpoch === app.accountBindingEpoch
+    && conversation === nova.conversationId;
+  handoffBusy.value = true;
+  let hasRequestKey = false;
+  try {
+    const request = pendingHandoff ?? {
+      account, epoch: bindingEpoch, conversation,
+      turn: lastReply.id.slice(0, 36), key: requireCryptoUuid(),
+    };
+    hasRequestKey = true;
+    if (!await confirm({ title: handoffCopy.value.action, message: handoffCopy.value.confirm,
+      confirmLabel: handoffCopy.value.action, owner: dialogOwner }) || !current()) return;
+    pendingHandoff = request;
+    const conversationNo = await novaAiApi.confirmHandoff(request.conversation, request.turn, request.key);
+    if (!current()) return;
+    pendingHandoff = null;
+    navTo(`/pages/support/chat?cid=${encodeURIComponent(conversationNo)}`);
+  } catch {
+    if (current()) {
+      if (!hasRequestKey) {
+        toast.info(handoffCopy.value.fresh, "");
+        navTo("/pages/support/chat?start=support");
+      } else toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
+    }
+  } finally { if (attemptEpoch === handoffAttemptEpoch) handoffBusy.value = false; }
 }
 
 async function refreshNovaAvailability() {
@@ -461,6 +587,15 @@ async function refreshNovaHistory() {
       novaHistoryLoading.value = false;
       void drainNovaQueue();
     }
+  }
+}
+
+async function loadEarlierNovaHistory() {
+  if (!remoteApiEnabled || !isAi.value || !novaPageVisible) return;
+  try {
+    await nova.loadEarlierRemote(app.accountKey, cursor => novaAiApi.history(nova.conversationId, cursor));
+  } catch {
+    toast.warn(t.value.nova.localFailed, t.value.nova.localRetry);
   }
 }
 
@@ -605,6 +740,21 @@ async function onSend(text: string, restore?: () => void) {
   if (isAi.value && remoteApiEnabled) {
     const accountKey = app.accountKey;
     const conversationBoundary = nova.conversationBoundary;
+    let gate = categoryGate;
+    if (!gate || gate.category !== "ai") {
+      gate = { category: "ai", promise: convStore.refreshCategories() };
+      categoryGate = gate;
+    }
+    const categoryOutcome = await gate.promise;
+    if (categoryGate !== gate || categoryOutcome !== "applied" || !convStore.categoryEnabled("ai")) {
+      restore?.();
+      return;
+    }
+    if (!novaPageVisible || accountKey !== app.accountKey
+      || conversationBoundary !== nova.conversationBoundary) {
+      restore?.();
+      return;
+    }
     if (!nova.historyLoaded) {
       try {
         await refreshNovaHistory();
@@ -659,6 +809,11 @@ async function onSend(text: string, restore?: () => void) {
       restore?.();
       return;
     }
+    if (remoteApiEnabled && !convStore.categoryEnabled(type)) {
+      restore?.();
+      toast.info(t.value.conversations.categoryDisabled, "");
+      return;
+    }
     try {
       cid.value = await convStore.startConversation(type, text);
       startType.value = null;
@@ -710,8 +865,14 @@ async function drainNovaQueue() {
       remainingNovaThinkingMs(requestStartedAt, novaThinkingNow()), request.epoch);
     if (!completed || !current()) return;
     nova.completeRemote(item.turnId, result.reply);
+    handoffNeedsFreshQuestion.value = false;
+    handoffRecommended.value = !!result.handoffReason;
   } catch (error) {
-    if (current()) nova.failRemote(item.turnId, novaFailure(error));
+    if (current()) {
+      nova.failRemote(item.turnId, novaFailure(error));
+      handoffNeedsFreshQuestion.value = true;
+      handoffRecommended.value = true;
+    }
   } finally {
     if (novaRequestControl.isCurrent(request.epoch)) {
       finishNovaThinking(request.epoch);
@@ -790,6 +951,11 @@ async function onStartNewConversation() {
 
 function goBack() {
   navBack("/pages/support/messages");
+}
+
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
+  if (event.repeat) return;
+  void action();
 }
 </script>
 

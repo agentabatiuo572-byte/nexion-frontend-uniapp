@@ -18,12 +18,23 @@
           <text v-if="notifs.unread > 0" :style="unreadBadgeStyle">{{ notifs.unread }}</text>
         </view>
         <view class="flex items-center" style="gap: 4px">
-          <view v-if="notifs.unread > 0" class="flex items-center active:opacity-70" :style="actionBtnStyle('var(--v5-brand)')" @click="notifs.markAllRead()">
+          <view v-if="notifs.unread > 0" class="flex items-center active:opacity-70" :style="actionBtnStyle('var(--v5-brand)')" role="button" tabindex="0" :aria-label="t.notifs.markAll" @click="notifs.markAllRead()" @keydown.enter.stop.prevent="notifs.markAllRead()" @keydown.space.stop.prevent="notifs.markAllRead()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></svg>
             <text style="margin-left: 4px">{{ t.notifs.markAll }}</text>
           </view>
-          <view v-if="hasRead" class="flex items-center active:opacity-70" :style="actionBtnStyle('var(--v5-ink-3)')" @click="notifs.clearRead()">
+          <view
+            v-if="hasRead"
+            class="flex items-center active:opacity-70"
+            :style="actionBtnStyle('var(--v5-ink-3)')"
+            role="button"
+            tabindex="0"
+            :aria-label="t.notifs.clearReadAria"
+            @click="confirmClearRead"
+            @keydown.enter.stop.prevent="confirmClearRead"
+            @keydown.space.stop.prevent="confirmClearRead"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+            <text style="margin-left: 4px">{{ t.notifs.clearReadAria }}</text>
           </view>
         </view>
       </view>
@@ -35,7 +46,13 @@
             v-if="id === 'all' || countOf(id) > 0"
             class="active:opacity-70"
             :style="pillStyle(filter === id)"
+            role="button"
+            tabindex="0"
+            :aria-label="filterLabel(id)"
+            :aria-pressed="filter === id"
             @click="filter = id"
+            @keydown.enter.stop.prevent="filter = id"
+            @keydown.space.stop.prevent="filter = id"
           >
             <text>{{ filterLabel(id) }} ({{ countOf(id) }})</text>
           </view>
@@ -44,7 +61,19 @@
 
       <!-- Timeline -->
       <view class="px-4">
-        <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle"><text>{{ notifsErrorText }}</text><text class="block" :style="ctaStyle('system')" @click="notifs.retryRemote()">{{ t.ui.retry }}</text></view>
+        <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle">
+          <text>{{ notifsErrorText }}</text>
+          <text
+            class="block"
+            :style="ctaStyle('system')"
+            role="button"
+            tabindex="0"
+            :aria-label="t.ui.retry"
+            @click="notifs.retryRemote()"
+            @keydown.enter.stop.prevent="notifs.retryRemote()"
+            @keydown.space.stop.prevent="notifs.retryRemote()"
+          >{{ t.ui.retry }}</text>
+        </view>
         <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
           <view
@@ -55,6 +84,11 @@
             @touchstart="onTouchStart(n, $event)"
             @touchend="onTouchEnd(n, $event)"
             @click="onTap(n)"
+            role="button"
+            tabindex="0"
+            :aria-label="n.title"
+            @keydown.enter.stop.prevent="onTap(n)"
+            @keydown.space.stop.prevent="onTap(n)"
           >
             <view class="relative shrink-0">
               <view class="grid place-items-center" :style="iconBoxStyle(n.kind)">
@@ -72,7 +106,17 @@
             </view>
           </view>
         </view>
-        <text v-if="notifs.nextCursor && !notifs.loading" class="block text-center" :style="ctaStyle('system')" @click="notifs.loadMoreRemote()">{{ t.notifs.loadMore }}</text>
+        <text
+          v-if="notifs.nextCursor && !notifs.loading"
+          class="block text-center"
+          :style="ctaStyle('system')"
+          role="button"
+          tabindex="0"
+          :aria-label="t.notifs.loadMore"
+          @click="notifs.loadMoreRemote()"
+          @keydown.enter.stop.prevent="notifs.loadMoreRemote()"
+          @keydown.space.stop.prevent="notifs.loadMoreRemote()"
+        >{{ t.notifs.loadMore }}</text>
       </view>
     </view>
   </AppChassis>
@@ -80,6 +124,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -89,6 +134,7 @@ import { useNotifications, type NotifKind, type Notification } from "@/store/not
 import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
+import { confirm as uiConfirm } from "@/store/ui";
 
 const t = useT();
 const notifs = useNotifications();
@@ -165,8 +211,17 @@ async function onTap(n: Notification) {
     return;
   }
   await notifs.markRead(n.id);
-  const href = KIND_META[n.kind].href;
-  if (href) navTo(href);
+  // Missing CTA is the PC operator's explicit "no navigation" choice.
+}
+
+async function confirmClearRead() {
+  const accepted = await uiConfirm({
+    title: t.value.notifs.clearReadAria,
+    message: t.value.notifs.clearReadAria,
+    confirmLabel: t.value.notifs.clearReadAria,
+    icon: "warn",
+  });
+  if (accepted) await notifs.clearRead();
 }
 
 type UniTouchEvent = { changedTouches?: ArrayLike<{ clientX: number; clientY: number }> };
@@ -194,6 +249,7 @@ async function onTouchEnd(n: Notification, event: UniTouchEvent) {
   if (canonicalRoute) navTo(canonicalRoute);
 }
 onMounted(() => { void notifs.refreshRemote(); });
+onShow(() => { void notifs.refreshRemote(); });
 
 const unreadBadgeStyle: CSSProperties = {
   fontSize: "12px",
@@ -204,7 +260,7 @@ const unreadBadgeStyle: CSSProperties = {
   fontWeight: 600,
 };
 function actionBtnStyle(color: string): CSSProperties {
-  return { height: "36px", padding: "0 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600, color };
+  return { height: "44px", padding: "0 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 600, color };
 }
 function pillStyle(active: boolean): CSSProperties {
   return {

@@ -95,7 +95,7 @@ export interface WithdrawalApi {
     amount: number;
     chain: SupportedWithdrawalNetwork;
     address: string;
-    policyVersion?: string;
+    policyVersion: string;
   }): Promise<WithdrawalEligibilitySnapshot>;
   get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;
   abandonAttempt(input: WithdrawalAttemptAbandonInput): Promise<WithdrawalAttemptAbandonResult>;
@@ -288,13 +288,24 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   };
 }
 
-function parseSubmissionList(value: unknown): WithdrawalSubmission[] {
+function parseSubmissionPage(value: unknown): {
+  withdrawals: WithdrawalSubmission[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+} {
   const row = record(value);
+  const page = record(row?.page);
+  const total = number(page?.total);
+  const pageNum = number(page?.pageNum, 1);
+  const pageSize = number(page?.pageSize, 1);
   if (!row || row.source !== "nx_withdrawal_order" || row.sourceEnvironment !== "PRODUCTION"
-      || !Array.isArray(row.withdrawals)) {
+      || !Array.isArray(row.withdrawals) || !page || total === null || pageNum === null || pageSize === null
+      || !Number.isSafeInteger(pageNum) || !Number.isSafeInteger(pageSize)
+      || row.withdrawals.length > pageSize || row.withdrawals.length > total) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_LIST_RESPONSE_INVALID" });
   }
-  return row.withdrawals.map(parseSubmission);
+  return { withdrawals: row.withdrawals.map(parseSubmission), total, pageNum, pageSize };
 }
 
 function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
@@ -608,18 +619,48 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
 
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
   return {
-    list: async () => parseSubmissionList(await client.request({
-      method: "GET", path: "/api/withdrawals",
-    })),
+    list: async () => {
+      const first = parseSubmissionPage(await client.request({
+        method: "GET", path: "/api/withdrawals?pageNum=1&pageSize=50",
+      }));
+      if (first.pageNum !== 1 || first.pageSize !== 50) {
+        throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_PAGINATION_INVALID" });
+      }
+      const rows = [...first.withdrawals];
+      const ids = new Set(rows.map((item) => item.withdrawalNo));
+      let pageNum = first.pageNum;
+      while (rows.length < first.total) {
+        pageNum += 1;
+        const next = parseSubmissionPage(await client.request({
+          method: "GET", path: `/api/withdrawals?pageNum=${pageNum}&pageSize=${first.pageSize}`,
+        }));
+        if (next.pageNum !== pageNum || next.pageSize !== first.pageSize || next.total !== first.total
+            || next.withdrawals.length === 0) {
+          throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_PAGINATION_INVALID" });
+        }
+        for (const item of next.withdrawals) {
+          if (ids.has(item.withdrawalNo)) throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_PAGINATION_DUPLICATE" });
+          ids.add(item.withdrawalNo);
+          rows.push(item);
+        }
+      }
+      if (rows.length !== first.total) throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_PAGINATION_INVALID" });
+      return rows;
+    },
     policy: async () => parsePolicy(await client.request({
       method: "GET",
       path: "/api/withdrawals/policy",
     })),
-    eligibility: async (input) => parseEligibility(await client.request({
-      method: "POST", path: "/api/withdrawals/eligibility",
-      body: input,
-      timeoutMs: 30_000,
-    })),
+    eligibility: async (input) => {
+      if (!input.policyVersion?.trim()) {
+        throw new ApiError({ kind: "configuration", message: "WITHDRAWAL_POLICY_VERSION_REQUIRED" });
+      }
+      return parseEligibility(await client.request({
+        method: "POST", path: "/api/withdrawals/eligibility",
+        body: input,
+        timeoutMs: 30_000,
+      }));
+    },
     get: async (withdrawalNo) => parseStatusSnapshot(await client.request({
       method: "GET",
       path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,

@@ -100,8 +100,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -114,6 +114,7 @@ import { useNova } from "@/store/nova";
 import type { ConversationType, ConvMessage } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const convStore = useConversations();
@@ -125,16 +126,25 @@ const selectedType = ref<ConversationType>("advisor");
 // Entering the inbox is a lazy timeout checkpoint (chat entry and session start
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
-onShow(async () => {
-  const tasks: Promise<unknown>[] = [convStore.refresh()];
+async function refreshInbox(): Promise<void> {
+  const tasks: Promise<unknown>[] = [convStore.refresh(), convStore.refreshCategories()];
   if (remoteApiEnabled) {
     tasks.push(nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history()));
   }
   await Promise.allSettled(tasks);
+}
+
+let releaseActiveRefresh = () => {};
+onShow(async () => {
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshInbox);
+  await refreshInbox();
 });
+onHide(() => releaseActiveRefresh());
+onUnmounted(() => releaseActiveRefresh());
 
 function retryConversations() {
-  void convStore.refresh().catch(() => undefined);
+  void Promise.allSettled([convStore.refresh(), convStore.refreshCategories()]);
 }
 
 // Contact-support entry shows only when no live session exists.
@@ -144,7 +154,7 @@ const hasActiveSupport = computed(() =>
 
 function onStartConversation(type?: Exclude<ConversationType, "ai">) {
   const target = type ?? (selectedType.value === "advisor" || selectedType.value === "support" ? selectedType.value : null);
-  if (!target) return;
+  if (!target || !convStore.categoryEnabled(target)) return;
   navTo("/pages/support/chat?start=" + target);
 }
 
@@ -159,8 +169,12 @@ const TYPES = computed<{ key: ConversationType; tint: string; icon: string }[]>(
     { key: "support", tint: "var(--v5-tech-cyan)", icon: SUPPORT_ICON },
   ];
   available.push({ key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON });
-  return available;
+  return available.filter((row) => convStore.categoryEnabled(row.key));
 });
+
+watch(TYPES, (available) => {
+  if (!available.some((row) => row.key === selectedType.value) && available[0]) selectedType.value = available[0].key;
+}, { immediate: true });
 
 interface Row {
   id: string;
@@ -209,6 +223,7 @@ function relTime(ts: number): string {
 
 const rows = computed<Row[]>(() => {
   const sel = selectedType.value;
+  if (!convStore.categoryEnabled(sel)) return [];
   if (sel === "ai") {
     const msgs = nova.messages;
     const last = msgs.length ? msgs[msgs.length - 1] : null;

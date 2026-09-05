@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import uniPlugin from "@dcloudio/vite-plugin-uni";
 import UnoCSS from "unocss/vite";
+import { mustBlockDevelopmentOAuthProxy } from "./src/lib/dev-preview-auth-boundary";
 
 // @dcloudio/vite-plugin-uni ships as CJS. With "type":"module" in package.json
 // (required so the ESM-only unocss/vite plugin can be imported), Vite loads
@@ -73,6 +74,14 @@ export default defineConfig(({ mode }) => {
           target: apiPreviewTarget,
           changeOrigin: true,
           headers: apiPreviewHeaders,
+          bypass: (req, res) => {
+            if (!mustBlockDevelopmentOAuthProxy(req.url, req.socket.remoteAddress)) return;
+            res.statusCode = 403;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.setHeader("Cache-Control", "no-store");
+            res.end(JSON.stringify({ code: 403, message: "DEVELOPMENT_OAUTH_LOOPBACK_REQUIRED", data: null }));
+            return false;
+          },
           configure: (proxy) => {
             proxy.on("proxyReq", (proxyReq, req) => {
               const authorization = req.headers.authorization;

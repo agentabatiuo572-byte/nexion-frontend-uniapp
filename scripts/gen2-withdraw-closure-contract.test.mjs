@@ -13,7 +13,7 @@ function slice(source, start, end) {
 
 test("remote checkout refreshes server Gen-2 eligibility before any order command", () => {
   const page = read("src/pages/store/checkout.vue");
-  const submit = slice(page, "async function submitRemoteOrder()", "function stopRemoteOrderPolling()");
+  const submit = slice(page, "async function submitRemoteOrder()", "// ── 抵扣上下文");
   const eligibility = submit.indexOf("await refreshPurchaseEligibility()");
   const order = submit.indexOf("orderApi.");
   assert.ok(eligibility >= 0, "submit must refresh server eligibility");

@@ -151,7 +151,7 @@ onUnload(() => {
 const inviteHint = computed(() => remoteApiEnabled ? "—" : fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const members = computed(() => network.members);
-const directInvites = computed(() => remoteApiEnabled ? remoteSnapshot.value?.facts.directRefs ?? 0 : members.value.filter((m) => m.layer === 1).length);
+const directInvites = computed(() => remoteApiEnabled ? remoteSnapshot.value?.facts.directInvites ?? "—" : members.value.filter((m) => m.layer === 1).length);
 const activeDirect = computed(() => remoteApiEnabled ? remoteSnapshot.value?.facts.activeDirect ?? 0 : members.value.filter((m) => m.layer === 1 && m.status === "active").length);
 const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.value ? "—" : String(activeDirect.value));
 
@@ -193,6 +193,7 @@ const tiers = computed<QuotaTier[]>(() =>
     ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
       productId: tier.productId, name: tier.name, price: tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
+      available: tier.available,
       unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",
       conditions: tier.conditions.map((condition) => ({
         label: condition.kind === "teamVolume" ? t.value.quota.condTeamVol

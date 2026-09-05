@@ -30,6 +30,29 @@ test("failed phone calibration offers retry and activate-later without minting a
     "result, defer, readback and retry responses must be fenced before another server command or local mutation");
 });
 
+test("estimator activate-later confirms the server state and exits onboarding without reopening registration success", () => {
+  const estimator = read("src/pages/onboarding/estimator.vue");
+  const deferredTransition = read("src/lib/defer-phone-activation.ts");
+  const handler = estimator.slice(estimator.indexOf("async function deferPhoneActivation"));
+
+  assert.match(handler, /await confirmDeferredPhoneActivation\(/,
+    "the estimator failure path must persist DEFERRED instead of treating navigation as the decision");
+  assert.match(deferredTransition, /onboardingCalibrationApi\.defer\(/);
+  assert.match(deferredTransition, /activationStatus !== "DEFERRED"/);
+  assert.match(estimator, /markPhoneActivationDeferred/);
+  assert.match(estimator, /auth\.completeOnboarding\(\)/);
+  assert.match(handler, /navReset\(\{ url: "\/pages\/index\/index"/);
+  assert.doesNotMatch(estimator, /pages\/register\/success/,
+    "a login/onboarding recovery page must never masquerade as a newly completed registration");
+  assert.match(estimator, /activationDeferFailed/,
+    "a failed defer write must be explained as a failed save, not as an activation failure");
+  assert.match(estimator, /function retryCalibration\(\) \{\s*if \(deferBusy\.value\) return;/,
+    "retry must stay locked while a DEFERRED command is in flight");
+  const leaveHandler = estimator.slice(estimator.indexOf("function leaveEstimator"), estimator.indexOf("async function deferPhoneActivation"));
+  assert.doesNotMatch(leaveHandler, /confirmDeferredPhoneActivation|onboardingCalibrationApi\.defer/,
+    "back is navigation, never an implicit server-side defer decision");
+});
+
 test("deferred activation is a persisted non-active state, not a forced recalibration loop", () => {
   const session = read("src/store/session.ts");
   const deferred = session.slice(session.indexOf("function markPhoneActivationDeferred"), session.indexOf("function isCurrentDeviceCalibrated"));
@@ -73,7 +96,7 @@ test("device warehouse and slot sheet cannot bypass phone recalibration", () => 
 test("all locales explain retry, defer, warehouse recovery and reward consequences", () => {
   for (const locale of ["zh", "en", "vi"]) {
     const messages = read(`src/i18n/messages/${locale}.ts`);
-    for (const key of ["activationRetry", "activationDefer", "activationDeferredHint", "activationDeferredToast", "activationRewardGate"]) {
+    for (const key of ["activationRetry", "activationDefer", "activationDeferFailed", "activationDeferredHint", "activationDeferredToast", "activationRewardGate"]) {
       assert.match(messages, new RegExp(`${key}:`), `${locale} missing ${key}`);
     }
   }

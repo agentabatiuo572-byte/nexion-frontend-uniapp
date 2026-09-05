@@ -21,6 +21,7 @@ import { normalizeAccountKey } from "./account-cloud";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
+import type { OrderLineItem } from "@/lib/order-line-items";
 import {
   captureRuntimeRevision,
   isCurrentRuntimeRevision,
@@ -43,6 +44,8 @@ export interface Order {
   quantity: number;
   /** Number of products represented by a canonical bundle order. */
   itemCount?: number;
+  /** Structured server SKU lines; present for canonical bundle orders. */
+  lineItems?: OrderLineItem[];
   /** Server-calculated sum of every line item before discounts. */
   subtotal: number;
   unitPrice: number;        // USDT
@@ -59,8 +62,13 @@ export interface Order {
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
   placedAt: number;
+  expiresAt?: number;
   paidAt?: number;
   activatedAt?: number;
+  refundedAt?: number;
+  refundAmountUsdt?: number;
+  refundChannel?: string;
+  refundBillNo?: string;
   timeline: OrderTimelineEvent[];
   deviceId?: string;        // the spawned device id once activated
   // Data-center the unit was provisioned in (Singapore / Frankfurt)
@@ -142,11 +150,15 @@ export const useOrders = defineStore("orders", () => {
   let boundEpoch = 0;
   let refreshGeneration = 0;
   const orders = ref<Order[]>([]);
+  const nextCursor = ref<string | null>(null);
+  const loadingMore = ref(false);
 
   function clearOrdersForCommerceRunChange() {
     if (!remoteApiEnabled) return;
     refreshGeneration += 1;
     orders.value = [];
+    nextCursor.value = null;
+    loadingMore.value = false;
   }
   const unsubscribeCommerceRun = subscribeRuntimeRevision(clearOrdersForCommerceRunChange);
   onScopeDispose(unsubscribeCommerceRun);
@@ -179,6 +191,8 @@ export const useOrders = defineStore("orders", () => {
     boundEpoch += 1;
     refreshGeneration += 1;
     orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
+    nextCursor.value = null;
+    loadingMore.value = false;
   }
   bindAccount(boundKey); // boot 期先挂 "default";账号确定后由 rebindAccountScopedStores 重绑
 
@@ -191,7 +205,7 @@ export const useOrders = defineStore("orders", () => {
     if (status === "provisioning") timeline.push({ status, ts: row.paidAt ?? row.placedAt });
     if (row.activatedAt != null) timeline.push({ status: "activated", ts: row.activatedAt });
     if (!["placed", "paid", "provisioning", "activated"].includes(status)) {
-      timeline.push({ status, ts: row.activatedAt ?? row.paidAt ?? row.placedAt });
+      timeline.push({ status, ts: row.refundedAt ?? row.activatedAt ?? row.paidAt ?? row.placedAt });
     }
     return {
       id: row.orderNo,
@@ -199,6 +213,7 @@ export const useOrders = defineStore("orders", () => {
       productName: row.productName,
       quantity: row.quantity,
       ...(row.itemCount != null && { itemCount: row.itemCount }),
+      ...(row.lineItems != null && { lineItems: row.lineItems }),
       subtotal: row.subtotalUsdt,
       unitPrice: row.unitPriceUsdt,
       discount: row.tradeinNo ? 0 : row.discountUsdt,
@@ -207,8 +222,13 @@ export const useOrders = defineStore("orders", () => {
       paymentMethod: row.paymentMethod ?? "wallet",
       status,
       placedAt: row.placedAt,
+      ...(row.expiresAt != null && { expiresAt: row.expiresAt }),
       ...(row.paidAt != null && { paidAt: row.paidAt }),
       ...(row.activatedAt != null && { activatedAt: row.activatedAt }),
+      ...(row.refundedAt != null && { refundedAt: row.refundedAt }),
+      ...(row.refundAmountUsdt != null && { refundAmountUsdt: row.refundAmountUsdt }),
+      ...(row.refundChannel != null && { refundChannel: row.refundChannel }),
+      ...(row.refundBillNo != null && { refundBillNo: row.refundBillNo }),
       ...(row.targetDeviceId != null && { deviceId: String(row.targetDeviceId) }),
       timeline,
       dataCenter,
@@ -220,18 +240,69 @@ export const useOrders = defineStore("orders", () => {
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestGeneration = ++refreshGeneration;
+    loadingMore.value = false;
     const requestRunScope = captureRuntimeRevision();
     const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
       && requestGeneration === refreshGeneration
       && isCurrentRuntimeRevision(requestRunScope);
     try {
-      const canonical = await orderApi.list();
+      const canonical = await orderApi.list(null, 50);
       if (!isCurrent()) return;
       orders.value = canonical.orders.map(fromCanonical);
+      nextCursor.value = canonical.nextCursor ?? null;
     } catch (error) {
       if (!isCurrent()) return;
       throw error;
     }
+  }
+
+  async function loadMoreRemote(): Promise<void> {
+    if (!remoteApiEnabled || loadingMore.value || !nextCursor.value) return;
+    const cursor = nextCursor.value;
+    const requestBoundKey = boundKey;
+    const requestEpoch = boundEpoch;
+    const requestGeneration = ++refreshGeneration;
+    const requestRunScope = captureRuntimeRevision();
+    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
+      && requestGeneration === refreshGeneration
+      && isCurrentRuntimeRevision(requestRunScope);
+    loadingMore.value = true;
+    try {
+      const canonical = await orderApi.list(cursor, 50);
+      if (!isCurrent()) return;
+      if (canonical.nextCursor === cursor) {
+        nextCursor.value = null;
+        throw new Error("ORDER_LIST_CURSOR_NOT_ADVANCING");
+      }
+      const known = new Set(orders.value.map((order) => order.id));
+      orders.value = [
+        ...orders.value,
+        ...canonical.orders.map(fromCanonical).filter((order) => !known.has(order.id)),
+      ];
+      nextCursor.value = canonical.nextCursor ?? null;
+    } finally {
+      if (isCurrent()) loadingMore.value = false;
+    }
+  }
+
+  async function ensureRemoteOrder(id: string): Promise<Order | undefined> {
+    if (!remoteApiEnabled) return getById(id);
+    const requestBoundKey = boundKey;
+    const requestEpoch = boundEpoch;
+    const requestRunScope = captureRuntimeRevision();
+    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
+      && isCurrentRuntimeRevision(requestRunScope);
+    await refreshRemote();
+    if (!isCurrent()) return undefined;
+    let found = getById(id);
+    const visited = new Set<string>();
+    while (!found && nextCursor.value && !visited.has(nextCursor.value)) {
+      visited.add(nextCursor.value);
+      await loadMoreRemote();
+      if (!isCurrent()) return undefined;
+      found = getById(id);
+    }
+    return found;
   }
 
   async function cancelOrderRemote(id: string): Promise<boolean> {
@@ -244,14 +315,14 @@ export const useOrders = defineStore("orders", () => {
     try {
       await orderApi.cancel(id, `order-cancel:${id}`);
       if (!isCurrent()) return false;
-      await refreshRemote();
+      await ensureRemoteOrder(id);
       if (!isCurrent()) return false;
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     } catch {
       if (!isCurrent()) return false;
       // The command may have committed before the response was lost. Read-back is
       // the only safe result for the UI; never project a local cancellation.
-      try { await refreshRemote(); } catch { return false; }
+      try { await ensureRemoteOrder(id); } catch { return false; }
       if (!isCurrent()) return false;
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     }
@@ -436,7 +507,23 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, createOrders, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
+  return {
+    orders,
+    nextCursor,
+    loadingMore,
+    createOrder,
+    createOrders,
+    advanceOrder,
+    markActivated,
+    cancelOrder,
+    cancelOrderRemote,
+    getById,
+    bindAccount,
+    currentAccountKey,
+    refreshRemote,
+    loadMoreRemote,
+    ensureRemoteOrder,
+  };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

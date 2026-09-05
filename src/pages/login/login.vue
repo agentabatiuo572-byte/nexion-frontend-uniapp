@@ -53,7 +53,7 @@
               </view>
             </view>
             <view class="lg-forgot-row">
-              <text class="lg-forgot" role="link" tabindex="0" @click="goReset" @keydown.enter.prevent="goReset" @keydown.space.prevent="goReset">{{ t.login.forgotPassword }}</text>
+              <text class="lg-forgot" role="link" tabindex="0" @click="goReset" @keydown.enter.prevent="goReset">{{ t.login.forgotPassword }}</text>
             </view>
           </template>
         </view>
@@ -89,7 +89,7 @@
       </view>
 
       <!-- Error -->
-      <view v-if="error" class="lg-error">
+      <view v-if="error" class="lg-error" role="alert" aria-live="assertive">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="lg-error__t">{{ error }}</text>
       </view>
@@ -107,19 +107,19 @@
       </view>
 
       <!-- OAuth (step 1, not reset) -->
-      <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
+      <view v-if="step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
         <AuthProviderGrid :busy="loading" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
       </view>
 
       <!-- Footer -->
       <view class="lg-footer">
-        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">{{ t.login.signUp }}</text></text>
+        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
-    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
+    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" :provider-hold="remoteApiEnabled" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </StandalonePageShell>
 </template>
@@ -220,6 +220,7 @@ onLoad((options) => {
 });
 
 const showCaptcha = ref(false);
+const captchaPurpose = ref<"otp" | "password">("otp");
 
 const phoneClean = computed(() => sanitizePhoneInput(phone.value));
 const phoneOk = computed(() => validateNationalPhone(country.value, phoneClean.value));
@@ -439,8 +440,8 @@ function geoText(code: unknown): string | null {
 }
 
 // Sign-in completion (shared by password + OTP). Binds the account-cloud
-// snapshot, claims this carrier's session, and routes a changed physical device
-// through recalibration before the main app.
+// snapshot, claims this carrier's session, then enters only a safe business
+// return target or Home. Registration and device setup own their own routes.
 function finishSignIn(
   session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number },
   context: OtpFlowContext | null = null,
@@ -502,8 +503,8 @@ async function requestCode(captchaTicket?: string) {
   if (remoteApiEnabled) {
     try {
       const res = sceneAtRequest === "reset"
-        ? await authApi.sendPasswordResetOtp({ countryCode: country.value, phone: phoneClean.value })
-        : await authApi.sendLoginOtp({ countryCode: country.value, phone: phoneClean.value });
+        ? await authApi.sendPasswordResetOtp({ countryCode: country.value, phone: phoneClean.value, ...(captchaTicket ? { captchaTicket } : {}) })
+        : await authApi.sendLoginOtp({ countryCode: country.value, phone: phoneClean.value, ...(captchaTicket ? { captchaTicket } : {}) });
       if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest || step.value !== stepAtRequest) return;
       loading.value = false;
       otpRequestId.value = res.challengeNo;
@@ -515,7 +516,12 @@ async function requestCode(captchaTicket?: string) {
     } catch (cause) {
       if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
       loading.value = false;
-      error.value = remoteLoginError(cause);
+      if (cause instanceof Error && cause.message === "USER_CAPTCHA_REQUIRED") {
+        captchaPurpose.value = "otp";
+        showCaptcha.value = true;
+      } else {
+        error.value = remoteLoginError(cause);
+      }
     }
     return;
   }
@@ -537,7 +543,11 @@ async function requestCode(captchaTicket?: string) {
     startResend(res.resendAfterSec);
     return;
   }
-  if (res.error === "captcha_required") { showCaptcha.value = true; return; }
+  if (res.error === "captcha_required") {
+    captchaPurpose.value = "otp";
+    showCaptcha.value = true;
+    return;
+  }
   if (res.error === "rate_limited") {
     // 规格 ⑤(AUTH01):`rate_limited` → Toast 剩余秒数;inline 错误条留给 verify 类错误。
     toast.info(fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec }));
@@ -546,6 +556,10 @@ async function requestCode(captchaTicket?: string) {
 }
 function onCaptchaOk(ticket: string) {
   showCaptcha.value = false;
+  if (captchaPurpose.value === "password") {
+    void signInWithPassword(ticket);
+    return;
+  }
   void requestCode(ticket);
 }
 function resend() {
@@ -576,7 +590,7 @@ function remoteLoginError(error: unknown): string {
   }
 }
 
-async function signInWithPassword() {
+async function signInWithPassword(captchaTicket?: string) {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!phoneOk.value || !pwdOk.value) { error.value = t.value.login.errorInvalidPassword; return; }
@@ -589,7 +603,12 @@ async function signInWithPassword() {
   };
   loading.value = true;
   try {
-    const result = await authApi.login({ countryCode: country.value, phone: phoneClean.value, password: password.value });
+    const result = await authApi.login({
+      countryCode: country.value,
+      phone: phoneClean.value,
+      password: password.value,
+      ...(captchaTicket ? { captchaTicket } : {}),
+    });
     if (!isCurrentPasswordAttempt(passwordAttempt)) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
@@ -606,6 +625,11 @@ async function signInWithPassword() {
   } catch (loginError) {
     if (!isCurrentPasswordAttempt(passwordAttempt)) return;
     loading.value = false;
+    if (loginError instanceof Error && loginError.message === "USER_CAPTCHA_REQUIRED") {
+      captchaPurpose.value = "password";
+      showCaptcha.value = true;
+      return;
+    }
     error.value = remoteLoginError(loginError);
   }
 }

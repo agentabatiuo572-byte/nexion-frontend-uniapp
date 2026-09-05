@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createBundleOrderApi } from "./bundle-order-api";
 import { advanceRuntimeRevision } from "./order-api";
+import bundleSource from "../pages/store/bundle.vue?raw";
 
 describe("bundle order API", () => {
   afterEach(() => advanceRuntimeRevision(null));
@@ -73,5 +74,34 @@ describe("bundle order API", () => {
       .create(["a", "b"], 3, "sandbox-key"))
       .rejects.toMatchObject({ message: "BUNDLE_ORDER_RESPONSE_INVALID" });
     advanceRuntimeRevision(null);
+  });
+
+  it("settles a remote bundle only through the NexGrid wallet", () => {
+    expect(bundleSource).toContain("orderApi.pay(");
+    expect(bundleSource).toContain("ORDER_WALLET_INSUFFICIENT");
+    expect(bundleSource).toContain("/pages/me/wallet-topup");
+    expect(bundleSource).not.toContain("createPaymentSession");
+    expect(bundleSource).not.toContain("openHostedPaymentPage");
+  });
+
+  it("retires the purchase intent after a confirmed debit and treats order refresh as read-only recovery", () => {
+    const confirmed = bundleSource.indexOf("paymentConfirmed = true");
+    const retire = bundleSource.indexOf("retireBundleKey(list, accountKey)", confirmed);
+    const clear = bundleSource.indexOf("cart.clear()", confirmed);
+    const readback = bundleSource.indexOf("await orders.refreshRemote()", confirmed);
+    expect(confirmed).toBeGreaterThan(-1);
+    expect(retire).toBeGreaterThan(confirmed);
+    expect(clear).toBeGreaterThan(retire);
+    expect(readback).toBeGreaterThan(clear);
+    expect(bundleSource).toContain("walletPaymentConfirmedRefreshPending");
+  });
+
+  it("rechecks the account after policy refresh before creating a bundle", () => {
+    const policyRead = bundleSource.indexOf("const latestPolicy = await bundleDiscountApi.current()");
+    const create = bundleSource.indexOf("const created = await bundleOrderApi.create(");
+    const fence = bundleSource.indexOf("if (!scopeIsCurrent())", policyRead);
+    expect(policyRead).toBeGreaterThan(-1);
+    expect(fence).toBeGreaterThan(policyRead);
+    expect(fence).toBeLessThan(create);
   });
 });

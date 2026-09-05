@@ -79,6 +79,45 @@ beforeEach(() => {
 });
 
 describe("App remote fleet refresh wiring", () => {
+  it("keeps the last Home and earnings projection when a later read has a transient failure", async () => {
+    const overview = {
+      earnings: {
+        today: { usdt: 12, nex: 1 }, week: { usdt: 34, nex: 2 },
+        month: { usdt: 56, nex: 3 }, all: { usdt: 78, nex: 4 },
+      },
+    };
+    remote.appHomeApi.fetch
+      .mockResolvedValueOnce(overview)
+      .mockRejectedValueOnce(new Error("home offline"));
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    await expect(app.refreshHomeTruth()).resolves.toBe(true);
+    await expect(app.refreshHomeTruth()).resolves.toBe(false);
+
+    expect(app.homeTruth).toEqual(overview);
+    expect(app.earnings.today).toBe(12);
+    expect(app.homeTruthStatus).toBe("error");
+  });
+
+  it("coalesces concurrent Home lifecycle reads for the current account generation", async () => {
+    const pending = deferred<unknown>();
+    remote.appHomeApi.fetch.mockReturnValueOnce(pending.promise);
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    const first = app.refreshHomeTruth();
+    const duplicate = app.refreshHomeTruth();
+    expect(remote.appHomeApi.fetch).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      earnings: {
+        today: { usdt: 0, nex: 0 }, week: { usdt: 0, nex: 0 },
+        month: { usdt: 0, nex: 0 }, all: { usdt: 0, nex: 0 },
+      },
+    });
+    await expect(Promise.all([first, duplicate])).resolves.toEqual([true, true]);
+  });
+
   it("lets an existing lifecycle read coalesce, but makes the following default read fresh", async () => {
     const staleFleet = deferred<CanonicalE3Fleet>();
     const freshFleet = deferred<CanonicalE3Fleet>();

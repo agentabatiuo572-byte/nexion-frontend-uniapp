@@ -1,6 +1,7 @@
 import { isUserSession, type ApiResult, type AuthSessionResponse } from "./contracts";
 import { ApiError, asApiError } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
+import { withSessionCookieLock } from "./session-cookie-lock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -108,8 +109,15 @@ function decodeTransportData(value: unknown): unknown {
 }
 
 function authFailure(status: number, code?: number, message = ""): boolean {
+  if (terminalAuthFailure(status, code, message)) return true;
   if (status !== 401 && code !== 401) return false;
   return /^(AUTH_REQUIRED|USER_AUTH_REQUIRED|TOKEN_|USER_REFRESH_TOKEN_|REFRESH_)/.test(message);
+}
+
+/** A blocklisted account is a terminal server decision, never a refreshable token expiry. */
+function terminalAuthFailure(status: number, code?: number, message = ""): boolean {
+  return (status === 403 || code === 403)
+    && (message === "ACCOUNT_BLOCKLISTED" || message === "USER_REFRESH_NOT_ALLOWED");
 }
 
 function authenticatedSession(value: unknown, credentialMode: RefreshCredentialMode): value is AuthSessionResponse & {
@@ -140,7 +148,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   ): Promise<T> {
     let response: HttpResponse;
     try {
-      response = await options.transport.request(request);
+      const send = () => options.transport.request(request);
+      response = refreshCredentialMode === "cookie" && request.method === "POST"
+        && request.url.startsWith(`${baseUrl}/auth/users/`)
+        ? await withSessionCookieLock(send)
+        : await send();
     } catch (error) {
       throw asApiError(error);
     }
@@ -183,18 +195,27 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return envelope.data as T;
   }
 
-  async function expireSession(expectedRevision: number): Promise<never> {
+  async function terminateSession(
+    expectedRevision: number,
+    message = "SESSION_EXPIRED",
+    status = 401,
+    code = 401,
+  ): Promise<never> {
     if (!options.vault.clearIfUnchanged(expectedRevision)) {
       throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
     }
     await options.onUnauthorized?.();
-    throw new ApiError({ kind: "auth", message: "SESSION_EXPIRED", status: 401, code: 401 });
+    throw new ApiError({ kind: "auth", message, status, code });
+  }
+
+  async function expireSession(expectedRevision: number): Promise<never> {
+    return terminateSession(expectedRevision);
   }
 
   async function refreshNow(): Promise<SessionSnapshot> {
     const revision = options.vault.revision();
     const current = options.vault.read();
-    if (!current || (refreshCredentialMode === "token" && !current.refreshToken)) return expireSession(revision);
+    if (refreshCredentialMode === "token" && !current?.refreshToken) return expireSession(revision);
     try {
       const data = await execute<AuthSessionResponse>({
         url: `${baseUrl}/auth/users/refresh`,
@@ -203,14 +224,14 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
           "Content-Type": "application/json",
           ...(refreshCredentialMode === "cookie" ? { "X-Nexion-Refresh-Mode": "cookie" } : {}),
         },
-        ...(refreshCredentialMode === "token" ? { body: { refreshToken: current.refreshToken } } : {}),
+        ...(refreshCredentialMode === "token" ? { body: { refreshToken: current!.refreshToken } } : {}),
         timeoutMs: 12_000,
         withCredentials: refreshCredentialMode === "cookie",
       });
       if (!authenticatedSession(data, refreshCredentialMode)) {
         throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
       }
-      if (data.user.userId !== current.user.userId) {
+      if (current && data.user.userId !== current.user.userId) {
         throw new ApiError({ kind: "protocol", message: "REFRESH_USER_MISMATCH" });
       }
       const next: SessionSnapshot = {
@@ -230,7 +251,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         && (error.message === "SESSION_EXPIRED" || error.message === "SESSION_CHANGED_DURING_REFRESH")
       ) throw error;
       const apiError = asApiError(error);
-      if (apiError.kind === "auth") return expireSession(revision);
+      // A denial from the refresh endpoint is terminal, unlike a resource's
+      // ordinary permission 403. Never evict a newer revision or an empty boot.
+      if (current && (apiError.kind === "auth" || apiError.status === 401 || apiError.status === 403
+          || apiError.code === 401 || apiError.code === 403)) return expireSession(revision);
       throw apiError;
     }
   }
@@ -247,6 +271,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   async function request<T>(apiRequest: ApiRequest): Promise<T> {
     const authenticated = apiRequest.authenticated !== false;
     let session = options.vault.read();
+    const sessionRevision = options.vault.revision();
     if (authenticated && !session?.accessToken) {
       // A protected prefetch started from Login has no authority to mutate the
       // global auth lifecycle. Treat the missing vault as a local caller-state
@@ -280,6 +305,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch (error) {
       const apiError = asApiError(error);
       if (!authenticated || apiError.kind !== "auth") throw apiError;
+      if (terminalAuthFailure(apiError.status ?? 0, apiError.code, apiError.message)) {
+        return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
+      }
       const latest = options.vault.read();
       if (!session || !latest || latest.user.userId !== session.user.userId) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
@@ -306,6 +334,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
     const authenticated = apiRequest.authenticated !== false;
     let session = options.vault.read();
+    const sessionRevision = options.vault.revision();
     if (authenticated && !session?.accessToken) {
       throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
     }
@@ -329,6 +358,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch (error) {
       const apiError = asApiError(error);
       if (!authenticated || apiError.kind !== "auth") throw apiError;
+      if (terminalAuthFailure(apiError.status ?? 0, apiError.code, apiError.message)) {
+        return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
+      }
       const latest = options.vault.read();
       if (!session || !latest || latest.user.userId !== session.user.userId) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });

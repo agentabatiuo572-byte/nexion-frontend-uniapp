@@ -46,8 +46,10 @@
             v-for="d in inactiveDevices"
             :key="d.id"
             class="sas-device"
+            :class="{ 'is-pending': activationInFlight.has(d.id) }"
             role="button"
-            tabindex="0"
+            :tabindex="activationInFlight.has(d.id) ? -1 : 0"
+            :aria-disabled="activationInFlight.has(d.id) ? 'true' : 'false'"
             @click="onActivate(d)"
             @keydown.enter.prevent="onActivate(d)"
             @keydown.space.prevent="onActivate(d)"
@@ -83,6 +85,9 @@ import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { occupiesDeviceSlot } from "@/lib/device-slot-policy";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { isSettledRejection } from "@/api/errors";
+import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 
 const sheet = useSlotActionSheet();
 const app = useApp();
@@ -112,7 +117,9 @@ function hide() {
   sheet.hide();
 }
 
-function onActivate(d: Device) {
+const activationInFlight = ref(new Set<string>());
+
+async function onActivate(d: Device) {
   if (d.kind === "phone") {
     sheet.hide();
     navTo("/pages/onboarding/connect?mode=recalibrate");
@@ -121,6 +128,54 @@ function onActivate(d: Device) {
   if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= app.slotCap) {
     toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: app.slotCap }));
     return;
+  }
+  if (remoteApiEnabled) {
+    const deviceId = Number(d.id);
+    const version = Number(d.rowVersion);
+    if (activationInFlight.value.has(d.id)) return;
+    if (
+      !Number.isSafeInteger(deviceId)
+      || deviceId <= 0
+      || !Number.isSafeInteger(version)
+      || version < 0
+    ) {
+      toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+      return;
+    }
+    const accountKey = app.accountKey;
+    const key = acquireDeviceCommandKey(accountKey, "activate", d.id, version);
+    const confirmed = () => {
+      if (accountKey !== app.accountKey) return false;
+      const current = app.devices.find((item) => item.id === d.id);
+      return Boolean(current) && current!.activatedAt !== null;
+    };
+    activationInFlight.value.add(d.id);
+    try {
+      await deviceE3Api.activate(deviceId, version, app.slotCap, key);
+      if (!(await app.refreshRemoteFleet()) || !confirmed()) {
+        throw new Error("DEVICE_ACTIVATION_NOT_CONFIRMED");
+      }
+      finishDeviceCommand(accountKey, "activate", d.id, version);
+      toast.success(fmt(t.value.slotSheet.toastActivated, { name: deviceName(t.value, d) }));
+      sheet.hide();
+      return;
+    } catch (cause) {
+      try {
+        if (accountKey === app.accountKey && await app.refreshRemoteFleet() && confirmed()) {
+          finishDeviceCommand(accountKey, "activate", d.id, version);
+          toast.success(fmt(t.value.slotSheet.toastActivated, { name: deviceName(t.value, d) }));
+          sheet.hide();
+          return;
+        }
+      } catch {
+        // Retain the stable key while both command and readback remain uncertain.
+      }
+      if (isSettledRejection(cause)) finishDeviceCommand(accountKey, "activate", d.id, version);
+      if (accountKey === app.accountKey) toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+      return;
+    } finally {
+      activationInFlight.value.delete(d.id);
+    }
   }
   const ok = app.activateDevice(d.id, reservedSlots.value);
   if (ok) {
@@ -284,6 +339,10 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
 }
 .sas-device:active {
   background: var(--v5-surface-3);
+}
+.sas-device.is-pending {
+  opacity: 0.58;
+  pointer-events: none;
 }
 .sas-device-ico {
   width: 40px;

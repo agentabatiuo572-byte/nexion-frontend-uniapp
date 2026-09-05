@@ -1,4 +1,5 @@
 import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot, QuestTaskCategory } from "@/api/quest-api";
+import { isCurrentQuest } from "./actionable-quest";
 
 export type HomeTaskCardId = "newcomer" | "weekly";
 
@@ -40,7 +41,7 @@ export function selectHomeWeeklySource(
   promo: CanonicalPromoBanner | null,
 ): HomeWeeklySource | null {
   const weeklyQuests = quests.filter(
-    (quest) => quest.layer === "WEEKLY_T1" || quest.layer === "WEEKLY_T2",
+    (quest) => (quest.layer === "WEEKLY_T1" || quest.layer === "WEEKLY_T2") && isCurrentQuest(quest),
   );
   const quest = weeklyQuests.find((candidate) => candidate.status !== "CLAIMED");
   if (quest) return { kind: "quest", quest };
@@ -50,13 +51,14 @@ export function selectHomeWeeklySource(
 
 /**
  * Keeps the 5174 weekly-card slot structure while preserving server authority.
- * Mission identity/reward comes from nx_mission; the shared visual countdown
- * and product-yield metadata comes from PC H3's nx_growth_promo_banner row.
+ * Mission countdown follows its actual eligibility deadline; product-yield
+ * presentation metadata comes from PC H3's nx_growth_promo_banner row.
  */
 export function presentHomeWeeklyCard(
   source: HomeWeeklySource | null,
   presentation: CanonicalPromoBanner | null,
   questBonusMultiplier: number,
+  now = Date.now(),
 ): HomeWeeklyCardView {
   if (!source) {
     return {
@@ -74,14 +76,16 @@ export function presentHomeWeeklyCard(
 
   const metadata = source.kind === "promo" ? source.promo : presentation;
   if (source.kind === "quest") {
+    const remaining = Math.max(0, Date.parse(source.quest.eligibleUntil) - now);
+    const hours = Number.isFinite(remaining) ? Math.floor(remaining / 3600000) : null;
     const multiplier = Number.isFinite(questBonusMultiplier) && questBonusMultiplier > 0
       ? questBonusMultiplier
       : 1;
     return {
       multiplier,
       rewardNex: Math.round(source.quest.rewardNex * multiplier),
-      countdownDays: metadata?.countdownDays ?? null,
-      countdownHours: metadata?.countdownHours ?? null,
+      countdownDays: hours === null ? null : Math.floor(hours / 24),
+      countdownHours: hours === null ? null : hours % 24,
       subtitle: metadata?.targetDevice
         ? `${source.quest.name} · ${metadata.targetDevice}`
         : source.quest.name,

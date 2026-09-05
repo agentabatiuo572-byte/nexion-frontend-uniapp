@@ -24,6 +24,13 @@ describe("funds controls keyboard and assistive semantics", () => {
     expect(source).toContain('@keydown.enter.prevent="handleSubmit"');
   });
 
+  it("rechecks remote withdrawal decisions when authoritative policy facts change", () => {
+    const source = read("../../pages/me/wallet-withdraw.vue");
+    expect(source).toContain("watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion]");
+    expect(source).toContain("watch([smallAmountLine, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion]");
+    expect(source.match(/const epoch = \+\+remote(?:SmallLine)?EligibilityEpoch;/g)).toHaveLength(2);
+  });
+
   it("announces theme choices as a radio group", () => {
     const source = read("./theme-row.vue");
     expect(source).toContain('role="radiogroup"');

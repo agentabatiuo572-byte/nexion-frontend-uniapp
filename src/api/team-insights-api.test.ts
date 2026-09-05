@@ -36,6 +36,22 @@ describe("team unilevel API", () => {
     expect(request).toHaveBeenCalledWith({ path: "/api/app/team/insights/leaderboard?period=week&page=2&pageSize=20" });
   });
 
+  it("carries the server-issued candidate snapshot version on a continuation page", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      period: "week", page: 2, pageSize: 20, totalRows: 20, rows: [], myRank: null,
+      gapToNext: 0, poolUsd: 0, topN: 0, generatedAt: "2026-08-13T00:00:00Z",
+      snapshotAt: "2026-08-13T00:00:00Z", snapshotVersion: "a".repeat(64),
+    });
+
+    await expect(createTeamInsightsApi({ request } as unknown as ApiClient)
+      .leaderboard("week", 2, 20, "2026-08-13T00:00:00Z", "a".repeat(64)))
+      .resolves.toMatchObject({ snapshotVersion: "a".repeat(64) });
+    expect(request).toHaveBeenCalledWith({
+      path: "/api/app/team/insights/leaderboard?period=week&page=2&pageSize=20&snapshotAt=2026-08-13T00%3A00%3A00Z&snapshotVersion=" + "a".repeat(64),
+    });
+  });
+
   it("rejects a leaderboard page with duplicate or out-of-window ranks", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
@@ -112,11 +128,11 @@ describe("team unilevel API", () => {
       source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
       currentWeekPoolUSDT: 100, myRank: 4, myVotes: 0, totalVotes: 0, mySharePct: 0,
       projectedPayoutUSDT: 0, distribution: [], history: [], nextPayoutAt: "2026-08-16T23:59:00Z",
-      unlockRank: 5, injectRate: 0.05,
+      unlockRank: 5, injectRate: 0.05, topN: 3,
     });
 
     await expect(createTeamInsightsApi({ request } as unknown as ApiClient).leadershipPool()).resolves.toMatchObject({
-      unlockRank: 5, injectRate: 0.05, nextPayoutAt: "2026-08-16T23:59:00Z",
+      unlockRank: 5, injectRate: 0.05, topN: 3, nextPayoutAt: "2026-08-16T23:59:00Z",
     });
   });
 

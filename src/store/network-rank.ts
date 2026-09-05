@@ -60,7 +60,9 @@ export const useNetworkRank = defineStore("networkRank", () => {
         lastSuccessRun = runScope;
         return true;
       } catch {
-        if (current()) { snapshot.value = null; status.value = "error"; }
+        // A transient rank failure must not erase the last server-confirmed
+        // placement. Status stays actionable so callers render stale/error UI.
+        if (current()) status.value = "error";
         return false;
       }
     })();

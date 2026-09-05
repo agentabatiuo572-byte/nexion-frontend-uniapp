@@ -3,7 +3,7 @@ import { defineStore } from "pinia";
 import { supportApi } from "@/api/runtime";
 import { remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
-import type { Conversation, ConversationType, TicketCategory } from "@/domain/support";
+import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 
 function mutationKey(scope: string): string {
   const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
@@ -23,6 +23,8 @@ function persistPending(accountKey: string, runId: string, values: Map<string, s
 }
 type CommandScope = { accountKey: string; epoch: number; runId: string; pending: Map<string, string>; inFlight: Map<string, Promise<unknown>> };
 type SnapshotScope = { accountKey: string; epoch: number; runId: string };
+type AccountScope = Pick<SnapshotScope, "accountKey" | "epoch">;
+export type CategoryRefreshOutcome = "applied" | "stale" | "failed";
 
 export const useConversations = defineStore("conversations", () => {
   const conversations = ref<Conversation[]>([]);
@@ -30,6 +32,9 @@ export const useConversations = defineStore("conversations", () => {
   const mutating = ref(false);
   const error = ref<string | null>(null);
   const typingIds = ref<Record<string, boolean>>({});
+  const categoryAvailability = ref<ConversationCategoryAvailability>(remoteApiEnabled
+    ? { advisor: false, support: false, ai: false }
+    : { advisor: true, support: true, ai: true });
   const totalUnread = computed(() => conversations.value.reduce((sum, row) => sum + row.unread, 0));
   let pendingKeys = new Map<string, string>();
   let inFlight = new Map<string, Promise<unknown>>();
@@ -38,6 +43,7 @@ export const useConversations = defineStore("conversations", () => {
   let pendingRunId = "unverified";
   const openGeneration = new Map<string, number>();
   let listRequestGeneration = 0;
+  let categoryRequestGeneration = 0;
 
   async function preparePendingRun(): Promise<void> {
     const accountKey = accountKeyValue;
@@ -56,6 +62,9 @@ export const useConversations = defineStore("conversations", () => {
   function snapshotScope(): SnapshotScope { return { accountKey: accountKeyValue, epoch: accountEpoch, runId: pendingRunId }; }
   function snapshotIsCurrent(scope: SnapshotScope): boolean {
     return scope.epoch === accountEpoch && scope.accountKey === accountKeyValue && scope.runId === pendingRunId;
+  }
+  function accountScopeIsCurrent(scope: AccountScope): boolean {
+    return scope.epoch === accountEpoch && scope.accountKey === accountKeyValue;
   }
 
   async function commandScope(): Promise<CommandScope> {
@@ -79,8 +88,11 @@ export const useConversations = defineStore("conversations", () => {
     return error.status === 409 || (error.status ?? 0) >= 500 || error.kind === "network" || error.kind === "protocol";
   }
 
-  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>): Promise<T> {
+  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>, expectedAccount?: AccountScope): Promise<T> {
     const scope = await commandScope();
+    if (expectedAccount && (expectedAccount.epoch !== scope.epoch || expectedAccount.accountKey !== scope.accountKey)) {
+      throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    }
     const fingerprint = await opaqueIntentSlot(intent);
     if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const running = scope.inFlight.get(fingerprint) as Promise<T> | undefined;
@@ -96,6 +108,7 @@ export const useConversations = defineStore("conversations", () => {
       const result = await promise;
       scope.pending.delete(fingerprint);
       persistPending(scope.accountKey, scope.runId, scope.pending);
+      if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
       return result;
     } catch (cause) {
       if (recover && mustReadBack(cause) && scopeIsCurrent(scope)) {
@@ -103,6 +116,7 @@ export const useConversations = defineStore("conversations", () => {
         if (adopted !== null) {
           scope.pending.delete(fingerprint);
           persistPending(scope.accountKey, scope.runId, scope.pending);
+          if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
           return adopted;
         }
       }
@@ -146,6 +160,34 @@ export const useConversations = defineStore("conversations", () => {
     }
   }
 
+  async function refreshCategories(): Promise<CategoryRefreshOutcome> {
+    if (!remoteApiEnabled) return "applied";
+    const account = { epoch: accountEpoch, accountKey: accountKeyValue };
+    const requestGeneration = ++categoryRequestGeneration;
+    try {
+      const next = await supportApi.conversationCategories();
+      if (!accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration) return "stale";
+      categoryAvailability.value = next;
+      return "applied";
+    } catch {
+      return !accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration
+        ? "stale" : "failed";
+    }
+  }
+
+  function categoryEnabled(type: ConversationType): boolean {
+    return categoryAvailability.value[type] === true;
+  }
+
+  /** Older pages may only prepend immutable messages; they never replace the live header/window. */
+  function prependHistory(current: Conversation, older: Conversation): Conversation {
+    const messages = [...older.messages, ...current.messages]
+      .sort((left, right) => left.ts - right.ts || Number(left.id) - Number(right.id))
+      .filter((message, index, all) => index === 0 || all[index - 1].id !== message.id);
+    return { ...current, messages, historyTruncated: older.historyTruncated,
+      historyNextCursor: older.historyNextCursor ?? null };
+  }
+
   function byType(type: ConversationType): Conversation[] {
     return conversations.value.filter((row) => row.type === type).sort((a, b) => b.lastTs - a.lastTs);
   }
@@ -159,7 +201,9 @@ export const useConversations = defineStore("conversations", () => {
     openGeneration.set(id, requestGeneration);
     error.value = null;
     let conversation = await supportApi.conversation(id);
-    if (epoch !== accountEpoch || accountKey !== accountKeyValue || runId !== pendingRunId || openGeneration.get(id) !== requestGeneration || !active()) return conversation;
+    if (epoch !== accountEpoch || accountKey !== accountKeyValue || runId !== pendingRunId || openGeneration.get(id) !== requestGeneration || !active()) {
+      throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    }
     const lastAgent = [...conversation.messages].reverse().find(message => message.sender === "agent");
     if (conversation.unread > 0 && lastAgent) {
       try {
@@ -173,6 +217,25 @@ export const useConversations = defineStore("conversations", () => {
     }
     if (epoch === accountEpoch && accountKey === accountKeyValue && runId === pendingRunId && openGeneration.get(id) === requestGeneration && active()) replace(conversation);
     return conversation;
+  }
+
+  async function loadEarlier(id: string, active: () => boolean = () => true): Promise<Conversation | undefined> {
+    const current = get(id);
+    const beforeMessageId = current?.historyNextCursor;
+    if (!current || !beforeMessageId) return current;
+    const epoch = accountEpoch;
+    const accountKey = accountKeyValue;
+    const runId = pendingRunId;
+    const requestGeneration = (openGeneration.get(id) ?? 0) + 1;
+    openGeneration.set(id, requestGeneration);
+    const older = await supportApi.conversation(id, beforeMessageId);
+    if (epoch !== accountEpoch || accountKey !== accountKeyValue || runId !== pendingRunId
+        || openGeneration.get(id) !== requestGeneration || !active()) return get(id);
+    const latest = get(id);
+    if (!latest) return older;
+    const merged = prependHistory(latest, older);
+    replace(merged);
+    return merged;
   }
 
   async function reconcile(id: string, epoch: number): Promise<void> {
@@ -239,7 +302,9 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   async function sendUser(id: string, text: string): Promise<boolean> {
+    const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const current = get(id) ?? await open(id);
+    if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const epoch = accountEpoch;
     let conversation: Conversation;
     try {
@@ -247,7 +312,7 @@ export const useConversations = defineStore("conversations", () => {
         key => supportApi.replyConversation(current, text, key), async key => {
           const result = await supportApi.commandResult(key);
           return result?.kind === "conversation" ? result.conversation : null;
-        });
+        }, account);
     } catch (cause) {
       if (mustReadBack(cause)) await reconcile(id, epoch);
       throw cause;
@@ -257,7 +322,9 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   async function convertToTicket(id: string, category: TicketCategory, title: string): Promise<string> {
+    const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const current = get(id) ?? await open(id);
+    if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const epoch = accountEpoch;
     let result: { conversation: Conversation; ticket: { id: string } };
     try {
@@ -267,7 +334,7 @@ export const useConversations = defineStore("conversations", () => {
           return commandResult?.kind === "conversation-ticket"
             ? { conversation: commandResult.conversation, ticket: commandResult.ticket }
             : null;
-        });
+        }, account);
     } catch (cause) {
       if (mustReadBack(cause)) await reconcile(id, epoch);
       throw cause;
@@ -278,9 +345,12 @@ export const useConversations = defineStore("conversations", () => {
 
   function reset() {
     accountEpoch += 1; conversations.value = []; error.value = null; typingIds.value = {};
-    openGeneration.clear(); listRequestGeneration += 1;
+    openGeneration.clear(); listRequestGeneration += 1; categoryRequestGeneration += 1;
     inFlight = new Map(); mutating.value = false;
     pendingKeys = new Map();
+    categoryAvailability.value = remoteApiEnabled
+      ? { advisor: false, support: false, ai: false }
+      : { advisor: true, support: true, ai: true };
   }
 
   function bindAccount(accountKey: string) {
@@ -293,5 +363,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, typingIds, totalUnread, loading, mutating, error, refresh, byType, get, open, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
+  return { conversations, typingIds, categoryAvailability, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
 });

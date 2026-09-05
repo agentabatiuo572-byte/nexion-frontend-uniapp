@@ -16,13 +16,13 @@
 
       <view v-if="remoteReceiptsMode" style="margin: 0 16px">
         <EmptyState
-          v-if="showRemoteVietQrInitialError"
+          v-if="showRemoteReceiptInitialError"
           kind="recoverable-error"
           :title="t.empty.errorTitle"
           :desc="t.empty.errorDesc"
           :cta-label="t.empty.errorCta"
           emphasis
-          @cta="retryRemoteVietQrReceipts"
+          @cta="retryRemoteReceipts"
         />
         <EmptyState v-else-if="!remoteComputeReceiptLoading && !remoteVietQrInitialLoading && remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
@@ -58,15 +58,15 @@
           </view>
         </view>
         <view
-          v-if="showRemoteVietQrInlineError"
+          v-if="showRemoteReceiptInlineError"
           class="flex items-center justify-center active:opacity-70"
           style="min-height: 44px; margin: 8px 0"
           role="button"
           tabindex="0"
           :aria-label="t.empty.errorCta"
-          @click="retryRemoteVietQrReceipts"
-          @keydown.enter.stop.prevent="retryRemoteVietQrReceipts"
-          @keydown.space.stop.prevent="retryRemoteVietQrReceipts"
+          @click="retryRemoteReceipts"
+          @keydown.enter.stop.prevent="retryRemoteReceipts"
+          @keydown.space.stop.prevent="retryRemoteReceipts"
         >
           <text :style="rowSubStyle">{{ t.empty.errorDesc }} · {{ t.empty.errorCta }}</text>
         </view>
@@ -94,14 +94,20 @@
               :key="c"
               class="inline-flex items-center shrink-0 active:opacity-70"
               :style="tabPillStyle(c)"
+              role="button"
+              tabindex="0"
+              :aria-label="tabLabel(c)"
+              :aria-pressed="tab === c"
               @click="tab = c"
+              @keydown.enter.prevent="tab = c"
+              @keydown.space.prevent="tab = c"
             >
               <text :style="tabLabelStyle(c)">{{ tabLabel(c) }}</text>
               <text v-if="counts[c] > 0" class="font-mono-tabular tabular-nums" :style="tabCountStyle">{{ counts[c] }}</text>
             </view>
           </view>
         </scroll-view>
-        <view v-if="receipts.length > 0" class="grid place-items-center shrink-0 active:opacity-70" :style="clearBtnStyle" @click="handleClearAll">
+        <view v-if="receipts.length > 0" class="grid place-items-center shrink-0 active:opacity-70" :style="clearBtnStyle" role="button" tabindex="0" :aria-label="t.receipt.clearAll" @click="handleClearAll" @keydown.enter.prevent="handleClearAll" @keydown.space.prevent="handleClearAll">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
         </view>
       </view>
@@ -116,7 +122,12 @@
           :key="`${r.signature}-${i}`"
           class="flex items-center active:opacity-80"
           :style="rowStyle(i)"
+          role="button"
+          tabindex="0"
+          :aria-label="`${r.model} ${typeLabel(r)}`"
           @click="open = r"
+          @keydown.enter.prevent="open = r"
+          @keydown.space.prevent="open = r"
           @longpress="copySig(r)"
         >
           <view class="grid place-items-center shrink-0" :style="rowIconStyle(r)">
@@ -194,15 +205,21 @@ const remoteReceiptItems = computed<ServerReceiptListItem[]>(() => depositsStore
 const remoteComputeReceiptItems = ref<CanonicalComputeReceiptSummary[]>([]);
 const remoteComputeReceiptNextOffset = ref<number | null>(null);
 const remoteComputeReceiptLoading = ref(remoteReceiptsMode);
+const remoteComputeReceiptStatus = ref<"loading" | "ready" | "error">(
+  remoteReceiptsMode ? "loading" : "ready",
+);
+const failedComputeReceiptRequest = ref<{ offset: number; append: boolean } | null>(null);
 const remoteMoreLoading = ref(false);
 const remoteVietQrInitialLoading = computed(() => depositsStore.remoteReceiptInitialStatus === "loading");
-const showRemoteVietQrInitialError = computed(() =>
-  depositsStore.remoteReceiptInitialStatus === "error"
+const showRemoteReceiptInitialError = computed(() =>
+  (depositsStore.remoteReceiptInitialStatus === "error" || remoteComputeReceiptStatus.value === "error")
   && remoteReceiptItems.value.length === 0
   && remoteComputeReceiptItems.value.length === 0,
 );
-const showRemoteVietQrInlineError = computed(() =>
-  (depositsStore.remoteReceiptInitialStatus === "error" || depositsStore.remoteReceiptMoreStatus === "error")
+const showRemoteReceiptInlineError = computed(() =>
+  (depositsStore.remoteReceiptInitialStatus === "error"
+    || depositsStore.remoteReceiptMoreStatus === "error"
+    || remoteComputeReceiptStatus.value === "error")
   && (remoteReceiptItems.value.length > 0 || remoteComputeReceiptItems.value.length > 0),
 );
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
@@ -242,6 +259,8 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean): Promi
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
   remoteComputeReceiptLoading.value = true;
+  remoteComputeReceiptStatus.value = "loading";
+  failedComputeReceiptRequest.value = null;
   try {
     const page = await taskAssignmentApi.receipts(offset, 20);
     if (requestEpoch !== receiptPageRequestEpoch
@@ -252,11 +271,14 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean): Promi
       ? [...remoteComputeReceiptItems.value, ...page.items]
       : page.items;
     remoteComputeReceiptNextOffset.value = page.nextOffset;
+    remoteComputeReceiptStatus.value = "ready";
   } catch {
     if (requestEpoch === receiptPageRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
+      failedComputeReceiptRequest.value = { offset, append };
+      remoteComputeReceiptStatus.value = "error";
       toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
     }
   } finally {
@@ -287,12 +309,18 @@ async function loadMoreRemoteReceipts(): Promise<void> {
   }
 }
 
-function retryRemoteVietQrReceipts(): void {
+function retryRemoteReceipts(): void {
+  if (remoteComputeReceiptStatus.value === "error") {
+    const failed = failedComputeReceiptRequest.value ?? { offset: 0, append: false };
+    void loadRemoteComputeReceipts(failed.offset, failed.append);
+  }
   if (depositsStore.remoteReceiptInitialStatus === "error") {
     void depositsStore.refreshRemoteVietQrDeposits();
     return;
   }
-  void depositsStore.loadMoreRemoteVietQrReceipts();
+  if (depositsStore.remoteReceiptMoreStatus === "error") {
+    void depositsStore.loadMoreRemoteVietQrReceipts();
+  }
 }
 
 async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
@@ -335,6 +363,8 @@ function invalidateRemoteReceiptsPage(): void {
   receiptsPageFence.invalidate();
   remoteMoreLoading.value = false;
   remoteComputeReceiptLoading.value = false;
+  remoteComputeReceiptStatus.value = remoteReceiptsMode ? "loading" : "ready";
+  failedComputeReceiptRequest.value = null;
   open.value = null;
   depositsStore.invalidateRemoteVietQrReceiptReads();
 }

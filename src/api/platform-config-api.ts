@@ -97,6 +97,32 @@ function safeUrl(value: unknown, required: boolean, allowHttp: boolean): string 
   return url;
 }
 
+function safeShareUrlTemplate(key: ShareChannelKey, intentType: ShareIntentType, value: unknown): string {
+  const template = optionalString(value);
+  if (!template) {
+    if (intentType === "web") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    return "";
+  }
+  if (intentType !== "web" || (!template.includes("{link}") && !template.includes("{text}")) || /[\s#]/.test(template)) {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  try {
+    const parsed = new URL(template
+      .replaceAll("{link}", "https%3A%2F%2Fnexgrid.invalid%2Fref%2Fcode")
+      .replaceAll("{text}", "share-text"));
+    if (key === "sms") {
+      if (parsed.protocol !== "sms:" || parsed.pathname !== "" || !parsed.search.startsWith("?body=") || parsed.hash) {
+        return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+      }
+    } else if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
+      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+  } catch {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  return template;
+}
+
 function parsePlatformShareConfig(value: unknown): ShareConfig {
   const root = record(value);
   const baseUrl = safeUrl(root.baseUrl, false, false);
@@ -113,12 +139,8 @@ function parsePlatformShareConfig(value: unknown): ShareConfig {
     keys.add(key);
     const enabled = row.enabled;
     if (typeof enabled !== "boolean") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-    const urlTemplate = optionalString(row.urlTemplate);
+    const urlTemplate = safeShareUrlTemplate(key as ShareChannelKey, intentType as ShareIntentType, row.urlTemplate);
     const textTemplate = optionalString(row.textTemplate);
-    if (urlTemplate && !urlTemplate.includes("{link}") && !urlTemplate.includes("{text}")) {
-      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-    }
-    if (intentType === "web" && !urlTemplate) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
     if (enabled && intentType !== "copy" && intentType !== "poster" && intentType !== "system" && !textTemplate) {
       return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
     }

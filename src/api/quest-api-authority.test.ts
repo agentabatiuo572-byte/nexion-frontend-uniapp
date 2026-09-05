@@ -19,6 +19,7 @@ describe("quest API authority", () => {
   it("accepts the production mission projection only in remote mode", async () => {
     const request = vi.fn().mockResolvedValue({
       quests: [quest],
+      dayOneRewardNex: 500,
       promoBanner: {},
       questBonusMultiplier: 1,
       rhythmMonth: 1,
@@ -36,6 +37,7 @@ describe("quest API authority", () => {
     const request = vi.fn()
       .mockResolvedValueOnce({
         quests: [quest],
+        dayOneRewardNex: 500,
         promoBanner: {},
         questBonusMultiplier: 1,
         rhythmMonth: 1,
@@ -68,7 +70,7 @@ describe("quest API authority", () => {
 
   it("rejects sandbox payloads in both development and production", async () => {
     const sandbox = {
-      quests: [quest], promoBanner: {}, questBonusMultiplier: 1, rhythmMonth: 0,
+      quests: [quest], dayOneRewardNex: 500, promoBanner: {}, questBonusMultiplier: 1, rhythmMonth: 0,
       serverCanonical: true, sourceEnvironment: "SANDBOX", runId: "sandbox-run-20260816", source: "mock",
     };
     await expect(createQuestApi({ request: async () => sandbox } as never, "prod").state())
@@ -88,6 +90,7 @@ describe("quest API authority", () => {
   ])("rejects a quest with %s", async (override, _reason) => {
     const payload = {
       quests: [{ ...quest, ...override }],
+      dayOneRewardNex: 500,
       promoBanner: {},
       questBonusMultiplier: 1,
       rhythmMonth: 1,
@@ -103,6 +106,7 @@ describe("quest API authority", () => {
   it("accepts an expired Day-One instance as a visible but ineligible row", async () => {
     const payload = {
       quests: [{ ...quest, status: "EXPIRED", eligible: false }],
+      dayOneRewardNex: 0,
       promoBanner: {},
       questBonusMultiplier: 1,
       rhythmMonth: 1,
@@ -127,6 +131,7 @@ describe("quest API authority", () => {
         eligibleUntil: "2026-08-31T00:00:00+08:00",
         eligible: false,
       }],
+      dayOneRewardNex: 0,
       promoBanner: {},
       questBonusMultiplier: 1,
       rhythmMonth: 1,

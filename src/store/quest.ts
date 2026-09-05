@@ -106,6 +106,7 @@ export const useQuest = defineStore("quest", () => {
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
   const remoteQuests = ref<CanonicalQuest[]>([]);
+  const dayOneRewardNex = ref(0);
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
@@ -115,6 +116,7 @@ export const useQuest = defineStore("quest", () => {
     for (const key of Object.keys(completedMap)) delete completedMap[key];
     for (const key of Object.keys(rewardMap)) delete rewardMap[key];
     remoteQuests.value = [];
+    dayOneRewardNex.value = 0;
   }
 
   function scheduleEligibilityRefresh(rows: CanonicalQuest[]) {
@@ -159,6 +161,7 @@ export const useQuest = defineStore("quest", () => {
       // visible snapshot. A malformed response must not partially clear it.
       clearRemoteFacts();
       remoteQuests.value = nextQuests;
+      dayOneRewardNex.value = snapshot.dayOneRewardNex;
       Object.assign(rewardMap, nextRewards);
       Object.assign(completedMap, nextCompleted);
       hasRemoteSnapshot = true;
@@ -281,5 +284,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, remoteQuests, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
+  return { completedMap, remoteQuests, dayOneRewardNex, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
 });

@@ -41,6 +41,7 @@ import {
 import { useDeposits } from "@/store/deposits";
 import {
   apiRuntimeConfig,
+  apiClient,
   authApi,
   h5RefreshCookieEnabled,
   remoteApiEnabled,
@@ -51,6 +52,9 @@ import { completeSignIn } from "@/auth/complete-sign-in";
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { refreshEarnConfig } from "@/store/earn-config";
+import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { useI18nRuntime } from "@/store/i18n-runtime";
+import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
 import {
   enforcePendingLegalTermsGate,
@@ -73,6 +77,9 @@ let pendingServerSessionRecovery = false;
 type ServerSessionRestoreState = "idle" | "restoring" | "ready" | "failed";
 let serverSessionRestoreState: ServerSessionRestoreState = h5RefreshCookieEnabled ? "idle" : "ready";
 let serverSessionRestoreInFlight: Promise<boolean> | null = null;
+const SERVER_SESSION_PROBE_MIN_MS = 60_000;
+let serverSessionProbeAt = 0;
+let serverSessionProbeInFlight: Promise<boolean> | null = null;
 // Capture the non-secret trace before any startup request can reject and clear
 // its persisted shell. It is consumed on the first recovery redirect.
 let serverAuthenticatedAccountTraceAtBoot = remoteApiEnabled && readServerAuthenticatedAccountTrace();
@@ -477,9 +484,38 @@ function hasServerAuthenticatedAccountTrace(auth: ReturnType<typeof useAuth>): b
  * login and evict that new session.
  */
 function canRefreshRemoteAccount(auth: ReturnType<typeof useAuth>): boolean {
-  if (!remoteApiEnabled || !auth.isAuthenticated || !auth.onboardingComplete) return false;
+  if (!remoteApiEnabled || !auth.isAuthenticated) return false;
   const serverSession = sessionVault.read();
   return !!serverSession && auth.accountId === `user:${serverSession.user.userId}`;
+}
+
+/**
+ * A formal-App session can be revoked while the user is idle. The local
+ * registry is a mock-only convenience and must never decide remote authority.
+ * Probe the server at most once per foreground minute; the API client owns the
+ * single-flight refresh and routes an authoritative 401/403 through the safe
+ * logout handler. Transport failures deliberately retain the visible session.
+ */
+function probeServerSession(): Promise<boolean> {
+  const auth = useAuth();
+  if (!canRefreshRemoteAccount(auth)) return Promise.resolve(false);
+  if (serverSessionProbeInFlight) return serverSessionProbeInFlight;
+  const now = Date.now();
+  if (now - serverSessionProbeAt < SERVER_SESSION_PROBE_MIN_MS) return Promise.resolve(true);
+  const accountId = auth.accountId;
+  const revision = sessionVault.revision();
+  serverSessionProbeAt = now;
+  const probe = apiClient.refreshSession()
+    .then((session) => auth.isAuthenticated
+      && auth.accountId === accountId
+      && sessionVault.revision() >= revision
+      && session.user.userId === Number(accountId.replace("user:", "")))
+    .catch(() => false)
+    .finally(() => {
+      if (serverSessionProbeInFlight === probe) serverSessionProbeInFlight = null;
+    });
+  serverSessionProbeInFlight = probe;
+  return probe;
 }
 
 /**
@@ -539,6 +575,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     pendingServerSessionRecovery = false;
     serverAuthenticatedAccountTraceAtBoot = false;
     serverSessionRestoreState = "ready";
+    serverSessionProbeAt = Date.now();
     return true;
   })().finally(() => {
     serverSessionRestoreInFlight = null;
@@ -610,20 +647,16 @@ function checkAuthGuard(): boolean {
     navReset({ url: "/pages/onboarding/intro" });
     return true;
   }
-  if (!auth.onboardingComplete) {
-    navReset({ url: "/pages/onboarding/estimator" });
-    return true;
-  }
   return false;
 }
 
-// ── Account session guard + new-device recalibration redirect ──
+// ── Account session guard ──
 // Mirrors GET /api/auth/session: each 1s tick (and instantly via the cross-tab
 // storage event) checks THIS session record. SPEC-4 allows the same account to
 // stay active across signed App / H5 / white-app carriers; only self sign-out,
-// deleted session, or ops revoke (killedAt) evicts this carrier. If a new device
-// needs recalibration (different deviceId from the account's calibrated device)
-// → reLaunch to the calibration ritual in recalibrate mode.
+// deleted session, or ops revoke (killedAt) evicts this carrier. A device
+// recalibration flag is business state, not authority to hijack login routing;
+// the explicit device-management action owns that UI.
 // Returns true if it redirected (caller bails). Production: identical logic
 // against the server session endpoint; the storage event becomes an SSE/push.
 function checkSession(): boolean {
@@ -631,6 +664,10 @@ function checkSession(): boolean {
   if (!route || isAuthWhitelisted(route)) return false; // flow pages exempt
   const auth = useAuth();
   if (!auth.isAuthenticated) return false; // auth guard handles unauth
+  if (remoteApiEnabled) {
+    void probeServerSession();
+    return false;
+  }
   const session = useSession();
   const st = session.validate();
   if (st === "kicked" || st === "logged-out") {
@@ -648,10 +685,6 @@ function checkSession(): boolean {
   // that follows an eviction).
   const app = useApp();
   if (app.miningPaused) app.resumeMining();
-  if (session.requiresRecalibration && auth.onboardingComplete) {
-    navReset({ url: "/pages/onboarding/connect?mode=recalibrate" });
-    return true;
-  }
   return false;
 }
 
@@ -857,7 +890,7 @@ function checkQuestRoute() {
   // register/ref/tx/session)都返回 false,所以在这些页上同样会走到这里。这没问题
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
-  if (checkSession()) return; // evicted / needs recalibration → redirected
+  if (checkSession()) return; // evicted/invalid session → redirected; recalibration is explicit device management only
   if (route !== lastLegalTermsGateRoute) {
     lastLegalTermsGateRoute = route;
     if (canRefreshRemoteAccount(useAuth())) scheduleLegalTermsGate(`/${route}`);
@@ -981,7 +1014,10 @@ function canRunBusinessLoops(): boolean {
   const route = readCurrentRoute();
   if (!route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return false;
   const auth = useAuth();
-  if (!auth.isAuthenticated || !auth.onboardingComplete) return false;
+  if (!auth.isAuthenticated) return false;
+  // Formal App authority is the server session. The local carrier registry is
+  // retained only for mock mode and cannot keep remote business loops alive.
+  if (remoteApiEnabled) return canRefreshRemoteAccount(auth);
   return useSession().validate() === "active";
 }
 
@@ -1059,7 +1095,7 @@ onLaunch(() => {
     });
   }
   configureBehaviorAnalyticsContext(() => ({
-    enabled: remoteApiEnabled && auth.isAuthenticated && auth.onboardingComplete,
+    enabled: remoteApiEnabled && auth.isAuthenticated,
     subject: auth.accountId,
   }));
   installBusinessLoopProbe();
@@ -1102,6 +1138,14 @@ onLaunch(() => {
 });
 onShow(() => {
   attachSessionWatch();
+  if (remoteApiEnabled) {
+    // PC-managed runtime configuration must converge when the App returns to
+    // foreground; a launch-only fetch leaves pricing, phase and translations
+    // stale for an entire long-lived session.
+    void refreshEarnConfig().catch(() => undefined);
+    void refreshServerProductPhase(true).catch(() => false);
+    void useI18nRuntime().refresh(useLocaleStore().code, true).catch(() => undefined);
+  }
   const termsGateRoute = readCurrentRoute();
   if (termsGateRoute && !isAuthWhitelisted(termsGateRoute) && canRefreshRemoteAccount(useAuth())) {
     scheduleLegalTermsGate(`/${termsGateRoute}`);
@@ -1123,6 +1167,7 @@ onShow(() => {
     return;
   }
   if (canRefreshRemoteAccount(useAuth())) {
+    void probeServerSession();
     void useApp().refreshHomeTruth();
     void refreshAuthenticatedRemoteFleet();
   }

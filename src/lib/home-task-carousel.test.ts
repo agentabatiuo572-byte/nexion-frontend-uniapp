@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 import conversionBannerSource from "../components/home/conversion-banner.vue?raw";
 import weeklyQuestHeroSource from "../components/home/weekly-quest-hero.vue?raw";
@@ -37,6 +37,7 @@ const pausedPromo: CanonicalPromoBanner = {
 
 const weeklySnapshot: QuestSnapshot = {
   quests: [weeklyQuest],
+  dayOneRewardNex: 0,
   promoBanner: pausedPromo,
   questBonusMultiplier: 1,
   rhythmMonth: 0,
@@ -47,6 +48,13 @@ const weeklySnapshot: QuestSnapshot = {
 };
 
 describe("home task carousel", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-05T00:00:00+08:00"));
+  });
+
+  afterEach(() => vi.useRealTimers());
+
   it("keeps the weekly slide when the server projects active weekly missions", () => {
     expect(deriveHomeTaskCards(false, {
       homeNewcomerTasksEnabled: true,
@@ -102,11 +110,11 @@ describe("home task carousel", () => {
   it("keeps the high-fidelity countdown and daily-rate slots for a real weekly quest", () => {
     const source = selectHomeWeeklySource([weeklyQuest], pausedPromo);
 
-    expect(presentHomeWeeklyCard(source, pausedPromo, 1)).toEqual({
+    expect(presentHomeWeeklyCard(source, pausedPromo, 1, Date.parse("2026-09-05T00:00:00+08:00"))).toEqual({
       multiplier: 1,
       rewardNex: 30,
-      countdownDays: 4,
-      countdownHours: 12,
+      countdownDays: 2,
+      countdownHours: 0,
       subtitle: "Complete a learning course · StellarBox Pro",
       targetDevice: "StellarBox Pro",
       targetDaily: 1.5,
@@ -117,11 +125,11 @@ describe("home task carousel", () => {
   });
 
   it("does not invent weekly display metadata when PC H3 has no presentation row", () => {
-    expect(presentHomeWeeklyCard({ kind: "quest", quest: weeklyQuest }, null, 1.2)).toEqual({
+    expect(presentHomeWeeklyCard({ kind: "quest", quest: weeklyQuest }, null, 1.2, Date.parse("2026-09-05T00:00:00+08:00"))).toEqual({
       multiplier: 1.2,
       rewardNex: 36,
-      countdownDays: null,
-      countdownHours: null,
+      countdownDays: 2,
+      countdownHours: 0,
       subtitle: "Complete a learning course",
       targetDevice: null,
       targetDaily: null,

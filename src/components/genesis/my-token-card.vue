@@ -13,7 +13,7 @@
       </view>
       <view class="text-center">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" :stroke="isListed ? 'var(--v5-warning)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-        <text class="block tabular-nums" :style="tokenIdStyle">#{{ tokenId }}</text>
+        <text class="block tabular-nums" :style="tokenIdStyle" :title="String(tokenId)" :aria-label="String(tokenId)">#{{ displayGenesisHoldingId(tokenId) }}</text>
         <text class="block" :style="yoursStyle">{{ t.marketplace.yoursLabel }}</text>
       </view>
     </view>
@@ -48,6 +48,7 @@
 </template>
 
 <script setup lang="ts">
+import { displayGenesisHoldingId } from "@/lib/genesis-holding-id";
 import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -56,7 +57,7 @@ import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast, confirm } from "@/store/ui";
 
-const props = defineProps<{ tokenId: number }>();
+const props = defineProps<{ tokenId: string | number }>();
 
 const t = useT();
 const genesis = useGenesis();

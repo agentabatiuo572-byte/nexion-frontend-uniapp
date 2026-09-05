@@ -11,7 +11,7 @@
   <StandalonePageShell class="tos-root" :reserve-bottom="false">
     <!-- Sticky back header + brand -->
     <view class="tos-top">
-      <view class="tos-back active:opacity-60" :class="{ 'tos-back--blocked': exitBlocked }" role="button" tabindex="0" :aria-disabled="exitBlocked ? 'true' : 'false'" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
+      <view class="tos-back active:opacity-60" :class="{ 'tos-back--blocked': exitBlocked }" role="button" tabindex="0" :aria-disabled="exitBlocked ? 'true' : 'false'" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack($event)" @keydown.space.prevent="goBack($event)">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="tos-brand">
@@ -24,16 +24,16 @@
     <view class="tos-wrap">
       <!-- Hero -->
       <view class="tos-hero">
-        <text class="tos-eyebrow">{{ serverTerms ? `${t.terms.effectiveLabel} · ${serverTerms.version}` : t.terms.effectiveLabel }}</text>
+        <text class="tos-eyebrow">{{ serverTerms ? `${serverTerms.effectiveAt} · ${serverTerms.version}` : t.terms.effectiveLabel }}</text>
         <text class="tos-title">{{ serverTerms?.title ?? t.terms.heroTitle }}</text>
-        <text class="tos-sub">{{ serverTerms ? `${serverTerms.summary} · ${serverTerms.effectiveAt}` : t.terms.heroSubtitle }}</text>
+        <text class="tos-sub">{{ serverTerms?.summary ?? t.terms.heroSubtitle }}</text>
       </view>
 
       <!-- Numbered sections -->
       <view v-if="loadError" class="tos-fail" role="alert">
         <text class="tos-fail__message">{{ loadError }}</text>
-        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" @click="loadTerms" @keydown.enter.prevent="loadTerms" @keydown.space.prevent="loadTerms">
-          <text>{{ t.ui.retry }}</text>
+        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
+          <text>{{ loadingTerms ? "…" : t.ui.retry }}</text>
         </view>
       </view>
       <view v-else-if="loaded" class="tos-sections">
@@ -48,14 +48,14 @@
       <view v-else class="tos-fail"><text>{{ t.terms.loading }}</text></view>
 
       <!-- Risk disclosure cross-link -->
-      <view class="tos-risk active:opacity-80" role="link" tabindex="0" @click="goRisk" @keydown.enter.prevent="goRisk" @keydown.space.prevent="goRisk">
+      <view class="tos-risk active:opacity-80" role="link" tabindex="0" @click="goRisk" @keydown.enter.prevent="goRisk($event)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text class="tos-risk__t">{{ t.terms.riskLink }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
       </view>
 
       <!-- Acknowledge & return -->
-      <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms" @keydown.space.prevent="confirmTerms">
+      <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms($event)" @keydown.space.prevent="confirmTerms($event)">
         <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : t.terms.confirmContinue) }}</text>
       </view>
     </view>
@@ -91,6 +91,7 @@ type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequ
 const loadErrorKey = ref<TermsErrorKey | null>(null);
 const loadError = computed(() => loadErrorKey.value ? t.value.terms[loadErrorKey.value] : null);
 const confirming = ref(false);
+const loadingTerms = ref(false);
 const loaded = ref(!remoteApiEnabled);
 const returnTo = ref("/pages/onboarding/intro");
 const explicitReturn = ref(false);
@@ -132,7 +133,8 @@ function currentSessionFence(): LegalTermsSessionFence | null {
 }
 
 async function loadTerms() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || loadingTerms.value) return;
+  loadingTerms.value = true;
   loaded.value = false;
   loadErrorKey.value = null;
   const requestFence = currentSessionFence();
@@ -161,7 +163,17 @@ async function loadTerms() {
     loadErrorKey.value = "loadFailed";
   } finally {
     loaded.value = true;
+    loadingTerms.value = false;
   }
+}
+
+function repeatedKeyboardActivation(event?: Event): boolean {
+  return Boolean((event as KeyboardEvent | undefined)?.repeat);
+}
+
+function retryTerms(event?: Event) {
+  if (repeatedKeyboardActivation(event) || loadingTerms.value) return;
+  void loadTerms();
 }
 
 function pad(n: number): string {
@@ -179,7 +191,8 @@ function blockRequiredExit(): boolean {
   return true;
 }
 
-function goBack() {
+function goBack(event?: Event) {
+  if (repeatedKeyboardActivation(event)) return;
   if (blockRequiredExit()) return;
   // The post-login gate reaches this page through reLaunch. H5 can still expose
   // a stale stack depth during the acknowledgement transition, making a generic
@@ -188,11 +201,12 @@ function goBack() {
   if (explicitReturn.value) { navTo(returnTo.value); return; }
   navBack(returnTo.value);
 }
-function goRisk() {
+function goRisk(event?: Event) {
+  if (repeatedKeyboardActivation(event)) return;
   navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(returnTo.value)}`);
 }
-async function confirmTerms() {
-  if (confirming.value) return;
+async function confirmTerms(event?: Event) {
+  if (repeatedKeyboardActivation(event) || confirming.value) return;
   if (!remoteApiEnabled || !serverTerms.value || serverTerms.value.acknowledged) { goBack(); return; }
   if (!currentSessionFence()) {
     loadErrorKey.value = "loginRequired";

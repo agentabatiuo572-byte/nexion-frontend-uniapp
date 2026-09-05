@@ -44,7 +44,7 @@ describe("Genesis purchase visible wallet projection", () => {
 
   it("describes a committed purchase as synchronized money and order facts, not a provisional seat lock", () => {
     expect(sheetSource).toContain("genesis.purchaseSubtitle");
-    expect(storeSource).toContain("remoteOrders.value = [...state.orders]");
+    expect(storeSource).toContain("orderPager.reset(state.orders, state.ordersNextCursor ?? null)");
   });
 
   it("keeps the standard development smoke test canonical and read-only", () => {

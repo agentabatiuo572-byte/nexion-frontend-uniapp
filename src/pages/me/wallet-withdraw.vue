@@ -85,6 +85,7 @@
         <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
         <text v-if="heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ heldLine }}</text>
         <text v-if="withdrawalRatioLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalRatioLine }}</text>
+        <text v-if="withdrawalPolicy" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ perWithdrawalLimitText }}</text>
       </view>
 
       <!-- 🔴 小额免审快车道的正向态:免掉闸时**说出来**。走查实测,此前输 $30 页面一个字都没有,
@@ -148,6 +149,7 @@
           </view>
         </view>
         <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ networkHint(network) }}</text>
+        <text v-if="withdrawalChannelStatusText" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ withdrawalChannelStatusText }}</text>
       </view>
 
       <!-- 提现地址(RM01a ⑤:当前网络地址掩码中段 + 「管理」入口;未设置 → 内联引导卡,不是拦截态) -->
@@ -270,7 +272,9 @@
                  判定层按「不限制」走,这时再说一句「每日限额:0 笔/日」就是当场撒谎
                  (实景实测:后端不可达时它真的渲染成 0 笔/日)。
                  「有没有这句话」与「闸生不生效」从此是同一个条件,不会再各走各的。 -->
-            <text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>
+            <text v-if="limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>
+            <text v-else-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>
+            <text v-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalAmountNotSet }}</text>
           </view>
         </view>
       </view>
@@ -382,6 +386,7 @@ import {
   formatWithdrawalRatioPercent,
   resolveWithdrawalUseMax,
 } from "@/lib/withdrawal-use-max";
+import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
@@ -542,7 +547,27 @@ const dailyFacts = computed(() => ({
   limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
   withdrawals: app.withdrawals,
 }));
-const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) }));
+const limitFacts = computed(() => withdrawalLimitFacts({
+  perWithdrawalMaximum: maxWithdrawable.value,
+  dailyLimitCount: dailyFacts.value.limitCount,
+  withdrawals: dailyFacts.value.withdrawals,
+  now: nowTick.value,
+}));
+const perWithdrawalLimitText = computed(() => fmt(t.value.wallet.perWithdrawalLimit, {
+  amount: limitFacts.value.perWithdrawalMaximum.toFixed(2),
+}));
+const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
+  used: String(limitFacts.value.dailyUsedCount),
+  remaining: String(limitFacts.value.dailyRemainingCount ?? 0),
+  limit: String(dailyFacts.value.limitCount),
+}));
+const withdrawalChannelStatusText = computed(() => {
+  const policy = withdrawalPolicy.value;
+  if (!policy) return "";
+  if (!policy.withdrawalEnabled) return t.value.wallet.withdrawalChannelsClosed;
+  const channels = policy.enabledNetworks.map((item) => item.replace("USDT-", "")).join(" · ");
+  return fmt(t.value.wallet.withdrawalChannelsAvailable, { channels });
+});
 /**
  * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
  *
@@ -627,19 +652,35 @@ const boundAddressShort = computed(() => (boundAddress.value ? maskAddressMid(bo
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
 const remoteEligibility = ref<WithdrawalEligibility | null>(null);
+const remoteEligibilityFailed = ref(false);
+let refreshedConflictVersion = "";
 let remoteEligibilityEpoch = 0;
-watch([amountNum, network, boundAddress, () => app.accountKey], async () => {
-  if (!remoteApiEnabled || amountNum.value <= 0 || boundAddress.value.length <= 10) {
-    remoteEligibility.value = null;
+watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
+  // A changed amount/network/address invalidates the previous server decision
+  // immediately. Keeping the old accepted decision visible until the next
+  // request settles can briefly re-enable submit for inputs the server has
+  // never approved.
+  const epoch = ++remoteEligibilityEpoch;
+  remoteEligibility.value = null;
+  remoteEligibilityFailed.value = false;
+  const policyVersion = withdrawalPolicy.value?.policyVersion;
+  if (!remoteApiEnabled || !policyVersion || amountNum.value <= 0 || boundAddress.value.length <= 10) {
     return;
   }
-  const epoch = ++remoteEligibilityEpoch;
   try {
     const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
-      maxWithdrawable.value, dailyFacts.value, amountNum.value);
+      maxWithdrawable.value, dailyFacts.value, amountNum.value, policyVersion);
     if (epoch === remoteEligibilityEpoch && app.accountKey) remoteEligibility.value = snapshot;
-  } catch {
-    if (epoch === remoteEligibilityEpoch) remoteEligibility.value = null;
+  } catch (cause) {
+    if (epoch !== remoteEligibilityEpoch) return;
+    remoteEligibilityFailed.value = true;
+    // Refresh once for a rejected version. A new version reruns this watcher;
+    // an unchanged version must not create an endless retry loop.
+    if (cause instanceof ApiError && cause.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT"
+      && refreshedConflictVersion !== policyVersion) {
+      refreshedConflictVersion = policyVersion;
+      await loadWithdrawalPolicy();
+    }
   }
 }, { immediate: true });
 
@@ -824,10 +865,10 @@ const eligibility = computed(() => {
   void eligibilityClock.value; // 建立对「时间边界」的依赖,不参与计算
   if (remoteApiEnabled) {
     return remoteEligibility.value ?? {
-      canSubmit: true,
-      maxWithdrawableUsdt: maxWithdrawable.value,
-      route: "pass" as const,
-      riskReasons: [], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
+      canSubmit: false,
+      maxWithdrawableUsdt: 0,
+      route: "manual" as const,
+      riskReasons: ["server-eligibility-pending"], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
       dailyCountResetAt: Date.now(), configVersion: "remote-pending",
     };
   }
@@ -836,6 +877,7 @@ const eligibility = computed(() => {
 // 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
 const withdrawalRiskNotice = computed(
   () =>
+    (!remoteApiEnabled || remoteEligibility.value !== null) &&
     !frozenNow.value &&
     boundAddress.value.length > 10 &&
     eligibility.value.route !== "pass" &&
@@ -885,19 +927,20 @@ const heldLine = computed(() => {
 // WD01 is a server-owned policy value in remote mode.
 const smallAmountLine = computed(() => withdrawalPolicy.value?.smallAmountThresholdUsd ?? 0);
 const remoteSmallLineEligibility = ref<WithdrawalEligibility | null>(null);
-let remoteSmallLineEpoch = 0;
-watch([smallAmountLine, network, boundAddress, () => app.accountKey], async () => {
-  if (!remoteApiEnabled || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
-    remoteSmallLineEligibility.value = null;
+let remoteSmallLineEligibilityEpoch = 0;
+watch([smallAmountLine, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
+  const epoch = ++remoteSmallLineEligibilityEpoch;
+  remoteSmallLineEligibility.value = null;
+  const policyVersion = withdrawalPolicy.value?.policyVersion;
+  if (!remoteApiEnabled || !policyVersion || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
     return;
   }
-  const epoch = ++remoteSmallLineEpoch;
   try {
     const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
-      maxWithdrawable.value, dailyFacts.value, smallAmountLine.value);
-    if (epoch === remoteSmallLineEpoch && app.accountKey) remoteSmallLineEligibility.value = snapshot;
+      maxWithdrawable.value, dailyFacts.value, smallAmountLine.value, policyVersion);
+    if (epoch === remoteSmallLineEligibilityEpoch && app.accountKey) remoteSmallLineEligibility.value = snapshot;
   } catch {
-    if (epoch === remoteSmallLineEpoch) remoteSmallLineEligibility.value = null;
+    if (epoch === remoteSmallLineEligibilityEpoch) remoteSmallLineEligibility.value = null;
   }
 }, { immediate: true });
 /**
@@ -1026,11 +1069,16 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   if (withdrawalPolicy.value?.withdrawalEnabled !== true) return t.value.walletV3.submitReasonWithdrawalClosed;
   // RM01a:该网络未设提现地址 → 最根本的前置,先说它(页面上方是引导卡,不是报错)。
   if (boundAddress.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
+  // No eligibility request is made until these inputs exist. Missing input is
+  // not an in-flight request and must never be presented as perpetual loading.
+  if (amount <= 0) return t.value.walletV3.submitReasonAmountRequired;
+  if (remoteApiEnabled && decision.configVersion === "remote-pending") {
+    return remoteEligibilityFailed.value ? t.value.walletV3.submitReasonServiceUnavailable : t.value.help.loadingMore;
+  }
   // 换址冻结:24h 内提交按钮置灰(横幅带真倒计时)。
   if (frozenNow.value) return t.value.addrRebind.submitFrozenReason;
   // FEAT-WD01b:今日笔数用完 → 置灰 + 告知何时重置(不建单不扣款)
   if (decision.dailyLimitReached) return dailyLimitReachedText.value;
-  if (amount <= 0) return t.value.walletV3.submitReasonAmountRequired;
   if (amount < minWithdrawable.value) {
     return fmt(t.value.walletV3.submitReasonMinAmount, { n: minWithdrawable.value.toFixed(0) });
   }
@@ -1245,9 +1293,18 @@ async function handleSubmit() {
         snap.maxWithdrawable,
         snap.daily,
         snap.amount,
+        snap.policyVersion,
       );
     } catch (err) {
       clearSubmitFreeze();
+      if (err instanceof ApiError && err.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT") {
+        remoteEligibilityEpoch += 1;
+        remoteEligibility.value = null;
+        remoteEligibilityFailed.value = true;
+        await loadWithdrawalPolicy();
+        toast.info(t.value.walletV3.withdrawFeeStale);
+        return;
+      }
       // The eligibility call is the one server round-trip on this path, so a region
       // refusal surfaces here as a rejection. Translate it; `null` = not a region
       // refusal, so keep the existing timeout message rather than mislabelling a

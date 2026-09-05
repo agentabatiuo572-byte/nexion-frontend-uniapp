@@ -27,6 +27,8 @@ export interface Ticket {
   messages: TicketMessage[];
   /** True when the server intentionally returned only the newest message window. */
   historyTruncated?: boolean;
+  /** Opaque-to-the-view cursor for the next older server-owned ticket page. */
+  historyNextCursor?: number | null;
 }
 
 export const CATEGORY_LABEL: Record<TicketCategory, string> = {
@@ -45,6 +47,7 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 };
 
 export type ConversationType = "ai" | "advisor" | "support";
+export type ConversationCategoryAvailability = Record<ConversationType, boolean>;
 export type ConvRoleKey = "roleAi" | "roleAdvisor" | "roleSupport";
 export type ConvSessionStatus = "active" | "closed";
 export interface ConvMessage {
@@ -69,6 +72,8 @@ export interface Conversation {
   sessionStatus: ConvSessionStatus;
   /** True when the server intentionally returned only the newest message window. */
   historyTruncated?: boolean;
+  /** Opaque-to-the-view cursor for the next older server-owned conversation page. */
+  historyNextCursor?: number | null;
 }
 
 export interface SupportFaq {

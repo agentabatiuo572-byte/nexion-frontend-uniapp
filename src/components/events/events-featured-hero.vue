@@ -56,9 +56,9 @@
       </view>
 
       <!-- CTA -->
-      <view v-if="showClaim" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" tabindex="0" :aria-label="claimLabel" @click="emit('claim')">
+      <view v-if="showClaim" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="claimLabel" @click="emitUnlessBusy('claim')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
-        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="emit('claim')">{{ claimLabel }}</text>
+        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
       </view>
       <view v-else-if="ev._claimed" class="mt-5 w-full rounded-full flex items-center justify-center" :class="{ 'active:opacity-90': !!ev.useHref }" :style="claimedPillStyle" :role="ev.useHref ? 'button' : undefined" :tabindex="ev.useHref ? 0 : undefined" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
@@ -69,7 +69,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
         </template>
       </view>
-      <view v-else-if="showJoinAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.ctaLabel ?? t.events.joinCta" @click="emit('join')">
+      <view v-else-if="showJoinAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="ev.ctaLabel ?? t.events.joinCta" @click="emitUnlessBusy('join')">
         <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
@@ -93,10 +93,16 @@ import { eventOpenTarget } from "./event-open-target";
 
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
-const props = defineProps<{ ev: EnrichedEvent; rewardNex: number }>();
+const props = withDefaults(defineProps<{ ev: EnrichedEvent; rewardNex: number; busy?: boolean }>(), { busy: false });
 const emit = defineEmits<{ (e: "join"): void; (e: "claim"): void; (e: "cta"): void }>();
 
 const t = useT();
+const busy = computed(() => props.busy);
+function emitUnlessBusy(event: "join" | "claim") {
+  if (props.busy) return;
+  if (event === "join") emit("join");
+  else emit("claim");
+}
 const { elRef: barEl, inView: barInView } = useScrollGrowProgress();
 
 const showClaim = computed(() => props.ev._trackable && props.ev._done && !props.ev._claimed);

@@ -9,10 +9,20 @@ test("bundle editor uses the real remote order lifecycle with stable command rec
     read("src/pages/store/bundle.vue"),
     read("src/api/bundle-order-api.ts"),
   ]);
-  assert.match(page, /if \(remoteApiEnabled\)[\s\S]{0,900}bundleOrderApi\.create/);
+  const checkoutStart = page.indexOf("async function onCheckout()");
+  const checkoutEnd = page.indexOf("const cardStyle", checkoutStart);
+  assert.ok(checkoutStart >= 0 && checkoutEnd > checkoutStart, "bundle checkout source slice must exist");
+  const checkout = page.slice(checkoutStart, checkoutEnd);
+  const remoteBranch = checkout.indexOf("if (remoteApiEnabled)");
+  const createOrder = checkout.indexOf("bundleOrderApi.create");
+  const payOrder = checkout.indexOf("orderApi.pay", createOrder);
+  const activatedReadback = checkout.indexOf('settled.status !== "activated"', payOrder);
+  assert.ok(remoteBranch >= 0 && createOrder > remoteBranch, "remote branch must create the canonical bundle order");
+  assert.ok(payOrder > createOrder && activatedReadback > payOrder,
+    "bundle order must be paid and read back as activated before success");
   assert.match(page, /acquireBundleKey\(list, accountKey\)/);
-  assert.match(page, /if \(policyStale \|\| !isAmbiguousOutcome\(error\)\) retireBundleKey/);
-  assert.match(page, /checkoutUnavailable = computed\(\(\) => submitting\.value \|\| products\.value\.length < 2\)/);
+  assert.match(page, /if \(!canonicalOrderCommitted && \(policyStale \|\| !isAmbiguousOutcome\(error\)\)\)/);
+  assert.match(page, /checkoutUnavailable = computed\(\(\) => submitting\.value \|\| walletRefreshing\.value \|\| products\.value\.length < 2\)/);
   assert.match(api, /\/api\/orders\/bundle/);
   assert.match(api, /idSource !== "server"/);
 });

@@ -70,9 +70,9 @@
         </view>
 
         <!-- Submit -->
-        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" role="button" tabindex="0" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">
+        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" role="button" :aria-disabled="!canOpen || remotePending" :tabindex="!canOpen || remotePending ? -1 : 0" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <text>{{ ctaText }}</text>
+          <text>{{ canOpen ? ctaText : t.home.quickStakeStopped }}</text>
         </view>
         <text class="block text-center" :style="noticeStyle">{{ lockedNoticeText }}</text>
       </view>
@@ -105,7 +105,7 @@ import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { ApiError } from "@/api/errors";
-import { resolveStakingPool } from "@/lib/staking-canonical";
+import { canOpenStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
 import { formatCommandAmount, normalizeCommandAmount } from "@/lib/command-amount";
 
 const PRESETS = [100, 500, 1000, 5000];
@@ -121,6 +121,7 @@ const risk = useRiskDisclosure();
 
 const amount = ref(0);
 const remotePending = ref(false);
+const canOpen = computed(() => canOpenStakingPool(staking, props.term));
 const remoteGate = createRemoteIntentGate("G1");
 const selectedPool = computed(() => props.term === null ? null : resolveStakingPool(
   { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
@@ -191,6 +192,7 @@ function emitClose() {
 }
 
 async function submit() {
+  if (!canOpen.value || remotePending.value) return;
   const term = props.term;
   if (term === null) return;
   const min = minAmount.value;

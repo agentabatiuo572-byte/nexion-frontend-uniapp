@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { isActiveSlotDevice, occupiesDeviceSlot } from "./device-slot-policy";
 
 describe("device slot policy", () => {
+  it("releases a pending-deactivation slot before its running task finishes", () => {
+    const device = { kind: "phone" as const, activatedAt: 123, pendingDeactivate: true };
+    expect(isActiveSlotDevice(device)).toBe(false);
+    expect(isActiveSlotDevice({ ...device, pendingDeactivate: false })).toBe(true);
+  });
   it("keeps Cloud Share visible but excludes it from the six physical activation slots", () => {
     expect(occupiesDeviceSlot("cloud-share")).toBe(false);
     expect(isActiveSlotDevice({ kind: "cloud-share", activatedAt: Date.now() })).toBe(false);

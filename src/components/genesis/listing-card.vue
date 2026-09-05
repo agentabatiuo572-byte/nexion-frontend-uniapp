@@ -5,7 +5,7 @@
     <view class="relative flex items-center justify-center" :style="artStyle">
       <view class="text-center">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-        <text class="block tabular-nums" :style="tokenIdStyle">#{{ l.tokenId }}</text>
+        <text class="block tabular-nums" :style="tokenIdStyle" :title="String(l.tokenId)" :aria-label="String(l.tokenId)">#{{ displayGenesisHoldingId(l.tokenId) }}</text>
         <text class="block" :style="founderStyle">{{ t.marketplace.founderLabel }}</text>
       </view>
       <view class="mc-pulse" :style="dotStyle" />
@@ -29,12 +29,13 @@
 </template>
 
 <script setup lang="ts">
+import { displayGenesisHoldingId } from "@/lib/genesis-holding-id";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
 export interface Listing {
-  tokenId: number;
+  tokenId: string | number;
   holdingNo?: string;
   priceUSDT: number;
   lastSaleUSDT: number | null;

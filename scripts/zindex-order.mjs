@@ -371,7 +371,7 @@ function selftest() {
   {
     // 事故现场:说明型半屏(原子类定位)退回 90 —— 补这条轴之前它退回去也不会红。
     const files = patch("src/components/earn/capacity-explainer-sheet.vue",
-      (t) => t.replace(/(class="fixed inset-0" style="z-index: )900/, "$190"));
+      (t) => t.replace(/(class="[^"]*\bfixed\b[^"]*\binset-0\b[^"]*" style="z-index: )900/, "$190"));
     p("红测③-原子类事故现场 说明半屏退回 90 必红(补轴前它是判据外的)",
       evaluate(files).problems.some((x) => x.startsWith("庆祝压在业务 UI 之上")),
       evaluate(files).problems.join(" / "));

@@ -71,4 +71,51 @@ describe("API client session lifecycle", () => {
       refreshCredentialMode: "cookie",
     });
   });
+
+  it("safely evicts an account blocklisted by the server without attempting a refresh retry", async () => {
+    const vault = createSessionVault();
+    vault.save({
+      accessToken: "blocked-access",
+      refreshToken: "refresh-token",
+      tokenType: "Bearer",
+      user: { userId: 88, countryCode: "+86", phone: "18800000088", nickname: "Blocked", onboardingComplete: true },
+    });
+    const request = vi.fn().mockResolvedValue({
+      status: 403,
+      data: { code: 403, message: "ACCOUNT_BLOCKLISTED", data: null },
+      headers: {},
+    });
+    const onUnauthorized = vi.fn();
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:8110",
+      vault,
+      transport: { request },
+      onUnauthorized,
+    });
+
+    await expect(api.request({ path: "/api/app/home/overview" })).rejects.toThrow("ACCOUNT_BLOCKLISTED");
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(vault.read()).toBeNull();
+  });
+
+  it("clears a revoked 401 only after its single refresh attempt is rejected", async () => {
+    const vault = createSessionVault();
+    vault.save({
+      accessToken: "expired-access",
+      refreshToken: "refresh-token",
+      tokenType: "Bearer",
+      user: { userId: 89, countryCode: "+86", phone: "18800000089", nickname: "Revoked", onboardingComplete: true },
+    });
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "TOKEN_EXPIRED", data: null }, headers: {} })
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "REFRESH_TOKEN_REVOKED", data: null }, headers: {} });
+    const onUnauthorized = vi.fn();
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:8110", vault, transport: { request }, onUnauthorized });
+
+    await expect(api.request({ path: "/api/app/home/overview" })).rejects.toThrow("SESSION_EXPIRED");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(vault.read()).toBeNull();
+  });
 });

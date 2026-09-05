@@ -59,6 +59,14 @@
         <WeeklyQuestList />
       </view>
 
+      <!-- Day One — the six configured conditions unlock one server-owned group reward. -->
+      <view :style="sectionStyle">
+        <view class="mx-4 flex items-center" :style="sectionHeadStyle">
+          <text :style="sectionTitleStyle">{{ t.home.dayOneFirstDayReward }}</text>
+        </view>
+        <view class="mx-4"><DayOneQuestCard v-model:expanded="dayOneExpanded" /></view>
+      </view>
+
       <!-- Events -->
       <view :style="sectionStyle">
         <view class="mx-4 flex items-center" :style="sectionHeadStyle">
@@ -120,6 +128,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import EmptyState from "@/components/empty-state.vue";
 import WeeklyQuestHero from "@/components/home/weekly-quest-hero.vue";
 import WeeklyQuestList from "@/components/home/weekly-quest-list.vue";
+import DayOneQuestCard from "@/components/home/day-one-quest-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useEventQuest } from "@/store/event-quest";
@@ -127,14 +136,18 @@ import { EVENTS } from "@/mock/events";
 import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { useApp } from "@/store/app";
+import { useQuest } from "@/store/quest";
 import { useLocaleStore } from "@/store/locale";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { createRemotePageRequestFence } from "@/lib/remote-page-request-fence";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const eventQuest = useEventQuest();
 const app = useApp();
+const quest = useQuest();
+const dayOneExpanded = ref(true);
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
 const remoteEvents = ref<CanonicalEvent[]>([]);
@@ -142,6 +155,13 @@ const remoteEventsError = ref(false);
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
 let mounted = false;
 const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted);
+let releaseActiveRefresh = () => {};
+function activatePageRefresh() {
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(async () => {
+    await Promise.all([refreshRemoteEvents(), quest.refreshRemote()]);
+  });
+}
 async function refreshRemoteEvents(): Promise<void> {
   if (!remoteApiEnabled) return;
   const scope = remoteRequestFence.capture();
@@ -169,24 +189,29 @@ const missionVisibility = createPageVisibilityRefresh((reason) => {
     remoteEventsError.value = false;
   }
   void refreshRemoteEvents();
+  void quest.refreshRemote();
 });
 bindPageVisibilityRefresh(missionVisibility, {
   mounted: (callback) => onMounted(() => {
     mounted = true;
+    activatePageRefresh();
     callback();
   }),
   shown: (callback) => onShow(() => {
     mounted = true;
+    activatePageRefresh();
     callback();
   }),
   hidden: (callback) => onHide(() => {
     mounted = false;
+    releaseActiveRefresh();
     remoteRequestFence.invalidate();
     callback();
   }),
 });
 onUnmounted(() => {
   mounted = false;
+  releaseActiveRefresh();
   remoteRequestFence.invalidate();
 });
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => language.value], ([accountKey]) => {

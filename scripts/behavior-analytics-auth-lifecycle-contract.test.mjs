@@ -11,9 +11,10 @@ test("behavior analytics drops active state without a request on logout, account
   assert.doesNotMatch(service, /function pause\(\) \{[\s\S]*?tracker\.hide\(activeRoute\)/);
 });
 
-test("only an authenticated, onboarding-complete subject enables analytics", async () => {
+test("only an authenticated subject enables analytics; registration onboarding is not an access gate", async () => {
   const app = await readFile(new URL("../src/App.vue", import.meta.url), "utf8");
-  assert.match(app, /auth\.isAuthenticated && auth\.onboardingComplete/);
+  assert.match(app, /enabled: remoteApiEnabled && auth\.isAuthenticated,/);
+  assert.doesNotMatch(app, /enabled: remoteApiEnabled && auth\.isAuthenticated && auth\.onboardingComplete/);
   assert.match(service, /if \(!context\.enabled \|\| !nextSubject\) \{\s*dispose\(false\)/);
 });
 

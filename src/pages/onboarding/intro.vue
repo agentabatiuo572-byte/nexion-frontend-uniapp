@@ -108,9 +108,9 @@
             <text class="stat-num">{{ fmtNum(devices) }}</text>
             <text class="stat-label">{{ t.intro.statsDevices }}</text>
           </view>
-          <view class="stat-sep" />
-          <view class="stat-item">
-            <text class="stat-num stat-num--brand">${{ fmtNum(paid) }}</text>
+          <view v-if="paid !== null" class="stat-sep" />
+          <view v-if="paid !== null" class="stat-item">
+            <text class="stat-num stat-num--brand">{{ paid === null ? t.intro.publicStatsUnavailable : `$${fmtNum(paid)}` }}</text>
             <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
           </view>
         </view>
@@ -128,7 +128,9 @@
         </view>
         <view class="intro-terms">
           <text class="terms-left">{{ t.intro.termsLeft }} </text>
-          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.intro.termsLink }}</text>
+          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms">{{ t.intro.termsLink }}</text>
+          <text aria-hidden="true"> · </text>
+          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy">{{ t.privacy.title }}</text>
         </view>
       </view>
     </view>
@@ -207,7 +209,9 @@ const fleetNow = () => (fleetOk() && !cfg.syncFailed ? fleetDevicesOf(cfg.config
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
 //   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
 //   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
-const paidNow = () => remoteApiEnabled ? app.homeTruth?.onboarding.cumulativePaidUsdt ?? null : paidCumulativeNow();
+// No public payout projection exists. Private purchase totals are not payouts;
+// omit this unsupported metric rather than expose an account-dependent amount.
+const paidNow = () => remoteApiEnabled ? null : paidCumulativeNow();
 const paid = ref(paidNow());
 // Intro is public and is often shown before a user session exists. H9 public
 // stats are the server authority here; the authenticated home projection must
@@ -279,6 +283,9 @@ function goLogin() {
 }
 function goTerms() {
   navTo("/pages/onboarding/terms");
+}
+function goPrivacy() {
+  navTo("/pages/onboarding/privacy");
 }
 </script>
 

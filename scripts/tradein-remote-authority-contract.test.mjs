@@ -42,8 +42,23 @@ test("share checkout never enters the physical-device trade-in capacity prefligh
 test("remote trade-in sheet revalidates eligibility and never previews local credit", () => {
   const source = read("src/components/tradein-sheets.vue");
   assert.match(source, /deviceE3Api\.eligibility\(targetKind\)/);
-  assert.match(source, /isProductAvailable\(p, phase\.value\)/);
+  assert.match(source, /remoteRetireEligibleTargets\.value\.has\(p\.id\)/);
+  assert.match(source, /eligibility\.sources\.some\(\(candidate\) => candidate\.eligible/);
+  assert.doesNotMatch(source, /remoteApiEnabled\s*\?\s*isProductAvailable\(p, phase\.value\)/);
   assert.match(source, /remoteApiEnabled \? "—" :/);
+});
+
+test("remote keep-and-buy uses the atomic server command and verifies paid inactive readback", () => {
+  const source = read("src/components/tradein-sheets.vue");
+  const start = source.indexOf("async function submitCanonicalKeepBuy");
+  const end = source.indexOf("function onKeepBuy", start);
+  const keep = source.slice(start, end);
+  assert.match(keep, /deviceE3Api\.capacityKeep/);
+  assert.doesNotMatch(keep, /orderApi\.create/);
+  assert.match(keep, /canonicalStatus !== "paid"/);
+  assert.match(keep, /activationStatus\.toUpperCase\(\) !== "WAITING_PROVISIONING"/);
+  assert.match(keep, /persisted\.targetDeviceId !== submitted\.targetDeviceId/);
+  assert.match(keep, /target\.activatedAt !== null/);
 });
 
 test("remote device and product cards do not render a locally estimated trade-in credit", () => {

@@ -4,7 +4,6 @@ import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
-import { safeReturnTo } from "@/routing/safe-return-to";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
@@ -13,6 +12,7 @@ import { authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
+import { resolvePostSignInRoute } from "@/auth/post-sign-in-route";
 
 interface CompleteSignInOptions {
   identity: string;
@@ -59,7 +59,8 @@ export function _devHasCompletedSignIn(idempotencyKey: string): boolean {
  * first-wins 并返回 canonical session；client 只消费该结果。mock 顺序：先写
  * auth，再绑定 app 与所有账号域 store，再 claim/resume session，最后绑定 sponsor；
  * 任一持久化校验失败都会清 session/auth 并重绑 default，绝不保留半登录态，然后
- * 才按 onboarding/recalibration/returnTo 路由。内存 idempotency key 仅防响应重试
+ * 才按 recalibration/returnTo 路由。注册成功与 onboarding 由注册入口独立负责，
+ * 不能由登录时的 onboarding 状态触发。内存 idempotency key 仅防响应重试
  * 重复 claim session，不替代服务端事务。
  */
 export function completeSignIn(options: CompleteSignInOptions): CompleteSignInResult {
@@ -171,7 +172,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // Login completion is a re-ack checkpoint. The helper fences its request to
   // this exact bearer/account and only starts business reads after the server
   // confirms the current version is acknowledged.
-  if (remoteApiEnabled && options.serverProfile && auth.onboardingComplete) {
+  if (remoteApiEnabled && options.serverProfile) {
     const expectedUserId = options.serverProfile.userId;
     void scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index").then(() => {
       const current = sessionVault.read();
@@ -185,16 +186,13 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
       void refreshEarningsReleaseStatus(options.identity).catch(() => {});
     });
   }
-  if (options.deferNavigation) return { ok: true };
-  if (!auth.onboardingComplete) {
-    void navReset("/pages/onboarding/estimator");
-    return { ok: true };
-  }
-  if (requiresRecalibration) {
-    void navReset("/pages/onboarding/connect?mode=recalibrate");
-    return { ok: true };
-  }
-  const dest = safeReturnTo(options.returnTo ?? null, "/pages/index/index");
+  const dest = resolvePostSignInRoute({
+    onboardingComplete: auth.onboardingComplete,
+    requiresRecalibration,
+    returnTo: options.returnTo,
+    deferNavigation: options.deferNavigation,
+  });
+  if (!dest) return { ok: true };
   void navReset(dest);
   return { ok: true };
 }

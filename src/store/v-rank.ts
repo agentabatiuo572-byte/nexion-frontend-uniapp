@@ -224,6 +224,7 @@ export const useVRank = defineStore("vRank", () => {
   const teamVolumeUSD = ref(init.teamVolumeUSD);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  const prizeName = ref(remoteApiEnabled ? "" : "NexGrid V-Rank");
   const remoteReady = ref(!remoteApiEnabled);
   const remoteError = ref<string | null>(null);
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
@@ -235,6 +236,7 @@ export const useVRank = defineStore("vRank", () => {
     teamVolumeUSD.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
+    prizeName.value = "";
     remoteReady.value = false;
   }
 
@@ -277,6 +279,7 @@ export const useVRank = defineStore("vRank", () => {
       const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
       if (!isCurrent()) return;
       ladder.value = remoteLadder.ranks.map(canonicalRank);
+      prizeName.value = remoteLadder.prizeName;
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
       selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
       directRefs.value = remoteCurrent.progress.directRefs;
@@ -309,7 +312,7 @@ export const useVRank = defineStore("vRank", () => {
   }
 
   return {
-    myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder,
+    myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, prizeName,
     remoteReady, remoteError,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank,
   };

@@ -19,7 +19,7 @@ function harness(messages = en) {
   const current = { accessToken: "test-session", userId: 1, runEpoch: 1 };
   const snapshot = { source: "server", sourceEnvironment: "PRODUCTION", runId: "", version: "v1", acknowledged: false };
   const deps = {
-    remoteApiEnabled: true, loaded: ref(false), loadErrorKey: errorKey, serverTerms: ref<any>(snapshot),
+    remoteApiEnabled: true, loaded: ref(false), loadingTerms: ref(false), loadErrorKey: errorKey, serverTerms: ref<any>(snapshot),
     t, confirming: ref(false), locale: { code: "en" }, returnTo: ref("/pages/me/me"), explicitReturn: ref(false),
     currentSessionFence: () => ({ ...current }), sameLegalTermsSession, sameLegalTermsRun,
     captureRuntimeRevision: () => ({ runId: "", epoch: current.runEpoch }),
@@ -35,6 +35,12 @@ function harness(messages = en) {
 }
 
 describe("terms localized failure behavior", () => {
+  it("renders the effective date and version from the same server snapshot", () => {
+    expect(source).toContain("`${serverTerms.effectiveAt} · ${serverTerms.version}`");
+    expect(source).not.toContain("`${t.terms.effectiveLabel} · ${serverTerms.version}`");
+    expect(source).not.toContain("`${serverTerms.summary} · ${serverTerms.effectiveAt}`");
+  });
+
   it.each([en, zh, viMessages])("never exposes the server exception on load or acknowledge", async (messages) => {
     const h = harness(messages);
     h.legalTermsApi.current.mockRejectedValue(new Error("internal SQL token=do-not-show"));
@@ -72,5 +78,29 @@ describe("terms localized failure behavior", () => {
     expect(h.error.value).toBe(en.terms.sessionChanged);
     expect(h.recordLegalTermsAcknowledged).not.toHaveBeenCalled();
     expect(h.navBack).not.toHaveBeenCalled();
+  });
+
+  it("keeps retry loading single-flight while the first request is pending", async () => {
+    const h = harness();
+    let resolve!: (value: any) => void;
+    h.legalTermsApi.current.mockImplementation(() => new Promise((r) => { resolve = r; }));
+
+    const first = h.loadTerms();
+    await h.loadTerms();
+    expect(h.legalTermsApi.current).toHaveBeenCalledOnce();
+
+    resolve(h.snapshot);
+    await first;
+    expect(h.loadingTerms.value).toBe(false);
+  });
+
+  it("passes keyboard events to every activation handler and rejects repeat events", () => {
+    for (const handler of ["goBack", "retryTerms", "goRisk", "confirmTerms"]) {
+      expect(source).toContain(`@keydown.enter.prevent="${handler}($event)"`);
+    }
+    expect(source).toContain('@keydown.space.prevent="goBack($event)"');
+    expect(source).toContain('@keydown.space.prevent="retryTerms($event)"');
+    expect(source).toContain('@keydown.space.prevent="confirmTerms($event)"');
+    expect(source).toContain("function repeatedKeyboardActivation(event?: Event)");
   });
 });

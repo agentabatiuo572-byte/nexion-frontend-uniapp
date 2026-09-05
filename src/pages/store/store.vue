@@ -12,9 +12,9 @@
 <template>
   <AppChassis active="store">
     <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
-      <StoreHero :multiplier="yieldAuthority.multiplier" />
-      <ClusterLadder :authority="yieldAuthority" />
-      <VsPhoneHero :authority="yieldAuthority" />
+      <StoreHero :multiplier="upgrade?.multiplier ?? null" />
+      <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
+      <VsPhoneHero v-if="upgrade" :authority="yieldAuthority" :comparison="upgrade" />
 
       <!-- Sprint 2 finale — phase + legacy-ownership trade-in window -->
       <TradeinWindowBanner />
@@ -99,8 +99,13 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
+import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
+import { useApp } from "@/store/app";
 
 const t = useT();
+const app = useApp();
+const ownedDevices = computed(() => app.remoteFleetStatus === "ready" ? app.visibleDevices : []);
+const ownedHardware = computed(() => highestOwnedHardware(ownedDevices.value));
 const genesisCfg = useGenesisConfig();
 const earnConfig = useEarnConfig();
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -152,9 +157,10 @@ const lockedProducts = computed(() =>
   }),
 );
 
-// Featured = first active product (S1)
+const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices.value));
+// Feature a real upgrade when one is available; the full catalogue remains browsable.
 const featured = computed(
-  () => unlockedProducts.value.find((p) => p.id === "stellarbox-s1") ?? unlockedProducts.value[0],
+  () => unlockedProducts.value.find((p) => p.id === upgrade.value?.target.id) ?? unlockedProducts.value[0],
 );
 const restProducts = computed(() =>
   unlockedProducts.value.filter((p) => p.id !== featured.value?.id),

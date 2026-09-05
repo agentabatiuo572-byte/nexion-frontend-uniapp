@@ -114,6 +114,15 @@
         </view>
       </scroll-view>
 
+      <!-- Pagination remains reachable even when this page has no rows of the selected kind. -->
+      <view v-if="notifs.nextCursor" class="md-foot">
+        <view class="md-detail-cta" role="button" :tabindex="notifs.loading ? -1 : 0"
+          :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore"
+          @click="notifs.loadMoreRemote()" @keydown.enter.prevent="notifs.loadMoreRemote()" @keydown.space.prevent="notifs.loadMoreRemote()">
+          <text class="md-detail-cta-t">{{ notifs.loading ? t.help.loadingMore : t.notifs.loadMore }}</text>
+        </view>
+      </view>
+
       <!-- Footer -->
       <view class="md-foot">
         <text class="md-foot-t">{{ t.notifs.prefsFooter }}</text>
@@ -123,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -208,6 +217,9 @@ function close() {
 // 本轮改成 fixed 后门立刻判红(a11y-activate [G]),按仓内统一写法接平台层。
 // Enter/Space 由 lib/a11y-activate.ts 自动补,故上面只声明 role + tabindex,不手写 @keydown。
 useDialogA11y(computed(() => drawer.open), ".md-root", close);
+watch(() => drawer.open, (open) => {
+  if (open) void notifs.refreshRemote();
+});
 async function onCta(notification: Notification) {
   const canonicalRoute = await notifs.recordCta(notification.id);
   if (!canonicalRoute) return;
@@ -217,9 +229,9 @@ async function onCta(notification: Notification) {
 
 function timeAgo(ts: number): string {
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-  if (mins < 60) return `${mins}m`;
-  if (mins < 1440) return `${Math.floor(mins / 60)}h`;
-  return `${Math.floor(mins / 1440)}d`;
+  if (mins < 60) return fmt(t.value.notifs.minutesAgo, { n: mins });
+  if (mins < 1440) return fmt(t.value.notifs.hoursAgo, { n: Math.floor(mins / 60) });
+  return fmt(t.value.notifs.daysAgo, { n: Math.floor(mins / 1440) });
 }
 function absoluteTime(ts: number): string {
   const d = new Date(ts);

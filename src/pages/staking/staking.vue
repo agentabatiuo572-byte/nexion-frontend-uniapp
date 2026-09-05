@@ -85,6 +85,7 @@
             :penalty-suffix="t.stakingV3.penaltySuffix"
             :ribbon="RIBBONS[term]"
             :is-last="i === TERMS.length - 1"
+            :disabled="!canOpenPool(term)"
             @open="openSheet(term)"
           />
         </view>
@@ -147,7 +148,7 @@ import {
   type StakingPosition,
 } from "@/store/staking";
 import { confirm as uiConfirm, toast } from "@/store/ui";
-import { resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
+import { canOpenStakingPool, resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
 import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 
 const ONE_DAY_MS = 86400 * 1000;
@@ -162,6 +163,9 @@ const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cya
 const staking = useStaking();
 const app = useApp(); // 仅用于 reportStuckFunds 取当前资金快照(入待对账队列)
 const stakingConfigAvailable = computed(() => staking.isMockMode || staking.remoteReady);
+function canOpenPool(term: StakingTerm) {
+  return canOpenStakingPool(staking, term);
+}
 
 function poolForTerm(term: StakingTerm) {
   return resolveStakingPool(
@@ -209,8 +213,14 @@ let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   if (!staking.isMockMode) {
     // syncRemote 自吞不 reject(resilience 门);失败信号走返回值。
-    void staking.syncRemote().then((ok) => { if (!ok) toast.error(t.value.stakingV3.toast.staleTitle); });
-    timer = setInterval(() => { void staking.syncRemote(); }, 4000);
+    void staking.syncRemote().then((ok) => {
+      nowTs.value = staking.currentTime();
+      if (!ok) toast.error(t.value.stakingV3.toast.staleTitle);
+    });
+    timer = setInterval(() => {
+      nowTs.value = staking.currentTime();
+      void staking.syncRemote().then(() => { nowTs.value = staking.currentTime(); });
+    }, 4000);
     return;
   }
   staking.markMatured();
@@ -229,12 +239,11 @@ const maturedCount = computed(() => positions.value.filter((p) => p.status === "
 const totalLocked = computed(() => activePositions.value.reduce((s, p) => s + p.amountUSDT, 0));
 
 const totalAccrued = computed(() => {
-  void nowTs.value;
-  const now = Date.now();
+  const now = nowTs.value;
   return positions.value
     .filter((p) => p.status === "active" || p.status === "matured")
     .reduce((s, p) => {
-      const elapsed = Math.min(now, p.unlockTs) - p.startTs;
+      const elapsed = Math.max(0, Math.min(now, p.unlockTs) - p.startTs);
       const yrs = elapsed / (365 * ONE_DAY_MS);
       return s + p.amountUSDT * p.apy * yrs;
     }, 0);
@@ -252,6 +261,7 @@ const totalAccruedText = computed(() => totalAccrued.value.toFixed(2));
 const avgApyText = computed(() => (totalLocked.value > 0 ? `${(avgAPY.value * 100).toFixed(1)}%` : "—"));
 
 function openSheet(term: StakingTerm) {
+  if (!canOpenPool(term)) return;
   sheetTerm.value = term;
   sheetOpen.value = true;
 }

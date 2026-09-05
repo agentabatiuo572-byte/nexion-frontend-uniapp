@@ -27,6 +27,18 @@ function client(response: unknown): ApiClient {
 
 describe("exchange server minimums", () => {
   beforeEach(() => advanceRuntimeRevision(null));
+  it("keeps a failed queue order readable alongside completed orders", async () => {
+    const orders = ["FAILED", "COMPLETED"].map((status, index) => ({
+      exchangeNo: `EX-REGRESSION-000${index}`, fromAsset: "NEX", toAsset: "USDT",
+      fromAmount: 10, toAmount: 1, rate: 0.1, status,
+    }));
+    const snapshot = { ...caps, caps, wallet: { usdtAvailable: 20, nexAvailable: 10 },
+      todayUserUsedUsdt: 0, todayPlatformUsedUsdt: 0, lifetimeExchangedUsdt: 0,
+      orders, ordersPage: { total: 2, pageNum: 1, pageSize: 20 } };
+    await expect(createExchangeApi(client(snapshot)).fetchState()).resolves.toMatchObject({ orders });
+    snapshot.orders[0].status = "UNRECOGNIZED";
+    await expect(createExchangeApi(client(snapshot)).fetchState()).rejects.toMatchObject({ message: "EXCHANGE_STATE_RESPONSE_INVALID" });
+  });
   it("reads direction-specific minimums from the canonical caps response", async () => {
     await expect(createExchangeApi(client(caps)).fetchCaps()).resolves.toMatchObject({ minUsdt: 3, minNex: 42 });
   });

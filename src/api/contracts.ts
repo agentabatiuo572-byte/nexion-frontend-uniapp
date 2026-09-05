@@ -85,6 +85,7 @@ export interface SecuritySession {
 }
 
 export interface SecurityState {
+  nextCursor?: string | null;
   twoFactorEnabled: boolean;
   passwordChangedAt: string | null;
   sessions: SecuritySession[];

@@ -46,7 +46,7 @@
       <view class="mx-4">
         <!-- 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 已是 brand-soft,不撞色 -->
         <view class="flex gap-0.5" style="background: var(--v5-surface); border-radius: 12px; padding: 3px">
-          <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" @click="range = r">
+          <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" role="button" tabindex="0" :aria-label="rangeLabel(r)" :aria-pressed="range === r" @click="range = r">
             <text :style="pillLabelStyle(r)">{{ rangeLabel(r) }}</text>
           </view>
         </view>
@@ -83,7 +83,7 @@
       </view>
       <!-- FEAT-DEV01: 任务池升级提示线(信息态 · 行内展开;详情入口 → W-CAP1 说明弹层) -->
       <!-- 仅 @click:uni 编译器在小程序端将 click 映射为 tap;H5 下 @tap+@click 双绑会双触发(本页实测,开关类必单绑) -->
-      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px; min-height: 44px; display: flex; flex-direction: column; justify-content: center" @click="taskPoolOpen = !taskPoolOpen">
+      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px; min-height: 44px; display: flex; flex-direction: column; justify-content: center" role="button" tabindex="0" :aria-label="t.earn.taskPoolLineTitle" :aria-expanded="taskPoolOpen" @click="taskPoolOpen = !taskPoolOpen">
         <view class="flex items-center justify-between gap-2">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -93,11 +93,11 @@
         </view>
         <view v-if="taskPoolOpen" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
-          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand); font-weight: 600" role="button" tabindex="0" :aria-label="t.earn.capExplainTitle" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
         </view>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
-      <EmptySlotsHint>
+      <EmptySlotsHint v-if="fleetReady">
         <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
       </EmptySlotsHint>
 
@@ -170,9 +170,11 @@ function toggleDevice(id: string) {
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, {
+const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
+const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
   n: devices.value.filter(isActiveSlotDevice).length,
-}));
+  max: app.slotCap,
+}) : "— / —");
 
 // ── HERO total earned ──
 const serverPeriod = computed(() => {

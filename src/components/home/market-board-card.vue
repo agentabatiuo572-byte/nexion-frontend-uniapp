@@ -6,8 +6,8 @@
 <template>
   <view data-home-section="compute-market">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket" @keydown.space.stop.prevent="goMarket">{{ t.home.marketBoardOpen }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text><text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" @click="goMarket" @keydown.enter.stop.prevent="goMarket">{{ t.home.marketBoardOpen }} →</text>
     </view>
 
     <view v-if="homeMarketRows.length" style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
@@ -29,7 +29,6 @@
         :style="{ gridTemplateColumns: marketGridColumns, padding: '10px 14px', borderBottom: i < homeMarketRows.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         @click="goEarn"
         @keydown.enter.stop.prevent="goEarn"
-        @keydown.space.stop.prevent="goEarn"
       >
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand); background: var(--v5-brand-soft); border-radius: 4px; padding: 2px 4px; text-align: center; justify-self: start; font-weight: 500">{{ displayRow(row).tag }}</text>
         <view class="min-w-0">

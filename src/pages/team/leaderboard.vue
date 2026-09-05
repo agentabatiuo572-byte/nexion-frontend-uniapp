@@ -172,6 +172,7 @@ import { fmt } from "@/i18n/format";
 import { LEADERBOARD, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
+import { asApiError } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
@@ -238,13 +239,15 @@ async function loadRemote(page = 1, append = false) {
     && requestedPeriod === period.value;
   try {
     const snapshot = await teamInsightsApi.leaderboard(requestedPeriod, page, PAGE_SIZE,
-      append ? remoteSnapshot.value?.snapshotAt : null);
+      append ? remoteSnapshot.value?.snapshotAt : null,
+      append ? remoteSnapshot.value?.snapshotVersion : null);
     if (!current()) { if (request === remoteRequest && !append) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
     if (append) {
       const previous = remoteSnapshot.value;
       const expectedFirstRank = previous ? previous.rows.length + 1 : -1;
       if (!previous || previous.period !== requestedPeriod || snapshot.page !== page
         || snapshot.snapshotAt !== previous.snapshotAt
+        || snapshot.snapshotVersion !== previous.snapshotVersion
         || snapshot.pageSize !== PAGE_SIZE || snapshot.rows[0]?.rank !== expectedFirstRank) {
         throw new Error("TEAM_LEADERBOARD_PAGE_SEQUENCE_INVALID");
       }
@@ -253,9 +256,15 @@ async function loadRemote(page = 1, append = false) {
       remoteSnapshot.value = snapshot;
     }
     remoteState.value = "ready";
-  } catch {
+  } catch (error) {
     if (!current()) { if (request === remoteRequest && !append) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
-    if (append) remoteLoadMoreError.value = true;
+    const apiError = asApiError(error);
+    if (append && apiError.message === "TEAM_LEADERBOARD_SNAPSHOT_STALE") {
+      // The server deliberately refuses a continuation after its five-minute
+      // frozen candidate snapshot expires; restart from page one rather than
+      // retrying a token that can never become valid again.
+      void loadRemote(1, false);
+    } else if (append) remoteLoadMoreError.value = true;
     else {
       remoteSnapshot.value = null;
       remoteState.value = "error";

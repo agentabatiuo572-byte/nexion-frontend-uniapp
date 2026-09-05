@@ -17,7 +17,7 @@
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
-          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.pool.loading : t.pool.loadError }}</text>
+          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.pool.loading : remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError }}</text>
           <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" @click="loadRemotePool">
             <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.pool.retry }}</text>
           </view>
@@ -140,7 +140,7 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -153,6 +153,8 @@ import { rankLabel, rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
+import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
+import { createPayoutClock } from "@/lib/payout-clock";
 import { useApp } from "@/store/app";
 import { leadershipMainRows } from "@/lib/leadership-pool-main";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -167,9 +169,16 @@ const app = useApp();
 const vState = useVRank();
 const pool = useLeadershipPool();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
-const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+const remoteState = ref<"loading" | "ready" | "error" | "hold">(remoteApiEnabled ? "loading" : "ready");
 let remoteRequest = 0;
 let mounted = true;
+let pageVisible = false;
+const now = ref(Date.now());
+const payoutClock = createPayoutClock({
+  tick: (value) => { now.value = value; },
+  nextPayoutAt: () => remoteApiEnabled ? Date.parse(remotePool.value?.nextPayoutAt ?? "") : NaN,
+  refresh: () => loadRemotePool(),
+});
 
 const myRank = computed(() => (remoteApiEnabled ? remotePool.value?.myRank ?? 0 : vState.myRank) as VRank);
 const poolUnlockRank = computed(() => (remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3) as VRank);
@@ -198,8 +207,8 @@ const poolHistory = computed<LeadershipPayout[]>(() => remoteApiEnabled
       poolUSDT: 0, myVotes: myVotes.value, totalVotes: totalVotes.value,
       mySharePct: myShare.value, payoutUSDT: item.payoutUSDT }))
   : pool.history);
-const daysToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - Date.now()) / 86400000)));
-const hoursToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - Date.now()) / 3600000)));
+const daysToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - now.value) / 86400000)));
+const hoursToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - now.value) / 3600000)));
 
 const weeklyDescText = computed(() => {
   const n = daysToPayout.value > 0 ? `${daysToPayout.value}${t.value.pool.daysShort}` : `${hoursToPayout.value}${t.value.pool.hoursShort}`;
@@ -223,17 +232,18 @@ const totalPeopleText = computed(() =>
   fmt(t.value.pool.totalPeople, { n: Object.values(dist.value).reduce((a, b) => a + b, 0).toLocaleString() }),
 );
 // 头部集中度:派生真值(顶部 N 名领袖占池比),随 seed/票权变,非硬编码。
+const poolTopN = computed(() => remoteApiEnabled ? remotePool.value?.topN ?? 0 : POOL_TOP_N);
 const topPct = computed(() => {
   if (!remoteApiEnabled) return Math.round(pool.topConcentrationPct() * 100);
   if (totalVotes.value <= 0) return 0;
-  let remaining = POOL_TOP_N; let votes = 0;
+  let remaining = poolTopN.value; let votes = 0;
   for (let rank = 12; rank >= poolUnlockRank.value && remaining > 0; rank -= 1) {
     const count = dist.value[rank as VRank] ?? 0; const take = Math.min(count, remaining);
     votes += take * (remoteVotesByRank.value[rank] ?? 0); remaining -= take;
   }
   return Math.round((votes / totalVotes.value) * 100);
 });
-const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n: POOL_TOP_N, pct: topPct.value }));
+const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n: poolTopN.value, pct: topPct.value }));
 
 const voteRows = computed(() => {
   const ranks = Array.from({ length: 13 - poolUnlockRank.value }, (_, index) =>
@@ -270,24 +280,24 @@ function go(url: string) {
 }
 
 async function loadRemotePool() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || !pageVisible) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   remoteState.value = "loading";
   remotePool.value = null;
-  const current = () => mounted && request === remoteRequest && accountKey === app.accountKey
+  const current = () => mounted && pageVisible && request === remoteRequest && accountKey === app.accountKey
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.leadershipPool();
     if (!current()) return;
     remotePool.value = snapshot;
     remoteState.value = "ready";
-  } catch {
+  } catch (cause) {
     if (!current()) return;
     remotePool.value = null;
-    remoteState.value = "error";
+    remoteState.value = leadershipPoolFailureState(cause);
   }
 }
 
@@ -303,8 +313,19 @@ const unsubscribePoolRun = subscribeRuntimeRevision(() => {
   remoteState.value = "loading";
   void loadRemotePool();
 });
-onShow(() => { if (remoteApiEnabled) void loadRemotePool(); });
+onShow(() => {
+  pageVisible = true;
+  if (remoteApiEnabled) void loadRemotePool();
+  payoutClock.start();
+});
+onHide(() => {
+  pageVisible = false;
+  remoteRequest += 1;
+  payoutClock.stop();
+});
 onUnmounted(() => {
+  pageVisible = false;
+  payoutClock.stop();
   unsubscribePoolRun();
   mounted = false;
   remoteRequest += 1;

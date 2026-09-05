@@ -7,6 +7,8 @@ export interface PasswordLoginRequest {
   countryCode: string;
   phone: string;
   password: string;
+  /** Opaque server-issued/provider assertion used only when the OTP gate requests it. */
+  captchaTicket?: string;
 }
 
 export interface TwoFactorLoginRequest extends PasswordLoginRequest {
@@ -17,6 +19,8 @@ export interface TwoFactorLoginRequest extends PasswordLoginRequest {
 export interface RegistrationOtpRequest {
   countryCode: string;
   phone: string;
+  /** Opaque server-issued/provider assertion; never generated or signed by this client. */
+  captchaTicket?: string;
 }
 
 export interface RegistrationOtpResult {
@@ -274,6 +278,7 @@ export function createAuthApi(
   options: { refreshCredentialMode?: RefreshCredentialMode } = {},
 ): AuthApi {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
+  let restoreInFlight: Promise<SessionSnapshot | null> | null = null;
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
@@ -306,6 +311,9 @@ export function createAuthApi(
   };
   return {
     async login(request) {
+      // Set-Cookie from a bootstrap restore must settle before a new login.
+      // Do not initiate a refresh merely because the user pressed Sign in.
+      if (restoreInFlight) await restoreInFlight;
       const revision = vault.revision();
       const data = await client.request<AuthSessionResponse>({
         path: "/auth/users/login",
@@ -438,25 +446,15 @@ export function createAuthApi(
       });
       return oauthExchangeFromResponse(data, vault, revision, refreshCredentialMode);
     },
-    async restore() {
-      if (refreshCredentialMode === "token") {
-        if (!vault.read()?.refreshToken) return null;
-        return client.refreshSession();
-      }
-      const revision = vault.revision();
-      try {
-        const data = await client.request<AuthSessionResponse>({
-          path: "/auth/users/refresh",
-          method: "POST",
-          authenticated: false,
-          headers: cookieHeaders,
+    restore() {
+      if (refreshCredentialMode === "token" && !vault.read()?.refreshToken) return Promise.resolve(null);
+      if (!restoreInFlight) {
+        // Bootstrap and ordinary token renewal share one rotation request.
+        restoreInFlight = client.refreshSession().catch(() => null).finally(() => {
+          restoreInFlight = null;
         });
-        const session = sessionFromResponse(data, refreshCredentialMode);
-        if (!session || !vault.saveIfUnchanged(session, revision)) return null;
-        return vault.read();
-      } catch {
-        return null;
       }
+      return restoreInFlight;
     },
     discardSessionIfCurrent(expectedRevision) {
       discardSessionIfCurrent(expectedRevision);

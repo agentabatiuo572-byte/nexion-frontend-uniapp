@@ -46,6 +46,7 @@ export type CanonicalVRankReward = MonetaryVRankReward | EntitlementVRankReward;
 
 export interface CanonicalVRankLadder {
   source: string;
+  prizeName: string;
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string;
@@ -163,7 +164,7 @@ function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   if (!Array.isArray(source.ranks)) return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
   if (ranks.length !== 13 || ranks.some((rank, index) => rank.v !== index)) return invalid();
-  return { source: text(source.source), ...proof, ranks };
+  return { source: text(source.source), prizeName: text(source.prizeName), ...proof, ranks };
 }
 
 function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {

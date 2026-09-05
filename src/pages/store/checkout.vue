@@ -104,10 +104,10 @@
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
               <text class="flex-1" style="font-size: 12px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-              <text v-if="!remoteTradeinRecoveryRequired" style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+	              <text v-if="!remoteTradeinRecoveryRequired" style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" role="button" tabindex="0" @click="removeTradein" @keydown.enter.prevent="onKeyboardActivate($event, removeTradein)" @keydown.space.prevent="onKeyboardActivate($event, removeTradein)">{{ t.tradein.checkoutRemove }}</text>
             </view>
             <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
+	              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" role="button" tabindex="0" @click="reAddTradein" @keydown.enter.prevent="onKeyboardActivate($event, reAddTradein)" @keydown.space.prevent="onKeyboardActivate($event, reAddTradein)">{{ t.tradein.checkoutReAdd }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -190,12 +190,6 @@
           </view>
           <text class="block" :style="centerTitleStyle">{{ remoteOrderFailure ? t.tradein.errPurchaseFailed : t.store.coAwaiting }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? `${t.store.coServerStatus}: ${remoteOrderFailure}` : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
-          <view v-if="remoteApiEnabled && remoteOrderPollError && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="restartRemoteOrderPolling">
-            <text>{{ t.store.coRetryStatus }}</text>
-          </view>
-          <view v-if="remoteApiEnabled && orderId && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 10px" @click.stop="reopenRemoteHostedPayment">
-            <text>{{ t.bankPane.hostedContinueCta }}</text>
-          </view>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
@@ -282,7 +276,7 @@ import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
-import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -308,7 +302,6 @@ import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
-import { openHostedPaymentPage as openTrustedHostedPaymentPage } from "@/lib/hosted-payment";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 
@@ -341,9 +334,9 @@ const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
   if (remoteApiEnabled) return [{
-    id: "bankqr-vn",
-    label: t.value.bankPane.hostedContinueCta,
-    hint: t.value.bankPane.hostedSecureNote,
+    id: "nexgrid-wallet",
+    label: t.value.wallet.title,
+    hint: t.value.wallet.usdtBalance,
     iconPath: WALLET_PATH,
     iconPath2: WALLET_PATH2,
   }];
@@ -386,6 +379,20 @@ const productId = ref("stellarbox-s1");
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
 const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+const checkoutWalletRefreshing = ref(false);
+let checkoutWalletRefreshSequence = 0;
+
+async function refreshCheckoutWallet(): Promise<void> {
+  if (!remoteApiEnabled) return;
+  const request = app.captureRemoteAccountRequest();
+  const sequence = ++checkoutWalletRefreshSequence;
+  checkoutWalletRefreshing.value = true;
+  try {
+    await app.refreshRemoteFleet(request);
+  } finally {
+    if (sequence === checkoutWalletRefreshSequence) checkoutWalletRefreshing.value = false;
+  }
+}
 
 async function refreshPurchaseEligibility(): Promise<boolean> {
   if (!remoteApiEnabled) return !purchaseGate.value.blocked;
@@ -723,17 +730,17 @@ const remoteCapacityGate = new RemoteCapacityGate();
 watch(() => app.accountKey, () => {
   interceptFired = false;
   remoteCapacityGate.reset();
+  checkoutWalletRefreshSequence += 1;
+  checkoutWalletRefreshing.value = false;
   // Checkout progress is money state owned by one account. Clear every
   // projection immediately so a late response cannot expose account A's order
   // after the session has switched to account B.
-  stopRemoteOrderPolling();
   confirming = false;
   orderId.value = null;
   remoteOrderFailure.value = null;
   receiptWriteFailure.value = null;
   receiptRetrying.value = false;
   restoreReceiptRecovery();
-  remoteOrderPollError.value = false;
   remoteTradeinRecoveryRequired.value = false;
   remoteOrderCommandKey.clear();
   activeSession.value = null;
@@ -828,10 +835,9 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(remoteApiEnabled ? "bankqr-vn" : "usdt-trc20");
+const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
-const remoteOrderPollError = ref(false);
 const CHECKOUT_RECEIPT_RECOVERY_KEY = "nexgrid-checkout-receipt-recovery-v1";
 type CheckoutReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderId: string; productId?: string };
 const receiptWriteFailure = ref<CheckoutReceiptRecovery | null>(null);
@@ -844,43 +850,6 @@ let confirming = false;
 const remoteOrderCommandKey = new StableCommandKey();
 const REMOTE_CHECKOUT_COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
 type RemoteCheckoutCommands = { commands?: Record<string, string> };
-const REMOTE_HOSTED_PAYMENT_KEY = "nexgrid-remote-hosted-payment-v1";
-type RemoteHostedPayment = {
-  accountKey: string;
-  orderNo: string;
-  productId: string;
-};
-
-function persistRemoteHostedPayment(orderNo: string): boolean {
-  const accountKey = orders.currentAccountKey();
-  return writeAccountRow<RemoteHostedPayment>(REMOTE_HOSTED_PAYMENT_KEY, accountKey, {
-    accountKey,
-    orderNo,
-    productId: productId.value,
-  });
-}
-
-function restoreRemoteHostedPayment(): void {
-  if (!remoteApiEnabled || orderId.value) return;
-  const accountKey = orders.currentAccountKey();
-  const stored = readAccountRow<RemoteHostedPayment>(REMOTE_HOSTED_PAYMENT_KEY, accountKey);
-  if (!stored || stored.accountKey !== accountKey || stored.productId !== productId.value
-      || !stored.orderNo) return;
-  orderId.value = stored.orderNo;
-  remoteOrderFailure.value = null;
-  step.value = "awaiting";
-}
-
-function clearRemoteHostedPayment(): boolean {
-  return writeAccountRow<RemoteHostedPayment | null>(
-    REMOTE_HOSTED_PAYMENT_KEY, orders.currentAccountKey(), null);
-}
-
-function openHostedPaymentPage(paymentUrl: string): void {
-  if (!openTrustedHostedPaymentPage(paymentUrl)) {
-    throw new Error("HDPAY_HOSTED_PAGE_OPEN_UNAVAILABLE");
-  }
-}
 // Freeze the canonical quote and endpoint after any remote mutation attempt;
 // an ambiguous-success retry must never switch from trade-in to /api/orders.
 const remoteTradeinRecoveryRequired = ref(false);
@@ -1055,7 +1024,7 @@ let quotedTradeIn: { deviceId: string } | null = null;
 let pendingVoucherRelease: string | null = null;
 
 async function onConfirmPay() {
-  if (confirming || step.value !== "confirm") return;
+  if (confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
   confirming = true;
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
@@ -1290,20 +1259,7 @@ function remoteOrderKey(): string {
   const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
     tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
   const accountKey = orders.currentAccountKey();
-  const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey);
-  const durable = persisted?.commands?.[intent];
-  if (durable) return durable;
-  const key = remoteOrderCommandKey.get(() => {
-    const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    return `h7-order:${suffix}`;
-  });
-  // persist-verdict-ok: 远端命令键的耐久性归远端幂等设计(页内内存键仍在;跨刷新丢键须服务端按 intent 幂等,见 HANDOFF U-21)
-  writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, {
-    commands: { ...(persisted?.commands ?? {}), [intent]: key },
-  });
-  return key;
+  return acquireAccountCommandKey(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, intent, "h7-order");
 }
 
 function retireRemoteOrderKey(): void {
@@ -1321,19 +1277,57 @@ function retireRemoteOrderKey(): void {
   remoteOrderCommandKey.clear();
 }
 
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
+  if (event.repeat) return;
+  action();
+}
+
+async function offerWalletTopup(requiredUsdt: number): Promise<void> {
+  const accountScope = captureAccountScope();
+  dialogsOpen += 1;
+  const accepted = await confirm({
+    title: t.value.errors.insufficientBalanceTitle,
+    message: fmt(t.value.errors.insufficientBalanceMsg, { amt: requiredUsdt.toLocaleString() }),
+    confirmLabel: t.value.me.topup,
+    cancelLabel: t.value.store.coCancel,
+    icon: "warn",
+    owner: dialogOwner,
+  });
+  dialogsOpen = Math.max(0, dialogsOpen - 1);
+  if (accepted && pageAlive && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
+}
+
 async function submitRemoteOrder(): Promise<void> {
   const submissionScope = captureAccountScope();
   const scopeIsCurrent = () => isCurrentAccountScope(submissionScope);
+  const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
   if (!p || purchaseUnavailable.value) {
     confirming = false;
     return;
   }
+  if (!Number.isFinite(quotedTotal) || quotedTotal < 0) {
+    confirming = false;
+    toast.warn(t.value.store.coTotalQuoteChanged);
+    step.value = "select-payment";
+    return;
+  }
+  if (app.user.usdtBalance + 0.000001 < quotedTotal) {
+    confirming = false;
+    await offerWalletTopup(quotedTotal);
+    return;
+  }
   if (!(await refreshPurchaseEligibility())) {
     confirming = false;
     toast.warn(purchaseEligibilityFailureCopy());
     step.value = "select-payment";
+    return;
+  }
+  // Eligibility is account-scoped. An account switch while it was loading must
+  // never let the old account's quote create an order for the newly bound user.
+  if (!scopeIsCurrent()) {
+    confirming = false;
     return;
   }
   let canonicalOrderCommitted = false;
@@ -1438,36 +1432,31 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
     canonicalOrderCommitted = true;
-    const paymentSession = await orderApi.createPaymentSession(
-      created.orderNo,
-      `hdpay-session:${created.orderNo}`,
-    );
+    const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
     if (!scopeIsCurrent()) return;
-    if (paymentSession.orderNo !== created.orderNo
-        || Math.abs(paymentSession.amountUsdt - created.amountUsdt) > 0.000001) {
-      throw new Error("HDPAY_COMMERCE_SESSION_READBACK_MISMATCH");
+    if (paid.orderNo !== created.orderNo) {
+      throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");
+    }
+    if (paid.paymentMethod === "WALLET"
+        && (paid.walletBalanceAfterUsdt === null
+          || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope))) {
+      throw new Error("WALLET_PAYMENT_RECEIPT_ACCOUNT_MISMATCH");
     }
     orderId.value = created.orderNo;
-    if (!persistRemoteHostedPayment(created.orderNo)) {
-      throw new Error("HDPAY_PAYMENT_SESSION_PERSIST_FAILED");
-    }
     remoteOrderFailure.value = null;
-    remoteOrderPollError.value = false;
     if (requestedVoucherId) await voucher.refreshRemote();
     if (!scopeIsCurrent()) return;
     await orders.refreshRemote();
     if (!scopeIsCurrent()) return;
-    // PENDING_PAYMENT has not created or activated a device yet. Fleet refresh
-    // is authoritative only after the ACTIVATED readback below; making it part
-    // of order creation turns an unrelated fleet outage into a false purchase
-    // failure after the server has already committed the order.
-    // Retire the durable key only after the server order readback above and
-    // account-scoped order refresh both succeeded; unknown outcomes reuse it.
-    // A canonical PENDING_PAYMENT receipt proves only creation. It is not
-    // provisioning or activation; wait for a real provider callback/readback.
+    const settled = orders.orders.find((order) => order.id === created.orderNo);
+    if (!settled || settled.status !== "activated") {
+      throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
+    }
+    // Fleet refresh is best effort after the authoritative paid receipt and
+    // order readback. A temporary projection outage must not re-submit payment.
+    void app.refreshRemoteFleet(walletReceiptScope);
     retireRemoteOrderKey();
-    step.value = "awaiting";
-    openHostedPaymentPage(paymentSession.paymentUrl);
+    step.value = "live";
   } catch (error) {
     if (!scopeIsCurrent()) return;
     // Keep only outcome-unknown errors: transport, malformed response, 5xx and
@@ -1478,116 +1467,20 @@ async function submitRemoteOrder(): Promise<void> {
       || (apiError.kind === "http" && (apiError.status ?? 0) >= 500)
       || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN";
     if (!keepForReadback && !canonicalOrderCommitted) retireRemoteOrderKey();
+    if (apiError.message === "ACCOUNT_COMMAND_STORAGE_UNAVAILABLE") {
+      toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+    } else if (apiError.message === "ORDER_WALLET_INSUFFICIENT") {
+      await offerWalletTopup(quotedTotal);
+    } else if (["ORDER_MONTHLY_QUOTA_PAUSED", "ORDER_MONTHLY_QUOTA_EXHAUSTED"].includes(apiError.message)) {
+      toast.warn(t.value.quota.stockUnavailable);
+    } else {
+      toast.warn(t.value.tradein.errPurchaseFailed);
+    }
     // No local order, balance debit, or voucher redemption mirror in remote mode.
     step.value = "confirm";
-    toast.warn(t.value.tradein.errPurchaseFailed);
   } finally {
     confirming = false;
   }
-}
-
-let reopeningHostedPayment = false;
-async function reopenRemoteHostedPayment(): Promise<void> {
-  const requestOrderNo = orderId.value;
-  const requestAccount = auth.accountId;
-  if (!remoteApiEnabled || !requestOrderNo || reopeningHostedPayment) return;
-  reopeningHostedPayment = true;
-  try {
-    const session = await orderApi.createPaymentSession(
-      requestOrderNo, `hdpay-session:${requestOrderNo}`);
-    if (requestAccount !== auth.accountId || requestOrderNo !== orderId.value) return;
-    if (!persistRemoteHostedPayment(requestOrderNo)) {
-      throw new Error("HDPAY_PAYMENT_SESSION_PERSIST_FAILED");
-    }
-    openHostedPaymentPage(session.paymentUrl);
-  } catch {
-    if (requestAccount === auth.accountId && requestOrderNo === orderId.value) {
-      toast.warn(t.value.bankPane.hostedOpenFailed);
-    }
-  } finally {
-    reopeningHostedPayment = false;
-  }
-}
-
-// Remote checkout follows only the canonical server state. The recursive
-// timeout is single-flight for one page epoch; hide/account changes invalidate
-// late responses before they can mutate the visible checkout.
-let remoteOrderPollTimer: ReturnType<typeof setTimeout> | undefined;
-let remoteOrderPollEpoch = 0;
-let remoteOrderPageVisible = false;
-
-function stopRemoteOrderPolling() {
-  remoteOrderPollEpoch += 1;
-  if (remoteOrderPollTimer) {
-    clearTimeout(remoteOrderPollTimer);
-    remoteOrderPollTimer = undefined;
-  }
-}
-
-function scheduleRemoteOrderPoll(requestEpoch: number, delayMs: number) {
-  if (requestEpoch !== remoteOrderPollEpoch || !remoteOrderPageVisible) return;
-  remoteOrderPollTimer = setTimeout(() => { void pollRemoteOrder(requestEpoch); }, delayMs);
-}
-
-async function pollRemoteOrder(requestEpoch: number) {
-  const requestOrderNo = orderId.value;
-  const requestAccount = auth.accountId;
-  if (!remoteApiEnabled || !remoteOrderPageVisible || !requestOrderNo
-      || requestEpoch !== remoteOrderPollEpoch) return;
-  try {
-    const snapshot = await orderApi.list();
-    if (requestAccount !== auth.accountId || requestEpoch !== remoteOrderPollEpoch
-        || requestOrderNo !== orderId.value || !remoteOrderPageVisible) return;
-    const authoritative = snapshot.orders.find((row) => row.orderNo === requestOrderNo);
-    if (!authoritative) throw new Error("REMOTE_ORDER_READBACK_NOT_FOUND");
-    remoteOrderPollError.value = false;
-    switch (authoritative.canonicalStatus) {
-      case "placed":
-        scheduleRemoteOrderPoll(requestEpoch, 5000);
-        return;
-      case "paid":
-        step.value = "confirmed";
-        return;
-      case "provisioning":
-        step.value = "activating";
-        return;
-      case "activated":
-        if (!clearRemoteHostedPayment()) {
-          remoteOrderPollError.value = true;
-          scheduleRemoteOrderPoll(requestEpoch, 5000);
-          return;
-        }
-        stopRemoteOrderPolling();
-        step.value = "live";
-        void orders.refreshRemote().catch(() => undefined); // orders 契约保持 reject;此处纯展示刷新
-        void app.refreshRemoteFleet();
-        return;
-      case "payment_failed":
-      case "expired":
-      case "provisioning_failed":
-      case "refunded":
-      case "chargeback":
-      case "cancelled":
-        remoteOrderFailure.value = authoritative.canonicalStatus;
-        stopRemoteOrderPolling();
-        return;
-    }
-  } catch {
-    if (requestAccount !== auth.accountId || requestEpoch !== remoteOrderPollEpoch
-        || requestOrderNo !== orderId.value || !remoteOrderPageVisible) return;
-    remoteOrderPollError.value = true;
-    scheduleRemoteOrderPoll(requestEpoch, 5000);
-  }
-}
-
-function restartRemoteOrderPolling() {
-  stopRemoteOrderPolling();
-  remoteOrderPollError.value = false;
-  if (!remoteApiEnabled || !remoteOrderPageVisible || !orderId.value
-      || !["awaiting", "confirmed", "activating"].includes(step.value)
-      || remoteOrderFailure.value) return;
-  const requestEpoch = remoteOrderPollEpoch;
-  scheduleRemoteOrderPoll(requestEpoch, 0);
 }
 
 // ── 抵扣上下文的页级镜像(审计 R5 P0)──
@@ -1609,7 +1502,6 @@ function reassertTradeinContext() {
 }
 
 onShow(() => {
-  remoteOrderPageVisible = true;
   pageVisible = true;
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
@@ -1625,16 +1517,13 @@ onShow(() => {
   }
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
+  void refreshCheckoutWallet();
   restoreReceiptRecovery();
-  restoreRemoteHostedPayment();
-  restartRemoteOrderPolling();
 });
 onHide(() => {
-  remoteOrderPageVisible = false;
   pageVisible = false;
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。
   if (activeSession.value && pending.viewingId === activeSession.value.id) pending.setViewing(null);
-  stopRemoteOrderPolling();
 });
 
 // ── state-machine timers (mirror source useEffect auto-advance chain) ──
@@ -1650,13 +1539,9 @@ watch(step, async (s) => {
   // 两个地址同时催付、落单后旧票成孤儿继续拉人二次付款(独立审计 P0 族)。单一咽喉,
   // 不在十来处回弹点各写一遍。
   if ((s === "select-payment" || s === "confirm") && activeSession.value) dropActiveSession();
-  // Remote checkout is a server-state machine. Never turn elapsed time into a
-  // payment, provisioning, or activation result; only authoritative readback
-  // may advance it. Local mock retains the guided timer demonstration.
-  if (remoteApiEnabled && (s === "awaiting" || s === "confirmed" || s === "activating")) {
-    restartRemoteOrderPolling();
-    return;
-  }
+  // Remote wallet payment is completed synchronously by the Java transaction;
+  // only the local mock keeps the guided timer demonstration below.
+  if (remoteApiEnabled && (s === "awaiting" || s === "confirmed" || s === "activating")) return;
   if (s === "awaiting") {
     advanceTimer = setTimeout(() => { step.value = "confirmed"; }, 2400);
     return;
@@ -2028,9 +1913,7 @@ function goTrack() {
 function cleanup() {
   if (!pageAlive) return;
   clearAdvance();
-  remoteOrderPageVisible = false;
   pageVisible = false;
-  stopRemoteOrderPolling();
   tradein.clearApplied(tradeinOwner); // 只清本页 owner 的那份;在世实例的上下文不动
   // 本页拉起的置换 / 槽位 sheet 是 chassis 级全局层,不随页面卸载自动收 —— 不收会跟到落地页,
   // 整屏 backdrop 把浮动条与页面一起挡死(T3 黑盒 P1-2)。

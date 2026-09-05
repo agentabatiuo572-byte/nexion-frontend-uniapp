@@ -14,10 +14,10 @@
         </view>
 
         <view class="flex items-center" style="gap: 8px; margin-top: 12px">
-          <view :style="downloadButtonStyle" @click="copyDownloadUrl">
+          <view :style="downloadButtonStyle" role="button" tabindex="0" :aria-label="t.computeShare.downloadCta" @click="copyDownloadUrl">
             <text>{{ downloadUrl ? t.computeShare.downloadCta : t.computeShare.downloadPending }}</text>
           </view>
-          <view :style="devicesButtonStyle" @click="goDevices">
+          <view :style="devicesButtonStyle" role="button" tabindex="0" :aria-label="t.computeShare.goDevicesCta" @click="goDevices">
             <text>{{ t.computeShare.goDevicesCta }}</text>
           </view>
         </view>
@@ -39,6 +39,10 @@
             v-for="model in GPU_MODEL_PRESETS"
             :key="model"
             :style="modelButtonStyle(model)"
+            role="button"
+            tabindex="0"
+            :aria-label="model"
+            :aria-pressed="selectedModel === model"
             @click="selectedModel = model"
           >
             <text>{{ model }}</text>
@@ -56,7 +60,7 @@
               <text v-if="enrollment.pairingCode" class="block" :style="pairingCodeStyle">{{ enrollment.pairingCode }}</text>
               <text v-else class="block" :style="pairingCodeStyle">{{ pairingStatusLabel }}</text>
             </view>
-            <view v-if="enrollment.pairingCode" :style="copyCodeStyle" @click="copyPairingCode">
+            <view v-if="enrollment.pairingCode" :style="copyCodeStyle" role="button" tabindex="0" :aria-label="t.computeShare.copyPairingCode" @click="copyPairingCode">
               <text>{{ t.computeShare.copyPairingCode }}</text>
             </view>
           </view>
@@ -67,6 +71,10 @@
         <view
           :style="connectButtonStyle"
           :data-disabled="slotsFull || connecting || enrollment?.status === 'PENDING'"
+          role="button"
+          tabindex="0"
+          :aria-disabled="slotsFull || connecting || enrollment?.status === 'PENDING' ? 'true' : 'false'"
+          :aria-label="connectButtonText"
           data-proof="compute-share-demo-connect"
           @click="connectDemoComputer"
         >

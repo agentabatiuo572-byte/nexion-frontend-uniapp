@@ -8,6 +8,10 @@ describe("leaderboard paging and keyboard contract", () => {
   it("loads concrete server pages instead of truncating the first 100 rows", () => {
     expect(source).toContain("teamInsightsApi.leaderboard(requestedPeriod, page, PAGE_SIZE,");
     expect(source).toContain("append ? remoteSnapshot.value?.snapshotAt : null");
+    expect(source).toContain("append ? remoteSnapshot.value?.snapshotVersion : null");
+    expect(source).toContain("snapshot.snapshotVersion !== previous.snapshotVersion");
+    expect(source).toContain('apiError.message === "TEAM_LEADERBOARD_SNAPSHOT_STALE"');
+    expect(source).toContain("void loadRemote(1, false)");
     expect(source).toContain("rows.value.length < (remoteSnapshot.value?.totalRows ?? 0)");
     expect(source).toContain("rows: [...previous.rows, ...snapshot.rows]");
   });

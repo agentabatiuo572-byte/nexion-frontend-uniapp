@@ -95,6 +95,34 @@ describe("platform experience config contract", () => {
         appDownload: { ...valid.share.appDownload, officialUrl: "javascript:alert(1)" },
       },
     })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    for (const urlTemplate of ["javascript:{text}", "data:text/html,{text}", "file:///{link}"]) {
+      expect(() => parsePlatformExperienceConfig({
+        ...valid,
+        share: {
+          ...valid.share,
+          channels: [{
+            key: "telegram",
+            intentType: "web",
+            textTemplate: "Join {link}",
+            urlTemplate,
+            enabled: true,
+          }],
+        },
+      })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+    expect(parsePlatformExperienceConfig({
+      ...valid,
+      share: {
+        ...valid.share,
+        channels: [{
+          key: "sms",
+          intentType: "web",
+          textTemplate: "Join {link}",
+          urlTemplate: "sms:?body={text}",
+          enabled: true,
+        }],
+      },
+    }).share.channels[0].urlTemplate).toBe("sms:?body={text}");
     expect(() => parsePlatformExperienceConfig({
       ...valid,
       share: {

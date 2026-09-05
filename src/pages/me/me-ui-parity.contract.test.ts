@@ -15,6 +15,9 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   // Production language choices only advertise locales with complete bundled copy.
   "language.vue",
   "me.vue",
+  // Formal notifications retain the 5174 layout while adding a labelled,
+  // confirmed clear-read action and page-show server refresh.
+  "notifications.vue",
   "preferences.vue",
   "profile.vue",
   // Formal earnings proof deliberately omits the Prototype's synthetic sparkline;
@@ -56,26 +59,29 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
   // R3: preserve layout while enabling keyboard FAQ and category controls.
-  "help.vue": "4f57ab133938b32401dd83a590021679eda4c68d26f05ecf1010201433f1e6da",
-  "language.vue": "0288060a450b97e9712f9c48d80f0ef6416038c380cec422157f1d52746a064a",
+  "help.vue": "ecea9895c4b6949e728f61b0ce7e5ced94ce27e79d70753d4f3ede509dbec552",
+  "language.vue": "13447b1d8aa9e01afb78d7f65d5f9cb4dcc89e947c843eb172d79b34a40ea2fb",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
+  "notifications.vue": "a5364e90ea9b5111df247207a486ac094a1839fecccb7f63b6e11f95df4706b5",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // the formal page also uses the shared BrandLockup without changing the surrounding layout.
-  "proof.vue": "9f7085d75b1c1efe9cee5ec54693ccf80d27451cc240db2442a6c122cc4e57da",
+  "proof.vue": "7de4caeb6ac8cfa9bfd48a0f216af7ac712f9966e0c727dbf259d26f362f29e9",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // P3-13 additionally renders recoverable initial/pagination errors and a busy
-  // load-more label; the successful receipt-row layout is unchanged.
-  "receipts.vue": "f8bc3661a5ec95dbba6b6a2fe193d91b206dc13a4fb92c77f569b20df1fed1df",
+  // load-more label. Compute-summary failures now remain explicit and retryable.
+  "receipts.vue": "11de2e695fae89d874feebdc8e4aa3acc1c213fd2619e11b1032bb73c0c656f8",
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
-  "security.vue": "d931bb1e41ba29b945b4b9d13ae16362d2c717f0ae90753609963f06895e23bb",
+  // Formal single-device signout names that device; server cursor exposes remaining sessions.
+  "security.vue": "8eb2584d7f83472ec1eac4dd1d4de4f49ea226cabf5ccb9a185131af34ddd7f7",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
-  "support-tickets.vue": "b1fc360599a54ef4ad094ac2a7601b96c3fb8b22d1ae85470b70fc110c534154",
+  // Production ticket detail can request the server-paginated earlier history.
+  "support-tickets.vue": "c058bea3b141432c95f151d342bb509cf456b709237737f776edcf6ea9d40d10",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",
@@ -83,7 +89,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-cards-new.vue": "d0134756c231552e9068b064b664c5ef1cc7ee3242272f03d4ed1744f9696c97",
   "wallet-cards.vue": "3d1ab2de2b31a61e95bf2a388ba334b6d785a977421f7de75d9ab6e147171622",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
-  "wallet-exchange.vue": "56d32953f04a0c8ed538ed9caa55642867bcf0be02cd7892776dcc34bfc3a3a5",
+  // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
+  "wallet-exchange.vue": "e4abd0447523aa3e0dd34c12cce2e8dcc2fa52eaff0958f6cb1cbbacf89c2689",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
   "wallet-nex.vue": "50f0cd137035f0f0bc3ee3eb69e6c033b1c2a7c45a671b2f0c8b07eab9c9c0d9",
@@ -93,9 +100,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-repurchase.vue": "876bc068892e35c026ac750a8e723388d328a04bb6aca02f1e342534b89dd560",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
-  "wallet-withdraw.vue": "98351cedecc19ce13fe2fe0b7dd601872916d894a2ce714e6d51f22760aa4e11",
+  // Per-transaction maximum, daily count capacity and channel availability remain distinct.
+  "wallet-withdraw.vue": "21e60cec868dc64a1310fe2edde5c151ea5748815e50d0227b78da37022a5333",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
-  "wallet.vue": "9231b2983d0e21f6e6cbd38a8cc1c7fa8037f693b339c689dc05b14cff2f0fe4",
+  "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",
 };
 
 function block(text: string, tag: "style" | "template"): string {

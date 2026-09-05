@@ -261,6 +261,7 @@ import { navBack, navTo } from "@/lib/route";
 import { toast, confirm } from "@/store/ui";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
+import { useApp } from "@/store/app";
 import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
@@ -274,6 +275,7 @@ import { findResumablePaymentIntent, openHostedPaymentPage } from "@/lib/hosted-
 const t = useT();
 const fx = useFx();
 const dep = useDeposits();
+const app = useApp();
 
 // ── 视图派生(单选真源 = store intents;本地只记「正在看哪张单」+ UI 等待旗)──
 const viewIntentId = ref<string | null>(null);
@@ -484,7 +486,15 @@ function regen() {
   if (!it) return;
   createOrder(it.usdtAmount);
 }
-function finishCreditedFlow() {
+async function finishCreditedFlow() {
+  if (remoteApiEnabled) {
+    const accountScope = app.captureRemoteAccountRequest();
+    if (!(await app.refreshRemoteFleet(accountScope))) {
+      if (pageActive.value) toast.warn(t.value.topupChrome.depositOpFailedNote);
+      return;
+    }
+    if (!pageActive.value) return;
+  }
   navBack("/pages/me/wallet");
 }
 function startNewTopup() {
