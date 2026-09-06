@@ -148,6 +148,7 @@
               </view>
             </view>
 
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 8px">{{ t.store.detQuantityHint }}</text>
             <!-- 4-cell roi-grid -->
             <view class="grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr">
               <view :style="roiCellStyle(0)">

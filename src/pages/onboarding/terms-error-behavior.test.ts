@@ -16,7 +16,7 @@ const compiled = ts.transpileModule(
 function harness(messages = en) {
   const t = ref(messages);
   const errorKey = ref<"loadFailed" | "ackFailed" | "sessionChanged" | "runChanged" | "loginRequired" | null>(null);
-  const current = { accessToken: "test-session", userId: 1, runEpoch: 1 };
+  const current = { accessToken: "test-session", userId: 1, sessionRevision: 1, runEpoch: 1 };
   const snapshot = { source: "server", sourceEnvironment: "PRODUCTION", runId: "", version: "v1", acknowledged: false };
   const deps = {
     remoteApiEnabled: true, loaded: ref(false), loadingTerms: ref(false), loadErrorKey: errorKey, serverTerms: ref<any>(snapshot),
@@ -72,7 +72,7 @@ describe("terms localized failure behavior", () => {
     const pending = h.confirmTerms();
     await h.confirmTerms();
     expect(h.legalTermsApi.acknowledge).toHaveBeenCalledOnce();
-    h.current.runEpoch += 1;
+    h.current.sessionRevision += 1;
     resolve({ ...h.snapshot, acknowledged: true });
     await pending;
     expect(h.error.value).toBe(en.terms.sessionChanged);
@@ -92,6 +92,17 @@ describe("terms localized failure behavior", () => {
     resolve(h.snapshot);
     await first;
     expect(h.loadingTerms.value).toBe(false);
+  });
+
+  it("keeps a same-session Terms response through an unrelated catalog refresh", async () => {
+    const h = harness();
+    h.legalTermsApi.current.mockImplementation(async () => {
+      h.current.runEpoch += 1;
+      return { ...h.snapshot, acknowledged: true };
+    });
+    await h.loadTerms();
+    expect(h.error.value).toBeNull();
+    expect(h.recordLegalTermsAcknowledged).toHaveBeenCalledOnce();
   });
 
   it("passes keyboard events to every activation handler and rejects repeat events", () => {

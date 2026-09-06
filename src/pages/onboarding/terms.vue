@@ -128,8 +128,7 @@ onBackPress(() => {
 function currentSessionFence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
   if (!session?.accessToken) return null;
-  const revision = captureRuntimeRevision();
-  return { accessToken: session.accessToken, userId: session.user.userId, runEpoch: revision.epoch };
+  return { accessToken: session.accessToken, userId: session.user.userId, sessionRevision: sessionVault.revision() };
 }
 
 async function loadTerms() {

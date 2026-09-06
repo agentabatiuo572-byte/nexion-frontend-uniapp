@@ -7,12 +7,13 @@ const state = vi.hoisted(() => ({
     user: { userId: 7 },
   } as { accessToken: string; user: { userId: number } } | null,
   revision: { epoch: 1, runId: "" },
+  sessionRevision: 1,
   current: vi.fn<() => Promise<LegalTermsCurrent>>(),
 }));
 
 vi.mock("@/api/runtime", () => ({
   remoteApiEnabled: true,
-  sessionVault: { read: () => state.session },
+  sessionVault: { read: () => state.session, revision: () => state.sessionRevision },
   legalTermsApi: { current: () => state.current() },
 }));
 
@@ -57,6 +58,7 @@ describe("legal terms runtime gate", () => {
     vi.useRealTimers();
     state.session = { accessToken: "token-a", user: { userId: 7 } };
     state.revision = { epoch: 1, runId: "" };
+    state.sessionRevision = 1;
     state.current.mockReset();
     vi.stubGlobal("uni", {
       reLaunch: vi.fn(),
@@ -221,7 +223,7 @@ describe("legal terms runtime gate", () => {
     expect(runtime.enforcePendingLegalTermsGate("/pages/me/me")).toBe(false);
   });
 
-  it("starts a fresh verification when the runtime epoch changes mid-request", async () => {
+  it("does not invalidate authenticated terms when the product catalog refreshes mid-request", async () => {
     let resolveOld!: (value: LegalTermsCurrent) => void;
     state.current
       .mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
@@ -234,8 +236,22 @@ describe("legal terms runtime gate", () => {
     await settleGate();
     await settleGate();
 
-    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(state.current).toHaveBeenCalledTimes(1);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a late acknowledgement after logout and same-credential re-login", async () => {
+    let resolveOld!: (value: LegalTermsCurrent) => void;
+    state.current.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce(snapshot(false));
+    const runtime = await loadRuntime();
+    const pending = runtime.scheduleLegalTermsGate("/pages/index/index");
+    state.sessionRevision += 2;
+    resolveOld(snapshot(true));
+    await pending;
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
   });
 
   it("rechecks the same user after an access-token rotation during verification", async () => {
