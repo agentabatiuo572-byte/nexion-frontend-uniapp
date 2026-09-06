@@ -47,7 +47,7 @@ import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { trialReservesSlotNow } from "@/store/free-trial";
+import { trialReservesSlotNow, trialProducesNow } from "@/store/free-trial";
 import { isDeviceOnline } from "@/lib/hashpower";
 
 const t = useT();
@@ -58,7 +58,7 @@ const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const onlineCount = computed(
-  () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
+  () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + (trialProducesNow() ? 1 : 0),
 );
 
 const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));

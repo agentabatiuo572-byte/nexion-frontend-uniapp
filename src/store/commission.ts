@@ -165,6 +165,8 @@ export const useCommission = defineStore("commission", () => {
   let boundKey = "default";
   let bindingEpoch = 0;
   let configRefreshGeneration = 0;
+  let binaryRefreshGeneration = 0;
+  let eventsRefreshGeneration = 0;
   const events = ref<CommissionEvent[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const eventsEvidence = ref<import("@/api/team-insights-api").TeamCommissionSnapshot | null>(null);
   const config = ref<CanonicalCommissionConfig | null>(null);
@@ -247,19 +249,21 @@ export const useCommission = defineStore("commission", () => {
 
   async function refreshCanonicalBinary(scope = requestScope()) {
     if (!remoteApiEnabled) return;
+    const generation = ++binaryRefreshGeneration;
     binaryStatus.value = "loading";
     try {
       const snapshot = await commissionConfigApi.binary();
-      if (!isCurrentScope(scope)) return;
+      if (generation !== binaryRefreshGeneration || !isCurrentScope(scope)) return;
       binarySnapshot.value = snapshot;
       binaryStatus.value = "ready";
     } catch {
-      if (isCurrentScope(scope)) binaryStatus.value = "error";
+      if (generation === binaryRefreshGeneration && isCurrentScope(scope)) binaryStatus.value = "error";
     }
   }
 
   async function refreshCanonicalEvents(scope = requestScope()) {
     if (!remoteApiEnabled) return;
+    const generation = ++eventsRefreshGeneration;
     events.value = [];
     eventsEvidence.value = null;
     eventsStatus.value = "loading";
@@ -268,14 +272,14 @@ export const useCommission = defineStore("commission", () => {
     eventsTotalRows.value = 0;
     try {
       const snapshot = await teamInsightsApi.commissions(1, 20);
-      if (!isCurrentScope(scope)) return;
+      if (generation !== eventsRefreshGeneration || !isCurrentScope(scope)) return;
       eventsEvidence.value = snapshot;
       events.value = snapshot.events;
       eventsPage.value = snapshot.page;
       eventsTotalRows.value = snapshot.totalRows;
       eventsStatus.value = "ready";
     } catch {
-      if (isCurrentScope(scope)) eventsStatus.value = "error";
+      if (generation === eventsRefreshGeneration && isCurrentScope(scope)) eventsStatus.value = "error";
     }
   }
 
@@ -283,10 +287,11 @@ export const useCommission = defineStore("commission", () => {
     if (!remoteApiEnabled || eventsStatus.value !== "ready"
         || eventsLoadMoreStatus.value === "loading" || events.value.length >= eventsTotalRows.value) return;
     const nextPage = eventsPage.value + 1;
+    const generation = eventsRefreshGeneration;
     eventsLoadMoreStatus.value = "loading";
     try {
       const snapshot = await teamInsightsApi.commissions(nextPage, 20, eventsEvidence.value?.snapshotAt);
-      if (!isCurrentScope(scope) || snapshot.page !== nextPage) return;
+      if (generation !== eventsRefreshGeneration || !isCurrentScope(scope) || snapshot.page !== nextPage) return;
       const seen = new Set(events.value.map((event) => event.id));
       const appended = [...events.value, ...snapshot.events.filter((event) => !seen.has(event.id))];
       events.value = appended;
@@ -295,7 +300,7 @@ export const useCommission = defineStore("commission", () => {
       eventsTotalRows.value = snapshot.totalRows;
       eventsLoadMoreStatus.value = "idle";
     } catch {
-      if (isCurrentScope(scope)) eventsLoadMoreStatus.value = "error";
+      if (generation === eventsRefreshGeneration && isCurrentScope(scope)) eventsLoadMoreStatus.value = "error";
     }
   }
 

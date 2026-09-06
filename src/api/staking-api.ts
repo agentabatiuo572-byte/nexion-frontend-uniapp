@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { parseHistorySnapshotId, historySnapshotQuery } from "./history-snapshot";
 import { parseServerTimestamp } from "./server-time";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
@@ -46,7 +47,7 @@ export interface StakingPosition {
 
 export interface StakingSnapshot {
   positions: StakingPosition[];
-  positionsPage: { total: number; pageNum: number; pageSize: number };
+  positionsPage: { total: number; pageNum: number; pageSize: number; snapshotId?: string };
   walletBalanceUsdt: number;
   serverTime: number;
   position?: StakingPosition;
@@ -244,7 +245,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): StakingSnapshot {
   }
   return {
     positions,
-    positionsPage: { total, pageNum, pageSize },
+    positionsPage: { total, pageNum, pageSize, snapshotId: parseHistorySnapshotId(page.snapshotId) },
     walletBalanceUsdt,
     serverTime,
     position: row.position === undefined ? undefined : parsePosition(row.position),
@@ -272,9 +273,9 @@ export function createStakingApi(client: ApiClient, mode: ApiEnvironment = "prod
       pageNum += 1;
       const next = parseSnapshot(await client.request({
         method: "GET",
-        path: `/api/stakes?pageNum=${pageNum}&pageSize=${first.positionsPage.pageSize}`,
+        path: `/api/stakes?pageNum=${pageNum}&pageSize=${first.positionsPage.pageSize}${historySnapshotQuery(first.positionsPage.snapshotId)}`,
       }), mode);
-      if (next.positionsPage.pageNum !== pageNum || next.positionsPage.total !== first.positionsPage.total
+      if (next.positionsPage.snapshotId !== first.positionsPage.snapshotId || next.positionsPage.pageNum !== pageNum || next.positionsPage.total !== first.positionsPage.total
           || next.positionsPage.pageSize !== first.positionsPage.pageSize || next.positions.length === 0) {
         return invalid("STAKING_POSITIONS_PAGINATION_INVALID");
       }

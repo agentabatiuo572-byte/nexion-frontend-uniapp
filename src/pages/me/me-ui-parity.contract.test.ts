@@ -83,7 +83,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Production ticket detail can request the server-paginated earlier history.
   "support-tickets.vue": "c058bea3b141432c95f151d342bb509cf456b709237737f776edcf6ea9d40d10",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
-  "trial.vue": "d1e97c05e19ad14071c3ff95fc8f54c234c23f949c5447c8f394f8730cd25e1a",
+  // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
+  "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
   "wallet-address-rebind.vue": "c5865a83b3fe7e15196a9b0e852100900e72b1d88125692469b84062d957a7be",
   "wallet-bills.vue": "b2479f2aa783f980f4e04db1dbc133a5b2f4588330d66395f0222fdacde425af",
   "wallet-cards-new.vue": "d0134756c231552e9068b064b664c5ef1cc7ee3242272f03d4ed1744f9696c97",

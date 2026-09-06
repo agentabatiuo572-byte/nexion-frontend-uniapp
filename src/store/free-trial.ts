@@ -169,6 +169,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const remoteCanStart = ref(false);
   const remoteEligibilityReason = ref<TrialIneligibleReason>("unknown");
   const authorityClaimNo = ref<string | null>(null);
+  const authorityServerState = ref<TrialAuthorityState["serverState"] | null>(null);
   const authorityVersion = ref(0);
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightAccount: string | null = null;
@@ -226,6 +227,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     remoteCanStart.value = false;
     remoteEligibilityReason.value = "unknown";
     authorityClaimNo.value = null;
+    authorityServerState.value = null;
     authorityVersion.value = 0;
     authorityStatus.value = nextStatus;
     authorityError.value = error;
@@ -240,7 +242,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       status: next.status,
       startedAt: next.startedAt,
       expiresAt: next.expiresAt,
-      graceEndsAt: next.graceEndsAt,
+      graceEndsAt: next.serverState === "EXTENDED" ? next.extendedEndsAt ?? null : next.graceEndsAt,
       finishedAt: next.finishedAt,
       // Remote shadow values are server projections, never locally accrued facts.
       shadowFrozenAtUSD: next.shadowUSD,
@@ -252,6 +254,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     remoteCanStart.value = next.canStart;
     remoteEligibilityReason.value = next.eligibilityReason ?? "unknown";
     authorityClaimNo.value = next.claimNo;
+    authorityServerState.value = next.serverState;
     authorityVersion.value = next.version;
     useTrialConfig().applyAuthoritative(next.config);
     authorityStatus.value = "ready";
@@ -551,7 +554,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     status, startedAt, expiresAt, graceEndsAt, finishedAt,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
-    authorityClaimNo, authorityVersion,
+    authorityClaimNo, authorityVersion, authorityServerState,
     eligibility, canStart, start, convert, cancel, poll, bindAccount, snapshot,
     refreshRemote, refreshEligibilityRemote,
   };
@@ -595,6 +598,12 @@ const SLOT_RESERVING_STATUSES: TrialStatus[] = ["active", "grace"];
 /** Non-reactive variant for store actions (e.g. useApp.activateDevice slot cap). */
 export function trialReservesSlotNow(): boolean {
   return SLOT_RESERVING_STATUSES.includes(useFreeTrial().status);
+}
+
+/** Reserved capacity is not proof that a trial is producing. */
+export function trialProducesNow(): boolean {
+  const trial = useFreeTrial();
+  return trial.status === "active" && (!remoteApiEnabled || trial.authorityStatus === "ready" || trial.authorityStatus === "loading");
 }
 
 export { computeDiscountedPrice, computeTrialOffset };

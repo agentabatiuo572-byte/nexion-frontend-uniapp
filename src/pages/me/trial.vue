@@ -22,6 +22,7 @@
         <template v-if="isActiveCycle">
           <CountdownHero
             :status="status"
+            :extended="freeTrial.authorityServerState === 'EXTENDED'"
             :now="now"
             :remaining-ms="remainingMsValue"
             :shadow-u-s-d="shadowUSD"
@@ -41,7 +42,7 @@
           <view v-if="status === 'grace'" :style="stoppedRowStyle">
             <view class="flex items-center" style="gap: 6px">
               <view style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-warning); flex-shrink: 0" />
-              <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.trial.stoppedNote }}</text>
+              <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ freeTrial.authorityServerState === 'EXTENDED' ? t.trial.extendedNote : t.trial.stoppedNote }}</text>
             </view>
             <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ offsetUsableUntilText }}</text>
           </view>
