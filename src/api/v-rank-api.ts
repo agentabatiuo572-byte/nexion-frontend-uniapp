@@ -40,6 +40,7 @@ export interface EntitlementVRankReward {
   voucherId?: string;
   skuId?: string;
   customLabel?: string;
+  displayName?: string;
 }
 
 export type CanonicalVRankReward = MonetaryVRankReward | EntitlementVRankReward;
@@ -117,7 +118,8 @@ function reward(value: unknown): CanonicalVRankReward {
       skuId: optionalText(source.skuId), customLabel: optionalText(source.customLabel) };
   }
   const amount = optionalNumber(source.amount);
-  return { type, ...(amount === undefined ? {} : { amount }), voucherId: optionalText(source.voucherId),
+  const displayName = optionalText(source.displayName);
+  return { type, ...(displayName === undefined ? {} : { displayName }), ...(amount === undefined ? {} : { amount }), voucherId: optionalText(source.voucherId),
     skuId: optionalText(source.skuId), customLabel: optionalText(source.customLabel) };
 }
 

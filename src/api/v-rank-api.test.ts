@@ -6,6 +6,14 @@ const row = (v: number) => ({
   peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
 });
 
+it("keeps canonical entitlement names in the App contract", async () => {
+  const request = vi.fn().mockResolvedValue({ source: "nx_v_rank_config", serverCanonical: true,
+    sourceEnvironment: "PRODUCTION", runId: "", prizeName: "Ranks",
+    ranks: ladder().map((item) => ({ ...item, rewards: [{ type: "VOUCHER", voucherId: "VC-1", displayName: "Welcome voucher" }] })) });
+  const result = await createVRankApi({ request } as never).ladder();
+  expect(result.ranks[0].rewards[0]).toMatchObject({ displayName: "Welcome voucher" });
+});
+
 it("preserves every configured reward type for App display without issuing a reward", async () => {
   const request = vi.fn().mockResolvedValue({
     source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",

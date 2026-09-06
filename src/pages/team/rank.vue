@@ -105,6 +105,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
+import { isEntitlementVRankReward, rankEntitlementLabel } from "@/lib/rank-entitlement-label";
 import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -168,10 +169,8 @@ function nonNexRewards(rank: VRankDef): VRankReward[] {
 }
 
 function rewardText(reward: VRankReward): string {
-  if (reward.type === "USDT") return `${reward.amount.toLocaleString()} USDT`;
-  if (reward.type === "VOUCHER") return reward.voucherId ?? "VOUCHER";
-  if (reward.type === "SKU") return reward.skuId ?? "SKU";
-  return reward.customLabel ?? "CUSTOM";
+  if (isEntitlementVRankReward(reward)) return rankEntitlementLabel(reward, t.value.rank.rewardUnavailable);
+  return `${reward.amount.toLocaleString()} ${reward.type}`;
 }
 
 // 三语:词典里 rank.cond.* 五条早就有(此前是死键,这里原本拼英文)

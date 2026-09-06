@@ -1546,6 +1546,8 @@ export const en = {
     graceBuyCta: "Buy with your ${amount} credit",
     buyCtaPlain: "Go to purchase",
     stoppedNote: "Production has stopped",
+    extendedNote: "The purchase deadline has been extended. Trial credit is frozen and does not accrue during the extension.",
+    countdownExtendedRibbon: "Extended purchase deadline",
     rulesEntry: "How the trial credit works",
     rulesTitle: "Trial credit rules",
     rulesBefore: "Before purchase, trial credit only offsets the device price (up to ${cap}).",
@@ -1635,10 +1637,10 @@ export const en = {
     inventoryRowActivate: "Activate",
     inventoryRowDeactivate: "Deactivate",
     inventoryRowSlotsFull: "Slots full",
-    phoneActivationTitle: "Phone compute is not active",
+    phoneActivationTitle: "This phone needs binding and calibration",
     phoneActivationBody: "Recheck and bind this phone here. It can receive phone-compute tasks only after activation succeeds.",
-    phoneActivationRewardGate: "Phone-compute and activation rewards are not issued until the phone is bound and active.",
-    phoneActivationCta: "Reactivate phone compute",
+    phoneActivationRewardGate: "This notice applies only to this phone, not to other active devices on your account. Tasks and rewards depend on server confirmation after binding.",
+    phoneActivationCta: "Calibrate and bind this phone",
     // Trade-in promo banner — surfaces when user has an eligible device for
     // an upgrade. Config-gated by DEFAULT_TRADEIN_CONFIG.promo (kill switch,
     // cooldown, max-per-session, routes).
@@ -4229,6 +4231,7 @@ export const en = {
 
   // ─── v3 D-2 phase 2 keys ─────────────────────────────────────────
   rank: {
+    rewardUnavailable: { voucher: "Voucher reward (details unavailable)", sku: "Item reward (details unavailable)", custom: "Reward details unavailable" },
     pageTitle: "V Rank",
     currentRank: "Current rank",
     done: "Done",

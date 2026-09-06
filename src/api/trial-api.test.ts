@@ -35,6 +35,18 @@ const base = {
 };
 
 describe("trial conversion contract", () => {
+  it("retains the extended purchase deadline without resuming production", () => {
+    const extendedEndsAt = 1_726_000_000_000;
+    const parsed = parseTrialAuthorityState({ ...base, state: "EXTENDED", eligibilityReason: "in-progress",
+      graceEndsAt: null, extendedEndsAtEpochMs: extendedEndsAt });
+    expect(parsed.status).toBe("grace");
+    expect(parsed.extendedEndsAt).toBe(extendedEndsAt);
+    expect(parsed.shadowUSD).toBe(base.shadowUsdt);
+  });
+  it("rejects extended authority without a real deadline", () => {
+    expect(() => parseTrialAuthorityState({ ...base, state: "EXTENDED", eligibilityReason: "in-progress" }))
+      .toThrow("TRIAL_RESPONSE_INVALID");
+  });
   const canonicalReceipt = {
     orderNo: "TRC-ABC123",
     productNo: "stellarbox-s1",

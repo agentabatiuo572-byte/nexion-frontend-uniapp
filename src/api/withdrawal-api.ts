@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { parseHistorySnapshotId, historySnapshotQuery } from "./history-snapshot";
 import { ApiError } from "./errors";
 import type { Withdrawal, WithdrawalStatus, WithdrawalTerminalReason } from "../store/types";
 import type { WithdrawalRiskRoute } from "../store/config-types";
@@ -293,6 +294,7 @@ function parseSubmissionPage(value: unknown): {
   total: number;
   pageNum: number;
   pageSize: number;
+  snapshotId?: string;
 } {
   const row = record(value);
   const page = record(row?.page);
@@ -305,7 +307,8 @@ function parseSubmissionPage(value: unknown): {
       || row.withdrawals.length > pageSize || row.withdrawals.length > total) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_LIST_RESPONSE_INVALID" });
   }
-  return { withdrawals: row.withdrawals.map(parseSubmission), total, pageNum, pageSize };
+  return { withdrawals: row.withdrawals.map(parseSubmission), total, pageNum, pageSize,
+    snapshotId: parseHistorySnapshotId(page.snapshotId) };
 }
 
 function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
@@ -632,9 +635,9 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
       while (rows.length < first.total) {
         pageNum += 1;
         const next = parseSubmissionPage(await client.request({
-          method: "GET", path: `/api/withdrawals?pageNum=${pageNum}&pageSize=${first.pageSize}`,
+          method: "GET", path: `/api/withdrawals?pageNum=${pageNum}&pageSize=${first.pageSize}${historySnapshotQuery(first.snapshotId)}`,
         }));
-        if (next.pageNum !== pageNum || next.pageSize !== first.pageSize || next.total !== first.total
+        if (next.snapshotId !== first.snapshotId || next.pageNum !== pageNum || next.pageSize !== first.pageSize || next.total !== first.total
             || next.withdrawals.length === 0) {
           throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_PAGINATION_INVALID" });
         }

@@ -1483,6 +1483,8 @@ export const zh: Messages = {
     graceBuyCta: "用 ${amount} 抵扣金购买",
     buyCtaPlain: "去购买",
     stoppedNote: "已停止产出",
+    extendedNote: "购买期限已延长；试用抵扣金已冻结，延期期间不会继续累计。",
+    countdownExtendedRibbon: "延期购买期限",
     rulesEntry: "查看抵扣规则",
     rulesTitle: "抵扣金规则",
     rulesBefore: "购买前,试用抵扣金仅用于抵扣购机款(最高抵 ${cap})。",
@@ -1570,10 +1572,10 @@ export const zh: Messages = {
     inventoryRowActivate: "激活",
     inventoryRowDeactivate: "取消激活",
     inventoryRowSlotsFull: "槽位已满",
-    phoneActivationTitle: "手机算力尚未激活",
+    phoneActivationTitle: "当前登录手机尚未完成绑定校准",
     phoneActivationBody: "你可以在这里重新检测并绑定当前手机，激活成功后才会开始接取手机算力任务。",
-    phoneActivationRewardGate: "未激活并绑定手机时，不发放手机算力及相关激活奖励。",
-    phoneActivationCta: "重新激活手机算力",
+    phoneActivationRewardGate: "此提示仅针对当前登录手机，不代表账户中其他已激活设备被停用；完成绑定校准后，以服务器确认的任务和奖励为准。",
+    phoneActivationCta: "校准并绑定当前手机",
     // 置换促销 banner — 当用户拥有可置换设备时显示,受 DEFAULT_TRADEIN_CONFIG.promo
     // 后台 kill switch / cooldown / 单会话最大次数 / 路由白名单控制
   },
@@ -4099,6 +4101,7 @@ export const zh: Messages = {
 
   // ─── v3 D-2 阶段二 ─────────────────────────────────────────
   rank: {
+    rewardUnavailable: { voucher: "券奖励（详情暂不可用）", sku: "商品奖励（详情暂不可用）", custom: "奖励详情暂不可用" },
     pageTitle: "V 级头衔",
     currentRank: "当前等级",
     done: "已达成",

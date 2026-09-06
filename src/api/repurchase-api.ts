@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { parseHistorySnapshotId, historySnapshotQuery } from "./history-snapshot";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
@@ -44,7 +45,7 @@ export interface RepurchaseOrder {
 
 export interface RepurchaseSnapshot {
   orders: RepurchaseOrder[];
-  ordersPage: { total: number; pageNum: number; pageSize: number };
+  ordersPage: { total: number; pageNum: number; pageSize: number; snapshotId?: string };
   walletBalanceUsdt: number;
   serverTime: number;
   focusOrderNo?: string;
@@ -221,7 +222,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): RepurchaseSnapshot
       || orders.length > pageSize || orders.length > total) return invalid();
   return {
     orders,
-    ordersPage: { total, pageNum, pageSize },
+    ordersPage: { total, pageNum, pageSize, snapshotId: parseHistorySnapshotId(page.snapshotId) },
     walletBalanceUsdt,
     serverTime,
     focusOrderNo: optionalText(validRow, "focusOrderNo"),
@@ -252,9 +253,9 @@ export function createRepurchaseApi(client: ApiClient, mode: ApiEnvironment = "p
     while (orders.length < first.ordersPage.total) {
       pageNum += 1;
       const next = parseSnapshot(await client.request({
-        method: "GET", path: `/api/repurchase/orders?pageNum=${pageNum}&pageSize=${first.ordersPage.pageSize}`,
+        method: "GET", path: `/api/repurchase/orders?pageNum=${pageNum}&pageSize=${first.ordersPage.pageSize}${historySnapshotQuery(first.ordersPage.snapshotId)}`,
       }), mode);
-      if (next.ordersPage.pageNum !== pageNum || next.ordersPage.pageSize !== first.ordersPage.pageSize
+      if (next.ordersPage.snapshotId !== first.ordersPage.snapshotId || next.ordersPage.pageNum !== pageNum || next.ordersPage.pageSize !== first.ordersPage.pageSize
           || next.ordersPage.total !== first.ordersPage.total || next.orders.length === 0) return invalid();
       for (const order of next.orders) {
         if (ids.has(order.orderNo)) return invalid();

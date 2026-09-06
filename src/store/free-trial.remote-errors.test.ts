@@ -67,9 +67,24 @@ const authority = (canStart: boolean, reason?: TrialAuthorityState["eligibilityR
   },
 });
 
-const { useFreeTrial } = await import("./free-trial");
+const { useFreeTrial, remainingMs, trialProducesNow } = await import("./free-trial");
 
 describe("useFreeTrial remote command errors", () => {
+  it("uses the extension deadline but keeps shadow frozen and the trial offline", async () => {
+    const deadline = 1_726_000_000_000;
+    remote.state.mockResolvedValue({ ...authority(false, "in-progress"), serverState: "EXTENDED", status: "grace",
+      claimNo: "TRIAL-EXTENDED", startedAt: 1_724_000_000_000, expiresAt: deadline,
+      extendedEndsAt: deadline, graceEndsAt: null, shadowUSD: 50, shadowNEX: 15 });
+    const store = useFreeTrial();
+    await store.refreshRemote();
+    expect(store.authorityServerState).toBe("EXTENDED");
+    expect(store.graceEndsAt).toBe(deadline);
+    expect(remainingMs(deadline - 1000)).toBe(1000);
+    expect(store.authoritativeShadowUSD).toBe(50);
+    expect(trialProducesNow()).toBe(false);
+    store.bindAccount("other-account");
+    expect(store.authorityServerState).toBeNull();
+  });
   beforeEach(() => {
     setActivePinia(createPinia());
     remote.eligibility.mockReset();

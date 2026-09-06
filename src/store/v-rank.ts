@@ -53,6 +53,7 @@ export interface EntitlementVRankReward {
   voucherId?: string;
   skuId?: string;
   customLabel?: string;
+  displayName?: string;
 }
 
 export type VRankReward = MonetaryVRankReward | EntitlementVRankReward;
@@ -268,9 +269,11 @@ export const useVRank = defineStore("vRank", () => {
     vDownlineCounts.value = next.vDownlineCounts;
   }
 
+  let refreshGeneration = 0;
   async function refreshCanonicalVRank(request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch)) {
     if (!remoteApiEnabled) return;
-    const isCurrent = () => remoteAccountEpoch.isCurrent(request);
+    const generation = ++refreshGeneration;
+    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
     if (isCurrent()) {
       remoteReady.value = false;
       remoteError.value = null;

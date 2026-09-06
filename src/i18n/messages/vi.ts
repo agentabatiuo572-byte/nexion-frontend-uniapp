@@ -1494,6 +1494,8 @@ export const vi: Messages = {
     graceBuyCta: "Dùng ${amount} khấu trừ để mua",
     buyCtaPlain: "Đi mua",
     stoppedNote: "Đã ngừng sinh lời",
+    extendedNote: "Hạn mua đã được gia hạn. Khoản khấu trừ dùng thử đã đóng băng và không tăng thêm trong thời gian gia hạn.",
+    countdownExtendedRibbon: "Hạn mua được gia hạn",
     rulesEntry: "Xem quy tắc khấu trừ",
     rulesTitle: "Quy tắc tiền khấu trừ",
     rulesBefore: "Trước khi mua, tiền khấu trừ dùng thử chỉ dùng để trừ vào giá máy (tối đa ${cap}).",
@@ -1576,10 +1578,10 @@ export const vi: Messages = {
     inventoryRowActivate: "Kích hoạt",
     inventoryRowDeactivate: "Tắt",
     inventoryRowSlotsFull: "Đã đầy khe",
-    phoneActivationTitle: "Tính toán trên điện thoại chưa được kích hoạt",
+    phoneActivationTitle: "Điện thoại này cần liên kết và hiệu chuẩn",
     phoneActivationBody: "Bạn có thể kiểm tra lại và liên kết điện thoại này tại đây. Máy chỉ nhận tác vụ sau khi kích hoạt thành công.",
-    phoneActivationRewardGate: "Chưa liên kết và kích hoạt điện thoại thì không cấp thưởng tính toán hoặc thưởng kích hoạt liên quan.",
-    phoneActivationCta: "Kích hoạt lại tính toán điện thoại",
+    phoneActivationRewardGate: "Thông báo chỉ áp dụng cho điện thoại hiện tại, không có nghĩa các thiết bị khác đã bị tắt. Tác vụ và phần thưởng phụ thuộc xác nhận của máy chủ sau khi liên kết.",
+    phoneActivationCta: "Hiệu chuẩn và liên kết điện thoại này",
   },
   deactivateSheet: {
     title: "Thiết bị đang chạy nhiệm vụ",
@@ -4090,6 +4092,7 @@ export const vi: Messages = {
   },
 
   rank: {
+    rewardUnavailable: { voucher: "Phần thưởng phiếu (chưa có chi tiết)", sku: "Phần thưởng sản phẩm (chưa có chi tiết)", custom: "Chưa có chi tiết phần thưởng" },
     pageTitle: "Cấp V",
     currentRank: "Cấp hiện tại",
     done: "Đã đạt",

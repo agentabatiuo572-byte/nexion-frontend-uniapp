@@ -106,6 +106,12 @@
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
+            <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle">
+              <view v-for="(endpoint, index) in docs.endpoints" :key="`${endpoint.method}:${endpoint.path}:${index}`" style="padding: 6px 0; overflow-wrap: anywhere">
+                <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ endpoint.method }}</text>
+                <text class="font-mono-tabular" style="margin-left: 8px; font-size: 12px">{{ endpoint.path }}</text>
+              </view>
+            </view>
             <view v-if="!remoteApiEnabled" class="mt-3 rounded-lg" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
             <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.developer.docsEvents, { events: docs.events.join(" · ") }) }}</text></view>
           </template>
