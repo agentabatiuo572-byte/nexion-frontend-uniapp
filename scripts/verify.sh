@@ -2606,7 +2606,7 @@ platform_stats_anchor() {
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|publicStatsHealth' \
     'src/store/app.ts|publicStatsHealth' \
-    'src/pages/onboarding/intro.vue|fleetDevicesOf' \
+    'src/pages/onboarding/intro.vue|onlineDevicesOf' \
     'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
     # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串

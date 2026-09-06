@@ -56,11 +56,11 @@
 
           <!-- buy / sell CTAs -->
           <view class="grid grid-cols-2" :style="ctaRowStyle">
-            <view class="rounded-full flex items-center justify-center nx-press" :style="buyBtnStyle" @click="goExchange">
+            <view class="rounded-full flex items-center justify-center nx-press" :style="buyBtnStyle" @click="goExchange('usdt2nex')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5l-5-5L2 17" /><path d="M16 7h6v6" /></svg>
               <text :style="buyTextStyle">{{ t.marketPage.nexHero.buy }}</text>
             </view>
-            <view class="rounded-xl flex items-center justify-center nx-press" :style="sellBtnStyle" @click="goExchange">
+            <view class="rounded-xl flex items-center justify-center nx-press" :style="sellBtnStyle" @click="goExchange('nex2usdt')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></svg>
               <text :style="sellTextStyle">{{ t.marketPage.nexHero.sell }}</text>
             </view>
@@ -166,8 +166,8 @@ const statCells = computed(() => [
   { label: t.value.marketPage.stats.rank, value: nex.value.rank === "—" ? "—" : `#${nex.value.rank}` },
 ]);
 
-function goExchange() {
-  navTo("/pages/me/wallet-exchange");
+function goExchange(direction: "usdt2nex" | "nex2usdt") {
+  navTo(`/pages/me/wallet-exchange?direction=${direction}`);
 }
 
 // ─── styles ───

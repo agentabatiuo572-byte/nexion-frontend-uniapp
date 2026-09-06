@@ -9,7 +9,8 @@ describe("repurchase confirmation boundary", () => {
   it("requires an explicit confirmation before the server money command", () => {
     expect(source).toContain('confirm as uiConfirm');
     expect(source).toContain('confirmed = await uiConfirm({');
-    expect(source).toContain('if (!confirmed || !isMounted.value) return;');
+    expect(source).toContain('if (!confirmed || !currentScope(generation)) return;');
+    expect(source).toContain('isMounted.value && generation === accountGeneration');
 
     const confirmation = source.indexOf('confirmed = await uiConfirm({');
     expect(source).toContain('const quoteAmount = normalizeCommandAmount(amount.value);');

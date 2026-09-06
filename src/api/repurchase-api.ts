@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
+import { parseServerTimestamp } from "./server-time";
 
 export type RepurchaseStatus =
   | "PENDING_LOCK"
@@ -96,10 +97,7 @@ function integer(value: unknown, min = 0): number | null {
 }
 
 function timestamp(value: unknown): number | null {
-  const raw = text(value);
-  if (!raw) return null;
-  const parsed = Date.parse(raw.replace(" ", "T"));
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseServerTimestamp(value);
 }
 
 function optionalText(row: Record<string, unknown>, key: string): string | undefined {

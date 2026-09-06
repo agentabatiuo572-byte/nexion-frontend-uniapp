@@ -73,7 +73,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
-import { LOCALES, PRIORITY_LABELS, localesByPriority, type LocaleCode } from "@/i18n";
+import { LOCALES, localesByPriority, type LocaleCode } from "@/i18n";
 import { profileLocaleSyncState, retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 
 const t = useT();
@@ -81,7 +81,7 @@ const locale = useLocaleStore();
 const code = computed(() => locale.code);
 const grouped = localesByPriority();
 const priorities = [0, 1, 2, 3] as const;
-const priorityLabels = PRIORITY_LABELS;
+const priorityLabels = computed(() => t.value.language.priorityLabels);
 const localeCount = LOCALES.length;
 
 function pick(next: LocaleCode) {
