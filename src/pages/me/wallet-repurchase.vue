@@ -87,10 +87,10 @@
 
         <!-- projection -->
         <view :style="cardStyle">
-          <text class="block" :style="monoLabelStyle">{{ w.after90 }}</text>
+          <text class="block" :style="monoLabelStyle">{{ isRemote ? fmt(w.afterDays, { days: repurchase.config?.lockDays ?? '—' }) : w.after90 }}</text>
           <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
             <Row :label="w.principal" :value="`$${formatCommandAmount(amount)}`" />
-            <Row :label="w.interest" :value="projectedYield === null ? '—' : `+$${projectedYield.toFixed(2)}`" tint="var(--v5-brand)" />
+            <Row :label="isRemote ? fmt(w.interestCanonical, { apy: repurchase.config?.apyPct ?? '—', days: repurchase.config?.lockDays ?? '—' }) : w.interest" :value="projectedYield === null ? '—' : `+$${projectedYield.toFixed(2)}`" tint="var(--v5-brand)" />
             <view :style="dividerStyle" />
             <Row :label="w.unlockable" :value="projectedYield === null ? '—' : `$${(amount + projectedYield).toFixed(2)}`" bold />
           </view>
@@ -103,8 +103,21 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSubmit ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
 
-        <text class="block" :style="lockedNoticeStyle">{{ w.lockedNotice }}</text>
+        <text class="block" :style="lockedNoticeStyle">{{ isRemote ? fmt(w.confirmMessage, { amount: formatCommandAmount(amount), days: repurchase.config?.lockDays ?? '—', penalty: repurchase.config?.earlyPenaltyPct ?? '—' }) : w.lockedNotice }}</text>
         </template>
+        <view v-if="isRemote" :style="cardStyle">
+          <text class="block" :style="heroTitleStyle">{{ w.ordersTitle }}</text>
+          <button :disabled="confirming || repurchase.submitting || repurchase.loading" @click="refreshRemote">{{ repurchase.loading ? w.loading : w.retry }}</button>
+          <text v-if="!repurchase.loading && !repurchase.error && !repurchase.orders.length">{{ w.ordersEmpty }}</text>
+          <view v-for="order in repurchase.orders" :key="order.orderNo" style="padding: 16px 0; border-top: 1px solid var(--v5-border)">
+            <text class="block" style="overflow-wrap: anywhere">{{ order.orderNo }}</text>
+            <Row :label="orderStatusLabel(order.status)" :value="`${order.amountUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
+            <Row :label="w.maturesAt" :value="new Date(order.unlockAt).toLocaleString()" />
+            <Row :label="fmt(w.interestCanonical, { apy: order.apyPct, days: order.lockDays })" :value="`${order.estimatedInterestUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
+            <button v-if="order.status === 'MATURE_UNCLAIMED'" :disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" @click="handleClaim(order.orderNo)">{{ w.claimAction }}</button>
+            <button v-if="order.status === 'ACTIVE'" :disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" @click="handleEarlyWithdraw(order.orderNo)">{{ w.earlyAction }}</button>
+          </view>
+        </view>
       </view>
     </view>
   </AppChassis>
@@ -127,6 +140,7 @@ import { useRepurchase } from "@/store/repurchase";
 import { resolveRepurchaseRuntimePolicy } from "@/lib/repurchase-runtime-policy";
 import { navTo } from "@/lib/route";
 import { formatCommandAmount, normalizeCommandAmount } from "@/lib/command-amount";
+import type { RepurchaseStatus } from "@/api/repurchase-api";
 
 const PRESETS = [100, 200, 500, 1000];
 
@@ -144,6 +158,9 @@ const user = computed(() => app.user);
 const amount = ref<number>(200);
 const amountTouched = ref(false);
 const confirming = ref(false);
+let accountGeneration = 0;
+watch(() => app.accountKey, () => { accountGeneration += 1; }, { flush: "sync" });
+const currentScope = (generation: number) => isMounted.value && generation === accountGeneration;
 const recovering = computed(() => isRemote.value && repurchase.pendingOpenAmount !== null);
 watch(() => repurchase.pendingOpenAmount, (pending) => {
   if (pending !== null) amount.value = pending;
@@ -249,6 +266,7 @@ async function handleRepurchase() {
   if (isRemote.value) {
     if (!remoteReady.value || !canSubmit.value || !isMounted.value) return;
     confirming.value = true;
+    const generation = accountGeneration;
     const quoteAmount = normalizeCommandAmount(amount.value);
     let confirmed = false;
     try {
@@ -274,15 +292,15 @@ async function handleRepurchase() {
     } finally {
       confirming.value = false;
     }
-    if (!confirmed || !isMounted.value) return;
+    if (!confirmed || !currentScope(generation)) return;
     try {
       await repurchase.open(quoteAmount);
-      if (!isMounted.value) return;
-      toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: quoteAmount }));
+      if (!currentScope(generation)) return;
+      toast.success(w.value.toastSuccess, `${formatCommandAmount(quoteAmount)} USDT`);
       const nextPreset = repurchase.config?.presets?.[0];
       amount.value = repurchase.pendingOpenAmount ?? nextPreset ?? repurchase.config?.minAmountUsdt ?? 0;
     } catch (cause) {
-      if (!isMounted.value) return;
+      if (!currentScope(generation)) return;
       const message = cause instanceof Error && cause.message
         ? cause.message
         : w.value.unavailableBody;
@@ -357,6 +375,50 @@ async function handleRepurchase() {
   }
   toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: amount.value }));
   amount.value = 200;
+}
+
+function orderStatusLabel(status: RepurchaseStatus): string {
+  return ({ PENDING_LOCK: w.value.statusPending, ACTIVE: w.value.statusActive,
+    MATURE_UNCLAIMED: w.value.statusMature, CLAIMED: w.value.statusClaimed,
+    EARLY_WITHDRAWN: w.value.statusEarly })[status];
+}
+
+async function handleClaim(orderNo: string) {
+  const order = repurchase.orders.find((entry) => entry.orderNo === orderNo);
+  if (!isRemote.value || !isMounted.value || confirming.value || repurchase.submitting || repurchase.loading || repurchase.error || order?.status !== "MATURE_UNCLAIMED") return;
+  const generation = accountGeneration;
+  confirming.value = true;
+  try {
+    const confirmed = await uiConfirm({
+      title: w.value.claimTitle,
+      message: fmt(w.value.claimMessage, { order: orderNo, amount: (order.amountUsdt + order.estimatedInterestUsdt).toFixed(6) }),
+      confirmLabel: w.value.claimAction, cancelLabel: w.value.cancelLabel, icon: "info", owner: "wallet-repurchase",
+    });
+    if (!confirmed || !currentScope(generation) || repurchase.orders.find((entry) => entry.orderNo === orderNo)?.status !== "MATURE_UNCLAIMED") return;
+    await repurchase.claim(orderNo);
+    if (currentScope(generation)) toast.success(w.value.actionSuccess);
+  } catch {
+    if (currentScope(generation)) toast.error(w.value.unavailableTitle, w.value.actionUnknown);
+  } finally { confirming.value = false; }
+}
+
+async function handleEarlyWithdraw(orderNo: string) {
+  const order = repurchase.orders.find((entry) => entry.orderNo === orderNo);
+  if (!isRemote.value || !isMounted.value || confirming.value || repurchase.submitting || repurchase.loading || repurchase.error || order?.status !== "ACTIVE") return;
+  const generation = accountGeneration;
+  confirming.value = true;
+  try {
+    const confirmed = await uiConfirm({
+      title: w.value.earlyTitle,
+      message: fmt(w.value.earlyMessage, { order: orderNo, penalty: order.earlyPenaltyPct, amount: (order.amountUsdt * (1 - order.earlyPenaltyPct / 100)).toFixed(6) }),
+      confirmLabel: w.value.earlyAction, cancelLabel: w.value.cancelLabel, icon: "warn", owner: "wallet-repurchase",
+    });
+    if (!confirmed || !currentScope(generation) || repurchase.orders.find((entry) => entry.orderNo === orderNo)?.status !== "ACTIVE") return;
+    await repurchase.earlyWithdraw(orderNo);
+    if (currentScope(generation)) toast.success(w.value.actionSuccess);
+  } catch {
+    if (currentScope(generation)) toast.error(w.value.unavailableTitle, w.value.actionUnknown);
+  } finally { confirming.value = false; }
 }
 
 function goHow() {

@@ -178,7 +178,7 @@ import { useT } from "@/i18n/use-t";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
+import { onlineDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -202,9 +202,9 @@ const cfg = useConfig();
 const app = useApp();
 const fleetOk = () => {
   const ps = cfg.config.publicStats;
-  return !!ps && publicStatsHealth(ps).fleetOk;
+  return !!ps && publicStatsHealth(ps).fleetOk && publicStatsHealth(ps).rateOk;
 };
-const fleetNow = () => (fleetOk() && !cfg.syncFailed ? fleetDevicesOf(cfg.config.publicStats) : null);
+const fleetNow = () => (fleetOk() && !cfg.syncFailed ? onlineDevicesOf(cfg.config.publicStats) : null);
 // 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
 //   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。

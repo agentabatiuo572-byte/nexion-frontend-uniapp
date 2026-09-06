@@ -85,6 +85,7 @@
       </view>
 
       <!-- Activity list -->
+      <WalletListRow icon-bg="var(--v5-brand-2-soft)" :label="t.repurchase.ordersTitle" chevron href="/pages/me/wallet-repurchase" />
       <text class="block" :style="listTitleStyle">{{ t.wallet.activitySection }}</text>
       <view :style="listCardStyle">
         <WalletListRow icon-bg="var(--v5-brand-2-soft)" :first="true" :label="t.wallet.dailyCheckin" :sublabel="t.wallet.dailyCheckinSub" chevron href="/pages/daily/daily">

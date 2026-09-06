@@ -90,7 +90,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-cards.vue": "3d1ab2de2b31a61e95bf2a388ba334b6d785a977421f7de75d9ab6e147171622",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
-  "wallet-exchange.vue": "e4abd0447523aa3e0dd34c12cce2e8dcc2fa52eaff0958f6cb1cbbacf89c2689",
+  // Server fee and six-decimal net proceeds are disclosed before confirmation.
+  "wallet-exchange.vue": "48c7571b34de2737fb0b8d4e1a395813a7b4a11c583a29f91fe394e3a1107041",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
   "wallet-nex.vue": "50f0cd137035f0f0bc3ee3eb69e6c033b1c2a7c45a671b2f0c8b07eab9c9c0d9",
@@ -98,7 +99,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
   // Confirmed operations retain the form while a separate history-sync notice offers GET-only retry.
-  "wallet-repurchase.vue": "d5ef2212e1c97c5b2fee171f896abc4c05018acedd00a881318cf0b7c6c1fefa",
+  // Formal G7 now exposes historical orders, claim/early actions and server-configured copy.
+  "wallet-repurchase.vue": "6e3844e14cd7dd5505034f9452cf47cf427fb156aa7dc7076216fd0193fe7269",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.

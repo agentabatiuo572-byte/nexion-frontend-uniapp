@@ -351,9 +351,18 @@ function onWheelTransitionEnd(e: Event) {
   settleSpin();
 }
 
+const spinSubmitting = ref(false);
 async function doSpin(skipConfirm = false) {
+  if (spinSubmitting.value) return;
+  spinSubmitting.value = true;
+  try { await executeSpin(skipConfirm); }
+  finally { spinSubmitting.value = false; }
+}
+
+async function executeSpin(skipConfirm = false) {
   if (spin.availableSpins() <= 0) return;
   const generation = accountGeneration;
+  const eventCode = spin.activeEventCode;
   const usingBonus = !spin.hasFreeSpinToday();
 
   // bonus 票为稀缺资源 → 二次确认;免费次数零门槛不弹(转化优先)。
@@ -385,9 +394,9 @@ async function doSpin(skipConfirm = false) {
   }
 
   if (remoteApiEnabled) {
-    const key = pendingSpinKey ?? createSpinIdempotencyKey();
-    pendingSpinKey = key;
-    const result = await spin.spinRemote("evt-spring-spin", key);
+    const key = pendingSpinKeys.get(eventCode) ?? createSpinIdempotencyKey();
+    pendingSpinKeys.set(eventCode, key);
+    const result = await spin.spinRemote(eventCode, key);
     if (generation !== accountGeneration) return;
     if (result.stale) return;
     if (!result.ok) {
@@ -402,7 +411,7 @@ async function doSpin(skipConfirm = false) {
       });
       return;
     }
-    pendingSpinKey = null;
+    pendingSpinKeys.delete(eventCode);
     clearSettleTimer();
     settleTimer = setTimeout(() => {
       settleTimer = null;
@@ -429,12 +438,17 @@ async function doSpin(skipConfirm = false) {
   }, 3650);
 }
 
-let pendingSpinKey: string | null = null;
+const pendingSpinKeys = new Map<string, string>();
 watch(() => app.accountKey, () => {
   accountGeneration += 1;
-  pendingSpinKey = null;
+  pendingSpinKeys.clear();
   clearSettleTimer();
 });
+watch(() => [spin.activeEventCode, spin.open], () => {
+  accountGeneration += 1;
+  clearSettleTimer();
+  netError.hide();
+}, { flush: "sync" });
 let spinKeySequence = 0;
 function createSpinIdempotencyKey(): string {
   const randomUuid = globalThis.crypto?.randomUUID;

@@ -1139,6 +1139,7 @@ onLaunch(() => {
 onShow(() => {
   attachSessionWatch();
   if (remoteApiEnabled) {
+    void useConfig().load();
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
     // stale for an entire long-lived session.

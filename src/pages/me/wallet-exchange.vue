@@ -72,7 +72,7 @@
 
       <!-- Receive card -->
       <view :style="swapCardStyle">
-        <text class="block" :style="cardLabelStyle">{{ t.exchange.receive }}</text>
+        <text class="block" :style="cardLabelStyle">{{ remoteApiEnabled ? t.exchange.netReceive : t.exchange.receive }}</text>
         <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
           <text class="flex-1 min-w-0 tabular-nums truncate" :style="receiveValueStyle">{{ toAmountLabel }}</text>
           <text class="shrink-0" style="font-size: 15px; color: var(--v5-ink-3)">{{ toSym }}</text>
@@ -84,13 +84,17 @@
       </view>
 
       <!-- Fee -->
+      <view v-if="remoteApiEnabled" class="flex items-center justify-between" :style="feeRowStyle">
+        <text>{{ t.exchange.exchangeFee }}</text>
+        <text>{{ remoteQuote ? `${amtLabel(remoteQuote.feeUsdt)} USDT` : '—' }}</text>
+      </view>
       <view class="flex items-center justify-between" :style="feeRowStyle">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.feeLabel }}</text>
         <text style="font-size: 12px; color: var(--v5-brand)">{{ t.exchange.feeFree }}</text>
       </view>
 
       <!-- Error -->
-      <view v-if="overBalance || underMin" :style="errorStyle">
+      <view v-if="overBalance || underMin || feeInvalid" :style="errorStyle">
         <text>{{ errorLabel }}</text>
       </view>
 
@@ -197,6 +201,7 @@
 <script setup lang="ts">
 import { onLoad } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
+import { exchangeQuote } from "@/lib/exchange-quote";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -507,7 +512,7 @@ const remoteMinimumReady = computed(() => !remoteApiEnabled || (remoteState.valu
 const money = (n: number): number => +n.toFixed(2);
 /** 展示口径与 money() 同精度 —— 屏幕上的数 = 报价的数 = 落账的数。 */
 const amtLabel = (n: number): string =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: remoteApiEnabled ? 6 : 2 });
 
 // 输入在**进入资金链路的那一刻**就归到账本精度:此后报价 / 额度门 / 扣款 / 账单 / 历史
 // 拿到的是同一个数。留着 1.2345 往下走的话,弹窗显示 1.23、账本扣 1.23、账单却记 1.2345。
@@ -523,10 +528,15 @@ function quoteTo(dir: "usdt2nex" | "nex2usdt", from: number, r: number): number 
   if (from === 0) return 0;
   return money(dir === "usdt2nex" ? from / r : from * r);
 }
-const toAmount = computed(() => quoteTo(direction.value, fromAmount.value, rate.value));
+const remoteQuote = computed(() => {
+  const caps = remoteState.value?.caps;
+  return caps ? exchangeQuote(direction.value, fromAmount.value, rate.value, caps.feePct, caps.feeMinUsdt) : null;
+});
+const feeInvalid = computed(() => remoteApiEnabled && fromAmount.value > 0 && remoteState.value !== null && !remoteQuote.value);
+const toAmount = computed(() => remoteApiEnabled ? (remoteQuote.value?.toAmount ?? 0) : quoteTo(direction.value, fromAmount.value, rate.value));
 const overBalance = computed(() => fromAmount.value > fromBal.value);
 const underMin = computed(() => fromAmount.value > 0 && minFrom.value !== null && fromAmount.value < minFrom.value);
-const valid = computed(() => remoteMinimumReady.value && fromAmount.value > 0 && !overBalance.value && !underMin.value);
+const valid = computed(() => remoteMinimumReady.value && fromAmount.value > 0 && !overBalance.value && !underMin.value && !feeInvalid.value);
 /**
  * 🔴 提交在途守卫(范式同 wallet-cards-new.vue 的 isBinding:`ref(false)` 挂在
  * **组件实例**上,不用 checkout.vue 那个模块级 `let` —— 模块级变量跨实例共享,
@@ -537,7 +547,7 @@ const valid = computed(() => remoteMinimumReady.value && fromAmount.value > 0 &&
 const submitting = ref(false);
 const ctaEnabled = computed(() => valid.value && !submitting.value);
 // USD value of this swap = the leg denominated in USDT
-const swapUSDValue = computed(() => (direction.value === "usdt2nex" ? fromAmount.value : toAmount.value));
+const swapUSDValue = computed(() => remoteApiEnabled ? (remoteQuote.value?.grossUsdt ?? 0) : (direction.value === "usdt2nex" ? fromAmount.value : toAmount.value));
 
 // uni input event → e.detail.value (typed Event; mirrors topup-card-form).
 function detailVal(e: Event): string {
@@ -651,6 +661,7 @@ async function handleConfirm() {
     usd: swapUSDValue.value,
     account: app.accountKey,
     remoteBaseline: remoteState.value,
+    feeUsdt: remoteQuote.value?.feeUsdt ?? 0,
   };
   submitting.value = true;
   // settled 记录「这笔到底成交了没有」—— 下面 catch 里那句资金断言必须跟它走,
@@ -660,7 +671,7 @@ async function handleConfirm() {
     if (remoteApiEnabled) {
       const ok = await confirm({
         title: t.value.exchange.confirm,
-        message: `${snap.fromSym} ${amtLabel(snap.fromAmount)} → ${snap.toSym} ${amtLabel(snap.toAmount)}`,
+        message: `${snap.fromSym} ${amtLabel(snap.fromAmount)} → ${t.value.exchange.netReceive}: ${snap.toSym} ${amtLabel(snap.toAmount)}\n${t.value.exchange.exchangeFee}: ${amtLabel(snap.feeUsdt)} USDT\n${t.value.exchange.quoteEstimate}`,
         icon: "info",
         confirmLabel: t.value.exchange.confirm,
       });
@@ -871,12 +882,13 @@ async function handleConfirm() {
 // ── derived labels ──
 const minLabel = computed(() => t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : String(minFrom.value)).replace("{sym}", fromSym.value));
 const fromBalLabel = computed(() => (fromSym.value === "USDT" ? fromBal.value.toFixed(2) : fromBal.value.toLocaleString()));
-const toAmountLabel = computed(() => amtLabel(toAmount.value));
+const toAmountLabel = computed(() => feeInvalid.value ? "—" : amtLabel(toAmount.value));
 const rateLabel = computed(() => t.value.exchange.rate.replace("{rate}", rate.value.toFixed(5)));
 const updatedLabel = computed(() => t.value.exchange.rateLastUpdated.replace("{n}", String(secsAgo.value)));
 const errorLabel = computed(() =>
   overBalance.value
     ? t.value.exchange.insufficientMessage.replace("{sym}", fromSym.value)
+    : feeInvalid.value ? t.value.exchange.belowFee
     : t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : String(minFrom.value)).replace("{sym}", fromSym.value),
 );
 const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(displayQueue.value.length) }));

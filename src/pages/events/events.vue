@@ -355,7 +355,7 @@ function handleCta(ev: EnrichedEvent) {
     return;
   }
   if (ev.kind === "wheel") {
-    luckySpin.openSheet();
+      luckySpin.openSheet(ev.id);
   }
 }
 
