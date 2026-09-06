@@ -3530,6 +3530,7 @@ export const zh: Messages = {
     downloadErrorToast: "PNG 生成或保存失败，请重试",
   },
   taskHistory: {
+    loading: "正在读取任务历史…",
     tabHistory: "历史",
     viewAll: "查看全部",
     historyEmpty: "暂无已完成任务 — 第一笔即将出现。",
@@ -4670,6 +4671,8 @@ export const zh: Messages = {
     howItWorksEntry: "规则介绍",
     unavailableTitle: "复投暂不可用",
     unavailableBody: "未取得后台权威状态,未执行本地扣款。请稍后重试。",
+    historySyncing: "操作已完成，正在同步完整记录…",
+    historySyncFailed: "操作已完成，记录暂未同步完整。请重试读取，无需重新提交。",
     retry: "重新获取",
     loading: "正在获取后台状态…",
   },

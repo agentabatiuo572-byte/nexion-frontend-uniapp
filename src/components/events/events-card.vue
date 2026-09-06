@@ -105,7 +105,7 @@ function emitUnlessBusy(event: "join" | "claim") {
 const { elRef: barEl, inView: barInView } = useScrollGrowProgress();
 
 const dim = computed(() => props.ev.status === "ended");
-const showClaim = computed(() => props.ev._trackable && props.ev._done && !props.ev._claimed);
+const showClaim = computed(() => props.ev.status === "ongoing" && props.ev._trackable && props.ev._done && !props.ev._claimed);
 const showJoinAction = computed(
   () => props.ev._trackable && !props.ev.joined && !props.ev._done && props.ev.status === "ongoing",
 );

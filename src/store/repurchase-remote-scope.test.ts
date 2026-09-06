@@ -63,6 +63,84 @@ beforeEach(() => {
 });
 
 describe("repurchase remote authority", () => {
+  function manyOrders(): RepurchaseSnapshot {
+    return {
+      ...snapshot,
+      orders: Array.from({ length: 101 }, (_, index) => ({
+        orderNo: `R-${index}`, amountUsdt: 100, apyPct: 35, earlyPenaltyPct: 15,
+        lockDays: 90, lockedAt: 1, unlockAt: 2, estimatedInterestUsdt: 10,
+        status: "CLAIMED" as const,
+      })),
+      ordersPage: { total: 101, pageNum: 3, pageSize: 50 },
+    };
+  }
+
+  it.each(["open", "claim", "earlyWithdraw"] as const)("rehydrates every order after a paginated %s receipt", async (action) => {
+    const full = manyOrders();
+    const receipt = { ...full, orders: full.orders.slice(0, 100), ordersPage: { total: 101, pageNum: 1, pageSize: 100 } };
+    remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(full);
+    remote.repurchaseApi[action].mockResolvedValue(receipt);
+    const store = useRepurchase();
+    store.bindAccount("account-a");
+    await store.refresh();
+    remote.repurchaseApi.fetchOrders.mockClear();
+    if (action === "open") await store.open(100);
+    else await store[action]("R-0");
+    expect(remote.repurchaseApi.fetchOrders).toHaveBeenCalledTimes(1);
+    expect(store.orders).toHaveLength(101);
+    expect(store.orders[100].orderNo).toBe("R-100");
+  });
+
+  it("keeps the acknowledged command successful when the full history read fails", async () => {
+    const full = manyOrders();
+    const receipt = { ...full, orders: full.orders.slice(0, 100), ordersPage: { total: 101, pageNum: 1, pageSize: 100 } };
+    remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(full);
+    remote.repurchaseApi.open.mockResolvedValue(receipt);
+    const store = useRepurchase();
+    store.bindAccount("account-a");
+    await store.refresh();
+    remote.repurchaseApi.fetchOrders.mockRejectedValue(new Error("history unavailable"));
+    await expect(store.open(100)).resolves.toEqual(receipt);
+    expect(store.pendingOpenAmount).toBeNull();
+    expect(store.error).toBe("");
+    expect(store.historyError).toBe("history unavailable");
+    expect(store.historyLoading).toBe(false);
+    expect(store.loading).toBe(false);
+    expect(store.walletBalanceUsdt).toBe(receipt.walletBalanceUsdt);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(full);
+    await store.refreshHistory();
+    expect(store.orders).toHaveLength(101);
+    expect(store.historyError).toBe("");
+    expect(remote.repurchaseApi.open).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["account", "refresh"])("ignores a late history read superseded by %s", async (superseding) => {
+    const full = manyOrders();
+    const receipt = { ...full, orders: full.orders.slice(0, 100) };
+    remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(full);
+    remote.repurchaseApi.open.mockResolvedValue(receipt);
+    const store = useRepurchase();
+    store.bindAccount("account-a");
+    await store.refresh();
+    let finish!: (value: RepurchaseSnapshot) => void;
+    remote.repurchaseApi.fetchOrders.mockReturnValueOnce(new Promise<RepurchaseSnapshot>((resolve) => { finish = resolve; }));
+    const command = store.open(100);
+    await flush();
+    expect(store.historyLoading).toBe(true);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue({ ...snapshot, walletBalanceUsdt: 123 });
+    if (superseding === "account") store.bindAccount("account-b");
+    await store.refresh();
+    finish(full);
+    await command;
+    expect(store.walletBalanceUsdt).toBe(123);
+    expect(store.orders).toEqual([]);
+    expect(store.historyLoading).toBe(false);
+    expect(store.loading).toBe(false);
+  });
+
   it("opens only through the server API after a canonical refresh", async () => {
     remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
     remote.repurchaseApi.fetchOrders.mockResolvedValue(snapshot);

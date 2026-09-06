@@ -3644,6 +3644,7 @@ export const en = {
     downloadErrorToast: "PNG generation or save failed. Please try again.",
   },
   taskHistory: {
+    loading: "Loading task history…",
     tabHistory: "History",
     viewAll: "View all",
     historyEmpty: "No completed tasks yet — your first one is on the way.",
@@ -4820,6 +4821,8 @@ export const en = {
     howItWorksEntry: "Rules",
     unavailableTitle: "Re-investment unavailable",
     unavailableBody: "The authoritative server state is unavailable. No local charge was made. Please try again later.",
+    historySyncing: "Operation completed. Syncing the full history…",
+    historySyncFailed: "Operation completed, but history is not fully synced. Retry reading; do not resubmit.",
     retry: "Retry",
     loading: "Loading server state…",
   },
