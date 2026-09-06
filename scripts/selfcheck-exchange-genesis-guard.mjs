@@ -110,12 +110,14 @@ const EXCHANGE_INPUT_SRC = ts2js([
   grabBlock(exchangeInputRaw, "export function canonicalExchangeAmount(").replace(/^export /, ""),
 ].join("\n"));
 const pageMath = new Function(
+  "remoteApiEnabled",
   `${MONEY_SRC}\n${ts2js([
     grabStatement(exRaw, "const amtLabel = "),
     grabBlock(exRaw, "function quoteTo("),
     grabBlock(exRaw, "function swapLine("),
   ].join("\n"))}\n; return { money, amtLabel, quoteTo, swapLine };`,
-)();
+)(false);
+const remoteAmountLabel = new Function("remoteApiEnabled", `${ts2js(grabStatement(exRaw, "const amtLabel = "))}; return amtLabel;`)(true);
 
 console.log("selfcheck-exchange-genesis-guard — 兑换成交快照单源化 + 创世购买重入守卫");
 
@@ -181,7 +183,7 @@ const iDebit = Math.min(
     `gate@${iRateGate} await@${iAwait} debit@${iDebit}`);
   check("A② 复验与页面展示共用同一个报价公式 quoteTo(报价实现全文只此一处)",
     /function quoteTo\(/.test(strip(exRaw))
-    && /const toAmount = computed\(\(\) => quoteTo\(/.test(strip(exRaw))
+    && strip(exRaw).includes('const toAmount = computed(() => remoteApiEnabled ? (remoteQuote.value?.toAmount ?? 0) : quoteTo(direction.value, fromAmount.value, rate.value))')
     && (strip(exRaw).match(/return money\(dir === "usdt2nex" \? from \/ r : from \* r\);/g) || []).length === 1);
   // 同上:钉「活账号 vs 快照账号的比较」这件事,不钉某一个运算符方向(否则同一处漂移会再咬一次)。
   const iAcctCmp = confirmBody.search(/app\.accountKey\s*[!=]==\s*snap\.account|snap\.account\s*[!=]==\s*app\.accountKey/);
@@ -223,11 +225,13 @@ const iDebit = Math.min(
     && /return money\(dir === "usdt2nex" \? from \/ r : from \* r\);/.test(ex));
   check("A④ 用户输入进入资金链路时就归到账本精度(否则账单记 1.2345 而账本只动 1.23)",
     /const fromAmount = computed\(\(\) => \{[\s\S]{0,120}return isNaN\(n\) \? 0 : money\(n\);/.test(ex));
-  check("A④ 展示口径固定 2 位(min=max 同时钉死;只钉 max 会被 toLocaleString 的默认 min=0 放过)",
-    /const amtLabel = [\s\S]{0,160}minimumFractionDigits: 2, maximumFractionDigits: 2/.test(ex));
+  check("A④ Mock 保持两位账本精度，真实服务端金额保留六位精度",
+    /minimumFractionDigits: 2, maximumFractionDigits: remoteApiEnabled \? 6 : 2/.test(ex)
+    && pageMath.amtLabel(1.123456) === (1.12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    && remoteAmountLabel(1.123456) === (1.123456).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }));
   // 🔴 四个展示口逐个点名 —— 「新写法在不在」是弱判据,四处**全部**经由 amtLabel 才算数。
   const SITES = [
-    ["收款卡", /const toAmountLabel = computed\(\(\) => amtLabel\(toAmount\.value\)\)/],
+    ["收款卡", /const toAmountLabel = computed\(\(\) => feeInvalid\.value \? "—" : amtLabel\(toAmount\.value\)\)/],
     ["确认弹窗", /message: `\$\{snap\.fromSym\} \$\{amtLabel\(snap\.fromAmount\)\} → \$\{snap\.toSym\} \$\{amtLabel\(snap\.toAmount\)\}`/],
     ["成功 toast", /\.replace\("\{fromAmt\}", amtLabel\(snap\.fromAmount\)\)[\s\S]{0,80}\.replace\("\{toAmt\}", amtLabel\(snap\.toAmount\)\)/],
     ["历史行", /return `\$\{amtLabel\(h\.fromAmount\)\} \$\{h\.fromSym\} → \$\{amtLabel\(h\.toAmount\)\} \$\{h\.toSym\}`/],
@@ -439,6 +443,7 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     //    无条件求值,而 harness 没有这个桩。远端分支本身仍由另一套契约覆盖(见上一行注释),
     //    这里只补上「无条件被读到」的那两个 ref,不把远端路径拉进本 harness。
     remoteState: { value: null },
+    remoteQuote: { value: null },
     remoteError: { value: null },
     // The page now freezes the backend acceptance-run scope before either the
     // remote or explicit local-mock branch. Keep this legacy harness on one

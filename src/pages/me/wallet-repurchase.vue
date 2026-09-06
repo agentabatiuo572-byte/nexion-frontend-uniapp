@@ -107,15 +107,15 @@
         </template>
         <view v-if="isRemote" :style="cardStyle">
           <text class="block" :style="heroTitleStyle">{{ w.ordersTitle }}</text>
-          <button :disabled="confirming || repurchase.submitting || repurchase.loading" @click="refreshRemote">{{ repurchase.loading ? w.loading : w.retry }}</button>
+          <view role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading" :style="retryCtaStyle" @click="refreshOrders" @keydown.enter.prevent="refreshOrders" @keydown.space.prevent="refreshOrders"><text>{{ repurchase.loading ? w.loading : w.retry }}</text></view>
           <text v-if="!repurchase.loading && !repurchase.error && !repurchase.orders.length">{{ w.ordersEmpty }}</text>
           <view v-for="order in repurchase.orders" :key="order.orderNo" style="padding: 16px 0; border-top: 1px solid var(--v5-border)">
             <text class="block" style="overflow-wrap: anywhere">{{ order.orderNo }}</text>
             <Row :label="orderStatusLabel(order.status)" :value="`${order.amountUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
-            <Row :label="w.maturesAt" :value="new Date(order.unlockAt).toLocaleString()" />
+            <Row :label="w.maturesAt" :value="new Date(order.unlockAt).toLocaleString(dateLocale())" />
             <Row :label="fmt(w.interestCanonical, { apy: order.apyPct, days: order.lockDays })" :value="`${order.estimatedInterestUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
-            <button v-if="order.status === 'MATURE_UNCLAIMED'" :disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" @click="handleClaim(order.orderNo)">{{ w.claimAction }}</button>
-            <button v-if="order.status === 'ACTIVE'" :disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" @click="handleEarlyWithdraw(order.orderNo)">{{ w.earlyAction }}</button>
+            <view v-if="order.status === 'MATURE_UNCLAIMED'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleClaim(order.orderNo)" @keydown.enter.prevent="handleClaim(order.orderNo)" @keydown.space.prevent="handleClaim(order.orderNo)"><text>{{ w.claimAction }}</text></view>
+            <view v-if="order.status === 'ACTIVE'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleEarlyWithdraw(order.orderNo)" @keydown.enter.prevent="handleEarlyWithdraw(order.orderNo)" @keydown.space.prevent="handleEarlyWithdraw(order.orderNo)"><text>{{ w.earlyAction }}</text></view>
           </view>
         </view>
       </view>
@@ -129,7 +129,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import Row from "@/components/me/repurchase-row.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useApp } from "@/store/app";
@@ -250,6 +250,11 @@ function selectPreset(preset: number) {
   if (confirming.value || repurchase.submitting || recovering.value) return;
   amountTouched.value = true;
   amount.value = preset;
+}
+
+function refreshOrders() {
+  if (confirming.value || repurchase.submitting || repurchase.loading) return;
+  void refreshRemote();
 }
 
 async function refreshRemote() {
