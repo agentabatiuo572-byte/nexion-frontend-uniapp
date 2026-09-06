@@ -3515,6 +3515,7 @@ export const vi: Messages = {
     downloadErrorToast: "Không thể tạo hoặc lưu PNG. Vui lòng thử lại.",
   },
   taskHistory: {
+    loading: "Đang tải lịch sử tác vụ…",
     tabHistory: "Lịch sử",
     viewAll: "Xem tất cả",
     historyEmpty: "Chưa có tác vụ nào hoàn thành — tác vụ đầu tiên sẽ sớm xuất hiện.",
@@ -4675,6 +4676,8 @@ export const vi: Messages = {
     howItWorksEntry: "Quy tắc",
     unavailableTitle: "Tái đầu tư hiện không khả dụng",
     unavailableBody: "Không lấy được trạng thái chính thức từ máy chủ. Không có khoản trừ cục bộ nào được thực hiện. Vui lòng thử lại sau.",
+    historySyncing: "Thao tác đã hoàn tất. Đang đồng bộ toàn bộ lịch sử…",
+    historySyncFailed: "Thao tác đã hoàn tất nhưng lịch sử chưa đồng bộ đầy đủ. Hãy tải lại, không gửi lại thao tác.",
     retry: "Thử lại",
     loading: "Đang tải trạng thái máy chủ…",
   },

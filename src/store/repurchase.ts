@@ -22,6 +22,8 @@ export const useRepurchase = defineStore("repurchase", () => {
   const loading = ref(false);
   const submitting = ref(false);
   const error = ref("");
+  const historyLoading = ref(false);
+  const historyError = ref("");
   const intents = createRemoteIntentGate("g7");
   const pendingOpenAmount = ref<number | null>(null);
   let boundAccount = "";
@@ -38,6 +40,7 @@ export const useRepurchase = defineStore("repurchase", () => {
     walletBalanceUsdt.value = snapshot.walletBalanceUsdt;
     serverTime.value = snapshot.serverTime;
     error.value = "";
+    historyError.value = "";
   }
 
   function acceptConfig(nextConfig: RepurchaseConfig): RepurchaseConfig {
@@ -61,6 +64,7 @@ export const useRepurchase = defineStore("repurchase", () => {
     const refreshRequest = ++refreshGeneration;
     const configRequest = ++configGeneration;
     const ordersRequest = ++ordersGeneration;
+    historyLoading.value = false;
     loading.value = true;
     error.value = "";
     const configOutcome = repurchaseApi.fetchConfig()
@@ -114,6 +118,23 @@ export const useRepurchase = defineStore("repurchase", () => {
     pendingOpenAmount.value = pending.length ? pending[0] as number : null;
   }
 
+  async function refreshHistory() {
+    if (!remoteApiEnabled || !boundAccount) return;
+    const account = accountGeneration;
+    const request = ++ordersGeneration;
+    historyLoading.value = true;
+    historyError.value = "";
+    try {
+      const snapshot = await repurchaseApi.fetchOrders();
+      if (account === accountGeneration && request === ordersGeneration) apply(snapshot);
+    } catch (cause) {
+      // A read failure cannot reverse a confirmed money operation.
+      if (account === accountGeneration && request === ordersGeneration) historyError.value = message(cause);
+    } finally {
+      if (account === accountGeneration && request === ordersGeneration) historyLoading.value = false;
+    }
+  }
+
   async function command(scope: string, payload: number | string, action: (idempotencyKey: string) => Promise<RepurchaseSnapshot>) {
     if (submitting.value) throw new Error("REPURCHASE_COMMAND_IN_PROGRESS");
     if (!boundAccount) throw new Error("REMOTE_INTENT_ACCOUNT_INVALID");
@@ -135,6 +156,11 @@ export const useRepurchase = defineStore("repurchase", () => {
       intents.complete(lease, true);
       // A storage cleanup problem cannot undo an acknowledged server receipt.
       try { restorePendingOpen(); } catch (cause) { error.value = message(cause); }
+      if (snapshot.orders.length < snapshot.ordersPage.total) {
+        // Money is already committed. A paginated receipt is not a complete
+        // history; hydrate it without turning a failed GET into a failed POST.
+        await refreshHistory();
+      }
       return snapshot;
     } catch (cause) {
       // A later rejection cannot disprove an earlier unknown commit.
@@ -194,6 +220,8 @@ export const useRepurchase = defineStore("repurchase", () => {
     serverTime.value = 0;
     error.value = "";
     loading.value = false;
+    historyLoading.value = false;
+    historyError.value = "";
     submitting.value = false;
     pendingOpenAmount.value = null;
     try { restorePendingOpen(); } catch (cause) { error.value = message(cause); }
@@ -208,8 +236,11 @@ export const useRepurchase = defineStore("repurchase", () => {
     loading,
     submitting,
     error,
+    historyLoading,
+    historyError,
     pendingOpenAmount,
     refresh,
+    refreshHistory,
     open,
     claim,
     earlyWithdraw,

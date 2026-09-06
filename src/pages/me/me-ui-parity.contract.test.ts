@@ -97,7 +97,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
-  "wallet-repurchase.vue": "876bc068892e35c026ac750a8e723388d328a04bb6aca02f1e342534b89dd560",
+  // Confirmed operations retain the form while a separate history-sync notice offers GET-only retry.
+  "wallet-repurchase.vue": "d5ef2212e1c97c5b2fee171f896abc4c05018acedd00a881318cf0b7c6c1fefa",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
