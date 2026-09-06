@@ -151,7 +151,10 @@ test("remote leaderboard, leadership pool, and commission pages use self-scoped 
   assert.match(poolFailure, /\? "hold" : "error"/);
   assert.match(commission, /teamInsightsApi\.commissions/);
   assert.match(commission, /bindingEpoch \+= 1/);
-  assert.match(commission, /if \(!isCurrentScope\(scope\)\) return/);
+  for (const generation of ["binaryRefreshGeneration", "eventsRefreshGeneration"]) {
+    assert.match(commission, new RegExp(`if \\(generation !== ${generation} \\|\\| !isCurrentScope\\(scope\\)\\) return`));
+    assert.match(commission, new RegExp(`generation === ${generation} && isCurrentScope\\(scope\\)`));
+  }
 });
 
 test("remote unilevel page renders only the server cycle/source/layer/split projection", async () => {

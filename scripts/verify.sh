@@ -2206,7 +2206,9 @@ trial02_source_fingerprints() {
   #      (FEAT-TRIAL02)时已随根 PRD §9.11a.2 改名为 `/api/trial/convert`(两行公式逐字相同),
   #      签字规格里只有 convert、无 redeem 概念。全仓零调用、零消费点。
   #   判定与证据链见 docs/changes/2026-08-13-trial-early-buy-adjudication.md。
-  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts"; do
+  # 2026-09-06: exact parser/store regression fixtures also read the server deadline.
+  # This permits only that field in those two tests; every card/auto-charge fingerprint above stays banned.
+  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts|src/store/free-trial.remote-errors.test.ts|src/api/trial-api.test.ts"; do
     pat=${pair%%:*}; allow=${pair#*:}
     hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -vE "^($allow):" | head -5)
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside allow-list [$allow] (scanned $files_n files)";
