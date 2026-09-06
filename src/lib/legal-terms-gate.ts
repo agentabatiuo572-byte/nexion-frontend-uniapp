@@ -7,8 +7,8 @@ export const LOGIN_ROUTE = "/pages/login/login";
 export interface LegalTermsSessionFence {
   accessToken: string;
   userId: number;
-  /** Monotonic runtime generation; rejects a response across catalog rollover. */
-  runEpoch?: number;
+  /** Authentication generation, independent of product/fleet refreshes. */
+  sessionRevision?: number;
 }
 
 function internalReturnTo(raw: string | null | undefined, fallback: string): string {
@@ -91,5 +91,5 @@ export function sameLegalTermsSession(
   if (!expected || !actual) return false;
   return expected.accessToken === actual.accessToken
     && expected.userId === actual.userId
-    && (expected.runEpoch === undefined || actual.runEpoch === expected.runEpoch);
+    && (expected.sessionRevision === undefined || actual.sessionRevision === expected.sessionRevision);
 }

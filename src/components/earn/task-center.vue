@@ -70,8 +70,8 @@
       class="mb-3 rounded-xl"
       style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)"
     >
-      <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.syncFailedTitle }}</text>
-      <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.syncFailedBody }}</text>
+      <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.assignmentsUnavailableTitle }}</text>
+      <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.assignmentsUnavailableBody }}</text>
       <view
         class="inline-flex items-center active:opacity-70"
         style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)"
@@ -168,7 +168,7 @@ async function openTaskReceipt(task: CompletedTask): Promise<void> {
     if (requestEpoch === receiptRequestEpoch
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
-      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+      toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
     }
   }
 }

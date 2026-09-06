@@ -78,12 +78,12 @@ describe("legal terms session gate", () => {
     expect(sameLegalTermsRun({ ...acknowledged(false), sourceEnvironment: "PRODUCTION", runId: "" })).toBe(true);
   });
 
-  it("rejects late responses after account, token, or runtime revision changes", () => {
-    const first: LegalTermsSessionFence = { accessToken: "token-a", userId: 7, runEpoch: 1 };
+  it("rejects late responses after account, token, or authentication revision changes", () => {
+    const first: LegalTermsSessionFence = { accessToken: "token-a", userId: 7, sessionRevision: 1 };
     expect(sameLegalTermsSession(first, { ...first })).toBe(true);
     expect(sameLegalTermsSession(first, { ...first, accessToken: "token-b" })).toBe(false);
     expect(sameLegalTermsSession(first, { ...first, userId: 8 })).toBe(false);
-    expect(sameLegalTermsSession({ ...first, runEpoch: 2 }, { ...first, runEpoch: 3 })).toBe(false);
+    expect(sameLegalTermsSession({ ...first, sessionRevision: 2 }, { ...first, sessionRevision: 3 })).toBe(false);
     expect(sameLegalTermsSession(first, null)).toBe(false);
   });
 });

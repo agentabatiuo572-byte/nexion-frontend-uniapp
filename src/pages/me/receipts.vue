@@ -279,7 +279,7 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean): Promi
       && expectedBindingEpoch === app.accountBindingEpoch) {
       failedComputeReceiptRequest.value = { offset, append };
       remoteComputeReceiptStatus.value = "error";
-      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+      toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
     }
   } finally {
     if (requestEpoch === receiptPageRequestEpoch
@@ -340,7 +340,7 @@ async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): P
       && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
-      toast.error(t.value.wallet.syncFailedTitle, t.value.wallet.syncFailedBody);
+      toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
     }
   }
 }

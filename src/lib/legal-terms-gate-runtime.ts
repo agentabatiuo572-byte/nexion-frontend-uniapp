@@ -28,19 +28,18 @@ let pendingRequirement: {
 function fence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
   if (!session?.accessToken) return null;
-  const revision = captureRuntimeRevision();
-  return { accessToken: session.accessToken, userId: session.user.userId, runEpoch: revision.epoch };
+  return { accessToken: session.accessToken, userId: session.user.userId, sessionRevision: sessionVault.revision() };
 }
 
 function sessionKey(value: LegalTermsSessionFence): string {
-  return `${value.userId}:${value.accessToken}:${value.runEpoch ?? 0}`;
+  return `${value.userId}:${value.accessToken}:${value.sessionRevision ?? 0}`;
 }
 
-function rescheduleAfterEpochChange(expected: LegalTermsSessionFence, returnTo: string): Promise<void> {
+function rescheduleAfterSessionChange(expected: LegalTermsSessionFence, returnTo: string): Promise<void> {
   const current = fence();
   if (!current
       || current.userId !== expected.userId
-      || (current.accessToken === expected.accessToken && current.runEpoch === expected.runEpoch)) {
+      || sameLegalTermsSession(expected, current)) {
     return Promise.resolve();
   }
   return scheduleLegalTermsGate(returnTo);
@@ -141,7 +140,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
   const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
     .then((snapshot) => {
       if (!sameLegalTermsSession(requestFence, fence())) {
-        return rescheduleAfterEpochChange(requestFence, returnTo);
+        return rescheduleAfterSessionChange(requestFence, returnTo);
       }
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
@@ -157,7 +156,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
     })
     .catch(() => {
       if (!sameLegalTermsSession(requestFence, fence())) {
-        return rescheduleAfterEpochChange(requestFence, returnTo);
+        return rescheduleAfterSessionChange(requestFence, returnTo);
       }
       if (failedKeys.has(key)) return;
       finishVerification(key);

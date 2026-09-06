@@ -277,6 +277,7 @@ import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder } from "@/lib/checkout-order-recovery";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -1026,6 +1027,11 @@ let pendingVoucherRelease: string | null = null;
 async function onConfirmPay() {
   if (confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
   confirming = true;
+  const recoveryScope = captureAccountScope();
+  if (remoteApiEnabled) {
+    const recovering = await resumeServerOrder();
+    if (recovering || !isCurrentAccountScope(recoveryScope) || !pageAlive) { confirming = false; return; }
+  }
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
@@ -1254,10 +1260,14 @@ function cancelCheckout() {
 
 // IDEMPOTENCY-FRESH-OK: 下面 738-740 行先读**持久化**的 durable 键(readAccountRow),命中就直接返回 ——
 // 这把钥匙跨 App 重启都稳,是全仓最强的一处;现铸分支只在「这个 intent 头一次」时走到。
-function remoteOrderKey(): string {
+function remoteOrderIntent(): string {
   const p = product.value;
-  const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
+  return [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
     tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
+}
+
+function remoteOrderKey(): string {
+  const intent = remoteOrderIntent();
   const accountKey = orders.currentAccountKey();
   return acquireAccountCommandKey(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, intent, "h7-order");
 }
@@ -1275,6 +1285,22 @@ function retireRemoteOrderKey(): void {
     writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, { commands });
   }
   remoteOrderCommandKey.clear();
+}
+
+let serverOrderRecovery: { key: string; promise: Promise<boolean> } | null = null;
+function resumeServerOrder(): Promise<boolean> {
+  if (!remoteApiEnabled || !pageAlive) return Promise.resolve(false);
+  const scope = captureAccountScope();
+  const recoveryProduct = productId.value;
+  const key = JSON.stringify([scope.accountKey, scope.epoch, recoveryProduct]);
+  if (serverOrderRecovery?.key === key) return serverOrderRecovery.promise;
+  const promise = recoverCheckoutOrder(orders.currentAccountKey(), recoveryProduct, {
+    list: orderApi.list,
+    isCurrent: () => isCurrentAccountScope(scope) && productId.value === recoveryProduct,
+    navigate: (url) => pageAlive && pageVisible ? navReplace(url) : Promise.resolve(false),
+  }).finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
+  serverOrderRecovery = { key, promise };
+  return promise;
 }
 
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
@@ -1331,6 +1357,7 @@ async function submitRemoteOrder(): Promise<void> {
     return;
   }
   let canonicalOrderCommitted = false;
+  let recoveryOrderNo: string | null = null;
   try {
     const tradeinContext = appliedTradeinView.value;
     if (tradein.appliedTradein && !tradeinContext) {
@@ -1406,6 +1433,13 @@ async function submitRemoteOrder(): Promise<void> {
       idempotencyKey: remoteOrderKey(),
     });
     if (!scopeIsCurrent()) return;
+    canonicalOrderCommitted = true;
+    recoveryOrderNo = created.orderNo;
+    // Persist the known server identity BEFORE payment. Refresh, lower balance,
+    // consumed vouchers and full capacity must recover this order, not create another.
+    rememberCheckoutOrder(orders.currentAccountKey(), {
+      productNo: p.id, orderNo: created.orderNo, intent: remoteOrderIntent(), commandKey: remoteOrderKey(),
+    });
     const receipt = created.voucherRedemption;
     // A claimed voucher changes its UI state only after the order's explicit,
     // server-issued redemption receipt. Missing/mismatched receipts fail closed.
@@ -1420,17 +1454,22 @@ async function submitRemoteOrder(): Promise<void> {
     }
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
     if (!scopeIsCurrent()) return;
+    const alreadySettled = persisted?.canonicalStatus === "activated"
+      && persisted.paymentStatus.toUpperCase() === "PAID"
+      && persisted.orderStatus.toUpperCase() === "COMPLETED"
+      && persisted.activationStatus.toUpperCase() === "ACTIVATED";
     if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
-        || (persisted.canonicalStatus !== "placed"
+        || (!alreadySettled && (persisted.canonicalStatus !== "placed"
           || persisted.paymentStatus.toUpperCase() !== "PENDING"
-          || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT")
-        || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
-        || created.paymentStatus.toUpperCase() !== "PENDING"
-        || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
+          || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
+          || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
+          || created.paymentStatus.toUpperCase() !== "PENDING"
+          || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"))
         || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
         || Math.abs(persisted.discountUsdt - created.discountUsdt) > 0.000001) {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
+    if (alreadySettled) { await resumeServerOrder(); return; }
     canonicalOrderCommitted = true;
     const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
     if (!scopeIsCurrent()) return;
@@ -1456,9 +1495,20 @@ async function submitRemoteOrder(): Promise<void> {
     // order readback. A temporary projection outage must not re-submit payment.
     void app.refreshRemoteFleet(walletReceiptScope);
     retireRemoteOrderKey();
+    forgetCheckoutOrder(orders.currentAccountKey(), p.id, created.orderNo);
     step.value = "live";
   } catch (error) {
     if (!scopeIsCurrent()) return;
+    if (recoveryOrderNo) {
+      // A timeout is not a failed purchase. The canonical order page reads the
+      // current status and reuses wallet-pay:<orderNo> only if payment is pending.
+      toast.warn(t.value.store.coRecoverOriginalOrder);
+      step.value = "awaiting";
+      if (!(await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(recoveryOrderNo)}`)) && scopeIsCurrent()) {
+        step.value = "confirm";
+      }
+      return;
+    }
     // Keep only outcome-unknown errors: transport, malformed response, 5xx and
     // the server's explicit unknown-result fence. Structured API facts—not text
     // matching—decide whether a business rejection can mint a new attempt.
@@ -1503,6 +1553,7 @@ function reassertTradeinContext() {
 
 onShow(() => {
   pageVisible = true;
+  void resumeServerOrder();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
