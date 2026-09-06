@@ -152,6 +152,7 @@ export const useRepurchase = defineStore("repurchase", () => {
       // Commands update orders and wallet, but not the independent config
       // resource. Only invalidate pre-receipt orders reads.
       ordersGeneration += 1;
+      historyLoading.value = false;
       apply(snapshot);
       intents.complete(lease, true);
       // A storage cleanup problem cannot undo an acknowledged server receipt.

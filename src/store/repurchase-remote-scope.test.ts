@@ -141,6 +141,25 @@ describe("repurchase remote authority", () => {
     expect(store.loading).toBe(false);
   });
 
+  it("clears a superseded history retry when a later command supplies a complete receipt", async () => {
+    remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
+    remote.repurchaseApi.fetchOrders.mockResolvedValue(snapshot);
+    remote.repurchaseApi.open.mockResolvedValue({ ...snapshot, walletBalanceUsdt: 400 });
+    const store = useRepurchase();
+    store.bindAccount("account-a");
+    await store.refresh();
+    let finish!: (value: RepurchaseSnapshot) => void;
+    remote.repurchaseApi.fetchOrders.mockReturnValueOnce(new Promise<RepurchaseSnapshot>((resolve) => { finish = resolve; }));
+    const history = store.refreshHistory();
+    expect(store.historyLoading).toBe(true);
+    await store.open(100);
+    expect(store.historyLoading).toBe(false);
+    finish(snapshot);
+    await history;
+    expect(store.walletBalanceUsdt).toBe(400);
+    expect(store.historyError).toBe("");
+  });
+
   it("opens only through the server API after a canonical refresh", async () => {
     remote.repurchaseApi.fetchConfig.mockResolvedValue(config);
     remote.repurchaseApi.fetchOrders.mockResolvedValue(snapshot);
