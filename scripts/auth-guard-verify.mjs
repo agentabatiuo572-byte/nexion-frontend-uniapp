@@ -17,12 +17,13 @@ const authed = JSON.stringify({ type: "object", data: {
 } });
 
 async function installServerSessionBoundary(page, authenticated) {
-  if (authenticated) {
-    await page.addInitScript((stored) => {
-      localStorage.clear();
-      localStorage.setItem("nexgrid-auth-v1", stored);
-    }, authed);
-  }
+  // The initial route and its auth fixture must arrive in the same document.
+  // Writing storage after a temporary home navigation races UniApp bootstrap
+  // and turns the requested starting route into a stale same-document hash.
+  await page.addInitScript((stored) => {
+    localStorage.clear();
+    localStorage.setItem("nexgrid-auth-v1", stored);
+  }, authenticated ? authed : unauth);
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (!/^\/(?:api|auth)\//.test(url.pathname)) return route.continue();
@@ -96,11 +97,8 @@ async function routeAfter(authenticated, target) {
   page.on("pageerror", (error) => pageErrors.push(error.stack || String(error)));
   page.on("console", collectAppConsoleErrors(consoleErrors, BASE));
   await installServerSessionBoundary(page, authenticated);
-  await page.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.evaluate((u) => {
-    localStorage.clear();
-    if (u) localStorage.setItem("nexgrid-auth-v1", u);
-  }, authenticated ? authed : unauth);
+  // The initial route is the document entry point. Do not boot home first and
+  // race its startup navigation against the route whose guard outcome we read.
   await page.goto(`${BASE}/?nx_device=off#${target}`, { waitUntil: "load", timeout: 30000 });
   await wait(1800); // onShow guard + one 1s tick
   const witness = await page.evaluate(() => ({
@@ -124,15 +122,27 @@ async function sameDocumentRoute(target, authenticated = true, initialRoute = ""
   page.on("pageerror", (error) => pageErrors.push(error.stack || String(error)));
   page.on("console", collectAppConsoleErrors(consoleErrors, BASE));
   await installServerSessionBoundary(page, authenticated);
-  await page.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.evaluate(({ stored }) => {
-    localStorage.clear();
-    localStorage.setItem("nexgrid-auth-v1", stored);
-  }, { stored: authenticated ? authed : unauth });
   const startRoute = initialRoute || (authenticated ? "/pages/me/me" : "/pages/onboarding/intro");
-  await page.goto(`${BASE}/?nx_device=off#${startRoute}`, { waitUntil: "load", timeout: 30000 });
-  // Start the same-document mutation only after the initial static page exists.
-  await waitForUniAppPage(page, startRoute.replace(/^\//, ""));
+  // A successful server-session restore intentionally takes a cold static
+  // review route home. Start that fixture on a protected route, prove the
+  // server identity rendered, then enter the static route as the first real
+  // same-document transition under test.
+  const staticStart = authenticated && !!initialRoute && startRoute.startsWith("/pages/entry-surfaces/");
+  const initialDocumentRoute = staticStart ? "/pages/me/me" : startRoute;
+  await page.goto(`${BASE}/?nx_device=off#${initialDocumentRoute}`, { waitUntil: "load", timeout: 30000 });
+  await waitForUniAppPage(page, initialDocumentRoute.replace(/^\//, ""));
+  if (staticStart) {
+    // `Guard Witness` exists only in the mocked /auth/users/refresh response;
+    // this proves the server restoration completed, unlike the raw persisted
+    // auth snapshot which exists before bootstrap starts.
+    await page.waitForFunction(
+      () => (document.body?.innerText || "").includes("Guard Witness"),
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.evaluate((hash) => { window.location.hash = hash; }, startRoute);
+    await waitForUniAppPage(page, startRoute.replace(/^\//, ""));
+  }
   await page.evaluate((hash) => { window.location.hash = hash; }, target);
   // A busy dev server can delay the one-second repair tick. Observe the
   // final guard destination instead of stopping at an intermediate retired-
