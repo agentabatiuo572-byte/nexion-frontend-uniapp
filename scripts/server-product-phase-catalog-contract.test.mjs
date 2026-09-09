@@ -41,8 +41,9 @@ test("account switching invalidates catalog snapshots and ignores stale response
   assert.match(phaseStore, /requestEpoch !== phaseEpoch/);
 });
 
-test("store detail and checkout refresh the server phase when they become visible", () => {
-  assert.match(detail, /onShow\([\s\S]*refreshServerProductPhase\(true\)/);
+test("store detail refreshes catalog before its scope-guarded phase and Trust reads when visible", () => {
+  assert.match(detail, /async function refreshDetailFacts\(\): Promise<void> \{[\s\S]*await refreshProductCatalog\(true\)[\s\S]*if \(readEpoch !== detailFactsEpoch \|\| !isCurrentAccountScope\(accountScope\)\) return;[\s\S]*refreshServerProductPhase\(true\)[\s\S]*refreshTrust\(true\)/);
+  assert.match(detail, /onShow\(\(\) => \{[\s\S]*void refreshDetailFacts\(\)/);
   assert.match(checkout, /onShow\([\s\S]*refreshServerProductPhase\(true\)/);
 });
 

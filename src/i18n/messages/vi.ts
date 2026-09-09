@@ -1796,7 +1796,7 @@ export const vi: Messages = {
       },
       withdraw: {
         q: "Tôi có thể rút thu nhập bất cứ lúc nào không?",
-        a: "Được, từ $20. Việc xử lý rút tiền tuân theo quy tắc và trạng thái xét duyệt hiện hiển thị trong Ví. Tiền rút sẽ chuyển vào địa chỉ rút tiền bạn đã thiết lập trong ví.",
+        a: "Được, từ $20. Việc xử lý rút tiền tuân theo quy tắc và trạng thái xử lý hiện hiển thị trong Ví. Tiền rút sẽ chuyển vào địa chỉ rút tiền bạn đã thiết lập trong ví.",
       },
       demand: {
         q: "Nếu nhu cầu AI giảm thì sao?",
