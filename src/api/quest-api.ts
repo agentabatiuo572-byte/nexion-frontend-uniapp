@@ -6,6 +6,7 @@ import { normalizeQuestActionRoute } from "@/lib/quest-presentation";
 export type QuestLayer = "DAY_ONE" | "WEEKLY_T1" | "WEEKLY_T2";
 export type QuestStatus = "PENDING" | "COMPLETED" | "CLAIMABLE" | "CLAIMED" | "EXPIRED";
 export type QuestTaskCategory = "wallet" | "explore" | "recommend" | "identity" | "social";
+export type DayOneSnapshotStatus = "SNAPSHOT" | "EMPTY" | "LEGACY_UNVERIFIED";
 
 export interface CanonicalQuest {
   questCode: string;
@@ -35,6 +36,9 @@ export interface CanonicalPromoBanner {
 export interface QuestSnapshot {
   quests: CanonicalQuest[];
   dayOneRewardNex: number;
+  /** Null means an older server state has no immutable Day-One snapshot. */
+  dayOneRequiredTaskCount: number | null;
+  dayOneSnapshotStatus: DayOneSnapshotStatus;
   promoBanner: CanonicalPromoBanner | null;
   questBonusMultiplier: number;
   rhythmMonth: number;
@@ -161,10 +165,39 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   };
 }
 
+function parseDayOneSnapshotMetadata(row: Record<string, unknown>, quests: readonly CanonicalQuest[]) {
+  const legacy = { dayOneRequiredTaskCount: null, dayOneSnapshotStatus: "LEGACY_UNVERIFIED" as const };
+  const hasCount = Object.prototype.hasOwnProperty.call(row, "dayOneRequiredTaskCount");
+  const hasStatus = Object.prototype.hasOwnProperty.call(row, "dayOneSnapshotStatus");
+  // Older running servers did not expose metadata. Preserve all rows (including
+  // weekly history), but never reconstruct a Day-One group from live missions.
+  if (!hasCount && !hasStatus) {
+    return legacy;
+  }
+  if (!hasCount || !hasStatus) return legacy;
+  const status = text(row.dayOneSnapshotStatus) as DayOneSnapshotStatus;
+  const requiredTaskCount = number(row.dayOneRequiredTaskCount, 0);
+  if (!status || !["SNAPSHOT", "EMPTY", "LEGACY_UNVERIFIED"].includes(status)) return legacy;
+  const dayOne = quests.filter((quest) => quest.layer === "DAY_ONE");
+  if (status === "SNAPSHOT") {
+    const singleInstance = new Set(dayOne.map((quest) => quest.instanceKey)).size === 1;
+    if (requiredTaskCount === null || !Number.isSafeInteger(requiredTaskCount) || requiredTaskCount < 1
+        || dayOne.length !== requiredTaskCount || !singleInstance) return legacy;
+    return { dayOneRequiredTaskCount: requiredTaskCount, dayOneSnapshotStatus: status };
+  }
+  if (status === "EMPTY" && requiredTaskCount === 0 && dayOne.length === 0) {
+    return { dayOneRequiredTaskCount: 0, dayOneSnapshotStatus: status };
+  }
+  if (status === "LEGACY_UNVERIFIED" && row.dayOneRequiredTaskCount === null) {
+    return { dayOneRequiredTaskCount: null, dayOneSnapshotStatus: status };
+  }
+  return legacy;
+}
+
 export function parseQuestSnapshot(value: unknown, mode: ApiEnvironment = "prod"): QuestSnapshot {
   const row = record(value);
   const multiplier = number(row?.questBonusMultiplier, 0.1);
-  const dayOneRewardNex = number(row?.dayOneRewardNex, 0, 100_000);
+  const dayOneRewardNex = number(row?.dayOneRewardNex, 0);
   const rhythmMonth = number(row?.rhythmMonth, 1);
   const source = text(row?.source);
   if (!row || !validAuthority(row, mode) || !Array.isArray(row.quests) || multiplier === null
@@ -177,9 +210,11 @@ export function parseQuestSnapshot(value: unknown, mode: ApiEnvironment = "prod"
   const quests = row.quests.map(parseQuest);
   const codes = new Set(quests.map((quest) => quest.questCode));
   if (codes.size !== quests.length) return invalid("QUEST_CODE_DUPLICATED");
+  const dayOneMetadata = parseDayOneSnapshotMetadata(row, quests);
   return {
     quests,
     dayOneRewardNex,
+    ...dayOneMetadata,
     promoBanner: parsePromo(row.promoBanner),
     questBonusMultiplier: multiplier,
     rhythmMonth,

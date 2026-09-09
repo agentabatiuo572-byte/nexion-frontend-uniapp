@@ -38,6 +38,8 @@ const pausedPromo: CanonicalPromoBanner = {
 const weeklySnapshot: QuestSnapshot = {
   quests: [weeklyQuest],
   dayOneRewardNex: 0,
+  dayOneRequiredTaskCount: null,
+  dayOneSnapshotStatus: "LEGACY_UNVERIFIED",
   promoBanner: pausedPromo,
   questBonusMultiplier: 1,
   rhythmMonth: 0,
