@@ -99,6 +99,37 @@ test("profile and same-document guard probes use the semantic readiness gate wit
   assert.match(profile, /waitForUniAppPage\(page, "pages\/me\/profile"\)/);
   assert.doesNotMatch(profile, /waitForTimeout\(1200\)/);
   assert.match(guard, /waitForUniAppPage\(page, startRoute\.replace/);
-  assert.equal((guard.match(/waitForUniAppPage\(page,/g) || []).length, 2, "guard must await both initial and final mounted routes");
+  assert.equal((guard.match(/waitForUniAppPage\(page,/g) || []).length, 3, "guard must await cold entry, static transition, and final mounted routes");
   assert.doesNotMatch(guard, /\)\.catch\(\(\) => \{\}\);/);
+});
+
+test("same-document guard fixture enters a static review start only after visible server-session restoration", () => {
+  const guard = fs.readFileSync(new URL("./auth-guard-verify.mjs", import.meta.url), "utf8");
+  const start = guard.indexOf("async function sameDocumentRoute");
+  const end = guard.indexOf("\ntry {", start);
+  const sameDocument = guard.slice(start, end);
+  const fixtureStart = guard.slice(guard.indexOf("async function installServerSessionBoundary"), start);
+
+  assert.match(fixtureStart, /await page\.addInitScript\([\s\S]*?authenticated \? authed : unauth/);
+  assert.equal((sameDocument.match(/await page\.goto\(/g) || []).length, 1, "the initial route must be the only document navigation");
+  assert.match(sameDocument, /const initialDocumentRoute = staticStart \? "\/pages\/me\/me" : startRoute/);
+  assert.match(sameDocument, /page\.goto\(`\$\{BASE\}\/\?nx_device=off#\$\{initialDocumentRoute\}`/);
+  assert.match(sameDocument, /document\.body\?\.innerText \|\| ""\)\.includes\("Guard Witness"\)/);
+  assert.match(sameDocument, /page\.evaluate\(\(hash\) => \{ window\.location\.hash = hash; \}, startRoute\)/);
+  assert.match(sameDocument, /waitForUniAppPage\(page, startRoute\.replace/);
+  assert.doesNotMatch(sameDocument, /pages\/index\/index/);
+  assert.doesNotMatch(sameDocument, /localStorage\.setItem\("nexgrid-auth-v1"/);
+});
+
+test("direct guard fixture also starts its requested route in one document without mistaking an eventual redirect for readiness", () => {
+  const guard = fs.readFileSync(new URL("./auth-guard-verify.mjs", import.meta.url), "utf8");
+  const start = guard.indexOf("async function routeAfter");
+  const end = guard.indexOf("\nasync function sameDocumentRoute", start);
+  const directRoute = guard.slice(start, end);
+
+  assert.equal((directRoute.match(/await page\.goto\(/g) || []).length, 1, "the direct route fixture must not first boot home");
+  assert.match(directRoute, /page\.goto\(`\$\{BASE\}\/\?nx_device=off#\$\{target\}`/);
+  assert.doesNotMatch(directRoute, /pages\/index\/index/);
+  assert.doesNotMatch(directRoute, /localStorage\.setItem\("nexgrid-auth-v1"/);
+  assert.match(directRoute, /await wait\(1800\)/, "routeAfter must keep sampling the guard outcome rather than wait for its raw protected target");
 });
