@@ -18,6 +18,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { waitForUniAppPage } from "./lib/probe-readiness.mjs";
 import { installFormalProbeSession } from "./lib/formal-probe-session.mjs";
 import {
   assertNoRuntimeErrors,
@@ -76,8 +77,8 @@ async function check(label, poisonTable) {
   page.on("pageerror", (e) => errors.push(String(e)));
   await installFormalProbeSession(page);
   await page.goto(directAppUrl(BASE, ROUTE), { waitUntil: "networkidle", timeout: 30000 });
-  // 绑定闸(App.vue 启动恢复)与首屏渲染都在页内异步,给一拍 settle。
-  await page.waitForTimeout(1200);
+  // The actual readiness boundary is the mounted route and first rendered text.
+  await waitForUniAppPage(page, "pages/me/profile");
   const witness = await page.evaluate(() => {
     const bare = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

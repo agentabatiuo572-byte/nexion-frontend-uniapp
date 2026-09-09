@@ -120,6 +120,7 @@ const REGISTRY = {
   "kyc-removal-contract.test.mjs": { how: "elsewhere", by: "npm run test:kyc-removal" },
   "probe-safety-contract.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
   "static-review-routes.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
+  "probe-readiness.test.mjs": { how: "chain" },
   "verify-scope-lib.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety(包 ax:import 图 / 路由归一 / 范围决策已知答案)" },
   "earnings-accrual-contract.test.mjs": { how: "elsewhere", by: "npm run test:earnings-accrual(需 --experimental-strip-types)" },
   "janus-stop-cancellation.test.mjs": { how: "elsewhere", by: "npm run test:janus-stop-cancellation + verify.sh" },
