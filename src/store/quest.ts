@@ -1,39 +1,14 @@
 import { defineStore } from "pinia";
 import { reactive, ref, watch } from "vue";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalQuest } from "@/api/quest-api";
+import type { CanonicalQuest, DayOneSnapshotStatus } from "@/api/quest-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { useLocaleStore } from "./locale";
+import { dayOneClaimState } from "@/lib/day-one-claim-state";
 
-/**
- * Quest store — ported from Nexion-prototype/lib/store/quest.ts + lib/mock/quest.ts
- * (zustand persist → Pinia + uni storage).
- *
- * First-day onboarding quest: route-/action-based tasks, each unlocking an
- * incremental NEX (and optionally USDT) micro-reward on FIRST completion.
- * This store owns only the *data + reward* side of the quest:
- *   - the canonical task definitions (id / i18nKey / href / rewards / order)
- *   - which task ids have been completed (persisted, idempotent)
- *   - markComplete(id) → tells the caller whether this was a first completion
- *     and how much to credit. It does NOT touch balances or bills — by
- *     architecture rule, stores don't import each other; cross-store
- *     orchestration (creditNex + bills + toast) is composed at the call site:
- *     App.vue route watcher (visit tasks), lib/share.ts (invite_friend), or
- *     the acting page (bind_bank_card in wallet-cards-new.vue). Each calls
- *     markComplete here, then credits + toasts on { firstTime: true }.
- *
- * The card display side (day-one-quest-card.vue on the protected home page)
- * currently renders a HARD-CODED `done` set and is intentionally NOT wired to
- * this store — see flag returned to the owner. Only the watcher/reward side
- * (globally safe) is built here.
- *
- * Backend-replaceable: task defs come from the same canonical shape the real
- * backend would serve (GET /api/quest); markComplete maps to
- * POST /api/quest/complete which returns { firstTime, rewardNex, rewardUsdt }
- * + the canonical balance/ledger rows. Swapping the local Record for an API
- * call requires zero changes to callers.
- */
+/** Formal mode reads server task facts and explicitly claims the DayOne group.
+ * Local completion/reward persistence is retained only for non-remote previews. */
 
 export type QuestTaskId =
   | "bind_bank_card"
@@ -106,7 +81,11 @@ export const useQuest = defineStore("quest", () => {
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
   const remoteQuests = ref<CanonicalQuest[]>([]);
+  const dayOneClaiming = ref(false);
+  const dayOneClaimError = ref(false);
   const dayOneRewardNex = ref(0);
+  const dayOneRequiredTaskCount = ref<number | null>(null);
+  const dayOneSnapshotStatus = ref<DayOneSnapshotStatus>("LEGACY_UNVERIFIED");
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
@@ -117,6 +96,8 @@ export const useQuest = defineStore("quest", () => {
     for (const key of Object.keys(rewardMap)) delete rewardMap[key];
     remoteQuests.value = [];
     dayOneRewardNex.value = 0;
+    dayOneRequiredTaskCount.value = null;
+    dayOneSnapshotStatus.value = "LEGACY_UNVERIFIED";
   }
 
   function scheduleEligibilityRefresh(rows: CanonicalQuest[]) {
@@ -162,6 +143,8 @@ export const useQuest = defineStore("quest", () => {
       clearRemoteFacts();
       remoteQuests.value = nextQuests;
       dayOneRewardNex.value = snapshot.dayOneRewardNex;
+      dayOneRequiredTaskCount.value = snapshot.dayOneRequiredTaskCount;
+      dayOneSnapshotStatus.value = snapshot.dayOneSnapshotStatus;
       Object.assign(rewardMap, nextRewards);
       Object.assign(completedMap, nextCompleted);
       hasRemoteSnapshot = true;
@@ -215,6 +198,39 @@ export const useQuest = defineStore("quest", () => {
     }
   }
 
+  async function claimDayOne(): Promise<boolean> {
+    if (!remoteApiEnabled || remoteStatus.value !== "ready" || dayOneClaiming.value) return false;
+    const code = dayOneClaimState(
+      remoteQuests.value, dayOneRequiredTaskCount.value, dayOneSnapshotStatus.value, Date.now(),
+    ).claimCode;
+    if (!code) return false;
+    const instanceKey = remoteQuests.value.find(row => row.questCode === code)?.instanceKey;
+    const epoch = accountEpoch;
+    dayOneClaiming.value = true;
+    dayOneClaimError.value = false;
+    try {
+      const refreshed = await refreshRemote();
+      if (epoch !== accountEpoch) return false;
+      if (!refreshed || dayOneClaimState(
+        remoteQuests.value, dayOneRequiredTaskCount.value, dayOneSnapshotStatus.value, Date.now(),
+      ).claimCode !== code
+          || remoteQuests.value.find(row => row.questCode === code)?.instanceKey !== instanceKey) {
+        dayOneClaimError.value = true;
+        return false;
+      }
+      const accepted = await claimRemote(code);
+      const claimed = accepted && dayOneClaimState(
+        remoteQuests.value, dayOneRequiredTaskCount.value, dayOneSnapshotStatus.value, Date.now(),
+      ).claimed
+        && remoteQuests.value.some(row => row.questCode === code
+        && row.instanceKey === instanceKey && row.status === "CLAIMED");
+      if (epoch === accountEpoch) dayOneClaimError.value = !claimed;
+      return epoch === accountEpoch && claimed;
+    } finally {
+      if (epoch === accountEpoch) dayOneClaiming.value = false;
+    }
+  }
+
   function persist() {
     writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
       completed: Object.keys(completedMap).filter((k) => completedMap[k]),
@@ -227,6 +243,8 @@ export const useQuest = defineStore("quest", () => {
     refreshSequence += 1;
     claimSequence += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
+    dayOneClaiming.value = false;
+    dayOneClaimError.value = false;
     discardRemoteSnapshot();
     remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
     if (remoteApiEnabled) {
@@ -284,5 +302,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, remoteQuests, dayOneRewardNex, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
+  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus, claimDayOne, dayOneClaiming, dayOneClaimError };
 });
