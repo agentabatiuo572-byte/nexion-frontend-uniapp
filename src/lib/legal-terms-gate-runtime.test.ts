@@ -81,7 +81,47 @@ describe("legal terms runtime gate", () => {
     }));
     expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/terms")).toBe(false);
     expect(runtime.enforcePendingLegalTermsGate("/pages/me/risk-disclosure")).toBe(false);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+  });
+
+  it("keeps the public privacy policy readable through an async unacknowledged Terms result", async () => {
+    state.current.mockResolvedValue(snapshot(false));
+    const runtime = await loadRuntime();
+
+    await runtime.scheduleLegalTermsGate("/pages/onboarding/privacy?return=%2Fpages%2Fonboarding%2Fintro");
+
+    expect(state.current).toHaveBeenCalledOnce();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
+    expect(uni.showLoading).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+
+    expect(runtime.enforcePendingLegalTermsGate("/pages/me/me")).toBe(true);
+    expect(uni.reLaunch).toHaveBeenLastCalledWith(expect.objectContaining({
+      url: "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme",
+    }));
+  });
+
+  it("does not redirect to Terms when a prior business-route check resolves after privacy becomes current", async () => {
+    let resolveCurrent!: (value: LegalTermsCurrent) => void;
+    state.current.mockReturnValueOnce(new Promise((resolve) => { resolveCurrent = resolve; }));
+    const runtime = await loadRuntime();
+
+    runtime.scheduleLegalTermsGate("/pages/me/me");
+    runtime.scheduleLegalTermsGate("/pages/onboarding/privacy");
+    resolveCurrent(snapshot(false));
+    await settleGate();
+
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(uni.hideLoading).toHaveBeenCalled();
+
+    expect(runtime.enforcePendingLegalTermsGate("/pages/team/team")).toBe(true);
+    expect(uni.reLaunch).toHaveBeenLastCalledWith(expect.objectContaining({
+      url: "/pages/onboarding/terms?return=%2Fpages%2Fteam%2Fteam",
+    }));
   });
 
   it("keeps the obligation and permits a later retry after both reset attempts fail", async () => {

@@ -7,6 +7,7 @@ import {
   claimLegalTermsRedirect,
   isLegalTermsGateExemptRoute,
   LEGAL_TERMS_ROUTE,
+  PRIVACY_POLICY_ROUTE,
   sameLegalTermsRun,
   isLegalTermsAcknowledged,
   sameLegalTermsSession,
@@ -24,6 +25,7 @@ let pendingRequirement: {
   version: string;
   reason: "verification" | "acknowledgement";
 } | null = null;
+const latestGateRouteByKey = new Map<string, string>();
 
 function fence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
@@ -88,11 +90,13 @@ export function enforcePendingLegalTermsGate(returnTo: string): boolean {
   if (!remoteApiEnabled) return false;
   const pending = currentPendingRequirement();
   if (!pending) return false;
+  const path = `/${returnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
+  if (path === PRIVACY_POLICY_ROUTE) return false;
   // While current() is unresolved, the masked loading layer blocks input and
   // App treats true as a signal to stop every business loop. Do not flash an
   // already-acknowledged user through the Terms page merely to verify state.
   if (pending.reason === "verification") return true;
-  if (isLegalTermsGateExemptRoute(returnTo)) return false;
+  if (isLegalTermsGateExemptRoute(path)) return false;
   redirectToRequiredTerms(pending.key, returnTo);
   return true;
 }
@@ -126,17 +130,22 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
   const requestFence = fence();
   if (!requestFence) return Promise.resolve();
   const key = sessionKey(requestFence);
+  latestGateRouteByKey.set(key, returnTo);
+  const publicPrivacyRoute = path === PRIVACY_POLICY_ROUTE;
   // A known obligation is authoritative until acknowledgement succeeds. Do
   // not let browser history or a repeated failed check downgrade it to the
   // non-redirecting verification state or replace its original return target.
   if (pendingRequirement?.key === key
       && pendingRequirement.reason === "acknowledgement") return Promise.resolve();
-  if (inFlight?.key === key) return inFlight.promise;
+  if (inFlight?.key === key) {
+    if (publicPrivacyRoute) finishVerification(key);
+    return inFlight.promise;
+  }
   // Every authoritative recheck is fail-closed, including a previously
   // acknowledged session: a newly published version must not gain a network
   // response window in which business activity can continue.
   pendingRequirement = { key, version: "", reason: "verification" };
-  beginVerification(key);
+  if (!publicPrivacyRoute) beginVerification(key);
   const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
     .then((snapshot) => {
       if (!sameLegalTermsSession(requestFence, fence())) {
@@ -146,9 +155,11 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       if (!isLegalTermsAcknowledged(snapshot)) {
         finishVerification(key);
         pendingRequirement = { key, version: snapshot.version, reason: "acknowledgement" };
-        const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${returnTo}`;
-        if (claimLegalTermsRedirect(redirectedKeys, redirectKey)) {
-          redirectToRequiredTerms(key, returnTo);
+        const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
+        const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
+        const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${currentReturnTo}`;
+        if (currentPath !== PRIVACY_POLICY_ROUTE && claimLegalTermsRedirect(redirectedKeys, redirectKey)) {
+          redirectToRequiredTerms(key, currentReturnTo);
         }
       } else {
         recordLegalTermsAcknowledged(snapshot);
@@ -162,11 +173,14 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       finishVerification(key);
       pendingRequirement = { key, version: "", reason: "acknowledgement" };
       failedKeys.add(key);
-      redirectToRequiredTerms(key, returnTo);
+      const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
+      const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
+      if (currentPath !== PRIVACY_POLICY_ROUTE) redirectToRequiredTerms(key, currentReturnTo);
     })
     .finally(() => {
       finishVerification(key);
       if (inFlight?.key === key) inFlight = null;
+      latestGateRouteByKey.delete(key);
     });
   inFlight = { key, promise };
   return promise;

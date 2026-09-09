@@ -58,9 +58,11 @@ describe("legal terms session gate", () => {
     expect(shouldBlockLegalTermsExit(false, true, acknowledged(false))).toBe(false);
   });
 
-  it("allows only the Terms and risk-disclosure pages while acknowledgement is pending", () => {
+  it("allows only canonical read-only legal documents while acknowledgement is pending", () => {
     expect(isLegalTermsGateExemptRoute("/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme")).toBe(true);
     expect(isLegalTermsGateExemptRoute("pages/me/risk-disclosure?return=%2Fpages%2Fonboarding%2Fterms")).toBe(true);
+    expect(isLegalTermsGateExemptRoute("/pages/onboarding/privacy?return=%2Fpages%2Fonboarding%2Fintro")).toBe(true);
+    expect(isLegalTermsGateExemptRoute("/pages/onboarding/privacy/export")).toBe(false);
     expect(isLegalTermsGateExemptRoute("/pages/me/me")).toBe(false);
   });
 
