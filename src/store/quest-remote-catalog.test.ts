@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, claim } = vi.hoisted(() => ({ state: vi.fn(), claim: vi.fn() }));
 
@@ -12,6 +12,10 @@ import { useQuest } from "./quest";
 import { useLocaleStore } from "./locale";
 
 describe("PC-managed H3 quest catalogue", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     setActivePinia(createPinia());
     state.mockReset();
@@ -158,6 +162,8 @@ describe("PC-managed H3 quest catalogue", () => {
   });
 
   it("scopes a claim idempotency key and readback to the current mission instance", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-03T12:00:00+08:00"));
     const current = {
       questCode: "visit_store",
       name: "Visit store",
