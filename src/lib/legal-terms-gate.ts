@@ -2,6 +2,7 @@ import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import { safeReturnTo } from "@/routing/safe-return-to";
 
 export const LEGAL_TERMS_ROUTE = "/pages/onboarding/terms";
+export const PRIVACY_POLICY_ROUTE = "/pages/onboarding/privacy";
 export const LOGIN_ROUTE = "/pages/login/login";
 
 export interface LegalTermsSessionFence {
@@ -69,7 +70,9 @@ export function shouldBlockLegalTermsExit(
 /** Legal documents remain readable while every business route stays gated. */
 export function isLegalTermsGateExemptRoute(route: string): boolean {
   const path = `/${route.replace(/^#?\/?/, "").split("?", 1)[0]}`;
-  return path === LEGAL_TERMS_ROUTE || path === "/pages/me/risk-disclosure";
+  return path === LEGAL_TERMS_ROUTE
+    || path === PRIVACY_POLICY_ROUTE
+    || path === "/pages/me/risk-disclosure";
 }
 
 /** Only canonical development/production Terms facts are accepted. */
