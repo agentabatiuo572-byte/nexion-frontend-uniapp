@@ -7,7 +7,8 @@ const checkout = fs.readFileSync(new URL("../src/pages/store/checkout.vue", impo
 const bundle = fs.readFileSync(new URL("../src/pages/store/bundle.vue", import.meta.url), "utf8");
 
 test("remote product detail resolves the canonical catalog before looking up a deep-linked SKU", () => {
-  assert.match(detail, /onLoad\(async \(options\) => \{[\s\S]*refreshProductCatalog\(true\)/);
+  assert.match(detail, /onLoad\(async \(options\) => \{[\s\S]*await refreshDetailFacts\(\)/);
+  assert.match(detail, /async function refreshDetailFacts\(\): Promise<void> \{[\s\S]*await refreshProductCatalog\(true\)[\s\S]*if \(readEpoch !== detailFactsEpoch \|\| !isCurrentAccountScope\(accountScope\)\) return;[\s\S]*refreshServerProductPhase\(true\)[\s\S]*refreshTrust\(true\)/);
   assert.match(detail, /catalogStatus === 'loading'/);
   assert.match(detail, /catalogStatus === 'error'/);
 });
