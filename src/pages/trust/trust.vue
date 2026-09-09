@@ -95,8 +95,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -110,6 +110,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 import { localizedTrustFieldValue, trustFieldValue, trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const tr = computed(() => t.value.trust);
@@ -163,10 +164,31 @@ const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ??
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
 const listingRows = computed(() => trustNumberedRows(listingsSection.value?.fields ?? [], "listing", ["Exchange", "State", "Url"] as const, language.value));
 
-async function loadTrustSections() {
-  if (!remoteApiEnabled) return;
-  if (await refresh(true)) recordPublishedTrustViews(sections.value.map((item) => item.sectionKey), language.value);
+let trustPageVisible = false;
+let trustVisibleEpoch = 0;
+let trustReadRequest = 0;
+
+function invalidateTrustPageRead(): void {
+  trustVisibleEpoch += 1;
 }
+
+async function loadTrustSections(): Promise<boolean> {
+  if (!remoteApiEnabled || !trustPageVisible) return false;
+  const visibleEpoch = trustVisibleEpoch;
+  const request = ++trustReadRequest;
+  const loaded = await refresh(true);
+  // The shared Trust reader drops stale runtime generations. The local page
+  // fence additionally prevents a hidden/stale visible cycle from counting a
+  // late response as a real page view, and records a coalesced read once.
+  if (trustPageVisible && visibleEpoch === trustVisibleEpoch && request === trustReadRequest && loaded) {
+    recordPublishedTrustViews(sections.value.map((item) => item.sectionKey), language.value);
+  }
+  return loaded;
+}
+
+const unsubscribeTrustRuntime = subscribeRuntimeRevision(() => {
+  if (trustPageVisible && remoteApiEnabled) void loadTrustSections();
+});
 
 function initials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
@@ -196,7 +218,20 @@ function openHref(raw: string) {
   if (!opened) toast.error(t.value.trust.openFailed);
 }
 
-onShow(() => { void loadTrustSections(); });
+onShow(() => {
+  trustPageVisible = true;
+  invalidateTrustPageRead();
+  void loadTrustSections();
+});
+onHide(() => {
+  trustPageVisible = false;
+  invalidateTrustPageRead();
+});
+onUnmounted(() => {
+  trustPageVisible = false;
+  invalidateTrustPageRead();
+  unsubscribeTrustRuntime();
+});
 
 const heroStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand-2) 18%, transparent) 0%, transparent 65%), var(--v5-surface)" };
 const heroIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
