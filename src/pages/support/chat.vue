@@ -500,7 +500,9 @@ function onRestart() {
     void refreshNovaAvailability();
     return;
   }
-  navTo("/pages/support/chat?start=support");
+  const type = humanType.value;
+  if (!type) return;
+  navTo("/pages/support/chat?start=" + type);
 }
 
 async function onHumanHandoff() {

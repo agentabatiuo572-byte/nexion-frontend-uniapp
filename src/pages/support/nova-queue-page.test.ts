@@ -25,11 +25,12 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function mount() {
+function mount(query: Record<string, string> = { type: "ai" }, conversation?: { type: string; status: string; agentName: string }, enabled = ["ai", "advisor", "support"]) {
   const hooks: Record<string, (...args: any[]) => any> = {};
   const app = vue.reactive({ accountKey: "account-a", visibleDevices: [], earnings: { today: 0 } });
   const api = { status: vi.fn(async () => ({ available: true })),
     history: vi.fn(async () => ({ conversationId: null, messages: [] })), chat: vi.fn() };
+  const startConversation = vi.fn(async (_type: string, _text: string) => "new-conversation");
   const modules: Record<string, unknown> = {
     vue: { ...vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
@@ -40,9 +41,10 @@ function mount() {
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => ({
-      get: () => undefined,
+      get: () => conversation,
       refreshCategories: async () => "applied",
-      categoryEnabled: () => true,
+      categoryEnabled: (type: string) => enabled.includes(type),
+      startConversation,
     }) },
     "@/store/nova": { useNova },
     "@/store/app": { useApp: () => app },
@@ -55,19 +57,49 @@ function mount() {
     "@/lib/secure-command-id": secureId,
     "@/lib/nova-thinking": thinking,
   };
-  const page = new Function("require", "exports", script + "; return { onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
+  const page = new Function("require", "exports", script + "; return { onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
     (name: string) => {
       if (name.endsWith(".vue")) return {};
       if (!(name in modules)) throw new Error(`Unmocked dependency: ${name}`);
       return modules[name];
     }, {},
   );
-  hooks.onLoad({ type: "ai" });
-  return { page, hooks, app, api, nova: useNova() };
+  hooks.onLoad(query);
+  return { page, hooks, app, api, startConversation, nova: useNova(), navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
 }
 
 beforeEach(() => { setActivePinia(createPinia()); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+describe("human conversation restart", () => {
+  it("keeps advisor restart usable when the independent support category is disabled", async () => {
+    const old = mount({ cid: "ended-thread" }, { type: "advisor", status: "ended", agentName: "unassigned" }, ["advisor"]);
+    old.page.onRestart();
+    const type = new URL(old.navigation.navTo.mock.calls[0][0], "https://test.local").searchParams.get("start")!;
+    const next = mount({ start: type }, undefined, ["advisor"]);
+    await next.hooks.onShow();
+    expect(next.navigation.navBack).not.toHaveBeenCalled();
+    await next.page.onSend("Please help with my question");
+    expect(next.startConversation).toHaveBeenCalledExactlyOnceWith("advisor", "Please help with my question");
+    expect(next.navigation.navBack).not.toHaveBeenCalled();
+    old.page.cleanup();
+    next.page.cleanup();
+  });
+
+  it.each(["advisor", "support"])("restarts an unassigned ended %s conversation in the same category", type => {
+    const { page, navigation } = mount({ cid: "ended-thread" }, { type, status: "ended", agentName: "unassigned" });
+    page.onRestart();
+    expect(navigation.navTo).toHaveBeenCalledExactlyOnceWith(`/pages/support/chat?start=${type}`);
+    page.cleanup();
+  });
+
+  it("does not silently switch an unavailable conversation to support", () => {
+    const { page, navigation } = mount({ cid: "missing-thread" });
+    page.onRestart();
+    expect(navigation.navTo).not.toHaveBeenCalled();
+    page.cleanup();
+  });
+});
 
 describe("real Nova page queue worker", () => {
   it("waits for canonical history before sending the first question", async () => {
