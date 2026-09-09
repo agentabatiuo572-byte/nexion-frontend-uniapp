@@ -3,6 +3,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { assertAuthGuardRoutes } from "./lib/probe-coverage.mjs";
+import { waitForUniAppPage } from "./lib/probe-readiness.mjs";
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const browser = await chromium.launch();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -130,7 +131,8 @@ async function sameDocumentRoute(target, authenticated = true, initialRoute = ""
   }, { stored: authenticated ? authed : unauth });
   const startRoute = initialRoute || (authenticated ? "/pages/me/me" : "/pages/onboarding/intro");
   await page.goto(`${BASE}/?nx_device=off#${startRoute}`, { waitUntil: "load", timeout: 30000 });
-  await wait(1200);
+  // Start the same-document mutation only after the initial static page exists.
+  await waitForUniAppPage(page, startRoute.replace(/^\//, ""));
   await page.evaluate((hash) => { window.location.hash = hash; }, target);
   // A busy dev server can delay the one-second repair tick. Observe the
   // final guard destination instead of stopping at an intermediate retired-
@@ -144,8 +146,10 @@ async function sameDocumentRoute(target, authenticated = true, initialRoute = ""
     (expected) => (location.hash || "").replace(/^#/, "") === expected,
     expectedRoute,
     { timeout: 10_000 },
-  ).catch(() => {});
-  await wait(300);
+  );
+  // A changed address bar is insufficient: UniApp can retain the old stack
+  // for a frame, so require the final route to be mounted before sampling.
+  await waitForUniAppPage(page, expectedRoute.replace(/^\//, ""));
   const witness = await page.evaluate(() => ({
     actualRoute: (location.hash || "").replace(/^#/, ""),
     appChildren: document.querySelector("#app")?.childElementCount ?? 0,
