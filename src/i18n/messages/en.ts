@@ -1866,15 +1866,15 @@ export const en = {
       },
       withdraw: {
         q: "Can I withdraw earnings anytime?",
-        a: "Yes, from $20. First withdrawal processes within 24 hours. Withdrawals go to the payout address you set in your wallet.",
+        a: "Yes, from $20. Withdrawal handling follows the current rules and review status shown in your wallet. Withdrawals go to the payout address you set in your wallet.",
       },
       demand: {
         q: "What if AI demand drops?",
-        a: "Earnings scale with AI workload pool pricing. Historical floor: $24/day even during low-demand periods.",
+        a: "Earnings vary with AI task demand and pricing. Refer to your actual task and settlement records.",
       },
       refund: {
         q: "Is there a refund window?",
-        a: "7-day money-back if device hasn't been activated. After activation, resale on marketplace.",
+        a: "To check the options available for your order, contact in-app support. Device replacement options are shown on your Devices page when available.",
       },
     },
     coProductNotFound: "Product not found.",

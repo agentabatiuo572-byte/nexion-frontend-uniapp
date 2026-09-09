@@ -1796,15 +1796,15 @@ export const vi: Messages = {
       },
       withdraw: {
         q: "Tôi có thể rút thu nhập bất cứ lúc nào không?",
-        a: "Được, từ $20. Lần rút đầu tiên xử lý trong vòng 24 giờ. Tiền rút sẽ chuyển vào địa chỉ rút tiền bạn đã thiết lập trong ví.",
+        a: "Được, từ $20. Việc xử lý rút tiền tuân theo quy tắc và trạng thái xét duyệt hiện hiển thị trong Ví. Tiền rút sẽ chuyển vào địa chỉ rút tiền bạn đã thiết lập trong ví.",
       },
       demand: {
         q: "Nếu nhu cầu AI giảm thì sao?",
-        a: "Thu nhập biến động theo giá của nhóm tác vụ AI. Mức thấp nhất từng ghi nhận: $24/ngày ngay cả trong giai đoạn nhu cầu thấp.",
+        a: "Thu nhập biến động theo nhu cầu và giá tác vụ AI. Hãy tham khảo bản ghi tác vụ và quyết toán thực tế của bạn.",
       },
       refund: {
         q: "Có thời hạn hoàn tiền không?",
-        a: "Hoàn tiền trong 7 ngày nếu thiết bị chưa được kích hoạt. Sau khi kích hoạt, có thể bán lại trên chợ giao dịch.",
+        a: "Để kiểm tra phương án xử lý hiện có cho đơn hàng của bạn, hãy liên hệ hỗ trợ trong ứng dụng. Các lựa chọn thay thế thiết bị được hiển thị trên trang Thiết bị khi có sẵn.",
       },
     },
     coProductNotFound: "Không tìm thấy sản phẩm.",

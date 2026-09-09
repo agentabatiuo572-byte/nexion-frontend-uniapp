@@ -269,6 +269,7 @@ import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import type { TrustLocale } from "@/api/trust-section-api";
@@ -283,23 +284,42 @@ const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = 
 
 const id = ref("");
 const catalogRetrying = ref(false);
+let detailFactsEpoch = 0;
+
+function invalidateDetailFacts(): void {
+  detailFactsEpoch += 1;
+}
+
+async function refreshDetailFacts(): Promise<void> {
+  const readEpoch = ++detailFactsEpoch;
+  const accountScope = captureAccountScope();
+  // A forced catalog settlement advances the runtime revision even when it
+  // fails. Start public Trust after that boundary so a current response is not
+  // discarded as superseded by the catalog listener.
+  await refreshProductCatalog(true);
+  if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
+  await Promise.all([
+    refreshServerProductPhase(true),
+    remoteApiEnabled ? refreshTrust(true) : Promise.resolve(true),
+  ]);
+  if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
+}
+
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
-  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), remoteApiEnabled ? refreshTrust() : Promise.resolve(true)]);
+  await refreshDetailFacts();
 });
 
 onShow(() => {
-  void refreshServerProductPhase(true);
-  void refreshProductCatalog(true);
-  if (remoteApiEnabled) void refreshTrust();
+  void refreshDetailFacts();
 });
 
 async function retryCatalog() {
   if (catalogRetrying.value) return;
   catalogRetrying.value = true;
   try {
-    await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
+    await refreshDetailFacts();
   } finally {
     catalogRetrying.value = false;
   }
@@ -570,10 +590,12 @@ onShow(() => {
   stickyPageVisible.value = true;
 });
 onHide(() => {
+  invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);
 });
 onUnmounted(() => {
+  invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);
 });
