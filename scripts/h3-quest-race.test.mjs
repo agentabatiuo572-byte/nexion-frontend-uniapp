@@ -13,6 +13,7 @@ const rawSource = fs.readFileSync("src/store/quest.ts", "utf8");
 const INJECTED_NAMES = [
   "reactive", "ref", "watch", "defineStore", "questApi", "remoteApiEnabled", "useLocaleStore",
   "normalizeAccountKey", "readAccountRow", "writeAccountRow",
+  "dayOneClaimState",
 ];
 const importedNames = new Set();
 for (const line of rawSource.match(/^import .*;\r?\n/gm) ?? []) {
@@ -81,6 +82,10 @@ function createStore(replies) {
     normalizeAccountKey: (key) => key,
     readAccountRow: () => null,
     writeAccountRow: () => undefined,
+    // The three cases below exercise refresh/account race fencing only; they
+    // never call claimDayOne. This fail-closed neutral shape keeps the runtime
+    // import harness complete without pretending it verifies Day-One claiming.
+    dayOneClaimState: () => Object.freeze({ claimCode: null, claimed: false }),
   };
   assert.deepEqual(Object.keys(INJECT), INJECTED_NAMES, "INJECT 与 INJECTED_NAMES 漂移");
   const useQuest = new Function(
