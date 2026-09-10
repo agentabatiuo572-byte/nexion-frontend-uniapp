@@ -1,7 +1,9 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
-import { supportApi } from "@/api/runtime";
-import { remoteApiEnabled } from "@/api/runtime";
+import { supportApi, apiClient, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { ConversationRealtime } from "@/api/conversation-realtime";
+import { createUniRealtimeSocket, setAppConversationRealtime } from "@/api/app-conversation-realtime";
+import { catchUpConversation, mergeConversationMessages } from "@/api/conversation-history";
 import { asApiError } from "@/api/errors";
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 
@@ -32,6 +34,28 @@ export const useConversations = defineStore("conversations", () => {
   const mutating = ref(false);
   const error = ref<string | null>(null);
   const typingIds = ref<Record<string, boolean>>({});
+  const onlineIds = ref<Record<string, boolean>>({});
+  const realtimeReady = ref(false);
+  let realtime: ConversationRealtime | null = null;
+  let watchedId: string | null = null;
+  let typingExpiry: ReturnType<typeof setTimeout> | undefined;
+  function startRealtime() {
+    if (realtime || !remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
+    const epoch = accountEpoch; let instance!: ConversationRealtime;
+    const current = () => realtime === instance && epoch === accountEpoch;
+    instance = new ConversationRealtime({
+      url: `${apiRuntimeConfig.baseUrl.replace(/^http/, "ws").replace(/\/$/, "")}/ws/conversations`,
+      ticket: () => apiClient.request({ method: "POST", path: "/api/app/support/realtime-ticket" }), socket: createUniRealtimeSocket,
+      reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
+      state: ready => { if (current()) realtimeReady.value = ready; },
+      presence: value => { if (!current()) return; clearTimeout(typingExpiry); if (!value) { typingIds.value={}; onlineIds.value={}; return; } onlineIds.value[value.conversationNo]=value.online; typingIds.value[value.conversationNo]=value.typing; typingExpiry=setTimeout(()=>{if(current())typingIds.value[value.conversationNo]=false;},value.expiresIn??5000); },
+    });
+    realtime=instance; setAppConversationRealtime(instance); instance.watch(watchedId); instance.start();
+  }
+  function stopRealtime() { const instance=realtime; realtime=null; setAppConversationRealtime(null); clearTimeout(typingExpiry); realtimeReady.value=false; typingIds.value={}; onlineIds.value={}; instance?.stop(); }
+  function watchRealtime(id: string | null) { watchedId=id; realtime?.watch(id); if (!id) { typingIds.value={}; onlineIds.value={}; } }
+  function setTyping(active: boolean) { realtime?.typing(active); }
+
   const categoryAvailability = ref<ConversationCategoryAvailability>(remoteApiEnabled
     ? { advisor: false, support: false, ai: false }
     : { advisor: true, support: true, ai: true });
@@ -131,13 +155,13 @@ export const useConversations = defineStore("conversations", () => {
     const prior = conversations.value.find((row) => row.id === conversation.id);
     if (prior && (conversation.version < prior.version || (conversation.version === prior.version && conversation.lastTs < prior.lastTs))) return;
     const rest = conversations.value.filter((row) => row.id !== conversation.id);
-    conversations.value = [conversation, ...rest].sort((a, b) => b.lastTs - a.lastTs);
+    conversations.value = [mergeConversationMessages(prior, conversation), ...rest].sort((a, b) => b.lastTs - a.lastTs);
   }
 
   /** A delayed page may add an absent row, but cannot erase or regress a newer live snapshot. */
   function mergeConversations(items: Conversation[]) { for (const conversation of items) replace(conversation); }
 
-  async function refresh(): Promise<void> {
+  async function refresh(active: () => boolean = () => true): Promise<void> {
     const epoch = accountEpoch;
     const requestGeneration = ++listRequestGeneration;
     loading.value = true;
@@ -145,13 +169,13 @@ export const useConversations = defineStore("conversations", () => {
     try {
       await preparePendingRun();
       const scope = snapshotScope();
-      if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration) return;
+      if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration || !active()) return;
       await reconcilePending();
-      if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration) return;
+      if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !active()) return;
       const items = (await supportApi.conversations()).items;
-      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration) mergeConversations(items);
+      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && active()) mergeConversations(items);
     } catch (cause) {
-      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) {
+      if (epoch === accountEpoch && requestGeneration === listRequestGeneration && active()) {
         error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
       }
       throw cause;
@@ -204,14 +228,21 @@ export const useConversations = defineStore("conversations", () => {
     if (epoch !== accountEpoch || accountKey !== accountKeyValue || runId !== pendingRunId || openGeneration.get(id) !== requestGeneration || !active()) {
       throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     }
+    const current = () => epoch === accountEpoch && accountKey === accountKeyValue && runId === pendingRunId && openGeneration.get(id) === requestGeneration && active();
+    conversation = await catchUpConversation(conversation, get(id), (no, before) => supportApi.conversation(no, before), current);
+    if (!current()) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const lastAgent = [...conversation.messages].reverse().find(message => message.sender === "agent");
     if (conversation.unread > 0 && lastAgent) {
       try {
-        conversation = await supportApi.markConversationRead(conversation, Number(lastAgent.id));
+        const acknowledged = await supportApi.markConversationRead(conversation, Number(lastAgent.id));
+        if (!current()) return conversation;
+        conversation = mergeConversationMessages(conversation, acknowledged);
       } catch (cause) {
+        if (!current()) return conversation;
         if (mustReadBack(cause)) {
-          try { conversation = await supportApi.conversation(id); } catch { /* retain the prior server snapshot */ }
+          try { conversation = mergeConversationMessages(conversation, await supportApi.conversation(id)); } catch { /* retain the prior server snapshot */ }
         }
+        if (!current()) return conversation;
         error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATION_READ_FAILED";
       }
     }
@@ -344,7 +375,8 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   function reset() {
-    accountEpoch += 1; conversations.value = []; error.value = null; typingIds.value = {};
+    stopRealtime(); watchedId = null;
+    accountEpoch += 1; conversations.value = []; error.value = null; loading.value = false; typingIds.value = {};
     openGeneration.clear(); listRequestGeneration += 1; categoryRequestGeneration += 1;
     inFlight = new Map(); mutating.value = false;
     pendingKeys = new Map();
@@ -363,5 +395,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, typingIds, categoryAvailability, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
+  return { conversations, typingIds, onlineIds, realtimeReady, startRealtime, stopRealtime, watchRealtime, setTyping, categoryAvailability, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
 });

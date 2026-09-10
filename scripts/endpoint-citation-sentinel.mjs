@@ -266,6 +266,7 @@ const LEDGER = {
   "/api/app/deposits/vietqr/intents/:param/cancel": "TBD-NAME: 同上(取消)",
   "/api/device/:param/deactivate": "TBD-NAME: 设备实例停用命令;后端 E3 用户设备契约已实现,前端 PRD 待同步",
   "/api/app/support": "TBD-NAME: 同上(工单读写)",
+  "/api/app/support/realtime-ticket": "BACKEND: ConversationSocketTicketController POST, one-time 30s USER ticket; M3-会话实时通信契约 §1",
   "/api/app/support/faqs/page": "TBD-NAME: 同上(FAQ, 服务端有界分页)",
   "/api/app/referral-rewards": "TBD-NAME: /api/app/* 族,推荐奖励发放面;另有 /api/config/referral-rewards 读配置",
   "/api/app/support/ai/:param": "BACKEND: AppNovaAiController 已实现;status/chat 动态动作段,PRD §11.0A Nova AI 顾问",

@@ -2,6 +2,7 @@
 import { navReset } from "@/lib/route";
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
+import { useConversations } from "@/store/conversations";
 import {
   useFreeTrial,
   liveShadowUSD,
@@ -999,6 +1000,7 @@ function installBusinessLoopProbe(): void {
 // 🔴 不变量:守卫只随前台/后台成对开关 —— onShow 起、onHide 停,其余任何时候都活着。
 // 它在白名单页由自身前两行(checkAuthGuard/checkSession 的白名单短路)保持惰性,常开无业务副作用。
 function stopBusinessLoops() {
+  useConversations().stopRealtime();
   businessLoopsRunning = false;
   stopBusinessTimeouts();
   useDeposits().pauseMockEngine();
@@ -1046,6 +1048,7 @@ function ensureBusinessLoopsAllowed(): boolean {
  */
 function ensureBusinessLoopsRunning(): boolean {
   if (!ensureBusinessLoopsAllowed()) return false;
+  useConversations().startRealtime();
   if (businessLoopsRunning) return true;
 
   useApp().settle();
