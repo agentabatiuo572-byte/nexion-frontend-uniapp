@@ -16,6 +16,7 @@ export interface VietQrPaymentConfig {
   feeVnd: number;
   feeUsdt: number;
   paymentMode?: "manual" | "hosted";
+  dailyCapacityKnown?: boolean;
 }
 
 interface PaymentProvenance {
@@ -164,6 +165,7 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
   const maxDepositUsdt = number(vietQr?.maxDepositUsdt, { min: 0 });
   const todayRemainingDepositUsdt = number(vietQr?.todayRemainingDepositUsdt, { min: 0 });
   const todayRemainingVnd = number(vietQr?.todayRemainingVnd, { min: 0 });
+  const dailyCapacityKnown = vietQr?.dailyCapacityKnown === undefined ? true : vietQr.dailyCapacityKnown;
   const toleranceVnd = number(vietQr?.toleranceVnd, { min: 0 });
   const graceMinutes = number(vietQr?.graceMinutes, { min: 0, integer: true });
   const version = number(vietQr?.version, { min: 0, integer: true });
@@ -177,6 +179,7 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
     || maxDepositUsdt < minDepositUsdt
     || todayRemainingDepositUsdt === null
     || todayRemainingVnd === null
+    || typeof dailyCapacityKnown !== "boolean"
     || toleranceVnd === null
     || graceMinutes === null
     || version === null
@@ -189,10 +192,13 @@ function parseConfig(value: unknown, mode: ApiEnvironment): PaymentConfig {
     ...proof,
     vietQr: {
       enabled: vietQr.enabled,
+      ...(vietQr.paymentMode === "manual" || vietQr.paymentMode === "hosted"
+        ? { paymentMode: vietQr.paymentMode } : {}),
       minDepositUsdt,
       maxDepositUsdt,
       todayRemainingDepositUsdt,
       todayRemainingVnd,
+      dailyCapacityKnown,
       toleranceVnd,
       graceMinutes,
       version,
