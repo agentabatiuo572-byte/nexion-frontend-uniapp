@@ -69,6 +69,7 @@
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
+      @typing="!isAi && convStore.setTyping($event)"
       :messages="threadMessages"
 	      :input-placeholder="inputPlaceholder"
 	      :send-label="t.conversations.send"
@@ -129,6 +130,11 @@ import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import {
+  createHumanConversationCreationRecovery,
+  createHumanThreadRealtimeLifecycle,
+  humanConversationPresence,
+} from "./conversation-realtime-page";
+import {
   createLatestAbortableRequest,
   NOVA_THINKING_CHECKING_MS,
   NOVA_THINKING_COMPOSING_MS,
@@ -175,45 +181,36 @@ let categoryGate: {
 } | null = null;
 const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
-const HUMAN_THREAD_POLL_MS = 5_000;
-let humanThreadPoll: ReturnType<typeof setTimeout> | undefined;
-let humanThreadEpoch = 0;
-let humanThreadVisible = false;
-let humanThreadPollInFlight = false;
+const humanRealtime = createHumanThreadRealtimeLifecycle({
+  currentId: () => cid.value,
+  isAi: () => isAi.value,
+  setTyping: active => convStore.setTyping(active),
+  watch: id => convStore.watchRealtime(id),
+});
+const humanCreateRecovery = createHumanConversationCreationRecovery({
+  visible: () => novaPageVisible,
+  account: () => app.accountKey,
+  binding: () => app.accountBindingEpoch,
+  currentId: () => cid.value,
+  startType: () => startType.value,
+  restore: id => {
+    cid.value = id;
+    startType.value = null;
+    revealTick.value += 1;
+  },
+});
+
+function restoreCompletedHumanCreate(activateRealtime = false) {
+  const restoredId = humanCreateRecovery.restore();
+  if (restoredId && activateRealtime) humanRealtime.activateIfCurrent(restoredId);
+}
 
 function stopHumanThreadPolling() {
-  humanThreadVisible = false;
-  humanThreadEpoch += 1;
-  if (humanThreadPoll !== undefined) clearTimeout(humanThreadPoll);
-  humanThreadPoll = undefined;
-  humanThreadPollInFlight = false;
+  humanRealtime.stop();
 }
 
-async function pollHumanThread() {
-  const pollEpoch = humanThreadEpoch;
-  const activeId = cid.value;
-  if (!humanThreadVisible || isAi.value || !activeId || humanThreadPollInFlight) return;
-  humanThreadPollInFlight = true;
-  try {
-    await convStore.open(activeId, () => humanThreadVisible && pollEpoch === humanThreadEpoch && activeId === cid.value);
-    if (!humanThreadVisible || pollEpoch !== humanThreadEpoch || activeId !== cid.value) return;
-  } catch {
-    // Preserve the last authoritative snapshot while a transient poll fails.
-  } finally { humanThreadPollInFlight = false; }
-}
-
-function startHumanThreadPolling(openEpoch: number) {
-  if (humanThreadPoll !== undefined) clearTimeout(humanThreadPoll);
-  humanThreadPoll = undefined;
-  if (humanThreadVisible && openEpoch === humanThreadEpoch && !isAi.value && cid.value) {
-    const schedule = () => {
-      humanThreadPoll = setTimeout(async () => {
-        await pollHumanThread();
-        if (humanThreadVisible && openEpoch === humanThreadEpoch) schedule();
-      }, HUMAN_THREAD_POLL_MS);
-    };
-    schedule();
-  }
+function startHumanThreadPolling(openEpoch: number, openId: string) {
+  humanRealtime.watchIfCurrent(openEpoch, openId);
 }
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
@@ -259,6 +256,10 @@ onLoad((q) => {
 // events — the interval then becomes a harmless no-op.
 onShow(async () => {
   novaPageVisible = true;
+  // Mark the human route visible before any category await. If this page hides,
+  // stop() invalidates the captured epoch, so an older onShow cannot revive it.
+  const humanOpenEpoch = isAi.value ? null : humanRealtime.show();
+  restoreCompletedHumanCreate();
   novaHistoryLoading.value = false;
   revealTick.value += 1;
   const requestedCategory = isAi.value ? "ai" : startType.value;
@@ -295,16 +296,15 @@ onShow(async () => {
       void drainNovaQueue();
     }
   }
-  else if (cid.value) {
-    humanThreadVisible = true;
-    const openEpoch = humanThreadEpoch;
+  else if (cid.value && humanOpenEpoch !== null) {
+    const openEpoch = humanOpenEpoch;
     const openId = cid.value;
-    try { await convStore.open(cid.value, () => humanThreadVisible && openEpoch === humanThreadEpoch && openId === cid.value); } catch {
-      if (!humanThreadVisible || openEpoch !== humanThreadEpoch) return;
+    try { await convStore.open(openId, () => humanRealtime.isCurrent(openEpoch, openId)); } catch {
+      if (!humanRealtime.isCurrent(openEpoch, openId)) return;
       navBack("/pages/support/messages");
       return;
     }
-    if (humanThreadVisible && openEpoch === humanThreadEpoch && openId === cid.value) startHumanThreadPolling(openEpoch);
+    startHumanThreadPolling(openEpoch, openId);
   }
 });
 onHide(() => {
@@ -386,6 +386,14 @@ const thinkingLabel = computed(() => {
     default: return t.value.nova.thinkingUnderstanding;
   }
 });
+const realtimePresence = computed(() => humanConversationPresence({
+  remote: remoteApiEnabled,
+  isAi: isAi.value,
+  ready: convStore.realtimeReady,
+  conversationId: cid.value,
+  online: cid.value ? convStore.onlineIds[cid.value] === true : false,
+  closed: isClosedSession.value,
+}));
 const headerRole = computed(() => {
   if (agentTyping.value) return thinkingLabel.value;
   if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
@@ -396,6 +404,7 @@ const headerRole = computed(() => {
   if (!conv.value) return "";
   if (isTransferredSession.value) return t.value.conversations.sessionTransferred;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
+  if (realtimePresence.value.showOnline) return t.value.conversations.online;
   return t.value.conversations[conv.value.roleKey];
 });
 const headerTint = computed(() =>
@@ -403,7 +412,7 @@ const headerTint = computed(() =>
 );
 // Presence dot: closed session must not claim "online" — grey it and stop the pulse.
 const dotStyle = computed<CSSProperties>(() =>
-  isClosedSession.value
+  realtimePresence.value.mutedDot
     ? { background: "var(--v5-ink-4)", animation: "none" }
     : { background: headerTint.value },
 );
@@ -485,11 +494,12 @@ const threadMessages = computed<ThreadMsg[]>(() => {
 
 async function loadEarlierHumanHistory() {
   const activeId = cid.value;
-  if (!activeId || !humanThreadVisible) return;
+  const scope = activeId ? humanRealtime.capture(activeId) : null;
+  if (!scope) return;
   try {
-    await convStore.loadEarlier(activeId, () => humanThreadVisible && activeId === cid.value);
+    await convStore.loadEarlier(scope.id, () => humanRealtime.isCurrent(scope.epoch, scope.id));
   } catch {
-    toast.warn(t.value.security.opFailed);
+    if (humanRealtime.isCurrent(scope.epoch, scope.id)) toast.warn(t.value.security.opFailed);
   }
 }
 
@@ -799,18 +809,28 @@ async function onSend(text: string, restore?: () => void) {
       restore?.();
       return;
     }
+    const creation = humanCreateRecovery.begin(type);
+    if (!creation) {
+      restore?.();
+      return;
+    }
     if (remoteApiEnabled && !convStore.categoryEnabled(type)) {
+      humanCreateRecovery.finish();
       restore?.();
       toast.info(t.value.conversations.categoryDisabled, "");
       return;
     }
     try {
-      cid.value = await convStore.startConversation(type, text);
-      startType.value = null;
-      revealTick.value += 1;
+      const createdId = await convStore.startConversation(type, text);
+      if (!humanCreateRecovery.isCurrent(creation)) return;
+      humanCreateRecovery.complete(createdId, creation);
+      restoreCompletedHumanCreate(true);
     } catch {
+      if (!humanCreateRecovery.isCurrent(creation) || !novaPageVisible) return;
       restore?.();
       toast.error(t.value.conversations.convertTicketFailed, "");
+    } finally {
+      humanCreateRecovery.finish();
     }
     return;
   }

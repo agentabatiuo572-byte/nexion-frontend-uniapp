@@ -64,11 +64,13 @@ test("support mutations reconcile an uncertain server result before allowing ano
   assert.match(conversations, /markConversationRead[\s\S]*?mustReadBack\(cause\)[\s\S]*?supportApi\.conversation\(id\)/);
 });
 
-test("all support snapshots are account-epoch guarded and a visible human thread polls every five seconds", async () => {
-  const [tickets, conversations, chat, scope, api] = await Promise.all([
+test("all support snapshots are account-epoch guarded and a visible human thread uses the realtime lifecycle", async () => {
+  const [tickets, conversations, chat, realtimePage, realtimePageTest, scope, api] = await Promise.all([
     read("src/store/tickets.ts"),
     read("src/store/conversations.ts"),
     read("src/pages/support/chat.vue"),
+    read("src/pages/support/conversation-realtime-page.ts"),
+    read("src/pages/support/conversation-realtime-page.test.ts"),
     read("src/lib/account-scope.ts"),
     read("src/api/support-api.ts"),
   ]);
@@ -78,23 +80,28 @@ test("all support snapshots are account-epoch guarded and a visible human thread
     assert.match(source, /if \(epoch === accountEpoch(?: && requestGeneration === listRequestGeneration)?\) loading\.value = false;/);
   }
   assert.match(scope, /useConversations\(\)\.bindAccount\(accountKey\)/);
-  assert.match(chat, /const HUMAN_THREAD_POLL_MS = 5_000/);
-  assert.match(chat, /humanThreadPollInFlight/);
-  assert.match(chat, /setTimeout\(async \(\) =>/);
-  assert.match(chat, /clearTimeout\(humanThreadPoll\)/);
+  assert.match(chat, /createHumanThreadRealtimeLifecycle/);
+  assert.match(chat, /const humanRealtime = createHumanThreadRealtimeLifecycle/);
+  assert.match(realtimePage, /function stop\(\): void \{\s*hooks\.setTyping\(false\);\s*hooks\.watch\(null\);\s*visible = false;\s*epoch \+= 1;/);
+  assert.match(realtimePageTest, /does not let a hidden or replaced conversation revive its realtime watch/);
+  assert.match(realtimePageTest, /expect\(calls\)\.toEqual\(\[\["watch", "CV-1"\], \["typing", false\], \["watch", null\]\]\)/);
   assert.match(chat, /onHide\(\(\) => \{[\s\S]*?stopHumanThreadPolling\(\);/);
   assert.match(api, /lastSeenMessageId, expectedStatus: conversation\.status\.toUpperCase\(\), expectedVersion: conversation\.version/);
 });
 
-test("human poll and open snapshots cannot write after hide or regress a newer conversation version", async () => {
-  const [conversations, chat] = await Promise.all([read("src/store/conversations.ts"), read("src/pages/support/chat.vue")]);
+test("human realtime and open snapshots cannot write after hide or regress a newer conversation version", async () => {
+  const [conversations, chat, realtimePage, realtimePageTest] = await Promise.all([
+    read("src/store/conversations.ts"), read("src/pages/support/chat.vue"),
+    read("src/pages/support/conversation-realtime-page.ts"), read("src/pages/support/conversation-realtime-page.test.ts"),
+  ]);
   assert.match(conversations, /const openGeneration = new Map<string, number>\(\)/);
   assert.match(conversations, /openGeneration\.get\(id\) !== requestGeneration \|\| !active\(\)/);
   assert.match(conversations, /conversation\.version < prior\.version/);
   assert.match(conversations, /conversation\.version === prior\.version && conversation\.lastTs < prior\.lastTs/);
-  assert.match(chat, /humanThreadPollInFlight/);
-  assert.match(chat, /convStore\.open\(activeId, \(\) => humanThreadVisible/);
-  assert.match(chat, /clearTimeout\(humanThreadPoll\)/);
+  assert.match(chat, /await convStore\.open\(openId, \(\) => humanRealtime\.isCurrent\(openEpoch, openId\)\)/);
+  assert.match(chat, /startHumanThreadPolling\(openEpoch, openId\)/);
+  assert.match(realtimePage, /return openEpoch === epoch && isVisibleFor\(openId\);/);
+  assert.match(realtimePageTest, /const oldHistoryScope = lifecycle\.capture\("CV-1"\);[\s\S]*?lifecycle\.stop\(\);[\s\S]*?lifecycle\.watchIfCurrent\(firstEpoch, "CV-1"\);/);
 });
 
 test("a late full-list read merges monotonically instead of restoring an older v0 snapshot", async () => {
@@ -116,19 +123,21 @@ test("a late full-list read merges monotonically instead of restoring an older v
   }
 });
 
-test("canonical support uses the development authority and late lifecycle work cannot restart polling", async () => {
-  const [api, chat] = await Promise.all([
+test("canonical support uses the development authority and late lifecycle work cannot restart realtime watch", async () => {
+  const [api, chat, realtimePage, realtimePageTest] = await Promise.all([
     read("src/api/support-api.ts"),
     read("src/pages/support/chat.vue"),
+    read("src/pages/support/conversation-realtime-page.ts"),
+    read("src/pages/support/conversation-realtime-page.test.ts"),
   ]);
   assert.match(api, /const supportRoot = "\/api\/app\/support"/);
   assert.match(api, /authorityRevision: async \(\) => "canonical-v1"/);
   assert.doesNotMatch(api, /support\/acceptance|sourceEnvironment !== "SANDBOX"/);
   assert.match(api, /supportPath\(`\/commands\//);
-  assert.match(chat, /humanThreadEpoch/);
-  assert.match(chat, /humanThreadVisible/);
-  assert.match(chat, /await convStore\.open\(cid\.value, \(\) => humanThreadVisible/);
-  assert.match(chat, /humanThreadVisible && openEpoch === humanThreadEpoch/);
+  assert.match(chat, /const humanOpenEpoch = isAi\.value \? null : humanRealtime\.show\(\);/);
+  assert.match(chat, /if \(!humanRealtime\.isCurrent\(openEpoch, openId\)\) return;/);
+  assert.match(realtimePage, /function watchIfCurrent\(openEpoch: number, openId: string\): void \{\s*if \(isCurrent\(openEpoch, openId\)\) hooks\.watch\(openId\);\s*\}/);
+  assert.match(realtimePageTest, /activates a newly-created human thread only while its page is current/);
 });
 
 test("unknown 409, network, protocol, and 5xx support commands read back a stable command key", async () => {
