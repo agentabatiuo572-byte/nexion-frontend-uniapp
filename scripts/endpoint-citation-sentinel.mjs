@@ -136,7 +136,6 @@ const LEDGER = {
   "GET /api/users/:id/vouchers": "TBD-NAME: PRD 未定义运营读他人券包 endpoint(admin 侧,候选名)",
 
   // ── quests / faucet / milestones ──────────────────────────────────────
-  "GET /api/quest": "PRD §9.11c.2",
   "POST /api/quest/complete": "PRD §9.11c.2",
   // 2026-08-15 包 zk:`GET /api/quests/weekly` 从台账删除 —— 最后一处文本引用在死文件
   // mock/weekly-quests.ts(0 运行时引用,已 Move .trash),实现自 U-16 起走 /api/quests/state。
