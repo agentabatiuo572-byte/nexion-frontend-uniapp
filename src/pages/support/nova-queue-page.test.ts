@@ -12,6 +12,7 @@ import * as limiter from "@/lib/send-limiter";
 import * as secureId from "@/lib/secure-command-id";
 import * as format from "@/i18n/format";
 import { ApiError } from "@/api/errors";
+import * as realtimePage from "./conversation-realtime-page";
 
 // Execute the actual SFC script with transport/lifecycle boundaries substituted.
 // This tests the page worker, not a second implementation of its algorithm.
@@ -27,7 +28,7 @@ function deferred<T>() {
 
 function mount(query: Record<string, string> = { type: "ai" }, conversation?: { type: string; status: string; agentName: string }, enabled = ["ai", "advisor", "support"]) {
   const hooks: Record<string, (...args: any[]) => any> = {};
-  const app = vue.reactive({ accountKey: "account-a", visibleDevices: [], earnings: { today: 0 } });
+  const app = vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
   const api = { status: vi.fn(async () => ({ available: true })),
     history: vi.fn(async () => ({ conversationId: null, messages: [] })), chat: vi.fn() };
   const startConversation = vi.fn(async (_type: string, _text: string) => "new-conversation");
@@ -45,6 +46,13 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: { 
       refreshCategories: async () => "applied",
       categoryEnabled: (type: string) => enabled.includes(type),
       startConversation,
+      open: vi.fn(async () => conversation),
+      loadEarlier: vi.fn(async () => conversation),
+      watchRealtime: vi.fn(),
+      setTyping: vi.fn(),
+      realtimeReady: false,
+      onlineIds: {},
+      typingIds: {},
     }) },
     "@/store/nova": { useNova },
     "@/store/app": { useApp: () => app },
@@ -56,6 +64,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: { 
     "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": secureId,
     "@/lib/nova-thinking": thinking,
+    "./conversation-realtime-page": realtimePage,
   };
   const page = new Function("require", "exports", script + "; return { onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
     (name: string) => {

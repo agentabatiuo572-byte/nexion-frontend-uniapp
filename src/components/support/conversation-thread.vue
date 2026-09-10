@@ -113,6 +113,7 @@
         placeholder-class="nx-conv-input-ph"
         confirm-type="send"
         @input="onDraft"
+        @blur="emit('typing', false)"
         @confirm="onSend"
       />
 	      <view class="nx-conv-send" :style="sendStyle" role="button" tabindex="0" :aria-label="sendLabel" :aria-disabled="!draft.trim()" @click="onSend" @keydown.enter.prevent="onKeyboardActivate($event, onSend)" @keydown.space.prevent="onKeyboardActivate($event, onSend)">
@@ -149,6 +150,7 @@ const emit = defineEmits<{
   /** restore() puts the text back in the input — call it when the send is rejected
       (e.g. rate-limited) so the user's typed message isn't silently swallowed. */
   (e: "send", text: string, restore: () => void): void;
+  (e: "typing", active: boolean): void;
   (e: "chip", key: string): void;
   (e: "cta", href: string, label: string): void;
   (e: "restart"): void;
@@ -187,12 +189,14 @@ function onEditInput(turnId: string, e: Event) {
 
 function onDraft(e: Event) {
   draft.value = (e as unknown as { detail: { value: string } }).detail.value;
+  emit("typing", Boolean(draft.value.trim()));
 }
 
 function onSend() {
   const text = draft.value.trim();
   if (!text) return;
   draft.value = "";
+  emit("typing", false);
   emit("send", text, () => {
     draft.value = text;
   });
