@@ -1,6 +1,39 @@
 import { expect, test } from "vitest";
 import { createPaymentApi } from "./payment-api";
 
+test.each(["manual", "hosted"])("preserves %s mode without deriving capacity knowledge from it", async (paymentMode) => {
+  const api = createPaymentApi({ request: async () => ({
+    serverCanonical: true, source: "nx_vietqr_config", sourceEnvironment: "PRODUCTION", runId: "",
+    vietQr: { enabled: true, paymentMode, dailyCapacityKnown: false,
+      minDepositUsdt: 10, maxDepositUsdt: 5000, todayRemainingDepositUsdt: 0,
+      todayRemainingVnd: 0, toleranceVnd: 1000, graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0 },
+  }) } as never, "dev");
+  await expect(api.config()).resolves.toMatchObject({
+    vietQr: { enabled: true, paymentMode, dailyCapacityKnown: false, maxDepositUsdt: 5000 },
+  });
+});
+
+test.each([false, true, undefined])("preserves explicit capacity knowledge independently of payment mode: %s", async (known) => {
+  const api = createPaymentApi({ request: async () => ({
+    serverCanonical: true, source: "nx_vietqr_config", sourceEnvironment: "PRODUCTION", runId: "",
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
+      todayRemainingDepositUsdt: 0, todayRemainingVnd: 0, toleranceVnd: 1000,
+      graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0,
+      ...(known === undefined ? {} : { dailyCapacityKnown: known }) },
+  }) } as never, "dev");
+  await expect(api.config()).resolves.toMatchObject({ vietQr: { dailyCapacityKnown: known ?? true } });
+});
+
+test.each([null, "false", 0])("rejects a malformed capacity knowledge flag: %s", async (known) => {
+  const api = createPaymentApi({ request: async () => ({
+    serverCanonical: true, source: "nx_vietqr_config", sourceEnvironment: "PRODUCTION", runId: "",
+    vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
+      todayRemainingDepositUsdt: 0, todayRemainingVnd: 0, toleranceVnd: 1000,
+      graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0, dailyCapacityKnown: known },
+  }) } as never, "dev");
+  await expect(api.config()).rejects.toMatchObject({ kind: "protocol", message: "PAYMENT_CONFIG_RESPONSE_INVALID" });
+});
+
 const intent = {
   intentNo: "VQR-12345678",
   usdtAmount: 25,

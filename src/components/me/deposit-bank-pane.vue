@@ -55,8 +55,10 @@
 
         <view class="flex items-center justify-between" style="margin-top: 10px; padding: 0 4px; gap: 8px">
           <view class="min-w-0"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeNote }}</text></view>
-          <view class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ todayRemainingLine }}</text></view>
+          <view v-if="dailyCapacityKnown" class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ todayRemainingLine }}</text></view>
         </view>
+
+        <view style="margin-top: 6px; padding: 0 4px"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ limitLine }}</text></view>
 
         <view
           :class="['nx-bank-create-cta w-full grid place-items-center', ctaEnabled ? 'active:opacity-90' : '']"
@@ -348,16 +350,17 @@ const amountNum = computed(() => {
 });
 const minDeposit = computed(() => remoteApiEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
 const maxDeposit = computed(() => remoteApiEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
+const dailyCapacityKnown = computed(() => !remoteApiEnabled || fx.dailyCapacityKnown);
 const todayRemainingDeposit = computed(() => remoteApiEnabled ? fx.todayRemainingDepositUsdt : BANK_MAX_DEPOSIT_USDT);
 const bankRailAvailable = computed(() => remoteApiEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
 const fxUsable = computed(() => fx.fxAvailable && fx.configReady && bankRailAvailable.value);
 const dailyCapacityExhausted = computed(() =>
-  fxUsable.value && todayRemainingDeposit.value < minDeposit.value,
+  fxUsable.value && dailyCapacityKnown.value && todayRemainingDeposit.value < minDeposit.value,
 );
 const inRange = computed(() =>
   amountNum.value >= minDeposit.value
   && amountNum.value <= maxDeposit.value
-  && amountNum.value <= todayRemainingDeposit.value,
+  && (!dailyCapacityKnown.value || amountNum.value <= todayRemainingDeposit.value),
 );
 
 function usdtLabel(value: number): string {
@@ -365,6 +368,8 @@ function usdtLabel(value: number): string {
 }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
+const limitLine = computed(() => fx.configReady
+  ? fmt(t.value.bankPane.limitNote, { min: minLabel.value, max: maxLabel.value }) : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
 const todayRemainingLine = computed(() =>
   fmt(t.value.bankPane.todayRemainingNote, { remaining: todayRemainingLabel.value }),
@@ -385,7 +390,7 @@ const amountError = computed(() => {
   if (amountNum.value > maxDeposit.value) {
     return fmt(t.value.bankPane.singleLimitExceeded, { max: maxLabel.value });
   }
-  if (amountNum.value > todayRemainingDeposit.value) {
+  if (dailyCapacityKnown.value && amountNum.value > todayRemainingDeposit.value) {
     return fmt(t.value.bankPane.dailyCapacityExceeded, { max: todayRemainingLabel.value });
   }
   return "";
@@ -405,7 +410,7 @@ let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
   if (creating.value || !fxUsable.value || usdt < minDeposit.value
-    || usdt > maxDeposit.value || usdt > todayRemainingDeposit.value) return;
+    || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
   createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
@@ -428,7 +433,8 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       creating.value = false;
       return;
     }
-    if (usdt < minDeposit.value || usdt > maxDeposit.value || usdt > todayRemainingDeposit.value) {
+    if (usdt < minDeposit.value || usdt > maxDeposit.value
+      || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) {
       const reason = usdt < minDeposit.value
         ? fmt(t.value.bankPane.minimumLimitExceeded, { min: minLabel.value })
         : usdt > maxDeposit.value
@@ -455,7 +461,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       if (cause instanceof ApiError && cause.kind === "business"
         && cause.message === "VIETQR_DAILY_CAPACITY_EXCEEDED") {
         await fx.load();
-        if (fx.fxAvailable && fx.configReady) {
+        if (fx.fxAvailable && fx.configReady && dailyCapacityKnown.value) {
           approvedBusinessFailureCopy = fmt(t.value.bankPane.dailyCapacityExceeded, {
             max: todayRemainingLabel.value,
           });

@@ -26,9 +26,11 @@ export const useFx = defineStore("fx", () => {
   const maxDepositUsdt = ref(0);
   const todayRemainingDepositUsdt = ref(0);
   const todayRemainingVnd = ref(0);
+  const dailyCapacityKnown = ref(true);
   const feeVnd = ref(0);
   const feeUsdt = ref(0);
   let inFlightLoad: Promise<void> | null = null;
+  let devFailureInjected = false;
 
   function resetRemoteState(): void {
     baseRateVndPerUsdt.value = 0;
@@ -41,6 +43,7 @@ export const useFx = defineStore("fx", () => {
     maxDepositUsdt.value = 0;
     todayRemainingDepositUsdt.value = 0;
     todayRemainingVnd.value = 0;
+    dailyCapacityKnown.value = true;
     feeVnd.value = 0;
     feeUsdt.value = 0;
   }
@@ -62,7 +65,8 @@ export const useFx = defineStore("fx", () => {
       try {
         if (remoteApiEnabled) {
           const [config, quote] = await Promise.all([paymentApi.config(), paymentApi.fxQuote()]);
-          if (syncFailed.value) return;
+          if (devFailureInjected) return;
+          syncFailed.value = false;
           baseRateVndPerUsdt.value = quote.baseRateVndPerUsdt;
           buySpreadPct.value = quote.buySpreadPct;
           lockWindowMin.value = quote.lockWindowMinutes;
@@ -71,13 +75,15 @@ export const useFx = defineStore("fx", () => {
           maxDepositUsdt.value = config.vietQr.maxDepositUsdt;
           todayRemainingDepositUsdt.value = config.vietQr.todayRemainingDepositUsdt;
           todayRemainingVnd.value = config.vietQr.todayRemainingVnd;
+          dailyCapacityKnown.value = config.vietQr.dailyCapacityKnown !== false;
           feeVnd.value = config.vietQr.feeVnd;
           feeUsdt.value = config.vietQr.feeUsdt;
           configReady.value = true;
           syncedAt.value = Date.now();
         } else {
           await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
-          if (!syncFailed.value) {
+          if (!devFailureInjected) {
+            syncFailed.value = false;
             baseRateVndPerUsdt.value = MOCK_FX_SEED.baseRateVndPerUsdt;
             buySpreadPct.value = MOCK_FX_SEED.buySpreadPct;
             lockWindowMin.value = MOCK_FX_SEED.lockWindowMin;
@@ -85,6 +91,7 @@ export const useFx = defineStore("fx", () => {
             maxDepositUsdt.value = MOCK_FX_SEED.maxDepositUsdt;
             todayRemainingDepositUsdt.value = MOCK_FX_SEED.todayRemainingDepositUsdt;
             todayRemainingVnd.value = MOCK_FX_SEED.todayRemainingVnd;
+            dailyCapacityKnown.value = true;
             feeVnd.value = MOCK_FX_SEED.feeVnd;
             feeUsdt.value = MOCK_FX_SEED.feeUsdt;
             vietQrEnabled.value = true;
@@ -110,6 +117,7 @@ export const useFx = defineStore("fx", () => {
   /** ⚠️ DEV/DEMO-ONLY:注入牌价拉取失败态,演 [FEAT-PAY03] ② 异常1(tester 驱动)。 */
   function _devSetFxFailure(value: boolean) {
     if (import.meta.env.PROD) return;
+    devFailureInjected = value;
     syncFailed.value = value;
   }
 
@@ -133,6 +141,7 @@ export const useFx = defineStore("fx", () => {
     maxDepositUsdt,
     todayRemainingDepositUsdt,
     todayRemainingVnd,
+    dailyCapacityKnown,
     feeVnd,
     feeUsdt,
     quoteRate,
