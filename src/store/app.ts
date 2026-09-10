@@ -398,6 +398,9 @@ export const useApp = defineStore("app", () => {
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
+  const remoteWithdrawalListStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const remoteWithdrawalListHasSnapshot = ref(!remoteApiEnabled);
+  let remoteWithdrawalListRefreshSequence = 0;
   const remoteWalletReceiptHasSnapshot = ref(false);
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
@@ -613,7 +616,9 @@ export const useApp = defineStore("app", () => {
     const capacity = Math.max(0, Math.min(1, device.capacityPct / 100));
     const fullDailyUsdt = capacity > 0 ? device.dailyUsdt / capacity : 0;
     const fullDailyNex = capacity > 0 ? device.dailyNex / capacity : 0;
-    const active = ["ACTIVE", "ONLINE", "BUSY"].includes(device.status);
+    const activeLifecycle = ["ACTIVE", "ONLINE", "BUSY", "RUNNING", "OFFLINE"].includes(device.status);
+    const active = device.activatedAt != null && device.deactivatedAt == null && activeLifecycle;
+    const activationUnconfirmed = activeLifecycle && (device.activatedAt == null || device.deactivatedAt != null);
     return {
       id: String(device.id),
       rowVersion: device.rowVersion,
@@ -626,11 +631,13 @@ export const useApp = defineStore("app", () => {
       baseRate: fullDailyUsdt,
       baseRateNEX: fullDailyNex,
       purchasedAt: device.purchasedAt ?? serverNow,
-      activatedAt: active ? (device.activatedAt ?? serverNow) : null,
+      activatedAt: active ? device.activatedAt : null,
+      activationUnconfirmed,
       pendingDeactivate: device.pendingDeactivate,
       lastSettledAt: null,
       onlineHeartbeatAt: null,
-      status: active ? "online" : "offline",
+      runtimeStatus: device.runtimeStatus ?? "UNKNOWN",
+      status: active && device.runtimeStatus === "ONLINE" ? "online" : "offline",
       gpuUsage: 0,
       gpuTemp: 0,
       gpuPower: 0,
@@ -908,6 +915,9 @@ export const useApp = defineStore("app", () => {
       miningPaused.value = false;
       adoptAccountSnapshot(emptySnapshot, true);
       withdrawals.value = [];
+      remoteWithdrawalListRefreshSequence += 1;
+      remoteWithdrawalListStatus.value = "idle";
+      remoteWithdrawalListHasSnapshot.value = false;
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
@@ -947,14 +957,32 @@ export const useApp = defineStore("app", () => {
   async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
     if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return false;
     const request = remoteAccountEpoch.snapshot();
+    const runScope = captureRuntimeRevision();
+    const activeSession = sessionVault.read();
+    if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
+    const refreshSequence = ++remoteWithdrawalListRefreshSequence;
+    remoteWithdrawalListStatus.value = "loading";
     try {
       const rows = await withdrawalApi.list();
-      if (!remoteAccountEpoch.isCurrent(request) || expectedAccountKey !== accountKey.value) return false;
+      if (!remoteAccountEpoch.isCurrent(request)
+        || !isCurrentRuntimeRevision(runScope)
+        || expectedAccountKey !== accountKey.value
+        || refreshSequence !== remoteWithdrawalListRefreshSequence) return false;
       const canonical = rows.map((row) => toCanonicalWithdrawal(row, row.targetAddress ?? "", row.createdAt));
       withdrawals.value = canonical;
       lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: canonical };
+      remoteWithdrawalListHasSnapshot.value = true;
+      remoteWithdrawalListStatus.value = "ready";
       return true;
     } catch {
+      if (remoteAccountEpoch.isCurrent(request)
+        && isCurrentRuntimeRevision(runScope)
+        && expectedAccountKey === accountKey.value
+        && refreshSequence === remoteWithdrawalListRefreshSequence) {
+        // Keep a prior same-account list readable, but make its age explicit to
+        // consumers; first-read failures have no snapshot and stay unknown.
+        remoteWithdrawalListStatus.value = "error";
+      }
       return false;
     }
   }
@@ -2305,7 +2333,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,

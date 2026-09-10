@@ -13,8 +13,11 @@ export interface CanonicalE3Device {
   deviceType: string;
   productCode: string;
   status: string;
+  runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
   pendingDeactivate: boolean;
   activatedAt: number | null;
+  /** Absent in older backend responses; the parser normalizes it to null. */
+  deactivatedAt: number | null;
   purchasedAt: number | null;
   dailyUsdt: number;
   dailyNex: number;
@@ -254,8 +257,10 @@ function device(value: unknown): CanonicalE3Device {
     deviceType: string(source.deviceType),
     productCode: string(source.productCode),
     status: string(source.status).toUpperCase(),
+    runtimeStatus: source.runtimeStatus === "ONLINE" || source.runtimeStatus === "OFFLINE" ? source.runtimeStatus : "UNKNOWN",
     pendingDeactivate: boolean(source.pendingDeactivate),
     activatedAt: timestamp(source.activatedAt),
+    deactivatedAt: timestamp(source.deactivatedAt),
     purchasedAt: timestamp(source.purchasedAt),
     dailyUsdt: number(source.dailyUsdt),
     dailyNex: number(source.dailyNex),

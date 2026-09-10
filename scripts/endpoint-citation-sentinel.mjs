@@ -104,6 +104,9 @@ const LEDGER = {
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────
   "GET /api/withdrawals": "PRD §9.4",
+  "GET /api/withdrawals/{withdrawalNo}": "BACKEND: AppWithdrawalController user-owned read by withdrawalNo; same resource as PRD §9.11f /api/withdrawals/:id",
+  "/api/auth/captcha/challenge": "TBD-NAME: SelfHostedCaptchaController POST challenge, Redis-backed self-hosted slider; user-approved Sep10 implementation, PRD auth endpoint naming pending sync",
+  "/api/auth/captcha/verify": "TBD-NAME: SelfHostedCaptchaController POST verify, one-use verification ticket; user-approved Sep10 implementation, PRD auth endpoint naming pending sync",
   "POST /api/withdrawals": "PRD §9.4 / §9.11e",
   "GET /api/withdrawals/:id": "PRD §9.11f(`GET /api/{module}/:id` 通式)",
   "POST /api/withdrawals/eligibility": "PRD §9.3.1-3",

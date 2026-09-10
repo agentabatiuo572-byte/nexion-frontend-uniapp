@@ -11,8 +11,8 @@ function mount(api:any){
  const props={phone:"+84901234567",scene:"LOGIN"};
  const query:any={in:()=>query,select:()=>query,boundingClientRect:(fn:any)=>{fn({width:324});return query;},exec:()=>{}};
  const names=["ref","computed","onMounted","onUnmounted","getCurrentInstance","nextTick","watch","useT","fmt","useDialogA11y","apiClient","createCaptchaApi","defineProps","defineEmits","uni"];
- const factory=new Function(...names,code+";return {loadChallenge,onCancel,onDown,onMove,onUp,onHandleKeydown,challenge,busy,curX};");
- const state=factory(ref,computed,()=>{},(fn:any)=>{unmount=fn;},()=>null,()=>Promise.resolve(),(_:any,fn:any)=>{changed=fn;},()=>({value:{authOtp:{captchaVerified:"ok",captchaFail:"failed",captchaFailCount:"count"}}}),()=>"",()=>{},null,()=>api,()=>props,()=>emit,{createSelectorQuery:()=>query});
+ const factory=new Function(...names,code+";return {loadChallenge,onCancel,onDown,onMove,onUp,onHandleKeydown,challenge,busy,curX,hintText};");
+ const state=factory(ref,computed,()=>{},(fn:any)=>{unmount=fn;},()=>null,()=>Promise.resolve(),(_:any,fn:any)=>{changed=fn;},()=>({value:{authOtp:{captchaVerified:"ok",captchaFail:"failed",captchaLoadFailed:"unavailable",captchaThrottled:"throttled",captchaFailCount:"count"}}}),()=>"",()=>{},null,()=>api,()=>props,()=>emit,{createSelectorQuery:()=>query});
  return {...state,emit,props,unmount:()=>unmount(),changed:()=>changed()};
 }
 afterEach(()=>vi.useRealTimers());
@@ -38,3 +38,9 @@ test("changing phone during verification invalidates its ticket",async()=>{
 test("failed proof clears consumed challenge and retry obtains a new one",async()=>{
  const api={challenge:vi.fn().mockResolvedValueOnce(fixture).mockResolvedValueOnce({...fixture,challengeId:"new-challenge"}),verify:vi.fn().mockRejectedValue(new Error("expired"))};const s=mount(api);await s.loadChallenge();s.onDown({clientX:0});s.onMove({clientX:100});await s.onUp();expect(s.challenge.value).toBeNull();expect(s.emit).not.toHaveBeenCalled();await s.onUp();expect(api.verify).toHaveBeenCalledTimes(1);await s.loadChallenge();expect(s.challenge.value.challengeId).toBe("new-challenge");s.unmount();
 });
+
+test.each([["USER_CAPTCHA_CHALLENGE_FAILED","failed"],["USER_CAPTCHA_CHALLENGE_EXPIRED","failed"],["USER_CAPTCHA_CHALLENGE_REPLAYED","failed"],["USER_CAPTCHA_CHALLENGE_INVALID","failed"],["USER_CAPTCHA_CHALLENGE_IP_MISMATCH","failed"],["USER_CAPTCHA_CHALLENGE_SCENE_MISMATCH","failed"],["USER_CAPTCHA_TICKET_RATE_LIMITED","throttled"],["USER_CAPTCHA_CHALLENGE_RATE_LIMITED","throttled"],["USER_CAPTCHA_CLIENT_ADDRESS_INVALID","failed"],["network","unavailable"],["USER_CAPTCHA_VERIFIER_UNAVAILABLE","unavailable"]])("verification error %s uses accurate recovery guidance",async(message,expected)=>{
+ const s=mount({challenge:async()=>fixture,verify:async()=>{throw new Error(message);}});await s.loadChallenge();s.onDown({clientX:0});s.onMove({clientX:100});await s.onUp();expect(s.hintText.value).toBe(expected);expect(s.challenge.value).toBeNull();s.unmount();
+});
+
+test.each([["USER_CAPTCHA_CHALLENGE_RATE_LIMITED","throttled"],["network","unavailable"]])("challenge error %s uses accurate recovery guidance",async(message,expected)=>{const s=mount({challenge:async()=>{throw new Error(message);}});await s.loadChallenge();expect(s.hintText.value).toBe(expected);s.unmount();});

@@ -154,7 +154,7 @@
             <CheckoutRow :label="t.store.coRowProduct" :value="product.name" />
             <CheckoutRow :label="t.store.coRowQuantity" value="1" />
             <CheckoutRow :label="t.store.coRowPayment" :value="paymentLabel" />
-            <CheckoutRow :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
+            <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
             <!-- Subtotal revealed when any deduction applies (to anchor the
                  discount rows) or when a card fee applies. -->
             <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
@@ -163,7 +163,7 @@
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
             <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
             <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
-            <CheckoutRow v-else :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
+            <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
             <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
             <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
@@ -278,6 +278,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder } from "@/lib/checkout-order-recovery";
+import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -377,11 +378,46 @@ function mintDialogOwner(): string {
 }
 
 const productId = ref("stellarbox-s1");
+const checkoutRouteFence = new CheckoutRouteFence();
+let purchaseEligibilityRequestSequence = 0;
+let activeCheckoutLoad: CheckoutRouteScope | null = null;
+let checkoutRouteInitialized = false;
+type PurchaseEligibilityResult = "eligible" | "ineligible" | "stale";
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
 const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 const checkoutWalletRefreshing = ref(false);
 let checkoutWalletRefreshSequence = 0;
+
+function checkoutRouteIdentity() {
+  const account = captureAccountScope();
+  return { accountKey: account.accountKey, accountEpoch: account.epoch, productNo: productId.value };
+}
+
+function beginCheckoutRoute(): CheckoutRouteScope {
+  return checkoutRouteFence.begin(checkoutRouteIdentity());
+}
+
+function captureCheckoutRoute(): CheckoutRouteScope {
+  return checkoutRouteFence.capture(checkoutRouteIdentity());
+}
+
+function invalidateCheckoutRoute(): void {
+  checkoutRouteFence.invalidate();
+  activeCheckoutLoad = null;
+}
+
+function isCurrentCheckoutRoute(scope: CheckoutRouteScope): boolean {
+  return pageAlive
+    && pageVisible
+    && checkoutRouteFence.isCurrent(scope, checkoutRouteIdentity());
+}
+
+function clearRemotePurchaseEligibility(): void {
+  purchaseEligibilityRequestSequence += 1;
+  remotePurchaseEligibility.value = null;
+  remotePurchaseEligibilityStatus.value = "idle";
+}
 
 async function refreshCheckoutWallet(): Promise<void> {
   if (!remoteApiEnabled) return;
@@ -395,18 +431,23 @@ async function refreshCheckoutWallet(): Promise<void> {
   }
 }
 
-async function refreshPurchaseEligibility(): Promise<boolean> {
-  if (!remoteApiEnabled) return !purchaseGate.value.blocked;
+/** A stale response is not a denial and must not drive a navigation or mutation. */
+async function refreshPurchaseEligibility(scope = captureCheckoutRoute()): Promise<PurchaseEligibilityResult> {
+  if (!remoteApiEnabled) return purchaseGate.value.blocked ? "ineligible" : "eligible";
+  const sequence = ++purchaseEligibilityRequestSequence;
+  if (!isCurrentCheckoutRoute(scope)) return "stale";
   remotePurchaseEligibilityStatus.value = "loading";
   try {
-    const snapshot = await purchaseEligibilityApi.get(productId.value);
+    const snapshot = await purchaseEligibilityApi.get(scope.productNo);
+    if (sequence !== purchaseEligibilityRequestSequence || !isCurrentCheckoutRoute(scope)) return "stale";
     remotePurchaseEligibility.value = snapshot;
     remotePurchaseEligibilityStatus.value = "ready";
-    return snapshot.eligible;
+    return snapshot.eligible ? "eligible" : "ineligible";
   } catch {
+    if (sequence !== purchaseEligibilityRequestSequence || !isCurrentCheckoutRoute(scope)) return "stale";
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
-    return false;
+    return "ineligible";
   }
 }
 
@@ -431,94 +472,93 @@ function purchaseEligibilityFailureCopy(): string {
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   trialCheckoutSource = o.source === "trial";
-  // accept ?product= (canonical) or ?id= (per task spec)
+  // accept ?product= (canonical) or ?id= via the one canonical product resolver.
   if (o.product) productId.value = resolveTrialCheckoutProductId(o.product) ?? o.product;
   else if (o.id) productId.value = resolveTrialCheckoutProductId(o.id) ?? o.id;
   resumeSessionId = o.resume || null;
-  const [catalogReady] = await Promise.all([
-    refreshProductCatalog(true),
-    refreshServerProductPhase(true),
-  ]);
-  // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
-  if (!catalogReady) return;
-  // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
-  // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
-  const pp = getProduct(productId.value);
-  // 三道跳转门任一命中且带 ?resume=:这张票在这个 SKU 上暂时付不了。**不销毁**它 —— 用户可能已经按地址转账,
-  // 静默删票 = 地址与金额从本地消失、资金孤儿化(审计 R9 P1;R3 曾为断「浮动条→门→弹回」循环而删票,方向反了)。
-  // 处置:票保留在册,明确告知「待支付订单已保留 / 已转账请联系客服」;到点自然作废,或用户从扫码步取消。
-  const dropResumeInvoice = () => {
-    if (!resumeSessionId) return;
-    if (pending.get(resumeSessionId)?.productId === productId.value) toast.warn(t.value.store.pendingResumeBlocked);
-    resumeSessionId = null;
-  };
-  // The trial CTA may point at a product whose finite stock has since reached
-  // zero. The canonical catalogue intentionally omits that row. This is not a
-  // hardware-quota decision: pop the transient checkout so Back cannot reveal
-  // an orphaned "product not found" page underneath the quota screen.
-  if (!pp) {
-    dropResumeInvoice();
-    const unavailableCopy = trialCheckoutSource
-      ? t.value.store.trialProductUnavailable
-      : t.value.store.productUnavailable;
-    if (trialCheckoutSource) navBack("/pages/me/trial");
-    else navTo("/store");
-    // Navigation tears down the checkout's native toast layer. Show the reason
-    // on the destination page so the CTA never looks like a silent no-op.
-    setTimeout(() => {
-      uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 });
-    }, 120);
-    return;
-  }
-  if (pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
-    dropResumeInvoice();
-    const unavailableCopy = trialCheckoutSource
-      ? t.value.store.trialProductUnavailable
-      : t.value.store.temporarilyOutOfStock;
-    if (trialCheckoutSource) navBack("/pages/me/trial");
-    else navTo("/store");
-    setTimeout(() => {
-      uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 });
-    }, 120);
-    return;
-  }
-  const trialConversion = trialQuoteAt(mockServerNow()).applied;
-  if (!trialConversion && pp.purchaseBlocked) {
-    dropResumeInvoice();
-    uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
-    navTo("/store");
-    return;
-  }
-  if (!trialConversion && !isProductAvailable(pp, phase.value)) {
-    const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
-    const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
-      && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
-    if (!mockEarlyWindow) {
+  const routeScope = beginCheckoutRoute();
+  checkoutRouteInitialized = true;
+  activeCheckoutLoad = routeScope;
+  try {
+    // A durable server order is a recovery route, never a fresh purchase. It has
+    // priority over catalog/eligibility gates so a newly denied purchase cannot
+    // hide an already committed original order.
+    if (remoteApiEnabled && await resumeServerOrder(routeScope)) return;
+    if (!isCurrentCheckoutRoute(routeScope)) return;
+
+    const [catalogReady] = await Promise.all([
+      refreshProductCatalog(true),
+      refreshServerProductPhase(true),
+    ]);
+    // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
+    if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
+    // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
+    // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
+    const pp = getProduct(routeScope.productNo);
+    // 三道跳转门任一命中且带 ?resume=:这张票在这个 SKU 上暂时付不了。**不销毁**它 —— 用户可能已经按地址转账,
+    // 静默删票 = 地址与金额从本地消失、资金孤儿化(审计 R9 P1;R3 曾为断「浮动条→门→弹回」循环而删票,方向反了)。
+    // 处置:票保留在册,明确告知「待支付订单已保留 / 已转账请联系客服」;到点自然作废,或用户从扫码步取消。
+    const dropResumeInvoice = () => {
+      if (!resumeSessionId) return;
+      if (pending.get(resumeSessionId)?.productId === routeScope.productNo) toast.warn(t.value.store.pendingResumeBlocked);
+      resumeSessionId = null;
+    };
+    if (!pp) {
       dropResumeInvoice();
-      uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
+      const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.productUnavailable;
+      if (trialCheckoutSource) navBack("/pages/me/trial");
+      else navTo("/store");
+      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      return;
+    }
+    if (pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
+      dropResumeInvoice();
+      const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.temporarilyOutOfStock;
+      if (trialCheckoutSource) navBack("/pages/me/trial");
+      else navTo("/store");
+      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      return;
+    }
+    const trialConversion = trialQuoteAt(mockServerNow()).applied;
+    if (!trialConversion && pp.purchaseBlocked) {
+      dropResumeInvoice();
+      uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
       navTo("/store");
       return;
     }
+    if (!trialConversion && !isProductAvailable(pp, phase.value)) {
+      const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
+      const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
+        && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
+      if (!mockEarlyWindow) {
+        dropResumeInvoice();
+        uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
+        navTo("/store");
+        return;
+      }
+    }
+    const eligibility = trialConversion ? "eligible" : await refreshPurchaseEligibility(routeScope);
+    if (!isCurrentCheckoutRoute(routeScope) || eligibility === "stale") return;
+    if (eligibility === "ineligible") {
+      dropResumeInvoice();
+      uni.showToast({ title: purchaseEligibilityFailureCopy(), icon: "none" });
+      if (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value) === "quotaDepleted") {
+        navTo(`/pages/store/detail?id=${routeScope.productNo}`);
+      } else {
+        navTo("/pages/team/quota");
+      }
+      return;
+    }
+    // Resuming a local pending invoice is not a new checkout and remains after
+    // the server-order recovery branch above.
+    if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
+    if (!isCurrentCheckoutRoute(routeScope)) return;
+    fireTradeinIntercept();
+  } finally {
+    if (activeCheckoutLoad?.generation === routeScope.generation
+      && activeCheckoutLoad.accountKey === routeScope.accountKey
+      && activeCheckoutLoad.productNo === routeScope.productNo) activeCheckoutLoad = null;
   }
-  // Hard purchase gate (等级门/锁额): refuse checkout for ineligible / sold-out
-  // SKUs — deep-link defense (store cards & detail already redirect blocked users
-  // to /team/quota). Server re-checks on POST /api/orders (server-canonical).
-  if (!trialConversion && !(await refreshPurchaseEligibility())) {
-    dropResumeInvoice();
-    uni.showToast({
-      title: purchaseEligibilityFailureCopy(),
-      icon: "none",
-    });
-    navTo("/pages/team/quota");
-    return;
-  }
-  // Resuming a pending session (floating bar / collision "continue that one")
-  // is not a new checkout: no trade-in intercept, straight back to the pay step.
-  if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
-  // Trade-in intercept must run AFTER productId resolves (so the eligibility
-  // composable gets the real device kind). onLoad fires before onMounted in
-  // uni pages, so this is the single earliest point the kind is known.
-  fireTradeinIntercept();
 });
 
 const catalogStatus = computed(() => productCatalogState.status);
@@ -728,11 +768,13 @@ const KNOWN_KINDS: DeviceKind[] = [
 ];
 let interceptFired = false;
 const remoteCapacityGate = new RemoteCapacityGate();
-watch(() => app.accountKey, () => {
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   interceptFired = false;
   remoteCapacityGate.reset();
   checkoutWalletRefreshSequence += 1;
   checkoutWalletRefreshing.value = false;
+  invalidateCheckoutRoute();
+  clearRemotePurchaseEligibility();
   // Checkout progress is money state owned by one account. Clear every
   // projection immediately so a late response cannot expose account A's order
   // after the session has switched to account B.
@@ -1027,10 +1069,10 @@ let pendingVoucherRelease: string | null = null;
 async function onConfirmPay() {
   if (confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
   confirming = true;
-  const recoveryScope = captureAccountScope();
+  const recoveryScope = captureCheckoutRoute();
   if (remoteApiEnabled) {
-    const recovering = await resumeServerOrder();
-    if (recovering || !isCurrentAccountScope(recoveryScope) || !pageAlive) { confirming = false; return; }
+    const recovering = await resumeServerOrder(recoveryScope);
+    if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
   }
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
@@ -1041,7 +1083,7 @@ async function onConfirmPay() {
     // debit + order creation). It must run before the ordinary order path so
     // the checkout cannot create a second, permanently pending order.
     if (trialQuote.applied) {
-      const confirmationScope = captureAccountScope();
+      const confirmationScope = captureCheckoutRoute();
       const p = product.value;
       const payQuote = trialQuoteAt(mockServerNow());
       if (!p || !payQuote.applied) {
@@ -1057,7 +1099,7 @@ async function onConfirmPay() {
         return;
       }
       const conversion = await freeTrial.convert(p.id, quotedTotal);
-      if (!isCurrentAccountScope(confirmationScope)) return;
+      if (!isCurrentCheckoutRoute(confirmationScope)) { confirming = false; return; }
       confirming = false;
       if (!conversion.ok || !conversion.orderNo) {
         toast.warn(t.value.store.coTrialQuoteChanged);
@@ -1288,16 +1330,14 @@ function retireRemoteOrderKey(): void {
 }
 
 let serverOrderRecovery: { key: string; promise: Promise<boolean> } | null = null;
-function resumeServerOrder(): Promise<boolean> {
-  if (!remoteApiEnabled || !pageAlive) return Promise.resolve(false);
-  const scope = captureAccountScope();
-  const recoveryProduct = productId.value;
-  const key = JSON.stringify([scope.accountKey, scope.epoch, recoveryProduct]);
+function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean> {
+  if (!remoteApiEnabled || !isCurrentCheckoutRoute(routeScope)) return Promise.resolve(false);
+  const key = JSON.stringify([routeScope.accountKey, routeScope.accountEpoch, routeScope.productNo, routeScope.generation]);
   if (serverOrderRecovery?.key === key) return serverOrderRecovery.promise;
-  const promise = recoverCheckoutOrder(orders.currentAccountKey(), recoveryProduct, {
+  const promise = recoverCheckoutOrder(routeScope.accountKey, routeScope.productNo, {
     list: orderApi.list,
-    isCurrent: () => isCurrentAccountScope(scope) && productId.value === recoveryProduct,
-    navigate: (url) => pageAlive && pageVisible ? navReplace(url) : Promise.resolve(false),
+    isCurrent: () => isCurrentCheckoutRoute(routeScope),
+    navigate: (url) => isCurrentCheckoutRoute(routeScope) ? navReplace(url) : Promise.resolve(false),
   }).finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
   serverOrderRecovery = { key, promise };
   return promise;
@@ -1308,8 +1348,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   action();
 }
 
-async function offerWalletTopup(requiredUsdt: number): Promise<void> {
-  const accountScope = captureAccountScope();
+async function offerWalletTopup(requiredUsdt: number, routeScope = captureCheckoutRoute()): Promise<void> {
   dialogsOpen += 1;
   const accepted = await confirm({
     title: t.value.errors.insufficientBalanceTitle,
@@ -1320,12 +1359,12 @@ async function offerWalletTopup(requiredUsdt: number): Promise<void> {
     owner: dialogOwner,
   });
   dialogsOpen = Math.max(0, dialogsOpen - 1);
-  if (accepted && pageAlive && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
+  if (accepted && isCurrentCheckoutRoute(routeScope)) navTo("/pages/me/wallet-topup");
 }
 
 async function submitRemoteOrder(): Promise<void> {
-  const submissionScope = captureAccountScope();
-  const scopeIsCurrent = () => isCurrentAccountScope(submissionScope);
+  const submissionScope = captureCheckoutRoute();
+  const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
@@ -1341,17 +1380,20 @@ async function submitRemoteOrder(): Promise<void> {
   }
   if (app.user.usdtBalance + 0.000001 < quotedTotal) {
     confirming = false;
-    await offerWalletTopup(quotedTotal);
+    await offerWalletTopup(quotedTotal, submissionScope);
     return;
   }
-  if (!(await refreshPurchaseEligibility())) {
+  const eligibility = await refreshPurchaseEligibility(submissionScope);
+  if (eligibility !== "eligible") {
     confirming = false;
-    toast.warn(purchaseEligibilityFailureCopy());
-    step.value = "select-payment";
+    if (eligibility === "ineligible" && scopeIsCurrent()) {
+      toast.warn(purchaseEligibilityFailureCopy());
+      step.value = "select-payment";
+    }
     return;
   }
-  // Eligibility is account-scoped. An account switch while it was loading must
-  // never let the old account's quote create an order for the newly bound user.
+  // Eligibility is account/SKU/page scoped. A late result cannot create an
+  // order after an account change, product change, or page exit.
   if (!scopeIsCurrent()) {
     confirming = false;
     return;
@@ -1469,7 +1511,7 @@ async function submitRemoteOrder(): Promise<void> {
         || Math.abs(persisted.discountUsdt - created.discountUsdt) > 0.000001) {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
-    if (alreadySettled) { await resumeServerOrder(); return; }
+    if (alreadySettled) { await resumeServerOrder(submissionScope); return; }
     canonicalOrderCommitted = true;
     const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
     if (!scopeIsCurrent()) return;
@@ -1520,7 +1562,7 @@ async function submitRemoteOrder(): Promise<void> {
     if (apiError.message === "ACCOUNT_COMMAND_STORAGE_UNAVAILABLE") {
       toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
     } else if (apiError.message === "ORDER_WALLET_INSUFFICIENT") {
-      await offerWalletTopup(quotedTotal);
+      await offerWalletTopup(quotedTotal, submissionScope);
     } else if (["ORDER_MONTHLY_QUOTA_PAUSED", "ORDER_MONTHLY_QUOTA_EXHAUSTED"].includes(apiError.message)) {
       toast.warn(t.value.quota.stockUnavailable);
     } else {
@@ -1553,7 +1595,7 @@ function reassertTradeinContext() {
 
 onShow(() => {
   pageVisible = true;
-  void resumeServerOrder();
+  if (checkoutRouteInitialized && !activeCheckoutLoad) void resumeServerOrder();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
@@ -1573,6 +1615,7 @@ onShow(() => {
 });
 onHide(() => {
   pageVisible = false;
+  invalidateCheckoutRoute();
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。
   if (activeSession.value && pending.viewingId === activeSession.value.id) pending.setViewing(null);
 });
@@ -1965,6 +2008,7 @@ function cleanup() {
   if (!pageAlive) return;
   clearAdvance();
   pageVisible = false;
+  invalidateCheckoutRoute();
   tradein.clearApplied(tradeinOwner); // 只清本页 owner 的那份;在世实例的上下文不动
   // 本页拉起的置换 / 槽位 sheet 是 chassis 级全局层,不随页面卸载自动收 —— 不收会跟到落地页,
   // 整屏 backdrop 把浮动条与页面一起挡死(T3 黑盒 P1-2)。

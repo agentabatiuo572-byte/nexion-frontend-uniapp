@@ -57,6 +57,8 @@ const props = withDefaults(
     active: boolean;
     disabled?: boolean;
     actionDisabled?: boolean;
+    /** Replaces the disabled action label when the server needs reconciliation. */
+    disabledLabel?: string;
     activateLabel: string;
     deactivateLabel: string;
     slotsFullLabel: string;
@@ -78,7 +80,7 @@ const actionColor = computed(() =>
   actionDisabled.value ? "var(--v5-ink-4)" : props.active ? "var(--v5-brand-2)" : "var(--v5-brand)",
 );
 const actionLabel = computed(() =>
-  props.active ? props.deactivateLabel : props.disabled ? props.slotsFullLabel : props.activateLabel,
+  props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,
 );
 
 function onAction() {

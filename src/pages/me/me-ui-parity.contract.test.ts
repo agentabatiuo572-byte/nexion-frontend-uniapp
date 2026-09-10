@@ -55,7 +55,7 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "939b5668f4f8dffc104856476b69b53375f6b3a4b056f63f19a9e901d2c3fcbd",
   // Existing formal phone-calibration entry, trial state and physical-slot guard.
-  "devices.vue": "eef17485a1a19178f62b0d85c6c940497c149aa04993deba62e30e46a13f52b0",
+  "devices.vue": "ff2a1662e252b3233c387cc24fc07708ff9ac53b5f4c2fddf3dc1d2c212bc00f",
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
   // R3: preserve layout while enabling keyboard FAQ and category controls.
@@ -95,7 +95,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-exchange.vue": "48c7571b34de2737fb0b8d4e1a395813a7b4a11c583a29f91fe394e3a1107041",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
-  "wallet-nex.vue": "50f0cd137035f0f0bc3ee3eb69e6c033b1c2a7c45a671b2f0c8b07eab9c9c0d9",
+  "wallet-nex.vue": "f6c9f05d530a6069210e11253b7929385b728c17b548619a4572ab0439e71e17",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
@@ -103,9 +103,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Formal G7 now exposes historical orders, claim/early actions and server-configured copy.
   "wallet-repurchase.vue": "6e3844e14cd7dd5505034f9452cf47cf427fb156aa7dc7076216fd0193fe7269",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
-  "wallet-withdraw-tracking.vue": "66490f81614d168d2dcc518695e019f198fd24ab714b3fc21bab6b52605aafb1",
+  "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
-  "wallet-withdraw.vue": "21e60cec868dc64a1310fe2edde5c151ea5748815e50d0227b78da37022a5333",
+  "wallet-withdraw.vue": "07a25252e9a52052f914e8627e6746318c833b27296bf3d50243d8b587eac352",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",
 };

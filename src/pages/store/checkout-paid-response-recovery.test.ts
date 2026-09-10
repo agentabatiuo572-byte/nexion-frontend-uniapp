@@ -16,7 +16,9 @@ function harness() {
     captureAccountScope: () => ({}), isCurrentAccountScope: () => true,
     app: { captureRemoteAccountRequest: () => ({}), user: { usdtBalance: 100 }, adoptCommerceWallet: vi.fn(), refreshRemoteFleet: vi.fn() },
     product: ref({ id: "sku" }), purchaseUnavailable: ref(false), voucherQuote: { id: null }, quotedTotal: 100,
-    confirming: true, offerWalletTopup: vi.fn(), refreshPurchaseEligibility: vi.fn().mockResolvedValue(true),
+    confirming: true, offerWalletTopup: vi.fn(), refreshPurchaseEligibility: vi.fn().mockResolvedValue("eligible"),
+    captureCheckoutRoute: () => ({ accountKey: "a", accountEpoch: 1, productNo: "sku", generation: 1 }),
+    isCurrentCheckoutRoute: () => true,
     step: ref("confirm"), t: ref(en), toast: { warn: vi.fn(), error: vi.fn() },
     tradein: { appliedTradein: null }, appliedTradeinView: ref(null),
     orderApi: { create: vi.fn().mockResolvedValue({ ...order, voucherRedemption: null }),
@@ -39,8 +41,10 @@ describe("real checkout handler outcome recovery", () => {
     let resolveA!: (v: boolean) => void;
     const recover = vi.fn().mockReturnValueOnce(new Promise((r) => { resolveA = r; }))
       .mockResolvedValue(false);
-    const deps = { remoteApiEnabled: true, pageAlive: true, pageVisible: true, productId,
-      captureAccountScope: () => ({ ...account }), isCurrentAccountScope: (s: typeof account) => s.epoch === account.epoch && s.accountKey === account.accountKey,
+    const deps = { remoteApiEnabled: true, productId,
+      captureCheckoutRoute: () => ({ accountKey: account.accountKey, accountEpoch: account.epoch, productNo: productId.value, generation: account.epoch }),
+      isCurrentCheckoutRoute: (scope: { accountKey: string; accountEpoch: number; productNo: string }) => scope.accountKey === account.accountKey
+        && scope.accountEpoch === account.epoch && scope.productNo === productId.value,
       orders: { currentAccountKey: () => account.accountKey }, orderApi: { list: vi.fn() },
       recoverCheckoutOrder: recover, navReplace: vi.fn() };
     const resume = new Function(...Object.keys(deps), js)(...Object.values(deps));
@@ -84,6 +88,16 @@ describe("real checkout handler outcome recovery", () => {
     await h.submit();
     expect(h.resumeServerOrder).toHaveBeenCalledOnce();
     expect(h.orderApi.pay).not.toHaveBeenCalled();
+  });
+  it("does not create, pay, toast, or reset the visible step after a stale eligibility result", async () => {
+    const h = harness();
+    h.refreshPurchaseEligibility.mockResolvedValue("stale");
+    h.isCurrentCheckoutRoute = () => false;
+    await h.submit();
+    expect(h.orderApi.create).not.toHaveBeenCalled();
+    expect(h.orderApi.pay).not.toHaveBeenCalled();
+    expect(h.toast.warn).not.toHaveBeenCalled();
+    expect(h.step.value).toBe("confirm");
   });
   it("checks durable recovery before changing the quote or running new-purchase gates", () => {
     const handler = source.slice(source.indexOf("async function onConfirmPay()"), source.indexOf("// $0 due"));

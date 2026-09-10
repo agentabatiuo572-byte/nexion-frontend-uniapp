@@ -64,6 +64,8 @@ export interface Device {
   id: string;
   /** Server CAS version. Remote mutations must send this exact value. */
   rowVersion?: number;
+  /** Independent server runtime fact; absent on local simulation rows. */
+  runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
   kind: DeviceKind;
   name: string;
   gpu: string;
@@ -100,6 +102,9 @@ export interface Device {
   // Every device, including the phone, stays inactive until the corresponding
   // server-authoritative activation command succeeds.
   activatedAt: number | null;
+  /** The server returned an active lifecycle code without its required activation time.
+   * Keep the record visible for support, but never expose it as activatable inventory. */
+  activationUnconfirmed?: boolean;
   // PRD §6.11 登记锚点: epoch ms of the last earnings settlement. Set on
   // activation (= registration), advanced by app.ts settle() on each accrual.
   // Earnings accrue by wall-clock (now - lastSettledAt), NOT by accumulated tick

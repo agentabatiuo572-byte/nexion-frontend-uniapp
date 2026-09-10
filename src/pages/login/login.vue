@@ -119,6 +119,7 @@
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
+    <!-- i18n-en-ok: Server CAPTCHA protocol scene enum, sent only to backend verification and never rendered. -->
     <ServerCaptchaSlider v-if="showCaptcha && remoteApiEnabled" :phone="fullPhone" :scene='(captchaPurpose === "password" ? "LOGIN" : otpScene === "reset" ? "RESET" : "LOGIN")' @success="onCaptchaOk" @close="showCaptcha = false" />
     <CaptchaSlider v-else-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />

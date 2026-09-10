@@ -16,7 +16,9 @@ describe("trial conversion checkout route", () => {
 
   it("does not send a trial conversion through the ordinary hardware-quota gate", () => {
     expect(checkoutSource).toContain("const trialConversion = trialQuoteAt(mockServerNow()).applied");
-    expect(checkoutSource).toContain("if (!trialConversion && !(await refreshPurchaseEligibility()))");
+    expect(checkoutSource).toContain('const eligibility = trialConversion ? "eligible" : await refreshPurchaseEligibility(routeScope);');
+    expect(checkoutSource).toContain('if (!isCurrentCheckoutRoute(routeScope) || eligibility === "stale") return;');
+    expect(checkoutSource).toContain('if (eligibility === "ineligible")');
     expect(checkoutSource).toContain("if (!trialQuote.applied && purchaseBlockedNow)");
   });
 

@@ -27,12 +27,14 @@
             <text class="block" :style="heroLabelStyle">{{ t.nexWallet.holdingsLabel }}</text>
             <view class="flex items-end justify-between" style="margin-top: 10px">
               <view>
-                <text class="block tabular-nums" :style="heroNumStyle">{{ fmtNum(nexBalance, 2) }}</text>
+                <text class="block tabular-nums" :style="heroNumStyle">{{ balanceKnown ? fmtNum(nexBalance, 2) : "—" }}</text>
                 <text class="block" :style="heroUnitStyle">NEX</text>
               </view>
               <view class="text-right">
-                <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ fmtUSD(usdValue) }}</text>
-                <text class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
+                <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ valuationKnown ? fmtUSD(usdValue) : "—" }}</text>
+                <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="heroChangeStyle" role="status" aria-live="polite">{{ t.wallet.loadingTransactions }}</text>
+                <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="heroChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
+                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 
@@ -133,7 +135,7 @@
             </view>
             <view class="text-right">
               <text class="block tabular-nums" :style="activityNexStyle">{{ a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} NEX</text>
-              <text class="block" :style="activityUsdStyle">≈ {{ fmtUSD(a.nex * nexPrice) }}</text>
+              <text class="block" :style="activityUsdStyle">≈ {{ marketValueKnown ? fmtUSD(a.nex * nexPrice) : "—" }}</text>
             </view>
           </view>
           </view>
@@ -160,6 +162,7 @@ import { useMarket } from "@/store/market";
 import { useCommission } from "@/store/commission";
 import { useBills } from "@/store/bills";
 import { remoteApiEnabled } from "@/api/runtime";
+import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 
 const t = useT();
 const app = useApp();
@@ -178,12 +181,22 @@ onUnmounted(() => {
   if (priceTimer) clearInterval(priceTimer);
 });
 function refreshNexSummary() {
-  if (remoteApiEnabled) void bills.refreshSummary().catch(() => undefined);
+  if (!remoteApiEnabled) return;
+  void app.refreshRemoteFleet().catch(() => undefined);
+  void bills.refreshSummary().catch(() => undefined);
 }
 onShow(refreshNexSummary);
 
 const nexBalance = computed(() => app.user.nexBalance);
+const balanceKnown = computed(() => !remoteApiEnabled || app.remoteFleetHasSnapshot);
 const nexPrice = computed(() => market.nexPriceUSDT);
+const marketAuthorityStatus = computed(() => remoteAuthorityStatus({
+  remoteApiEnabled,
+  hasSnapshot: market.remoteReady,
+  hasError: market.remoteError !== null,
+}));
+const marketValueKnown = computed(() => marketAuthorityStatus.value === "ready");
+const valuationKnown = computed(() => balanceKnown.value && marketValueKnown.value);
 const change24h = computed(() => market.change24hPct);
 const kline = computed(() => market.klineHourly);
 const usdValue = computed(() => nexBalance.value * nexPrice.value);
@@ -276,16 +289,18 @@ const quickCells = computed(() => [
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: `${fmtNum(nexBalance.value, 2)} NEX`, hint: fmtUSD(usdValue.value), tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} NEX` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
   { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `+${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
   { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} NEX`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
-const pnlSummary = computed(() => `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`);
+const pnlSummary = computed(() => valuationKnown.value
+  ? `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`
+  : "—");
 const pnlCells = computed(() => [
-  { label: t.value.nexWallet.pnl.costBasis, value: market.costBasis > 0 ? `$${market.costBasis.toFixed(3)}` : "—" },
-  { label: t.value.nexWallet.pnl.totalSpent, value: fmtUSD(totalSpent.value) },
-  { label: t.value.nexWallet.pnl.currentValue, value: fmtUSD(usdValue.value) },
+  { label: t.value.nexWallet.pnl.costBasis, value: marketValueKnown.value && market.costBasis > 0 ? `$${market.costBasis.toFixed(3)}` : "—" },
+  { label: t.value.nexWallet.pnl.totalSpent, value: valuationKnown.value ? fmtUSD(totalSpent.value) : "—" },
+  { label: t.value.nexWallet.pnl.currentValue, value: valuationKnown.value ? fmtUSD(usdValue.value) : "—" },
 ]);
 
 const useTiles = computed(() => [

@@ -5,7 +5,7 @@ test("loads anonymous server challenge without exposing an answer", async () => 
   const request=vi.fn().mockResolvedValue({...valid,targetX:200});
   const result=await createCaptchaApi({request} as never).challenge("REGISTER");
   expect(result).toEqual(valid);
-  expect(request).toHaveBeenCalledWith({path:"/auth/captcha/challenge",method:"POST",authenticated:false,body:{scene:"REGISTER"}});
+  expect(request).toHaveBeenCalledWith({path:"/api/auth/captcha/challenge",method:"POST",authenticated:false,body:{scene:"REGISTER"}});
 });
 test.each([{backgroundImage:"javascript:alert(1)"},{pieceY:150},{width:0},{expiresInSec:0},{challengeId:"short"}])("rejects malformed challenge %j", async patch => {
   const api=createCaptchaApi({request:vi.fn().mockResolvedValue({...valid,...patch})} as never);
@@ -15,7 +15,7 @@ test("forwards the server proof and returns only its opaque ticket", async () =>
   const request=vi.fn().mockResolvedValue({ticket:"ticket-0123456789abcdef",expiresInSec:60});
   const proof={scene:"RESET" as const,challengeId:valid.challengeId,offsetX:170,trail:[{x:0,t:0},{x:170,t:900}],inputMethod:"pointer" as const};
   expect(await createCaptchaApi({request} as never).verify(proof)).toEqual({ticket:"ticket-0123456789abcdef",expiresInSec:60});
-  expect(request).toHaveBeenCalledWith(expect.objectContaining({authenticated:false,body:proof}));
+  expect(request).toHaveBeenCalledWith({path:"/api/auth/captcha/verify",method:"POST",authenticated:false,body:proof});
 });
 test("does not fabricate a ticket on network failure", async () => {
   const api=createCaptchaApi({request:vi.fn().mockRejectedValue(new Error("network"))} as never);

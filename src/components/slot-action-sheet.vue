@@ -34,7 +34,7 @@
         <text class="sas-store-cta-t">{{ t.slotSheet.goStoreCta }}</text>
       </view>
 
-      <!-- secondary (de-emphasized): collapsed row → tap to reveal inactive devices -->
+      <!-- secondary (de-emphasized): collapsed row → tap to reveal activatable inventory -->
       <view v-if="inactiveDevices.length > 0" class="sas-activate">
         <view class="sas-activate-toggle" :class="{ 'is-open': expanded }" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded" @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
           <text class="sas-activate-toggle-t">{{ activateRowText }}</text>
@@ -68,6 +68,10 @@
           </view>
         </view>
       </view>
+
+      <view v-if="unconfirmedDevices.length > 0" class="sas-unconfirmed" role="status">
+        <text>{{ t.myDevices.inventoryActivationUnconfirmed }}</text>
+      </view>
     </view>
   </view>
 </template>
@@ -84,7 +88,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { occupiesDeviceSlot } from "@/lib/device-slot-policy";
+import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
@@ -103,7 +107,10 @@ watch(
   },
 );
 
-const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
+const inactiveDevices = computed(() => app.visibleDevices.filter(
+  (d) => d.activatedAt === null && !requiresActivationConfirmation(d),
+));
+const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const activeCount = computed(() => app.activeSlotCount);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + reservedSlots.value);
@@ -120,6 +127,10 @@ function hide() {
 const activationInFlight = ref(new Set<string>());
 
 async function onActivate(d: Device) {
+  if (requiresActivationConfirmation(d)) {
+    toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
+    return;
+  }
   if (d.kind === "phone") {
     sheet.hide();
     navTo("/pages/onboarding/connect?mode=recalibrate");
@@ -378,5 +389,15 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   flex-shrink: 0;
   display: grid;
   place-items: center;
+}
+.sas-unconfirmed {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--v5-warning) 10%, transparent);
+  color: var(--v5-warning-ink);
+  font-family: var(--font-v5);
+  font-size: 12px;
+  line-height: 1.45;
 }
 </style>

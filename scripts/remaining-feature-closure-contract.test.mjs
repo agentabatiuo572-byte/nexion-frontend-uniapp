@@ -20,9 +20,10 @@ test("bundle editor uses the real remote order lifecycle with stable command rec
   assert.ok(remoteBranch >= 0 && createOrder > remoteBranch, "remote branch must create the canonical bundle order");
   assert.ok(payOrder > createOrder && activatedReadback > payOrder,
     "bundle order must be paid and read back as activated before success");
-  assert.match(page, /acquireBundleKey\(list, accountKey\)/);
-  assert.match(page, /if \(!canonicalOrderCommitted && \(policyStale \|\| !isAmbiguousOutcome\(error\)\)\)/);
-  assert.match(page, /checkoutUnavailable = computed\(\(\) => submitting\.value \|\| walletRefreshing\.value \|\| products\.value\.length < 2\)/);
+  assert.match(page, /acquireBundleCommand\(list, accountKey, quotedTotal\)/);
+  assert.match(page, /bundleOrderApi\.create\(\s*command\.productNos, latestPolicy\.policyVersion, command\.expectedAmountUsdt, command\.key\)/);
+  assert.match(page, /if \(!canonicalOrderCommitted && !idempotencyPayloadMismatch\s*&& \(policyStale \|\| quoteStale \|\| !isAmbiguousOutcome\(error\)\)\)/);
+  assert.match(page, /const checkoutUnavailable = computed\(\(\) => submitting\.value \|\| walletRefreshing\.value \|\| products\.value\.length < 2\)/);
   assert.match(api, /\/api\/orders\/bundle/);
   assert.match(api, /idSource !== "server"/);
 });

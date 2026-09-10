@@ -27,14 +27,14 @@ function png(value: unknown): string {
 export function createCaptchaApi(client: ApiClient) {
   return {
     async challenge(scene: CaptchaScene): Promise<ServerCaptchaChallenge> {
-      const data = record(await client.request({ path: "/auth/captcha/challenge", method: "POST", authenticated: false, body: {scene} }));
+      const data = record(await client.request({ path: "/api/auth/captcha/challenge", method: "POST", authenticated: false, body: {scene} }));
       const width = integer(data.width, 100, 1024), height = integer(data.height, 60, 512);
       const pieceWidth = integer(data.pieceWidth, 10, width - 1), pieceHeight = integer(data.pieceHeight, 10, height);
       return { challengeId: opaque(data.challengeId), backgroundImage: png(data.backgroundImage), pieceImage: png(data.pieceImage), width, height, pieceWidth, pieceHeight,
         pieceY: integer(data.pieceY, 0, height - pieceHeight), expiresInSec: integer(data.expiresInSec, 1, 600) };
     },
     async verify(proof: CaptchaProof): Promise<{ticket: string; expiresInSec: number}> {
-      const data = record(await client.request({ path: "/auth/captcha/verify", method: "POST", authenticated: false, body: proof }));
+      const data = record(await client.request({ path: "/api/auth/captcha/verify", method: "POST", authenticated: false, body: proof }));
       return { ticket: opaque(data.ticket), expiresInSec: integer(data.expiresInSec, 1, 600) };
     },
   };

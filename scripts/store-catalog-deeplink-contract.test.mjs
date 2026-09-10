@@ -14,7 +14,7 @@ test("remote product detail resolves the canonical catalog before looking up a d
 });
 
 test("remote checkout resolves the canonical catalog before evaluating purchase gates", () => {
-  assert.match(checkout, /onLoad\(async \(options\) => \{[\s\S]*refreshProductCatalog\(true\)[\s\S]*if \(!catalogReady\) return;[\s\S]*const pp = getProduct/);
+  assert.match(checkout, /onLoad\(async \(options\) => \{[\s\S]*refreshProductCatalog\(true\)[\s\S]*if \(!isCurrentCheckoutRoute\(routeScope\) \|\| !catalogReady\) return;[\s\S]*const pp = getProduct\(routeScope\.productNo\)/);
   assert.match(checkout, /catalogStatus === 'loading'/);
   assert.match(checkout, /catalogStatus === 'error'/);
 });

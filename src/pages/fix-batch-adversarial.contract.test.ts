@@ -16,7 +16,12 @@ const read = (path: string) => sources[path] ?? "";
 describe("adversarial fix-batch contracts", () => {
   it("clears an accepted withdrawal eligibility snapshot before every new request", () => {
     const source = read("./me/wallet-withdraw.vue");
-    expect(source).toMatch(/const epoch = \+\+remoteEligibilityEpoch;\s*remoteEligibility\.value = null;/);
+    const start = source.indexOf("const epoch = ++remoteEligibilityEpoch;");
+    const cleared = source.indexOf("remoteEligibility.value = null;", start);
+    const request = source.indexOf("await requestWithdrawalEligibility(", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(cleared).toBeGreaterThan(start);
+    expect(request).toBeGreaterThan(cleared);
   });
 
   it("persists account-deletion request and cancel command keys until verified success", () => {

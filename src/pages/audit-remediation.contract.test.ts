@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 const sources = import.meta.glob([
   "../components/slot-action-sheet.vue",
+  "./me/devices.vue",
+  "./onboarding/connect.vue",
   "./me/receipts.vue",
   "./daily/daily.vue",
   "./globe/globe.vue",
@@ -18,6 +20,15 @@ describe("read-only audit remediation contracts", () => {
     expect(source).toContain("await deviceE3Api.activate");
     expect(source).toContain("await app.refreshRemoteFleet");
     expect(source).toContain("if (remoteApiEnabled)");
+  });
+
+  it("blocks both real activation click paths until a missing activation timestamp is reconciled", () => {
+    const slotSheet = read("../components/slot-action-sheet.vue");
+    const devices = read("./me/devices.vue");
+    expect(slotSheet).toContain("if (requiresActivationConfirmation(d))");
+    expect(slotSheet).toContain("const unconfirmedDevices");
+    expect(devices).toContain("if (requiresActivationConfirmation(d))");
+    expect(devices).toContain("const unconfirmedDevices");
   });
 
   it("does not collapse a failed compute receipt request into an empty list", () => {

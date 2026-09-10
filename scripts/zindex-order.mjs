@@ -11,8 +11,8 @@
  *
  * 两个正交断言(缺一不可):
  *   ① 阶梯序:登录/注册页**同时挂载**的 6 个浮层必须严格递增(值解析不到 = 红,不许假绿)。
- *   ② 全局天花板:滑块必须是业务面最高层 —— 全站扫一遍 z-index,除模拟设备 chrome
- *      白名单外不许有人 ≥ 滑块。①只遍历已知成员,新加一个 9600 的浮层它看不见;②才看得见。
+ *   ② 全局天花板:两种滑块验证码都是同级最高的安全控件 —— 全站扫一遍 z-index,除模拟设备
+ *      chrome 白名单外不许有人 ≥ 验证码。①只遍历已知成员,新加一个 9600 的浮层它看不见;②才看得见。
  *
  * 用法:node scripts/zindex-order.mjs [--selftest]
  */
@@ -29,21 +29,26 @@ export const stripComments = (s) =>
     .replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
 
-/** 规则块取 z-index;选择器写死 pin,解析不到返回 null(调用方必须判 null) */
-export function zOf(text, selector) {
+/** 规则块取 z-index 及其源码偏移;注释以空格替换后偏移仍和原文件一致。 */
+export function zHitOf(text, selector) {
   const src = stripComments(text);
-  const m = src.match(new RegExp(selector.replace(/\./g, "\\.") + "\\s*\\{[^}]*?z-index:\\s*(\\d+)", "s"));
-  return m ? parseInt(m[1], 10) : null;
+  const m = new RegExp(selector.replace(/\./g, "\\.") + "\\s*\\{[^}]*?z-index:\\s*(\\d+)", "s").exec(src);
+  return m ? { z: parseInt(m[1], 10), offset: m.index + m[0].lastIndexOf("z-index") } : null;
 }
 
-/** 全站扫 z-index 数值(含内联 style),返回 {file,line,z} */
+/** 规则块取 z-index;选择器写死 pin,解析不到返回 null(调用方必须判 null) */
+export function zOf(text, selector) {
+  return zHitOf(text, selector)?.z ?? null;
+}
+
+/** 全站扫 z-index 数值(含内联 style),返回 {file,line,z,offset}。 */
 export function scanAll(files) {
   const hits = [];
   for (const { rel, text } of files) {
     const src = stripComments(text);
     const re = /z-index:\s*(\d+)/g;
     let m;
-    while ((m = re.exec(src))) hits.push({ file: rel, line: src.slice(0, m.index).split("\n").length, z: parseInt(m[1], 10) });
+    while ((m = re.exec(src))) hits.push({ file: rel, line: src.slice(0, m.index).split("\n").length, z: parseInt(m[1], 10), offset: m.index });
   }
   return hits;
 }
@@ -58,6 +63,15 @@ export const LADDER = [
   { file: "src/components/global-ui.vue", sel: ".nx-mask", role: "阻断式弹窗 confirm/netError" },
   { file: "src/components/captcha-slider.vue", sel: ".cs-layer", role: "🔴 滑块人机验证(阻断式安全控件,发码流程停在它上面)" },
   { file: "src/components/device/standalone-page-shell.vue", sel: ".nx-standalone-home", role: "模拟设备 chrome(硬件层,pointer-events:none)" },
+];
+
+/*
+ * 本地和服务端验证码是同一个发码阻断点的两种运行实现。它们允许同层,但必须同值:
+ * 若把其中一个排除出天花板却不钉住同级关系,业务浮层也能借这个口子逃逸。
+ */
+export const CAPTCHA_SECURITY_CONTROLS = [
+  { file: "src/components/captcha-slider.vue", sel: ".cs-layer", role: "本地滑块验证码" },
+  { file: "src/components/server-captcha-slider.vue", sel: ".cs-layer", role: "服务端滑块验证码" },
 ];
 
 /* ── 契约 ③:庆祝浮层必须低于全部业务浮层 ──────────────────────────────────
@@ -267,14 +281,30 @@ export function evaluate(files = readVueFiles()) {
           `形态一改(absolute / 挪写法)判据就看不见它,z 掉回去也不会红`,
       );
 
-  // ② 天花板
+  // ② 天花板。两种验证码都必须解析到，且严格保持同级；它们是唯一允许等于安全天花板的组件。
   const capt = rungs.find((r) => r.sel === ".cs-layer");
+  const captchaControls = CAPTCHA_SECURITY_CONTROLS.map((control) => {
+    const hit = byRel.has(control.file) ? zHitOf(byRel.get(control.file), control.sel) : null;
+    return { ...control, hit, z: hit?.z ?? null };
+  });
+  for (const control of captchaControls) {
+    if (control.z === null)
+      problems.push(`验证码安全层级解析不到:${control.file} ${control.sel} —— 被删/改名/改写法都算红`);
+    else if (capt?.z != null && control.z !== capt.z)
+      problems.push(`验证码安全层级不一致:${control.role}(${control.z}) 必须 = 本地滑块验证码(${capt.z})`);
+  }
   const exemptFiles = new Set(CEILING_EXEMPT.map((e) => e.file));
-  const over = capt?.z == null ? [] : scanAll(files).filter((h) => h.z >= capt.z && !exemptFiles.has(h.file) && h.file !== "src/components/captcha-slider.vue");
+  // 只豁免验证码规则内**那一个** z-index 声明，不能按文件排除：同组件中新加的业务
+  // 浮层即使也写 9500，仍会在这里被抓住。
+  const captchaRuleOffsets = new Map(captchaControls.filter((control) => control.hit).map((control) => [control.file, control.hit.offset]));
+  const ceilingHits = scanAll(files);
+  const over = capt?.z == null ? [] : ceilingHits.filter((h) =>
+    h.z >= capt.z && !exemptFiles.has(h.file) && captchaRuleOffsets.get(h.file) !== h.offset,
+  );
   for (const h of over)
     problems.push(`天花板破了:${h.file}:${h.line} z-index ${h.z} ≥ 滑块 ${capt.z} —— 滑块是阻断式安全控件,不许有业务浮层压在它上面`);
 
-  return { rungs, problems, scanned: files.length, ceilingScanned: scanAll(files).length };
+  return { rungs, problems, scanned: files.length, ceilingScanned: ceilingHits.length };
 }
 
 /* ── 红测:每个合取项单独隔离破坏,一次只坏一项 ───────────────────────────── */
@@ -435,6 +465,25 @@ function selftest() {
     files.push({ rel: "src/components/device/standalone-page-shell.vue.bak", text: ".x { z-index: 10050; }" });
     p("红测②-反向 白名单外的 10050 也必红(白名单按文件不按数值)", evaluate(files).problems.some((x) => x.startsWith("天花板破了")));
   }
+  {
+    const securityProblems = evaluate(base).problems.filter((x) => x.startsWith("验证码安全层级"));
+    p("验证码正测 两种验证码同为 9500 的同级安全控件", securityProblems.length === 0, securityProblems.join(" / "));
+  }
+  {
+    const files = patch("src/components/server-captcha-slider.vue", (t) => t.replace(/(\.cs-layer\s*\{[^}]*?z-index:\s*)\d+/s, "$19499"));
+    p("验证码红测 服务端验证码降到 9499 必红(不得被业务层压住)",
+      evaluate(files).problems.some((x) => x.startsWith("验证码安全层级不一致")));
+  }
+  {
+    const files = patch("src/components/server-captcha-slider.vue", (t) => t.replace(/(\.cs-layer\s*\{[^}]*?z-index:\s*)\d+/s, "$19501"));
+    p("验证码红测 服务端验证码升到 9501 必红(不得抬高安全天花板)",
+      evaluate(files).problems.some((x) => x.startsWith("验证码安全层级不一致")));
+  }
+  for (const z of [9500, 9600]) {
+    const files = patch("src/components/server-captcha-slider.vue", (t) => `${t}\n<style scoped>\n.business { z-index: ${z}; }\n</style>`);
+    p(`验证码红测 同组件新增业务层 ${z} 仍必红(只放行 .cs-layer 的准确声明)`,
+      evaluate(files).problems.some((x) => x.startsWith("天花板破了")));
+  }
 
   // 判据本身:注释里的层级表不许被当成代码(否则本文件的说明注释会自伤)
   p("阴性 注释里的 z-index 不计数", scanAll([{ rel: "a.vue", text: "/* z-index: 99999 */\n<!-- z-index: 88888 -->" }]).length === 0);
@@ -454,7 +503,7 @@ if (res.problems.length) {
   console.error(`层级秩序: ${res.problems.length} 处违例\n`);
   for (const m of res.problems.slice(0, 10)) console.error("  " + m);
   if (res.problems.length > 10) console.error(`  …另有 ${res.problems.length - 10} 处同类(多为滑块被压低后「全世界都在它上面」的连带)`);
-  console.error(`\n秩序表见 src/components/captcha-slider.vue 顶部注释(单源)。确属例外 → 改本脚本的 LADDER / CEILING_EXEMPT 并写 reason。`);
+  console.error(`\n秩序表见 src/components/captcha-slider.vue 顶部注释(单源)。验证码同级实现只能改 CAPTCHA_SECURITY_CONTROLS；业务例外才可改 CEILING_EXEMPT 并写 reason。`);
   process.exit(1);
 }
 console.log(
