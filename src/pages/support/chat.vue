@@ -448,11 +448,10 @@ const quickChips = computed<QuickChip[]>(() =>
     : [],
 );
 
-// The server records a receipt for each agent message when the authenticated user
-// sees it.  Show that same object under the last agent bubble; never pretend it
-// belongs to a user message.
-function receiptFor(status: "sent" | "read" | undefined, isLastAgentMsg: boolean): string | undefined {
-  if (!status || !isLastAgentMsg) return undefined;
+// Human messages carry the authenticated user's delivery/read receipt. Show it
+// only under the newest outgoing USER bubble; Nova has its own projection above.
+function receiptFor(status: "sent" | "read" | undefined, isLatestReceipt: boolean): string | undefined {
+  if (!status || !isLatestReceipt) return undefined;
   return status === "read" ? t.value.conversations.receiptRead : t.value.conversations.receiptSent;
 }
 
@@ -482,13 +481,13 @@ const threadMessages = computed<ThreadMsg[]>(() => {
   }
   const c = conv.value;
   if (!c) return [];
-  const lastAgent = c.messages.map((m) => m.sender).lastIndexOf("agent");
+  const lastUser = c.messages.map((m) => m.sender).lastIndexOf("user");
   return c.messages.map((m, i) => ({
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
     text: m.text,
-    receipt: receiptFor(m.status, i === lastAgent),
+    receipt: receiptFor(m.status, i === lastUser),
   }));
 });
 
