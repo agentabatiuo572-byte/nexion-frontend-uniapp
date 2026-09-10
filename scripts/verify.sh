@@ -1338,7 +1338,7 @@ fi
 sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now,[^)]*\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
-adv_sites=$(grep -rcE 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+adv_sites=$(grep -rcE --include='*.ts' --include='*.vue' --exclude='*.test.ts' 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
 # 🔴 必须 == 1,不能写 <= 1:0 处意味着推进整个没了,那也是坏的。
 # 判据里「候选为空」要当失败处理,否则判据一失效就变成永远绿(踩过多次)。
 if [ "${adv_sites:-0}" -eq 1 ]; then

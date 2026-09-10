@@ -55,7 +55,19 @@ describe("device E3 eligibility API", () => {
       sourceEnvironment: "PRODUCTION",
       runId: "",
       serverCanonical: true,
-      devices: [{ instanceNo: "E3-1", capacityPct: 66.5 }],
+      devices: [{ instanceNo: "E3-1", capacityPct: 66.5, deactivatedAt: null }],
+    });
+  });
+
+  it("preserves a new backend deactivation time while accepting its absence from an older backend", async () => {
+    const current = fleetPayload(100);
+    (current.devices[0] as Record<string, unknown>).deactivatedAt = 1_800_000_000_000;
+
+    await expect(createDeviceE3Api(client(current), "dev").fleet()).resolves.toMatchObject({
+      devices: [{ deactivatedAt: 1_800_000_000_000 }],
+    });
+    await expect(createDeviceE3Api(client(fleetPayload(100)), "dev").fleet()).resolves.toMatchObject({
+      devices: [{ deactivatedAt: null }],
     });
   });
 

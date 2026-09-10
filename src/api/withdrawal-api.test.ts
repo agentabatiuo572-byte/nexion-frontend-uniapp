@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { createWithdrawalApi } from "./withdrawal-api";
+import { createWithdrawalApi, toCanonicalWithdrawal } from "./withdrawal-api";
 
 const row = {
   withdrawalNo: "WD-1", targetAddress: "0x1234567890123456789012345678901234567890",
@@ -38,6 +38,38 @@ test("does not send a preflight with a missing policy version", async () => {
   expect(request).not.toHaveBeenCalled();
 });
 
+test("reads the exact owned withdrawal detail instead of discarding its cold-restore fields", async () => {
+  const request = vi.fn().mockResolvedValue({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION", withdrawal: row,
+  });
+  const api = createWithdrawalApi({ request } as never);
+
+  await expect(api.get("WD-1")).resolves.toMatchObject({
+    withdrawalNo: "WD-1",
+    status: "review-pending",
+    withdrawal: { withdrawalNo: "WD-1", targetAddress: row.targetAddress },
+  });
+  expect(request).toHaveBeenCalledWith({ method: "GET", path: "/api/withdrawals/WD-1" });
+});
+
+test("rejects an exact withdrawal response if its authenticated route returns another user's receipt", async () => {
+  const api = createWithdrawalApi({ request: async () => ({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
+    withdrawal: { ...row, withdrawalNo: "WD-OTHER" },
+  }) } as never);
+
+  await expect(api.get("WD-1")).rejects.toThrow("WITHDRAWAL_RESPONSE_INVALID");
+});
+
+test("rejects a non-terminal exact receipt that lacks its authoritative hold deadline", async () => {
+  const api = createWithdrawalApi({ request: async () => ({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
+    withdrawal: { ...row, holdUntil: null },
+  }) } as never);
+
+  await expect(api.get("WD-1")).rejects.toThrow("WITHDRAWAL_RESPONSE_INVALID");
+});
+
 test("accepts the server strong-review receipt before mapping it to the client manual route", async () => {
   const api = createWithdrawalApi({ request: async () => ({
     source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
@@ -46,6 +78,31 @@ test("accepts the server strong-review receipt before mapping it to the client m
   }) } as never);
 
   await expect(api.list()).resolves.toMatchObject([{ withdrawalNo: "WD-1", riskRoute: "strong-review" }]);
+});
+
+test("accepts a legacy confirmed fast-pass history row without inventing a hold time", async () => {
+  const api = createWithdrawalApi({ request: async () => ({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
+    withdrawals: [{ ...row, status: "CONFIRMED", riskRoute: "fast-pass", holdUntil: null,
+      createdAt: "2026-09-07 00:30:00" }],
+    page: { pageNum: 1, pageSize: 50, total: 1, hasMore: false },
+  }) } as never);
+
+  const [legacy] = await api.list();
+  expect(legacy.holdUntil).toBeUndefined();
+  expect(toCanonicalWithdrawal(legacy, row.targetAddress).estimatedCompletion)
+    .toBe(Date.parse("2026-09-07T00:30:00+08:00"));
+  expect(toCanonicalWithdrawal(legacy, row.targetAddress).riskRoute).toBe("pass");
+});
+
+test("keeps hold time mandatory for current non-terminal withdrawal receipts", async () => {
+  const api = createWithdrawalApi({ request: async () => ({
+    source: "nx_withdrawal_order", sourceEnvironment: "PRODUCTION",
+    withdrawals: [{ ...row, riskRoute: "fast-pass", holdUntil: null }],
+    page: { pageNum: 1, pageSize: 50, total: 1, hasMore: false },
+  }) } as never);
+
+  await expect(api.list()).rejects.toThrow("WITHDRAWAL_RESPONSE_INVALID");
 });
 
 test("abandons an ambiguous attempt through the server fence instead of deleting local proof first", async () => {

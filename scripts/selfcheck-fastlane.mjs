@@ -1152,8 +1152,8 @@ function functionBody(src, opener) {
         && pgCode.includes("limit: String(dailyFacts.value.limitCount),")
         // 🔴 说不说使用量 ⟺ 服务端是否配置了计数闸；未配置时必须明确显示未设，
         // 不能把 0 伪装成每日额度。
-        && pgCode.includes('<text v-if="limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>')
-        && pgCode.includes('<text v-else-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>'));
+        && pgCode.includes('<text v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>')
+        && pgCode.includes('<text v-else-if="dailyFactsDisplayable && withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>'));
     check("🔴 提现页:显示 / 降额 CTA / 提交前复检均走服务端事实或冻结快照",
       (() => {
         // mock 轨的纯函数评估必须吃 dailyFacts；remote 轨的显示与降额 CTA 使用
@@ -1226,7 +1226,8 @@ function functionBody(src, opener) {
     // 🔴🔴 族 C(「抄一半」)的三条回归门。R2 跨端镜头点名:我照着现成写法改,
     //     却没把那处写法的**全部约束**一起带过来 —— 守卫抄丢了、钩子只挂了一半、还加错了页。
     check("🔴 两个页面**都**在 onShow 重取 policy(真正靠限额拦人的是提现页 —— 上一版只给了追踪页)",
-      /onShow\([\s\S]{0,300}?loadWithdrawalPolicy\(\);/.test(pgCode)
+      (functionBody(pgCode, "onShow(") ?? "").includes("retryWithdrawalFacts();")
+        && (functionBody(pgCode, "async function retryWithdrawalFacts(") ?? "").includes("loadWithdrawalPolicy(),")
         && /onShow\([\s\S]{0,400}?loadWithdrawalPolicy\(\);/.test(trackCode));
     check("🔴 追踪页的 loader 有在途守卫(抄提现页那份时漏抄 → 重复发请求 + 后到的覆盖先到的)",
       trackCode.includes("if (withdrawalPolicyLoading.value) return;")
@@ -1234,9 +1235,9 @@ function functionBody(src, opener) {
     check("🔴 policy 取数失败**不清空**已拿到的好值(清空 = 网络抖一下就把闸放开,与仓内钱路径惯例相反)",
       !/catch\s*\{[^}]*withdrawalPolicy\.value = null/.test(trackCode));
     check("🔴 60s 时钟起停 onShow/onHide **成对**(仓内硬规则 P-063:页面保活时 onUnmounted 不触发 → 定时器泄漏)",
-      trackCode.includes("onHide(stopDayTimer);")
+      (functionBody(trackCode, "onHide(") ?? "").includes("stopDayTimer();")
         && /onShow\([\s\S]{0,300}?setInterval\(/.test(trackCode)
-        && trackCode.includes("onUnmounted(stopDayTimer);"));
+        && (functionBody(trackCode, "onUnmounted(") ?? "").includes("stopDayTimer();"));
 
     // 🗑🗑 【C·判据已迁移】幂等键 / 意图签名 / 失败分诊接线 3 格(2026-08-13 判决)。
     //
@@ -1409,7 +1410,7 @@ function functionBody(src, opener) {
       // 2026-08-11 幂等 P0:金额的来源多了一个 —— 未收口的上一次尝试(重放要发的是那一笔的
       // 金额,不是当前输入)。判据只放行这一个前缀,别的来源照红;「await 之后不许再读活值」
       // 这半条一字不改。
-      const code = body.split("\r\n").filter((l) => !l.trim().startsWith("//")).join("\r\n");
+      const code = body.split(/\r?\n/).filter((l) => !l.trim().startsWith("//")).join("\n");
       const s = code.search(/amount: (pending\?\.amount \?\? )?amountNum\.value,/);
       const a = code.indexOf("await ");
       if (s < 0 || a < 0 || s > a) return false;

@@ -28,7 +28,7 @@
         </template>
         <!-- ⑤ 报错/极限态:题面加载或校验网络失败 → 层内失败态 + 重试,不静默关闭 -->
         <view v-else-if="loadFailed" class="cs-fail">
-          <text class="cs-fail__t">{{ t.authOtp.captchaLoadFailed }}</text>
+          <text class="cs-fail__t">{{ hintText || t.authOtp.captchaLoadFailed }}</text>
           <view class="cs-fail__btn" role="button" tabindex="0" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
         </view>
       </view>
@@ -91,13 +91,19 @@ const puzzleStyle=computed(()=>challenge.value?{height:"auto",aspectRatio:`${cha
 const pieceStyle=computed(()=>{const c=challenge.value;return c?{position:"absolute" as const,width:`${c.pieceWidth/c.width*100}%`,height:`${c.pieceHeight/c.height*100}%`,top:`${c.pieceY/c.height*100}%`,left:`${curX.value/maxHandle.value*(1-c.pieceWidth/c.width)*100}%`}:{};});
 function clearSkeleton(){if(skeletonTimer)clearTimeout(skeletonTimer);skeletonTimer=null;skeletonOn.value=false;}
 function resetHandle(){curX.value=0;dragging.value=false;trail=[];gestureStart=null;hintText.value="";hintIsError.value=false;}
+function failureHint(cause:unknown){
+ const message=cause instanceof Error?cause.message:"";
+ const rejected=/^USER_CAPTCHA_CHALLENGE_(FAILED|EXPIRED|REPLAYED|INVALID|IP_MISMATCH|SCENE_MISMATCH)$/.test(message)||message==="USER_CAPTCHA_CLIENT_ADDRESS_INVALID";
+ const throttled=/^USER_CAPTCHA_(CHALLENGE|TICKET)_RATE_LIMITED$/.test(message);
+ return throttled?t.value.authOtp.captchaThrottled:rejected?t.value.authOtp.captchaFail:t.value.authOtp.captchaLoadFailed;
+}
 async function loadChallenge(){
  if(closed||busy.value)return;
  const request=++generation;clearSkeleton();resetHandle();verified.value=false;challenge.value=null;loadFailed.value=false;
  skeletonTimer=setTimeout(()=>{if(!closed&&request===generation)skeletonOn.value=true;},300);
  try{const result=await api.challenge(props.scene);if(closed||request!==generation)return;challenge.value=result;await nextTick();if(closed||request!==generation)return;
  uni.createSelectorQuery().in(instance).select("#cs-track").boundingClientRect(rect=>{if(closed||request!==generation)return;const r=rect as UniApp.NodeInfo|null;if(r?.width)trackW.value=r.width;}).exec();
- }catch{if(!closed&&request===generation)loadFailed.value=true;}finally{if(request===generation)clearSkeleton();}
+ }catch(cause){if(!closed&&request===generation){loadFailed.value=true;hintText.value=failureHint(cause);hintIsError.value=true;}}finally{if(request===generation)clearSkeleton();}
 }
 function reloadChallenge(){void loadChallenge();}function onRetry(){void loadChallenge();}
 function pointerX(e:TouchEvent|MouseEvent){const touch=e as TouchEvent;return touch.touches?.length?touch.touches[0].clientX:(e as MouseEvent).clientX;}
@@ -110,7 +116,8 @@ async function onUp(){
  const request=generation,current=challenge.value,scene=props.scene;busy.value=true;
  try{const result=await api.verify({scene,challengeId:current.challengeId,offsetX:nativeX(),trail:[...trail],inputMethod});if(closed||request!==generation)return;verified.value=true;hintText.value=t.value.authOtp.captchaVerified;hintIsError.value=false;
  finishTimer=setTimeout(()=>{if(!closed&&request===generation)emit("success",result.ticket);},300);
- }catch{if(closed||request!==generation)return;challenge.value=null;loadFailed.value=true;hintText.value=t.value.authOtp.captchaFail;hintIsError.value=true;curX.value=0;}finally{if(request===generation)busy.value=false;}
+ }catch(cause){if(closed||request!==generation)return;challenge.value=null;loadFailed.value=true;
+ hintText.value=failureHint(cause);hintIsError.value=true;curX.value=0;}finally{if(request===generation)busy.value=false;}
 }
 function onHandleKeydown(e:KeyboardEvent){
  if(closed||busy.value||verified.value||!challenge.value)return;const key=e.key;if(!["ArrowRight","ArrowLeft","Home","End","Enter"," "].includes(key))return;e.preventDefault();inputMethod="keyboard";

@@ -136,12 +136,12 @@
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
             <text :style="rowLabelStyle(false)">{{ t.bundle.subtotal }}</text>
-            <text class="tabular-nums" :style="rowValueStyle()">${{ subtotal.toLocaleString() }}</text>
+            <text class="tabular-nums" :style="rowValueStyle()">${{ formatBundleUsdt(subtotal) }}</text>
           </view>
           <!-- Discount -->
           <view v-if="discountPct > 0" class="flex items-center justify-between" style="min-height: 24px">
             <text :style="rowLabelStyle(false)">{{ discountLabel }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">−${{ discountUSD.toFixed(0) }}</text>
+            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">−${{ formatBundleUsdt(discountUSD) }}</text>
           </view>
           <!-- Divider -->
           <view style="height: 1px; background: var(--v5-border); margin-top: 10px; margin-bottom: 10px" />
@@ -199,6 +199,9 @@ import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "@/api/bundle-order-api";
+import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
+import { restoreBundleCommand, type PendingBundleCommand } from "@/api/bundle-command";
 import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
@@ -263,11 +266,14 @@ const products = computed<Product[]>(() =>
       .filter((p) => isProductAvailable(p, phase.value))
     : [],
 );
-const subtotal = computed(() => products.value.reduce((s, p) => s + p.price, 0));
 const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
 const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
-const discountUSD = computed(() => subtotal.value * discountPct.value);
-const total = computed(() => subtotal.value - discountUSD.value);
+const bundleQuote = computed(() => quoteBundleAmountUsdt(
+  products.value.map((product) => product.price), discountPct.value,
+));
+const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
+const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
+const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
 const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + p.dailyEarn, 0));
 
 // 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
@@ -319,7 +325,10 @@ function activate(event: KeyboardEvent, action: () => void | Promise<void>) {
   void action();
 }
 
-const totalText = computed(() => total.value.toLocaleString(undefined, { maximumFractionDigits: 0 }));
+function formatBundleUsdt(value: number): string {
+  return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+}
+const totalText = computed(() => formatBundleUsdt(total.value));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
 const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
 const submitting = ref(false);
@@ -390,18 +399,49 @@ function onAddSuggestion(p: Product) {
   cart.add(p.id);
   toast.success(fmt(t.value.bundle.addedToBundle, { name: p.name }));
 }
-interface PendingBundleCommands { commands: Record<string, string> }
+interface PendingBundleCommands { commands: Record<string, PendingBundleCommand | string> }
 const BUNDLE_COMMAND_KEY = "nexgrid-bundle-order-command-v1";
+const BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED = "BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED";
 function bundleFingerprint(list: Product[]): string {
   return list.map((item) => item.id).sort().join("|");
 }
-function acquireBundleKey(list: Product[], accountKey: string): string {
+function acquireBundleCommand(list: Product[], accountKey: string, expectedAmountUsdt: number): PendingBundleCommand {
   const fingerprint = bundleFingerprint(list);
-  return acquireAccountCommandKey(BUNDLE_COMMAND_KEY, accountKey, fingerprint, "bundle");
+  const productNos = list.map((item) => item.id);
+  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
+  const existing = row?.commands?.[fingerprint];
+  const restored = restoreBundleCommand(existing);
+  if (restored && "recoveryKey" in restored) throw new Error(BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED);
+  if (restored) return restored.command;
+  const normalizedAmount = normalizeBundleExpectedAmountUsdt(expectedAmountUsdt);
+  if (normalizedAmount === null) throw new Error("BUNDLE_QUOTE_INVALID");
+  // A legacy string is a prior durable command key. Reuse it for recovery, but
+  // record the quote before issuing any request from this App version.
+  const key = acquireAccountCommandKey(BUNDLE_COMMAND_KEY, accountKey, fingerprint, "bundle");
+  const command = { key, expectedAmountUsdt: normalizedAmount, productNos };
+  const commands = { ...(readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey)?.commands ?? {}), [fingerprint]: command };
+  if (!writeAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey, { commands })) {
+    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+  }
+  const committed = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey)?.commands?.[fingerprint];
+  const committedCommand = restoreBundleCommand(committed);
+  if (!committedCommand || "recoveryKey" in committedCommand || committedCommand.command.key !== command.key
+      || committedCommand.command.expectedAmountUsdt !== command.expectedAmountUsdt
+      || committedCommand.command.productNos.join("|") !== command.productNos.join("|")) {
+    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+  }
+  return committedCommand.command;
 }
-function retireBundleKey(list: Product[], accountKey: string): void {
+function retireBundleKey(list: Product[], accountKey: string, expectedKey: string): void {
   const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
   const commands = { ...(row?.commands ?? {}) };
+  const current = commands[bundleFingerprint(list)];
+  const currentKey = typeof current === "string"
+    ? current
+    : current && typeof current === "object" && typeof (current as PendingBundleCommand).key === "string"
+      ? (current as PendingBundleCommand).key
+      : undefined;
+  if (currentKey !== expectedKey) return;
   delete commands[bundleFingerprint(list)];
   // persist-verdict-ok: 远端命令键耐久性归远端幂等设计(见 HANDOFF U-21)
   writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, { commands });
@@ -428,13 +468,9 @@ async function onCheckout() {
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
       && orders.currentAccountKey() === accountKey;
     const walletReceiptScope = app.captureRemoteAccountRequest();
-    const quotedTotal = total.value;
-    if (!Number.isFinite(quotedTotal) || quotedTotal < 0) {
+    const quotedTotal = normalizeBundleExpectedAmountUsdt(total.value);
+    if (quotedTotal === null) {
       toast.warn(t.value.store.coTotalQuoteChanged);
-      return;
-    }
-    if (app.user.usdtBalance + 0.000001 < quotedTotal) {
-      await offerBundleWalletTopup(quotedTotal);
       return;
     }
     submitting.value = true;
@@ -447,15 +483,24 @@ async function onCheckout() {
         toast.warn(t.value.bundle.policyChanged);
         return;
       }
-      const key = acquireBundleKey(list, accountKey);
+      const command = acquireBundleCommand(list, accountKey, quotedTotal);
+      if (app.user.usdtBalance + 0.000001 < command.expectedAmountUsdt) {
+        await offerBundleWalletTopup(command.expectedAmountUsdt);
+        return;
+      }
       let canonicalOrderCommitted = false;
       let paymentConfirmed = false;
       let confirmedOrderNo = "";
+      let createdOrderNo = "";
       try {
         const created = await bundleOrderApi.create(
-          list.map((item) => item.id), latestPolicy.policyVersion, key);
+          command.productNos, latestPolicy.policyVersion, command.expectedAmountUsdt, command.key);
         if (!scopeIsCurrent()) return;
         canonicalOrderCommitted = true;
+        createdOrderNo = created.orderNo;
+        if (!matchesBundleQuote(created, command.productNos, command.expectedAmountUsdt)) {
+          throw new ApiError({ kind: "protocol", message: "BUNDLE_QUOTE_RECEIPT_MISMATCH" });
+        }
         const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
         if (!scopeIsCurrent()) return;
         if (paid.orderNo !== created.orderNo
@@ -466,7 +511,7 @@ async function onCheckout() {
         }
         paymentConfirmed = true;
         confirmedOrderNo = created.orderNo;
-        retireBundleKey(list, accountKey);
+        retireBundleKey(list, accountKey, command.key);
         cart.clear();
         await orders.refreshRemote();
         if (!scopeIsCurrent()) return;
@@ -483,9 +528,12 @@ async function onCheckout() {
         navTo("/pages/store/orders");
       } catch (error) {
         const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
+        const quoteStale = error instanceof ApiError && error.message === "BUNDLE_QUOTE_STALE";
+        const idempotencyPayloadMismatch = error instanceof ApiError && error.message === "IDEMPOTENCY_KEY_PAYLOAD_MISMATCH";
         const apiError = asApiError(error);
-        if (!canonicalOrderCommitted && (policyStale || !isAmbiguousOutcome(error))) {
-          retireBundleKey(list, accountKey);
+        if (!canonicalOrderCommitted && !idempotencyPayloadMismatch
+            && (policyStale || quoteStale || !isAmbiguousOutcome(error))) {
+          retireBundleKey(list, accountKey, command.key);
         }
         if (!scopeIsCurrent()) return;
         if (paymentConfirmed) {
@@ -493,9 +541,20 @@ async function onCheckout() {
           if (confirmedOrderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(confirmedOrderNo)}`);
           return;
         }
-        if (policyStale) {
-          await refreshBundlePolicy();
-          toast.warn(t.value.bundle.policyChanged);
+        if (policyStale || quoteStale) {
+          await Promise.all([refreshBundlePolicy(), refreshProductCatalog(true)]);
+          toast.warn(quoteStale ? t.value.store.coTotalQuoteChanged : t.value.bundle.policyChanged);
+          return;
+        }
+        if (idempotencyPayloadMismatch) {
+          toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+          navTo("/pages/store/orders");
+          return;
+        }
+        if (apiError.message === "BUNDLE_QUOTE_RECEIPT_MISMATCH") {
+          toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+          if (createdOrderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(createdOrderNo)}`);
+          else navTo("/pages/store/orders");
           return;
         }
         if (apiError.message === "ACCOUNT_COMMAND_STORAGE_UNAVAILABLE") {
@@ -510,7 +569,12 @@ async function onCheckout() {
             : t.value.tradein.errPurchaseFailed);
         }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED) {
+        toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+        navTo("/pages/store/orders");
+        return;
+      }
       policyStatus.value = "error";
       toast.warn(t.value.store.catalogErrorBody);
     } finally {

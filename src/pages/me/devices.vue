@@ -136,6 +136,29 @@
           </view>
         </view>
 
+        <!-- Remote active lifecycle without activation time: support-visible, never activatable. -->
+        <view v-if="unconfirmedDevices.length > 0" style="margin-top: 12px">
+          <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
+            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionActivationUnconfirmed }}</text>
+            <text :style="sectionCountStyle">{{ unconfirmedDevices.length }}</text>
+          </view>
+          <view style="display: flex; flex-direction: column; gap: 8px">
+            <DeviceInventoryRow
+              v-for="d in unconfirmedDevices"
+              :key="d.id"
+              :device="d"
+              :active="false"
+              disabled
+              :disabled-label="t.myDevices.inventoryActivationUnconfirmed"
+              :activate-label="t.myDevices.inventoryRowActivate"
+              :deactivate-label="t.myDevices.inventoryRowDeactivate"
+              :slots-full-label="t.myDevices.inventoryRowSlotsFull"
+              :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
+              v-bind="tradeinStrip(d)"
+            />
+          </view>
+        </view>
+
         <!-- 空库存 —— 《06》的转化型空态 no-owned-asset:插画 + 引导 + 明确 CTA。
              空态自带 CTA,所以下面那个常驻「去商店」按钮此时收起,不重复两个同义按钮。 -->
         <EmptyState
@@ -197,7 +220,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { isProductAvailable } from "@/store/product-availability";
 import { refreshProductCatalog } from "@/store/product-catalog";
-import { occupiesDeviceSlot } from "@/lib/device-slot-policy";
+import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
@@ -219,10 +242,16 @@ function deferredCommandBusy(device: Device): boolean {
 const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
 const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
-const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
+const inactiveDevices = computed(() => app.visibleDevices.filter(
+  (d) => d.activatedAt === null && !requiresActivationConfirmation(d),
+));
+const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
+const inventoryEmpty = computed(() => activeDevices.value.length === 0
+  && inactiveDevices.value.length === 0
+  && unconfirmedDevices.value.length === 0);
 const phoneNeedsActivation = computed(() => {
   const phones = app.visibleDevices.filter((device) => device.kind === "phone");
+  if (phones.some(requiresActivationConfirmation)) return true;
   return !phones.some((device) => device.activatedAt !== null)
     || !session.isCurrentDeviceCalibrated(app.accountKey);
 });
@@ -316,6 +345,10 @@ function handleTradein(d: Device) {
 }
 
 async function handleActivate(d: Device) {
+  if (requiresActivationConfirmation(d)) {
+    toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
+    return;
+  }
   if (d.kind === "phone") {
     goPhoneActivation();
     return;

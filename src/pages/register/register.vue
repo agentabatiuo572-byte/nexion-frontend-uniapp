@@ -149,6 +149,7 @@
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
+    <!-- i18n-en-ok: Server CAPTCHA protocol scene enum, sent only to backend verification and never rendered. -->
     <ServerCaptchaSlider v-if="showCaptcha && remoteApiEnabled" :phone="fullPhone" :scene='"REGISTER"' @success="onCaptchaOk" @close="showCaptcha = false" />
     <CaptchaSlider v-else-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
@@ -197,6 +198,7 @@ import { restoreActivatedRegistrationSession } from "@/auth/complete-registratio
 import { stageRemoteRegistrationReceipt, clearRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
 import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
 import { visibleReferralGift } from "@/lib/referral-reward-gate";
+import { ApiError } from "@/api/errors";
 
 const t = useT();
 const app = useApp();
@@ -445,6 +447,7 @@ function goSendCode() {
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
   if (verifying.value) return;
+  devBackendDown.value = false;
   const phoneAtRequest = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
   verifying.value = true;
@@ -464,15 +467,15 @@ async function requestCode(captchaTicket?: string) {
       step.value = 2;
       startResend(res.resendAfterSec);
     } catch (cause) {
-      if (!mounted || flowVersion !== otpFlowVersion) return;
+      if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
       verifying.value = false;
-      if (cause instanceof Error && cause.message === "USER_CAPTCHA_REQUIRED") {
+      if (cause instanceof Error && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) {
         showCaptcha.value = true;
       } else {
         error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
       }
       // 开发构建里区分「产品坏了」与「本地后端没起」——网络级失败时亮工程横幅。
-      if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev";
+      if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev" && cause instanceof ApiError && cause.kind === "network";
     }
     return;
   }

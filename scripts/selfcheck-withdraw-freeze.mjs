@@ -102,7 +102,7 @@ check("页面提交路径没有本地扣 USDT、烧 NEX 或伪造提现账单",
   !/app\.(?:debitBalance|debitNex)\(/.test(submit)
   && !/bills\.(?:add|addForAccount)\(/.test(submit));
 check("policy 只从真实 GET /api/withdrawals/policy 获取且失败置空",
-  /withdrawalPolicy\.value\s*=\s*await withdrawalApi\.policy\(\)/.test(page)
+  /const policy = await withdrawalApi\.policy\(\);\s*if \(!isCurrentWithdrawalFactsScope\(\s*requestedAccountKey, requestedAccountBindingEpoch, runScope\.epoch, refreshSequence, withdrawalPolicyRefreshSequence,\s*\)\) return;\s*withdrawalPolicy\.value = policy;/.test(page)
   && /withdrawalPolicy\.value\s*=\s*null/.test(page)
   && /method:\s*"GET",\s*path:\s*"\/api\/withdrawals\/policy"/.test(api));
 check("POST 只发用户意图与版本，不接受客户端费用金额",

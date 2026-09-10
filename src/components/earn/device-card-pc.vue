@@ -456,6 +456,10 @@ const statusLabel = computed(() => {
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (idleGated.value) return t.value.earn.idle;
+  if (props.device.kind !== "phone" && props.device.capacitySource === "server"
+      && (props.device.runtimeStatus == null || props.device.runtimeStatus === "UNKNOWN")) {
+    return t.value.earn.runtimeUnknown;
+  }
   if (!deviceOnline.value) {
     return props.device.kind === "phone" ? t.value.earn.hashCarrierH5Mode : t.value.earn.offline;
   }

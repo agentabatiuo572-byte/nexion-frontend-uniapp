@@ -61,6 +61,15 @@ const FILE_EXEMPTIONS = [
 
 const VALUE_EXEMPTIONS = [
   {
+    id: "support-unassigned-token",
+    why: "后端备勤池代理名仅用于未分配状态比较，显示文案仍由三语词典提供；限定文件、变量及严格相等比较位置",
+    files: ["src/pages/support/chat.vue"],
+    // Only the final boolean operand of the real predicate is allowed. Anchors
+    // keep this token out of template text, string contents, assignments, and
+    // values passed to a rendering function.
+    strip: (line) => line.replace(/^(\s*return\b[^;\r\n]*\bnormalized\s*===\s*)(["'])备勤池\2(\s*;?\s*)$/, (_m, prefix, quote, suffix) => `${prefix}${quote}${quote}${suffix}`),
+  },
+  {
     id: "cn-title-field",
     why: "cnTitle 是 API 声明字段(src/api/v-rank-api.ts),本地 V_RANKS 是它的离线镜像;豁免只给**定义面**这两个文件",
     // 🔴 值级豁免必须**带文件作用域**:不带的话,任何页面把文案塞进 cnTitle 字段就能对门隐身
@@ -223,6 +232,15 @@ function selftest() {
     ["豁免:cnTitle 单引号写法同样放行(宽严不许取决于引号风格)", "src/store/v-rank.ts", "cnTitle: '学员',", 0],
     ["同文件里非 cnTitle 的中文照抓", "src/store/v-rank.ts", 'v: 0, title: "学员", cnTitle: "学员",', 1],
     ["🔴 cnTitle 豁免带文件作用域:消费面塞文案照抓", "src/pages/product/detail.vue", 'const o = { cnTitle: "立即购买" };', 1],
+    ["support token comparison allowed", "src/pages/support/chat.vue", 'return !normalized || normalized.toLowerCase() === "unassigned" || normalized === "备勤池";', 0],
+    ["support token single quote allowed", "src/pages/support/chat.vue", "return normalized === '备勤池';", 0],
+    ["support token display rejected", "src/pages/support/chat.vue", '<template><text>备勤池</text></template>', 1],
+    ["support token assignment rejected", "src/pages/support/chat.vue", 'const label = "备勤池";', 1],
+    ["support token fake comparison inside a string rejected", "src/pages/support/chat.vue", 'const source = "normalized === \\"备勤池\\"";', 1],
+    ["support token template comparison rejected", "src/pages/support/chat.vue", '<template><text>{{ normalized === "备勤池" }}</text></template>', 1],
+    ["support token wrapped rendering expression rejected", "src/pages/support/chat.vue", 'return render(normalized === "备勤池");', 1],
+    ["support token other file rejected", "src/pages/x/a.vue", 'return normalized === "备勤池";', 1],
+    ["support token substring rejected", "src/pages/support/chat.vue", 'return normalized === "备勤池客服";', 1],
     // legacy-config-token —— 阴阳两面各测一遍:只测 true 那行会让 "关"/"关闭" 半边判据无人验证。
     ["豁免:legacy 配置取值放行(true 侧)", "src/lib/trial-config-enum.ts", 'if (["true", "1", "enabled", "on", "开", "开放"].includes(v)) return true;', 0],
     ["豁免:legacy 配置取值放行(false 侧)", "src/lib/trial-config-enum.ts", 'if (["false", "0", "disabled", "off", "关", "关闭"].includes(v)) return false;', 0],

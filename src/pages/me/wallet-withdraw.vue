@@ -69,7 +69,7 @@
       <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked" :aria-label="t.wallet.useMax" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
@@ -79,13 +79,20 @@
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
-          <text>{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ maxWithdrawable.toFixed(2) }}</text></text>
-          <text>{{ minAmountLine }}</text>
+          <text v-if="withdrawalFactsDisplayable">{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ maxWithdrawable.toFixed(2) }}</text></text>
+          <text v-else>{{ withdrawalFactsStatusText }}</text>
+          <text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text>
+          <text v-else>—</text>
+        </view>
+        <text v-if="withdrawalFactsRefreshing" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalFactsStatusText }}</text>
+        <text v-else-if="withdrawalFactsStale" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning)">{{ withdrawalFactsStatusText }}</text>
+        <view v-if="withdrawalFactsNeedsRetry" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts" @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
+          <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline">{{ t.wallet.retryFunds }}</text>
         </view>
         <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
-        <text v-if="heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ heldLine }}</text>
-        <text v-if="withdrawalRatioLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalRatioLine }}</text>
-        <text v-if="withdrawalPolicy" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ perWithdrawalLimitText }}</text>
+        <text v-if="withdrawalFactsDisplayable && heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ heldLine }}</text>
+        <text v-if="withdrawalFactsDisplayable && withdrawalRatioLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalRatioLine }}</text>
+        <text v-if="withdrawalFactsDisplayable && withdrawalPolicy" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ perWithdrawalLimitText }}</text>
       </view>
 
       <!-- 🔴 小额免审快车道的正向态:免掉闸时**说出来**。走查实测,此前输 $30 页面一个字都没有,
@@ -267,14 +274,18 @@
                  上方并没有任何手续费可言;而这正是打开提现页的落地首屏,看的人最多。
                  分隔空格用 {{ ' ' }} 显式写,直接写在标签间的前导空格会被编译器吃掉
                  (实测渲染成 `$20.The fee…` 粘在一起)。 -->
-            <text class="block">{{ minWithdrawNoteText }}<text v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked">{{ t.wallet.minWithdrawNoteOffset }}</text></text>
+            <text v-if="withdrawalPolicyCurrent" class="block">{{ minWithdrawNoteText }}<text v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked">{{ t.wallet.minWithdrawNoteOffset }}</text></text>
+            <text v-else class="block">{{ t.help.loadingMore }}</text>
             <!-- 🔴 这句只在**闸真的会拦**时才出现:limitCount ≤0 = 服务端没配 / policy 拉不到,
                  判定层按「不限制」走,这时再说一句「每日限额:0 笔/日」就是当场撒谎
                  (实景实测:后端不可达时它真的渲染成 0 笔/日)。
                  「有没有这句话」与「闸生不生效」从此是同一个条件,不会再各走各的。 -->
-            <text v-if="limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>
-            <text v-else-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>
-            <text v-if="withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalAmountNotSet }}</text>
+            <text v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>
+            <text v-else-if="dailyFactsDisplayable && withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalCountNotSet }}</text>
+            <text v-else class="block">{{ dailyFactsStatusText }}</text>
+            <text v-if="dailyFactsDisplayable && withdrawalPolicy" class="block">{{ t.wallet.dailyWithdrawalAmountNotSet }}</text>
+            <text v-if="dailyFactsRefreshing" class="block" style="margin-top: 2px; color: var(--v5-ink-4)">{{ dailyFactsStatusText }}</text>
+            <text v-else-if="dailyFactsState === 'stale'" class="block" style="margin-top: 2px; color: var(--v5-warning)">{{ dailyFactsStatusText }}</text>
           </view>
         </view>
       </view>
@@ -366,7 +377,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
@@ -387,15 +398,27 @@ import {
   resolveWithdrawalUseMax,
 } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
+import {
+  financialFactState,
+  shouldRequestWithdrawalEligibility,
+  withdrawalFactsActionsFresh,
+} from "@/lib/withdrawal-facts-state";
+import { isCurrentWithdrawalFactsRequest } from "@/lib/withdrawal-facts-request-fence";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
-import { earningsReleaseSnapshot } from "@/store/earning-release";
+import {
+  earningsReleaseHasSnapshot,
+  earningsReleaseSnapshot,
+  earningsReleaseStatus,
+  refreshEarningsReleaseStatus,
+} from "@/store/earning-release";
 // 账单不再直连 useBills:提现的钱由服务端扣,只补收据 —— 走 postReceiptForAccount
 // (postMoneyBill 会照 draft 符号再扣一次本地余额)。分录形状由 withdrawalBillDrafts 单源构造。
 import { postReceiptForAccount } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
 import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -432,6 +455,7 @@ const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
 const withdrawalPolicyError = ref("");
+let withdrawalPolicyRefreshSequence = 0;
 const pendingAttempt = ref(readWithdrawAttempt(app.accountKey));
 const abandoningAttempt = ref(false);
 
@@ -440,18 +464,23 @@ function refreshPendingAttempt() {
 }
 
 async function abandonPendingAttempt() {
-  const pending = readWithdrawAttempt(app.accountKey);
+  const accountKey = app.accountKey;
+  const bindingEpoch = app.accountBindingEpoch;
+  const runtimeScope = captureRuntimeRevision();
+  const scopeIsCurrent = () => app.accountKey === accountKey
+    && app.accountBindingEpoch === bindingEpoch && isCurrentRuntimeRevision(runtimeScope);
+  const pending = readWithdrawAttempt(accountKey);
   if (!pending || abandoningAttempt.value || submitting.value || confirmingSubmit.value) return;
-  const confirmed = await uiConfirm({
-    title: t.value.walletV3.withdrawAbandonAttemptTitle,
-    message: t.value.walletV3.withdrawAbandonAttemptBody,
-    danger: true,
-    icon: "warn",
-    confirmLabel: t.value.walletV3.withdrawAbandonAttemptCta,
-  });
-  if (!confirmed) return;
   abandoningAttempt.value = true;
   try {
+    const confirmed = await uiConfirm({
+      title: t.value.walletV3.withdrawAbandonAttemptTitle,
+      message: t.value.walletV3.withdrawAbandonAttemptBody,
+      danger: true,
+      icon: "warn",
+      confirmLabel: t.value.walletV3.withdrawAbandonAttemptCta,
+    });
+    if (!confirmed || !scopeIsCurrent()) return;
     if (remoteApiEnabled) {
       const result = await withdrawalApi.abandonAttempt({
         idempotencyKey: pending.key,
@@ -461,21 +490,25 @@ async function abandonPendingAttempt() {
         policyVersion: pending.policyVersion,
         useNexFeeOffset: pending.offset,
       });
-      forgetWithdrawAttempt(app.accountKey);
+      if (!scopeIsCurrent()) return;
+      forgetWithdrawAttempt(accountKey);
       refreshPendingAttempt();
       if (result.state === "COMMITTED") {
         toast.info(t.value.walletV3.withdrawAbandonAlreadyCommitted);
         await app.refreshRemoteFleet();
+        if (!scopeIsCurrent()) return;
         navTo(`/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`);
       } else {
         toast.info(t.value.walletV3.withdrawAbandonSuccess);
       }
     } else {
-      forgetWithdrawAttempt(app.accountKey);
+      if (!scopeIsCurrent()) return;
+      forgetWithdrawAttempt(accountKey);
       refreshPendingAttempt();
       toast.info(t.value.walletV3.withdrawAbandonSuccess);
     }
   } catch {
+    if (!scopeIsCurrent()) return;
     toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
   } finally {
     abandoningAttempt.value = false;
@@ -486,24 +519,133 @@ const NETWORKS = computed<{ id: Withdrawal["network"]; label: string }[]>(() => 
     ? ALL_NETWORKS.filter((item) => withdrawalPolicy.value?.enabledNetworks.includes(item.id))
     : ALL_NETWORKS);
 
+function isCurrentWithdrawalFactsScope(
+  accountKey: string,
+  accountBindingEpoch: number,
+  runtimeEpoch: number,
+  sequence: number,
+  currentSequence: number,
+): boolean {
+  return isCurrentWithdrawalFactsRequest(
+    { accountKey, accountBindingEpoch, runtimeEpoch, sequence },
+    {
+      accountKey: app.accountKey,
+      accountBindingEpoch: app.accountBindingEpoch,
+      runtimeEpoch: captureRuntimeRevision().epoch,
+      sequence: currentSequence,
+    },
+  );
+}
+
 async function loadWithdrawalPolicy(): Promise<void> {
-  if (withdrawalPolicyLoading.value) return;
+  const requestedAccountKey = app.accountKey;
+  const requestedAccountBindingEpoch = app.accountBindingEpoch;
+  const runScope = captureRuntimeRevision();
+  const refreshSequence = ++withdrawalPolicyRefreshSequence;
   withdrawalPolicyLoading.value = true;
   withdrawalPolicyError.value = "";
   try {
-    withdrawalPolicy.value = await withdrawalApi.policy();
+    const policy = await withdrawalApi.policy();
+    if (!isCurrentWithdrawalFactsScope(
+      requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
+    )) return;
+    withdrawalPolicy.value = policy;
     if (!NETWORKS.value.some((item) => item.id === network.value) && NETWORKS.value[0]) {
       network.value = NETWORKS.value[0].id;
     }
   } catch (cause) {
+    if (!isCurrentWithdrawalFactsScope(
+      requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
+    )) return;
     withdrawalPolicy.value = null;
     // 焦虑文案收口(2026-08-15):原始 message/错误码只进日志,用户面一律人话。
     console.warn("[withdraw] policy fetch failed:", cause);
     withdrawalPolicyError.value = t.value.walletV3.submitReasonServiceUnavailable;
   } finally {
-    withdrawalPolicyLoading.value = false;
+    if (isCurrentWithdrawalFactsScope(
+      requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
+    )) withdrawalPolicyLoading.value = false;
   }
 }
+
+const withdrawalPolicyStatus = computed<"idle" | "loading" | "ready" | "error">(() => {
+  if (withdrawalPolicyLoading.value) return "loading";
+  if (withdrawalPolicyError.value) return "error";
+  return withdrawalPolicy.value ? "ready" : "idle";
+});
+const withdrawalPolicyCurrent = computed(() => withdrawalPolicyStatus.value === "ready");
+const withdrawalFactsState = computed(() => financialFactState(remoteApiEnabled, [
+  { hasSnapshot: app.remoteFleetHasSnapshot, status: app.remoteFleetStatus },
+  { hasSnapshot: earningsReleaseHasSnapshot.value, status: earningsReleaseStatus.value },
+  { hasSnapshot: withdrawalPolicy.value !== null, status: withdrawalPolicyStatus.value },
+]));
+const dailyFactsState = computed(() => financialFactState(remoteApiEnabled, [
+  { hasSnapshot: app.remoteFleetHasSnapshot, status: app.remoteFleetStatus },
+  { hasSnapshot: earningsReleaseHasSnapshot.value, status: earningsReleaseStatus.value },
+  { hasSnapshot: withdrawalPolicy.value !== null, status: withdrawalPolicyStatus.value },
+  { hasSnapshot: app.remoteWithdrawalListHasSnapshot, status: app.remoteWithdrawalListStatus },
+]));
+const withdrawalFactsDisplayable = computed(() => withdrawalFactsState.value === "ready" || withdrawalFactsState.value === "refreshing");
+const withdrawalFactsFresh = computed(() => withdrawalFactsState.value === "ready");
+const withdrawalFactsRefreshing = computed(() => withdrawalFactsState.value === "refreshing");
+const withdrawalFactsStale = computed(() => withdrawalFactsState.value === "stale");
+const withdrawalFactsNeedsRetry = computed(() =>
+  withdrawalFactsState.value === "stale"
+  || withdrawalFactsState.value === "unavailable"
+  || dailyFactsState.value === "stale"
+  || dailyFactsState.value === "unavailable",
+);
+const dailyFactsDisplayable = computed(() => dailyFactsState.value === "ready" || dailyFactsState.value === "refreshing");
+const dailyFactsRefreshing = computed(() => dailyFactsState.value === "refreshing");
+const withdrawalQuoteRefreshing = computed(() => withdrawalFactsRefreshing.value || dailyFactsRefreshing.value);
+const withdrawalActionsFresh = computed(() => withdrawalFactsActionsFresh(
+  withdrawalFactsState.value,
+  dailyFactsState.value,
+));
+function factsStatusText(state: "ready" | "loading" | "refreshing" | "stale" | "unavailable"): string {
+  if (state === "loading" || state === "refreshing") return t.value.help.loadingMore;
+  if (state === "stale") return t.value.wallet.fundsStaleBody;
+  return t.value.wallet.fundsUnavailableTitle;
+}
+const withdrawalFactsStatusText = computed(() => factsStatusText(withdrawalFactsState.value));
+const dailyFactsStatusText = computed(() => factsStatusText(dailyFactsState.value));
+const withdrawalActionStatusText = computed(() => withdrawalFactsFresh.value ? dailyFactsStatusText.value : withdrawalFactsStatusText.value);
+
+async function retryWithdrawalFacts(): Promise<void> {
+  const accountKey = app.accountKey;
+  await Promise.allSettled([
+    app.refreshRemoteFleet(),
+    refreshEarningsReleaseStatus(accountKey),
+    app.refreshRemoteWithdrawalList(accountKey),
+    loadWithdrawalPolicy(),
+  ]);
+}
+
+function invalidateWithdrawalFacts(): void {
+  // A retained policy/eligibility belongs to the previous account or bearer
+  // generation. Clear it before the new reads start so neither Use Max nor a
+  // submit preflight can act on an old account's financial projection.
+  withdrawalPolicyRefreshSequence += 1;
+  withdrawalPolicy.value = null;
+  withdrawalPolicyError.value = "";
+  withdrawalPolicyLoading.value = false;
+  remoteEligibilityEpoch += 1;
+  remoteEligibility.value = null;
+  remoteEligibilityFailed.value = false;
+  remoteSmallLineEligibilityEpoch += 1;
+  remoteSmallLineEligibility.value = null;
+  refreshedConflictVersion = "";
+}
+
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+  invalidateWithdrawalFacts();
+  void retryWithdrawalFacts();
+});
+
+const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision(() => {
+  invalidateWithdrawalFacts();
+  void retryWithdrawalFacts();
+});
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
 // pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
@@ -655,24 +797,35 @@ const remoteEligibility = ref<WithdrawalEligibility | null>(null);
 const remoteEligibilityFailed = ref(false);
 let refreshedConflictVersion = "";
 let remoteEligibilityEpoch = 0;
-watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
+watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
   // A changed amount/network/address invalidates the previous server decision
   // immediately. Keeping the old accepted decision visible until the next
   // request settles can briefly re-enable submit for inputs the server has
   // never approved.
   const epoch = ++remoteEligibilityEpoch;
+  const requestedAccountKey = app.accountKey;
+  const requestedAccountBindingEpoch = app.accountBindingEpoch;
+  const runScope = captureRuntimeRevision();
   remoteEligibility.value = null;
   remoteEligibilityFailed.value = false;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!remoteApiEnabled || !policyVersion || amountNum.value <= 0 || boundAddress.value.length <= 10) {
+  if (!policyVersion || !shouldRequestWithdrawalEligibility({
+    remote: remoteApiEnabled,
+    factsFresh: withdrawalActionsFresh.value,
+    policyVersion,
+    amount: amountNum.value,
+    addressLength: boundAddress.value.length,
+  })) {
     return;
   }
   try {
-    const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
+    const snapshot = await requestWithdrawalEligibility(requestedAccountKey, network.value, boundAddress.value,
       maxWithdrawable.value, dailyFacts.value, amountNum.value, policyVersion);
-    if (epoch === remoteEligibilityEpoch && app.accountKey) remoteEligibility.value = snapshot;
+    if (isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) {
+      remoteEligibility.value = snapshot;
+    }
   } catch (cause) {
-    if (epoch !== remoteEligibilityEpoch) return;
+    if (!isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) return;
     remoteEligibilityFailed.value = true;
     // Refresh once for a rejected version. A new version reruns this watcher;
     // an unchanged version must not create an endless retry loop.
@@ -680,6 +833,7 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, () => app.
       && refreshedConflictVersion !== policyVersion) {
       refreshedConflictVersion = policyVersion;
       await loadWithdrawalPolicy();
+      if (!isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) return;
     }
   }
 }, { immediate: true });
@@ -690,6 +844,7 @@ function pickNetwork(id: Withdrawal["network"]) {
   if (inputsLocked.value) return;
   network.value = id;
 }
+
 function moveNetwork(delta: number) {
   if (inputsLocked.value || NETWORKS.value.length < 2) return;
   const index = NETWORKS.value.findIndex((item) => item.id === network.value);
@@ -710,20 +865,28 @@ function goManage() {
 // 冻结倒计时(server 时钟 1s tick;归零自然放行)。
 const nowTick = ref(mockServerNow());
 let freezeTimer: ReturnType<typeof setInterval> | undefined;
+function stopFreezeTimer() {
+  if (freezeTimer !== undefined) clearInterval(freezeTimer);
+  freezeTimer = undefined;
+}
 onMounted(() => {
   if (remoteApiEnabled) void payout.refreshRemote();
-  void loadWithdrawalPolicy();
-  freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
+  void retryWithdrawalFacts();
 });
 // 🔴 回前台 / 返回本页时重取策略。上一轮我把这条补给了追踪页,**加错页了**:
 // 真正靠日限与最低额拦人的是**这一页**,而 App 端页面进栈后不销毁,不补拉就可能拿着
 // 好几天前的限额判人(R2 跨端镜头点名)。loader 自带在途守卫,重复触发是安全的。
 onShow(() => {
+  stopFreezeTimer();
+  nowTick.value = mockServerNow();
+  freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
   refreshPendingAttempt();
-  void loadWithdrawalPolicy();
+  void retryWithdrawalFacts();
 });
+onHide(stopFreezeTimer);
 onUnmounted(() => {
-  if (freezeTimer) clearInterval(freezeTimer);
+  stopFreezeTimer();
+  stopWithdrawalFactsRuntimeWatch();
 });
 const freezeLeftMs = computed(() => freezeRemainingMs(payout.stateFor(chainNetwork.value).freezeUntil, nowTick.value));
 const frozenNow = computed(() => freezeLeftMs.value > 0);
@@ -928,19 +1091,32 @@ const heldLine = computed(() => {
 const smallAmountLine = computed(() => withdrawalPolicy.value?.smallAmountThresholdUsd ?? 0);
 const remoteSmallLineEligibility = ref<WithdrawalEligibility | null>(null);
 let remoteSmallLineEligibilityEpoch = 0;
-watch([smallAmountLine, network, boundAddress, maxWithdrawable, dailyFacts, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
+watch([smallAmountLine, network, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
   const epoch = ++remoteSmallLineEligibilityEpoch;
+  const requestedAccountKey = app.accountKey;
+  const requestedAccountBindingEpoch = app.accountBindingEpoch;
+  const runScope = captureRuntimeRevision();
   remoteSmallLineEligibility.value = null;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!remoteApiEnabled || !policyVersion || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
+  if (!policyVersion || !shouldRequestWithdrawalEligibility({
+    remote: remoteApiEnabled,
+    factsFresh: withdrawalActionsFresh.value,
+    policyVersion,
+    amount: smallAmountLine.value,
+    addressLength: boundAddress.value.length,
+  })) {
     return;
   }
   try {
-    const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
+    const snapshot = await requestWithdrawalEligibility(requestedAccountKey, network.value, boundAddress.value,
       maxWithdrawable.value, dailyFacts.value, smallAmountLine.value, policyVersion);
-    if (epoch === remoteSmallLineEligibilityEpoch && app.accountKey) remoteSmallLineEligibility.value = snapshot;
+    if (isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteSmallLineEligibilityEpoch)) {
+      remoteSmallLineEligibility.value = snapshot;
+    }
   } catch {
-    if (epoch === remoteSmallLineEligibilityEpoch) remoteSmallLineEligibility.value = null;
+    if (isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteSmallLineEligibilityEpoch)) {
+      remoteSmallLineEligibility.value = null;
+    }
   }
 }, { immediate: true });
 /**
@@ -1002,7 +1178,18 @@ const fastLaneBody = computed(() => fmt(t.value.wallet.fastLaneOnBody, { g: waiv
  * 覆盖低于最低额 / 超过可提余额 / 今日笔数用完 / 换绑冻结 / 费率不可用等全部原因。
  * (金额为空由前一个分支的占位说明接管,不走这里。)
  */
-const quoteBlocked = computed(() => amountNum.value > 0 && submitDisabledReason.value !== "");
+// A background revalidation invalidates the action gate, never the already
+// confirmed display quote. The next submit still requires fresh facts and a
+// server eligibility round-trip below. Initial/failed reads have no readable
+// snapshot and therefore remain blocked from numeric quote rendering.
+const quoteDisplayBlocked = computed(() =>
+  amountNum.value > 0
+  && !withdrawalQuoteRefreshing.value
+  && submitDisabledReason.value !== "",
+);
+const quoteBlocked = computed(() =>
+  quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
+);
 const firstTimeReviewApplies = computed(() => eligibility.value.riskReasons.includes("first-withdrawal-review"));
 /**
  * 🔴 这里**不给时间承诺**。
@@ -1062,6 +1249,7 @@ const riskNoticeBody = computed(() => {
  * 两个判据只要不是同一个源,迟早漂移。这里收成一个。
  */
 function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string {
+  if (!withdrawalActionsFresh.value) return withdrawalActionStatusText.value;
   if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   // 费率可读与通道开放是两个独立事实。总开关关闭时仍展示服务端报价，
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
@@ -1120,6 +1308,10 @@ function onAmount(e: Event) {
 }
 function useMax() {
   if (inputsLocked.value) return;
+  if (!withdrawalActionsFresh.value) {
+    toast.info(withdrawalActionStatusText.value);
+    return;
+  }
   const decision = resolveWithdrawalUseMax(maxWithdrawable.value, minWithdrawable.value);
   if (decision.reason === "below-minimum") {
     toast.info(fmt(t.value.wallet.useMaxBelowMinimum, {

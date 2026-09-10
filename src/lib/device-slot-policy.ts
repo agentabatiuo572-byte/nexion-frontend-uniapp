@@ -3,6 +3,7 @@ import type { DeviceKind } from "@/store/types";
 type SlotDevice = {
   kind: DeviceKind;
   activatedAt: number | null;
+  activationUnconfirmed?: boolean;
   pendingDeactivate?: boolean;
 };
 
@@ -13,4 +14,9 @@ export function occupiesDeviceSlot(kind: DeviceKind): boolean {
 
 export function isActiveSlotDevice(device: SlotDevice): boolean {
   return device.activatedAt !== null && !device.pendingDeactivate && occupiesDeviceSlot(device.kind);
+}
+
+/** A remote lifecycle row without its activation timestamp must be reconciled before activation. */
+export function requiresActivationConfirmation(device: Pick<SlotDevice, "activationUnconfirmed">): boolean {
+  return device.activationUnconfirmed === true;
 }

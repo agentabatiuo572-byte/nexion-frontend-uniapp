@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { parseHistorySnapshotId, historySnapshotQuery } from "./history-snapshot";
+import { parseServerTimestamp } from "./server-time";
 import { ApiError } from "./errors";
 import type { Withdrawal, WithdrawalStatus, WithdrawalTerminalReason } from "../store/types";
 import type { WithdrawalRiskRoute } from "../store/config-types";
@@ -13,7 +14,9 @@ export interface WithdrawalSubmission {
   amount: number;
   chain: SupportedWithdrawalNetwork;
   status: string;
-  holdUntil: string;
+  /** Required for current non-terminal submissions. Legacy confirmed fast-pass
+   * history predates the hold column and carries no synthetic replacement. */
+  holdUntil?: string;
   networkConfirmUsd: number;
   networkFee: number;
   penaltyFee: number;
@@ -89,6 +92,11 @@ export interface WithdrawalStatusSnapshot {
   nexRefundedAt: number | null;
 }
 
+/** Exact user-owned read returned by GET /api/withdrawals/{withdrawalNo}. */
+export interface WithdrawalDetailSnapshot extends WithdrawalStatusSnapshot {
+  withdrawal: WithdrawalSubmission;
+}
+
 export interface WithdrawalApi {
   list(): Promise<WithdrawalSubmission[]>;
   policy(): Promise<WithdrawalPolicy>;
@@ -98,7 +106,7 @@ export interface WithdrawalApi {
     address: string;
     policyVersion: string;
   }): Promise<WithdrawalEligibilitySnapshot>;
-  get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;
+  get(withdrawalNo: string): Promise<WithdrawalDetailSnapshot>;
   abandonAttempt(input: WithdrawalAttemptAbandonInput): Promise<WithdrawalAttemptAbandonResult>;
   submit(
     amount: number,
@@ -208,7 +216,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const status = text(row?.status);
   const targetAddress = text(row?.targetAddress) ?? undefined;
   const createdAtRaw = text(row?.createdAt);
-  const createdAt = createdAtRaw ? Date.parse(createdAtRaw) : undefined;
+  const createdAt = createdAtRaw ? parseServerTimestamp(createdAtRaw) ?? undefined : undefined;
   const holdUntil = text(row?.holdUntil);
   const riskRoute = text(row?.riskRoute);
   const amount = number(row?.amount, Number.EPSILON);
@@ -251,8 +259,20 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     "strong-review",
     "freeze",
   ]);
-  if (!row || !withdrawalNo || !status || !holdUntil || !riskRoute
-      || !allowedRiskRoutes.has(riskRoute.toLowerCase())
+  // Old, already-confirmed fast-pass rows have no hold timestamp because no
+  // hold ever existed. Accept only that terminal historical shape, require its
+  // real creation timestamp, and normalize the retired `pass` spelling. New
+  // and non-terminal submissions still require the server hold timestamp.
+  const legacyConfirmedFastPass = status?.toUpperCase() === "CONFIRMED"
+    && (riskRoute?.toLowerCase() === "pass" || riskRoute?.toLowerCase() === "fast-pass")
+    && !holdUntil
+    && createdAt !== undefined
+    && Number.isFinite(createdAt);
+  const canonicalRiskRoute = legacyConfirmedFastPass && riskRoute?.toLowerCase() === "pass"
+    ? "fast-pass"
+    : riskRoute;
+  if (!row || !withdrawalNo || !status || (!holdUntil && !legacyConfirmedFastPass) || !canonicalRiskRoute
+      || !allowedRiskRoutes.has(canonicalRiskRoute.toLowerCase())
       || !["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"].includes(String(chain))
       || amount === null || networkConfirmUsd === null || networkFee === null || penaltyFee === null || grossFee === null
       || nexBurned === null || feeWaived === null || actualFee === null || netReceive === null
@@ -265,26 +285,26 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
   return {
-    withdrawalNo,
+    withdrawalNo: withdrawalNo!,
     ...(targetAddress ? { targetAddress } : {}),
     ...(createdAt !== undefined && Number.isFinite(createdAt) ? { createdAt } : {}),
-    amount,
+    amount: amount!,
     chain: chain as SupportedWithdrawalNetwork,
-    status,
-    holdUntil,
-    networkConfirmUsd,
-    networkFee,
-    penaltyFee,
-    grossFee,
-    nexBurned,
+    status: status!,
+    ...(holdUntil ? { holdUntil } : {}),
+    networkConfirmUsd: networkConfirmUsd!,
+    networkFee: networkFee!,
+    penaltyFee: penaltyFee!,
+    grossFee: grossFee!,
+    nexBurned: nexBurned!,
     nexRefunded,
     nexRefundedAt,
-    feeWaived,
-    actualFee,
-    netReceive,
-    policyVersion,
-    useNexFeeOffset: row.useNexFeeOffset,
-    riskRoute,
+    feeWaived: feeWaived!,
+    actualFee: actualFee!,
+    netReceive: netReceive!,
+    policyVersion: policyVersion!,
+    useNexFeeOffset: row!.useNexFeeOffset as boolean,
+    riskRoute: canonicalRiskRoute,
     idSource: "server",
   };
 }
@@ -298,17 +318,18 @@ function parseSubmissionPage(value: unknown): {
 } {
   const row = record(value);
   const page = record(row?.page);
+  const withdrawals = row && Array.isArray(row.withdrawals) ? row.withdrawals : null;
   const total = number(page?.total);
   const pageNum = number(page?.pageNum, 1);
   const pageSize = number(page?.pageSize, 1);
   if (!row || row.source !== "nx_withdrawal_order" || row.sourceEnvironment !== "PRODUCTION"
-      || !Array.isArray(row.withdrawals) || !page || total === null || pageNum === null || pageSize === null
+      || withdrawals === null || !page || total === null || pageNum === null || pageSize === null
       || !Number.isSafeInteger(pageNum) || !Number.isSafeInteger(pageSize)
-      || row.withdrawals.length > pageSize || row.withdrawals.length > total) {
+      || withdrawals.length > pageSize || withdrawals.length > total) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_LIST_RESPONSE_INVALID" });
   }
-  return { withdrawals: row.withdrawals.map(parseSubmission), total, pageNum, pageSize,
-    snapshotId: parseHistorySnapshotId(page.snapshotId) };
+  return { withdrawals: withdrawals!.map(parseSubmission), total: total!, pageNum: pageNum!, pageSize: pageSize!,
+    snapshotId: parseHistorySnapshotId(page!.snapshotId) };
 }
 
 function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
@@ -460,6 +481,7 @@ function canonicalRiskRoute(route: string): WithdrawalRiskRoute {
   const normalized = route.trim().toLowerCase();
   switch (normalized) {
     case "fast-pass":
+    case "pass": // accepted only for confirmed legacy history by parseSubmission
       return "pass";
     case "delay":
       return "delay";
@@ -506,7 +528,15 @@ export function toCanonicalWithdrawal(
   address: string,
   submittedAt = submission.createdAt ?? Date.now(),
 ): Withdrawal {
-  const estimatedCompletion = Date.parse(submission.holdUntil);
+  const status = canonicalStatus(submission.status);
+  // A confirmed legacy row without a historical hold has no future estimate to
+  // display. Its server-created timestamp is the only truthful terminal anchor;
+  // never substitute the browser clock or manufacture a hold deadline.
+  const estimatedCompletion = submission.holdUntil
+    ? Date.parse(submission.holdUntil)
+    : status === "confirmed" && submission.createdAt !== undefined && Number.isFinite(submission.createdAt)
+      ? submission.createdAt
+      : NaN;
   if (!address.trim() || !Number.isFinite(estimatedCompletion)) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
@@ -528,7 +558,7 @@ export function toCanonicalWithdrawal(
       feeWaivedUsd: submission.feeWaived,
       ...(submission.penaltyFee > 0 ? { penaltyUsd: submission.penaltyFee } : {}),
     },
-    status: canonicalStatus(submission.status),
+    status,
     riskRoute: canonicalRiskRoute(submission.riskRoute),
     riskReasons: [],
     submittedAt,
@@ -620,6 +650,21 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
   };
 }
 
+function parseWithdrawalDetail(value: unknown, expectedWithdrawalNo: string): WithdrawalDetailSnapshot {
+  const envelope = record(value);
+  const rawWithdrawal = envelope?.withdrawal;
+  if (!envelope || envelope.source !== "nx_withdrawal_order"
+      || envelope.sourceEnvironment !== "PRODUCTION" || !record(rawWithdrawal)) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+  }
+  const withdrawal = parseSubmission(rawWithdrawal);
+  const snapshot = parseStatusSnapshot(rawWithdrawal, expectedWithdrawalNo);
+  if (withdrawal.withdrawalNo !== expectedWithdrawalNo || withdrawal.withdrawalNo !== snapshot.withdrawalNo) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+  }
+  return { ...snapshot, withdrawal };
+}
+
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
   return {
     list: async () => {
@@ -664,7 +709,7 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
         timeoutMs: 30_000,
       }));
     },
-    get: async (withdrawalNo) => parseStatusSnapshot(await client.request({
+    get: async (withdrawalNo) => parseWithdrawalDetail(await client.request({
       method: "GET",
       path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,
     }), withdrawalNo),

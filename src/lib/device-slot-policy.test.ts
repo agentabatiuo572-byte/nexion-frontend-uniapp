@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isActiveSlotDevice, occupiesDeviceSlot } from "./device-slot-policy";
+import { isActiveSlotDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "./device-slot-policy";
 
 describe("device slot policy", () => {
   it("releases a pending-deactivation slot before its running task finishes", () => {
@@ -10,6 +10,12 @@ describe("device slot policy", () => {
   it("keeps Cloud Share visible but excludes it from the six physical activation slots", () => {
     expect(occupiesDeviceSlot("cloud-share")).toBe(false);
     expect(isActiveSlotDevice({ kind: "cloud-share", activatedAt: Date.now() })).toBe(false);
+  });
+
+  it("requires reconciliation before an activation record missing its timestamp can be activated", () => {
+    expect(requiresActivationConfirmation({ activationUnconfirmed: true })).toBe(true);
+    expect(requiresActivationConfirmation({ activationUnconfirmed: false })).toBe(false);
+    expect(requiresActivationConfirmation({})).toBe(false);
   });
 
   it("counts active phones, PC shares, boxes and racks as physical slot occupants", () => {
