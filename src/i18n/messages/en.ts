@@ -3055,6 +3055,9 @@ export const en = {
     roleAi: "AI compute advisor",
     roleAdvisor: "Growth advisor",
     roleSupport: "Customer support",
+    offline: "Offline",
+    connecting: "Reconnecting…",
+    waitingAgent: "Waiting for an agent",
     online: "online",
     unassignedAgent: "Unassigned",
     // List empty states

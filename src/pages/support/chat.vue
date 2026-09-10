@@ -132,7 +132,6 @@ import { requireCryptoUuid } from "@/lib/secure-command-id";
 import {
   createHumanConversationCreationRecovery,
   createHumanThreadRealtimeLifecycle,
-  humanConversationPresence,
 } from "./conversation-realtime-page";
 import {
   createLatestAbortableRequest,
@@ -386,33 +385,47 @@ const thinkingLabel = computed(() => {
     default: return t.value.nova.thinkingUnderstanding;
   }
 });
-const realtimePresence = computed(() => humanConversationPresence({
-  remote: remoteApiEnabled,
-  isAi: isAi.value,
-  ready: convStore.realtimeReady,
-  conversationId: cid.value,
-  online: cid.value ? convStore.onlineIds[cid.value] === true : false,
-  closed: isClosedSession.value,
-}));
+function isWaitingForAgent(name: string): boolean {
+  const normalized = name.trim();
+  return !normalized || normalized.toLowerCase() === "unassigned" || normalized === "备勤池";
+}
+const waitingForAgent = computed(() => !!conv.value && isWaitingForAgent(conv.value.agentName));
+const humanPresence = computed(() => {
+  // Nova never consumes a human thread's connection or presence state.
+  if (isAi.value) return { online: undefined, mutedDot: false };
+  const online = cid.value ? convStore.onlineIds[cid.value] : undefined;
+  return {
+    online,
+    mutedDot: isClosedSession.value || isTransferredSession.value || waitingForAgent.value
+      || !remoteApiEnabled || !convStore.realtimeReady || online !== true,
+  };
+});
 const headerRole = computed(() => {
-  if (agentTyping.value) return thinkingLabel.value;
-  if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
-  if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
-  if (isAi.value && remoteApiEnabled) return t.value.nova.localRole;
-  if (isAi.value) return t.value.conversations.roleAi;
+  if (isAi.value) {
+    if (agentTyping.value) return thinkingLabel.value;
+    if (novaStatusLoading.value) return t.value.nova.localConnecting;
+    if (novaProviderHold.value) return t.value.nova.localUnavailable;
+    return remoteApiEnabled ? t.value.nova.localRole : t.value.conversations.roleAi;
+  }
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
   if (isTransferredSession.value) return t.value.conversations.sessionTransferred;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
-  if (realtimePresence.value.showOnline) return t.value.conversations.online;
+  if (!remoteApiEnabled) return t.value.conversations[conv.value.roleKey];
+  if (waitingForAgent.value) return t.value.conversations.waitingAgent;
+  if (!convStore.realtimeReady) return t.value.conversations.connecting;
+  if (humanPresence.value.online === false) return t.value.conversations.offline;
+  if (agentTyping.value) return thinkingLabel.value;
+  if (humanPresence.value.online === true) return t.value.conversations.online;
   return t.value.conversations[conv.value.roleKey];
 });
 const headerTint = computed(() =>
   isAi.value ? "var(--v5-brand-2)" : conv.value?.avatarTint ?? (humanType.value === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)"),
 );
-// Presence dot: closed session must not claim "online" — grey it and stop the pulse.
+// Never show a live dot until a human conversation has an assigned, current
+// websocket presence. Unknown, reconnecting, and offline stay visually neutral.
 const dotStyle = computed<CSSProperties>(() =>
-  realtimePresence.value.mutedDot
+  humanPresence.value.mutedDot
     ? { background: "var(--v5-ink-4)", animation: "none" }
     : { background: headerTint.value },
 );

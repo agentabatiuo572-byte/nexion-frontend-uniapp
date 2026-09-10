@@ -32,7 +32,8 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
   status: string;
   agentName: string;
   messages?: Array<unknown>;
-}, enabled = ["ai", "advisor", "support"]) {
+  roleKey?: string;
+}, enabled = ["ai", "advisor", "support"], realtime: { ready?: boolean; online?: boolean; typing?: boolean; remote?: boolean } = {}) {
   const hooks: Record<string, (...args: any[]) => any> = {};
   const app = vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
   const api = { status: vi.fn(async () => ({ available: true })),
@@ -56,23 +57,23 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
       loadEarlier: vi.fn(async () => conversation),
       watchRealtime: vi.fn(),
       setTyping: vi.fn(),
-      realtimeReady: false,
-      onlineIds: {},
-      typingIds: {},
+      realtimeReady: realtime.ready ?? false,
+      onlineIds: realtime.online === undefined ? {} : { [query.cid ?? ""]: realtime.online },
+      typingIds: realtime.typing === true ? { [query.cid ?? ""]: true } : {},
     }) },
     "@/store/nova": { useNova },
     "@/store/app": { useApp: () => app },
     "@/store/ui": { toast: { warn: vi.fn(), info: vi.fn(), error: vi.fn() }, confirm: async () => true,
       useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/mock/nova-templates": {},
-    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: true },
+    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: realtime.remote ?? true },
     "@/lib/nova-failure": failure,
     "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": secureId,
     "@/lib/nova-thinking": thinking,
     "./conversation-realtime-page": realtimePage,
   };
-  const page = new Function("require", "exports", script + "; return { onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
+  const page = new Function("require", "exports", script + "; return { headerRole, dotStyle, onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
     (name: string) => {
       if (name.endsWith(".vue")) return {};
       if (!(name in modules)) throw new Error(`Unmocked dependency: ${name}`);
@@ -164,6 +165,47 @@ describe("human chat receipt projection", () => {
       expect.objectContaining({ tone: "user", text: "Nova question", receipt: zh.conversations.receiptSent }),
     ]));
     current.page.cleanup();
+  });
+});
+
+describe("human chat realtime presence", () => {
+  const assigned = { type: "support", status: "open", agentName: "Ava", roleKey: "roleSupport" as const };
+
+  it.each(["Unassigned", "备勤池"])("shows waiting assignment for %s without claiming online", agentName => {
+    const current = mount({ cid: "CV-live" }, { ...assigned, agentName }, undefined, { ready: true, online: true });
+    expect(current.page.headerRole.value).toBe(zh.conversations.waitingAgent);
+    expect(current.page.dotStyle.value).toMatchObject({ animation: "none" });
+    current.page.cleanup();
+  });
+
+  it("derives reconnecting, online, and offline from live websocket state", () => {
+    const reconnecting = mount({ cid: "CV-live" }, assigned, undefined, { ready: false, online: true });
+    const online = mount({ cid: "CV-live" }, assigned, undefined, { ready: true, online: true });
+    const offline = mount({ cid: "CV-live" }, assigned, undefined, { ready: true, online: false });
+    expect(reconnecting.page.headerRole.value).toBe(zh.conversations.connecting);
+    expect(reconnecting.page.dotStyle.value).toMatchObject({ animation: "none" });
+    expect(online.page.headerRole.value).toBe(zh.conversations.online);
+    expect(online.page.dotStyle.value.animation).toBeUndefined();
+    expect(offline.page.headerRole.value).toBe(zh.conversations.offline);
+    expect(offline.page.dotStyle.value).toMatchObject({ animation: "none" });
+    reconnecting.page.cleanup(); online.page.cleanup(); offline.page.cleanup();
+  });
+
+  it("keeps unknown presence neutral, local mode on the role, AI isolated, and closed states first", () => {
+    const unknown = mount({ cid: "CV-live" }, assigned, undefined, { ready: true });
+    const local = mount({ cid: "CV-live" }, assigned, undefined, { ready: false, online: false, remote: false });
+    const ai = mount({ type: "ai" }, undefined, undefined, { ready: false, online: false });
+    const closed = mount({ cid: "CV-live" }, { ...assigned, status: "closed" }, undefined, { ready: true, online: true, typing: true });
+    const transferred = mount({ cid: "CV-live" }, { ...assigned, status: "transferred" }, undefined, { ready: true, online: true, typing: true });
+    expect(unknown.page.headerRole.value).toBe(zh.conversations.roleSupport);
+    expect(unknown.page.dotStyle.value).toMatchObject({ animation: "none" });
+    expect(local.page.headerRole.value).toBe(zh.conversations.roleSupport);
+    expect(local.page.dotStyle.value).toMatchObject({ animation: "none" });
+    expect(ai.page.headerRole.value).toBe(zh.nova.localRole);
+    expect(ai.page.dotStyle.value).toEqual({ background: "var(--v5-brand-2)" });
+    expect(closed.page.headerRole.value).toBe(zh.conversations.sessionEnded);
+    expect(transferred.page.headerRole.value).toBe(zh.conversations.sessionTransferred);
+    unknown.page.cleanup(); local.page.cleanup(); ai.page.cleanup(); closed.page.cleanup(); transferred.page.cleanup();
   });
 });
 
