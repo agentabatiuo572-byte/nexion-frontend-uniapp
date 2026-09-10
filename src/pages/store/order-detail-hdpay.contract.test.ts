@@ -35,7 +35,7 @@ describe("wallet payment for a pending commerce order", () => {
   });
 
   it("blocks cancellation while wallet payment is in flight or confirmed but readback is pending", () => {
-    expect(detailSource).toContain('return order.value?.status === "placed"\n    && !walletPaymentConfirmed.value\n    && !payingFromWallet.value;');
+    expect(detailSource.replace(/\r\n/g, "\n")).toContain('return order.value?.status === "placed"\n    && !walletPaymentConfirmed.value\n    && !payingFromWallet.value;');
     expect(detailSource).toContain("const cancellingOrder = ref(false);");
     expect(detailSource).toContain("let cancelAttemptSequence = 0;");
     expect(detailSource).toContain("&& !cancellingOrder.value");

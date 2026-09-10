@@ -287,6 +287,36 @@ try {
     //   crashes 里赫然是 NO_BACKEND_IN_GATE)。桩要与它模拟的世界同形,否则测的是桩。
     const { ApiError } = await import("/src/api/errors.ts");
     const unreachable = (why) => new ApiError({ kind: "network", message: why, retryable: true });
+    // `GET /api/withdrawals/:id` 是一条精确归属的 detail read：不能再拿旧的
+    // 裸状态报文冒充它。外层来源与内层完整单据都是解析器的 fail-closed 边界；
+    // 只把本格要驱动的 status fields 覆盖进完整真实形状，才是在验消费链而非验旧桩。
+    const exactDetail = (payload, envelope = {}) => ({
+      source: "nx_withdrawal_order",
+      sourceEnvironment: "PRODUCTION",
+      withdrawal: {
+        withdrawalNo: payload.withdrawalNo,
+        targetAddress: "TRX9Yh7mQ2vK8pLxN4dW6sJ3fBcHgR5tZa",
+        amount: 120,
+        chain: "USDT-TRC20",
+        status: payload.status,
+        holdUntil: new Date(Date.now() + 3600_000).toISOString(),
+        networkConfirmUsd: 1,
+        networkFee: 1,
+        penaltyFee: 0,
+        grossFee: 1,
+        nexBurned: 0,
+        nexRefunded: 0,
+        feeWaived: 0,
+        actualFee: 1,
+        netReceive: 119,
+        policyVersion: "withdraw-status-mirror-runtime",
+        useNexFeeOffset: false,
+        riskRoute: "fast-pass",
+        idSource: "server",
+        ...payload,
+      },
+      ...envelope,
+    });
     // 🔴 桩必须**按请求的单号**回话。上一版不看 req.path 一律回同一份报文,而
     // refreshRemoteWithdrawals 会把**所有在途单**逐个问一遍(前几轮的单据经三路合并
     // 还留在列表里)—— 于是这一轮的结论被套到了别人头上,断言时而红时而绿(实测:
@@ -298,7 +328,7 @@ try {
         if (!String(req.path).endsWith(encodeURIComponent(payload.withdrawalNo))) {
           throw unreachable("NOT_THE_TARGET_ORDER");
         }
-        return payload;
+        return exactDetail(payload);
       };
       try { return await app.refreshRemoteWithdrawals(); }
       finally { rt.apiClient.request = realRequest; }
@@ -416,11 +446,11 @@ try {
     // 为什么显示字段不许抛:抛出去会被调用方吞掉 → 整张单据镜像失败 → 单据永久停在处理中,
     // 而代价只是一句话没显示。两害相权。
     const apiMod = await import("/src/api/withdrawal-api.ts");
-    const probeSnapshot = async (over) => {
-      rt.apiClient.request = async () => ({
+    const probeSnapshot = async (over, envelope) => {
+      rt.apiClient.request = async () => exactDetail({
         withdrawalNo: ID.confirm, status: "CONFIRMED", confirmedAt: null,
         terminalReason: null, retriable: null, ...over,
-      });
+      }, envelope);
       try { return { ok: true, snap: await apiMod.createWithdrawalApi(rt.apiClient).get(ID.confirm) }; }
       // 两种协议错都算:认不出状态抛 STATUS_INVALID,其余报文违规抛 RESPONSE_INVALID。
       // (只认后者会让「状态闸」这一格永远判不过 —— 门自己的判据也要对得上被测代码。)
@@ -449,6 +479,12 @@ try {
     // (d) 不认识的**字符串**码回落 other 而不抛(后台加新码不该打死老客户端)。
     const future = await probeSnapshot({ terminalReason: "SOME_FUTURE_CODE" });
     const unknownCodeFallsBack = future.ok && future.snap.terminalReason === "other";
+    // (e) exact detail 的来源与嵌套单据同属身份边界：不能因为状态字段可消费，
+    //     就接受来源不明或把 withdrawal 从 envelope 拿掉的旧裸报文。
+    const wrongSource = await probeSnapshot({}, { source: "untrusted_withdrawal_order" });
+    const missingNestedWithdrawal = await probeSnapshot({}, { withdrawal: null });
+    const exactDetailBoundary = !wrongSource.ok && wrongSource.protocol
+      && !missingNestedWithdrawal.ok && missingNestedWithdrawal.protocol;
     rt.apiClient.request = realRequest;
 
     // 🔴 渲染面的靶**不在这里种**(见下面 ⑨ 之后那一段):登录会触发
@@ -466,7 +502,7 @@ try {
       reasonOnlyStatus: reasonOnlyRow.status,
       reasonOnlyReason: reasonOnlyRow.terminalReason,
       reasonOnlyRetriable: reasonOnlyRow.retriable,
-      parserAlive, idMismatchThrows, degrade, unknownCodeFallsBack,
+      parserAlive, idMismatchThrows, degrade, unknownCodeFallsBack, exactDetailBoundary,
     };
   }, { ID });
 
@@ -554,6 +590,8 @@ try {
       (R.degrade || []).filter((d) => !d.ok).map((d) => d.label).join(" · "));
     check("⑦ 但不认识的**字符串**码必须回落 other 而**不抛**(否则后台加个新码就打死老客户端)",
       R.unknownCodeFallsBack === true, "未知码没回落到 other");
+    check("⑦ 🔴 exact detail 必带可信来源与嵌套 withdrawal(不许旧裸状态报文借道)",
+      R.exactDetailBoundary === true, "来源或嵌套缺失没有被协议闸拒绝");
   }
 
   // ── ⑨ 🔴 接线断言:**App 自己**去调,本脚本一根手指都不碰那个 action ──────────
@@ -575,6 +613,34 @@ try {
     const [rt, appMod] = await Promise.all([import("/src/api/runtime.ts"), import("/src/store/app.ts")]);
     const app = appMod.useApp();
     const { ApiError } = await import("/src/api/errors.ts");
+    // page.evaluate 有独立浏览器作用域，不能借用上面回读格的 fixture。
+    // 这里也必须走 current exact-detail contract，才能证明 App 自己消费的是真读回执。
+    const exactDetail = (payload) => ({
+      source: "nx_withdrawal_order",
+      sourceEnvironment: "PRODUCTION",
+      withdrawal: {
+        withdrawalNo: payload.withdrawalNo,
+        targetAddress: "TRX9Yh7mQ2vK8pLxN4dW6sJ3fBcHgR5tZa",
+        amount: 88,
+        chain: "USDT-TRC20",
+        status: payload.status,
+        holdUntil: new Date(Date.now() + 3600_000).toISOString(),
+        networkConfirmUsd: 1,
+        networkFee: 1,
+        penaltyFee: 0,
+        grossFee: 1,
+        nexBurned: 0,
+        nexRefunded: 0,
+        feeWaived: 0,
+        actualFee: 1,
+        netReceive: 87,
+        policyVersion: "withdraw-status-mirror-runtime",
+        useNexFeeOffset: false,
+        riskRoute: "fast-pass",
+        idSource: "server",
+        ...payload,
+      },
+    });
 
     // 🔴 **追加**而不是整表替换:渲染面那张靶此刻只活在内存里(服务端档不落盘),
     //   一整表覆盖就把它抹了,后面渲染几格会去追踪页看一个不存在的单号 —— 空态,全红,
@@ -597,7 +663,7 @@ try {
     rt.apiClient.request = async (req) => {
       if (req.method === "GET" && req.path === `/api/withdrawals/${id}`) {
         asked += 1;
-        return { withdrawalNo: id, status: "CONFIRMED", confirmedAt: Date.now(), terminalReason: null, retriable: null };
+        return exactDetail({ withdrawalNo: id, status: "CONFIRMED", confirmedAt: Date.now(), terminalReason: null, retriable: null });
       }
       // 其余请求照「后端不在」的样子失败 —— 别顺手把整个 app 桩成一个假世界。
       // 抛 ApiError(kind:"network")而不是裸 Error:桩要与它模拟的世界同形,
@@ -630,6 +696,33 @@ try {
     const [rt, appMod] = await Promise.all([import("/src/api/runtime.ts"), import("/src/store/app.ts")]);
     const app = appMod.useApp();
     const { ApiError } = await import("/src/api/errors.ts");
+    // 本 evaluate 是另一份浏览器闭包；渲染链同样只能接受嵌套、带来源的 exact detail。
+    const exactDetail = (payload) => ({
+      source: "nx_withdrawal_order",
+      sourceEnvironment: "PRODUCTION",
+      withdrawal: {
+        withdrawalNo: payload.withdrawalNo,
+        targetAddress: "TRX9Yh7mQ2vK8pLxN4dW6sJ3fBcHgR5tZa",
+        amount: 120,
+        chain: "USDT-TRC20",
+        status: payload.status,
+        holdUntil: new Date(Date.now() + 3600_000).toISOString(),
+        networkConfirmUsd: 1,
+        networkFee: 1,
+        penaltyFee: 0,
+        grossFee: 1,
+        nexBurned: 0,
+        nexRefunded: 0,
+        feeWaived: 0,
+        actualFee: 1,
+        netReceive: 119,
+        policyVersion: "withdraw-status-mirror-runtime",
+        useNexFeeOffset: false,
+        riskRoute: "fast-pass",
+        idSource: "server",
+        ...payload,
+      },
+    });
     app.withdrawals = [{
       id,
       amount: 120,
@@ -650,13 +743,19 @@ try {
       if (!String(req.path).endsWith(encodeURIComponent(id))) {
         throw new ApiError({ kind: "network", message: "NOT_THE_TARGET_ORDER", retryable: true });
       }
-      return {
+      return exactDetail({
         withdrawalNo: id, status: "REVIEW_REJECTED", confirmedAt: null,
         terminalReason: "RISK_HIT", retriable: false,
-      };
+      });
     };
     try { await app.refreshRemoteWithdrawals(); }
-    finally { rt.apiClient.request = realRequest; }
+    catch (error) {
+      rt.apiClient.request = realRequest;
+      throw error;
+    }
+    // 深链页 mounted/onShow 会自己再做一次 exact read。桩必须跨过下面的 SPA
+    // 跳转而存活；把原 request 放在浏览器页内，读取完渲染面后再明确还原。
+    globalThis.__withdrawStatusMirrorRenderRestore = realRequest;
     const row = app.withdrawals.find((w) => w.id === id) || {};
     return {
       ...seeded,
@@ -686,6 +785,13 @@ try {
       .filter((b) => labels.includes((b.getAttribute("aria-label") || "").trim()))
       .map((b) => b.getAttribute("aria-disabled")),
   }), AGAIN_LABELS);
+  await page.evaluate(async () => {
+    const rt = await import("/src/api/runtime.ts");
+    const restore = globalThis.__withdrawStatusMirrorRenderRestore;
+    if (typeof restore !== "function") throw new Error("RENDER_READ_STUB_RESTORE_MISSING");
+    rt.apiClient.request = restore;
+    delete globalThis.__withdrawStatusMirrorRenderRestore;
+  });
   check("⑤ 追踪页把原因渲染成业务话术(渲染面接得上生产面)",
     /Unusual account activity|账户行为异常|Tài khoản có hoạt động bất thường/.test(view.text),
     view.text.replace(/\s+/g, " ").slice(0, 200));
