@@ -2954,6 +2954,9 @@ export const zh: Messages = {
     roleAi: "算力 AI 顾问",
     roleAdvisor: "专属增长顾问",
     roleSupport: "客服支持",
+    offline: "离线",
+    connecting: "正在恢复连接…",
+    waitingAgent: "等待分配客服",
     online: "在线",
     unassignedAgent: "待分配客服",
     // 清单空态
