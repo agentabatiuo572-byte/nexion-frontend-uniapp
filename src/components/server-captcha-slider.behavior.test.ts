@@ -1,0 +1,40 @@
+import { afterEach, expect, test, vi } from "vitest";
+import { ref, computed } from "vue";
+import ts from "typescript";
+import raw from "./server-captcha-slider.vue?raw";
+const script=raw.split('<script setup lang="ts">')[1].split("</script>")[0].replace(/^import .*;$/gm, "");
+const code=ts.transpileModule(script,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+const fixture={challengeId:"challenge-0123456789abcdef",backgroundImage:"data:image/png;base64,YQ==",pieceImage:"data:image/png;base64,YQ==",width:320,height:160,pieceWidth:44,pieceHeight:44,pieceY:40,expiresInSec:120};
+function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>resolve=r);return {promise,resolve};}
+function mount(api:any){
+ let unmount=()=>{},changed=()=>{};const emit=vi.fn();
+ const props={phone:"+84901234567",scene:"LOGIN"};
+ const query:any={in:()=>query,select:()=>query,boundingClientRect:(fn:any)=>{fn({width:324});return query;},exec:()=>{}};
+ const names=["ref","computed","onMounted","onUnmounted","getCurrentInstance","nextTick","watch","useT","fmt","useDialogA11y","apiClient","createCaptchaApi","defineProps","defineEmits","uni"];
+ const factory=new Function(...names,code+";return {loadChallenge,onCancel,onDown,onMove,onUp,onHandleKeydown,challenge,busy,curX};");
+ const state=factory(ref,computed,()=>{},(fn:any)=>{unmount=fn;},()=>null,()=>Promise.resolve(),(_:any,fn:any)=>{changed=fn;},()=>({value:{authOtp:{captchaVerified:"ok",captchaFail:"failed",captchaFailCount:"count"}}}),()=>"",()=>{},null,()=>api,()=>props,()=>emit,{createSelectorQuery:()=>query});
+ return {...state,emit,props,unmount:()=>unmount(),changed:()=>changed()};
+}
+afterEach(()=>vi.useRealTimers());
+test("closed challenge response cannot restore puzzle",async()=>{
+ const d=deferred<any>();const s=mount({challenge:()=>d.promise});const read=s.loadChallenge();s.onCancel();d.resolve(fixture);await read;expect(s.challenge.value).toBeNull();expect(s.emit).toHaveBeenCalledExactlyOnceWith("close");
+});
+test("new challenge wins over a late previous response",async()=>{
+ const a=deferred<any>(),b=deferred<any>();const api={challenge:vi.fn().mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise)};const s=mount(api);const first=s.loadChallenge(),second=s.loadChallenge();b.resolve({...fixture,challengeId:"new"});await second;a.resolve(fixture);await first;expect(s.challenge.value.challengeId).toBe("new");
+});
+test("closing during verification suppresses success and code-send callback",async()=>{
+ vi.useFakeTimers();const d=deferred<any>();const s=mount({challenge:async()=>fixture,verify:()=>d.promise});await s.loadChallenge();s.onDown({clientX:0});s.onMove({clientX:120});const verify=s.onUp();s.onCancel();d.resolve({ticket:"server-ticket",expiresInSec:60});await verify;await vi.runAllTimersAsync();expect(s.emit.mock.calls).toEqual([["close"]]);
+});
+test("pointer correction keeps raw coordinates and bounded trail",async()=>{
+ const api={challenge:async()=>fixture,verify:vi.fn().mockResolvedValue({ticket:"server-ticket",expiresInSec:60})};const s=mount(api);await s.loadChallenge();s.onDown({clientX:0});for(let x=1;x<=160;x++)s.onMove({clientX:x});s.onMove({clientX:140.4});await s.onUp();const proof=api.verify.mock.calls[0][0];expect(proof.inputMethod).toBe("pointer");expect(proof.trail.length).toBeLessThanOrEqual(128);expect(proof.trail.at(-1).x).toBe(proof.offsetX);expect(proof.offsetX).toBe(140);expect(Number.isInteger(proof.offsetX)).toBe(true);expect(proof.trail.every((point:any)=>Number.isInteger(point.x))).toBe(true);s.unmount();
+});
+test("keyboard uses the same server verifier and permits left correction",async()=>{
+ const api={challenge:async()=>fixture,verify:vi.fn().mockResolvedValue({ticket:"server-ticket",expiresInSec:60})};const s=mount(api);await s.loadChallenge();for(const key of ["ArrowRight","ArrowRight","ArrowLeft","Enter"])s.onHandleKeydown({key,preventDefault:()=>{}});await Promise.resolve();expect(api.verify).toHaveBeenCalledOnce();expect(api.verify.mock.calls[0][0].inputMethod).toBe("keyboard");expect(api.verify.mock.calls[0][0].offsetX).toBeCloseTo(2);s.unmount();
+});
+
+test("changing phone during verification invalidates its ticket",async()=>{
+ vi.useFakeTimers();const d=deferred<any>();const api={challenge:vi.fn().mockResolvedValue(fixture),verify:()=>d.promise};const s=mount(api);await s.loadChallenge();s.onDown({clientX:0});s.onMove({clientX:100});const pending=s.onUp();s.props.phone="+84909999999";s.changed();d.resolve({ticket:"old-ticket",expiresInSec:60});await pending;await vi.runAllTimersAsync();expect(s.emit).not.toHaveBeenCalled();expect(api.challenge).toHaveBeenCalledTimes(2);s.unmount();
+});
+test("failed proof clears consumed challenge and retry obtains a new one",async()=>{
+ const api={challenge:vi.fn().mockResolvedValueOnce(fixture).mockResolvedValueOnce({...fixture,challengeId:"new-challenge"}),verify:vi.fn().mockRejectedValue(new Error("expired"))};const s=mount(api);await s.loadChallenge();s.onDown({clientX:0});s.onMove({clientX:100});await s.onUp();expect(s.challenge.value).toBeNull();expect(s.emit).not.toHaveBeenCalled();await s.onUp();expect(api.verify).toHaveBeenCalledTimes(1);await s.loadChallenge();expect(s.challenge.value.challengeId).toBe("new-challenge");s.unmount();
+});

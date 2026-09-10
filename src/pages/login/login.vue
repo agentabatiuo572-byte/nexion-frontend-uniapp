@@ -119,12 +119,14 @@
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
-    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" :provider-hold="remoteApiEnabled" @success="onCaptchaOk" @close="showCaptcha = false" />
+    <ServerCaptchaSlider v-if="showCaptcha && remoteApiEnabled" :phone="fullPhone" :scene='(captchaPurpose === "password" ? "LOGIN" : otpScene === "reset" ? "RESET" : "LOGIN")' @success="onCaptchaOk" @close="showCaptcha = false" />
+    <CaptchaSlider v-else-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { navReset } from "@/lib/route";
 import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
