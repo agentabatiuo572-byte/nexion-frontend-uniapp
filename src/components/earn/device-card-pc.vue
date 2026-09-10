@@ -453,6 +453,7 @@ const idleGated = computed(
 );
 
 const statusLabel = computed(() => {
+  if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (idleGated.value) return t.value.earn.idle;
   if (!deviceOnline.value) {
@@ -461,11 +462,12 @@ const statusLabel = computed(() => {
   return t.value.earn.online;
 });
 const statusColor = computed(() => {
+  if (props.device.pendingDeactivate) return "var(--v5-warning)";
   if (reconnecting.value) return "var(--v5-warning)";
   if (idleGated.value || !deviceOnline.value) return "var(--v5-ink-3)";
   return "var(--v5-brand)";
 });
-const statusGlow = computed(() => !reconnecting.value && !idleGated.value && deviceOnline.value);
+const statusGlow = computed(() => !props.device.pendingDeactivate && !reconnecting.value && !idleGated.value && deviceOnline.value);
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
