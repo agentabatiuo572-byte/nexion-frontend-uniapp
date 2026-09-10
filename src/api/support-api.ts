@@ -92,10 +92,10 @@ function parseConversationHeader(value: unknown): Conversation {
 }
 function parseConversationMessage(value: unknown): ConvMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
-  const raw = text(v?.senderType)?.toLowerCase(); const sender = raw === "user" ? "user" : raw === "agent" ? "agent" : null;
-  const receipt = text(v?.receiptStatus)?.toLowerCase(); const status = receipt === "read" ? "read" : receipt === "sent" ? "sent" : undefined;
-  if (!v || id === null || ts === null || !body || !sender || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender !== "agent" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id: String(id), sender, text: body, ts, status: sender === "agent" ? status : undefined };
+  const raw = text(v?.senderType)?.toLowerCase(); const sender = raw === "user" ? "user" : raw === "agent" ? "agent" : raw === "system" ? "system" : null;
+  const receipt = v?.receiptStatus == null ? null : text(v.receiptStatus)?.toLowerCase(); const status = receipt === "read" ? "read" : receipt === "sent" ? "sent" : undefined;
+  if (!v || id === null || ts === null || !body || !sender || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender === "system" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+  return { id: String(id), sender, text: body, ts, status: sender === "system" ? undefined : status };
 }
 function parseConversationDetail(value: unknown): Conversation {
   const v = row(value); const nextCursor = cursor(v?.nextCursor); if (!v || !Array.isArray(v.messages) || typeof v.historyTruncated !== "boolean" || (v.nextCursor !== null && v.nextCursor !== undefined && nextCursor === null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
