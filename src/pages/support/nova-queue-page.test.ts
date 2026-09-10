@@ -12,6 +12,7 @@ import * as limiter from "@/lib/send-limiter";
 import * as secureId from "@/lib/secure-command-id";
 import * as format from "@/i18n/format";
 import { ApiError } from "@/api/errors";
+import { createSupportApi } from "@/api/support-api";
 import * as realtimePage from "./conversation-realtime-page";
 
 // Execute the actual SFC script with transport/lifecycle boundaries substituted.
@@ -26,7 +27,12 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function mount(query: Record<string, string> = { type: "ai" }, conversation?: { type: string; status: string; agentName: string }, enabled = ["ai", "advisor", "support"]) {
+function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
+  type: string;
+  status: string;
+  agentName: string;
+  messages?: Array<unknown>;
+}, enabled = ["ai", "advisor", "support"]) {
   const hooks: Record<string, (...args: any[]) => any> = {};
   const app = vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
   const api = { status: vi.fn(async () => ({ available: true })),
@@ -107,6 +113,57 @@ describe("human conversation restart", () => {
     page.onRestart();
     expect(navigation.navTo).not.toHaveBeenCalled();
     page.cleanup();
+  });
+});
+
+describe("human chat receipt projection", () => {
+  async function conversationWithReceipts(latestUserReceipt: "SENT" | "READ" | null) {
+    return createSupportApi({ request: async () => ({
+      conversation: {
+        conversationNo: "CV-receipts", conversationType: "SUPPORT", status: "OPEN", version: 1,
+        ownerAgentName: "Ava", unreadCount: 0, lastMessage: "Newest question",
+        lastMessageAt: "2026-09-10T00:00:00Z",
+      },
+      messages: [
+        { id: 1, senderType: "user", content: "Older question", createdAt: "2026-09-10T00:00:00Z", receiptStatus: "READ" },
+        { id: 2, senderType: "agent", content: "Agent reply", createdAt: "2026-09-10T00:01:00Z", receiptStatus: "READ" },
+        { id: 3, senderType: "user", content: "Newest question", createdAt: "2026-09-10T00:02:00Z", receiptStatus: latestUserReceipt },
+      ],
+      historyTruncated: false, nextCursor: null,
+    }) } as never).conversation("CV-receipts");
+  }
+
+  it.each([
+    ["SENT", zh.conversations.receiptSent],
+    ["READ", zh.conversations.receiptRead],
+  ] as const)("shows the latest USER backend %s receipt without placing one under an AGENT message", async (status, label) => {
+    const conversation = await conversationWithReceipts(status);
+    const current = mount({ cid: conversation.id }, conversation);
+
+    expect(current.page.threadMessages.value.map((message: { tone: string; receipt?: string }) => ({ tone: message.tone, receipt: message.receipt }))).toEqual([
+      { tone: "user", receipt: undefined },
+      { tone: "agent", receipt: undefined },
+      { tone: "user", receipt: label },
+    ]);
+    current.page.cleanup();
+  });
+
+  it("does not invent a human receipt when the backend omits the latest USER receipt", async () => {
+    const conversation = await conversationWithReceipts(null);
+    const current = mount({ cid: conversation.id }, conversation);
+
+    expect(current.page.threadMessages.value.every((message: { receipt?: string }) => message.receipt === undefined)).toBe(true);
+    current.page.cleanup();
+  });
+
+  it("keeps Nova's own latest-user receipt projection", () => {
+    const current = mount({ type: "ai" });
+    current.nova.sendUser("Nova question");
+
+    expect(current.page.threadMessages.value).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tone: "user", text: "Nova question", receipt: zh.conversations.receiptSent }),
+    ]));
+    current.page.cleanup();
   });
 });
 
