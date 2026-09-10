@@ -368,6 +368,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
    *  false 时 `genesisPurchaseBlock` 返回 `configUnavailable` 保守锁购;
    *  `refresh()` 成功即恢复(= 规格异常3 的「重试」)。 */
   const loaded = ref(false);
+  let refreshGeneration = 0;
 
   /**
    * 🔴 重新读配置源。这是关闭态能约束**已打开会话**的关键(独立验收 P0→P1):
@@ -380,6 +381,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
    *      判定读的不再是构造时的内存快照,而是当下的权威源。
    */
   async function refresh() {
+    const generation = ++refreshGeneration;
     // 🔴🔴 mock 模式没有服务端可读,而下面的 catch 是 **fail-closed**(把市场钉成 closed、
     //   loaded 置 false)。少了这个分支,mock 下 refresh 必然走进 catch ⇒
     //   `genesisPurchaseBlock` 先判 `!configLoaded → configUnavailable`,创世**整条流程**
@@ -393,6 +395,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
     }
     try {
       const state = await genesisApi.state();
+      if (generation !== refreshGeneration) return;
       config.value = {
         ...config.value,
         halted: state.halted,
@@ -409,6 +412,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
       };
       loaded.value = true;
     } catch {
+      if (generation !== refreshGeneration) return;
       config.value = {
         ...config.value,
         halted: true,

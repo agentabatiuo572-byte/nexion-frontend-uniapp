@@ -179,8 +179,8 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, onMounted, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import PerkRow from "@/components/genesis/perk-row.vue";
@@ -198,6 +198,7 @@ import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled } from "@/api/runtime";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { deriveGenesisTierRows, type GenesisTierDisplayState } from "@/lib/genesis-tier-display";
 import { resolveGenesisPrimaryCta, showGenesisPrimaryPrice } from "@/lib/genesis-primary-cta";
 
@@ -205,12 +206,22 @@ const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 let refreshInFlight: Promise<void> | null = null;
+let genesisPageVisible = false;
+let refreshRequested = false;
 
-function refreshGenesisPage(): Promise<void> {
-  if (refreshInFlight) return refreshInFlight;
+function refreshGenesisPage(recheck = false): Promise<void> {
+  if (!genesisPageVisible) return Promise.resolve();
+  if (refreshInFlight) {
+    if (recheck) refreshRequested = true;
+    return refreshInFlight;
+  }
   const operation = (async () => {
-    await cfg.refresh();
-    await genesis.syncRemote();
+    do {
+      refreshRequested = false;
+      await cfg.refresh();
+      if (!genesisPageVisible) return;
+      await genesis.syncRemote();
+    } while (refreshRequested && genesisPageVisible);
   })();
   refreshInFlight = operation;
   void operation.finally(() => {
@@ -222,13 +233,26 @@ function refreshGenesisPage(): Promise<void> {
 // A direct H5 hash-route load can mount this page without emitting uni-app's
 // page-level onShow hook. Mount must therefore bootstrap the public Genesis
 // projection; onShow remains the refresh path when navigating back later.
-onMounted(() => {
-  void refreshGenesisPage();
-});
+function showGenesisPage() {
+  const returning = !genesisPageVisible;
+  genesisPageVisible = true;
+  void refreshGenesisPage(returning);
+}
+onMounted(showGenesisPage);
 // 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
 //   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
-onShow(() => {
-  void refreshGenesisPage();
+onShow(showGenesisPage);
+onHide(() => {
+  genesisPageVisible = false;
+  refreshRequested = false;
+});
+const stopGenesisRevision = subscribeRuntimeRevision(() => {
+  if (remoteApiEnabled && genesisPageVisible) void refreshGenesisPage(true);
+});
+onUnmounted(() => {
+  genesisPageVisible = false;
+  refreshRequested = false;
+  stopGenesisRevision();
 });
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
@@ -361,7 +385,7 @@ async function openSheet() {
     //   重读配置源,成功即当场解锁;仍失败则给「可重试」说明。
     //   结果判定问派生 `block`,不摸原料 `.loaded`(④b 门):refresh 写共享 store,
     //   computed 同步失效,下一行读到的已是重读后的判定。
-    await cfg.refresh();
+    await refreshGenesisPage(true);
     if (block.value !== "configUnavailable") {
       toast.success(t.value.genesis.marketClosed.retryOk);
     } else {
