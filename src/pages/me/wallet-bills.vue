@@ -21,6 +21,9 @@
         <view
           v-for="tb in TABS"
           :key="tb"
+          role="button"
+          tabindex="0"
+          :aria-pressed="tab === tb"
           class="flex-1 grid place-items-center active:opacity-70"
           :style="pillStyle(tb)"
           @click="tab = tb"
@@ -117,7 +120,8 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale, fmt } from "@/i18n/format";
+import { dateLocale } from "@/i18n/format";
+import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
@@ -229,9 +233,7 @@ function monthLabel(month: string, n: number): string {
  * 之前种子行是英文硬串,越南语用户会在同一个列表里看到中文表头 + 英文摘要 + 越南语新行,三种语言。
  */
 function billMemo(b: Bill): string {
-  const dict = t.value.bills.memo as Record<string, string> | undefined;
-  const s = b.memoKey ? dict?.[b.memoKey] : undefined;
-  return s ? (b.memoParams ? fmt(s, b.memoParams) : s) : b.memo;
+  return resolveWalletBillMemo(b, t.value.bills.memo as Record<string, string>);
 }
 function runningBalanceLabel(bal: number): string {
   return `${t.value.bills.runningBalance}: $${bal.toFixed(2)}`;

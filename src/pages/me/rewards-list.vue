@@ -130,6 +130,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type BillType } from "@/store/bills";
 import { getProduct } from "@/mock/products";
@@ -172,7 +173,8 @@ const records = computed(() => fundsServerEnabled
   ? activePager.value.rows
   : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
 const visibleCount = ref(PAGE_SIZE);
-const visibleRecords = computed(() => fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value));
+const visibleRecords = computed(() => (fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value))
+  .map((bill) => ({ ...bill, memo: resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>) })));
 const hasMore = computed(() => fundsServerEnabled ? activePager.value.hasMore : visibleCount.value < records.value.length);
 const scrollAnchor = ref<unknown>(null);
 const initialLoading = computed(() => fundsServerEnabled && activePager.value.status === "loading" && records.value.length === 0);

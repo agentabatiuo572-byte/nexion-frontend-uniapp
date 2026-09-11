@@ -51,6 +51,111 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
     await p.refresh(); expect(remote.walletBillsApi.list).toHaveBeenCalledWith(1, 50, { asset: "NEX", category: "REWARD", cursor: "start" });
     expect(store.getLedger().rows).toEqual([]);
   });
+  it("uses the controlled projection for a trial purchase and never exposes its internal remark", async () => {
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 1, nextPage: null, nextCursor: null,
+      bills: [{ ...row("trial-charge"), bizNo: "TRIAL-42:CHARGE", bizType: "TRIAL_CHARGE", direction: "OUT", amount: 1249,
+        remark: "H2 internal conversion settlement", category: "purchase", presentationCode: "trialCharge" }],
+    });
+    const pager = useBills().getLedger(); await pager.refresh();
+    expect(pager.rows[0]).toMatchObject({ type: "purchase", amount: -1249, memo: "", memoKey: "trialCharge", ref: undefined });
+  });
+  it.each(["constructor", "toString", "__proto__"])("treats inherited presentation code %s as unknown", async (presentationCode) => {
+    remote.walletBillsApi.list.mockResolvedValue({
+      ...page(["unrecognized"]),
+      bills: [{ ...row("unrecognized"), bizType: "FUTURE_UNMAPPED", presentationCode }],
+    });
+    const pager = useBills().getLedger(); await pager.refresh();
+    expect(pager.rows[0]).toMatchObject({ memoKey: "other", memo: "", ref: undefined });
+  });
+  it("uses the legacy bizType allowlist without exposing internal remarks or DEV task identifiers", async () => {
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 3, nextPage: null, nextCursor: null,
+      bills: [
+        { ...row("compute"), bizNo: "DEV-TASK-77", bizType: "COMPUTE_TASK_REWARD", remark: "development server-authoritative compute task reward" },
+        { ...row("unknown"), bizNo: "INTERNAL-ONLY-9", bizType: "FUTURE_UNMAPPED", remark: "D5 internal ledger note" },
+        { ...row("order"), bizNo: "ORD-42", bizType: "ORDER_PURCHASE", direction: "OUT", remark: "internal order settlement" },
+      ],
+    });
+    const pager = useBills().getLedger(); await pager.refresh();
+    expect(pager.rows).toMatchObject([
+      { type: "earn", memo: "", memoKey: "computeTaskReward", ref: undefined },
+      { type: "other", memo: "", memoKey: "other", ref: undefined },
+      { type: "purchase", memo: "", memoKey: "purchase", ref: "ORD-42" },
+    ]);
+  });
+  it("normalizes every current withdrawal accounting leg to its withdrawal tracking number", async () => {
+    const withdrawalNo = "WD-0123456789ABCDEF0123456789ABCDEF";
+    const components = [
+      ["WITHDRAW_NET_PRINCIPAL", `${withdrawalNo}:USDT:PRINCIPAL`, "withdrawPrincipal"],
+      ["WITHDRAW_NETWORK_FEE", `${withdrawalNo}:USDT:NETWORK_FEE`, "withdrawNetworkFee"],
+      ["WITHDRAW_PENALTY_FEE", `${withdrawalNo}:USDT:PENALTY_FEE`, "withdrawPenaltyFee"],
+      ["WITHDRAW_FEE_OFFSET", `${withdrawalNo}:NEX:OFFSET`, "withdrawFeeOffset"],
+      ["WITHDRAW_PAYOUT_REFUND", `${withdrawalNo}:PAYOUT:USDT:REFUND`, "withdrawPayoutRefund"],
+      ["WITHDRAW_PAYOUT_NEX_REFUND", `${withdrawalNo}:PAYOUT:NEX:REFUND`, "withdrawPayoutNexRefund"],
+      ["WITHDRAW_REFUND", `D2-REFUND-${withdrawalNo}`, "withdrawRefund"],
+      ["WITHDRAW_FEE_OFFSET_REFUND", `D2-NEX-REFUND-${withdrawalNo}`, "withdrawFeeOffsetRefund"],
+    ] as const;
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: components.length, nextPage: null, nextCursor: null,
+      bills: components.map(([bizType, bizNo], index) => ({ ...row(`withdraw-${index}`), bizType, bizNo, remark: `D${index + 2} internal withdrawal accounting note` })),
+    });
+
+    const pager = useBills().getLedger(); await pager.refresh();
+
+    expect(pager.rows).toHaveLength(components.length);
+    expect(pager.rows).toEqual(expect.arrayContaining(components.map(([, , memoKey]) => expect.objectContaining({
+      type: "withdraw", memo: "", memoKey, ref: withdrawalNo,
+    }))));
+  });
+  it("keeps future withdrawal legs generic unless the server supplies a recognized presentation code", async () => {
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 2, nextPage: null, nextCursor: null,
+      bills: [
+        { ...row("withdraw-unknown"), bizType: "WITHDRAW_FUTURE_COMPONENT", category: "withdraw", direction: "OUT", presentationCode: undefined },
+        { ...row("withdraw-server-code"), bizType: "WITHDRAW_FUTURE_COMPONENT", category: "withdraw", direction: "OUT", presentationCode: "withdrawNetworkFee" },
+      ],
+    });
+
+    const pager = useBills().getLedger(); await pager.refresh();
+
+    expect(pager.rows).toMatchObject([
+      { type: "withdraw", memo: "", memoKey: "withdraw", ref: undefined },
+      { type: "withdraw", memo: "", memoKey: "withdrawNetworkFee", ref: undefined },
+    ]);
+  });  it("keeps specific legacy component labels when an older server sends generic withdraw", async () => {
+    const withdrawalNo = "WD-0123456789ABCDEF0123456789ABCDEF";
+    const components = [
+      ["WITHDRAW_NET_PRINCIPAL", `${withdrawalNo}:USDT:PRINCIPAL`, "withdrawPrincipal"],
+      ["WITHDRAW_NETWORK_FEE", `${withdrawalNo}:USDT:NETWORK_FEE`, "withdrawNetworkFee"],
+      ["WITHDRAW_PENALTY_FEE", `${withdrawalNo}:USDT:PENALTY_FEE`, "withdrawPenaltyFee"],
+      ["WITHDRAW_FEE_OFFSET", `${withdrawalNo}:NEX:OFFSET`, "withdrawFeeOffset"],
+      ["WITHDRAW_PAYOUT_REFUND", `${withdrawalNo}:PAYOUT:USDT:REFUND`, "withdrawPayoutRefund"],
+      ["WITHDRAW_PAYOUT_NEX_REFUND", `${withdrawalNo}:PAYOUT:NEX:REFUND`, "withdrawPayoutNexRefund"],
+      ["WITHDRAW_REFUND", `D2-REFUND-${withdrawalNo}`, "withdrawRefund"],
+      ["WITHDRAW_FEE_OFFSET_REFUND", `D2-NEX-REFUND-${withdrawalNo}`, "withdrawFeeOffsetRefund"],
+    ] as const;
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: components.length, nextPage: null, nextCursor: null,
+      bills: components.map(([bizType, bizNo], index) => ({ ...row(`legacy-withdraw-${index}`), bizType, bizNo, category: "withdraw", presentationCode: "withdraw" })),
+    });
+
+    const pager = useBills().getLedger(); await pager.refresh();
+
+    expect(pager.rows).toEqual(expect.arrayContaining(components.map(([, , memoKey]) => expect.objectContaining({
+      type: "withdraw", memo: "", memoKey, ref: withdrawalNo,
+    }))));
+  });
+  it("does not turn a malformed withdrawal component key into a tracking link", async () => {
+    remote.walletBillsApi.list.mockResolvedValue({
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 1, nextPage: null, nextCursor: null,
+      bills: [{ ...row("withdraw-malformed"), bizType: "WITHDRAW_PAYOUT_REFUND", bizNo: "D5-PRIVATE-LEDGER:PAYOUT:USDT:REFUND", remark: "provider internal return" }],
+    });
+
+    const pager = useBills().getLedger(); await pager.refresh();
+
+    expect(pager.rows[0]).toMatchObject({ type: "withdraw", memo: "", memoKey: "withdrawPayoutRefund", ref: undefined });
+  });
   it("rejects old-account and same-account-rebind results without changing current data", async () => {
     const old = deferred<ReturnType<typeof page>>(); const oldSum = deferred<ReturnType<typeof summary>>();
     remote.walletBillsApi.list.mockReturnValueOnce(old.promise).mockResolvedValue(page(["B"]));

@@ -213,31 +213,142 @@ export const useBills = defineStore("bills", () => {
 
   function productionBill(row: WalletBillRow): Bill {
     const amount = row.direction === "IN" ? row.amount : -row.amount;
+    const legacy = legacyPresentation(row.bizType);
+    const type = row.category ?? legacy?.type ?? "other";
+    const projectedMemoKey = presentationCode(row.presentationCode);
+    // Older projections identify every withdrawal leg as generic `withdraw`.
+    // A known legacy component is more specific; new component codes still win.
+    const memoKey = projectedMemoKey === "withdraw" && legacy?.memoKey !== undefined && legacy.memoKey !== "withdraw"
+      ? legacy.memoKey
+      : projectedMemoKey ?? legacy?.memoKey ?? categoryMemoKey(type);
     return {
       id: row.id,
-      type: productionBillType(row.bizType, row.direction),
+      type,
       amount,
       symbol: row.asset,
       status: row.status === "SUCCESS" ? "posted" : row.status === "PENDING" ? "pending" : "failed",
       ts: row.createdAt,
-      memo: row.remark || row.bizType,
-      ref: row.bizNo,
+      // `remark` and `bizNo` are ledger internals. A new server supplies controlled
+      // projection fields; the exact legacy allowlist keeps older servers readable.
+      memo: "",
+      memoKey,
+      ref: row.publicReference ?? legacyPublicReference(row.bizType, row.bizNo, legacy?.publicReference),
       balanceAfter: row.balanceAfter,
     };
   }
 
-  function productionBillType(bizType: string, direction: WalletBillRow["direction"]): BillType {
-    const value = bizType.toUpperCase();
-    if (/(DEPOSIT|TOPUP|RECHARGE)/.test(value)) return "topup";
-    if (/(WITHDRAW|PAYOUT)/.test(value)) return "withdraw";
-    if (/(REFERRAL|COMMISSION|UNILEVEL|BINARY|LEADERSHIP)/.test(value)) return "refer";
-    if (/(STAKE|STAKING)/.test(value)) return direction === "IN" ? "unstake" : "stake";
-    if (/(EXCHANGE|SWAP)/.test(value)) return "swap";
-    if (/(ACHIEVEMENT|MILESTONE|QUEST)/.test(value)) return "achievement";
-    if (/(REWARD|BONUS)/.test(value)) return "bonus";
-    if (/(PURCHASE|ORDER|REPURCHASE|GENESIS|TRADE_IN)/.test(value)) return direction === "IN" ? "earn" : "purchase";
-    if (/(EARN|RELEASE|TASK|TRIAL)/.test(value)) return "earn";
-    return "other";
+  type LegacyPublicReference = "direct" | "withdrawalComponent";
+  type LegacyPresentation = { type: BillType; memoKey: string; publicReference?: LegacyPublicReference };
+  const LEGACY_PRESENTATIONS: Record<string, LegacyPresentation> = {
+    COMPUTE_TASK_REWARD: { type: "earn", memoKey: "computeTaskReward" },
+    DAILY_CHECK_IN: { type: "bonus", memoKey: "dailyCheckIn" },
+    TRIAL_CHARGE: { type: "purchase", memoKey: "trialCharge" },
+    TRIAL_BONUS: { type: "bonus", memoKey: "trialBonus" },
+    QUEST_REWARD: { type: "achievement", memoKey: "questReward" },
+    PURCHASE_REWARD: { type: "bonus", memoKey: "purchaseReward" },
+    ORDER_PURCHASE: { type: "purchase", memoKey: "purchase", publicReference: "direct" },
+    GENESIS_PURCHASE: { type: "purchase", memoKey: "purchase", publicReference: "direct" },
+    WITHDRAWAL: { type: "withdraw", memoKey: "withdraw", publicReference: "direct" },
+    WITHDRAW_PAYOUT: { type: "withdraw", memoKey: "withdraw", publicReference: "direct" },
+    // Each current withdrawal writer emits one immutable component row.  The
+    // value before ':' is the withdrawal number; suffixes identify internal
+    // accounting legs and must never become the user-facing tracking id.
+    WITHDRAW_NET_PRINCIPAL: { type: "withdraw", memoKey: "withdrawPrincipal", publicReference: "withdrawalComponent" },
+    WITHDRAW_NETWORK_FEE: { type: "withdraw", memoKey: "withdrawNetworkFee", publicReference: "withdrawalComponent" },
+    WITHDRAW_PENALTY_FEE: { type: "withdraw", memoKey: "withdrawPenaltyFee", publicReference: "withdrawalComponent" },
+    WITHDRAW_FEE_OFFSET: { type: "withdraw", memoKey: "withdrawFeeOffset", publicReference: "withdrawalComponent" },
+    WITHDRAW_PAYOUT_REFUND: { type: "withdraw", memoKey: "withdrawPayoutRefund", publicReference: "withdrawalComponent" },
+    WITHDRAW_PAYOUT_NEX_REFUND: { type: "withdraw", memoKey: "withdrawPayoutNexRefund", publicReference: "withdrawalComponent" },
+    WITHDRAW_REFUND: { type: "withdraw", memoKey: "withdrawRefund", publicReference: "withdrawalComponent" },
+    WITHDRAW_FEE_OFFSET_REFUND: { type: "withdraw", memoKey: "withdrawFeeOffsetRefund", publicReference: "withdrawalComponent" },
+    DEPOSIT: { type: "topup", memoKey: "topup", publicReference: "direct" },
+    TOPUP: { type: "topup", memoKey: "topup", publicReference: "direct" },
+    RECHARGE: { type: "topup", memoKey: "topup", publicReference: "direct" },
+    VIETQR_DEPOSIT: { type: "topup", memoKey: "topup", publicReference: "direct" },
+    EXCHANGE_SELL: { type: "swap", memoKey: "swap" },
+    EXCHANGE_BUY: { type: "swap", memoKey: "swap" },
+  };
+  const PRESENTATION_CODES: Record<string, string> = {
+    computeTaskReward: "computeTaskReward",
+    dailyCheckIn: "dailyCheckIn",
+    trialCharge: "trialCharge",
+    trialBonus: "trialBonus",
+    questReward: "questReward",
+    purchaseReward: "purchaseReward",
+    earn: "earn",
+    refer: "refer",
+    bonus: "bonus",
+    topup: "topup",
+    withdraw: "withdraw",
+    withdrawPrincipal: "withdrawPrincipal",
+    withdrawNetworkFee: "withdrawNetworkFee",
+    withdrawPenaltyFee: "withdrawPenaltyFee",
+    withdrawFeeOffset: "withdrawFeeOffset",
+    withdrawPayoutRefund: "withdrawPayoutRefund",
+    withdrawPayoutNexRefund: "withdrawPayoutNexRefund",
+    withdrawRefund: "withdrawRefund",
+    withdrawFeeOffsetRefund: "withdrawFeeOffsetRefund",
+    purchase: "purchase",
+    swap: "swap",
+    verification: "verification",
+    stake: "stake",
+    unstake: "unstake",
+    achievement: "achievement",
+    other: "other",
+  };
+  const CATEGORY_MEMO_KEYS: Record<BillType, string> = {
+    earn: "earn", refer: "refer", bonus: "bonus", topup: "topup", withdraw: "withdraw", purchase: "purchase",
+    swap: "swap", verification: "verification", stake: "stake", unstake: "unstake", achievement: "achievement", other: "other",
+  };
+  function legacyPresentation(bizType: string) {
+    return LEGACY_PRESENTATIONS[bizType.trim().toUpperCase()];
+  }
+  function legacyPublicReference(bizType: string, bizNo: string, kind: LegacyPublicReference | undefined): string | undefined {
+    if (kind === "direct") return bizNo;
+    if (kind !== "withdrawalComponent") return undefined;
+    const value = bizType.trim().toUpperCase();
+    if (value === "WITHDRAW_REFUND") return validWithdrawalNo(trimKnownPrefix(bizNo, "D2-REFUND-"));
+    if (value === "WITHDRAW_FEE_OFFSET_REFUND") return validWithdrawalNo(trimKnownPrefix(bizNo, "D2-NEX-REFUND-"));
+    const suffix = withdrawalComponentSuffix(value);
+    return suffix ? validWithdrawalNo(trimKnownComponentSuffix(bizNo, suffix)) : undefined;
+  }
+  function trimKnownPrefix(value: string, prefix: string): string | undefined {
+    if (!value.startsWith(prefix)) return undefined;
+    const reference = value.slice(prefix.length);
+    return reference || undefined;
+  }
+  function withdrawalComponentSuffix(bizType: string): string | undefined {
+    switch (bizType) {
+      case "WITHDRAW_NET_PRINCIPAL": return ":USDT:PRINCIPAL";
+      case "WITHDRAW_NETWORK_FEE": return ":USDT:NETWORK_FEE";
+      case "WITHDRAW_PENALTY_FEE": return ":USDT:PENALTY_FEE";
+      case "WITHDRAW_FEE_OFFSET": return ":NEX:OFFSET";
+      case "WITHDRAW_PAYOUT_REFUND": return ":PAYOUT:USDT:REFUND";
+      case "WITHDRAW_PAYOUT_NEX_REFUND": return ":PAYOUT:NEX:REFUND";
+      default: return undefined;
+    }
+  }
+  function trimKnownComponentSuffix(value: string, suffix: string): string | undefined {
+    if (!value.endsWith(suffix)) return undefined;
+    const reference = value.slice(0, -suffix.length);
+    return reference || undefined;
+  }
+  function validWithdrawalNo(value: string | undefined): string | undefined {
+    // AppWithdrawalService emits WD- plus an upper-case UUID without hyphens.
+    if (!value?.startsWith("WD-") || value.length !== 35) return undefined;
+    for (let index = 3; index < value.length; index += 1) {
+      const char = value.charCodeAt(index);
+      const digit = char >= 48 && char <= 57;
+      const upperHex = char >= 65 && char <= 70;
+      if (!digit && !upperHex) return undefined;
+    }
+    return value;
+  }
+  function presentationCode(code: string | undefined): string | undefined {
+    return code && Object.prototype.hasOwnProperty.call(PRESENTATION_CODES, code) ? PRESENTATION_CODES[code] : undefined;
+  }
+  function categoryMemoKey(type: BillType): string {
+    return CATEGORY_MEMO_KEYS[type];
   }
 
   function refreshServerLedger(options: { force?: boolean } = {}): Promise<void> {

@@ -4,6 +4,7 @@ import { ApiError } from "./errors";
 export type WalletBillAsset = "USDT" | "NEX";
 export type WalletBillDirection = "IN" | "OUT";
 export type WalletBillStatus = "SUCCESS" | "PENDING" | "FAILED";
+export type WalletBillCategory = "earn" | "refer" | "bonus" | "topup" | "withdraw" | "purchase" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
 
 export interface WalletBillRow {
   id: string;
@@ -16,6 +17,11 @@ export interface WalletBillRow {
   status: WalletBillStatus;
   remark: string;
   createdAt: number;
+  /** Controlled App projection. Absent only while reading an older server. */
+  category?: WalletBillCategory;
+  presentationCode?: string;
+  /** A server-approved identifier that is safe to show or route from an App bill. */
+  publicReference?: string;
 }
 
 export interface WalletBillsSnapshot {
@@ -42,6 +48,8 @@ export interface WalletBillsSummary {
   asOf: number;
   rewardsUsdt: number;
   rewardsNex: number;
+  settledRewardsNex?: number | null;
+  withdrawalOffsetNexSpent?: number | null;
   latestRewardAt: number | null;
   todayNexEarn: number;
   pendingNex: number;
@@ -94,6 +102,9 @@ function bill(value: unknown): WalletBillRow {
     status,
     remark: typeof row.remark === "string" ? row.remark : "",
     createdAt,
+    category: category(row.category),
+    presentationCode: optionalText(row.presentationCode),
+    publicReference: optionalText(row.publicReference),
   };
 }
 
@@ -114,6 +125,16 @@ export function parseWalletBillsSnapshot(value: unknown): WalletBillsSnapshot {
   return { source: "server", sourceEnvironment: "PRODUCTION", bills: row.bills.map(bill), page, pageSize, total, nextPage, nextCursor };
 }
 
+function optionalText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function category(value: unknown): WalletBillCategory | undefined {
+  const candidate = optionalText(value);
+  return candidate && ["earn", "refer", "bonus", "topup", "withdraw", "purchase", "swap", "verification", "stake", "unstake", "achievement", "other"].includes(candidate)
+    ? candidate as WalletBillCategory : undefined;
+}
+
 export function parseWalletBillsSummary(value: unknown): WalletBillsSummary {
   const row = object(value);
   if (!row || row.source !== "server" || row.sourceEnvironment !== "PRODUCTION"
@@ -124,6 +145,10 @@ export function parseWalletBillsSummary(value: unknown): WalletBillsSummary {
   const rewardsUsdt = money(row.rewardsUsdt);
   const rewardsNex = money(row.rewardsNex);
   const pendingNex = money(row.pendingNex);
+  const settledRewardsNex = row.settledRewardsNex == null ? null : money(row.settledRewardsNex);
+  const withdrawalOffsetNexSpent = row.withdrawalOffsetNexSpent == null ? null : money(row.withdrawalOffsetNexSpent);
+  if ((row.settledRewardsNex != null && settledRewardsNex === null)
+      || (row.withdrawalOffsetNexSpent != null && withdrawalOffsetNexSpent === null)) return invalid();
   const signedEarn = typeof row.todayNexEarn === "number" || (typeof row.todayNexEarn === "string" && row.todayNexEarn.trim())
     ? Number(row.todayNexEarn) : Number.NaN;
   const count = row.monthBillCount;
@@ -131,7 +156,7 @@ export function parseWalletBillsSummary(value: unknown): WalletBillsSummary {
       || rewardsUsdt === null || rewardsNex === null || pendingNex === null || !Number.isFinite(signedEarn)
       || typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return invalid();
   return { source: "server", sourceEnvironment: "PRODUCTION", asOf, timeZone, rewardsUsdt, rewardsNex,
-    pendingNex, latestRewardAt, todayNexEarn: signedEarn, monthBillCount: count, recentNexBills: row.recentNexBills.map(bill) };
+    pendingNex, settledRewardsNex, withdrawalOffsetNexSpent, latestRewardAt, todayNexEarn: signedEarn, monthBillCount: count, recentNexBills: row.recentNexBills.map(bill) };
 }
 
 export function createWalletBillsApi(client: ApiClient) {
