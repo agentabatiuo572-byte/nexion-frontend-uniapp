@@ -148,9 +148,15 @@ test("raw-navigation gate catches whitespace and bracket notation", () => {
   assert.equal(usesRawNavigateTo("navTo(url)"), false);
 });
 
-test("search keeps its richer raw-navigation failure visible and retryable", () => {
+test("search keeps its richer raw-navigation failure visible, retryable, and ordered", () => {
   const searchPage = fs.readFileSync("src/pages/search/search.vue", "utf8");
-  assert.match(searchPage, /success:\s*\(\)\s*=>\s*\{/);
-  assert.match(searchPage, /navigationError\.value\s*=\s*true/);
+  assert.match(searchPage, /import \{ beginNavigationAttempt, completeNavigationAttempt \} from "@\/lib\/navigation-attempt"/);
+  assert.match(searchPage, /const navigationState = ref\(\{ attempt: 0, pendingUrl: "", hasError: false \}\)/);
+  assert.match(searchPage, /const navigationError = computed\(\(\) => navigationState\.value\.hasError\)/);
+  assert.match(searchPage, /const started = beginNavigationAttempt\(navigationState\.value, url\);\s*navigationState\.value = started;/);
+  assert.match(searchPage, /success:\s*\(\)\s*=>\s*\{\s*navigationState\.value = completeNavigationAttempt\(navigationState\.value, started\.attempt, "success"\);\s*\}/);
+  assert.match(searchPage, /fail:\s*\(\)\s*=>\s*\{\s*navigationState\.value = completeNavigationAttempt\(navigationState\.value, started\.attempt, "failure"\);\s*\}/);
+  assert.match(searchPage, /if \(pendingNavigationUrl\.value\) navigateWithFeedback\(pendingNavigationUrl\.value\)/);
+  assert.match(searchPage, /v-if="navigationError"/);
   assert.match(searchPage, /retryNavigation/);
 });

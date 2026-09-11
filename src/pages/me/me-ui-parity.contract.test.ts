@@ -59,7 +59,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Disable editing and repeat activation while the same goal intent is saving.
   "goals.vue": "60440d2dd970a5e3ed9a4648fc83e272cb452e10a90f26e1dc0c4a02c3b33307",
   // R3: preserve layout while enabling keyboard FAQ and category controls.
-  "help.vue": "ecea9895c4b6949e728f61b0ce7e5ced94ce27e79d70753d4f3ede509dbec552",
+  // Complete/current FAQ reads gate empty states and expose refresh retry.
+  // Exact deep links clear on category selection; a withdrawn target shows
+  // generic no-match copy without its internal ID. Styles remain unchanged.
+  "help.vue": "bfb23c862c905608072b5f6f5da68122d8364afa5faa463164333b21cf79d9e4",
   "language.vue": "13447b1d8aa9e01afb78d7f65d5f9cb4dcc89e947c843eb172d79b34a40ea2fb",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
   "notifications.vue": "a5364e90ea9b5111df247207a486ac094a1839fecccb7f63b6e11f95df4706b5",

@@ -37,8 +37,8 @@
           class="active:opacity-70"
           :style="chipStyle(cat === 'all')"
           role="button" tabindex="0" :aria-pressed="cat === 'all'"
-          @click="cat = 'all'"
-          @keydown.enter.prevent="cat = 'all'" @keydown.space.prevent="cat = 'all'"
+          @click="selectCategory('all')"
+          @keydown.enter.prevent="selectCategory('all')" @keydown.space.prevent="selectCategory('all')"
         >
           <text>{{ t.receipt.tabAll }}</text>
         </view>
@@ -48,8 +48,8 @@
           class="active:opacity-70"
           :style="chipStyle(cat === c)"
           role="button" tabindex="0" :aria-pressed="cat === c"
-          @click="cat = c"
-          @keydown.enter.prevent="cat = c" @keydown.space.prevent="cat = c"
+          @click="selectCategory(c)"
+          @keydown.enter.prevent="selectCategory(c)" @keydown.space.prevent="selectCategory(c)"
         >
           <text>{{ categoryLabel(c) }}</text>
         </view>
@@ -58,7 +58,7 @@
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
         <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
-        <EmptyState v-else-if="filtered.length === 0" :kind="query.trim() ? 'no-search-results' : 'empty-list'" :title="query.trim() ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() ? t.empty.searchDesc : t.empty.listDesc" compact />
+        <EmptyState v-else-if="filtered.length === 0 && faqPageNum > 0 && !faqLoading && !faqLoadError && !canLoadMoreFaqs" :kind="query.trim() || requestedFaqId ? 'no-search-results' : 'empty-list'" :title="query.trim() || requestedFaqId ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() || requestedFaqId ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
             v-for="(it, i) in filtered"
@@ -76,8 +76,23 @@
             </view>
           </view>
         </template>
+        <view v-if="faqLoading && faqs.length === 0" role="status" aria-live="polite" aria-busy="true" :style="faqFallbackStyle">
+          <text>{{ w.loadingMore }}</text>
+        </view>
         <view v-if="faqLoadError && faqs.length > 0" :style="faqFallbackStyle" role="status" aria-live="polite">
           <text>{{ t.empty.errorDesc }}</text>
+          <view
+            class="active:opacity-80"
+            role="button"
+            tabindex="0"
+            :aria-label="t.empty.errorCta"
+            :aria-disabled="faqLoading ? 'true' : 'false'"
+            @click="retryFaqs"
+            @keydown.enter.prevent="retryFaqs"
+            @keydown.space.prevent="retryFaqs"
+          >
+            <text>{{ t.empty.errorCta }}</text>
+          </view>
         </view>
         <view
           v-if="canLoadMoreFaqs"
@@ -155,7 +170,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -171,6 +186,7 @@ import type { SupportFaq } from "@/domain/support";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
+import { readPublishedFaqPages } from "@/lib/published-faq-pages";
 
 const t = useT();
 const w = computed(() => t.value.help);
@@ -186,6 +202,10 @@ const faqLoading = ref(false);
 const catOrder: FaqCategory[] = ["getting-started", "earnings", "devices", "payments", "technical"];
 
 const query = ref("");
+const requestedFaqId = ref("");
+onLoad((options) => {
+  requestedFaqId.value = typeof options?.faqId === "string" ? options.faqId.trim().slice(0, 128) : "";
+});
 const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
@@ -202,11 +222,21 @@ async function loadFaqs() {
   faqLoadError.value = false;
   faqLoading.value = true;
   try {
-    const next = await supportApi.faqPage(requestedLanguage, undefined, "Help Center", 1, FAQ_PAGE_SIZE);
+    const targetId = requestedFaqId.value;
+    const isCurrent = () => requestGeneration === faqRequestGeneration && requestedLanguage === locale.code
+      && remoteAccountScope.isCurrent(requestScope);
+    const allItems = targetId ? await readPublishedFaqPages(supportApi, requestedLanguage, isCurrent) : null;
+    const next = allItems ? { items: allItems, total: allItems.length, pageNum: 1 }
+      : await supportApi.faqPage(requestedLanguage, undefined, "Help Center", 1, FAQ_PAGE_SIZE);
     if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
       faqs.value = next.items;
       faqPageNum.value = next.pageNum;
       faqTotal.value = next.total;
+      if (targetId && requestedFaqId.value === targetId) {
+        const target = next.items.find(item => item.id === targetId);
+        query.value = target?.question ?? "";
+        openId.value = target?.id ?? null;
+      }
     }
   } catch {
     if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
@@ -237,6 +267,11 @@ async function loadMoreFaqs() {
   }
 }
 
+function retryFaqs() {
+  if (faqLoading.value) return;
+  void loadFaqs();
+}
+
 function resetFaqProjection() {
   faqRequestGeneration += 1;
   faqs.value = [];
@@ -256,7 +291,13 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onSearch(e: Event) {
+  requestedFaqId.value = "";
   query.value = detailVal(e);
+}
+function selectCategory(value: FaqCategory | "all") {
+  if (requestedFaqId.value) query.value = "";
+  requestedFaqId.value = "";
+  cat.value = value;
 }
 function toggleFaq(id: string) {
   openId.value = openId.value === id ? null : id;
@@ -265,7 +306,13 @@ function toggleFaq(id: string) {
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
   return faqs.value.map((it) => ({ ...it, q: it.question, a: it.answer })).filter((it) => {
-    const inCat = cat.value === "all" || it.category === cat.value;
+    if (requestedFaqId.value) return it.id === requestedFaqId.value;
+    // M4 publishes canonical support categories; the app groups these into topics.
+    const category = it.category.trim().toLowerCase();
+    const inCat = cat.value === "all" || category === cat.value
+      || (cat.value === "payments" && ["deposit", "withdrawal"].includes(category))
+      || (cat.value === "devices" && ["hardware", "genesis"].includes(category))
+      || (cat.value === "getting-started" && ["general", "account", "other"].includes(category));
     const inSearch = !q || it.q.toLowerCase().includes(q) || it.a.toLowerCase().includes(q);
     return inCat && inSearch;
   });
@@ -316,8 +363,10 @@ function syncBotAccountScope() {
   thinking.value = false;
 }
 
-watch(() => String(app.accountKey), () => {
+watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => {
   syncBotAccountScope();
+  requestedFaqId.value = "";
+  query.value = "";
   resetFaqProjection();
   void loadFaqs();
 });

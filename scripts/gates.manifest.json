@@ -312,7 +312,7 @@
     "test:githooks": {
       "kind": "test",
       "inputs": [".githooks/**", "package.json"],
-      "$why": "git 层门自测(pre-commit S 级门 + pre-push full 门,2026-09-02 Tier 1-B);static 档同其它 test 步跳过,scoped 按输入缩范围"
+      "$why": "git 层门自测(pre-commit 本机验证自动提交门 + pre-push full 门,2026-09-02 Tier 1-B);static 档同其它 test 步跳过,scoped 按输入缩范围"
     },
     "test:country-code-contracts": {
       "kind": "test",

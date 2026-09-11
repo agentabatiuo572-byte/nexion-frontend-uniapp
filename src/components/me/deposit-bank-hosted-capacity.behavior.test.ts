@@ -9,18 +9,19 @@ import source from "./deposit-bank-pane.vue?raw";
 import { createPaymentApi } from "@/api/payment-api";
 import { ApiError } from "@/api/errors";
 import { useFx } from "@/store/fx";
-import { fmtVnd, vndForUsdt } from "@/store/fx-core";
+import { computeQuoteRate, fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { en } from "@/i18n/messages/en";
 import { fmt } from "@/i18n/format";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 
 const runtime = vi.hoisted(() => ({ config: vi.fn(), fxQuote: vi.fn() }));
 vi.mock("@/api/runtime", () => ({ remoteApiEnabled: true, paymentApi: runtime }));
+const quoteRate = computeQuoteRate(26000, 1.5);
 
 function config(known: boolean | undefined = false, remaining = 0) {
   return { serverCanonical: true, source: "nx_vietqr_config", sourceEnvironment: "PRODUCTION", runId: "",
     vietQr: { enabled: true, minDepositUsdt: 10, maxDepositUsdt: 5000,
-      todayRemainingDepositUsdt: remaining, todayRemainingVnd: remaining * 26390,
+      todayRemainingDepositUsdt: remaining, todayRemainingVnd: remaining * quoteRate,
       toleranceVnd: 1000, graceMinutes: 10, version: 4, feeVnd: 0, feeUsdt: 0,
       ...(known === undefined ? {} : { dailyCapacityKnown: known }) } };
 }
@@ -28,7 +29,7 @@ function config(known: boolean | undefined = false, remaining = 0) {
 function install(response = config()) {
   const api = createPaymentApi({ request: async (request: { path: string }) => request.path.includes("fx-quote")
     ? { serverCanonical: true, source: "nx_finance_fx_quote_config", sourceEnvironment: "PRODUCTION", runId: "",
-      baseRateVndPerUsdt: 26000, buySpreadPct: 1.5, quoteRateVndPerUsdt: 26390,
+      baseRateVndPerUsdt: 26000, buySpreadPct: 1.5, quoteRateVndPerUsdt: quoteRate,
       lockWindowMinutes: 30, version: 7, asOf: "2026-09-11T00:00:00Z" }
     : response } as never, "dev");
   runtime.config.mockImplementation(() => api.config());
