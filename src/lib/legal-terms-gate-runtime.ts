@@ -2,6 +2,7 @@ import { navReset } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { captureRuntimeRevision } from "@/api/order-api";
+import { pendingProfileLocaleHydration } from "./locale-profile-hydration";
 import {
   buildLegalTermsRoute,
   claimLegalTermsRedirect,
@@ -26,8 +27,14 @@ let pendingRequirement: {
   locale: string;
   version: string;
   reason: "verification" | "acknowledgement";
+  registrationCompletionReturnTo?: string;
 } | null = null;
 const latestGateRouteByKey = new Map<string, string>();
+
+function registrationCompletionReturnTo(returnTo: string): string | undefined {
+  return returnTo === "/pages/register/success" || returnTo === "/pages/onboarding/estimator"
+    ? returnTo : undefined;
+}
 
 function fence(): LegalTermsSessionFence | null {
   const session = sessionVault.read();
@@ -99,7 +106,12 @@ export function enforcePendingLegalTermsGate(returnTo: string): boolean {
   // already-acknowledged user through the Terms page merely to verify state.
   if (pending.reason === "verification") return true;
   if (isLegalTermsGateExemptRoute(path)) return false;
-  redirectToRequiredTerms(pending.key, returnTo);
+  // The route watcher can still see the form while its async reset to Terms
+  // is rendering. Preserve the registration-owned destination in that window;
+  // the in-flight route map has already been cleared after the Terms read.
+  const destination = path === "/pages/register/register"
+    ? pending.registrationCompletionReturnTo ?? returnTo : returnTo;
+  redirectToRequiredTerms(pending.key, destination);
   return true;
 }
 
@@ -165,7 +177,17 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
     finishVerification(inFlight.key);
     latestGateRouteByKey.delete(inFlight.key);
   }
-  const promise = legalTermsApi.current(requestLocale, "GLOBAL", true)
+  const read = Promise.resolve().then(async () => {
+    // The synchronous locale-selection watcher registers its write in the same
+    // turn. Resolve the barrier after that turn, while verification stays closed.
+    const languageHydration = pendingProfileLocaleHydration({ accountId: `user:${requestFence.userId}`, revision: requestFence.sessionRevision ?? 0 });
+    if (languageHydration) await languageHydration;
+    if (!ownsRead() || !sameLegalTermsSession(requestFence, fence()) || requestLocale !== useLocaleStore().code) {
+      throw new Error("LEGAL_TERMS_LANGUAGE_HYDRATION_SUPERSEDED");
+    }
+    return legalTermsApi.current(requestLocale, "GLOBAL", true);
+  });
+  const promise = read
     .then((snapshot) => {
       if (!ownsRead()) return;
       if (!sameLegalTermsSession(requestFence, fence())) {
@@ -178,8 +200,11 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
         finishVerification(key);
-        pendingRequirement = { key, locale: requestLocale, version: snapshot.version, reason: "acknowledgement" };
         const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
+        pendingRequirement = {
+          key, locale: requestLocale, version: snapshot.version, reason: "acknowledgement",
+          registrationCompletionReturnTo: registrationCompletionReturnTo(currentReturnTo),
+        };
         const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
         const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${currentReturnTo}`;
         if (currentPath !== PRIVACY_POLICY_ROUTE && claimLegalTermsRedirect(redirectedKeys, redirectKey)) {
@@ -199,9 +224,12 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       }
       if (failedKeys.has(key)) return;
       finishVerification(key);
-      pendingRequirement = { key, locale: requestLocale, version: "", reason: "acknowledgement" };
-      failedKeys.add(key);
       const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
+      pendingRequirement = {
+        key, locale: requestLocale, version: "", reason: "acknowledgement",
+        registrationCompletionReturnTo: registrationCompletionReturnTo(currentReturnTo),
+      };
+      failedKeys.add(key);
       const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
       if (currentPath !== PRIVACY_POLICY_ROUTE) redirectToRequiredTerms(key, currentReturnTo);
     })

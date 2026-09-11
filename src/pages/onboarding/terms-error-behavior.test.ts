@@ -4,6 +4,7 @@ import ts from "typescript";
 import source from "./terms.vue?raw";
 import { sameLegalTermsSession, sameLegalTermsRun, shouldBlockLegalTermsExit } from "@/lib/legal-terms-gate";
 import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
+import { isProfileLocaleHydrationError } from "@/lib/locale-profile-hydration";
 import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as viMessages } from "@/i18n/messages/vi";
@@ -11,13 +12,13 @@ import { vi as viMessages } from "@/i18n/messages/vi";
 const compiled = ts.transpileModule(
   source.slice(source.indexOf("function showTermsPage()"), source.indexOf("onMounted(showTermsPage)"))
     + source.slice(source.indexOf("async function loadTerms()"), source.indexOf("</script>"))
-    + "\nreturn { loadTerms, confirmTerms, showTermsPage, hideTermsPage };",
+    + "\nreturn { loadTerms, confirmTerms, showTermsPage, hideTermsPage, retryTerms };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
 ).outputText;
 
 function harness(messages = en) {
   const t = ref(messages);
-  const errorKey = ref<"loadFailed" | "ackFailed" | "sessionChanged" | "runChanged" | "loginRequired" | null>(null);
+  const errorKey = ref<"loadFailed" | "ackFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "languageSyncFailed" | null>(null);
   const current = { accessToken: "test-session", userId: 1, sessionRevision: 1, runEpoch: 1 };
   const snapshot = { source: "server", sourceEnvironment: "PRODUCTION", runId: "", version: "v1",
     requestedLocale: "en", resolvedLocale: "en", requestedJurisdiction: "GLOBAL", resolvedJurisdiction: "GLOBAL",
@@ -30,16 +31,29 @@ function harness(messages = en) {
     captureRuntimeRevision: () => ({ runId: "", epoch: current.runEpoch }),
     legalTermsApi: { current: vi.fn().mockResolvedValue(snapshot), acknowledge: vi.fn().mockResolvedValue(snapshot) },
     recordLegalTermsAcknowledged: vi.fn(), shouldBlockLegalTermsExit,
+    pendingProfileLocaleHydration: vi.fn<() => Promise<void> | null>(() => null), isProfileLocaleHydrationError,
+    retryCurrentProfileLocale: vi.fn(),
     navTo: vi.fn(), navBack: vi.fn(), buildLegalTermsLoginRoute: vi.fn(), buildLegalTermsRoute: vi.fn(),
     uni: { showToast: vi.fn() },
   };
   const handlers = new Function(...Object.keys(deps), compiled)(...Object.values(deps)) as {
-    loadTerms(): Promise<void>; confirmTerms(): Promise<void>; showTermsPage(): void; hideTermsPage(): void;
+    loadTerms(): Promise<void>; confirmTerms(): Promise<void>; showTermsPage(): void; hideTermsPage(): void; retryTerms(): void;
   };
   return { ...deps, ...handlers, current, snapshot, error: computed(() => errorKey.value ? t.value.terms[errorKey.value] : null) };
 }
 
 describe("terms localized failure behavior", () => {
+  it.each(["/pages/register/success", "/pages/onboarding/estimator"])("returns an acknowledged registration to its explicit target %s", async (returnTo) => {
+    const h = harness();
+    h.returnTo.value = returnTo;
+    h.explicitReturn.value = true;
+    h.legalTermsApi.acknowledge.mockResolvedValue({ ...h.snapshot, acknowledged: true });
+    await h.confirmTerms();
+    expect(h.recordLegalTermsAcknowledged).toHaveBeenCalledOnce();
+    expect(h.navTo).toHaveBeenCalledExactlyOnceWith(returnTo);
+    expect(h.navBack).not.toHaveBeenCalled();
+  });
+
   it("renders the effective date and version from the same server snapshot", () => {
     expect(source).toContain("`${serverTerms.effectiveAt} · ${serverTerms.version}`");
     expect(source).not.toContain("`${t.terms.effectiveLabel} · ${serverTerms.version}`");
@@ -108,8 +122,10 @@ describe("terms localized failure behavior", () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveChinese = resolve; }));
 
     const english = h.loadTerms();
+    await Promise.resolve();
     h.locale.code = "zh";
     const chinese = h.loadTerms();
+    await Promise.resolve();
     expect(h.legalTermsApi.current).toHaveBeenCalledTimes(2);
 
     resolveChinese({ ...h.snapshot, requestedLocale: "zh", acknowledged: false });
@@ -142,8 +158,10 @@ describe("terms localized failure behavior", () => {
       .mockImplementationOnce(() => new Promise((ok, fail) => { resolveOld = ok; rejectOld = fail; }))
       .mockImplementationOnce(() => new Promise((ok) => { resolveCurrent = ok; }));
     const oldRead = h.loadTerms();
+    await Promise.resolve();
     h.locale.code = "zh";
     const currentRead = h.loadTerms();
+    await Promise.resolve();
     if (completion === "resolve") resolveOld({ ...h.snapshot, acknowledged: true });
     else rejectOld(new Error("OLD_READ_FAILURE"));
     await oldRead;
@@ -251,6 +269,7 @@ describe("terms localized failure behavior", () => {
     let resolve!: (value: any) => void;
     h.legalTermsApi.current.mockImplementationOnce(() => new Promise((ok) => { resolve = ok; }));
     const read = h.loadTerms();
+    await Promise.resolve();
     h.hideTermsPage();
     await h.loadTerms();
     expect(h.legalTermsApi.current).toHaveBeenCalledOnce();
@@ -260,7 +279,7 @@ describe("terms localized failure behavior", () => {
     expect(h.serverTerms.value).toBeNull();
     h.legalTermsApi.current.mockResolvedValue({ ...h.snapshot, version: "v2" });
     h.showTermsPage();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(h.loadingTerms.value).toBe(false));
     expect(h.legalTermsApi.current).toHaveBeenCalledTimes(2);
     expect(h.serverTerms.value?.version).toBe("v2");
     expect(source).toContain("onHide(hideTermsPage)");
@@ -279,7 +298,7 @@ describe("terms localized failure behavior", () => {
     h.hideTermsPage();
     h.legalTermsApi.current.mockResolvedValue({ ...h.snapshot, version: "v2" });
     h.showTermsPage();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(h.loadingTerms.value).toBe(false));
     const newAcknowledgement = h.confirmTerms();
     expect(h.legalTermsApi.acknowledge).toHaveBeenCalledTimes(2);
     resolveOld({ ...h.snapshot, acknowledged: true });
@@ -315,6 +334,36 @@ describe("terms localized failure behavior", () => {
     await newAcknowledgement;
     expect(h.confirming.value).toBe(false);
     expect(h.recordLegalTermsAcknowledged).toHaveBeenCalledOnce();
+    expect(h.navBack).toHaveBeenCalledOnce();
+  });
+
+  it.each([en, zh, viMessages])("blocks consent until a failed account language write is retried", async (messages) => {
+    const h = harness(messages);
+    const failed = Promise.reject(new Error("PROFILE_LANGUAGE_SYNC_FAILED"));
+    h.pendingProfileLocaleHydration.mockReturnValue(failed);
+    await h.loadTerms();
+    expect(h.error.value).toBe(messages.terms.languageSyncFailed);
+    expect(h.serverTerms.value).toBeNull();
+    await h.confirmTerms();
+    expect(h.legalTermsApi.current).not.toHaveBeenCalled();
+    expect(h.legalTermsApi.acknowledge).not.toHaveBeenCalled();
+    expect(h.navBack).not.toHaveBeenCalled();
+
+    let saved!: () => void;
+    h.retryCurrentProfileLocale.mockImplementation(() => {
+      h.pendingProfileLocaleHydration.mockReturnValue(new Promise<void>((resolve) => { saved = resolve; }));
+    });
+    h.retryTerms();
+    await Promise.resolve();
+    expect(h.retryCurrentProfileLocale).toHaveBeenCalledOnce();
+    expect(h.legalTermsApi.current).not.toHaveBeenCalled();
+    saved();
+    await vi.waitFor(() => expect(h.loadingTerms.value).toBe(false));
+    expect(h.error.value).toBeNull();
+    expect(h.legalTermsApi.current).toHaveBeenCalledExactlyOnceWith("en", "GLOBAL", true);
+    h.legalTermsApi.acknowledge.mockResolvedValue({ ...h.snapshot, acknowledged: true });
+    await h.confirmTerms();
+    expect(h.legalTermsApi.acknowledge).toHaveBeenCalledOnce();
     expect(h.navBack).toHaveBeenCalledOnce();
   });
 

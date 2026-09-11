@@ -48,14 +48,16 @@ describe("PC-managed H3 quest catalogue", () => {
     }).mockResolvedValueOnce({
       quests: [{ questCode: "H3_FIRST_ORDER_STARTED", name: "Start first order", layer: "DAY_ONE", rewardNex: 50, status: "PENDING" }],
     });
-    const quest = useQuest();
     const locale = useLocaleStore();
+    locale.applyServerLocale("en");
+    const quest = useQuest();
     await quest.refreshRemote();
+    expect(state).toHaveBeenLastCalledWith("en");
 
     locale.setLocale("zh");
 
-    await vi.waitFor(() => expect(state).toHaveBeenLastCalledWith("zh"));
-    expect(quest.remoteQuests[0]?.name).toBe("Start first order");
+    await vi.waitFor(() => expect(quest.remoteQuests[0]?.name).toBe("Start first order"));
+    expect(state).toHaveBeenLastCalledWith("zh");
   });
 
   it("keeps the last confirmed catalogue visible while a background refresh is pending", async () => {

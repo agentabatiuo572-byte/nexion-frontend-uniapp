@@ -1754,6 +1754,17 @@ if "$NODE_BIN" -e '
     const script=descriptor.scriptSetup?.content||descriptor.script?.content||"";
     const sourceFile=ts.createSourceFile(file,script,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
     const registrationLaunchUrls=[];
+    function literalRoute(expression){
+      if(ts.isStringLiteral(expression)) return expression.text;
+      if(!ts.isCallExpression(expression)||!ts.isIdentifier(expression.expression)||expression.arguments.length) return undefined;
+      const callee=sourceFile.statements.find((node)=>ts.isFunctionDeclaration(node)&&node.name?.text===expression.expression.text);
+      const statements=callee?.body?.statements;
+      // Resolve only an actual zero-argument helper with one literal return in
+      // this platform output. Unused route strings cannot satisfy the check.
+      if(callee?.parameters.length!==0||statements?.length!==1||!ts.isReturnStatement(statements[0])) return undefined;
+      const result=statements[0].expression;
+      return result&&ts.isStringLiteral(result)?result.text:undefined;
+    }
     let hasOfficialIdentifier=false,hasWindowOpenCall=false;
     (function walk(node){
       if(ts.isIdentifier(node)&&node.text==="officialDownloadUrl") hasOfficialIdentifier=true;
@@ -1769,7 +1780,8 @@ if "$NODE_BIN" -e '
           const options=node.arguments[0];
           if(options&&ts.isObjectLiteralExpression(options)){
             const url=options.properties.find((prop)=>ts.isPropertyAssignment(prop)&&((ts.isIdentifier(prop.name)&&prop.name.text==="url")||(ts.isStringLiteral(prop.name)&&prop.name.text==="url")));
-            if(url&&ts.isStringLiteral(url.initializer)) registrationLaunchUrls.push(url.initializer.text);
+            const destination=url&&literalRoute(url.initializer);
+            if(destination) registrationLaunchUrls.push(destination);
           }
         }
         ts.forEachChild(node,collect);
@@ -1895,9 +1907,9 @@ if "$NODE_BIN" -e '
   if(appSuccess.templateExpressions.some((expression)=>/doneWhyApp|doneOfficialDownload/.test(expression))) throw new Error("App output retained H5 reminder copy bindings");
   if(/doneComingSoon|APP 即将上线|APP launching soon/.test(success)) throw new Error("obsolete success-page coming-soon contract remains");
   if(!/appDownload:\s*\{[\s\S]*officialUrl:\s*string/.test(config)) throw new Error("official download URL is not typed in platform config");
-  if(!h5Register.registrationLaunchUrls.includes("/pages/register/success")) throw new Error("H5 registration function lost the success reLaunch call");
+  if(h5Register.registrationLaunchUrls[0]!=="/pages/register/success") throw new Error("H5 registration function lost the primary success reLaunch call");
   if(appRegister.registrationLaunchUrls.includes("/pages/register/success")) throw new Error("App registration function retained the H5 success reLaunch call");
-  if(!appRegister.registrationLaunchUrls.includes("/pages/onboarding/estimator")) throw new Error("App registration function lost the onboarding reLaunch call");
+  if(appRegister.registrationLaunchUrls[0]!=="/pages/onboarding/estimator") throw new Error("App registration function lost the primary onboarding reLaunch call");
   ' >/tmp/uni-register-success-platform.log 2>&1; then
   ok "register success H5/App platform contract"
 else

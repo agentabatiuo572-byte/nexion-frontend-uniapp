@@ -71,6 +71,18 @@ export async function installFormalProbeSession(page, { authenticated = true, re
         body: JSON.stringify({ code: 0, message: "OK", data: fixture }),
       });
     }
+    // Authenticated restoration waits for the account-owned language before
+    // reading Terms. A valid profile keeps this control focused on its target
+    // business page; responseFor above can still supply failure fixtures.
+    if (url.pathname === "/api/app/profile" && authenticated && route.request().method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ code: 0, message: "OK", data: {
+          nickname: "Formal Probe", avatarUrl: "", avatarRevision: "", language: "en",
+        } }),
+      });
+    }
     return route.fulfill({
       status: 200,
       contentType: "application/json",

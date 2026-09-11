@@ -13,18 +13,23 @@
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
       <text class="est-title">{{ t.onboarding.estimatorTitleH }}</text>
-      <text class="est-hint">{{ loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting) }}</text>
+      <text class="est-hint">{{ estimatorHint }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
     <view class="est-reveal">
       <transition name="est-fade" mode="out-in">
-        <view v-if="loadFailed" key="failed" class="est-loading est-loading--failed">
-          <text class="est-loading__t">{{ t.onboarding.calibrationFailedTitle }}</text>
-          <text class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
-          <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
+        <view v-if="readState !== 'loading' && readState !== 'ready'" key="read-state" class="est-loading est-loading--failed">
+          <text class="est-loading__t">{{ readStateTitle }}</text>
+          <text class="est-failed__hint">{{ readStateDetail }}</text>
+          <text v-if="readState === 'error'" class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
+          <text v-if="readState === 'error'" class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
           <view class="est-failed__actions">
-            <view class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
+            <view v-if="readState === 'not-started' || readState === 'deferred'" class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
+              @click="goStartCalibration" @keydown.enter.prevent="goStartCalibration" @keydown.space.prevent="goStartCalibration">
+              <text>{{ readState === 'deferred' ? t.onboarding.calibrationRecalibrate : t.onboarding.calibrationGoConnect }}</text>
+            </view>
+            <view v-else class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
               @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
               <text>{{ t.onboarding.activationRetry }}</text>
             </view>
@@ -52,7 +57,7 @@
           </view>
           <view class="est-phone__body">
             <text class="est-phone__name">{{ t.onboarding.yourPhone }}</text>
-            <text class="est-phone__spec">{{ t.onboarding.mobileNpu }}</text>
+            <text class="est-phone__spec">{{ t.onboarding.mobileComputeEstimate }}</text>
           </view>
           <view class="est-phone__rate">
             <text class="est-phone__rate-v">{{ phoneRateLabel }}</text>
@@ -115,12 +120,17 @@ import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { createEstimatorScope, isCurrentEstimatorScope, type EstimatorScope } from "@/lib/estimator-scope";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
+import {
+  estimatorCalibrationReadErrorState,
+  estimatorCalibrationReadState,
+  type EstimatorCalibrationReadState,
+} from "@/lib/estimator-calibration-read-state";
 
 const t = useT();
 const app = useApp();
 const auth = useAuth();
 const detected = ref(false);
-const loadFailed = ref(false);
+const readState = ref<"loading" | EstimatorCalibrationReadState>("loading");
 const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
@@ -133,6 +143,22 @@ const s1Label = computed(() => s1.value ? `$${s1.value.dailyUsdt.toFixed(2)}` : 
 const proLabel = computed(() => pro.value ? `$${pro.value.dailyUsdt.toFixed(2)}` : "—");
 const proMonthlyLabel = computed(() => pro.value ? `~$${(pro.value.dailyUsdt * 30).toFixed(0)}` : "—");
 const multS1Label = computed(() => phoneRate.value && s1.value ? `${Math.round(s1.value.dailyUsdt / phoneRate.value)}×` : "—");
+const estimatorHint = computed(() => {
+  if (readState.value === "not-started") return t.value.onboarding.calibrationNotStartedHint;
+  if (readState.value === "deferred") return t.value.onboarding.calibrationDeferredHint;
+  if (readState.value === "error") return t.value.onboarding.calibrationReadUnavailable;
+  return detected.value ? t.value.onboarding.estimatorHint : t.value.onboarding.detecting;
+});
+const readStateTitle = computed(() => readState.value === "not-started"
+  ? t.value.onboarding.calibrationNotStartedTitle
+  : readState.value === "deferred"
+    ? t.value.onboarding.calibrationDeferredTitle
+    : t.value.onboarding.calibrationFailedTitle);
+const readStateDetail = computed(() => readState.value === "not-started"
+  ? t.value.onboarding.calibrationNotStartedDetail
+  : readState.value === "deferred"
+    ? t.value.onboarding.calibrationDeferredDetail
+    : t.value.onboarding.calibrationReadUnavailable);
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let mounted = false;
@@ -155,22 +181,24 @@ function isCurrent(scope: { estimator: EstimatorScope; remote: RemoteAccountRequ
 
 function loadCalibration() {
   const scope = scopePair();
-  loadFailed.value = false;
+  readState.value = "loading";
   void onboardingCalibrationApi.result(getDeviceId()).then((result) => {
     if (!isCurrent(scope)) return;
-    if (!result.calibrationAvailable || (result.activationStatus !== "CALIBRATED" && result.activationStatus !== "ACTIVE")) {
+    const nextState = estimatorCalibrationReadState(result);
+    if (nextState !== "ready") {
       calibration.value = null;
       detected.value = false;
-      loadFailed.value = true;
+      readState.value = nextState;
       return;
     }
     calibration.value = result;
+    readState.value = "ready";
     scheduleReveal();
-  }).catch(() => {
+  }).catch((error: unknown) => {
     if (!isCurrent(scope)) return;
     calibration.value = null;
     detected.value = false;
-    loadFailed.value = true;
+    readState.value = estimatorCalibrationReadErrorState(error);
   });
 }
 
@@ -199,7 +227,7 @@ watch(() => String(app.accountKey || ""), (next) => {
   deferBusy.value = false;
   deferIntent = null;
   detected.value = false;
-  loadFailed.value = false;
+  readState.value = "loading";
   calibration.value = null;
   loadCalibration();
 });
@@ -223,6 +251,16 @@ onBackPress(() => {
 function goConnect() {
   if (!detected.value || !calibration.value?.calibrationAvailable) return;
   navReset({ url: "/pages/onboarding/connect", fail: () => {} });
+}
+
+function goStartCalibration() {
+  if (deferBusy.value || (readState.value !== "not-started" && readState.value !== "deferred")) return;
+  navReset({
+    url: readState.value === "deferred"
+      ? "/pages/onboarding/connect?mode=recalibrate"
+      : "/pages/onboarding/connect",
+    fail: () => {},
+  });
 }
 
 function completeOnboardingLocally(): boolean {

@@ -54,6 +54,15 @@ async function installServerSessionBoundary(page, authenticated) {
           : { code: 401, message: "AUTH_REQUIRED", data: null }),
       });
     }
+    if (url.pathname === "/api/app/profile" && authenticated && route.request().method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ code: 0, message: "OK", data: {
+          nickname: "Guard Witness", avatarUrl: "", avatarRevision: "", language: "en",
+        } }),
+      });
+    }
     if (url.pathname === "/api/legal/terms/current") {
       return route.fulfill({
         status: 200,

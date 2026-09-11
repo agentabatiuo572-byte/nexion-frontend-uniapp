@@ -32,6 +32,8 @@ test("registration remains the only flow that launches registration success and 
   const success = read("src/pages/register/success.vue");
   assert.doesNotMatch(login, /pages\/register\/success|pages\/onboarding\/estimator/);
   assert.match(register, /deferNavigation: true/);
-  assert.match(register, /url: "\/pages\/register\/success"/);
+  assert.match(register, /returnTo: registrationCompletionDestination\(\)/);
+  assert.match(register, /url: registrationCompletionDestination\(\)/);
+  assert.match(register, /return "\/pages\/register\/success"/);
   assert.match(success, /url: "\/pages\/onboarding\/estimator"/);
 });
