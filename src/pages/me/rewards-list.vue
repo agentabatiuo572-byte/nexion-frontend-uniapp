@@ -22,8 +22,14 @@
 
       <!-- ── Vouchers (ticket-style cards: value stub + perforation + body) ── -->
       <template v-if="cat === 'voucher'">
-        <!-- Empty -->
-        <EmptyState v-if="available.length === 0 && expired.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
+        <view v-if="voucherInitialLoading" :style="loadingStyle"><text>{{ t.home.networkStatUpdating }}</text></view>
+        <template v-else>
+          <view v-if="voucherReadError" class="flex items-center justify-between" :style="remoteErrorStyle">
+            <text>{{ t.authOtp.errorServiceUnavailable }}</text>
+            <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="retryVouchers"><text>{{ t.ui.retry }}</text></view>
+          </view>
+          <!-- An empty voucher wallet is a definite conclusion only after its current remote read. -->
+          <EmptyState v-if="voucherKnownEmpty" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
 
         <template v-else>
           <view v-if="available.length > 0">
@@ -75,6 +81,7 @@
               </view>
             </view>
           </view>
+        </template>
         </template>
       </template>
 
@@ -138,7 +145,7 @@ import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { navTo } from "@/lib/route";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
-import { fundsServerEnabled } from "@/api/runtime";
+import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 
 // Mirrors L1's RewardsCat (pages/me/rewards.vue); unknown values fall back.
 type RewardsCat = "voucher" | "usdt" | "nex";
@@ -163,6 +170,13 @@ const pageTitle = computed(() =>
 // ── vouchers ──
 const available = computed<VoucherDef[]>(() => voucher.claimedUnused);
 const expired = computed<VoucherDef[]>(() => voucher.expiredVouchers);
+const voucherInitialLoading = computed(() => remoteApiEnabled
+  && (voucher.remoteStatus === "idle" || voucher.remoteStatus === "loading")
+  && available.value.length === 0 && expired.value.length === 0);
+const voucherReadError = computed(() => remoteApiEnabled && voucher.remoteStatus === "error");
+const voucherKnownEmpty = computed(() => (!remoteApiEnabled || voucher.remoteStatus === "ready")
+  && available.value.length === 0 && expired.value.length === 0);
+function retryVouchers() { void voucher.refreshRemote(); }
 
 // ── reward records (per-symbol, newest-first from the ledger) ──
 const symbol = computed(() => (cat.value === "nex" ? "NEX" : "USDT"));
@@ -194,7 +208,10 @@ async function loadMoreRecords() {
   }
   if (hasMore.value) visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);
 }
-onShow(() => { void refreshRecords(); });
+onShow(() => {
+  void refreshRecords();
+  if (cat.value === "voucher") void voucher.refreshRemote();
+});
 useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && cat.value !== "voucher" && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,

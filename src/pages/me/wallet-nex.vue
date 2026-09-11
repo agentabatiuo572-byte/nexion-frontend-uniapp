@@ -203,7 +203,7 @@ const kline = computed(() => market.klineHourly);
 const usdValue = computed(() => nexBalance.value * nexPrice.value);
 const isUp = computed(() => change24h.value >= 0);
 
-// Only active devices contribute today's NEX.
+// Remote mode uses the server's signed daily earn-ledger net, including pending entries.
 const todayNEX = computed<number | null>(() =>
   remoteApiEnabled
     ? bills.summaryStatus !== "ready"
@@ -291,7 +291,7 @@ const quickCells = computed(() => [
 
 const breakdownRows = computed(() => [
   { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} NEX` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `+${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
   { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} NEX`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 

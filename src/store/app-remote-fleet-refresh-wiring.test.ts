@@ -79,6 +79,40 @@ beforeEach(() => {
 });
 
 describe("App remote fleet refresh wiring", () => {
+  it.each(["success", "failure"])("keeps a delayed Home %s from the previous account out of the current wallet projection", async (outcome) => {
+    const previous = deferred<unknown>();
+    const overview = {
+      earnings: {
+        today: { usdt: 12, nex: 1 }, week: { usdt: 34, nex: 2 },
+        month: { usdt: 56, nex: 3 }, all: { usdt: 78, nex: 4 },
+      },
+    };
+    remote.appHomeApi.fetch.mockReturnValueOnce(previous.promise).mockResolvedValueOnce(overview);
+    const app = useApp();
+    app.bindAccount("user:1001");
+    const oldRead = app.refreshHomeTruth();
+
+    remote.sessionVault.read.mockReturnValue({ user: { userId: 2002 } });
+    app.bindAccount("user:2002");
+    expect(app.homeTruth).toBeNull();
+    expect(app.homeTruthStatus).toBe("idle");
+    await expect(app.refreshHomeTruth()).resolves.toBe(true);
+
+    if (outcome === "success") {
+      previous.resolve({ earnings: {
+        today: { usdt: 999, nex: 99 }, week: { usdt: 999, nex: 99 },
+        month: { usdt: 999, nex: 99 }, all: { usdt: 999, nex: 99 },
+      } });
+    } else {
+      previous.reject(new Error("previous account offline"));
+    }
+    await expect(oldRead).resolves.toBe(false);
+    expect(app.homeTruth).toEqual(overview);
+    expect(app.earnings.today).toBe(12);
+    expect(app.homeTruthStatus).toBe("ready");
+    expect(app.homeTruthError).toBeNull();
+  });
+
   it("keeps the last Home and earnings projection when a later read has a transient failure", async () => {
     const overview = {
       earnings: {

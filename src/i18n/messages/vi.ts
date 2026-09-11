@@ -1288,10 +1288,10 @@ export const vi: Messages = {
     breakdown: {
       label: "CƠ CẤU NẮM GIỮ",
       liquid: "Số dư khả dụng",
-      mining: "NEX từ tính toán hôm nay",
-      miningHint: "Từ đội thiết bị đang chạy của bạn",
-      pending: "Đang chờ hồi",
-      pendingHint: "Không có NEX đang hồi",
+      mining: "Thu nhập NEX ròng hôm nay",
+      miningHint: "Thu trừ chi, gồm các mục đang xử lý",
+      pending: "NEX đang xử lý",
+      pendingHint: "Tổng giá trị các mục NEX đang xử lý",
     },
     pnl: {
       label: "ƯỚC TÍNH THEO MỐC NỀN TẢNG",
