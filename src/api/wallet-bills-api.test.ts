@@ -10,8 +10,26 @@ describe("wallet summary and paginated API contract", () => {
   it("preserves an opaque cursor's bytes without trimming", () => {
     expect(parseWalletBillsSnapshot({...snapshot(),nextCursor:" opaque-token "}).nextCursor).toBe(" opaque-token ");
   });
+  it("keeps the controlled category, presentation code and public reference", () => {
+    const parsed = parseWalletBillsSnapshot({...snapshot(), total: 1, bills: [{
+      id: "WL-1", bizNo: "ORD-42", bizType: "ORDER_PURCHASE", asset: "USDT", direction: "OUT", amount: "12.5",
+      balanceAfter: "37.5", status: "SUCCESS", remark: "internal settlement", createdAt: "2026-09-07T10:00:00Z",
+      category: "purchase", presentationCode: "purchase", publicReference: "ORD-42",
+    }]});
+    expect(parsed.bills[0]).toMatchObject({ category: "purchase", presentationCode: "purchase", publicReference: "ORD-42" });
+  });
   it("parses exact server totals and allows signed earnings", () => {
     expect(parseWalletBillsSummary(summary())).toMatchObject({rewardsUsdt:12.000001,rewardsNex:2202,todayNexEarn:-1,asOf:Date.parse("2026-08-31T10:00:00Z")});
+  });
+  it("keeps settled Daily totals separate from gross rewards and supports older servers as unknown", () => {
+    expect(parseWalletBillsSummary(summary())).toMatchObject({ settledRewardsNex: null, withdrawalOffsetNexSpent: null });
+    expect(parseWalletBillsSummary({ ...summary(), settledRewardsNex: "199", withdrawalOffsetNexSpent: "18" }))
+      .toMatchObject({ rewardsNex: 2202, settledRewardsNex: 199, withdrawalOffsetNexSpent: 18 });
+  });
+  it.each(["", true, "NaN", Infinity, -1])("rejects malformed Daily totals %s", value => {
+    for (const key of ["settledRewardsNex", "withdrawalOffsetNexSpent"]) {
+      expect(() => parseWalletBillsSummary({ ...summary(), [key]: value })).toThrow("WALLET_BILLS_RESPONSE_INVALID");
+    }
   });
   it.each([null, "", true, "NaN", Infinity])("rejects a malformed required amount %s", value => {
     expect(() => parseWalletBillsSummary({...summary(),rewardsNex:value})).toThrow("WALLET_BILLS_RESPONSE_INVALID");

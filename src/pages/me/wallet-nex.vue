@@ -157,6 +157,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
+import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useApp } from "@/store/app";
 import { useMarket } from "@/store/market";
 import { useCommission } from "@/store/commission";
@@ -224,7 +225,7 @@ const nexLedger = computed(() => {
       ts: bill.ts,
       kind: "ledger",
       nex: bill.amount,
-      label: bill.memo || bill.type,
+      label: resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>),
     }));
 });
 const pendingNex = computed<number | null>(() => {
