@@ -68,7 +68,7 @@
       <view v-if="fundsReadable" :style="listCardStyle">
         <WalletListRow icon-bg="var(--v5-success-soft)" :first="true" :label="t.wallet.todayLabel">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">{{ todayEarningsText }}</text></template>
         </WalletListRow>
         <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.reviewingEarnings" :sublabel="t.wallet.reviewingEarningsSub" @click="showPendingSheet">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg></template>
@@ -135,6 +135,7 @@ import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
 import { onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled } from "@/api/runtime";
+import { resolveWalletTodayEarnings } from "@/lib/wallet-today-earnings";
 
 const t = useT();
 const app = useApp();
@@ -197,6 +198,13 @@ const buckets = computed(() => ({
 const usdt = computed(() => app.user.usdtBalance);
 const nexLabel = computed(() => app.user.nexBalance.toLocaleString());
 const pending = computed(() => app.user.pendingEarnings);
+const todayEarnings = computed(() => resolveWalletTodayEarnings({
+  remoteApiEnabled,
+  homeTruthStatus: app.homeTruthStatus,
+  homeTodayUsdt: app.homeTruth?.earnings.today.usdt ?? null,
+  localTodayUsdt: app.earnings.today,
+}));
+const todayEarningsText = computed(() => todayEarnings.value === null ? "—" : `+$${todayEarnings.value.toFixed(2)}`);
 const pendingReview = computed(() => buckets.value.pendingReviewUsdt);
 const lockedRewards = computed(() => buckets.value.bonusLockedUsdt);
 const teamLifetimeUSD = computed(() => commission.totalUSDTLifetime());

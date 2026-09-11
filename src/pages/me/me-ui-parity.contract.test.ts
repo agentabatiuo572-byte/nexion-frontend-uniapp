@@ -24,6 +24,8 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   // this surface displays the server-authoritative total rather than invented trend data.
   "proof.vue",
   "receipts.vue",
+  // Voucher reads expose loading and recoverable failure before claiming an empty wallet.
+  "rewards-list.vue",
   // Same 5174 cards, plus production-only authoritative-summary unavailable/retry state.
   "rewards.vue",
   // Formal App keeps the 5174 visual styles while adding production-only
@@ -79,6 +81,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Compute and VietQR receipts render in separately selected, independently
   // recoverable lanes; a VietQR-only account must not be labelled as compute receipts.
   "receipts.vue": "e5458482b51be00830c7879c29857274f7c7a5b1e4a01f4706299308d01fec9b",
+  // Same ticket styles; current remote read state governs loading, retry and definite empty.
+  "rewards-list.vue": "e94eda52ff2176ff9fe6e46b5837433b062a7953934302da732281703042fbf5",
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.

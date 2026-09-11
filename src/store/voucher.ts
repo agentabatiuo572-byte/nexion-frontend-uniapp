@@ -1,10 +1,11 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, onScopeDispose } from "vue";
 import { remoteApiEnabled, voucherApi } from "@/api/runtime";
 import type { CanonicalVoucher, VoucherSnapshot } from "@/api/voucher-api";
 import {
   captureRuntimeRevision,
   isCurrentRuntimeRevision,
+  subscribeRuntimeRevision,
   type RuntimeRevisionScope,
 } from "@/api/order-api";
 import { mockServerNow } from "./server-time";
@@ -78,6 +79,8 @@ export const useVoucher = defineStore("voucher", () => {
   const claimed = ref<ClaimRecord[]>([]);
   const remoteCatalog = ref<CanonicalVoucher[]>([]);
   const catalogLoadedAt = ref(0);
+  const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const remoteError = ref("");
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let remoteGeneration = 0;
   /**
@@ -89,10 +92,13 @@ export const useVoucher = defineStore("voucher", () => {
   const catalogReady = ref(!remoteApiEnabled);
 
   function clearRemoteFacts() {
+    if (!remoteApiEnabled) return;
     claimed.value = [];
     remoteCatalog.value = [];
     catalogLoadedAt.value = 0;
     catalogReady.value = !remoteApiEnabled;
+    remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
+    remoteError.value = "";
   }
 
   function applyRemoteSnapshot(snapshot: VoucherSnapshot) {
@@ -106,6 +112,8 @@ export const useVoucher = defineStore("voucher", () => {
       }));
     catalogLoadedAt.value = mockServerNow();
     catalogReady.value = true;
+    remoteStatus.value = "ready";
+    remoteError.value = "";
   }
 
   function remoteRequestIsCurrent(
@@ -118,20 +126,38 @@ export const useVoucher = defineStore("voucher", () => {
       && isCurrentRuntimeRevision(runScope);
   }
 
+  /**
+   * A failed popup/claim command may have superseded an in-flight catalogue
+   * read. If its own scope is still current, replace that orphaned read with a
+   * fresh GET; otherwise a new account/runtime/request already owns recovery.
+   */
+  function recoverCurrentRemoteRead(
+    request: RemoteAccountRequest,
+    runScope: RuntimeRevisionScope,
+    generation: number,
+  ): void {
+    if (!remoteRequestIsCurrent(request, runScope, generation)) return;
+    void refreshRemote();
+  }
+
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
+    remoteStatus.value = "loading";
+    remoteError.value = "";
     try {
       const snapshot = await voucherApi.state();
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       applyRemoteSnapshot(snapshot);
       return true;
-    } catch {
+    } catch (cause) {
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       // 拉取失败也算「等到头了」:再等下去只会把自动弹层无限期卡住,让位给下一个候选。
       catalogReady.value = true;
+      remoteStatus.value = "error";
+      remoteError.value = cause instanceof Error ? cause.message : "VOUCHER_CATALOG_UNAVAILABLE";
       return false;
     }
   }
@@ -147,6 +173,7 @@ export const useVoucher = defineStore("voucher", () => {
       applyRemoteSnapshot(snapshot);
       return true;
     } catch {
+      recoverCurrentRemoteRead(request, runScope, generation);
       return false;
     }
   }
@@ -165,6 +192,7 @@ export const useVoucher = defineStore("voucher", () => {
       await refreshRemote();
       return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
     } catch {
+      recoverCurrentRemoteRead(request, runScope, generation);
       return false;
     }
   }
@@ -192,6 +220,15 @@ export const useVoucher = defineStore("voucher", () => {
     }
     claimed.value = rows.bind(rawAccountKey)?.claimed ?? [];
   }
+  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
+    if (!remoteApiEnabled || remoteAccountEpoch.snapshot().accountKey === "default") return;
+    // A runtime revision invalidates both in-flight reads and existing voucher
+    // facts. Clear selectable old vouchers before requesting the new catalog.
+    remoteGeneration += 1;
+    clearRemoteFacts();
+    void refreshRemote();
+  });
+  onScopeDispose(unsubscribeCommerceRun);
   bindAccount("default");
 
   function record(id: string): ClaimRecord | undefined {
@@ -368,6 +405,8 @@ export const useVoucher = defineStore("voucher", () => {
     popupEvaluationReady,
     catalog,
     catalogReady,
+    remoteStatus,
+    remoteError,
     claimedUnused,
     expiredVouchers,
     hasClaimableForSurface,

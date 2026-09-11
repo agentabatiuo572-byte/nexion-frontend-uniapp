@@ -1268,10 +1268,10 @@ export const zh: Messages = {
     breakdown: {
       label: "持仓结构",
       liquid: "可用余额",
-      mining: "今日算力收益",
-      miningHint: "来自活跃设备",
-      pending: "冷却中",
-      pendingHint: "无 NEX 在冷却",
+      mining: "今日 NEX 收益净额",
+      miningHint: "收入减支出，包含待处理记录",
+      pending: "待处理 NEX",
+      pendingHint: "待处理 NEX 记录的金额合计",
     },
     pnl: {
       label: "平台基准估算",

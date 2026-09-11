@@ -18,6 +18,12 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  // Voucher emptiness requires a successful canonical catalog, not an empty
+  // object that the production parser correctly treats as an unavailable read.
+  if (url.pathname === "/api/vouchers") return {
+    source: "nx_growth_voucher + nx_growth_voucher_grant", serverCanonical: true, vouchers: [],
+    provenance: { source: "nx_growth_voucher", sourceEnvironment: "PRODUCTION", runId: "" },
+  };
   // History reads have a page envelope, not the account/public-state envelope.
   // A malformed fixture must not turn a valid empty list into an outage screen.
   if ((url.pathname === "/api/genesis/account" && ["orders", "emissions"].includes(url.searchParams.get("history")))

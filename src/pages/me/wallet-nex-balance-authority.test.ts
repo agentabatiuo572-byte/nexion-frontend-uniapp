@@ -11,9 +11,10 @@ function mount(remote: boolean, hasSnapshot: boolean, balance: number, marketRea
   const code = ts.transpileModule(block, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const app = reactive({ remoteFleetHasSnapshot: hasSnapshot, user: { nexBalance: balance }, visibleDevices: [] });
   const market = reactive({ remoteReady: marketReady, remoteError: marketReady ? null : "failed", nexPriceUSDT: 2, costBasis: 1, change24hPct: 0 });
+  const bills = reactive({ summaryStatus: "error", summary: { todayNexEarn: 0, pendingNex: 0 } });
   const section = { liquid: "liquid", mining: "mining", pending: "pending", costBasis: "basis", totalSpent: "spent", currentValue: "value" };
   const state = new Function("computed", "app", "market", "remoteApiEnabled", "remoteAuthorityStatus", "bills", "t", "tintIcon", "ICON", code + ";return {breakdownRows,pnlSummary,pnlCells,balanceKnown,valuationKnown,nexBalance,usdValue,fmtNum,fmtUSD};")(
-    computed, app, market, remote, remoteAuthorityStatus, { summaryStatus: "error" },
+    computed, app, market, remote, remoteAuthorityStatus, bills,
     { value: { nexWallet: { breakdown: section, pnl: section } } }, () => "", {});
   const balanceExpression = source.match(/:style="heroNumStyle">\{\{(.*?)\}\}/)?.[1];
   const valueExpression = source.match(/:style="heroUsdStyle">≈ \{\{(.*?)\}\}/)?.[1];
@@ -22,8 +23,16 @@ function mount(remote: boolean, hasSnapshot: boolean, balance: number, marketRea
     balance: new Function("balanceKnown", "nexBalance", "fmtNum", `return (${balanceExpression});`)(state.balanceKnown.value, state.nexBalance.value, state.fmtNum),
     value: new Function("valuationKnown", "usdValue", "fmtUSD", `return (${valueExpression});`)(state.valuationKnown.value, state.usdValue.value, state.fmtUSD),
   });
-  return { ...state, app, market, renderHero };
+  return { ...state, app, market, bills, renderHero };
 }
+test.each([[-2, "-2.00 NEX"], [2, "+2.00 NEX"], [0, "+0.00 NEX"]] as const)("formats the signed daily NEX net amount %s", (amount, expected) => {
+  const s = mount(true, true, 50);
+  s.bills.summary.todayNexEarn = amount;
+  s.bills.summaryStatus = "ready";
+  expect(s.breakdownRows.value[1].value).toBe(expected);
+  s.bills.summaryStatus = "error";
+  expect(s.breakdownRows.value[1].value).toBe("—");
+});
 test("missing wallet authority never displays zero holdings or invented valuation", () => {
   const s = mount(true, false, 0);
   expect(s.renderHero()).toEqual({balance:"—",value:"—"});

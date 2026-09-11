@@ -2,14 +2,14 @@
   My Rewards L1 (我的奖励 · 类别汇总) — me sub-page. OKX-rewards-hub-style
   stat cards (owner-directed 2026-07-09): hero benefit line, then one big
   surface card per category — category name, LARGE value (vouchers = available
-  count; USDT/NEX = credited totals), one-line purpose description, and a
+  count; USDT/NEX = reward totals), one-line purpose description, and a
   round arrow affordance. Whole card taps into the L2 records page
   /me/rewards/list?cat=… (pages/me/rewards-list).
 
   Opening this page writes the rewards-seen watermark (clears the reward half
   of the Me-entry unread dot; the voucher half stays until used/expired).
 
-  Voucher counts come from the voucher store. Real credited totals come from
+  Voucher counts come from the voucher store. Remote reward totals come from
   GET /api/app/wallet/bills/summary; only mock mode sums local reward bills.
   All-zero keeps the three cards (big zeros) + hint line.
   Wrapped in <AppChassis active="me">.
@@ -67,7 +67,7 @@ import { useBills, isRewardBill } from "@/store/bills";
 import { useRewardsSeen } from "@/store/rewards-seen";
 import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
-import { fundsServerEnabled } from "@/api/runtime";
+import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 // L2 category param — mirrored by pages/me/rewards-list.vue (invalid → voucher).
@@ -88,6 +88,7 @@ async function refreshRewardSummary() {
   const accountKey = app.accountKey;
   const accountScope = remoteAccountScope.snapshot();
   const request = ++rewardViewRequest;
+  if (remoteApiEnabled) void voucher.refreshRemote();
   if (!fundsServerEnabled) {
     rewardsSeen.markSeen();
     return;
@@ -98,10 +99,11 @@ async function refreshRewardSummary() {
 }
 onShow(() => { rewardViewActive = true; void refreshRewardSummary(); });
 
-const availableCount = computed(() => voucher.claimedUnused.length);
-const expiredCount = computed(() => voucher.expiredVouchers.length);
+const voucherReady = computed(() => !remoteApiEnabled || voucher.remoteStatus === "ready");
+const availableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
+const expiredCount = computed<number | null>(() => voucherReady.value ? voucher.expiredVouchers.length : null);
 
-// Credited totals per symbol — same reward-family predicate as the dot and
+// Reward totals per symbol — same reward-family predicate as the dot and
 // the L2 records (bills.ts isRewardBill, single source).
 function creditedTotal(symbol: "USDT" | "NEX"): number {
   return bills.bills.reduce((sum, b) => (isRewardBill(b) && b.symbol === symbol ? sum + b.amount : sum), 0);
@@ -109,14 +111,15 @@ function creditedTotal(symbol: "USDT" | "NEX"): number {
 const usdtTotal = computed(() => creditedTotal("USDT"));
 const nexTotal = computed(() => creditedTotal("NEX"));
 const summaryReady = computed(() => !fundsServerEnabled || bills.summaryStatus === "ready");
-const summaryFailed = computed(() => fundsServerEnabled && bills.summaryStatus === "error");
+const summaryFailed = computed(() => (fundsServerEnabled && bills.summaryStatus === "error")
+  || (remoteApiEnabled && voucher.remoteStatus === "error"));
 const remoteUsdtTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsUsdt ?? null : null);
 const remoteNexTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsNex ?? null : null);
 const displayUsdtTotal = computed(() => fundsServerEnabled ? remoteUsdtTotal.value : usdtTotal.value);
 const displayNexTotal = computed(() => fundsServerEnabled ? remoteNexTotal.value : nexTotal.value);
 
 const allZero = computed(
-  () => summaryReady.value && availableCount.value === 0 && expiredCount.value === 0 && displayUsdtTotal.value === 0 && displayNexTotal.value === 0,
+  () => summaryReady.value && voucherReady.value && availableCount.value === 0 && expiredCount.value === 0 && displayUsdtTotal.value === 0 && displayNexTotal.value === 0,
 );
 
 interface CatCard {
@@ -131,10 +134,10 @@ const cats = computed<CatCard[]>(() => [
   {
     key: "voucher",
     label: t.value.rewards.catVouchers,
-    big: String(availableCount.value),
+    big: availableCount.value === null ? "--" : String(availableCount.value),
     unit: t.value.rewards.unitVouchers,
     // Expired stock replaces the purpose line — the more actionable fact.
-    desc: expiredCount.value > 0 ? fmt(t.value.rewards.expiredCount, { n: expiredCount.value }) : t.value.rewards.catVouchersDesc,
+    desc: expiredCount.value !== null && expiredCount.value > 0 ? fmt(t.value.rewards.expiredCount, { n: expiredCount.value }) : t.value.rewards.catVouchersDesc,
   },
   {
     key: "usdt",

@@ -1332,10 +1332,10 @@ export const en = {
     breakdown: {
       label: "POSITION BREAKDOWN",
       liquid: "Liquid balance",
-      mining: "Today's compute accrual",
-      miningHint: "From your active fleet",
-      pending: "Pending cooldown",
-      pendingHint: "No NEX in cooldown",
+      mining: "Today's net NEX earnings",
+      miningHint: "Credits minus debits, including pending entries",
+      pending: "Pending NEX",
+      pendingHint: "Total amount of NEX entries awaiting processing",
     },
     pnl: {
       label: "PLATFORM BASELINE ESTIMATE",
