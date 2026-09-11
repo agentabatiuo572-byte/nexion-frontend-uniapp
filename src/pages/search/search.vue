@@ -1,8 +1,8 @@
 <!--
   Global search — ported from Nexion-prototype/app/(main)/search/page.tsx.
 
-  Single search input indexes a static route/FAQ catalog + live store products,
-  user devices, and network members. Real-time filter, grouped results.
+  Single search input indexes routes, published Help Center FAQs, live store
+  products, user devices, and network members. Real-time filter, grouped results.
 
   Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
   backHref="/" → SubPageHeader back="/pages/index/index". Search and Nova
@@ -46,12 +46,12 @@
         </view>
       </view>
 
-      <view v-else-if="remoteApiEnabled && productCatalogState.status === 'loading'" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
+      <view v-else-if="searchResultState.body === 'loading'" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.home.networkStatUpdating }}</text>
       </view>
 
       <EmptyState
-        v-else-if="remoteApiEnabled && productCatalogState.status === 'error'"
+        v-else-if="searchResultState.body === 'recoverable-error'"
         kind="recoverable-error"
         :title="t.authOtp.errorServiceUnavailable"
         :cta-label="t.ui.retry"
@@ -60,7 +60,7 @@
 
       <!-- 无搜索结果 —— 《06》no-search-results:插画 + 引导 + 清除搜索 -->
       <EmptyState
-        v-else-if="results.length === 0"
+        v-else-if="searchResultState.body === 'empty'"
         kind="no-search-results"
         :title="t.empty.searchTitle"
         :desc="t.empty.searchDesc"
@@ -68,8 +68,18 @@
         @cta="openNova(q)"
       />
 
+      <EmptyState
+        v-if="searchResultState.showSourceError"
+        class="mx-4 mt-4"
+        kind="recoverable-error"
+        :title="t.authOtp.errorServiceUnavailable"
+        :cta-label="t.ui.retry"
+        compact
+        @cta="retrySearchSources"
+      />
+
       <!-- Results -->
-      <view v-else class="mx-4 mt-3 space-y-3">
+      <view v-if="searchResultState.body === 'results'" class="mx-4 mt-3 space-y-3">
         <view v-for="grp in groupedList" :key="grp.group">
           <text class="block font-mono-tabular" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
           <view :style="resultCardStyle">
@@ -77,8 +87,10 @@
               v-for="(h, i) in grp.hits"
               :key="`${h.group}-${h.label}-${i}`"
               class="flex items-center nx-search-row"
+              role="button" tabindex="0"
               :style="rowStyle(i === grp.hits.length - 1)"
               @click="openHit(h)"
+              @keydown.enter.prevent="openHit(h)" @keydown.space.prevent="openHit(h)"
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
@@ -108,10 +120,14 @@ import { useStaking } from "@/store/staking";
 import { PRODUCTS } from "@/mock/products";
 import { productCopy } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, supportApi } from "@/api/runtime";
+import type { SupportFaq } from "@/domain/support";
+import { readPublishedFaqPages } from "@/lib/published-faq-pages";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
+import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-source-state";
+import { beginNavigationAttempt, completeNavigationAttempt } from "@/lib/navigation-attempt";
 import { fmt } from "@/i18n/format";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
@@ -130,10 +146,44 @@ const staking = useStaking();
 
 const q = ref("");
 
-function refreshSearchSources(force = false) {
+let searchSourceReadEpoch = 0;
+const publishedFaqs = ref<SupportFaq[]>([]);
+const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
+let publishedFaqReadEpoch = 0;
+
+async function refreshPublishedFaqs(): Promise<void> {
+  const readEpoch = ++publishedFaqReadEpoch;
+  const accountKey = app.accountKey;
+  const accountEpoch = app.accountBindingEpoch;
+  const language = locale.code;
+  const isCurrent = () => readEpoch === publishedFaqReadEpoch && accountKey === app.accountKey
+    && accountEpoch === app.accountBindingEpoch && language === locale.code;
+  publishedFaqs.value = [];
+  publishedFaqStatus.value = "loading";
+  try {
+    const items = await readPublishedFaqPages(supportApi, language, isCurrent);
+    if (!isCurrent()) return;
+    publishedFaqs.value = items;
+    publishedFaqStatus.value = "ready";
+  } catch {
+    if (isCurrent()) publishedFaqStatus.value = "error";
+  }
+}
+
+async function refreshSearchSources(force = false): Promise<void> {
   if (!remoteApiEnabled) return;
-  void refreshProductCatalog(force);
+  void refreshPublishedFaqs();
+  const readEpoch = ++searchSourceReadEpoch;
+  const accountKey = app.accountKey;
+  const accountEpoch = app.accountBindingEpoch;
+  // A successful catalogue read advances the runtime revision. Do not start
+  // E3 fleet work under the revision it is about to invalidate.
+  await refreshProductCatalog(force);
+  if (readEpoch !== searchSourceReadEpoch
+    || accountKey !== app.accountKey
+    || accountEpoch !== app.accountBindingEpoch) return;
   void network.refreshCanonicalNetwork();
+  void app.refreshRemoteFleet(undefined, { coalesce: !force });
   void staking.syncRemote();
 }
 
@@ -150,8 +200,12 @@ function retrySearchSources() {
   refreshSearchSources(true);
 }
 
-const devices = computed(() => app.visibleDevices);
-const members = computed(() => network.members);
+const devices = computed(() => !remoteApiEnabled
+  || app.remoteFleetStatus === "ready"
+  || app.remoteFleetHasSnapshot
+  ? app.visibleDevices
+  : []);
+const members = computed(() => !remoteApiEnabled || network.remoteStatus === "ready" ? network.members : []);
 const searchableProducts = computed(() => !remoteApiEnabled || productCatalogState.status === "ready" ? PRODUCTS : []);
 
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
@@ -240,10 +294,16 @@ const results = computed<Hit[]>(() => {
       });
     }
   }
-  for (const f of FAQ) {
+  for (const f of remoteApiEnabled ? [] : FAQ) {
     const c = faqCopy[f.key];
     if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
       out.push({ group: "faq", label: c.label, sublabel: c.sub, href: f.href });
+    }
+  }
+  for (const faq of publishedFaqs.value) {
+    if (faq.question.toLowerCase().includes(query) || faq.answer.toLowerCase().includes(query)) {
+      out.push({ group: "faq", label: faq.question, sublabel: faq.answer,
+        href: `/pages/me/help?faqId=${encodeURIComponent(faq.id)}` });
     }
   }
   const help: Hit = {
@@ -254,6 +314,16 @@ const results = computed<Hit[]>(() => {
   };
   return out.length ? [...out.slice(0, 29), help] : [];
 });
+
+const searchResultState = computed(() => resolveSearchResultState({
+  hasQuery: !!q.value.trim(),
+  remoteCatalogueStatus: remoteApiEnabled ? productCatalogState.status : "ready",
+  remoteNetworkStatus: remoteApiEnabled ? network.remoteStatus : "ready",
+  remoteFleetStatus: remoteApiEnabled ? app.remoteFleetStatus : "ready",
+  remoteFleetHasSnapshot: remoteApiEnabled ? app.remoteFleetHasSnapshot : true,
+  remoteFaqStatus: remoteApiEnabled ? publishedFaqStatus.value : "ready",
+  resultCount: results.value.length,
+}));
 
 // Grouped as an ordered list of { group, hits } (preserves insertion order,
 // avoids Object.entries over a reactive Record per P-027 spirit).
@@ -275,16 +345,21 @@ function groupLabel(g: Group): string {
   return labels[g as keyof typeof labels] ?? g;
 }
 
-const navigationError = ref(false);
-const pendingNavigationUrl = ref("");
+const navigationState = ref({ attempt: 0, pendingUrl: "", hasError: false });
+const navigationError = computed(() => navigationState.value.hasError);
+const pendingNavigationUrl = computed(() => navigationState.value.pendingUrl);
 
 function navigateWithFeedback(url: string) {
-  pendingNavigationUrl.value = url;
-  navigationError.value = false;
+  const started = beginNavigationAttempt(navigationState.value, url);
+  navigationState.value = started;
   uni.navigateTo({
     url,
-    success: () => { navigationError.value = false; pendingNavigationUrl.value = ""; },
-    fail: () => { navigationError.value = true; },
+    success: () => {
+      navigationState.value = completeNavigationAttempt(navigationState.value, started.attempt, "success");
+    },
+    fail: () => {
+      navigationState.value = completeNavigationAttempt(navigationState.value, started.attempt, "failure");
+    },
   });
 }
 

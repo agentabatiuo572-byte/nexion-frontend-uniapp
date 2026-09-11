@@ -26,6 +26,7 @@ import { ensureServer } from "./lib/dev-server-pool.mjs";
 import { findBash } from "./lib/find-bash.mjs";
 import { acquireVerifyRunLock } from "./lib/verify-run-lock.mjs";
 import { loadKnownRed, applyKnownRedToSteps } from "./lib/known-red.mjs";
+import { captureCommitCandidate, verifiedCommitCandidate } from "../.githooks/commit-verification.mjs";
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -63,6 +64,7 @@ const manifest = loadManifest();
 const P = plan({ mode: requestedMode, manifest });
 const mode = P.mode;
 const fpStart = treeFingerprint();
+const commitStart = captureCommitCandidate(ROOT);
 // 🔴 开跑即写 verdict:"running" 占位:半路崩掉时,守卫不许拿**上一轮**的 pass 记录放行(headTree 没变时完全对得上)。
 try { fs.writeFileSync(LAST_RUN_PATH, JSON.stringify({ mode, verdict: "running", startedAt: new Date().toISOString(), tree: null, headTree: null, dirty: fpStart?.dirty ?? null, head: fpStart?.head || null, steps: [] }, null, 1)); } catch { /* 写不了占位不影响跑 */ }
 say(`${C.c}━━ verify-chain · mode=${mode}${P.upgraded ? `(请求 ${P.requested} → ${P.upgraded})` : ""} · ${STEPS.length} 步 · tree ${fpStart ? fpStart.fingerprint.slice(0, 10) : "?"}${fpStart?.dirty ? "(dirty)" : ""} ━━${C.n}`);
@@ -187,6 +189,7 @@ if (pool) { try { pool.development.stop(); } catch { /* 起服子进程可能已
 
 // ── 汇总 + 产物 ──────────────────────────────────────────────────────────────
 const fpEnd = treeFingerprint();
+const commitEnd = captureCommitCandidate(ROOT);
 // 已知红(Tier 1-C):FAIL 步命中 scripts/known-red.json 未到期条目 → KNOWN-RED,不进 verdict;到期 → 仍 FAIL 并写明;清单本身坏了 → 追加一条 FAIL(门的门)。
 const knownRed = loadKnownRed();
 if (knownRed.problems.length) results.push({ step: "known-red.json", status: "FAIL", ms: 0, code: 2, reason: `已知红清单不可用:${knownRed.problems[0]}(node scripts/lib/known-red.mjs lint 看全部)` });
@@ -208,6 +211,7 @@ say(`  ${C.g}PASS ${count("PASS")}${C.n} · ${C.g}CACHED ${count("CACHED")}${C.n
 
 const record = {
   mode, requestedMode: P.requested, upgraded: P.upgraded, verdict, treeMoved,
+  commitCandidate: verifiedCommitCandidate(commitStart, commitEnd, { mode, verdict, treeMoved }),
   startedTree: fpStart, endedTree: fpEnd,
   tree: !treeMoved && fpEnd ? fpEnd.fingerprint : null, headTree: !treeMoved && fpEnd ? fpEnd.headTree : null, dirty: fpEnd ? fpEnd.dirty : null,
   head: fpEnd?.head || null, at: new Date().toISOString(), totalMs,
