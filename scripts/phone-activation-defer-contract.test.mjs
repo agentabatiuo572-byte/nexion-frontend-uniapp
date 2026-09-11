@@ -16,7 +16,7 @@ test("failed phone calibration offers retry and activate-later without minting a
   assert.doesNotMatch(handler, /applyPhoneCalibration|markCalibrated|resumeMining/);
   assert.match(page, /markPhoneActivationDeferred/);
   assert.doesNotMatch(page.slice(page.indexOf("async function deferPhoneActivation"), page.indexOf("function leaveConnect")), /clearCalibrated/);
-  assert.match(page, /result\(calibrationIntent\?\.deviceId \|\| getDeviceId\(\)\)/);
+  assert.match(page, /await confirmDeferredPhoneActivation\(/);
   assert.match(page, /current\.activationStatus !== "DEFERRED"/);
   assert.match(page, /markAuthAccountOnboardingComplete[\s\S]*\|\| remoteApiEnabled/,
     "a server-confirmed defer must not be turned back into an onboarding failure by the optional local phone directory");
@@ -26,8 +26,8 @@ test("failed phone calibration offers retry and activate-later without minting a
     "a server-confirmed DEFERRED state must win over local cache write failures without weakening the local mock contract");
   assert.match(page, /activationBusy\.value = false;[\s\S]*accountEpoch \+= 1/,
     "an account switch must release the previous account's busy state");
-  assert.ok((handler.match(/acceptCurrentCanonical\(requestScope, /g) ?? []).length >= 3,
-    "result, defer, readback and retry responses must be fenced before another server command or local mutation");
+  assert.match(handler, /accept: \(result\) => acceptCurrentCanonical\(requestScope, result\)/,
+    "shared defer recovery fences result, write and readback before mutation");
 });
 
 test("estimator activate-later confirms the server state and exits onboarding without reopening registration success", () => {
@@ -89,8 +89,10 @@ test("device warehouse and slot sheet cannot bypass phone recalibration", () => 
   assert.match(devices, /!phones\.some\(\(device\) => device\.activatedAt !== null\)/);
 
   const connect = read("src/pages/onboarding/connect.vue");
-  assert.match(connect, /error\.status !== 404/);
-  assert.match(connect, /intent\.expectedRevision = 0/);
+  assert.match(connect, /createPhoneCalibrationFlow/);
+  const flow = read("src/lib/phone-calibration-flow.ts");
+  assert.match(flow, /error\.status !== 404/);
+  assert.match(flow, /expectedRevision: current\?\.revision \?\? 0/);
 });
 
 test("all locales explain retry, defer, warehouse recovery and reward consequences", () => {
