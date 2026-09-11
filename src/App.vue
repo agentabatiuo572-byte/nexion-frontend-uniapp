@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
+import { watch } from "vue";
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
 import { useConversations } from "@/store/conversations";
@@ -726,6 +727,19 @@ const QUEST_TICK_MS = 1000;
 let questTimer: ReturnType<typeof setInterval> | undefined;
 let lastQuestRoute = "";
 let lastLegalTermsGateRoute = "";
+let lastLegalTermsGateLocale = "";
+
+// An explicit language change can change the account's required legal document
+// without navigating. Close the gate synchronously before the profile write.
+watch(() => useLocaleStore().code, () => {
+  if (!remoteApiEnabled || !questTimer || !canRefreshRemoteAccount(useAuth())) return;
+  const route = readCurrentRoute();
+  if (!route || isStaticReviewRoute(route)) return;
+  lastLegalTermsGateRoute = route;
+  lastLegalTermsGateLocale = useLocaleStore().code;
+  void scheduleLegalTermsGate(`/${route}`);
+  if (hasPendingLegalTermsRequirement()) stopBusinessLoops();
+}, { flush: "sync" });
 
 // 🔴 本文件**唯一**的路由读取口 —— 不要加第二个(verify 哨兵 app-route-single-reader 盯着)。
 //
@@ -892,8 +906,9 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted/invalid session → redirected; recalibration is explicit device management only
-  if (route !== lastLegalTermsGateRoute) {
+  if (route !== lastLegalTermsGateRoute || useLocaleStore().code !== lastLegalTermsGateLocale) {
     lastLegalTermsGateRoute = route;
+    lastLegalTermsGateLocale = useLocaleStore().code;
     if (canRefreshRemoteAccount(useAuth())) scheduleLegalTermsGate(`/${route}`);
   }
   if (enforcePendingLegalTermsGate(`/${route}`)) {
@@ -951,6 +966,7 @@ function startQuestWatch() {
   // 冷启深链落地页要记一次访问(112b9d0 以此作实证基线),预填会把这一次吞掉。
   lastQuestRoute = "";
   lastLegalTermsGateRoute = "";
+  lastLegalTermsGateLocale = "";
   questTimer = setInterval(checkQuestRoute, QUEST_TICK_MS);
 }
 function stopQuestWatch() {
@@ -1165,6 +1181,7 @@ onShow(() => {
   // scheduled above so the first one-second tick does not duplicate the same
   // current-terms request; a real route change still schedules immediately.
   lastLegalTermsGateRoute = termsGateRoute;
+  lastLegalTermsGateLocale = useLocaleStore().code;
   if (termsGateRoute && (enforcePendingLegalTermsGate(`/${termsGateRoute}`)
     || hasPendingLegalTermsRequirement())) {
     stopBusinessLoops();

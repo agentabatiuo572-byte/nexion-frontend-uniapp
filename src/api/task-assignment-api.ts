@@ -87,6 +87,10 @@ export interface CanonicalComputeReceiptSummary {
 export interface CanonicalComputeReceiptPage {
   items: CanonicalComputeReceiptSummary[];
   nextOffset: number | null;
+  /** Server-validated seek boundary for the next stable receipt page. */
+  nextCursor: string | null;
+  /** Null means an older compatible server has not exposed a canonical total. */
+  total: number | null;
   source: "server";
   sourceEnvironment: ServerSourceEnvironment;
   runId: string;
@@ -96,7 +100,7 @@ export interface CanonicalComputeReceiptPage {
 export interface TaskAssignmentApi {
   state(): Promise<CanonicalTaskAssignments>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
-  receipts(offset?: number, limit?: number): Promise<CanonicalComputeReceiptPage>;
+  receipts(offset?: number, limit?: number, cursor?: string | null): Promise<CanonicalComputeReceiptPage>;
 }
 
 function invalid(message = "TASK_ASSIGNMENT_RESPONSE_INVALID"): never {
@@ -287,7 +291,10 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
     return invalid("TASK_RECEIPT_PAGE_RESPONSE_INVALID");
   }
   const nextOffset = source.nextOffset == null ? null : integer(source.nextOffset);
-  return { items, nextOffset, ...proof };
+  const nextCursor = source.nextCursor == null ? null : text(source.nextCursor);
+  const total = source.total == null ? null : integer(source.total);
+  if (total !== null && total < items.length) return invalid("TASK_RECEIPT_PAGE_RESPONSE_INVALID");
+  return { items, nextOffset, nextCursor, total, ...proof };
 }
 
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
@@ -305,14 +312,16 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
       }
       return detail;
     },
-    async receipts(offset = 0, limit = 20) {
+    async receipts(offset = 0, limit = 20, cursor = null) {
       const normalizedOffset = integer(offset);
       const normalizedLimit = integer(limit, 1);
+      const normalizedCursor = cursor == null ? null : text(cursor);
       if (normalizedOffset > 1_000_000 || normalizedLimit > 50) {
         throw new ApiError({ kind: "configuration", message: "TASK_RECEIPT_PAGE_INVALID" });
       }
       return receiptPage(await client.request<unknown>({
-        path: `/api/tasks/receipts?offset=${normalizedOffset}&limit=${normalizedLimit}`,
+        path: `/api/tasks/receipts?offset=${normalizedOffset}&limit=${normalizedLimit}`
+          + (normalizedCursor === null ? "" : `&cursor=${encodeURIComponent(normalizedCursor)}`),
       }), mode);
     },
   };

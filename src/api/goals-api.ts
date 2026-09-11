@@ -25,10 +25,11 @@ export interface GoalRecommendation {
   source: string;
   sourceEnvironment: "PRODUCTION";
   runId: string;
-  productNo: string;
-  productName: string;
-  dailyEarn: number;
-  price: number;
+  purchaseRequired: boolean;
+  productNo: string | null;
+  productName: string | null;
+  dailyEarn: number | null;
+  price: number | null;
   requiredDaily: number;
   targetUsdt: number;
   days: number;
@@ -71,14 +72,35 @@ function validScope(row: Partial<GoalRecommendation>, mode: ApiEnvironment): boo
     && row.sourceEnvironment === "PRODUCTION" && row.runId === "";
 }
 
-function validRecommendation(value: unknown, mode: ApiEnvironment): value is GoalRecommendation {
-  if (!value || typeof value !== "object") return false;
-  const row = value as Partial<GoalRecommendation>;
-  return row.serverCanonical === true && typeof row.source === "string" && validScope(row, mode)
-    && typeof row.productNo === "string" && row.productNo.length > 0
+function hasPurchasableProduct(row: Partial<GoalRecommendation>): boolean {
+  return typeof row.productNo === "string" && row.productNo.length > 0
     && typeof row.productName === "string" && row.productName.length > 0
-    && number(row.dailyEarn) && row.dailyEarn! > 0 && number(row.price) && row.price! > 0
-    && number(row.requiredDaily) && number(row.targetUsdt) && number(row.days) && row.days! > 0;
+    && number(row.dailyEarn) && row.dailyEarn > 0 && number(row.price) && row.price >= 0
+    && number(row.requiredDaily) && row.requiredDaily > 0;
+}
+
+function isNoPurchaseRecommendation(row: Partial<GoalRecommendation>): boolean {
+  return row.productNo === null && row.productName === null && row.dailyEarn === null && row.price === null
+    && row.requiredDaily === 0;
+}
+
+function normalizeRecommendation(value: unknown, mode: ApiEnvironment): GoalRecommendation | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Partial<GoalRecommendation>;
+  const validCommon = row.serverCanonical === true && typeof row.source === "string" && validScope(row, mode)
+    && number(row.requiredDaily) && number(row.targetUsdt) && number(row.days) && row.days > 0;
+  if (!validCommon) return null;
+
+  if (row.purchaseRequired === true && hasPurchasableProduct(row)) return row as GoalRecommendation;
+  if (row.purchaseRequired === false && isNoPurchaseRecommendation(row)) return row as GoalRecommendation;
+
+  // Servers before the purchaseRequired contract always sent a complete product
+  // recommendation. Normalize only that unambiguous legacy shape; incomplete
+  // responses remain protocol errors and can never be mistaken for no purchase.
+  if (row.purchaseRequired === undefined && hasPurchasableProduct(row)) {
+    return { ...row, purchaseRequired: true } as GoalRecommendation;
+  }
+  return null;
 }
 
 function path(goalId: number): string {
@@ -111,7 +133,8 @@ export function createGoalsApi(client: ApiClient, mode: ApiEnvironment = "prod")
     async recommendation(targetUsdt, deadlineAt) {
       const query = `?targetUsdt=${encodeURIComponent(String(targetUsdt))}&deadlineAt=${encodeURIComponent(String(deadlineAt))}`;
       const value = await client.request<unknown>({ method: "GET", path: `/api/goals/recommendation${query}` });
-      return validRecommendation(value, mode) ? value : invalid();
+      const recommendation = normalizeRecommendation(value, mode);
+      return recommendation ?? invalid();
     },
   };
 }

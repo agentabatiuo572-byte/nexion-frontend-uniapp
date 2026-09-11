@@ -155,8 +155,8 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, nextTick, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { ref, computed, nextTick, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue";
@@ -173,16 +173,46 @@ import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { remoteApiEnabled } from "@/api/runtime";
+import { h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
+
 
 const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+let marketplacePageVisible = false;
+let marketplaceObservationEpoch = 0;
+async function refreshMarketplaceFacts(): Promise<void> {
+  if (!remoteApiEnabled || !marketplacePageVisible) return;
+  const scope = captureAccountScope();
+  const pageEpoch = marketplaceObservationEpoch;
+  const loaded = await genesis.syncRemote().catch(() => false);
+  if (!loaded || genesis.remotePublicReadState !== "ready") return;
+
+  await nextTick();
+  if (!marketplacePageVisible || pageEpoch !== marketplaceObservationEpoch
+    || genesis.remotePublicReadState !== "ready") return;
+
+  void authenticatedPageObservationReporter.report({
+    subject: "genesis-secondary-market",
+    scope,
+    session: sessionVault.read(),
+    visible: () => marketplacePageVisible && pageEpoch === marketplaceObservationEpoch,
+    isCurrent: isCurrentAccountScope,
+    submit: () => h3ObservationApi.secondaryMarket(),
+  });
+}
+
+
 // 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
 onShow(() => {
+  marketplacePageVisible = true;
   void cfg.refresh();
-  void genesis.syncRemote();
+  void refreshMarketplaceFacts();
 });
+onHide(() => { marketplacePageVisible = false; marketplaceObservationEpoch += 1; });
+onUnmounted(() => { marketplacePageVisible = false; marketplaceObservationEpoch += 1; });
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
 const { marketClosed, secondaryBlock, blockText } = useGenesisSaleGate();
 /** 阻断说明文案 —— 走 blockText 唯一出口(P1-3 收口:此前 4 处各写一份同款 switch)。

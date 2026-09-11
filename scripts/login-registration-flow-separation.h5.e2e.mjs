@@ -27,7 +27,6 @@ const acknowledgedTerms = {
   source: "server",
   sourceEnvironment: "PRODUCTION",
   runId: "",
-  requestedLocale: "zh-CN",
   resolvedLocale: "zh-CN",
   requestedJurisdiction: "GLOBAL",
   resolvedJurisdiction: "GLOBAL",
@@ -89,7 +88,7 @@ async function installServerFixture(context) {
       });
     }
     if (url.pathname === "/api/legal/terms/current") {
-      return route.fulfill({ status: 200, contentType: "application/json", body: envelope(acknowledgedTerms) });
+      return route.fulfill({ status: 200, contentType: "application/json", body: envelope({ ...acknowledgedTerms, requestedLocale: url.searchParams.get("locale") || "en" }) });
     }
     if (url.pathname.startsWith("/api/") && request.headers().authorization === "Bearer e2e-access-login") {
       // Home bootstraps several unrelated projections. Keep this focused

@@ -36,8 +36,9 @@ describe("read-only audit remediation contracts", () => {
     expect(source).toContain('remoteComputeReceiptStatus.value = "error"');
     expect(source).toContain("showRemoteReceiptInitialError");
     expect(source).toContain("retryRemoteReceipts");
-    expect(source).toContain("failedComputeReceiptRequest.value = { offset, append }");
-    expect(source).toContain("loadRemoteComputeReceipts(failed.offset, failed.append)");
+    expect(source).toContain("failedComputeReceiptRequest.value = { offset, cursor, append }");
+    expect(source).toContain("if (failed.append) void loadSelectedMoreRemoteReceipts();");
+    expect(source).toContain("else void loadRemoteComputeReceipts(failed.offset, false, failed.cursor);");
     expect(source).toContain('@keydown.enter.prevent="tab = c"');
     expect(source).toContain('@keydown.space.prevent="handleClearAll"');
   });

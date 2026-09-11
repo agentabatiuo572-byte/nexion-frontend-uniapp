@@ -67,8 +67,19 @@
           </view>
         </view>
         <view v-else-if="remoteApiEnabled && !eligibility.eligible" data-testid="detail-purchase-ineligible" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
-          <text class="block" :style="purchaseEligibilityTitleStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
-          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityFailClosed }}</text>
+          <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibilityDenyTitle }}</text>
+          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityDenyBody }}</text>
+          <view v-if="purchaseEligibilityMessage === 'error'" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" @click.stop="retryEligibility">
+            <text>{{ t.store.purchaseEligibilityRetry }}</text>
+          </view>
+        </view>
+        <view v-if="remoteApiEnabled && eligibility.status === 'ready' && eligibility.snapshot" data-testid="detail-purchase-policy-facts" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
+          <view v-for="(policy, policyIndex) in eligibility.snapshot.policies" :key="`${policy.policy}-${policyIndex}`" style="padding: 4px 0">
+            <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibilityPolicyTitle(policy) }}</text>
+            <text v-if="eligibilityQualificationConditions(policy).length > 1" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityPolicyMode(policy) }}</text>
+            <text v-for="condition in eligibilityQualificationConditions(policy)" :key="condition.kind" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(condition) }}</text>
+            <text v-if="eligibilityMonthlyStockCondition(policy)" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(eligibilityMonthlyStockCondition(policy)!) }}</text>
+          </view>
         </view>
         <!-- === Section 1: Hero === -->
         <view class="mx-4 rounded-2xl border overflow-hidden relative" :style="heroCardStyle">
@@ -248,7 +259,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SectionHeader from "@/components/store/section-header.vue";
@@ -268,10 +279,13 @@ import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
-import { remoteApiEnabled } from "@/api/runtime";
+import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
+import type { PurchaseEligibilityCondition, PurchaseEligibilityPolicy } from "@/api/purchase-eligibility-api";
+import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
@@ -284,6 +298,8 @@ const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = 
 
 const id = ref("");
 const catalogRetrying = ref(false);
+let detailPageVisible = false;
+let detailObservationEpoch = 0;
 let detailFactsEpoch = 0;
 
 function invalidateDetailFacts(): void {
@@ -303,6 +319,7 @@ async function refreshDetailFacts(): Promise<void> {
     remoteApiEnabled ? refreshTrust(true) : Promise.resolve(true),
   ]);
   if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
+  void observeCanonicalProductDetail();
 }
 
 onLoad(async (options) => {
@@ -312,6 +329,7 @@ onLoad(async (options) => {
 });
 
 onShow(() => {
+  detailPageVisible = true;
   void refreshDetailFacts();
 });
 
@@ -327,6 +345,46 @@ async function retryCatalog() {
 
 const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
+async function observeCanonicalProductDetail(): Promise<void> {
+  const canonicalProduct = product.value;
+  if (!remoteApiEnabled || !detailPageVisible || catalogStatus.value !== "ready" || !canonicalProduct?.id) return;
+
+  const scope = captureAccountScope();
+  const pageEpoch = detailObservationEpoch;
+  await nextTick();
+  if (
+    !detailPageVisible
+    || pageEpoch !== detailObservationEpoch
+    || catalogStatus.value !== "ready"
+    || product.value !== canonicalProduct
+  ) return;
+
+  void authenticatedPageObservationReporter.report({
+    subject: `store-detail:${canonicalProduct.id}`,
+    scope,
+    session: sessionVault.read(),
+    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch,
+    isCurrent: isCurrentAccountScope,
+    submit: () => h3ObservationApi.productDetail(canonicalProduct.id),
+  });
+  if (canonicalProduct.id !== "stellarbox-s1" || canonicalProduct.productType === "SHARE"
+    || !Number.isFinite(canonicalProduct.price) || canonicalProduct.price <= 0
+    || !Number.isFinite(canonicalProduct.dailyEarn) || canonicalProduct.dailyEarn <= 0) return;
+  void authenticatedPageObservationReporter.report({
+    subject: "day-one:view-product-roi:stellarbox-s1",
+    scope,
+    session: sessionVault.read(),
+    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch,
+    isCurrent: isCurrentAccountScope,
+    submit: () => dayOnePageObservationApi.s1Roi(),
+    accepted: (result) => result.recorded,
+  });
+}
+
+watch([catalogStatus, () => product.value?.id], () => {
+  void observeCanonicalProductDetail();
+});
+
 const isShare = computed(() => product.value?.productType === "SHARE");
 const stockUnavailable = computed(() => !isShare.value
   && product.value?.inventoryMode === "FINITE"
@@ -355,6 +413,18 @@ const isLocked = computed(() => {
 // mode consumes only the account-scoped server eligibility response.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(product);
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => product.value?.id ?? "");
+const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMessage(
+  eligibility.value.status,
+  eligibility.value.snapshot,
+));
+const eligibilityDenyTitle = computed(() => purchaseEligibilityMessage.value === "quotaDepleted"
+  ? t.value.store.purchaseEligibilityQuotaDepleted
+  : purchaseEligibilityMessage.value === "ineligible"
+    ? t.value.store.purchaseEligibilityIneligible
+    : t.value.store.purchaseEligibilityError);
+const eligibilityDenyBody = computed(() => purchaseEligibilityMessage.value === "error"
+  ? t.value.store.purchaseEligibilityFailClosed
+  : t.value.store.purchaseEligibilityConditionsUnmet);
 const purchaseGate = computed(() => remoteApiEnabled
   ? {
       gated: true,
@@ -505,6 +575,51 @@ const annualPctText = computed(() =>
 );
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
 
+function eligibilityPolicyTitle(policy: PurchaseEligibilityPolicy): string {
+  return policy.policy === "F4B"
+    ? t.value.store.purchaseEligibilityQuotaPolicy
+    : t.value.store.purchaseEligibilityProductPolicy;
+}
+function eligibilityPolicyMode(policy: PurchaseEligibilityPolicy): string {
+  if (policy.policy === "F4B") {
+    return policy.mode === "EITHER"
+      ? t.value.store.purchaseEligibilityQuotaEitherAndStock
+      : t.value.store.purchaseEligibilityQuotaAllAndStock;
+  }
+  return policy.mode === "EITHER"
+    ? t.value.store.purchaseEligibilityModeEither
+    : t.value.store.purchaseEligibilityModeAll;
+}
+function eligibilityQualificationConditions(policy: PurchaseEligibilityPolicy): PurchaseEligibilityCondition[] {
+  return policy.conditions.filter((condition) => condition.kind !== "monthlyQuota");
+}
+function eligibilityMonthlyStockCondition(policy: PurchaseEligibilityPolicy): PurchaseEligibilityCondition | undefined {
+  return policy.conditions.find((condition) => condition.kind === "monthlyQuota");
+}
+function eligibilityNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
+}
+function eligibilityConditionText(condition: PurchaseEligibilityCondition): string {
+  const values = {
+    current: eligibilityNumber(condition.current),
+    required: eligibilityNumber(condition.required),
+    gap: eligibilityNumber(condition.gap),
+  };
+  const copy = condition.kind === "rank"
+    ? fmt(t.value.store.purchaseEligibilityRank, values)
+    : condition.kind === "activeDirect"
+      ? fmt(t.value.store.purchaseEligibilityActiveDirect, values)
+      : condition.kind === "teamVolumeUsd"
+        ? fmt(t.value.store.purchaseEligibilityTeamVolume, values)
+        : condition.kind === "lifetimeQuota"
+          ? fmt(t.value.store.purchaseEligibilityLifetimeQuota, values)
+          : fmt(t.value.store.purchaseEligibilityMonthlyQuota, values);
+  if (condition.kind === "monthlyQuota" || condition.kind === "lifetimeQuota") return copy;
+  return `${copy} · ${condition.met
+    ? t.value.store.purchaseEligibilityConditionMet
+    : fmt(t.value.store.purchaseEligibilityConditionGap, values)}`;
+}
+
 function dec() {
   if (qty.value > 1) qty.value -= 1;
 }
@@ -523,7 +638,7 @@ const stickyOwner = Symbol("store-detail");
 const stickyPageVisible = ref(true);
 sticky.activate(stickyOwner);
 watch(
-  [stickyPageVisible, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate],
+  [stickyPageVisible, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage],
   () => {
     if (!stickyPageVisible.value) {
       sticky.hide(stickyOwner);
@@ -549,11 +664,17 @@ watch(
       return;
     }
     if (remoteApiEnabled && !eligibility.value.eligible) {
+      const quotaDepleted = purchaseEligibilityMessage.value === "quotaDepleted";
       sticky.show({
-        href: "/pages/team/quota",
+        href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : "/pages/team/quota",
         amount: `$${priceText.value}`,
-        amountSubtext: t.value.store.purchaseEligibilityIneligible,
-        buttonLabel: t.value.store.purchaseEligibilityIneligible,
+        amountSubtext: quotaDepleted
+          ? t.value.store.purchaseEligibilityQuotaDepleted
+          : t.value.store.purchaseEligibilityIneligible,
+        buttonLabel: quotaDepleted
+          ? t.value.store.purchaseEligibilityQuotaDepleted
+          : t.value.store.gateLockedCta,
+        disabled: quotaDepleted,
         showTabBar: false,
       }, stickyOwner);
       return;
@@ -590,11 +711,15 @@ onShow(() => {
   stickyPageVisible.value = true;
 });
 onHide(() => {
+  detailPageVisible = false;
+  detailObservationEpoch += 1;
   invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);
 });
 onUnmounted(() => {
+  detailPageVisible = false;
+  detailObservationEpoch += 1;
   invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);

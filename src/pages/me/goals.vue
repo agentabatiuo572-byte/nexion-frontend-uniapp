@@ -62,11 +62,14 @@
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ t.goals.loading }}</text>
       </view>
-      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
+      <view v-else-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
-        <text class="block" :style="recReasonStyle">{{ t.goals.serverUnavailable }}</text>
+        <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
+        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals">
+          <text :style="recCtaLabelStyle">{{ t.ui.retry }}</text>
+        </view>
       </view>
-      <view v-if="target > 0 && (!remoteApiEnabled || goalsStore.recommendation)" class="mx-4" :style="recCardStyle">
+      <view v-else-if="target > 0 && (!remoteApiEnabled || (goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true))" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
@@ -85,9 +88,16 @@
       </view>
 
       <!-- Active goals — de-carded: transparent hairline group on the page floor -->
-      <view v-if="remoteApiEnabled && goalsStore.status === 'loading'" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.loading }}</text></view>
-      <view v-else-if="remoteApiEnabled && goalsStore.status === 'error'" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.serverUnavailable }}</text></view>
-      <view v-else-if="goals.length > 0">
+      <view v-if="remoteApiEnabled && goalsStore.status === 'loading' && goals.length === 0" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.loading }}</text></view>
+      <view v-else-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length === 0" class="mx-4" :style="emptyStateStyle">
+        <text>{{ t.goals.serverUnavailable }}</text>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+      </view>
+      <view v-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length > 0" class="mx-4" :style="emptyStateStyle">
+        <text>{{ t.goals.serverUnavailable }}</text>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+      </view>
+      <view v-if="goals.length > 0">
         <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
         <view :style="goalGroupStyle">
           <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
@@ -117,6 +127,7 @@
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
 import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
@@ -145,10 +156,10 @@ const retryableSaveIntents = new Map<string, GoalSaveIntent>();
 let saveEpoch = 0;
 
 const recommendation = computed(() => {
-  if (remoteApiEnabled && goalsStore.recommendation) {
+  if (remoteApiEnabled && goalsStore.recommendation?.purchaseRequired) {
     return {
-      tier: goalsStore.recommendation.productName,
-      reason: fmt(t.value.goals.recReasonServer, { daily: goalsStore.recommendation.dailyEarn.toFixed(2) }),
+      tier: goalsStore.recommendation.productName ?? "",
+      reason: fmt(t.value.goals.recReasonServer, { daily: formatGoalDailyRate(goalsStore.recommendation.dailyEarn ?? 0) }),
     };
   }
   if (remoteApiEnabled) return { tier: "", reason: "" };
@@ -167,9 +178,14 @@ const recPathLine = computed(() =>
     target: target.value.toLocaleString(),
     days: days.value,
     tier: recommendation.value.tier,
-    perDay: (goalsStore.recommendation?.requiredDaily ?? target.value / days.value).toFixed(2),
+    perDay: formatGoalDailyRate(goalsStore.recommendation?.requiredDaily ?? target.value / days.value),
   }),
 );
+
+function formatGoalDailyRate(value: number): string {
+  if (value > 0 && value < 0.01) return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  return value.toFixed(2);
+}
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -185,11 +201,29 @@ function selectDays(value: number) {
   if (!savePending.value) days.value = value;
 }
 
+watch(() => goalsStore.accountEpoch, () => {
+  saveEpoch += 1;
+  savePending.value = false;
+  retryableSaveIntents.clear();
+}, { flush: "sync" });
+
+function refreshRemoteGoals(force = false): Promise<void> {
+  if (!remoteApiEnabled) return Promise.resolve();
+  const list = force ? goalsStore.refresh() : goalsStore.ensure();
+  const recommendation = goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+  return Promise.all([list, recommendation]).then(() => undefined);
+}
+
+function retryGoals() {
+  void refreshRemoteGoals(true);
+}
+
 onMounted(() => {
-  if (remoteApiEnabled) {
-    void goalsStore.refresh();
-    void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
-  }
+  void refreshRemoteGoals();
+});
+
+onShow(() => {
+  void refreshRemoteGoals();
 });
 
 watch([target, days], () => {
@@ -198,11 +232,9 @@ watch([target, days], () => {
   }
 });
 
-watch(() => goalsStore.accountEpoch, () => {
-  saveEpoch += 1;
-  savePending.value = false;
-  retryableSaveIntents.clear();
-}, { flush: "sync" });
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+  void refreshRemoteGoals();
+});
 
 function deadlineLine(deadlineMs: number): string {
   const daysLeft = Math.max(0, Math.ceil((deadlineMs - Date.now()) / ONE_DAY_MS));

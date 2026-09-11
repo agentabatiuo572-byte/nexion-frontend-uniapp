@@ -14,7 +14,8 @@ import {
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
 
-let inFlight: { key: string; promise: Promise<void> } | null = null;
+let inFlight: { key: string; locale: string; generation: number; promise: Promise<void> } | null = null;
+let readGeneration = 0;
 const failedKeys = new Set<string>();
 const redirectedKeys = new Set<string>();
 const verificationKeys = new Set<string>();
@@ -22,6 +23,7 @@ const REDIRECT_RETRY_MS = 5_000;
 let lastRedirectAttempt: { key: string; url: string; at: number } | null = null;
 let pendingRequirement: {
   key: string;
+  locale: string;
   version: string;
   reason: "verification" | "acknowledgement";
 } | null = null;
@@ -102,15 +104,22 @@ export function enforcePendingLegalTermsGate(returnTo: string): boolean {
 }
 
 /** Clear the current account obligation after an authoritative current snapshot. */
-export function recordLegalTermsAcknowledged(snapshot: Parameters<typeof isLegalTermsAcknowledged>[0]): void {
+export function recordLegalTermsAcknowledged(
+  snapshot: Parameters<typeof isLegalTermsAcknowledged>[0],
+  requestedLocale = snapshot.requestedLocale,
+): void {
   const current = fence();
   if (!current || !sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)
-      || !isLegalTermsAcknowledged(snapshot)) return;
+      || !isLegalTermsAcknowledged(snapshot) || requestedLocale !== useLocaleStore().code) return;
   const key = sessionKey(current);
+  // A page-owned confirmation may supersede a still-pending global read. The
+  // selected request locale also permits an explicitly displayed fallback doc.
+  if (inFlight?.key === key) inFlight = null;
   finishVerification(key);
   if (pendingRequirement?.key === key) pendingRequirement = null;
   if (lastRedirectAttempt?.key === key) lastRedirectAttempt = null;
   failedKeys.delete(key);
+  latestGateRouteByKey.delete(key);
 }
 
 /**
@@ -129,6 +138,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
   if (path === LEGAL_TERMS_ROUTE) return Promise.resolve();
   const requestFence = fence();
   if (!requestFence) return Promise.resolve();
+  const requestLocale = useLocaleStore().code;
   const key = sessionKey(requestFence);
   latestGateRouteByKey.set(key, returnTo);
   const publicPrivacyRoute = path === PRIVACY_POLICY_ROUTE;
@@ -136,25 +146,39 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
   // not let browser history or a repeated failed check downgrade it to the
   // non-redirecting verification state or replace its original return target.
   if (pendingRequirement?.key === key
+      && pendingRequirement.locale === requestLocale
       && pendingRequirement.reason === "acknowledgement") return Promise.resolve();
-  if (inFlight?.key === key) {
+  if (inFlight?.key === key && inFlight.locale === requestLocale) {
     if (publicPrivacyRoute) finishVerification(key);
     return inFlight.promise;
   }
   // Every authoritative recheck is fail-closed, including a previously
   // acknowledged session: a newly published version must not gain a network
   // response window in which business activity can continue.
-  pendingRequirement = { key, version: "", reason: "verification" };
+  pendingRequirement = { key, locale: requestLocale, version: "", reason: "verification" };
+  const generation = ++readGeneration;
+  const ownsRead = () => inFlight?.generation === generation;
+  failedKeys.delete(key);
   if (!publicPrivacyRoute) beginVerification(key);
-  const promise = legalTermsApi.current(useLocaleStore().code, "GLOBAL", true)
+  else finishVerification(key);
+  if (inFlight && inFlight.key !== key) {
+    finishVerification(inFlight.key);
+    latestGateRouteByKey.delete(inFlight.key);
+  }
+  const promise = legalTermsApi.current(requestLocale, "GLOBAL", true)
     .then((snapshot) => {
+      if (!ownsRead()) return;
       if (!sameLegalTermsSession(requestFence, fence())) {
         return rescheduleAfterSessionChange(requestFence, returnTo);
       }
+      if (requestLocale !== useLocaleStore().code) {
+        return scheduleLegalTermsGate(latestGateRouteByKey.get(key) ?? returnTo);
+      }
+      if (snapshot.requestedLocale !== requestLocale) throw new Error("LEGAL_TERMS_LOCALE_MISMATCH");
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
         finishVerification(key);
-        pendingRequirement = { key, version: snapshot.version, reason: "acknowledgement" };
+        pendingRequirement = { key, locale: requestLocale, version: snapshot.version, reason: "acknowledgement" };
         const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
         const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
         const redirectKey = `${key}:${snapshot.sourceEnvironment}:${snapshot.runId}:${snapshot.version}:${currentReturnTo}`;
@@ -162,26 +186,37 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
           redirectToRequiredTerms(key, currentReturnTo);
         }
       } else {
-        recordLegalTermsAcknowledged(snapshot);
+        recordLegalTermsAcknowledged(snapshot, requestLocale);
       }
     })
     .catch(() => {
+      if (!ownsRead()) return;
       if (!sameLegalTermsSession(requestFence, fence())) {
         return rescheduleAfterSessionChange(requestFence, returnTo);
       }
+      if (requestLocale !== useLocaleStore().code) {
+        return scheduleLegalTermsGate(latestGateRouteByKey.get(key) ?? returnTo);
+      }
       if (failedKeys.has(key)) return;
       finishVerification(key);
-      pendingRequirement = { key, version: "", reason: "acknowledgement" };
+      pendingRequirement = { key, locale: requestLocale, version: "", reason: "acknowledgement" };
       failedKeys.add(key);
       const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
       const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
       if (currentPath !== PRIVACY_POLICY_ROUTE) redirectToRequiredTerms(key, currentReturnTo);
     })
     .finally(() => {
-      finishVerification(key);
-      if (inFlight?.key === key) inFlight = null;
-      latestGateRouteByKey.delete(key);
+      // Same-account locale reads share a loading mask; only its current owner
+      // may release it. A completed old account can release its own mask key.
+      if (ownsRead()) {
+        finishVerification(key);
+        inFlight = null;
+        latestGateRouteByKey.delete(key);
+      } else if (inFlight?.key !== key) {
+        finishVerification(key);
+        latestGateRouteByKey.delete(key);
+      }
     });
-  inFlight = { key, promise };
+  inFlight = { key, locale: requestLocale, generation, promise };
   return promise;
 }

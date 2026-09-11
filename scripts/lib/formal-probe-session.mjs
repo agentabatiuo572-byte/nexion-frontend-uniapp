@@ -47,7 +47,7 @@ export async function installFormalProbeSession(page, { authenticated = true, re
             source: "server",
             sourceEnvironment: "PRODUCTION",
             runId: "",
-            requestedLocale: "en",
+            requestedLocale: url.searchParams.get("locale") || "en",
             resolvedLocale: "en",
             requestedJurisdiction: "GLOBAL",
             resolvedJurisdiction: "GLOBAL",
