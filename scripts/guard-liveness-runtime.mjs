@@ -99,7 +99,7 @@ async function open(ctx, landing, auth) {
             source: "server",
             sourceEnvironment: "PRODUCTION",
             runId: "",
-            requestedLocale: "en",
+            requestedLocale: url.searchParams.get("locale") || "en",
             resolvedLocale: "en",
             requestedJurisdiction: "GLOBAL",
             resolvedJurisdiction: "GLOBAL",

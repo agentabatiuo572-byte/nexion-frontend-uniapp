@@ -139,6 +139,9 @@ const LEDGER = {
   "GET /api/users/:id/vouchers": "TBD-NAME: PRD 未定义运营读他人券包 endpoint(admin 侧,候选名)",
 
   // ── quests / faucet / milestones ──────────────────────────────────────
+  "/api/growth/day-one/page-observations/:param": "BACKEND: AppDayOnePageObservationController 已实现;固定页面观察,服务端按新手实例快照及收据去重决定 recorded",
+  "/api/store/products/:param/detail-observation": "BACKEND: AppCanonicalBoundaryController 已实现;以 productNo 核实可见商品,服务端按 Asia/Shanghai 周期去重累计",
+  "/api/genesis/secondary-market/observation": "BACKEND: AppGenesisController 已实现;认证用户浏览二级市场,服务端按 Asia/Shanghai 周期去重",
   "POST /api/quest/complete": "PRD §9.11c.2",
   // 2026-08-15 包 zk:`GET /api/quests/weekly` 从台账删除 —— 最后一处文本引用在死文件
   // mock/weekly-quests.ts(0 运行时引用,已 Move .trash),实现自 U-16 起走 /api/quests/state。

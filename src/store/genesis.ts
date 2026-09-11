@@ -275,6 +275,7 @@ export const useGenesis = defineStore("genesis", () => {
   });
   const remoteEligibility = ref<GenesisEligibility | null>(null);
   const remoteEligibilityError = ref<string | null>(null);
+  const remotePublicReadState = ref<"loading" | "ready" | "unavailable">(remoteApiEnabled ? "loading" : "ready");
   const remoteHalted = ref(remoteApiEnabled);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const emissionPager = createGenesisActivityPager((cursor) => genesisApi.emissionPage(cursor), (item) => `${item.batchNo}:${item.holdingNo}`);
@@ -287,6 +288,7 @@ export const useGenesis = defineStore("genesis", () => {
   const tokenIdFor = genesisHoldingId;
 
   function applyPublicState(state: GenesisPublicState): void {
+    remotePublicReadState.value = "ready";
     totalSlots.value = state.series.totalSupply;
     soldSlots.value = state.series.soldSupply;
     nexListed.value = state.emissionOpen;
@@ -347,6 +349,7 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function clearRemoteFacts(): void {
+    remotePublicReadState.value = "unavailable";
     // Zero means the public supply is unknown. Do not render the local 1,000-slot
     // fallback as if it were a server fact after a failed public-state hydrate.
     totalSlots.value = 0;
@@ -371,13 +374,14 @@ export const useGenesis = defineStore("genesis", () => {
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const readGeneration = ++remoteReadGeneration;
+    remotePublicReadState.value = "loading";
     activityPager.reset(activityPager.state.items, null);
     orderPager.reset(orderPager.state.items, null);
     emissionPager.reset(emissionPager.state.items, null);
     // Public supply/market facts are readable without a user session. The
     // orchestrator independently fences protected account/eligibility reads
     // by bearer authority and account/RunID epoch.
-    return readGenesisRemoteFacts(genesisApi, {
+    const loaded = await readGenesisRemoteFacts(genesisApi, {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
       isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope),
       clear: clearRemoteFacts,
@@ -390,6 +394,9 @@ export const useGenesis = defineStore("genesis", () => {
         remoteEligibilityError.value = null;
       },
     });
+    if (readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope)
+      && remotePublicReadState.value === "loading") remotePublicReadState.value = "unavailable";
+    return loaded;
   }
 
   function persist(): boolean {
@@ -774,7 +781,7 @@ export const useGenesis = defineStore("genesis", () => {
     activityPage: activityPager.state, loadMoreActivity: activityPager.more,
     orderPage: orderPager.state, loadMoreGenesisOrders: orderPager.more,
     emissionPage: emissionPager.state, loadMoreEmissions: emissionPager.more, remoteEmissionTotals,
-    remoteHoldings, remoteEmissions, remoteOrders, syncRemote,
+    remoteHoldings, remoteEmissions, remoteOrders, remotePublicReadState, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

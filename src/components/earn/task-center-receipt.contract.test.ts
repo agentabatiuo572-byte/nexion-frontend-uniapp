@@ -19,11 +19,23 @@ describe("earn history Proof-of-Compute interaction", () => {
     expect(receiptsPage).toMatch(/taskAssignmentApi\.receipt\(task\.receiptNo/);
   });
 
-  it("loads the full remote history from the paginated receipt authority instead of device previews", () => {
-    expect(receiptsPage).toMatch(/taskAssignmentApi\.receipts\(offset, 20\)/);
+  it("loads the selected remote receipt category from its canonical paginated authority", () => {
+    expect(receiptsPage).toMatch(/taskAssignmentApi\.receipts\(offset, 20, cursor\)/);
     expect(receiptsPage).toContain("remoteComputeReceiptNextOffset");
-    expect(receiptsPage).toContain("Promise.allSettled(requests)");
+    expect(receiptsPage).toContain('remoteReceiptKind.value === "compute"');
+    expect(receiptsPage).toContain("loadSelectedRemoteReceipts");
+    expect(receiptsPage).toContain("loadSelectedMoreRemoteReceipts");
+    expect(receiptsPage).not.toContain("Promise.allSettled(requests)");
     expect(receiptsPage).not.toContain("app.visibleDevices.flatMap");
+  });
+
+  it("keeps Proof-of-Compute and top-up receipts in separate tabs with a compute default", () => {
+    expect(receiptsPage).toContain('type RemoteReceiptKind = "compute" | "deposit"');
+    expect(receiptsPage).toContain('const remoteReceiptKind = ref<RemoteReceiptKind>("compute")');
+    expect(receiptsPage).toContain('onLoad((options) =>');
+    expect(receiptsPage).toContain('options?.kind === "deposit" ? "deposit" : "compute"');
+    expect(receiptsPage).toContain('v-if="remoteReceiptKind === \'compute\'"');
+    expect(receiptsPage).toContain('v-if="remoteReceiptKind === \'deposit\'"');
   });
 
   it("invalidates receipt requests on every account binding and supports keyboard pagination", () => {
@@ -33,8 +45,8 @@ describe("earn history Proof-of-Compute interaction", () => {
     expect(taskCenter).toContain("app.accountBindingEpoch");
     expect(receiptsPage).toContain("expectedBindingEpoch !== app.accountBindingEpoch");
     expect(receiptsPage).toMatch(/watch\(\s*\(\) => \[app\.accountKey, app\.accountBindingEpoch\]/);
-    expect(receiptsPage).toContain('@keydown.enter.stop.prevent="loadMoreRemoteReceipts"');
-    expect(receiptsPage).toContain('@keydown.space.stop.prevent="loadMoreRemoteReceipts"');
+    expect(receiptsPage).toContain('@keydown.enter.stop.prevent="loadSelectedMoreRemoteReceipts"');
+    expect(receiptsPage).toContain('@keydown.space.stop.prevent="loadSelectedMoreRemoteReceipts"');
   });
 
   it("uses the same 8 GB routing capacity as the server for Cloud Share", () => {

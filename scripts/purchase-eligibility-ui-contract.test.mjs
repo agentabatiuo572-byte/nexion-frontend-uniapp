@@ -17,5 +17,13 @@ test("Gen-2 detail hides the sticky buy CTA until the server decision is ready",
   assert.match(page, /useRemotePurchaseEligibility/);
   assert.match(page, /remoteApiEnabled && eligibility\.value\.status !== "ready"/);
   assert.match(page, /remoteApiEnabled && !eligibility\.value\.eligible/);
+  assert.match(page, /purchaseEligibilityQuotaDepleted/);
+  assert.match(page, /eligibilityPolicyTitle\(policy\)/);
+  assert.match(page, /eligibilityQualificationConditions\(policy\)/);
+  assert.match(page, /eligibilityMonthlyStockCondition\(policy\)/);
+  assert.match(page, /purchaseEligibilityQuotaEitherAndStock/);
+  assert.match(page, /eligibilityConditionText\(condition\)/);
+  assert.doesNotMatch(page, /\{\{ policy\.decisionCode \}\}/);
+  assert.doesNotMatch(page, /\{\{ condition\.kind \}\}/);
   assert.match(read("src/lib/account-scope.ts"), /purchaseEligibilityStore\.clear/);
 });

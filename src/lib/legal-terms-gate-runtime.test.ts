@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   } as { accessToken: string; user: { userId: number } } | null,
   revision: { epoch: 1, runId: "" },
   sessionRevision: 1,
+  locale: "en",
   current: vi.fn<() => Promise<LegalTermsCurrent>>(),
 }));
 
@@ -18,7 +19,7 @@ vi.mock("@/api/runtime", () => ({
 }));
 
 vi.mock("@/store/locale", () => ({
-  useLocaleStore: () => ({ code: "en" }),
+  useLocaleStore: () => ({ code: state.locale }),
 }));
 
 vi.mock("@/api/order-api", () => ({
@@ -59,6 +60,7 @@ describe("legal terms runtime gate", () => {
     state.session = { accessToken: "token-a", user: { userId: 7 } };
     state.revision = { epoch: 1, runId: "" };
     state.sessionRevision = 1;
+    state.locale = "en";
     state.current.mockReset();
     vi.stubGlobal("uni", {
       reLaunch: vi.fn(),
@@ -309,5 +311,93 @@ describe("legal terms runtime gate", () => {
 
     expect(state.current).toHaveBeenCalledTimes(2);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
+
+  it.each(["resolve", "reject"])("ignores an old locale %s without releasing the current loading gate", async (completion) => {
+    let resolveOld!: (value: LegalTermsCurrent) => void;
+    let rejectOld!: (reason: Error) => void;
+    let resolveNew!: (value: LegalTermsCurrent) => void;
+    state.current
+      .mockImplementationOnce(() => new Promise((ok, fail) => { resolveOld = ok; rejectOld = fail; }))
+      .mockImplementationOnce(() => new Promise((ok) => { resolveNew = ok; }));
+    const runtime = await loadRuntime();
+    const old = runtime.scheduleLegalTermsGate("/pages/me/language");
+    state.locale = "zh";
+    const current = runtime.scheduleLegalTermsGate("/pages/me/language");
+    expect(state.current).toHaveBeenCalledTimes(2);
+    if (completion === "resolve") resolveOld(snapshot(true));
+    else rejectOld(new Error("OLD_LANGUAGE_FAILURE"));
+    await old;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.hideLoading).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    resolveNew({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
+    await current;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.reLaunch).toHaveBeenCalledOnce();
+  });
+
+  it("replaces an older language obligation with the selected language's authoritative check", async () => {
+    state.current.mockResolvedValueOnce(snapshot(false))
+      .mockResolvedValueOnce({ ...snapshot(true), requestedLocale: "zh", resolvedLocale: "zh" });
+    const runtime = await loadRuntime();
+    await runtime.scheduleLegalTermsGate("/pages/me/language");
+    state.locale = "zh";
+    await runtime.scheduleLegalTermsGate("/pages/me/language");
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
+
+  it("rechecks the current language if it changed before the pending response returns", async () => {
+    let resolveOld!: (value: LegalTermsCurrent) => void;
+    state.current.mockImplementationOnce(() => new Promise((ok) => { resolveOld = ok; }))
+      .mockResolvedValueOnce({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
+    const runtime = await loadRuntime();
+    const old = runtime.scheduleLegalTermsGate("/pages/me/language");
+    state.locale = "zh";
+    resolveOld(snapshot(true));
+    await old;
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+  });
+
+  it("does not clear the current locale obligation with another language's acknowledgement", async () => {
+    state.locale = "zh";
+    state.current.mockResolvedValue({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
+    const runtime = await loadRuntime();
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+  });
+
+  it("accepts the acknowledged fallback document only in the selected request locale", async () => {
+    state.locale = "vi";
+    state.current.mockResolvedValue({ ...snapshot(false), requestedLocale: "vi" });
+    const runtime = await loadRuntime();
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    runtime.recordLegalTermsAcknowledged(snapshot(true), "vi");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
+
+  it("releases the business loading mask immediately on a privacy entry with a new locale", async () => {
+    let resolveOld!: (value: LegalTermsCurrent) => void;
+    let resolveNew!: (value: LegalTermsCurrent) => void;
+    state.current
+      .mockImplementationOnce(() => new Promise((ok) => { resolveOld = ok; }))
+      .mockImplementationOnce(() => new Promise((ok) => { resolveNew = ok; }));
+    const runtime = await loadRuntime();
+    const old = runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.locale = "zh";
+    const current = runtime.scheduleLegalTermsGate("/pages/onboarding/privacy");
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(uni.hideLoading).toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
+    resolveOld(snapshot(true));
+    await old;
+    resolveNew({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
+    await current;
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
   });
 });

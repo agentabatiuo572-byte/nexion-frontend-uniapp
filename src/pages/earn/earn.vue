@@ -113,8 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import TrialHeroBanner from "@/components/trial-hero-banner.vue";
@@ -131,7 +131,10 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useFreeTrial } from "@/store/free-trial";
-import { remoteApiEnabled } from "@/api/runtime";
+import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
+
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 
 type Range = "Today" | "Week" | "Month" | "All";
@@ -141,15 +144,49 @@ const app = useApp();
 const t = useT();
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
+let earnPageVisible = false;
+let earnObservationEpoch = 0;
 
 // The banner is the first discoverable H2 entry. Do not make a new user wait
 // for the global poll before we know whether the server has made it eligible.
 onShow(() => {
+  earnPageVisible = true;
   if (remoteApiEnabled) {
     void freeTrial.refreshRemote(true);
     void app.refreshRemoteFleet(undefined, { coalesce: true }).catch(() => undefined);
     void app.refreshHomeTruth().catch(() => undefined);
+    void observeDayOneEarnPage();
   }
+});
+
+onHide(() => {
+  earnPageVisible = false;
+  earnObservationEpoch += 1;
+});
+
+onUnmounted(() => { earnPageVisible = false; earnObservationEpoch += 1; });
+
+async function observeDayOneEarnPage(): Promise<void> {
+  if (!remoteApiEnabled || !earnPageVisible || app.homeTruthStatus !== "ready"
+    || app.remoteFleetStatus !== "ready" || !app.homeTruth) return;
+  const scope = captureAccountScope();
+  const pageEpoch = earnObservationEpoch;
+  await nextTick();
+  if (!earnPageVisible || pageEpoch !== earnObservationEpoch || app.homeTruthStatus !== "ready"
+    || app.remoteFleetStatus !== "ready" || !app.homeTruth) return;
+  void authenticatedPageObservationReporter.report({
+    subject: "day-one:visit-earn",
+    scope,
+    session: sessionVault.read(),
+    visible: () => earnPageVisible && pageEpoch === earnObservationEpoch,
+    isCurrent: isCurrentAccountScope,
+    submit: () => dayOnePageObservationApi.earnPage(),
+    accepted: (result) => result.recorded,
+  });
+}
+
+watch([() => app.homeTruthStatus, () => app.remoteFleetStatus, () => app.homeTruth], () => {
+  void observeDayOneEarnPage();
 });
 
 function retryFleet() { void app.refreshRemoteFleet().catch(() => undefined); }

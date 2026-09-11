@@ -23,10 +23,41 @@
 
     <view class="tos-wrap">
       <!-- Hero -->
-      <view class="tos-hero">
-        <text class="tos-eyebrow">{{ serverTerms ? `${serverTerms.effectiveAt} · ${serverTerms.version}` : t.terms.effectiveLabel }}</text>
-        <text class="tos-title">{{ serverTerms?.title ?? t.terms.heroTitle }}</text>
-        <text class="tos-sub">{{ serverTerms?.summary ?? t.terms.heroSubtitle }}</text>
+      <view v-if="remoteApiEnabled && !serverTerms" class="tos-hero">
+        <text class="tos-eyebrow">{{ loadError ?? t.terms.loading }}</text>
+      </view>
+      <view v-else-if="serverTerms" class="tos-hero">
+        <text class="tos-eyebrow">{{ `${serverTerms.effectiveAt} · ${serverTerms.version}` }}</text>
+        <text class="tos-title">{{ serverTerms.title }}</text>
+        <text class="tos-sub">{{ serverTerms.summary }}</text>
+      </view>
+      <view v-else class="tos-hero">
+        <text class="tos-eyebrow">{{ t.terms.effectiveLabel }}</text>
+        <text class="tos-title">{{ t.terms.heroTitle }}</text>
+        <text class="tos-sub">{{ t.terms.heroSubtitle }}</text>
+      </view>
+
+      <!-- A locale-specific server version may require acknowledgement. Keep the
+           legal gate closed, while letting the user return to a shipped language
+           they can read; the next server response alone decides whether exit opens. -->
+      <view v-if="exitBlocked" class="tos-language" role="group" :aria-label="t.language.pageTitle">
+        <text class="tos-language__hint">{{ t.terms.languageRecovery }}</text>
+        <view class="tos-language__choices">
+          <view
+            v-for="language in LOCALES"
+            :key="language.code"
+            class="tos-language__choice active:opacity-70"
+            :class="{ 'tos-language__choice--active': language.code === locale.code }"
+            role="button"
+            tabindex="0"
+            :aria-pressed="language.code === locale.code"
+            @click="switchTermsLanguage(language.code)"
+            @keydown.enter.prevent="switchTermsLanguage(language.code)"
+            @keydown.space.prevent="switchTermsLanguage(language.code)"
+          >
+            <text>{{ language.nativeName }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- Numbered sections -->
@@ -63,14 +94,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { onBackPress, onLoad } from "@dcloudio/uni-app";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { onBackPress, onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
+import { LOCALES, type LocaleCode } from "@/i18n";
 import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import {
   buildLegalTermsLoginRoute,
@@ -83,6 +115,7 @@ import {
 } from "@/lib/legal-terms-gate";
 import { recordLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
+import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -96,6 +129,9 @@ const loaded = ref(!remoteApiEnabled);
 const returnTo = ref("/pages/onboarding/intro");
 const explicitReturn = ref(false);
 const exitBlocked = computed(() => shouldBlockLegalTermsExit(remoteApiEnabled, !!currentSessionFence(), serverTerms.value));
+const termsRequests = createLegalTermsRequestFence();
+let termsPageVisible = true;
+let confirmationGeneration = 0;
 
 const blocks = computed(() => {
   if (serverTerms.value) return [...serverTerms.value.sections].sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => ({ n: index + 1, title: section.title, body: section.body }));
@@ -119,7 +155,31 @@ onLoad((options) => {
   explicitReturn.value = typeof options?.return === "string" && options.return.length > 0;
   returnTo.value = canonicalLegalTermsReturnTo(options?.return, "/pages/onboarding/intro");
 });
-onMounted(() => { void loadTerms(); });
+function showTermsPage() {
+  termsPageVisible = true;
+  void loadTerms();
+}
+function hideTermsPage() {
+  termsPageVisible = false;
+  confirmationGeneration += 1;
+  confirming.value = false;
+  termsRequests.invalidate();
+  serverTerms.value = null;
+  loaded.value = !remoteApiEnabled;
+  loadingTerms.value = false;
+}
+onMounted(showTermsPage);
+onShow(showTermsPage);
+onHide(hideTermsPage);
+onUnmounted(hideTermsPage);
+watch(() => locale.code, () => {
+  // Clear synchronously: an acknowledgement for the previous language must not
+  // briefly unlock the back button while this locale's server read is in flight.
+  serverTerms.value = null;
+  loadErrorKey.value = null;
+  loaded.value = !remoteApiEnabled;
+  void loadTerms();
+}, { flush: "sync" });
 onBackPress(() => {
   if (blockRequiredExit()) return true;
   return false;
@@ -132,14 +192,28 @@ function currentSessionFence(): LegalTermsSessionFence | null {
 }
 
 async function loadTerms() {
-  if (!remoteApiEnabled || loadingTerms.value) return;
+  if (!remoteApiEnabled || !termsPageVisible) return;
+  // A duplicate retry for the same language must share the in-flight read. A
+  // language switch intentionally starts a fresh request so the new gate can
+  // replace the previous locale without waiting for it to settle.
+  if (loadingTerms.value && termsRequests.isLatestLocale(locale.code)) return;
+  confirmationGeneration += 1;
+  confirming.value = false;
+  const request = termsRequests.start(locale.code);
   loadingTerms.value = true;
   loaded.value = false;
   loadErrorKey.value = null;
+  serverTerms.value = null;
   const requestFence = currentSessionFence();
   try {
     const authenticated = !!requestFence;
-    const snapshot = await legalTermsApi.current(locale.code, "GLOBAL", authenticated);
+    const snapshot = await legalTermsApi.current(request.locale, "GLOBAL", authenticated);
+    if (!termsRequests.isCurrent(request, locale.code, snapshot.requestedLocale)) {
+      // A current response that claims a different requested locale is not an
+      // acknowledgement for this screen. Keep the gate closed and retryable.
+      if (termsRequests.isCurrent(request, locale.code)) loadErrorKey.value = "loadFailed";
+      return;
+    }
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       serverTerms.value = null;
       loadErrorKey.value = "sessionChanged";
@@ -153,6 +227,7 @@ async function loadTerms() {
     serverTerms.value = snapshot;
     if (snapshot.acknowledged) recordLegalTermsAcknowledged(snapshot);
   } catch {
+    if (!termsRequests.isCurrent(request, locale.code)) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       serverTerms.value = null;
       loadErrorKey.value = "sessionChanged";
@@ -161,9 +236,15 @@ async function loadTerms() {
     serverTerms.value = null;
     loadErrorKey.value = "loadFailed";
   } finally {
-    loaded.value = true;
-    loadingTerms.value = false;
+    if (termsRequests.isCurrent(request, locale.code)) {
+      loaded.value = true;
+      loadingTerms.value = false;
+    }
   }
+}
+
+function switchTermsLanguage(next: LocaleCode) {
+  if (next !== locale.code) locale.setLocale(next);
 }
 
 function repeatedKeyboardActivation(event?: Event): boolean {
@@ -212,17 +293,26 @@ async function confirmTerms(event?: Event) {
     navTo(buildLegalTermsLoginRoute(buildLegalTermsRoute(returnTo.value)));
     return;
   }
-    const requestFence = currentSessionFence();
-    const snapshot = serverTerms.value;
-    if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
-      loadErrorKey.value = "runChanged";
-      return;
-    }
+  const requestFence = currentSessionFence();
+  const snapshot = serverTerms.value;
+  const snapshotLocale = locale.code;
+  const confirmation = ++confirmationGeneration;
+  // A language change or a fresh document read replaces this screen's consent
+  // target. Its earlier command may finish, but cannot decide the new gate.
+  const ownsSnapshot = () => confirmation === confirmationGeneration && termsPageVisible
+    && locale.code === snapshotLocale && serverTerms.value === snapshot;
+  if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
+    loadErrorKey.value = "runChanged";
+    return;
+  }
   confirming.value = true;
   try {
     const acknowledged = await legalTermsApi.acknowledge(snapshot);
+    if (!ownsSnapshot()) return;
     if (!sameLegalTermsSession(requestFence, currentSessionFence())
       || acknowledged.version !== snapshot.version
+      || acknowledged.resolvedLocale !== snapshot.resolvedLocale
+      || acknowledged.resolvedJurisdiction !== snapshot.resolvedJurisdiction
       || acknowledged.runId !== snapshot.runId
       || !sameLegalTermsRun(acknowledged, captureRuntimeRevision().runId)) {
       loadErrorKey.value = "sessionChanged";
@@ -230,13 +320,14 @@ async function confirmTerms(event?: Event) {
     }
     serverTerms.value = acknowledged;
     if (acknowledged.acknowledged) {
-      recordLegalTermsAcknowledged(acknowledged);
+      recordLegalTermsAcknowledged(acknowledged, snapshotLocale);
       goBack();
     }
   } catch {
-    loadErrorKey.value = "ackFailed";
+    if (ownsSnapshot()) loadErrorKey.value = sameLegalTermsSession(requestFence, currentSessionFence())
+      ? "ackFailed" : "sessionChanged";
   }
-  finally { confirming.value = false; }
+  finally { if (confirmation === confirmationGeneration) confirming.value = false; }
 }
 </script>
 
@@ -298,6 +389,17 @@ async function confirmTerms(event?: Event) {
 .tos-hero {
   margin-bottom: 18px;
 }
+.tos-language {
+  margin: -4px 0 18px;
+  padding: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--v5-brand) 8%, var(--v5-surface));
+  border: 1px solid var(--v5-border);
+}
+.tos-language__hint { display: block; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2); }
+.tos-language__choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.tos-language__choice { min-height: 36px; padding: 0 12px; display: grid; place-items: center; border-radius: 9999px; color: var(--v5-ink-2); background: var(--v5-surface-2); font-size: 12px; }
+.tos-language__choice--active { color: var(--v5-on-brand); background: var(--v5-brand); }
 .tos-eyebrow {
   display: block;
   font-family: var(--font-jet-mono), ui-monospace, monospace;

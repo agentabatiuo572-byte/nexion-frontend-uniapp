@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SectionHeader from "@/components/store/section-header.vue";
@@ -89,7 +89,7 @@ import ProductCard from "@/components/store/product-card.vue";
 import PurchaseTicker from "@/components/store/purchase-ticker.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
@@ -101,6 +101,10 @@ import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
+import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
+
 
 const t = useT();
 const app = useApp();
@@ -111,11 +115,17 @@ const earnConfig = useEarnConfig();
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
+let storePageVisible = false;
+let storeObservationEpoch = 0;
 onShow(() => {
+  storePageVisible = true;
   genesisCfg.refresh();
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
+  void observeDayOneStorePage();
 });
+onHide(() => { storePageVisible = false; storeObservationEpoch += 1; });
+onUnmounted(() => { storePageVisible = false; storeObservationEpoch += 1; });
 const phase = useProductPhase();
 
 // mounted guard: phase override persists in storage, rehydrates client-only —
@@ -130,6 +140,25 @@ onMounted(() => {
 // explicit computed dependency. When the authoritative response reaches ready,
 // these computed listings run again against the new array.
 const catalogStatus = computed(() => productCatalogState.status);
+async function observeDayOneStorePage(): Promise<void> {
+  if (!remoteApiEnabled || !storePageVisible || catalogStatus.value !== "ready") return;
+  const scope = captureAccountScope();
+  const pageEpoch = storeObservationEpoch;
+  await nextTick();
+  if (!storePageVisible || pageEpoch !== storeObservationEpoch || catalogStatus.value !== "ready") return;
+  void authenticatedPageObservationReporter.report({
+    subject: "day-one:visit-store",
+    scope,
+    session: sessionVault.read(),
+    visible: () => storePageVisible && pageEpoch === storeObservationEpoch,
+    isCurrent: isCurrentAccountScope,
+    submit: () => dayOnePageObservationApi.storePage(),
+    accepted: (result) => result.recorded,
+  });
+}
+watch(catalogStatus, () => {
+  void observeDayOneStorePage();
+});
 const catalogHasProducts = computed(() => {
   const status = productCatalogState.status;
   return status === "ready" && PRODUCTS.length > 0;

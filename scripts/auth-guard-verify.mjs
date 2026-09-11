@@ -65,7 +65,7 @@ async function installServerSessionBoundary(page, authenticated) {
             source: "server",
             sourceEnvironment: "PRODUCTION",
             runId: "",
-            requestedLocale: "en",
+            requestedLocale: url.searchParams.get("locale") || "en",
             resolvedLocale: "en",
             requestedJurisdiction: "GLOBAL",
             resolvedJurisdiction: "GLOBAL",

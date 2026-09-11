@@ -26,17 +26,18 @@ function setup() {
   const catalog = vi.fn<() => Promise<boolean>>();
   const phase = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
   const trust = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+  const observe = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const productCatalogState = { status: "loading" };
   let currentAccountScope = { accountKey: "user:1", epoch: 1 };
   const value = new Function(
-    "ref", "computed", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState",
+    "ref", "computed", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail",
     lifecycleCode,
   )(ref, computed, Promise, catalog, phase, true, trust,
     (callback: (options?: Record<string, string>) => Promise<void>) => loaded.push(callback),
     (callback: () => void) => shown.push(callback),
     () => currentAccountScope,
     (scope: typeof currentAccountScope) => scope === currentAccountScope,
-    productCatalogState,
+    productCatalogState, observe,
   ) as {
     id: { value: string };
     catalogRetrying: { value: boolean };
@@ -46,7 +47,7 @@ function setup() {
     catalogStatus: { value: string };
   };
   return {
-    shown, loaded, catalog, phase, trust, value,
+    shown, loaded, catalog, phase, trust, observe, value,
     rebindAccount: () => { currentAccountScope = { accountKey: "user:2", epoch: 2 }; },
   };
 }
@@ -62,11 +63,13 @@ describe("store detail canonical read lifecycle", () => {
     // A forced catalog read advances the runtime revision on either settlement.
     // Starting Trust before that boundary makes its valid response stale.
     expect(s.trust).not.toHaveBeenCalled();
+    expect(s.observe).not.toHaveBeenCalled();
 
     catalogRead.resolve(false);
     await reading;
     expect(s.phase).toHaveBeenCalledTimes(1);
     expect(s.trust).toHaveBeenCalledTimes(1);
+    expect(s.observe).toHaveBeenCalledTimes(1);
   });
 
   it("does not restart public Trust after the detail read was invalidated by hide or account rebind", async () => {
@@ -79,6 +82,7 @@ describe("store detail canonical read lifecycle", () => {
     await hiddenRead;
     expect(hidden.phase).not.toHaveBeenCalled();
     expect(hidden.trust).not.toHaveBeenCalled();
+    expect(hidden.observe).not.toHaveBeenCalled();
 
     const staleAccountCatalog = deferred<boolean>();
     const account = setup();
@@ -89,9 +93,46 @@ describe("store detail canonical read lifecycle", () => {
     await accountRead;
     expect(account.phase).not.toHaveBeenCalled();
     expect(account.trust).not.toHaveBeenCalled();
+    expect(account.observe).not.toHaveBeenCalled();
     expect(page).toMatch(/onHide\(\(\) => \{[\s\S]*?invalidateDetailFacts\(\)/);
     expect(page).toMatch(/onUnmounted\(\(\) => \{[\s\S]*?invalidateDetailFacts\(\)/);
   });
+
+  it("calls the observer only after both public projections settle", async () => {
+    const s = setup();
+    const phase = deferred<boolean>();
+    const trust = deferred<boolean>();
+    s.catalog.mockResolvedValue(true);
+    s.phase.mockReturnValue(phase.promise);
+    s.trust.mockReturnValue(trust.promise);
+    const reading = s.value.refreshDetailFacts();
+    await Promise.resolve();
+    expect(s.trust).toHaveBeenCalledTimes(1);
+    expect(s.observe).not.toHaveBeenCalled();
+    phase.resolve(true);
+    await Promise.resolve();
+    expect(s.observe).not.toHaveBeenCalled();
+    trust.resolve(true);
+    await reading;
+    expect(s.observe).toHaveBeenCalledTimes(1);
+  });
+
+  for (const boundary of ["hide", "account rebind"] as const) {
+    it(`does not observe when ${boundary} occurs during the public projection read`, async () => {
+      const s = setup();
+      const trust = deferred<boolean>();
+      s.catalog.mockResolvedValue(true);
+      s.trust.mockReturnValue(trust.promise);
+      const reading = s.value.refreshDetailFacts();
+      await Promise.resolve();
+      expect(s.trust).toHaveBeenCalledTimes(1);
+      if (boundary === "hide") s.value.invalidateDetailFacts();
+      else s.rebindAccount();
+      trust.resolve(true);
+      await reading;
+      expect(s.observe).not.toHaveBeenCalled();
+    });
+  }
 
   it("starts a new lifecycle read from onShow without letting the earlier read trigger Trust", async () => {
     const first = deferred<boolean>();

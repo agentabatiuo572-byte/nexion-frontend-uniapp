@@ -15,4 +15,20 @@ describe("earning-goal save account fence", () => {
     expect(source).toMatch(/selectTarget\(p\)/);
     expect(source).toMatch(/selectDays\(d\)/);
   });
+
+  it("hides a server-confirmed recommendation when no purchase is required", () => {
+    expect(source).toMatch(/recommendation\?\.purchaseRequired/);
+    expect(source).toMatch(/recommendationStatus === 'ready'/);
+  });
+
+  it("explains an impossible catalog target without offering a purchase CTA", () => {
+    expect(source).toMatch(/recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT'/);
+    expect(source).toMatch(/t\.goals\.noEligibleProduct/);
+    expect(source).toMatch(/purchaseRequired === true/);
+  });
+
+  it("does not round a positive required daily amount down to zero", () => {
+    expect(source).toMatch(/function formatGoalDailyRate\(value: number\)/);
+    expect(source).toMatch(/formatGoalDailyRate\(goalsStore\.recommendation\?\.requiredDaily/);
+  });
 });

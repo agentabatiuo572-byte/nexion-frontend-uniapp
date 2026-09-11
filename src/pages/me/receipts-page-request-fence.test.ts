@@ -50,10 +50,11 @@ describe("receipts page request fence", () => {
 });
 
 describe("receipts page lifecycle wiring", () => {
-  it("invalidates all receipt lanes on hide and refreshes both sources on show", () => {
+  it("invalidates all receipt lanes on hide and refreshes only the selected source on show", () => {
     expect(receiptsPageSource).toContain('from "@dcloudio/uni-app"');
     expect(receiptsPageSource).toMatch(/onHide\(\(\) => \{[\s\S]*invalidateRemoteReceiptsPage\(\)/);
-    expect(receiptsPageSource).toMatch(/onShow\(\(\) => \{[\s\S]*refreshRemoteVietQrDeposits\(\)[\s\S]*loadRemoteComputeReceipts\(0, false\)/);
-    expect(receiptsPageSource).toMatch(/function invalidateRemoteReceiptsPage\(\)[\s\S]*receiptRequestEpoch \+= 1[\s\S]*receiptPageRequestEpoch \+= 1[\s\S]*remoteMoreLoading\.value = false[\s\S]*open\.value = null[\s\S]*invalidateRemoteVietQrReceiptReads\(\)/);
+    expect(receiptsPageSource).toMatch(/onShow\(\(\) => \{[\s\S]*receiptsPageFence\.show\(\)[\s\S]*loadSelectedRemoteReceipts\(\)/);
+    expect(receiptsPageSource).toMatch(/function loadSelectedRemoteReceipts\(\): void \{[\s\S]*remoteReceiptKind\.value === "compute"[\s\S]*loadRemoteComputeReceipts\(0, false\)[\s\S]*refreshRemoteVietQrDeposits\(\)/);
+    expect(receiptsPageSource).toMatch(/function invalidateRemoteReceiptsPage\(\)[\s\S]*receiptRequestEpoch \+= 1[\s\S]*receiptPageRequestEpoch \+= 1[\s\S]*remoteComputeMoreLoading\.value = false[\s\S]*remoteDepositMoreLoading\.value = false[\s\S]*open\.value = null[\s\S]*invalidateRemoteVietQrReceiptReads\(\)/);
   });
 });

@@ -103,6 +103,7 @@ describe("task assignment server receipt projection", () => {
         earningStatus: "SETTLED", completedAt: "2026-08-15T00:00:00Z",
       }],
       nextOffset: 20,
+      total: 11,
       source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
     });
     const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
@@ -110,11 +111,38 @@ describe("task assignment server receipt projection", () => {
     await expect(api.receipts(0, 20)).resolves.toMatchObject({
       items: [{ receiptNo: "R-CTA-2", rewardUsdt: 0.25, completedAt: Date.parse("2026-08-15T00:00:00Z") }],
       nextOffset: 20,
+      total: 11,
       sourceEnvironment: "PRODUCTION",
       runId: "",
       serverCanonical: true,
     });
     expect(request).toHaveBeenCalledWith({ path: "/api/tasks/receipts?offset=0&limit=20" });
+  });
+
+  it("keeps the receipt total unknown when an older canonical server has not supplied it", async () => {
+    const request = vi.fn().mockResolvedValue({
+      items: [], nextOffset: null,
+      source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
+    });
+
+    await expect(createTaskAssignmentApi({ request } as unknown as ApiClient, "prod").receipts())
+      .resolves.toMatchObject({ items: [], nextOffset: null, total: null });
+  });
+
+  it("sends the server-issued receipt cursor for a stable subsequent page", async () => {
+    const request = vi.fn().mockResolvedValue({
+      items: [], nextOffset: 40, nextCursor: "R-CTA-20", total: null,
+      source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
+    });
+    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
+
+    await expect(api.receipts(20, 20, "R-CTA-20")).resolves.toMatchObject({
+      nextOffset: 40,
+      nextCursor: "R-CTA-20",
+    });
+    expect(request).toHaveBeenCalledWith({
+      path: "/api/tasks/receipts?offset=20&limit=20&cursor=R-CTA-20",
+    });
   });
 
   it("rejects an unsettled receipt summary before rendering the history list", async () => {
