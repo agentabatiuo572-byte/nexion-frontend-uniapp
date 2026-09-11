@@ -14,7 +14,7 @@
 -->
 <template>
   <view>
-    <view class="relative overflow-hidden active:scale-[0.98]" :style="cardStyle" @click="onCardTap">
+    <view class="relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
       <!-- Gold aurora wash（装饰,卡内合法光晕:bg+overflow-hidden）-->
       <view aria-hidden :style="auroraStyle" />
 
@@ -73,24 +73,34 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onUnmounted, type CSSProperties } from "vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis } from "@/store/genesis";
+import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { resolveGenesisEligibilityCardCopy, resolveGenesisPrimaryCta } from "@/lib/genesis-primary-cta";
 
 const t = useT();
 const genesis = useGenesis();
+const cfg = useGenesisConfig();
 const { gate, eligible } = useGenesisEligibility();
 const { block, blockText, showUrgency, preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
 
 const eligSheetOpen = ref(false);
+const supplyRetrying = ref(false);
+let retryGeneration = 0;
+onUnmounted(() => { retryGeneration += 1; });
 
-const soldOut = computed(() => genesis.totalSlots - genesis.soldSlots <= 0);
+// Remote bootstrap/failure intentionally uses the numeric 0/0 sentinel.  It is
+// not a confirmed exhausted series, so the showcase must never turn it into a
+// "sold out" market claim or a visible "Limited 0" count.
+const supplyKnown = computed(() => genesis.remoteSupplyKnown);
+const soldOut = computed(() => supplyKnown.value && genesis.totalSlots - genesis.soldSlots <= 0);
 /** 「硬阻断」= 市场关闭 / 熔断 / 配置未知。**售罄与预售不算** —— 那两态本来就有各自的
  *  展示语言(售罄字样 / 倒计时),不该被这条规则连坐。与创世页 dock 的取舍一致。 */
 const hardBlocked = computed(() => {
@@ -108,7 +118,9 @@ const countdownDisplay = computed(() => {
   return `${dayPart}${countdownClock.value}`;
 });
 const priceText = computed(() => genesis.unitPriceUSDT.toLocaleString());
-const eyebrowText = computed(() => fmt(t.value.store.genesisCardEyebrow, { n: genesis.totalSlots.toLocaleString() }));
+const eyebrowText = computed(() =>
+  supplyKnown.value ? fmt(t.value.store.genesisCardEyebrow, { n: genesis.totalSlots.toLocaleString() }) : "",
+);
 // 🔴 闸放在**值本身**,不是放在模板的 v-if 上:值到哪都安全,不必指望每个渲染点
 //   都记得加条件。上一版闸在模板里、定义在这里,两处相隔几十行 —— 机器门看不出关联,
 //   人也容易在新增渲染点时漏掉(这正是「还剩一处没收」的温床)。
@@ -129,7 +141,9 @@ const ctaText = computed(() => {
   // 账号资格只决定点击后进资格 sheet 还是详情页，不再把主售 CTA 改回“查看认购资格”。
   return resolveGenesisPrimaryCta({
     block: block.value,
-    blockedText: blockText.value,
+    // Unknown public supply offers an in-place recovery, so expose that action
+    // on the card itself instead of hiding retry only in a later toast.
+    blockedText: block.value === "configUnavailable" ? t.value.genesis.marketClosed.retryCta : blockText.value,
     soldOut: t.value.store.genesisCardCtaMarket,
     comingSoon: t.value.genesisEligibility.comingSoon,
     reserve: t.value.genesisEligibility.cardCta,
@@ -140,10 +154,41 @@ function goGenesis() {
   eligSheetOpen.value = false;
   navTo("/pages/genesis/genesis");
 }
-function onCardTap() {
+async function retryGenesisState(): Promise<void> {
+  if (supplyRetrying.value) return;
+  supplyRetrying.value = true;
+  const accountScope = captureAccountScope();
+  const generation = retryGeneration;
+  const current = () => generation === retryGeneration && isCurrentAccountScope(accountScope);
+  try {
+    // Configuration and supply have separate consumers of the public Genesis
+    // projection.  Retry both, while the store's request generation keeps a
+    // stale same-scope response from committing after a newer read.
+    await cfg.refresh();
+    // A config response can complete after route leave or account rebinding.
+    // Do not turn that old user intent into a new public read or a toast.
+    if (!current()) return;
+    await genesis.syncRemote();
+    if (!current()) return;
+    if (block.value === "configUnavailable") {
+      toast.info(ctaText.value, t.value.genesis.marketClosed.retryHint);
+    } else {
+      toast.success(t.value.genesis.marketClosed.retryOk);
+    }
+  } catch {
+    if (current()) toast.info(ctaText.value, t.value.genesis.marketClosed.retryHint);
+  } finally {
+    supplyRetrying.value = false;
+  }
+}
+async function onCardTap() {
   // 🔴 与 ctaText 同问 `block` 一处,顺序不在此重排(FEAT-GEN10 ④)。
   if (block.value === "soldOut") {
     navTo("/pages/genesis/marketplace");
+    return;
+  }
+  if (block.value === "configUnavailable") {
+    await retryGenesisState();
     return;
   }
   if (block.value !== null) {

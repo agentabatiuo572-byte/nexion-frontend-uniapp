@@ -65,10 +65,11 @@
                 </view>
               </view>
               <view class="flex items-center justify-between tabular-nums" :style="barMetaStyle">
-                <text>
-                  <text>{{ soldText }}</text>
-                  <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> / {{ totalText }} {{ t.genesis.soldOf }}</text>
+                <text v-if="supplyDisplay.known">
+                  <text>{{ supplyDisplay.summary }}</text>
+                  <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> {{ t.genesis.soldOf }}</text>
                 </text>
+                <text v-else>—</text>
                 <!-- 🔴 关闭态 / 售罄态不展示剩余名额紧迫文案(规格 FEAT-GEN10 ④:
                      不对不可购买的东西制造紧迫感)。判据来自 showUrgency 单源,不在此处自判。 -->
                 <text v-if="showUrgency" class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
@@ -127,7 +128,7 @@
               <text style="color: var(--v5-ink); font-weight: 600">Q.</text>
               <text> {{ t.genesis.faq[k] }}</text>
             </text>
-            <text class="block" :style="faqAStyle">{{ t.genesis.faq[answerKey(k)] }}</text>
+            <text class="block" :style="faqAStyle">{{ faqAnswer(k) }}</text>
           </view>
         </view>
 
@@ -201,6 +202,8 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 import { deriveGenesisTierRows, type GenesisTierDisplayState } from "@/lib/genesis-tier-display";
 import { resolveGenesisPrimaryCta, showGenesisPrimaryPrice } from "@/lib/genesis-primary-cta";
+import { genesisSupplyDisplay } from "@/lib/genesis-supply-display";
+import { presentGenesisRoyalty } from "@/lib/genesis-marketplace-presentation";
 
 const t = useT();
 const genesis = useGenesis();
@@ -287,12 +290,18 @@ const faqKeys = ["q1", "q2", "q3"] as const;
 function answerKey(k: "q1" | "q2" | "q3"): "a1" | "a2" | "a3" {
   return k === "q1" ? "a1" : k === "q2" ? "a2" : "a3";
 }
+function faqAnswer(k: "q1" | "q2" | "q3"): string {
+  const answer = t.value.genesis.faq[answerKey(k)];
+  if (k !== "q2") return answer;
+  const royalty = presentGenesisRoyalty(genesis.remoteRoyaltyPct);
+  return royalty === null ? t.value.genesis.royaltyUnavailable : fmt(answer, { royalty });
+}
 
 const sold = computed(() => genesis.soldSlots);
 const total = computed(() => genesis.totalSlots);
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
-const soldPct = computed(() => (sold.value / total.value) * 100);
+const supplyDisplay = computed(() => genesisSupplyDisplay(sold.value, total.value, genesis.remoteSupplyKnown));
 const liveMarket = computed(() => remoteApiEnabled
   ? genesis.remoteListings.slice(0, 2).map((listing) => ({
       id: listing.tokenId,
@@ -336,8 +345,6 @@ const countdownDisplay = computed(() => {
   return `${t.value.genesisEligibility.countdownLabel} ${dayPart}${countdownClock.value}`;
 });
 
-const totalText = computed(() => total.value.toLocaleString());
-const soldText = computed(() => sold.value.toLocaleString());
 const priceText = computed(() => price.value.toLocaleString());
 
 // 阶梯档展示：累计售出决定各档 售罄/当前 态。档位读 live config(运营 G4 可配、可增删)。
@@ -545,7 +552,7 @@ const barTrackStyle: CSSProperties = {
 };
 const barFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${salesBarInView.value ? soldPct.value : 0}%`,
+  width: salesBarInView.value ? supplyDisplay.value.progressWidth : "0%",
   background: "linear-gradient(90deg, #B5894A 0%, #E2C97C 50%, var(--v5-genesis-gold-on-dark) 100%)",
   borderRadius: "2px",
   boxShadow: "0 0 8px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 50%, transparent)",

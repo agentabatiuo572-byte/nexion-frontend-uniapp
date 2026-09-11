@@ -17,6 +17,11 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionS
 import { resolveRemoteGenesisPurchase } from "@/lib/genesis-remote-purchase";
 import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
 import { genesisHoldingId } from "@/lib/genesis-holding-id";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { parseGenesisListingPrice } from "@/lib/genesis-listing-price";
+import { withGenesisCommandLock } from "@/lib/genesis-command-lock";
+import { hydrateGenesisMarketCommands, type GenesisMarketCommand, type GenesisMarketOperation,
+  type GenesisCommandOutcome } from "@/lib/genesis-market-command";
 import type {
   GenesisAccountState,
   GenesisEmission,
@@ -29,6 +34,10 @@ import type {
 // 阶梯档位类型 + 默认值现定义在 genesis-config.ts(叶子,避免 TDZ 循环);
 // re-export 兼容既有 import 方(canon-sentinel 改读 genesis-config,见 Step 5)。
 export { GENESIS_TIERS, type GenesisTier };
+
+/** Projection read state stays separate from the fact values: an empty list is
+ * only a real empty market/account after its corresponding remote read is ready. */
+export type GenesisRemoteReadState = "loading" | "ready" | "unavailable";
 
 /**
  * Genesis Node 创世节点 — 高价稀缺 OG 席位（1000 限量）。
@@ -140,6 +149,7 @@ interface GenesisUserData {
   ownedTokenIds: Array<string | number>;
   myListings: MyListing[];
   idempotencyKeys?: Record<string, string>;
+  marketCommands?: Record<string, GenesisMarketCommand>;
 }
 
 const STORAGE_KEY = "nexgrid-genesis"; // 仅全平台片
@@ -192,6 +202,7 @@ function hydrateUser(accountKey: string, soldSlots: number): GenesisUserData {
     myListings: Array.isArray(row.myListings) ? row.myListings : [],
     idempotencyKeys: row.idempotencyKeys && typeof row.idempotencyKeys === "object"
       ? { ...row.idempotencyKeys } : {},
+    marketCommands: row.marketCommands,
   };
 }
 
@@ -257,6 +268,9 @@ export const useGenesis = defineStore("genesis", () => {
   const initUser = remoteApiEnabled ? userDefaults() : hydrateUser(boundKey, initGlobal.soldSlots);
   const totalSlots = ref(remoteApiEnabled ? 0 : TOTAL_SLOTS);
   const soldSlots = ref(initGlobal.soldSlots);
+  // A numeric zero is a valid server fact. Keep its availability separately so
+  // pages never present the remote bootstrap/failure sentinel as a sale count.
+  const remoteSupplyKnown = ref(!remoteApiEnabled);
   const myOwned = ref(initUser.myOwned);
   const ownedTokenIds = ref<Array<string | number>>(initUser.ownedTokenIds);
   const myListings = ref<MyListing[]>(initUser.myListings);
@@ -273,27 +287,38 @@ export const useGenesis = defineStore("genesis", () => {
   const remoteMarketStats = ref<GenesisMarketStats>({
     floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null,
   });
+  // The active series projects this rate from the same canonical source that settles trades.
+  // Null means the public projection is unavailable; pages must not replace it with 0%.
+  const remoteRoyaltyPct = ref<number | null>(null);
   const remoteEligibility = ref<GenesisEligibility | null>(null);
   const remoteEligibilityError = ref<string | null>(null);
-  const remotePublicReadState = ref<"loading" | "ready" | "unavailable">(remoteApiEnabled ? "loading" : "ready");
+  const remotePublicReadState = ref<GenesisRemoteReadState>(remoteApiEnabled ? "loading" : "ready");
+  const remoteAccountReadState = ref<GenesisRemoteReadState>(remoteApiEnabled ? "loading" : "ready");
   const remoteHalted = ref(remoteApiEnabled);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const emissionPager = createGenesisActivityPager((cursor) => genesisApi.emissionPage(cursor), (item) => `${item.batchNo}:${item.holdingNo}`);
   const remoteEmissions = computed(() => emissionPager.state.items);
   const remoteEmissionTotals = ref<GenesisAccountState["emissionTotals"]>(null);
   const intentKeys = ref<Record<string, string>>(initUser.idempotencyKeys ?? {});
+  const marketCommands = ref<Record<string, GenesisMarketCommand>>({});
+  let marketJournalReady = true;
+  const marketLocks = new Map<string, symbol>();
+  const remoteSecondaryCommandProtocol = ref(0);
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   let remoteReadGeneration = 0;
 
   const tokenIdFor = genesisHoldingId;
 
   function applyPublicState(state: GenesisPublicState): void {
+    remoteSecondaryCommandProtocol.value = state.secondaryCommandProtocol === 2 ? 2 : 0;
     remotePublicReadState.value = "ready";
     totalSlots.value = state.series.totalSupply;
     soldSlots.value = state.series.soldSupply;
+    remoteSupplyKnown.value = true;
     nexListed.value = state.emissionOpen;
     activityPager.reset(state.transactions, state.transactionsNextCursor ?? null);
     remoteMarketStats.value = state.marketStats;
+    remoteRoyaltyPct.value = state.series.royaltyPct;
     remoteHalted.value = state.halted;
     const listingMap: Record<string, string> = Object.create(null);
     remoteListings.value = state.listings.map((listing) => {
@@ -305,9 +330,11 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function applyAccountState(state: GenesisAccountState): void {
+    remoteAccountReadState.value = "ready";
     // Account responses are canonical development/production facts. Supply is
     // still owned by GET /api/genesis/state; account reads cannot replace it.
     const holdingMap: Record<string, string> = Object.create(null);
+    remoteRoyaltyPct.value = state.series.royaltyPct;
     const ids = state.holdings.map((holding) => {
       const tokenId = tokenIdFor(holding.holdingNo);
       holdingMap[tokenId] = holding.holdingNo;
@@ -335,7 +362,22 @@ export const useGenesis = defineStore("genesis", () => {
     applyAccountState(state);
   }
 
+  function applySecondaryCommandReceipt(state: GenesisAccountState, request: RemoteAccountRequest, runScope: RuntimeRevisionScope): void {
+    // Invalidate older reads before applying the committed account receipt.
+    // Only market facts need refreshing: a failed GET must not erase the
+    // holding/listing that the successful command has just confirmed.
+    const generation = ++remoteReadGeneration;
+    applyAccountState(state);
+    remotePublicReadState.value = "loading";
+    void genesisApi.state().then((publicState) => {
+      if (generation === remoteReadGeneration && remoteScopeCurrent(request, runScope)) applyPublicState(publicState);
+    }).catch(() => {
+      if (generation === remoteReadGeneration && remoteScopeCurrent(request, runScope)) clearRemotePublicFacts();
+    });
+  }
+
   function clearRemoteAccountFacts(): void {
+    remoteAccountReadState.value = "unavailable";
     remoteHoldings.value = [];
     emissionPager.reset([], null);
     orderPager.reset([], null);
@@ -348,20 +390,27 @@ export const useGenesis = defineStore("genesis", () => {
     remoteEligibilityError.value = null;
   }
 
-  function clearRemoteFacts(): void {
+  function clearRemotePublicFacts(): void {
+    remoteSecondaryCommandProtocol.value = 0;
     remotePublicReadState.value = "unavailable";
     // Zero means the public supply is unknown. Do not render the local 1,000-slot
     // fallback as if it were a server fact after a failed public-state hydrate.
     totalSlots.value = 0;
     soldSlots.value = 0;
+    remoteSupplyKnown.value = false;
     nexListed.value = false;
     nexListedAt.value = null;
     remoteListings.value = [];
     activityPager.reset([], null);
     listingNoByTokenId.value = {};
-    clearRemoteAccountFacts();
     remoteHalted.value = true;
     remoteMarketStats.value = { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null };
+    remoteRoyaltyPct.value = null;
+  }
+
+  function clearRemoteFacts(): void {
+    clearRemotePublicFacts();
+    clearRemoteAccountFacts();
   }
 
   function remoteScopeCurrent(request: RemoteAccountRequest, runScope: RuntimeRevisionScope): boolean {
@@ -373,8 +422,10 @@ export const useGenesis = defineStore("genesis", () => {
     runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    if (!remoteScopeCurrent(request, runScope)) return false;
     const readGeneration = ++remoteReadGeneration;
     remotePublicReadState.value = "loading";
+    remoteAccountReadState.value = "loading";
     activityPager.reset(activityPager.state.items, null);
     orderPager.reset(orderPager.state.items, null);
     emissionPager.reset(emissionPager.state.items, null);
@@ -385,8 +436,12 @@ export const useGenesis = defineStore("genesis", () => {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
       isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope),
       clear: clearRemoteFacts,
+      clearPublic: clearRemotePublicFacts,
       clearAccount: clearRemoteAccountFacts,
-      applyEligibilityError: (reason) => { remoteEligibilityError.value = reason; },
+      applyEligibilityError: (reason) => {
+        remoteAccountReadState.value = "unavailable";
+        remoteEligibilityError.value = reason;
+      },
       applyPublicState,
       applyAccount: applyAccountState,
       applyEligibility: (eligibility) => {
@@ -394,12 +449,45 @@ export const useGenesis = defineStore("genesis", () => {
         remoteEligibilityError.value = null;
       },
     });
-    if (readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope)
-      && remotePublicReadState.value === "loading") remotePublicReadState.value = "unavailable";
+    if (readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope)) {
+      if (remotePublicReadState.value === "loading") remotePublicReadState.value = "unavailable";
+      if (remoteAccountReadState.value === "loading") remoteAccountReadState.value = "unavailable";
+    }
     return loaded;
   }
 
+  let commandStorageOwned = false;
+
+  function reloadCommandJournal(): boolean {
+    try {
+      const table = uni.getStorageSync(ACCOUNTS_KEY);
+      if (table && (typeof table !== "object" || Array.isArray(table))) throw new Error("GENESIS_COMMAND_JOURNAL_INVALID");
+      const row = table?.[boundKey] as Partial<GenesisUserData> | undefined;
+      if (row && (typeof row !== "object" || Array.isArray(row))) throw new Error("GENESIS_COMMAND_JOURNAL_INVALID");
+      const keys = row?.idempotencyKeys ?? {};
+      if (typeof keys !== "object" || Array.isArray(keys)
+        || Object.values(keys).some((key) => typeof key !== "string")) throw new Error("GENESIS_COMMAND_JOURNAL_INVALID");
+      const commands = hydrateGenesisMarketCommands(row?.marketCommands, keys, boundKey);
+      // A failed terminal-marker write is still known in this context. Keep it
+      // only while the corresponding durable pending record still exists.
+      for (const [id, command] of Object.entries(commands)) {
+        const known = marketCommands.value[id];
+        if (known?.state === "confirmed" && known.key === command.key
+          && known.operation === command.operation && known.holdingNo === command.holdingNo
+          && known.priceUsdt === command.priceUsdt) commands[id] = { ...command, state: "confirmed" };
+      }
+      intentKeys.value = { ...keys };
+      marketCommands.value = commands;
+      marketJournalReady = true;
+      return true;
+    } catch {
+      marketJournalReady = false;
+      return false;
+    }
+  }
+
   function persist(): boolean {
+    if (!marketJournalReady || (remoteApiEnabled && !commandStorageOwned)) return false;
     try {
       uni.setStorageSync(STORAGE_KEY, {
         soldSlots: soldSlots.value,
@@ -414,6 +502,7 @@ export const useGenesis = defineStore("genesis", () => {
       ownedTokenIds: ownedTokenIds.value,
       myListings: myListings.value,
       idempotencyKeys: intentKeys.value,
+      marketCommands: marketCommands.value,
     });
   }
 
@@ -423,7 +512,16 @@ export const useGenesis = defineStore("genesis", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(boundKey);
-      intentKeys.value = hydrateUser(boundKey, 0).idempotencyKeys ?? {};
+      const hydrated = hydrateUser(boundKey, 0);
+      intentKeys.value = hydrated.idempotencyKeys ?? {};
+      marketLocks.clear();
+      try {
+        marketCommands.value = hydrateGenesisMarketCommands(hydrated.marketCommands, intentKeys.value, boundKey);
+        marketJournalReady = true;
+      } catch {
+        marketJournalReady = false;
+        marketCommands.value = {};
+      }
       clearRemoteFacts();
       void syncRemote(remoteAccountEpoch.snapshot());
       return;
@@ -466,6 +564,7 @@ export const useGenesis = defineStore("genesis", () => {
    * 幂等记录首次上所时间锚，排放 vesting 从此刻起算。
    */
   function setNexListed(v: boolean) {
+    if (remoteApiEnabled) return;
     nexListed.value = v;
     if (v && nexListedAt.value == null) nexListedAt.value = Date.now();
     if (!v) nexListedAt.value = null;
@@ -531,29 +630,87 @@ export const useGenesis = defineStore("genesis", () => {
     return false;
   }
 
-  /** Account-scoped stable command key. It survives reloads and is reused when
-   * the network result is unknown; changing the requested intent creates a new
-   * slot without incorporating time or random state. */
-  function stableIntent(operation: string, target: string): string {
-    const scope = `${boundKey}|${operation}|${target}`;
-    const existing = intentKeys.value[scope];
-    if (existing) return existing;
-    const key = `genesis:${boundKey}:${operation}:${target}`;
-    intentKeys.value = { ...intentKeys.value, [scope]: key };
-    persist();
-    return key;
+  function claimMarketCommand(operation: GenesisMarketOperation, holdingNo: string, priceUsdt: number | null): GenesisMarketCommand | null {
+    const previousKeys = intentKeys.value;
+    const previousCommands = marketCommands.value;
+    const sequenceScope = `${boundKey}|market-command-sequence`;
+    const stored = previousKeys[sequenceScope];
+    const sequence = stored === undefined ? 0 : /^\d+$/.test(stored) ? Number(stored) : NaN;
+    if (!Number.isSafeInteger(sequence) || sequence >= Number.MAX_SAFE_INTEGER) return null;
+    const namespaceScope = `${boundKey}|market-command-namespace`;
+    const namespace = previousKeys[namespaceScope] || requireCryptoUuid();
+    const key = `genesis:v2:${namespace}:${sequence + 1}`;
+    const command: GenesisMarketCommand = { version: 2, key, holdingNo, operation, priceUsdt,
+      createdAt: Date.now(), state: "pending" };
+    intentKeys.value = { ...previousKeys, [namespaceScope]: namespace, [sequenceScope]: String(sequence + 1) };
+    marketCommands.value = { ...previousCommands, [key]: command };
+    if (persist()) return command;
+    intentKeys.value = previousKeys;
+    marketCommands.value = previousCommands;
+    return null;
   }
 
-  /** Retire a command key only after the mutation response was received.
-   * A timeout keeps the key for read-back/replay; a confirmed success must not
-   * poison a later, distinct list/cancel intent for the same holding. */
-  function retireIntent(operation: string, target: string): void {
-    const scope = `${boundKey}|${operation}|${target}`;
-    if (!(scope in intentKeys.value)) return;
-    const next = { ...intentKeys.value };
-    delete next[scope];
-    intentKeys.value = next;
-    persist();
+  function settleMarketCommand(id: string): boolean {
+    const command = marketCommands.value[id];
+    if (!command) return true;
+    // Save a terminal marker before deletion. If either storage write fails,
+    // retain the in-memory marker and lock; a later attempt is storage-only.
+    marketCommands.value = { ...marketCommands.value, [id]: { ...command, state: "confirmed" } };
+    if (!persist()) return false;
+    const previousCommands = marketCommands.value;
+    const previousKeys = intentKeys.value;
+    const commands = { ...previousCommands };
+    const keys = { ...previousKeys };
+    delete commands[id];
+    if (command.legacySlot && keys[command.legacySlot] === command.key) delete keys[command.legacySlot];
+    marketCommands.value = commands;
+    intentKeys.value = keys;
+    if (persist()) return true;
+    marketCommands.value = previousCommands;
+    intentKeys.value = previousKeys;
+    return false;
+  }
+
+  async function runMarketCommand(operation: GenesisMarketOperation, holdingNo: string, priceUsdt: number | null,
+    execute: (key: string) => Promise<GenesisAccountState>): Promise<GenesisCommandOutcome> {
+    if (remoteSecondaryCommandProtocol.value !== 2 || marketLocks.has(holdingNo)) return false;
+    const owner = Symbol(holdingNo);
+    marketLocks.set(holdingNo, owner);
+    const request = remoteAccountEpoch.snapshot();
+    const runScope = captureRuntimeRevision();
+    const current = () => remoteScopeCurrent(request, runScope);
+    try {
+      return await withGenesisCommandLock<GenesisCommandOutcome>(async () => {
+        if (!current() || !reloadCommandJournal()) return false;
+        commandStorageOwned = true;
+        try {
+          const previous = Object.entries(marketCommands.value).filter(([, row]) => row.holdingNo === holdingNo);
+          if (previous.length) {
+            for (const [id, command] of previous) {
+              if (command.state !== "confirmed") {
+                const status = await genesisApi.commandStatus(command.operation, holdingNo, command.key, command.priceUsdt);
+                if (!current()) return false;
+                // Missing/unknown/in-progress records never authorize a second mutation.
+                if (status !== "SUCCEEDED" && status !== "FAILED") return false;
+              }
+              if (!settleMarketCommand(id)) return "local-retirement-pending";
+            }
+            // The lookup establishes only the historical outcome. Render fresh account
+            // facts, never an old replay response or a success for this new button press.
+            await syncRemote(request, runScope);
+            return current() && remoteAccountReadState.value === "ready" ? "recovered" : false;
+          }
+          const command = claimMarketCommand(operation, holdingNo, priceUsdt);
+          if (!command) return false;
+          const state = await execute(command.key);
+          if (!current()) return false;
+          applySecondaryCommandReceipt(state, request, runScope);
+          return settleMarketCommand(command.key) ? true : "local-retirement-pending";
+        } finally { commandStorageOwned = false; }
+      }, false);
+    } finally {
+      if (marketLocks.get(holdingNo) === owner) marketLocks.delete(holdingNo);
+    }
   }
 
   async function purchase(
@@ -569,24 +726,30 @@ export const useGenesis = defineStore("genesis", () => {
     if (remoteApiEnabled) {
       const request = remoteAccountEpoch.snapshot();
       const runScope = captureRuntimeRevision();
-      const beforePrice = unitPriceUSDT.value;
-      const idempotencyKey = purchaseIdempotencyKey(n, tokenIds);
-      if (!idempotencyKey) return { ok: false, cost: 0, reason: "unavailable" };
-      const resolution = await resolveRemoteGenesisPurchase({
-        execute: () => genesisApi.purchase(n, idempotencyKey),
-        isCurrent: () => remoteScopeCurrent(request, runScope),
-        applyReceipt: applyCommittedPurchaseReceipt,
-        retireIntent: () => clearPurchaseIntent(n, tokenIds),
-        recoverUnknown: () => syncRemote(request, runScope),
-      });
-      if (!resolution.ok) return { ok: false, cost: 0, reason: resolution.reason };
-      const state = resolution.state;
-      return {
-        ok: true,
-        cost: n * beforePrice,
-        walletBalanceUsdt: state.walletBalanceUsdt,
-        walletReceiptSourceEnvironment: state.sourceEnvironment,
-      };
+      return withGenesisCommandLock(async () => {
+        if (!remoteScopeCurrent(request, runScope) || !reloadCommandJournal()) return { ok: false, cost: 0, reason: "unavailable" as const };
+        commandStorageOwned = true;
+        try {
+          const beforePrice = unitPriceUSDT.value;
+          const idempotencyKey = purchaseIdempotencyKey(n, tokenIds);
+          if (!idempotencyKey) return { ok: false, cost: 0, reason: "unavailable" as const };
+          const resolution = await resolveRemoteGenesisPurchase({
+            execute: () => genesisApi.purchase(n, idempotencyKey),
+            isCurrent: () => remoteScopeCurrent(request, runScope),
+            applyReceipt: applyCommittedPurchaseReceipt,
+            retireIntent: () => clearPurchaseIntent(n, tokenIds),
+            recoverUnknown: () => syncRemote(request, runScope),
+          });
+          if (!resolution.ok) return { ok: false, cost: 0, reason: resolution.reason };
+          const state = resolution.state;
+          return {
+            ok: true,
+            cost: n * beforePrice,
+            walletBalanceUsdt: state.walletBalanceUsdt,
+            walletReceiptSourceEnvironment: state.sourceEnvironment,
+          };
+        } finally { commandStorageOwned = false; }
+      }, { ok: false, cost: 0, reason: "unavailable" as const });
     }
 
     // ↓↓ mock 模式(remoteApiEnabled=false)走这里:本仓的 server 同构面,不是遗留死码。
@@ -631,7 +794,8 @@ export const useGenesis = defineStore("genesis", () => {
     return { ok: true, cost };
   }
 
-  async function listNode(tokenId: string | number, askPriceUSDT: number): Promise<boolean> {
+  async function listNode(tokenId: string | number, askPriceUSDT: number): Promise<GenesisCommandOutcome> {
+    if (parseGenesisListingPrice(String(askPriceUSDT)) === null) return false;
     // 🔴 守卫必须在 holdingNo 之前:holdingNo 由服务端状态派生,mock 下恒空 ——
     //   守卫放在 lookup 之后的话,本地路径照样被 `if (!holdingNo) return false` 挡死。
     if (remoteApiEnabled) {
@@ -640,13 +804,7 @@ export const useGenesis = defineStore("genesis", () => {
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     try {
-      // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
-      const target = `${holdingNo}:${askPriceUSDT.toFixed(6)}`;
-      const state = await genesisApi.list(holdingNo, askPriceUSDT, stableIntent("list", target));
-      if (!remoteScopeCurrent(request, runScope)) return false;
-      applyAccountState(state);
-      retireIntent("list", target);
-      return syncRemote(request, runScope);
+      return await runMarketCommand("list", holdingNo, askPriceUSDT, (key) => genesisApi.list(holdingNo, askPriceUSDT, key));
     } catch { await syncRemote(request, runScope); return false; }
     }
 
@@ -681,19 +839,14 @@ export const useGenesis = defineStore("genesis", () => {
   //   若关闭态连撤单也拦,用户的席位就被困在一张永远卖不掉的单里,既不能撤回也无人承接
   //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
   //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
-  async function cancelListing(tokenId: string | number): Promise<boolean> {
+  async function cancelListing(tokenId: string | number): Promise<GenesisCommandOutcome> {
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     try {
-      // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
-      const state = await genesisApi.cancel(holdingNo, stableIntent("cancel", holdingNo));
-      if (!remoteScopeCurrent(request, runScope)) return false;
-      applyAccountState(state);
-      retireIntent("cancel", holdingNo);
-      return syncRemote(request, runScope);
+      return await runMarketCommand("cancel", holdingNo, null, (key) => genesisApi.cancel(holdingNo, key));
     } catch { await syncRemote(request, runScope); return false; }
     }
 
@@ -711,20 +864,15 @@ export const useGenesis = defineStore("genesis", () => {
    * 新资格策略固定覆盖一级与二级交易；生产端在原子成交事务内再次校验。
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
-  async function acquireSecondary(tokenId: string | number): Promise<boolean> {
+  async function acquireSecondary(tokenId: string | number, expectedPriceUsdt: number): Promise<GenesisCommandOutcome> {
+    if (parseGenesisListingPrice(String(expectedPriceUsdt)) === null) return false;
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     try {
-      // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
-      // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)
-      const state = await genesisApi.buy(holdingNo, stableIntent("buy", holdingNo));
-      if (!remoteScopeCurrent(request, runScope)) return false;
-      applyAccountState(state);
-      retireIntent("buy", holdingNo);
-      return syncRemote(request, runScope);
+      return await runMarketCommand("buy", holdingNo, expectedPriceUsdt, (key) => genesisApi.buy(holdingNo, expectedPriceUsdt, key));
     } catch (error) {
       await syncRemote(request, runScope);
       // Preserve the backend policy/error token for the visible purchase surface.
@@ -774,14 +922,15 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   return {
-    totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
+    totalSlots, soldSlots, remoteSupplyKnown, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, remoteTransactions, remoteMarketStats, remoteEligibility, remoteEligibilityError, remoteHalted,
+    remoteListings, remoteTransactions, remoteMarketStats, remoteRoyaltyPct, remoteEligibility, remoteEligibilityError,
+    remotePublicReadState, remoteAccountReadState, remoteHalted,
     activityPage: activityPager.state, loadMoreActivity: activityPager.more,
     orderPage: orderPager.state, loadMoreGenesisOrders: orderPager.more,
     emissionPage: emissionPager.state, loadMoreEmissions: emissionPager.more, remoteEmissionTotals,
-    remoteHoldings, remoteEmissions, remoteOrders, remotePublicReadState, syncRemote,
+    remoteHoldings, remoteEmissions, remoteOrders, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

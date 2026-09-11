@@ -77,6 +77,32 @@ function functionBodyAt(src, from) {
   return src.slice(open);
 }
 
+// A direct `void genesisApi.state().then(...).catch(...)` is a protected
+// runtime call, not a local function named `state`. Read one complete statement
+// before deciding whether its rejection is handled: callback bodies may contain
+// semicolons, so a simple search to the first one is not sound.
+function statementAt(src, from) {
+  let paren = 0, brace = 0, bracket = 0, quote = "", escaped = false;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === quote) quote = "";
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { quote = ch; continue; }
+    if (ch === "(") paren++;
+    else if (ch === ")") paren--;
+    else if (ch === "{") brace++;
+    else if (ch === "}") brace--;
+    else if (ch === "[") bracket++;
+    else if (ch === "]") bracket--;
+    else if (ch === ";" && paren === 0 && brace === 0 && bracket === 0) return src.slice(from, i + 1);
+  }
+  return src.slice(from);
+}
+
 const walkFiles = (dir, test) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
   const abs = path.join(dir, e.name);
   return e.isDirectory() ? walkFiles(abs, test) : test(e.name) ? [abs] : [];
@@ -101,6 +127,7 @@ const declGap = [];      // 本文件声明了、四族却认不出 —— 判�
 const crossModule = [];  // 本文件压根没声明(如 useContentCopy().x())—— 构造性排除
 const noRuntimeUse = []; // 声明了但函数体不碰任何 runtime 导入 —— 构造性排除(不是远端缝)
 const unsupportedImport = []; // 引了 runtime 但不是具名花括号写法 —— 取不到名单,必红
+const uncaughtDirectRuntimeCalls = []; // 直接 void runtime API 也必须有终态 catch,不许静默跳过
 for (const abs of walkFiles(SRC, (n) => n.endsWith(".ts"))) {
   const rel = "src/" + path.relative(SRC, abs).split(path.sep).join("/");
   const raw = readFileSync(abs, "utf8");
@@ -120,6 +147,14 @@ for (const abs of walkFiles(SRC, (n) => n.endsWith(".ts"))) {
   // 🔴 只吃到**第一个左括号**为止:早期版本允许跨过 `()` 再取一段,于是
   //    `void refreshRemote().catch(...)` 被读成 `.catch`,payout-address 那条缝整条漏掉。
   for (const m of src.matchAll(/void\s+([\w$.]+)\s*\(/g)) {
+    const receiver = m[1].split(".")[0];
+    if (m[1].includes(".") && runtimeIdents.includes(receiver)) {
+      // API member names (for example genesisApi.state) are not declarations
+      // in this module. They remain covered by a stricter local catch check.
+      const statement = statementAt(src, m.index);
+      if (!/\.catch\s*\(/.test(statement)) uncaughtDirectRuntimeCalls.push(`${rel}#${m[1]}`);
+      continue;
+    }
     const fn = m[1].split(".").pop();
     if (!fn || fn === "0") continue;
     const key = `${rel}#${fn}`;
@@ -145,6 +180,8 @@ check(`🔴 扫描判据未塌陷(实扫 ${uniq.length} 条缝)`, uniq.length > 
 // ③ import 写法全部取得到名单:出现取不到的写法就红,不许整文件静默消失。
 check(`🔴 runtime import 写法全部可解析(取不到具名清单的文件:${dedup(unsupportedImport).length} 个)`,
   unsupportedImport.length === 0, dedup(unsupportedImport).join(", "));
+check(`🔴 direct void runtime API 调用必须终态 .catch()(未兜底:${dedup(uncaughtDirectRuntimeCalls).length} 条)`,
+  uncaughtDirectRuntimeCalls.length === 0, dedup(uncaughtDirectRuntimeCalls).join(", "));
 // 两个构造性排除桶**逐条打印**,不静默:人 review 日志时能直接看见谁被排除了、为什么。
 console.log(`  ....  构造性排除 · 跨模块调用(本文件无声明)${dedup(crossModule).length} 条:${dedup(crossModule).join(", ")}`);
 console.log(`  ....  构造性排除 · 函数体不碰 runtime 导入 ${dedup(noRuntimeUse).length} 条:${dedup(noRuntimeUse).join(", ")}`);

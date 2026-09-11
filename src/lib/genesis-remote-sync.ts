@@ -14,6 +14,9 @@ export interface GenesisRemoteReadScope {
   hasAuthority(): boolean;
   isCurrent(): boolean;
   clear(): void;
+  /** Clears only public market facts after a failed public read while keeping a
+   * separately successful account projection intact. */
+  clearPublic?(): void;
   clearAccount(): void;
   applyEligibilityError?(reason: GenesisEligibilityReadError): void;
   applyPublicState(state: GenesisPublicState): void;
@@ -80,6 +83,7 @@ export async function readGenesisRemoteFacts(
   // projection overlay only its explicitly scoped facts. This keeps a
   // just-confirmed purchase visible without changing public supply ownership.
   if (publicAvailable) scope.applyPublicState(publicResult.value);
+  else scope.clearPublic?.();
   if (accountAvailable) {
     scope.applyAccount(accountResult.value);
     scope.applyEligibility(eligibilityResult.value);

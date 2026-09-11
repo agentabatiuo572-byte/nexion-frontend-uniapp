@@ -4,6 +4,27 @@ import { advanceRuntimeRevision } from "./order-api";
 
 describe("genesis remote truth contract", () => {
   beforeEach(() => advanceRuntimeRevision(null));
+  it("queries an authenticated command status without dispatching or consuming a historical account receipt", async () => {
+    const request = vi.fn().mockResolvedValue({ status: "SUCCEEDED", secondaryCommandProtocol: 2 });
+    await expect(createGenesisApi({ request } as never).commandStatus("list", "GEN-ONE", "stored-key", 10.123456)).resolves.toBe("SUCCEEDED");
+    expect(request).toHaveBeenCalledExactlyOnceWith({ method: "GET", authenticated: true, idempotencyKey: "stored-key",
+      path: "/api/genesis/holdings/GEN-ONE/commands/list?priceUsdt=10.123456" });
+  });
+  it("rejects malformed or old-protocol recovery responses", async () => {
+    for (const response of [{ status: "SUCCEEDED" }, { status: "OK", secondaryCommandProtocol: 2 }]) {
+      const request = vi.fn().mockResolvedValue(response);
+      await expect(createGenesisApi({ request } as never).commandStatus("buy", "GEN-ONE", "legacy", null)).rejects.toThrow();
+    }
+  });
+  it("sends the buyer's displayed price and preserves a price-change rejection", async () => {
+    const rejection = new Error("GENESIS_LISTING_PRICE_CHANGED");
+    const request = vi.fn().mockRejectedValue(rejection);
+    await expect(createGenesisApi({ request } as never).buy("GEN-ONE", 10.123456, "quote-key")).rejects.toBe(rejection);
+    expect(request).toHaveBeenCalledExactlyOnceWith({
+      method: "POST", path: "/api/genesis/listings/GEN-ONE/buy", authenticated: true,
+      idempotencyKey: "quote-key", body: { expectedPriceUsdt: 10.123456 },
+    });
+  });
   it("reads eligibility from the dedicated server endpoint", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,

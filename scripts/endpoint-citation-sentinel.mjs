@@ -320,6 +320,7 @@ const LEDGER = {
   "/api/genesis/account": "TBD-NAME: 创世账户读;PRD 未定义",
   "/api/genesis/purchase": "TBD-NAME: 创世购买;PRD 未定义该路径(§10.1 有业务规则)",
   "/api/genesis/holdings/:param/listing": "TBD-NAME: 创世持仓挂单/撤单;概念见 PRD §10.2.4,路径未定义",
+  "/api/genesis/holdings/:param/commands/:param": "BACKEND: AppGenesisController 已实现;认证用户按原幂等键只读查询挂单/撤单/买入状态,不执行历史命令",
   "/api/genesis/listings/:param/buy": "TBD-NAME: 创世二级买入;同上",
   "/api/content/i18n": "TBD-NAME: 三语文案下发;PRD 未定义",
   "/api/content/learning/courses": "PRD §11.11.1(教程中心课程列表 + 进度汇总)",

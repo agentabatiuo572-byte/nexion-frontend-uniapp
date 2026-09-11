@@ -56,7 +56,7 @@ const deltaPct = computed<string | null>(() =>
     : null,
 );
 const isUp = computed(() => delta.value > 0);
-const priceText = computed(() => props.l.priceUSDT.toLocaleString());
+const priceText = computed(() => props.l.priceUSDT.toLocaleString(undefined, { maximumFractionDigits: 6 }));
 const lastSaleText = computed(() => props.l.lastSaleUSDT === null
   ? "—" : fmt(t.value.marketplace.lastSale, { k: (props.l.lastSaleUSDT / 1000).toFixed(1) }));
 

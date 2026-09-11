@@ -97,6 +97,7 @@ export interface GenesisTier {
 }
 
 export interface GenesisPublicState {
+  secondaryCommandProtocol?: number;
   sourceEnvironment: GenesisSourceEnvironment;
   runId: string;
   halted: boolean;
@@ -128,6 +129,8 @@ export interface GenesisMarketStats {
   floorDeltaPct: number | null;
   lastSaleUsdt: number | null;
 }
+
+export type GenesisCommandStatus = "SUCCEEDED" | "FAILED" | "PROCESSING" | "UNKNOWN" | "NOT_FOUND" | "MISMATCH";
 
 export interface GenesisAccountState {
   sourceEnvironment: GenesisSourceEnvironment;
@@ -428,6 +431,7 @@ export function parseGenesisPublicState(value: unknown, mode: ApiEnvironment = "
     catalogAvailable: row.catalogAvailable,
     tradeAvailable: row.tradeAvailable,
     tradeBlockedReason,
+    secondaryCommandProtocol: row.secondaryCommandProtocol === 2 ? 2 : 0,
     marketStats: parseMarketStats(row.marketStats),
   };
 }
@@ -519,6 +523,15 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
     eligibility: async () => parseEligibility(await client.request({
       method: "GET", path: "/api/genesis/eligibility", authenticated: true,
     }), mode),
+    commandStatus: async (operation: "list" | "cancel" | "buy", holdingNo: string, idempotencyKey: string,
+      priceUsdt: number | null): Promise<GenesisCommandStatus> => {
+      const row = record(await client.request({ method: "GET", authenticated: true, idempotencyKey,
+        path: `/api/genesis/holdings/${encodeURIComponent(holdingNo)}/commands/${operation}`
+          + (priceUsdt === null ? "" : `?priceUsdt=${encodeURIComponent(priceUsdt.toFixed(6))}`),
+      }));
+      if (!row || row.secondaryCommandProtocol !== 2 || !["SUCCEEDED", "FAILED", "PROCESSING", "UNKNOWN", "NOT_FOUND", "MISMATCH"].includes(String(row.status))) return invalid();
+      return row.status as GenesisCommandStatus;
+    },
     purchase: async (quantity: number, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST", path: "/api/genesis/purchase", authenticated: true, idempotencyKey, body: { quantity },
     }), mode),
@@ -536,11 +549,12 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
       authenticated: true,
       idempotencyKey,
     }), mode),
-    buy: async (holdingNo: string, idempotencyKey: string) => parseGenesisAccountState(await client.request({
+    buy: async (holdingNo: string, expectedPriceUsdt: number, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST",
       path: `/api/genesis/listings/${encodeURIComponent(holdingNo)}/buy`,
       authenticated: true,
       idempotencyKey,
+      body: { expectedPriceUsdt },
     }), mode),
   };
 }

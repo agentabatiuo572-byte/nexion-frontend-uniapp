@@ -136,7 +136,10 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
 
   const block = computed(() =>
     genesisPurchaseBlock({
-      configLoaded: cfg.loaded,
+      // `0 / 0` is the remote public-supply bootstrap/failure sentinel.  The
+      // config projection may already be readable, but a sale cannot be called
+      // sold out until its independently owned supply projection is confirmed.
+      configLoaded: cfg.loaded && (!remoteApiEnabled || genesis.remoteSupplyKnown),
       marketOpenState: cfg.config.marketOpenState,
       // Remote mode consumes the J1 server projection. The local mock keeps an
       // explicit local value; an unavailable remote refresh is already fail-closed
