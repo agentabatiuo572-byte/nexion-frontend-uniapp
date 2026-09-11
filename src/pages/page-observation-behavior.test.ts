@@ -51,6 +51,7 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     h3ObservationApi: createH3ObservationApi({ request } as unknown as ApiClient),
     invalidateDetailFacts: () => {}, stickyPageVisible: { value: true }, sticky: { hide: () => {} }, stickyOwner: "fixture",
     releaseActiveRefresh: () => {},
+    listingPageScope: { visible: false, epoch: 0 },
   };
   const js = ts.transpileModule(`
     const { ${Object.keys(deps).join(",")} } = deps;
@@ -131,7 +132,7 @@ it("actual Genesis sync separates public readiness from account-only success and
   const functions = new Map<string, ts.FunctionDeclaration>();
   const walk = (node: ts.Node) => { if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node); ts.forEachChild(node, walk); };
   walk(ast);
-  const publicState = { series: { totalSupply: 100, soldSupply: 1 }, emissionOpen: false, transactions: [], marketStats: {}, halted: false, listings: [] };
+  const publicState = { series: { totalSupply: 100, soldSupply: 1 }, emissionOpen: false, transactions: [], marketStats: {}, halted: false, listings: [], secondaryCommandProtocol: 2 };
   const api = { state: vi.fn().mockResolvedValue(publicState), account: vi.fn().mockResolvedValue({}), eligibility: vi.fn().mockResolvedValue({}) };
   const pager = () => ({ state: { items: [] }, reset: () => {} });
   const ref = (value: unknown = null) => ({ value });
@@ -146,26 +147,27 @@ it("actual Genesis sync separates public readiness from account-only success and
     remoteListings: ref(), listingNoByTokenId: ref(), tokenIdFor: (id: string) => id,
     remoteEligibility: ref(), remoteEligibilityError: ref(),
     remoteSupplyKnown: ref(), remoteRoyaltyPct: ref(), remoteAccountReadState: ref(),
+    remoteSecondaryCommandProtocol: ref(), nexListedAt: ref(),
   };
   const js = ts.transpileModule(`
     const { ${Object.keys(deps).join(",")} } = deps;
     let remoteReadGeneration = 0;
     const remotePublicReadState = { value: "loading" };
-    const clearRemotePublicFacts = () => { remotePublicReadState.value = "unavailable"; };
+    ${functions.get("clearRemotePublicFacts")!.getText(ast)}
     const clearRemoteFacts = clearRemotePublicFacts;
     ${functions.get("applyPublicState")!.getText(ast)}
     ${functions.get("syncRemote")!.getText(ast)}
-    return { syncRemote, remotePublicReadState };
+    return { syncRemote, remotePublicReadState, remoteSecondaryCommandProtocol };
   `, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  const actual = new Function("deps", js)(deps) as { syncRemote(): Promise<boolean>; remotePublicReadState: { value: string } };
-  await actual.syncRemote(); expect(actual.remotePublicReadState.value).toBe("ready");
+  const actual = new Function("deps", js)(deps) as { syncRemote(): Promise<boolean>; remotePublicReadState: { value: string }; remoteSecondaryCommandProtocol: { value: number } };
+  await actual.syncRemote(); expect(actual.remotePublicReadState.value).toBe("ready"); expect(actual.remoteSecondaryCommandProtocol.value).toBe(2);
   api.state.mockRejectedValueOnce(new Error("public unavailable"));
   expect(await actual.syncRemote()).toBe(true); // Account success is insufficient for a market observation.
-  expect(actual.remotePublicReadState.value).toBe("unavailable");
+  expect(actual.remotePublicReadState.value).toBe("unavailable"); expect(actual.remoteSecondaryCommandProtocol.value).toBe(0);
   let release!: (value: typeof publicState) => void;
   api.state.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
   const old = actual.syncRemote(); expect(actual.remotePublicReadState.value).toBe("loading");
-  await actual.syncRemote(); expect(actual.remotePublicReadState.value).toBe("ready");
+  await actual.syncRemote(); expect(actual.remotePublicReadState.value).toBe("ready"); expect(actual.remoteSecondaryCommandProtocol.value).toBe(2);
   release(publicState); expect(await old).toBe(false);
   expect(actual.remotePublicReadState.value).toBe("ready");
 });

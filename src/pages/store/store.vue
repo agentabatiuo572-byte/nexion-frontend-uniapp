@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, type CSSProperties } from "vue";
+import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SectionHeader from "@/components/store/section-header.vue";
@@ -91,6 +91,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
+import { useGenesis } from "@/store/genesis";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
@@ -105,27 +106,37 @@ import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 
-
 const t = useT();
 const app = useApp();
 const ownedDevices = computed(() => app.remoteFleetStatus === "ready" ? app.visibleDevices : []);
 const ownedHardware = computed(() => highestOwnedHardware(ownedDevices.value));
 const genesisCfg = useGenesisConfig();
+const genesis = useGenesis();
 const earnConfig = useEarnConfig();
+let storePageVisible = false;
+let storeObservationEpoch = 0;
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
-let storePageVisible = false;
-let storeObservationEpoch = 0;
 onShow(() => {
   storePageVisible = true;
   genesisCfg.refresh();
+  // G4's public state owns supply independently of the configuration fields.
+  // Re-read it whenever the store becomes visible so a prior failed 0/0
+  // bootstrap can recover without an account rebind or a Genesis-detail visit.
+  void genesis.syncRemote();
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
   void observeDayOneStorePage();
 });
-onHide(() => { storePageVisible = false; storeObservationEpoch += 1; });
-onUnmounted(() => { storePageVisible = false; storeObservationEpoch += 1; });
+onHide(() => {
+  storePageVisible = false;
+  storeObservationEpoch += 1;
+});
+onUnmounted(() => {
+  storePageVisible = false;
+  storeObservationEpoch += 1;
+});
 const phase = useProductPhase();
 
 // mounted guard: phase override persists in storage, rehydrates client-only —

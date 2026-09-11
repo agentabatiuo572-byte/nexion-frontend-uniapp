@@ -83,14 +83,14 @@ export const CAPTCHA_SECURITY_CONTROLS = [
    **付款半屏**漏在窗外 —— stake-sheet / genesis purchase-sheet / eligibility-sheet
    当时是 79/80(比秩序表记的 790/800 少一位数),庆祝 780 压在它们之上并**吃掉
    「锁仓」按钮的点击**(elementFromPoint 实测命中 .ms-backdrop)。那三张已归位到
-   790/800。2026-08-17 三处残留(消息抽屉 110/120 · opensea 弹窗 120 · PC 设备卡长按
+   790/800。2026-08-17 三处残留(消息抽屉 110/120 · OpenSea 弹窗 120 · PC 设备卡长按
    菜单 200)也已迁入 790/800,下沿随之降到 111 = 底盘常驻件最高值(模拟设备状态栏
    110)+1;此后 111 以上任何新浮层都在扫描面内。 */
 export const BUSINESS_BAND_FLOOR = 111; // 仅供文档/红测引用;判据已改为结构式,不再按数值取带
 
 /**
  * 结构判据的**显式欠账清单** —— 空 = 目标状态(2026-08-17 三条全部清掉:消息抽屉
- * 110/120 · opensea 弹窗 120 · PC 设备卡长按菜单 200,均已迁入 790/800 业务半屏带)。
+ * 110/120 · OpenSea 弹窗 120 · PC 设备卡长按菜单 200,均已迁入 790/800 业务半屏带)。
  * 🔴 这是**记账不是豁免**:清单在这里就是为了让下一个人看见它、而不是让门装作没看见。
  * 清掉一条就从这里删一条;新增任何一条都必须在这里写明理由,否则等于把缺陷藏进门里。
  *
@@ -99,19 +99,18 @@ export const BUSINESS_BAND_FLOOR = 111; // 仅供文档/红测引用;判据已�
  * fixed)、设备卡写的是内联 style(判据只扫 <style> 块)。所以本轮同时:
  *   · 抽屉改写成 fixed 满屏遮罩,与其余 19 个同形 → 自然落进扫描面;
  *   · 判据补扫 <template> 里的内联 style(见 scanFullScreenScrims);
- *   · 加 BAND_ANCHOR 钉住这三处,防「改回 absolute」这类绕过扫描面的回退。
+ *   · 加 BAND_ANCHOR 钉住仍存活的两处,防「改回 absolute」这类绕过扫描面的回退。
  */
 export const SCRIM_EXEMPT = [];
 
 /**
- * 回退锚 —— 这三处是 2026-08-17 从 110/120/200 迁进业务带的,必须一直**被扫描面看得见**。
+ * 回退锚 —— 这两处仍存活的组件曾从 110/120/200 迁进业务带,必须一直**被扫描面看得见**。
  * 与 SCRIM_EXEMPT 极性相反:那张是「别管这些」,这张是「这些必须在管辖内」。
  * why:光靠数值判据挡不住「把 position 改回 absolute」——形态一变判据就看不见它,
  * 于是 z 掉回 110 也全绿(这正是本轮之前的真实状态)。锚按文件断言,改名/删除同样红。
  */
 export const BAND_ANCHOR = [
   "src/components/message-drawer.vue",
-  "src/components/genesis/opensea-modal.vue",
   "src/components/earn/device-card-pc.vue",
 ];
 
@@ -425,15 +424,14 @@ function selftest() {
   }
   {
     // 锚的另一面:文件整体消失(删除 / 改名)也必须红,不许静默少守一处。
-    const files = clone().filter((f) => f.rel !== "src/components/genesis/opensea-modal.vue");
+    const files = clone().filter((f) => f.rel !== BAND_ANCHOR[0]);
     p("红测③-锚-消失 锚定文件被删/改名必红(不许因遍历不到而放行)",
       evaluate(files).problems.some((x) => x.startsWith("扫描面丢了成员")));
   }
   {
-    // 三处迁入后的数值本身:任一处掉回庆祝之下必红(锚管形态,这条管数值)。
+    // 两处仍存活锚的数值:任一处掉回庆祝之下必红(锚管形态,这条管数值)。
     for (const [rel, from, to] of [
       ["src/components/message-drawer.vue", /(\.md-root\s*\{[^}]*?z-index:\s*)\d+/s, "$1110"],
-      ["src/components/genesis/opensea-modal.vue", /(\.nx-os-overlay\s*\{[^}]*?z-index:\s*)\d+/s, "$1120"],
       ["src/components/earn/device-card-pc.vue", /(position: fixed; inset: 0; z-index: )\d+/, "$1200"],
     ]) {
       const files = patch(rel, (t) => t.replace(from, to));

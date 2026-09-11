@@ -40,6 +40,7 @@ describe("Genesis remote fact orchestration", () => {
   it("keeps holder facts when the unrelated public state projection is unavailable", async () => {
     const applied: { account?: GenesisAccountState; eligibility?: GenesisEligibility } = {};
     const applyPublicState = vi.fn();
+    const clearPublic = vi.fn();
     const api = {
       state: vi.fn<() => Promise<GenesisPublicState>>().mockRejectedValue(new Error("PUBLIC_STATE_SCHEMA_MISMATCH")),
       account: vi.fn<() => Promise<GenesisAccountState>>().mockResolvedValue(account()),
@@ -50,6 +51,7 @@ describe("Genesis remote fact orchestration", () => {
       hasAuthority: () => true,
       isCurrent: () => true,
       clear: vi.fn(),
+      clearPublic,
       clearAccount: vi.fn(),
       applyPublicState,
       applyAccount: (value) => { applied.account = value; },
@@ -59,6 +61,7 @@ describe("Genesis remote fact orchestration", () => {
     expect(applied.account?.eligibility.holderStatus).toBe("READY");
     expect(applied.eligibility?.reservedAllocation).toBe(800002.5);
     expect(applyPublicState).not.toHaveBeenCalled();
+    expect(clearPublic).toHaveBeenCalledOnce();
   });
 
   it("applies the authenticated account projection after public state so its scoped supply stays visible", async () => {
