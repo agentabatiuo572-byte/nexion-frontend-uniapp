@@ -2,7 +2,7 @@
   <StandalonePageShell class="cn-root" :top-inset="24">
     <!-- Progress (3/3 full) -->
     <view class="cn-bars">
-      <view class="cn-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
+      <view class="cn-back active:opacity-60" role="button" :tabindex="activationBusy || phase === 'calibrating' ? -1 : 0" :aria-disabled="activationBusy || phase === 'calibrating'" :aria-label="t.login.back" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
@@ -40,23 +40,9 @@
       <view v-else-if="phase === 'calibrating'" key="calibrating" class="cn-phase">
         <view class="cn-prog-row">
           <svg class="cn-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-          <text class="cn-prog-row__t">{{ progressText }}</text>
+          <text class="cn-prog-row__t">{{ t.onboarding.detecting }}</text>
         </view>
-        <view v-for="(tc, i) in testCards" :key="i" class="cn-test">
-          <view class="cn-test__top">
-            <view class="cn-test__ic" :style="{ background: mix(tc.accent, 14), color: tc.accent }">
-              <svg v-if="tc.progress < 1" width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="tc.accent" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="tc.icon" /><path v-if="tc.icon2" :d="tc.icon2" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="tc.accent" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </view>
-            <view class="cn-test__body">
-              <text class="cn-test__title">{{ tc.title }}</text>
-              <text class="cn-test__metric">{{ tc.metric }}</text>
-            </view>
-          </view>
-          <view class="cn-test__track">
-            <view class="cn-test__fill" :style="{ width: (tc.progress * 100) + '%', background: tc.accent }" />
-          </view>
-        </view>
+
       </view>
 
       <!-- Phase: result -->
@@ -67,7 +53,7 @@
             <text class="cn-score__cap-t">{{ t.onboarding.resultTitle }}</text>
           </view>
           <view class="cn-score__num">
-            <text class="cn-score__v">{{ shownScore }}</text>
+            <text class="cn-score__v">{{ finalScore }}</text>
             <text class="cn-score__d">/100</text>
           </view>
           <text class="cn-score__tier">{{ tierLabel }}</text>
@@ -79,7 +65,7 @@
 
         <view class="cn-summary">
           <view v-for="(r, i) in resultRows" :key="i" class="cn-row">
-            <view class="cn-row__check">
+            <view v-if="r.value !== '—'" class="cn-row__check">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </view>
             <text class="cn-row__label">{{ r.label }}</text>
@@ -116,7 +102,7 @@
     </transition>
 
     <view class="cn-cta">
-      <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
+      <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
         <text class="cn-go__t cn-go__t--on">{{ activateText }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -134,8 +120,8 @@
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
-import { ref, computed, onUnmounted, watch } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { onLoad, onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -147,8 +133,11 @@ import { getDeviceId } from "@/lib/device-id";
 import { collectDeviceSignals } from "@/lib/device-signals";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
-import type { CalibrationRequestSignals, OnboardingCalibration } from "@/api/onboarding-calibration-api";
-import { ApiError } from "@/api/errors";
+import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
+import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 
 const t = useT();
@@ -157,13 +146,13 @@ const auth = useAuth();
 // Recalibrate mode (?mode=recalibrate) = new-device re-measure; otherwise the
 // first-time onboarding calibration. Set in onLoad.
 const isRecal = ref(false);
+const resumeDeferred = ref(false);
 
 type Phase = "intro" | "calibrating" | "result" | "error";
 type FailedAction = "calibration" | "activate" | "defer";
 const phase = ref<Phase>("intro");
 const failedAction = ref<FailedAction>("calibration");
 
-const CALIBRATION_MS = 12_000;
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
 // sandbox, and remote cannot turn device observations into business facts.
@@ -179,14 +168,16 @@ let mounted = true;
 let accountEpoch = 0;
 let requestGeneration = 0;
 function accountKey(): string { return auth.accountId || auth.email || "default"; }
-function currentScope(): OnboardingCalibrationScope {
-  return { accountKey: accountKey(), accountEpoch, generation: requestGeneration };
+type RequestScope = OnboardingCalibrationScope & { remote: RemoteAccountRequest };
+function currentScope(): RequestScope {
+  return { accountKey: accountKey(), accountEpoch, generation: requestGeneration, remote: captureAccountScope() };
 }
-function scopeIsCurrent(scope: OnboardingCalibrationScope): boolean {
-  return mounted && isCurrentOnboardingCalibrationScope(scope, currentScope());
+function scopeIsCurrent(scope: RequestScope): boolean {
+  return mounted && auth.isAuthenticated && isCurrentAccountScope(scope.remote)
+    && isCurrentOnboardingCalibrationScope(scope, currentScope());
 }
-function acceptCurrentCanonical(scope: OnboardingCalibrationScope, result: OnboardingCalibration): boolean {
-  return scopeIsCurrent(scope) && result.sourceEnvironment === "PRODUCTION" && result.runId === "";
+function acceptCurrentCanonical(scope: RequestScope, result: OnboardingCalibration): boolean {
+  return scopeIsCurrent(scope) && calibrationBelongsTo(result, accountKey(), getDeviceId());
 }
 const authenticatedAccountKey = computed(() => auth.isAuthenticated ? accountKey() : "");
 watch(authenticatedAccountKey, (next, previous) => {
@@ -198,7 +189,8 @@ watch(authenticatedAccountKey, (next, previous) => {
   activationBusy.value = false;
   accountEpoch += 1;
   requestGeneration += 1;
-  calibrationIntent = null;
+  calibrationFlow.reset();
+  activationIntent = null;
   canonical.value = null;
   if (phase.value !== "intro") phase.value = "error";
   failedAction.value = "calibration";
@@ -233,141 +225,47 @@ const whyPoints = computed(() => [
   { icon: ICON.battery, color: "var(--v5-warning)", text: t.value.onboarding.calibrationWhyLine3 },
 ]);
 
-// ── calibrating tickers ──
-const progress = ref(0);
-const tops = ref(0);
-const ping = ref<number | null>(null);
-const battery = ref<number | null>(null);
-let calInterval: ReturnType<typeof setInterval> | undefined;
-let calTimeout: ReturnType<typeof setTimeout> | undefined;
-let calibrationIntent: {
-  deviceId: string;
-  signals: CalibrationRequestSignals;
-  expectedRevision: number | null;
-  idempotencyKey: string;
-} | null = null;
+// Initial onboarding reuses the estimator's canonical result. Only an explicit
+// warehouse remeasurement/resume can replace an existing calibration.
+const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
+  collect: collectDeviceSignals, key: () => `onboarding:${requireCryptoUuid()}` });
 let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string } | null = null;
 const activationBusy = ref(false);
 
-function startCalibration() {
-  if (calInterval) clearInterval(calInterval);
-  if (calTimeout) clearTimeout(calTimeout);
+async function startCalibration() {
   canonical.value = null;
   activationIntent = null;
-  progress.value = 0; tops.value = 0; ping.value = null; battery.value = null;
   const requestScope = { ...currentScope(), generation: ++requestGeneration };
   try {
-    if (!calibrationIntent) {
-      const deviceId = getDeviceId();
-      calibrationIntent = {
-        deviceId,
-        signals: collectDeviceSignals(),
-        expectedRevision: isRecal.value ? null : 0,
-        idempotencyKey: `onboarding:${deviceId}:${requireCryptoUuid()}`,
-      };
+    const result = await calibrationFlow.run({ deviceId: getDeviceId(), accountKey: accountKey(),
+      isCurrent: () => scopeIsCurrent(requestScope), recalibrate: isRecal.value || resumeDeferred.value });
+    if (!acceptCurrentCanonical(requestScope, result)) return;
+    canonical.value = result;
+    if (result.activationStatus === "DEFERRED") {
+      resumeDeferred.value = true;
+      phase.value = "intro";
+      return;
     }
+    if (!result.calibrationAvailable) throw new Error("ONBOARDING_CALIBRATION_UNAVAILABLE");
+    phase.value = "result";
   } catch {
+    if (!mounted || !isCurrentOnboardingCalibrationScope(requestScope, currentScope())) return;
     failedAction.value = "calibration";
     phase.value = "error";
-    return;
   }
-  const intent = calibrationIntent;
-  const expectedRevision = intent.expectedRevision === null
-    ? onboardingCalibrationApi.result(intent.deviceId)
-      .then((current) => { intent.expectedRevision = current.revision; return current.revision; })
-      .catch((error: unknown) => {
-        // A deferred first-time detection can legitimately have no canonical
-        // row yet. Re-entering from the warehouse creates revision 0; every
-        // other result error remains fail-closed.
-        if (!(error instanceof ApiError) || error.kind !== "http" || error.status !== 404) throw error;
-        intent.expectedRevision = 0;
-        return 0;
-      })
-    : Promise.resolve(intent.expectedRevision);
-  const serverRequest = expectedRevision.then((revision) => {
-    if (!scopeIsCurrent(requestScope)) throw new Error("ONBOARDING_CALIBRATION_SCOPE_STALE");
-    return onboardingCalibrationApi.calibrate(intent.deviceId, intent.signals, revision, intent.idempotencyKey);
-  });
-  // Let the ritual animate toward the already-authoritative response as soon
-  // as it arrives; the timeout below still gates the result screen.
-  void serverRequest.then((result) => {
-    if (acceptCurrentCanonical(requestScope, result)) canonical.value = result;
-  }).catch(() => {});
-  const start = Date.now();
-  calInterval = setInterval(() => {
-    const p = Math.min(1, (Date.now() - start) / CALIBRATION_MS);
-    progress.value = p;
-    const npuP = Math.min(1, p / 0.45);
-    tops.value = +(npuP * finalTops.value).toFixed(1);
-    if (p > 0.3) {
-      const netP = Math.min(1, (p - 0.3) / 0.5);
-      ping.value = finalPing.value === null ? null : Math.round(netP * finalPing.value);
-    }
-    if (p > 0.55) {
-      battery.value = finalBattery.value === null ? null : Math.round(Math.min(1, (p - 0.55) / 0.3) * finalBattery.value);
-    }
-  }, 100);
-  calTimeout = setTimeout(() => {
-    if (calInterval) clearInterval(calInterval);
-    serverRequest.then((result) => {
-      if (!acceptCurrentCanonical(requestScope, result)) return;
-      canonical.value = result;
-      progress.value = 1;
-      startResult();
-      phase.value = "result";
-    }).catch(() => {
-      if (!scopeIsCurrent(requestScope)) return;
-      failedAction.value = "calibration";
-      phase.value = "error";
-    });
-  }, CALIBRATION_MS);
-}
-
-const progressText = computed(() =>
-  fmt(t.value.onboarding.calibrationProgress, {
-    n: Math.max(0, Math.ceil((1 - progress.value) * (CALIBRATION_MS / 1000))),
-  })
-);
-
-const testCards = computed(() => {
-  const npuP = Math.min(1, progress.value / 0.45);
-  const netP = Math.min(1, Math.max(0, (progress.value - 0.3) / 0.5));
-  const pwP = Math.min(1, Math.max(0, (progress.value - 0.55) / 0.3));
-  return [
-    { icon: ICON.cpu, title: t.value.onboarding.testNpu, metric: fmt(t.value.onboarding.testComputeMetric, { n: tops.value.toFixed(1) }), progress: npuP, accent: "var(--v5-brand)" },
-    { icon: ICON.globe2, icon2: ICON.globe, title: t.value.onboarding.testNetwork, metric: ping.value === null ? "—" : fmt(t.value.onboarding.testNetworkPing, { sg: ping.value, tk: ping.value, us: ping.value }), progress: netP, accent: "var(--v5-tech-cyan)" },
-    { icon: ICON.battery, title: t.value.onboarding.testPower, metric: battery.value === null ? "—" : fmt(t.value.onboarding.testPowerOK, { n: battery.value }), progress: pwP, accent: "var(--v5-warning)" },
-  ];
-});
-
-// ── result score tick ──
-const shownScore = ref(0);
-let raf = 0;
-function startResult() {
-  const start = Date.now();
-  const tick = () => {
-    const p = Math.min(1, (Date.now() - start) / 900);
-    shownScore.value = Math.round(p * finalScore.value);
-    if (p < 1) raf = requestAnimationFrame(tick);
-  };
-  raf = requestAnimationFrame(tick);
 }
 
 const tierLabel = computed(() => fmt(t.value.onboarding.resultTier, { n: finalTier.value }));
 const resultRows = computed(() => [
   { label: t.value.onboarding.testNpu, value: fmt(t.value.onboarding.resultComputeMetric, { n: finalTops.value }) },
-  { label: t.value.onboarding.testNetwork, value: finalPing.value === null ? "—" : `${finalPing.value}ms · ${t.value.onboarding.resultLatencyGood}` },
-  { label: t.value.onboarding.testPower, value: finalBattery.value === null ? "—" : fmt(t.value.onboarding.resultPowerReady, { n: finalBattery.value }) },
+  { label: t.value.onboarding.testNetwork, value: finalPing.value === null ? "—" : `${finalPing.value}ms` },
+  { label: t.value.onboarding.testPower, value: finalBattery.value === null ? "—" : `${finalBattery.value}%` },
 ]);
 const policyLines = computed(() => [
   t.value.onboarding.policyLine1,
   t.value.onboarding.policyLine2,
   t.value.onboarding.policyLine3,
 ]);
-
-function mix(token: string, pct: number) {
-  return `color-mix(in oklab, ${token} ${pct}%, transparent)`;
-}
 
 // start calibration when entering that phase
 watch(phase, (p) => {
@@ -377,6 +275,11 @@ watch(phase, (p) => {
 function retryCalibration() {
   if (activationBusy.value) return;
   if (failedAction.value === "activate") {
+    if (!canonical.value?.calibrationAvailable) {
+      resumeDeferred.value = true;
+      phase.value = "intro";
+      return;
+    }
     void activate();
     return;
   }
@@ -417,16 +320,25 @@ async function activate() {
   const before = canonical.value;
   const command = activationCommand("ACTIVE", before.revision);
   const app = useApp();
-  // Apply the freshly-measured baseline to the live phone device + record this
+  // Apply the server-confirmed baseline to the live phone device + record this
   // device as the account's calibrated device (so future logins on it skip
   // recalibration, while a different device triggers it).
-  const cap = { score: before.score, tier: before.tier, tops: before.tops,
-    baseRateUsdt: before.baseRateUsdt, baseRateNex: before.baseRateNex, signals: before.signals };
   try {
-    const activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey);
+    let activated: OnboardingCalibration;
+    try {
+      activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey);
+    } catch (cause) {
+      if (!scopeIsCurrent(requestScope)) return;
+      const readback = await onboardingCalibrationApi.result(before.deviceId);
+      if (!acceptCurrentCanonical(requestScope, readback)) return;
+      canonical.value = readback;
+      if (!readback.calibrationAvailable || readback.activationStatus !== "ACTIVE") throw cause;
+      activated = readback;
+    }
     if (!acceptCurrentCanonical(requestScope, activated)) return;
-    if (activated.activationStatus !== "ACTIVE") throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
-    app.applyPhoneCalibration(cap);
+    if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
+    app.applyPhoneCalibration({ score: activated.score!, tier: activated.tier!, tops: activated.tops!,
+      baseRateUsdt: activated.baseRateUsdt!, baseRateNex: activated.baseRateNex!, signals: activated.signals! });
     if (!useSession().markCalibrated(auth.email || auth.accountId || "default")
         || !completeOnboardingLocally()) {
       throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
@@ -453,40 +365,12 @@ async function deferPhoneActivation() {
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   try {
-    let current = canonical.value;
-    if (!current) {
-      try {
-        current = await onboardingCalibrationApi.result(calibrationIntent?.deviceId || getDeviceId());
-        if (!acceptCurrentCanonical(requestScope, current)) return;
-      } catch (error: unknown) {
-        if (!scopeIsCurrent(requestScope)) return;
-        // Detection can fail before the first calibration row exists. Only
-        // that explicit absence may continue to the server's revision-0
-        // DEFERRED tombstone command; every other read failure stays closed.
-        if (!(error instanceof ApiError) || error.kind !== "http" || error.status !== 404) throw error;
-        current = null;
-      }
-    }
-    const deviceId = current?.deviceId || calibrationIntent?.deviceId || getDeviceId();
-    const command = activationCommand("DEFERRED", current?.revision ?? 0);
-    if (!scopeIsCurrent(requestScope)) return;
-    try {
-      current = await onboardingCalibrationApi.defer(deviceId, command.revision, command.idempotencyKey);
-      if (!acceptCurrentCanonical(requestScope, current)) return;
-    } catch (cause: unknown) {
-      if (!scopeIsCurrent(requestScope)) return;
-      const readback = await onboardingCalibrationApi.result(deviceId);
-      if (!acceptCurrentCanonical(requestScope, readback)) return;
-      if (readback.activationStatus !== "DEFERRED") {
-        // Retry the exact same command. Reusing both revision and key lets
-        // the server deduplicate a lost response and rejects a stale state.
-        current = await onboardingCalibrationApi.defer(deviceId, command.revision, command.idempotencyKey);
-        if (!acceptCurrentCanonical(requestScope, current)) return;
-      } else {
-        current = readback;
-      }
-      if (!current) throw cause;
-    }
+    const current = await confirmDeferredPhoneActivation({
+      current: canonical.value, deviceId: getDeviceId(),
+      command: (revision) => activationCommand("DEFERRED", revision),
+      isCurrent: () => scopeIsCurrent(requestScope),
+      accept: (result) => acceptCurrentCanonical(requestScope, result),
+    });
     if (!scopeIsCurrent(requestScope)) return;
     if (current.activationStatus !== "DEFERRED") throw new Error("PHONE_DEFER_NOT_CONFIRMED");
     canonical.value = current;
@@ -502,6 +386,9 @@ async function deferPhoneActivation() {
     navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/index/index", fail: () => {} });
   } catch {
     if (scopeIsCurrent(requestScope)) {
+      // A conflicting or uncertain write can leave the cached revision stale.
+      // The next explicit retry must first read the latest server decision.
+      canonical.value = null;
       failedAction.value = "defer";
       phase.value = "error";
     }
@@ -510,8 +397,7 @@ async function deferPhoneActivation() {
   }
 }
 function leaveConnect() {
-  if (calInterval) clearInterval(calInterval);
-  if (calTimeout) clearTimeout(calTimeout);
+  if (activationBusy.value || phase.value === "calibrating") return;
   requestGeneration += 1;
   navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
 }
@@ -519,13 +405,15 @@ function leaveConnect() {
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.mode === "recalibrate") isRecal.value = true;
+  if (o.mode === "resume") resumeDeferred.value = true;
 });
+onMounted(() => {
+  if (!isRecal.value && !resumeDeferred.value) phase.value = "calibrating";
+});
+onBackPress(() => { leaveConnect(); return true; });
 onUnmounted(() => {
   mounted = false;
   requestGeneration += 1;
-  if (calInterval) clearInterval(calInterval);
-  if (calTimeout) clearTimeout(calTimeout);
-  if (raf) cancelAnimationFrame(raf);
 });
 </script>
 

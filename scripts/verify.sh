@@ -26,6 +26,8 @@
 
 set -u
 MODULE="${1:-all}"
+# Every run owns its logs, including parallel runs from other worktrees.
+VERIFY_LOG_PREFIX="${TMPDIR:-/tmp}/nexgrid-verify-$$"
 # 🔴 export:本脚本 spawn 的**每个**探针都必须打同一个 origin。不 export 时,只读
 #   UNI_BASE_URL 的那几个探针(dom-qa / tap-feedback / empty-state / invisible-fill)
 #   会各自回落 5173 —— worktree 里主 checkout 正占着 5173,于是它们静默验了别的工程树。
@@ -106,7 +108,7 @@ if admin_root_resolved=$(resolve_admin_root); then ADMIN_ROOT="$admin_root_resol
 
 # ── 已知红(Tier 1-C):scripts/known-red.json 里登记的格(FAIL 标题固定前缀)未到期记 KNOWN-RED 不进 fail;到期回红。
 #    清单由 scripts/lib/known-red.mjs 校验(静态段有「已知红清单门」);这里只读它吐出的 TSV(prefix / until / why / active|expired)。
-KNOWN_RED_TSV="${TMPDIR:-/tmp}/uniapp-known-red.$$.tsv"
+KNOWN_RED_TSV="${VERIFY_LOG_PREFIX}-uniapp-known-red.$$.tsv"
 "${NODE_BIN:-node}" scripts/lib/known-red.mjs cells > "$KNOWN_RED_TSV" 2>/dev/null || : > "$KNOWN_RED_TSV"
 known_red_match() {   # $1=FAIL 标题 → 命中则打印 "until<TAB>why<TAB>status" 并返回 0
   local title="$1" prefix until why status
@@ -143,7 +145,7 @@ skipped() { PROBE_RETRIED_LAST=0; printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((sk
 # 反而掩盖不该存在的非确定性)。稳定红两跑仍红,不被洗绿(probe_retry_selftest 变异①钉死)。
 # ponytail: 重试 1 次是当前抖动率(~1/轮)下的够用值;若单探针 1 次重试仍频繁穿透,升级路径=
 # 该探针内部等待硬化单独立项,不是加大重试次数。
-PROBE_RETRY_LOG="${TMPDIR:-/tmp}/uniapp-probe-retries.$$.log"
+PROBE_RETRY_LOG="${VERIFY_LOG_PREFIX}-uniapp-probe-retries.$$.log"
 : > "$PROBE_RETRY_LOG"   # 开跑清空:防 Windows PID 复用把上一轮残留条目混进本轮回显
 PROBE_RETRIED_LAST=0
 # 用法:probe_retry <探针日志路径> <命令...>(重定向收进函数:首败整份存档 *.attempt1 后
@@ -162,11 +164,11 @@ probe_retry() {
 # 红测三变异:①恒败不洗绿 ②首败后成=绿+标记+留痕 ③接线完整性(解包即红)。
 # 每个变异先证注入生效(rc/标志文件)再看判定 —— 红测铁律:先证起点。
 probe_retry_selftest() {
-  local bad_bits="" sroot="${TMPDIR:-/tmp}"
-  local tmpflag="$sroot/uniapp-probe-retry-selftest.$$" slog="$sroot/uniapp-probe-retry-selftest-plog.$$"
+  local bad_bits="" sroot="$VERIFY_LOG_PREFIX"
+  local tmpflag="$sroot-uniapp-probe-retry-selftest.$$" slog="$sroot-uniapp-probe-retry-selftest-plog.$$"
   # 演习期间换草稿登记簿:selftest 自己注入的失败靶不许污染真登记簿(P1-1 狼来了)
   local real_log="$PROBE_RETRY_LOG"
-  PROBE_RETRY_LOG="$sroot/uniapp-probe-retry-selftest-reg.$$"; : > "$PROBE_RETRY_LOG"
+  PROBE_RETRY_LOG="$sroot-uniapp-probe-retry-selftest-reg.$$"; : > "$PROBE_RETRY_LOG"
   # ① 恒败探针经包装:终判必须仍红(稳定红不被洗绿)
   if probe_retry "$slog" bash -c 'exit 7'; then bad_bits="$bad_bits ①洗绿"; fi
   [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ①未重试"
@@ -229,10 +231,10 @@ SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SC
 scoped_skip=0
 VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
 if [ "$VERIFY_MODE" != "full" ]; then
-  if scope_plan=$("$NODE_BIN" scripts/lib/verify-scope.mjs plan --mode "$VERIFY_MODE" --format shell 2>/tmp/uni-scope-plan.err); then
+  if scope_plan=$("$NODE_BIN" scripts/lib/verify-scope.mjs plan --mode "$VERIFY_MODE" --format shell 2>"${VERIFY_LOG_PREFIX}-uni-scope-plan.err"); then
     eval "$scope_plan"
   else
-    SCOPE_MODE=full; SCOPE_UPGRADED="范围计划算不出($(head -1 /tmp/uni-scope-plan.err 2>/dev/null))→ full(保守方向)"
+    SCOPE_MODE=full; SCOPE_UPGRADED="范围计划算不出($(head -1 "${VERIFY_LOG_PREFIX}-uni-scope-plan.err" 2>/dev/null))→ full(保守方向)"
   fi
 fi
 # 路由级范围(包 ax,主人拍板 B):scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)只扫
@@ -260,16 +262,16 @@ scope_hit() {
 echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE · mode=$SCOPE_MODE${SCOPE_UPGRADED:+(请求 $SCOPE_REQUESTED → $SCOPE_UPGRADED)}${VERIFY_TREE_START:+ · tree ${VERIFY_TREE_START:0:10}} ━━${N}"
 if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; echo "  路由范围:${SCOPE_ROUTES_NOTE:-全部};route 类探针只扫「受影响 ∩ 射程」,门自身输入变了仍全扫"; fi
 # 门的门:manifest ↔ verify.sh 接线一致 + glob 都命中(改了清单没接线 / 接了线没声明 / 路径漂移,任一即红;三档都跑)
-if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > /tmp/uni-scope-lint.log 2>&1; then
-  ok "gates.manifest 接线门 — $(tail -1 /tmp/uni-scope-lint.log)"
+if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > "${VERIFY_LOG_PREFIX}-uni-scope-lint.log" 2>&1; then
+  ok "gates.manifest 接线门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-scope-lint.log")"
 else
-  bad "gates.manifest 接线门失败 — node scripts/lib/verify-scope.mjs lint 看明细"; sed 's/^/        /' /tmp/uni-scope-lint.log | head -12
+  bad "gates.manifest 接线门失败 — node scripts/lib/verify-scope.mjs lint 看明细"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-scope-lint.log" | head -12
 fi
 # 已知红清单门(Tier 1-C):清单格式 / 日期 / 90 天上限 / 重复;到期条目点名(它们在链上已回红)。清单坏 = 整链红,不许静默当 0 条。
-if "$NODE_BIN" scripts/lib/known-red.mjs lint > /tmp/uni-known-red-lint.log 2>&1; then
-  ok "已知红清单门 — $(tail -1 /tmp/uni-known-red-lint.log)"
+if "$NODE_BIN" scripts/lib/known-red.mjs lint > "${VERIFY_LOG_PREFIX}-uni-known-red-lint.log" 2>&1; then
+  ok "已知红清单门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-known-red-lint.log")"
 else
-  bad "已知红清单门失败 — node scripts/lib/known-red.mjs lint 看明细"; sed 's/^/        /' /tmp/uni-known-red-lint.log | head -12
+  bad "已知红清单门失败 — node scripts/lib/known-red.mjs lint 看明细"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-known-red-lint.log" | head -12
 fi
 
 # ── (1) type-check ──
@@ -278,40 +280,40 @@ echo -e "${C}[0] 静态门(不依赖 dev server,必须排在任何 preflight 之
 # 曾因一个 unbound variable 在 245 行崩死 —— 于是「能抓这件事的门恰恰跑不到」。
 # 判据:不依赖 dev server 的纯静态门,一律排在任何可能中止的 preflight 之前。
 conflict_marker_gate() {
-  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
-    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
+  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-conflict-marker.log" 2>&1; then
+    ok "冲突标记哨兵 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-conflict-marker.log")"
   else
     bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
-    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
+    grep -E "^(FAIL|        )" "${VERIFY_LOG_PREFIX}-uniapp-conflict-marker.log" | head -10 | sed "s/^/        /"
   fi
 }
 conflict_marker_gate
 # 交接书指针门:docs/HANDOFF 只许一行式索引,正文住后台仓(2026-08-14,曾漂 12 条正文 + U-4 撞号重编 U-19)。
 # 后台仓缺席的环境(临时 worktree / 独立 checkout)里跨仓半边显式 SKIP,本地判据照跑 —— PASS 行会写明跑了哪半。
 handoff_pointer_gate() {
-  if "$NODE_BIN" scripts/handoff-pointer-gate.mjs > /tmp/uniapp-handoff-pointer.log 2>&1; then
-    ok "交接书指针门 — $(tail -1 /tmp/uniapp-handoff-pointer.log)"
+  if "$NODE_BIN" scripts/handoff-pointer-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-handoff-pointer.log" 2>&1; then
+    ok "交接书指针门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-handoff-pointer.log")"
   else
     bad "交接书指针漂移 — node scripts/handoff-pointer-gate.mjs 看明细"
-    grep -E "^(FAIL|  - )" /tmp/uniapp-handoff-pointer.log | head -10 | sed "s/^/        /"
+    grep -E "^(FAIL|  - )" "${VERIFY_LOG_PREFIX}-uniapp-handoff-pointer.log" | head -10 | sed "s/^/        /"
   fi
 }
 handoff_pointer_gate
 runtime_flag_parity_gate() {
-  if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > /tmp/uniapp-flag-parity.log 2>&1; then
-    ok "运行时开关等价门 — $(tail -1 /tmp/uniapp-flag-parity.log)"
+  if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-flag-parity.log" 2>&1; then
+    ok "运行时开关等价门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-flag-parity.log")"
   else
     bad "运行时开关等价门失败 — node scripts/runtime-flag-parity-gate.mjs 看明细"
-    grep -E "^(FAIL|  )" /tmp/uniapp-flag-parity.log | head -8 | sed "s/^/        /"
+    grep -E "^(FAIL|  )" "${VERIFY_LOG_PREFIX}-uniapp-flag-parity.log" | head -8 | sed "s/^/        /"
   fi
 }
 runtime_flag_parity_gate
 api_idempotency_key_gate() {
-  if "$NODE_BIN" scripts/api-idempotency-key-gate.mjs > /tmp/uniapp-idem-key.log 2>&1; then
-    ok "接口幂等键稳定性门 — $(tail -1 /tmp/uniapp-idem-key.log)"
+  if "$NODE_BIN" scripts/api-idempotency-key-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-idem-key.log" 2>&1; then
+    ok "接口幂等键稳定性门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-idem-key.log")"
   else
     bad "接口幂等键不稳定 — node scripts/api-idempotency-key-gate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|        )" /tmp/uniapp-idem-key.log | head -10 | sed "s/^/        /"
+    grep -E "^(FAIL|  FAIL|        )" "${VERIFY_LOG_PREFIX}-uniapp-idem-key.log" | head -10 | sed "s/^/        /"
   fi
 }
 api_idempotency_key_gate
@@ -319,11 +321,11 @@ api_idempotency_key_gate
 # `**/.claude/**` 会把 worktree(住在 <主 checkout>/.claude/worktrees/<name>/)的全部源码
 # 一起拉黑 —— dev server 静默不跟进改动,改完 curl 回来还是旧转译产物,红测因此假绿。
 vite_watch_anchor_gate() {
-  if "$NODE_BIN" scripts/vite-watch-anchor-gate.mjs > /tmp/uniapp-vite-watch-anchor.log 2>&1; then
-    ok "vite 监视器锚定门 — $(grep -E '^PASS' /tmp/uniapp-vite-watch-anchor.log | tail -1)"
+  if "$NODE_BIN" scripts/vite-watch-anchor-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-vite-watch-anchor.log" 2>&1; then
+    ok "vite 监视器锚定门 — $(grep -E '^PASS' "${VERIFY_LOG_PREFIX}-uniapp-vite-watch-anchor.log" | tail -1)"
   else
     bad "vite 监视器 ignore 没锚在本树 — node scripts/vite-watch-anchor-gate.mjs 看明细"
-    grep -E "^FAIL" /tmp/uniapp-vite-watch-anchor.log | head -5 | sed "s/^/        /"
+    grep -E "^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-vite-watch-anchor.log" | head -5 | sed "s/^/        /"
   fi
 }
 vite_watch_anchor_gate
@@ -331,35 +333,35 @@ vite_watch_anchor_gate
 echo -e "${C}[1] vue-tsc type-check${N}"
 # 包 ar:走指纹缓存壳(输入未变 → PASS(cached);变了 → 裸 vue-tsc 真跑;--incremental 因 warm buildinfo 假绿禁用)。同一棵树一轮里 tsc 只算一次。
 # 壳的自证先跑(结构判据:不带 --incremental · FAIL 路径必删 pass 记录 · 记录带指纹)—— 2026-08-17 那次 P0 是外部 tester 逮到的,不是门逮到的
-if "$NODE_BIN" scripts/typecheck-cached.mjs --selftest >/tmp/uni-tsc-selftest.log 2>&1; then
-  ok "typecheck-cached selftest — $(tail -1 /tmp/uni-tsc-selftest.log)"
+if "$NODE_BIN" scripts/typecheck-cached.mjs --selftest >"${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log" 2>&1; then
+  ok "typecheck-cached selftest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log")"
 else
-  bad "typecheck-cached selftest 失败 — 缓存壳判据被改坏,本轮 tsc 结论按不可信解读"; tail -5 /tmp/uni-tsc-selftest.log | sed 's/^/        /'
+  bad "typecheck-cached selftest 失败 — 缓存壳判据被改坏,本轮 tsc 结论按不可信解读"; tail -5 "${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log" | sed 's/^/        /'
 fi
-if "$NODE_BIN" scripts/typecheck-cached.mjs >/tmp/uni-tsc.log 2>&1; then
-  ok "$(tail -1 /tmp/uni-tsc.log)"
+if "$NODE_BIN" scripts/typecheck-cached.mjs >"${VERIFY_LOG_PREFIX}-uni-tsc.log" 2>&1; then
+  ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-tsc.log")"
 else
-  bad "vue-tsc errors"; tail -15 /tmp/uni-tsc.log | sed 's/^/        /'
+  bad "vue-tsc errors"; tail -15 "${VERIFY_LOG_PREFIX}-uni-tsc.log" | sed 's/^/        /'
 fi
 
 # 🔴 紧跟类型检查:同一类(编译器能精确判定的)问题归在一处。守的是「store 里不许有
 # 不可达代码」—— 2026-08-13 创世五个动作的本地实现全成死代码,而它长得完全正常,
 # 还把 selfcheck-genesis-gate 的文本判据哄绿了(判据句就躺在死代码里)。
 store_unreachable_gate() {
-  if "$NODE_BIN" scripts/store-unreachable-code-gate.mjs > /tmp/uniapp-store-unreachable.log 2>&1; then
-    ok "store 不可达代码门 — $(tail -1 /tmp/uniapp-store-unreachable.log)"
+  if "$NODE_BIN" scripts/store-unreachable-code-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-store-unreachable.log" 2>&1; then
+    ok "store 不可达代码门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-store-unreachable.log")"
   else
     bad "store 里出现不可达代码 — node scripts/store-unreachable-code-gate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-store-unreachable.log | head -6 | sed "s/^/        /"
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-store-unreachable.log" | head -6 | sed "s/^/        /"
   fi
 }
 if scope_hit store-unreachable; then store_unreachable_gate; fi
 
 echo -e "${C}[1.5] i18n mirror${N}"
-if "$NODE_BIN" scripts/i18n-key-mirror.mjs >/tmp/uni-i18n-mirror.log 2>&1; then
-  ok "$(cat /tmp/uni-i18n-mirror.log)"
+if "$NODE_BIN" scripts/i18n-key-mirror.mjs >"${VERIFY_LOG_PREFIX}-uni-i18n-mirror.log" 2>&1; then
+  ok "$(cat "${VERIFY_LOG_PREFIX}-uni-i18n-mirror.log")"
 else
-  bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
+  bad "i18n en/zh key mismatch"; head -20 "${VERIFY_LOG_PREFIX}-uni-i18n-mirror.log" | sed 's/^/        /'
 fi
 
 # ── 硬编码中文哨兵(2026-08-11)──────────────────────────────────────────────
@@ -369,18 +371,18 @@ fi
 # src/i18n/messages/*.ts 的值,且判据是**枚举词表**,新词天然不在表里。
 # 本门反过来判:src/**/*.{vue,ts} 注释之外**含 CJK 即拦**,不枚举任何词。
 i18n_cjk_gate() {
-  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest > /tmp/uni-i18n-cjk-selftest.log 2>&1; then
-    ok "$(tail -1 /tmp/uni-i18n-cjk-selftest.log)"
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log")"
   else
     bad "i18n-cjk selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest 看明细)"
-    tail -8 /tmp/uni-i18n-cjk-selftest.log | sed 's/^/        /'
+    tail -8 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs > /tmp/uni-i18n-cjk.log 2>&1; then
-    ok "$(tail -1 /tmp/uni-i18n-cjk.log)"
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uni-i18n-cjk.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk.log")"
   else
     bad "页面/组件里有硬编码中文 — 搬进 src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读"
-    tail -12 /tmp/uni-i18n-cjk.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk.log" | sed 's/^/        /'
   fi
 }
 i18n_cjk_gate
@@ -395,7 +397,7 @@ i18n_cjk_gate
 i18n_en_gate() {
   # 日志名带 PID:多棵树并发跑同一道门时,固定名会让 `tail -1` 打印**别的树**那轮的总结行
   # (memory 里有实付案例:据末行判成 4 红、实为并发别人的)。判决本身取自退出码,不受影响。
-  local slog="${TMPDIR:-/tmp}/uni-i18n-en-selftest.$$.log" glog="${TMPDIR:-/tmp}/uni-i18n-en.$$.log"
+  local slog="${VERIFY_LOG_PREFIX}-uni-i18n-en-selftest.$$.log" glog="${VERIFY_LOG_PREFIX}-uni-i18n-en.$$.log"
   if "$NODE_BIN" scripts/i18n-hardcoded-en-copy-sentinel.mjs --selftest > "$slog" 2>&1; then
     ok "$(tail -1 "$slog")"
   else
@@ -418,7 +420,7 @@ i18n_en_gate
 # + <SvgText> 只许在 svg 内 + 用了必 import(kebab/别名也认)+ 同族 uni 内置标签也禁 + uno.config 不许启用 attributify(它把 font-size="9.5" 劫持成 2.375rem、:opacity 劫持成 0.0025)
 # + 判定面塌缩(0 个 svg 块 / 0 个 SvgText)判红。渲染面另有 svg_text_render_gate(运行时 bbox>0)。
 svg_text_source_gate() {
-  local slog="${TMPDIR:-/tmp}/uni-svg-text-src-selftest.$.log" glog="${TMPDIR:-/tmp}/uni-svg-text-src.$.log"
+  local slog="${VERIFY_LOG_PREFIX}-uni-svg-text-src-selftest.log" glog="${VERIFY_LOG_PREFIX}-uni-svg-text-src.log"
   if "$NODE_BIN" scripts/svg-text-source-gate.mjs --selftest > "$slog" 2>&1; then
     ok "$(tail -1 "$slog")"
   else
@@ -444,19 +446,19 @@ svg_text_source_gate
 # 🔴 样本量必须当**判据**,不能只印进标签:`node --test` 对「一条 test 都没有」的文件同样 exit 0
 #    (注释掉 / test.skip / 条件为假的 describe 都会走到这一步),于是门退化成「tests 0 · PASS」。
 #    上面那道 i18n 门写了「扫不到文件即判红」的假绿防线,这道门得有对等的一条。
-"$NODE_BIN" --test scripts/g-remote-authority-contract.test.mjs >/tmp/uni-g-remote-contract.log 2>&1
+"$NODE_BIN" --test scripts/g-remote-authority-contract.test.mjs >"${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log" 2>&1
 g_remote_rc=$?
 # 判据取 **pass 数**不取 tests 数:红测实测 `test.skip` 时 tests 仍计 4(skipped 1),拿 tests 当门会漏;
 # pass 数对「删掉 test」与「skip 掉 test」两种形态都会掉下来。
 # 按**字段**取数,别用 `^.` 锚行首:node --test 的汇总行前缀 `ℹ` 是 3 字节,grep 的 `.` 匹配单字节,
 # 取出来恒为空 —— 那样门会永远判红(方向安全,但判据其实已经失效,属另一种坏)。
-g_remote_pass=$(awk '$(NF-1)=="pass"{v=$NF} END{print v}' /tmp/uni-g-remote-contract.log)
-g_remote_fail=$(awk '$(NF-1)=="fail"{v=$NF} END{print v}' /tmp/uni-g-remote-contract.log)
+g_remote_pass=$(awk '$(NF-1)=="pass"{v=$NF} END{print v}' "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log")
+g_remote_fail=$(awk '$(NF-1)=="fail"{v=$NF} END{print v}' "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log")
 if [ "$g_remote_rc" -eq 0 ] && [ "${g_remote_pass:-0}" -ge 4 ] && [ "${g_remote_fail:-1}" -eq 0 ]; then
   ok "远端权威契约门 pass ${g_remote_pass} / fail ${g_remote_fail}(判据锚 i18n key + exchange 命名空间内有值;pass<4 或 fail>0 一律判红)"
 else
   bad "远端权威契约门失败(rc=$g_remote_rc pass=${g_remote_pass:-none} fail=${g_remote_fail:-none};pass 少于 4 = 有 test 被删或 skip,同样按红处理)"
-  grep -E "✖|AssertionError|expected" /tmp/uni-g-remote-contract.log | head -6 | sed 's/^/        /'
+  grep -E "✖|AssertionError|expected" "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log" | head -6 | sed 's/^/        /'
 fi
 
 # Key mirroring proves en/zh/vi agree with EACH OTHER, not that they cover every
@@ -476,27 +478,27 @@ if "$NODE_BIN" -e '
     }
   }
   console.log(`product catalog copy covers all ${ids.length} SKUs x 3 locales`);
-' >/tmp/uni-catalog-parity.log 2>&1; then
-  ok "$(cat /tmp/uni-catalog-parity.log)"
+' >"${VERIFY_LOG_PREFIX}-uni-catalog-parity.log" 2>&1; then
+  ok "$(cat "${VERIFY_LOG_PREFIX}-uni-catalog-parity.log")"
 else
-  bad "product catalog i18n parity"; head -5 /tmp/uni-catalog-parity.log | sed 's/^/        /'
+  bad "product catalog i18n parity"; head -5 "${VERIFY_LOG_PREFIX}-uni-catalog-parity.log" | sed 's/^/        /'
 fi
 
 # 上面三道 i18n 门整条轴是反的:都在查「中文有没有跑出词典」,没有一道查「英文有没有跑进
 # 界面」。实付(P-109):4c32a50 把规格兜底改成 `?? "unavailable"` 五处,中文态渲染出
 # 「你的手机 unavailable」等 4 处混排,三道门全绿。本门补这条轴 —— 服务端哨兵值不得当
 # client fallback、不得在商品渲染面裸用。selftest 先跑:哨兵失效即门失效。
-if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs --selftest > /tmp/uni-spec-sentinel-selftest.log 2>&1; then
-  ok "$(tail -1 /tmp/uni-spec-sentinel-selftest.log)"
+if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log" 2>&1; then
+  ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log")"
 else
   bad "spec-sentinel selftest 失败(哨兵失效即门失效;node scripts/spec-sentinel-render-gate.mjs --selftest 看明细)"
-  tail -8 /tmp/uni-spec-sentinel-selftest.log | sed 's/^/        /'
+  tail -8 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log" | sed 's/^/        /'
 fi
-if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs > /tmp/uni-spec-sentinel.log 2>&1; then
-  ok "$(tail -1 /tmp/uni-spec-sentinel.log)"
+if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs > "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log" 2>&1; then
+  ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log")"
 else
   bad "服务端规格哨兵被当兜底/裸渲染 — 走 t.store.specValueUnavailable 降级文案"
-  tail -10 /tmp/uni-spec-sentinel.log | sed 's/^/        /'
+  tail -10 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log" | sed 's/^/        /'
 fi
 
 # 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
@@ -505,10 +507,10 @@ fi
 # 用同一份冻结件,确认后与当前权威值核对不符即拒单;外加 NEX 退款反向分录(账本对得上钱包)。
 echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards · withdrawfee · withdraw-freeze · fastlane · feegate)${N}"
 for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate arrival i18n-interp console-filter slacopy onbrand reward-buckets; do
-  if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
-    ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
+  if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >""${VERIFY_LOG_PREFIX}-uni-selfcheck-$sc.log"" 2>&1; then
+    ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' ""${VERIFY_LOG_PREFIX}-uni-selfcheck-$sc.log"" | tail -1)"
   else
-    bad "selfcheck-$sc 有断言失败"; grep -E "FAIL|fail" "/tmp/uni-selfcheck-$sc.log" | head -8 | sed 's/^/        /'
+    bad "selfcheck-$sc 有断言失败"; grep -E "FAIL|fail" ""${VERIFY_LOG_PREFIX}-uni-selfcheck-$sc.log"" | head -8 | sed 's/^/        /'
   fi
 done
 
@@ -517,30 +519,30 @@ done
 # 修后判据按等价类解析 + 钉正向定型串,而关系型/解析型判据更容易在重构里悄悄失去牙齿 ——
 # 6 靶红测钉住它真会红,其中 4 靶是「旧判据漏、新判据抓」的资金缺陷形状。
 if scope_hit withdraw-rail-alias-redtest; then
-if "$NODE_BIN" scripts/withdraw-rail-alias.redtest.mjs > /tmp/uni-withdraw-rail-alias.log 2>&1; then
-  ok "withdraw-rail-alias redtest — $(tail -1 /tmp/uni-withdraw-rail-alias.log)"
+if "$NODE_BIN" scripts/withdraw-rail-alias.redtest.mjs > "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log" 2>&1; then
+  ok "withdraw-rail-alias redtest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log")"
 else
   bad "withdraw-rail-alias redtest 失败(哨兵失效即门失效;node scripts/withdraw-rail-alias.redtest.mjs 看明细)"
-  tail -12 /tmp/uni-withdraw-rail-alias.log | sed 's/^/        /'
+  tail -12 "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log" | sed 's/^/        /'
 fi
 fi
 
 # 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
 # 钱路「落盘 / CAS 判决必须被消费」—— AST 门(审计 R4→R6 同族五次:返回值当语句丢掉)。先自测门本身会红,再扫钱路文件。
-if node scripts/selfcheck-persist-verdict.mjs --selftest > /tmp/uni-persist-verdict-selftest.log 2>&1 && node scripts/selfcheck-persist-verdict.mjs > /tmp/uni-persist-verdict.log 2>&1; then
-  ok "persist-verdict — $(tail -1 /tmp/uni-persist-verdict.log)"
+if node scripts/selfcheck-persist-verdict.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-persist-verdict-selftest.log" 2>&1 && node scripts/selfcheck-persist-verdict.mjs > "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" 2>&1; then
+  ok "persist-verdict — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log")"
 else
   bad "persist-verdict:钱路上有落盘 / CAS / 资金原语的返回值被丢弃(node scripts/selfcheck-persist-verdict.mjs 看明细)"
-  cat /tmp/uni-persist-verdict-selftest.log /tmp/uni-persist-verdict.log | tail -20 | sed 's/^/        /'
+  cat "${VERIFY_LOG_PREFIX}-uni-persist-verdict-selftest.log" "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" | tail -20 | sed 's/^/        /'
 fi
 # 账号隔离 / 过期剪除 / 一次性离开提示 + 建单落盘契约(createOrder / createOrders 落盘失败返 null,不留内存孤儿单;一批一次落盘)+ 单次券核销 CAS(先占后花,双实例只成一次;release 放回)+ 恢复发票逐项 min 对账 + 存储行取值域 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
 # (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
 if scope_hit pending-checkout-vitest; then
-if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts src/store/free-trial.persist.test.ts > /tmp/uni-pending-checkout-vitest.log 2>&1; then
-  ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
+if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts src/store/free-trial.persist.test.ts > "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" 2>&1; then
+  ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
 else
   bad "pending-checkout vitest 失败(npx vitest run src/store/pending-checkout*.test.ts 看明细)"
-  sed 's/[[0-9;]*m//g' /tmp/uni-pending-checkout-vitest.log | tail -15 | sed 's/^/        /'
+  sed 's/[[0-9;]*m//g' "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" | tail -15 | sed 's/^/        /'
 fi
 fi
 
@@ -630,11 +632,11 @@ fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
 # (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
 if scope_hit remote-refresh-resilience; then
-if "$NODE_BIN" scripts/selfcheck-remote-refresh-resilience.mjs > /tmp/uni-remote-resilience.log 2>&1; then
-  ok "远端刷新韧性门 — $(tail -1 /tmp/uni-remote-resilience.log)"
+if "$NODE_BIN" scripts/selfcheck-remote-refresh-resilience.mjs > "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log" 2>&1; then
+  ok "远端刷新韧性门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log")"
 else
   bad "远端刷新韧性门失败 — node scripts/selfcheck-remote-refresh-resilience.mjs 看明细"
-  tail -8 /tmp/uni-remote-resilience.log | sed 's/^/        /'
+  tail -8 "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log" | sed 's/^/        /'
 fi
 fi
 
@@ -740,10 +742,10 @@ if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad
 # 也是上架合规风险。现场 / 判据 / 两处刻意放行(en "Mine ({n})" = 我的;vi đào tạo = 培训)
 # 与判据自检都在 scripts/mining-copy-gate.mjs 里说明。同型第二次:上一轮只删了单句、哨兵也只
 # 钉死那单句(见下方 SPEC-4 段仍保留的那条),词族其余成员因此活了下来 → 本门改判整个词族。
-if "$NODE_BIN" scripts/mining-copy-gate.mjs >/tmp/uni-mining-copy.log 2>&1; then
-  ok "$(cat /tmp/uni-mining-copy.log)"
+if "$NODE_BIN" scripts/mining-copy-gate.mjs >"${VERIFY_LOG_PREFIX}-uni-mining-copy.log" 2>&1; then
+  ok "$(cat "${VERIFY_LOG_PREFIX}-uni-mining-copy.log")"
 else
-  bad "crypto-mining vocabulary in i18n copy"; sed 's/^/        /' /tmp/uni-mining-copy.log
+  bad "crypto-mining vocabulary in i18n copy"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-mining-copy.log"
 fi
 # copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
 # literal stars/backticks, and route-path literals violate the no-jargon rule.
@@ -752,20 +754,20 @@ fi
 # 写一句带 markdown 强调的中文注释就会判红,而它要守的是「用户看得到的文案」里不许有 markdown。
 # 本仓记过这一族:子串哨兵必须先剥注释再匹配。新门只在**字符串字面量的值**里找,
 # 并对「一条文案都没抠到」判红(候选集为 0 = 判据失效)。红测:文案里塞 → 红;注释里塞 → 绿。
-if "$NODE_BIN" scripts/i18n-copy-residue-gate.mjs > /tmp/uniapp-i18n-residue.log 2>&1; then
-  ok "i18n 文案 markdown 残留门 — $(tail -1 /tmp/uniapp-i18n-residue.log)"
+if "$NODE_BIN" scripts/i18n-copy-residue-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-i18n-residue.log" 2>&1; then
+  ok "i18n 文案 markdown 残留门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-i18n-residue.log")"
 else
   bad "i18n 文案里有 markdown 残留 — node scripts/i18n-copy-residue-gate.mjs 看明细"
-  grep -E "^(FAIL| )" /tmp/uniapp-i18n-residue.log | head -8
+  grep -E "^(FAIL| )" "${VERIFY_LOG_PREFIX}-uniapp-i18n-residue.log" | head -8
 fi
 # 焦虑词哨兵(2026-08-15 pkg/zk):用户可见字符串禁内部运营/审查术语(人工审核/风控/审查/
 # manual review/xét duyệt…)。同 residue 门惯例:剥注释只扫字符串值、候选下限判红;
 # 确需保留的行(注销等破坏性流程)用 `anxiety-exempt: <理由>` 行内豁免,豁免清单随 PASS 输出供 review。
-if "$NODE_BIN" scripts/anxiety-copy-gate.mjs > /tmp/uniapp-anxiety-copy.log 2>&1; then
-  ok "焦虑词哨兵 — $(head -1 /tmp/uniapp-anxiety-copy.log)"
+if "$NODE_BIN" scripts/anxiety-copy-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-anxiety-copy.log" 2>&1; then
+  ok "焦虑词哨兵 — $(head -1 "${VERIFY_LOG_PREFIX}-uniapp-anxiety-copy.log")"
 else
   bad "用户可见文案命中焦虑/内部术语禁词 — node scripts/anxiety-copy-gate.mjs --list 看全量"
-  grep -E "^(FAIL| )" /tmp/uniapp-anxiety-copy.log | head -8
+  grep -E "^(FAIL| )" "${VERIFY_LOG_PREFIX}-uniapp-anxiety-copy.log" | head -8
 fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
@@ -793,7 +795,7 @@ if [ -z "$sa_bad" ]; then ok "safe-area-inset-bottom base padding >=22px (P-065)
 # Auth/onboarding bare pages must use one system-chrome owner. This catches the
 # orthogonal failure where a new flow page looks fine but forgets the status bar,
 # Home Indicator, or bottom safe-area reserve (P-069).
-if "$NODE_BIN" <<'NODE' >/tmp/uni-auth-system-chrome.log 2>&1
+if "$NODE_BIN" <<'NODE' >"${VERIFY_LOG_PREFIX}-uni-auth-system-chrome.log" 2>&1
 const fs = require("fs");
 const path = require("path");
 const flowDirs = ["onboarding", "login", "register", "ref", "session"];
@@ -834,14 +836,14 @@ NODE
 then
   ok "all bare login-entry pages share status bar + Home Indicator shell (P-069)"
 else
-  bad "bare login-entry system chrome contract"; sed 's/^/        /' /tmp/uni-auth-system-chrome.log
+  bad "bare login-entry system chrome contract"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome.log"
 fi
 if scope_hit login-entry-chrome-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry /tmp/uni-auth-system-chrome-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs; then
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs; then
     ok "bare login-entry system chrome runtime geometry (P-069)"
   else
-    bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
+    bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome-runtime.log"
   fi
 else
   skipped "bare login-entry system chrome runtime geometry (dev server not running at $BASE_URL)"
@@ -869,8 +871,8 @@ if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
   src/pages/me/me.vue \
   src/pages/me/proof.vue \
   src/pages/support/chat.vue \
-  src/mock/nova-templates.ts >/tmp/uni-r7-ui-status.log 2>&1; then
-  bad "SPEC-1 R7 user-facing online state bypasses heartbeat seam"; sed 's/^/        /' /tmp/uni-r7-ui-status.log
+  src/mock/nova-templates.ts >"${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log" 2>&1; then
+  bad "SPEC-1 R7 user-facing online state bypasses heartbeat seam"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log"
 else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
 fi
@@ -992,11 +994,11 @@ sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode
 # z1 判决 A:克隆逻辑 819a6da 起搬进 lib/platform-config-compat.ts(config store 经
 # completePlatformConfigSeed 初始化)。字面 pin 换行为门:克隆隔离 / captchaAlwaysScenes
 # 有效值 / WD02 网络费逐键 parity 全走「合成后的有效配置」,种子文件形态属实现细节。
-if ADMIN_ROOT="$ADMIN_ROOT" "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
-  ok "platform-config compat 行为门 — $(tail -1 /tmp/uni-config-compat.log)"
+if ADMIN_ROOT="$ADMIN_ROOT" "$NODE_BIN" scripts/selfcheck-config-compat.mjs > "${VERIFY_LOG_PREFIX}-uni-config-compat.log" 2>&1; then
+  ok "platform-config compat 行为门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-config-compat.log")"
 else
   bad "platform-config compat 行为门失败 — node scripts/selfcheck-config-compat.mjs 看明细"
-  tail -12 /tmp/uni-config-compat.log | sed 's/^/        /'
+  tail -12 "${VERIFY_LOG_PREFIX}-uni-config-compat.log" | sed 's/^/        /'
 fi
 # 引擎层: 身份注册表(独立于会话存储)+ 实时聚簇 + 释放 + 提现前置
 sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexgrid-risk-registry-v1'
@@ -1377,11 +1379,11 @@ else
     parity_arg=$(wslpath -w "$PLATFORM_CONFIG_PARITY")
     app_root_arg=$(wslpath -w "$PROJECT_DIR")
   fi
-  if NEXION_UNIAPP_ROOT="$app_root_arg" "$NODE_BIN" "$parity_arg" > /tmp/spec7-platform-config-parity.log 2>&1; then
+  if NEXION_UNIAPP_ROOT="$app_root_arg" "$NODE_BIN" "$parity_arg" > "${VERIFY_LOG_PREFIX}-spec7-platform-config-parity.log" 2>&1; then
     ok "SPEC-7 platform-config/API parity (real App platform config + PC E6/K1/K2 contracts)"
   else
     bad "SPEC-7 platform-config/API parity failed — current App $PROJECT_DIR and PC $ADMIN_ROOT must expose the same server-owned contract"
-    tail -25 /tmp/spec7-platform-config-parity.log | sed 's/^/        /'
+    tail -25 "${VERIFY_LOG_PREFIX}-spec7-platform-config-parity.log" | sed 's/^/        /'
   fi
 fi
 # 双端参数 key parity: uniapp 配置契约 ↔ admin main 活源(2026-08-15 改锚,单独立项)。
@@ -1419,11 +1421,11 @@ else
   # 历史沿革仍有效的部分:z1 判决 A(2026-08-10)captchaAlwaysScenes 出种子进 compat
   # 运行时默认,由 selfcheck-config-compat 行为门看住,不在本键清单。
   if "$NODE_BIN" scripts/spec7-admin-domain-parity.mjs "$ADMIN_ROOT" "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" \
-       > /tmp/uni-spec7-admin-domain.log 2>&1; then
-    ok "SPEC-7 param value parity·域锚(seed ∈ admin 域/白名单;$(tail -1 /tmp/uni-spec7-admin-domain.log | tr -d '\r'))"
+       > "${VERIFY_LOG_PREFIX}-uni-spec7-admin-domain.log" 2>&1; then
+    ok "SPEC-7 param value parity·域锚(seed ∈ admin 域/白名单;$(tail -1 "${VERIFY_LOG_PREFIX}-uni-spec7-admin-domain.log" | tr -d '\r'))"
   else
     bad "SPEC-7 param value parity·域锚失败 — node scripts/spec7-admin-domain-parity.mjs 看明细"
-    grep "^FAIL" /tmp/uni-spec7-admin-domain.log | head -8 | sed 's/^/        /'
+    grep "^FAIL" "${VERIFY_LOG_PREFIX}-uni-spec7-admin-domain.log" | head -8 | sed 's/^/        /'
   fi
   # 值 parity 覆盖度自守(z1 判决 A:硬计数改集合等式,与循环键清单同源):种子块键集
   # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
@@ -1519,10 +1521,10 @@ spec2_gpu_tier_monotonic() {
     if(rows.length!==6) throw new Error(`expected 6 tiers, got ${rows.length}`);
     const by=new Map(rows.map(r=>[r.id,r.tops]));
     for(let i=1;i<order.length;i++){ if(!(by.get(order[i])>by.get(order[i-1]))) throw new Error(`${order[i]} not > ${order[i-1]}`); }
-  ' >/tmp/uni-spec2-gpu.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-spec2-gpu.log" 2>&1; then
     ok "SPEC-2 gpu-tier monotonic TOPS (G1<...<G6)"
   else
-    bad "SPEC-2 gpu-tier monotonic TOPS"; sed 's/^/        /' /tmp/uni-spec2-gpu.log
+    bad "SPEC-2 gpu-tier monotonic TOPS"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec2-gpu.log"
   fi
 }
 spec2_gpu_tier_monotonic
@@ -1583,10 +1585,10 @@ spec2_guard_semantics() {
     const fallbackG2=rows.find(([,id])=>id==="G2");
     if(!tierFor4070) throw new Error("RTX 4070 must map to G4");
     if(!fallbackG2) throw new Error("G2 fallback tier missing");
-  ' >/tmp/uni-spec2-guard.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-spec2-guard.log" 2>&1; then
     ok "SPEC-2 guard semantics (disabled gate/config tier/hardware naming)"
   else
-    bad "SPEC-2 guard semantics"; sed 's/^/        /' /tmp/uni-spec2-guard.log
+    bad "SPEC-2 guard semantics"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec2-guard.log"
   fi
 }
 spec2_guard_semantics
@@ -1613,10 +1615,10 @@ spec3_prototype_homes_withdrawn() {
     if(/HomePrototype|homePrototypes/.test(types)) throw new Error("prototype home config types should be removed");
     const cfg=fs.readFileSync("src/mock/platform-config.ts","utf8");
     if(/homePrototypes|signedApp|h5Mobile|cloakApp/.test(cfg)) throw new Error("prototype home mock seed should be removed");
-  ' >/tmp/uni-spec3-prototype-withdrawn.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-spec3-prototype-withdrawn.log" 2>&1; then
     ok "SPEC-3 prototype home routes removed"
   else
-    bad "SPEC-3 prototype home withdrawal"; sed 's/^/        /' /tmp/uni-spec3-prototype-withdrawn.log
+    bad "SPEC-3 prototype home withdrawal"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec3-prototype-withdrawn.log"
   fi
 }
 spec3_prototype_homes_withdrawn
@@ -1674,19 +1676,19 @@ spec6_entry_surface_homes_present() {
     for(const token of ["在线增强","基础托管","体检融合"]){ if(!body.includes(token)) throw new Error(`SPEC-6 surface semantic token missing: ${token}`); }
     if(/secondary:\s*\{\s*label:\s*"PC sharing path",\s*href:\s*"\/pages\/compute-share\/download"/.test(body)) throw new Error("H5 entry must not advertise a disabled-by-default PC download path as direct CTA");
     if(/ENV_FILTERED|MANUAL_HOLD|keyword\d+|computeShareEnabled|H5_BASE_FACTOR|home-signed|home-h5|home-cloak|原型演示|工程字段名/.test(body)) throw new Error("SPEC-6 entry UI leaks withdrawn or engineering copy");
-  ' >/tmp/uni-spec6-entry-surfaces.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-spec6-entry-surfaces.log" 2>&1; then
     ok "SPEC-6 entry-surface homes present (3 independent routes + full links)"
   else
-    bad "SPEC-6 entry-surface homes"; sed 's/^/        /' /tmp/uni-spec6-entry-surfaces.log
+    bad "SPEC-6 entry-surface homes"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec6-entry-surfaces.log"
   fi
 }
 spec6_entry_surface_homes_present
 if scope_hit spec6-entry-runtime; then route_scope spec6-entry-runtime
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry /tmp/uni-spec6-entry-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
-    ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log")"
   else
-    bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
+    bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log"
   fi
 else
   skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
@@ -1696,10 +1698,10 @@ fi
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
 if scope_hit r7-device-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry /tmp/uni-r7-device-detail-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs; then
-    ok "$(cat /tmp/uni-r7-device-detail-runtime.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log")"
   else
-    bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
+    bad "R7 + device detail runtime"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log"
   fi
 else
   skipped "R7 + device detail runtime (dev server not running at $BASE_URL)"
@@ -1910,28 +1912,28 @@ if "$NODE_BIN" -e '
   if(h5Register.registrationLaunchUrls[0]!=="/pages/register/success") throw new Error("H5 registration function lost the primary success reLaunch call");
   if(appRegister.registrationLaunchUrls.includes("/pages/register/success")) throw new Error("App registration function retained the H5 success reLaunch call");
   if(appRegister.registrationLaunchUrls[0]!=="/pages/onboarding/estimator") throw new Error("App registration function lost the primary onboarding reLaunch call");
-  ' >/tmp/uni-register-success-platform.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-register-success-platform.log" 2>&1; then
   ok "register success H5/App platform contract"
 else
-  bad "register success H5/App platform contract"; sed 's/^/        /' /tmp/uni-register-success-platform.log
+  bad "register success H5/App platform contract"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-register-success-platform.log"
 fi
 # FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
 # “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
 if scope_hit spec7-k1-auth02-runtime; then
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry /tmp/uni-spec7-risk-gate-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs; then
-    ok "$(cat /tmp/uni-spec7-risk-gate-runtime.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log")"
   else
-    bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' /tmp/uni-spec7-risk-gate-runtime.log
+    bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log"
   fi
   if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
     ok "AUTH02 formal remote auth authority handoff — legacy local registered-number runtime retired; Java auth handoff is covered by real-backend integration"
   else
     for AUTH02_LOCALE in en zh; do
-      if probe_retry /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
-        ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
+      if probe_retry "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
+        ok "$(cat "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log")"
       else
-        bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
+        bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log"
       fi
     done
   fi
@@ -2009,11 +2011,11 @@ sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-sco
 #   新门改钉**不变量本身**:收口面从 account-scope.ts 的真实调用派生(不手写清单),
 #   三个 store 必须在收口面里(bindAccount / reset 都算),收口面塌空即判红。
 #   红测:摘掉 tickets → 红;把 bindAccount 全改名(收口面塌空)→ 红。
-if "$NODE_BIN" scripts/account-scope-gate.mjs > /tmp/uniapp-account-scope.log 2>&1; then
-  ok "账号隔离门 — $(tail -1 /tmp/uniapp-account-scope.log)"
+if "$NODE_BIN" scripts/account-scope-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log" 2>&1; then
+  ok "账号隔离门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log")"
 else
   bad "账号隔离门失败 — node scripts/account-scope-gate.mjs 看明细"
-  grep -E "^  FAIL|^FAIL" /tmp/uniapp-account-scope.log | head -6
+  grep -E "^  FAIL|^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log" | head -6
 fi
 sentinel_present "P2-8 account-scope helper rebinds cart" src/lib/account-scope.ts 'useCart\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds profile" src/lib/account-scope.ts 'useProfile\(\)\.bindAccount\(accountKey\)'
@@ -2067,32 +2069,32 @@ spec4_account_session_semantics() {
     if(/replace\(\s*\/-\/g/.test(walletUi)) throw new Error("wallet status enum is still transformed into UI copy");
     if(/return "just now"|`\\$\\{m\\}m ago`|`\\$\\{h\\}h ago`|`\\$\\{Math\.floor\(h \/ 24\)\}d ago`/.test(walletUi)) throw new Error("wallet relative time still hardcodes English copy");
     if(/label="My bank cards"|USDT Balance|NEX Boost Active|cards bound|Reused at checkout/.test(wallet)) throw new Error("wallet page still has hardcoded English UI copy");
-  ' >/tmp/uni-spec4-session.log 2>&1; then
+  ' >"${VERIFY_LOG_PREFIX}-uni-spec4-session.log" 2>&1; then
     ok "SPEC-4 account/session semantics (account cloud + multi-carrier)"
   else
-    bad "SPEC-4 account/session semantics"; sed 's/^/        /' /tmp/uni-spec4-session.log
+    bad "SPEC-4 account/session semantics"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-session.log"
   fi
 }
 spec4_account_session_semantics
-if "$NODE_BIN" scripts/spec4-account-cloud-merge-check.mjs >/tmp/uni-spec4-merge.log 2>&1; then
-  ok "$(cat /tmp/uni-spec4-merge.log)"
+if "$NODE_BIN" scripts/spec4-account-cloud-merge-check.mjs >"${VERIFY_LOG_PREFIX}-uni-spec4-merge.log" 2>&1; then
+  ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-merge.log")"
 else
-  bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
+  bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-merge.log"
 fi
 if scope_hit spec4-runtime; then
 if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
   ok "SPEC-4 formal remote account-cloud authority handoff — local app sync retired; Java account authority is covered by real-backend integration"
   ok "SPEC-4 formal remote session authority handoff — local session registry guard retired; Java session authority is covered by real-backend integration"
 elif "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry /tmp/uni-spec4-app-sync.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
-    ok "$(cat /tmp/uni-spec4-app-sync.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log")"
   else
-    bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' /tmp/uni-spec4-app-sync.log
+    bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log"
   fi
-  if probe_retry /tmp/uni-spec4-runtime-guard.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs; then
-    ok "$(cat /tmp/uni-spec4-runtime-guard.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log")"
   else
-    bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
+    bad "SPEC-4 runtime session guard"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log"
   fi
 else
   skipped "SPEC-4 account-cloud app sync (dev server not running at $BASE_URL)"
@@ -2565,10 +2567,10 @@ fi
 # delivered, a trust bug NONE of the sentinels above caught. This asserts the four
 # agree; authoritative values = PRD §7.1/§13.3.
 device_yield_parity() {
-  if "$NODE_BIN" scripts/check-device-yield-parity.mjs >/tmp/uni-yield-parity.log 2>&1; then
-    ok "$(cat /tmp/uni-yield-parity.log)"
+  if "$NODE_BIN" scripts/check-device-yield-parity.mjs >"${VERIFY_LOG_PREFIX}-uni-yield-parity.log" 2>&1; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-yield-parity.log")"
   else
-    bad "device-yield parity (advertised ≠ delivered drift)"; sed 's/^/        /' /tmp/uni-yield-parity.log
+    bad "device-yield parity (advertised ≠ delivered drift)"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-yield-parity.log"
   fi
 }
 device_yield_parity
@@ -2711,10 +2713,10 @@ platform_stats_anchor
 # Golden lives in the script — an INTENTIONAL schedule retune must update
 # golden + admin canon-numbers.json together.
 capacity_curve_parity() {
-  if "$NODE_BIN" scripts/check-capacity-curve-parity.mjs >/tmp/uni-capacity-parity.log 2>&1; then
-    ok "$(cat /tmp/uni-capacity-parity.log)"
+  if "$NODE_BIN" scripts/check-capacity-curve-parity.mjs >"${VERIFY_LOG_PREFIX}-uni-capacity-parity.log" 2>&1; then
+    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-capacity-parity.log")"
   else
-    bad "task-capacity curve parity / credit-ladder structure"; sed 's/^/        /' /tmp/uni-capacity-parity.log
+    bad "task-capacity curve parity / credit-ladder structure"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-capacity-parity.log"
   fi
 }
 capacity_curve_parity
@@ -2788,7 +2790,7 @@ home_task_carousel_contract() {
   grep -q 'homeNewcomerTasksEnabled: true' "$seed" || miss="${miss}newcomer-mock-projection "
   grep -q 'homeWeeklyPromoEnabled: true' "$seed" || miss="${miss}weekly-mock-projection "
   grep -q 'dayOneFirstDayReward: "新手任务"' "$zh" || miss="${miss}newcomer-copy "
-  if "$NODE_BIN" <<'NODE' >/tmp/home-task-carousel-relations.log 2>&1; then
+  if "$NODE_BIN" <<'NODE' >"${VERIFY_LOG_PREFIX}-home-task-carousel-relations.log" 2>&1; then
 const fs = require("fs");
 const ts = require("typescript");
 const { baseParse, NodeTypes } = require("@vue/compiler-dom");
@@ -2940,7 +2942,7 @@ NODE
     :
   else
     miss="${miss}relationship-gate "
-    sed 's/^/        /' /tmp/home-task-carousel-relations.log
+    sed 's/^/        /' "${VERIFY_LOG_PREFIX}-home-task-carousel-relations.log"
   fi
   if [ -z "$miss" ]; then ok "home task carousel contract (0/1/2 + 5s + expand pause + equal crop)";
   else bad "home task carousel contract incomplete — $miss"; fi
@@ -2950,18 +2952,18 @@ home_task_carousel_contract
 # ── 值域棘轮哨兵(vibe-playbook P2-F 2026-07-22 主人批):档间字号+圆角值集,只拦增量 ──
 # 基线 docs/VALUE-LADDER-BASELINE.json;新代码上阶梯(--v5-radius-* / 9 档字号),存量随尺寸迁移工程消化。
 value_ladder_gate() {
-  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs --selftest > /tmp/uniapp-value-ladder-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-value-ladder-selftest.log" 2>&1; then
     ok "value-ladder selftest(matcher 精度+棘轮方向红测)"
   else
     bad "value-ladder selftest 失败(node scripts/value-ladder-sentinel.mjs --selftest 看明细)"
-    tail -4 /tmp/uniapp-value-ladder-selftest.log | sed 's/^/        /'
+    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-value-ladder-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs > /tmp/uniapp-value-ladder.log 2>&1; then
+  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uniapp-value-ladder.log" 2>&1; then
     ok "value-ladder 档间字号/离散圆角 无增量(基线 docs/VALUE-LADDER-BASELINE.json)"
   else
     bad "value-ladder 增量违例 — node scripts/value-ladder-sentinel.mjs 看明细;新代码用 9 档字号 + var(--v5-radius-*)/阶梯值"
-    tail -8 /tmp/uniapp-value-ladder.log | sed 's/^/        /'
+    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-value-ladder.log" | sed 's/^/        /'
   fi
 }
 value_ladder_gate
@@ -2972,18 +2974,18 @@ value_ladder_gate
 # 本门:亮暗异值 token 全量 × hex 3/6/8 位 + rgb()/rgba() × 忽略 alpha 比 RGB。
 # 豁免走 docs/TOKEN-COPY-ALLOWLIST.json(reason 必填,selftest 校验)。
 token_copy_gate() {
-  if "$NODE_BIN" scripts/token-copy-sentinel.mjs --selftest > /tmp/uniapp-token-copy-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/token-copy-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-token-copy-selftest.log" 2>&1; then
     ok "token-copy selftest(双向红测:hex/rgb/rgba/变alpha 阳性全中 + 真灰/注释/color-mix 全 0)"
   else
     bad "token-copy selftest 失败(哨兵失效即门失效;node scripts/token-copy-sentinel.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-token-copy-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-token-copy-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/token-copy-sentinel.mjs > /tmp/uniapp-token-copy.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-token-copy.log)"
+  if "$NODE_BIN" scripts/token-copy-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uniapp-token-copy.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-token-copy.log")"
   else
     bad "token 色值字面副本 — 改 var(--token) 或 color-mix(in srgb, var(--token) N%, transparent)"
-    tail -12 /tmp/uniapp-token-copy.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-token-copy.log" | sed 's/^/        /'
   fi
 }
 token_copy_gate
@@ -2992,18 +2994,18 @@ token_copy_gate
 # 起因:清遮罩时用「值」匹配(grep 特定 rgba)只捞到 9/20,漏的 11 个写的是别的值。
 # 用值找「扮演某角色的东西」必漏 —— 本门改按角色判(选择器 *-backdrop/*-mask + 内联铺满覆盖层)。
 scrim_gate() {
-  if "$NODE_BIN" scripts/scrim-single-source.mjs --selftest > /tmp/uniapp-scrim-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/scrim-single-source.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-scrim-selftest.log" 2>&1; then
     ok "scrim selftest(双向红测:5 种字面值形态阳性全中 + token/非遮罩/注释/渐变全 0)"
   else
     bad "scrim selftest 失败(node scripts/scrim-single-source.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-scrim-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-scrim-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/scrim-single-source.mjs > /tmp/uniapp-scrim.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-scrim.log)"
+  if "$NODE_BIN" scripts/scrim-single-source.mjs > "${VERIFY_LOG_PREFIX}-uniapp-scrim.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-scrim.log")"
   else
     bad "弹层遮罩底色未走单源 token"
-    tail -10 /tmp/uniapp-scrim.log | sed 's/^/        /'
+    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-scrim.log" | sed 's/^/        /'
   fi
 }
 scrim_gate
@@ -3016,18 +3018,18 @@ scrim_gate
 # z-index」这个遍历看不见的方向);② 天花板:全站扫 z-index,白名单外不许 ≥ 滑块(阶梯只
 # 遍历已知成员,新加的 9600 浮层要靠这条才看得见)。
 zindex_order_gate() {
-  if "$NODE_BIN" scripts/zindex-order.mjs --selftest > /tmp/uniapp-zindex-selftest.log 2>&1; then
-    ok "$(grep -c '^PASS' /tmp/uniapp-zindex-selftest.log) 项 zindex-order selftest 全过(逐个相邻对隔离红测 + 事故现场 90 + 删除方向 + 天花板新成员)"
+  if "$NODE_BIN" scripts/zindex-order.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log" 2>&1; then
+    ok "$(grep -c '^PASS' "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log") 项 zindex-order selftest 全过(逐个相邻对隔离红测 + 事故现场 90 + 删除方向 + 天花板新成员)"
   else
     bad "zindex-order selftest 失败(node scripts/zindex-order.mjs --selftest 看明细)"
-    grep -E "^FAIL" /tmp/uniapp-zindex-selftest.log | head -8 | sed 's/^/        /'
+    grep -E "^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log" | head -8 | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/zindex-order.mjs > /tmp/uniapp-zindex.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-zindex.log)"
+  if "$NODE_BIN" scripts/zindex-order.mjs > "${VERIFY_LOG_PREFIX}-uniapp-zindex.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-zindex.log")"
   else
     bad "浮层层级秩序被破坏 — node scripts/zindex-order.mjs 看明细"
-    tail -10 /tmp/uniapp-zindex.log | sed 's/^/        /'
+    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-zindex.log" | sed 's/^/        /'
   fi
 }
 zindex_order_gate
@@ -3038,18 +3040,18 @@ zindex_order_gate
 # 本门换正交维度:不问源码怎么写,只问渲染出来跟不跟主题 —— 双主题 computed 完全相同
 # 的有色元素即嫌疑。存量走棘轮 docs/THEME-CONSTANT-BASELINE.json,只拦新增。
 theme_constant_gate() {
-  if "$NODE_BIN" scripts/theme-constant-gate.mjs --selftest > /tmp/uniapp-theme-const-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/theme-constant-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-theme-const-selftest.log" 2>&1; then
     ok "theme-constant selftest(判定纯函数双向红测 + 恒定 token 放行)"
   else
     bad "theme-constant selftest 失败(node scripts/theme-constant-gate.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-theme-const-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-theme-const-selftest.log" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-theme-const.log "$NODE_BIN" scripts/theme-constant-gate.mjs; then
-    ok "$(tail -1 /tmp/uniapp-theme-const.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log" "$NODE_BIN" scripts/theme-constant-gate.mjs; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log")"
   else
     bad "新增「双主题恒定」着色元素 — 该元素亮/暗渲染出来一个色 = 没跟主题"
-    tail -10 /tmp/uniapp-theme-const.log | sed 's/^/        /'
+    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log" | sed 's/^/        /'
   fi
 }
 if scope_hit theme-constant-runtime; then route_scope theme-constant-runtime; theme_constant_gate; fi
@@ -3059,18 +3061,18 @@ if scope_hit theme-constant-runtime; then route_scope theme-constant-runtime; th
 # empty-state 虚线);§4:玻璃 chrome(TabBar/Header/浮层)不在此约束内。
 # 同样走运行时判(C1 教训:静态 grep 只能钉想到的写法);门内建 3 条规范自带豁免。
 zero_border_gate() {
-  if "$NODE_BIN" scripts/zero-border-gate.mjs --selftest > /tmp/uniapp-zero-border-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/zero-border-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-zero-border-selftest.log" 2>&1; then
     ok "zero-border selftest(双向红测:实底/tint/渐变+四边框阳性全中 + 透明底/虚线/chrome/隔离环全 0)"
   else
     bad "zero-border selftest 失败(node scripts/zero-border-gate.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-zero-border-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-zero-border-selftest.log" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-zero-border.log "$NODE_BIN" scripts/zero-border-gate.mjs; then
-    ok "$(tail -1 /tmp/uniapp-zero-border.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log" "$NODE_BIN" scripts/zero-border-gate.mjs; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log")"
   else
     bad "新增「有填充 + 四边描边」容器 — 《03》§3 层级靠 surface 微差色,不靠描边"
-    tail -10 /tmp/uniapp-zero-border.log | sed 's/^/        /'
+    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log" | sed 's/^/        /'
   fi
 }
 if scope_hit zero-border-runtime; then route_scope zero-border-runtime; zero_border_gate; fi
@@ -3080,18 +3082,18 @@ if scope_hit zero-border-runtime; then route_scope zero-border-runtime; zero_bor
 # 存量黄灯 = docs/DOM-QA-LEDGER.json;gate 只拦 ledger 外新指纹(新页/改动页硬门)。
 # 豁免 = 人工审阅后 --update-ledger 收编 + entry 写 qaOk 理由。selftest = 哨兵自身双向红测。
 dom_qa_gate() {
-  if probe_retry /tmp/uniapp-dom-qa-selftest.log "$NODE_BIN" scripts/dom-qa.mjs --selftest; then
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-dom-qa-selftest.log" "$NODE_BIN" scripts/dom-qa.mjs --selftest; then
     ok "dom-qa selftest(双向红测:5 类阳性全中 + 干净 fixture 0)"
   else
     bad "dom-qa selftest 失败(探针失效即门失效;node scripts/dom-qa.mjs --selftest 看明细)"
-    tail -5 /tmp/uniapp-dom-qa-selftest.log | sed 's/^/        /'
+    tail -5 "${VERIFY_LOG_PREFIX}-uniapp-dom-qa-selftest.log" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-dom-qa.log "$NODE_BIN" scripts/dom-qa.mjs --sweep core; then
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-dom-qa.log" "$NODE_BIN" scripts/dom-qa.mjs --sweep core; then
     ok "dom-qa core(5 tab)无新 DOM 违例(存量黄灯见 docs/DOM-QA-LEDGER.json)"
   else
     bad "dom-qa 新 DOM 违例 — node scripts/dom-qa.mjs --sweep core 看明细;确属合法例外 → --update-ledger 收编并写 qaOk 理由"
-    tail -12 /tmp/uniapp-dom-qa.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-dom-qa.log" | sed 's/^/        /'
   fi
 }
 if scope_hit dom-qa-runtime; then route_scope dom-qa-runtime; dom_qa_gate; fi
@@ -3104,35 +3106,35 @@ if scope_hit dom-qa-runtime; then route_scope dom-qa-runtime; dom_qa_gate; fi
 # 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
 tap_feedback_gate() {
   if scope_hit tap-feedback-runtime; then route_scope tap-feedback-runtime
-  if probe_retry /tmp/uniapp-tap-selftest.log "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-tap-selftest.log" "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
     ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
   else
     bad "tap-feedback selftest 失败(探针失效即门失效;node scripts/tap-feedback-probe.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-tap-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-tap-selftest.log" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-tap.log "$NODE_BIN" scripts/tap-feedback-probe.mjs; then
-    ok "$(tail -1 /tmp/uniapp-tap.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-tap.log" "$NODE_BIN" scripts/tap-feedback-probe.mjs; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-tap.log")"
   else
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
-    tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-tap.log" | sed 's/^/        /'
   fi
   fi
   # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
   # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
   if scope_hit orphan-line-runtime; then route_scope orphan-line-runtime
-  if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-orphan-selftest.log" "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
     ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
   else
     bad "orphan-line selftest 失败(探针失效即门失效;node scripts/orphan-line-probe.mjs --selftest 看明细)"
-    tail -4 /tmp/uniapp-orphan-selftest.log | sed 's/^/        /'
+    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-orphan-selftest.log" | sed 's/^/        /'
     return
   fi
-  if probe_retry /tmp/uniapp-orphan.log "$NODE_BIN" scripts/orphan-line-probe.mjs; then
-    ok "$(tail -1 /tmp/uniapp-orphan.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-orphan.log" "$NODE_BIN" scripts/orphan-line-probe.mjs; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-orphan.log")"
   else
     bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
-    tail -8 /tmp/uniapp-orphan.log | sed 's/^/        /'
+    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-orphan.log" | sed 's/^/        /'
   fi
   fi
 }
@@ -3141,18 +3143,18 @@ tap_feedback_gate
 # ── 标签内注释哨兵(2026-07-23):HTML 注释卡在标签属性之间 = Vue 模板非法位置 ──
 # vue-tsc 不报(只看类型)、浏览器多数时候也照常渲染 → 人眼与既有门双双测不到,归机器层。
 tag_comment_gate() {
-  if "$NODE_BIN" scripts/tag-comment-gate.mjs --selftest > /tmp/uniapp-tagcomment-selftest.log 2>&1; then
+  if "$NODE_BIN" scripts/tag-comment-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-tagcomment-selftest.log" 2>&1; then
     ok "tag-comment selftest(标签内阳性中 + 标签外/子元素间假阳 0)"
   else
     bad "tag-comment selftest 失败(node scripts/tag-comment-gate.mjs --selftest 看明细)"
-    tail -4 /tmp/uniapp-tagcomment-selftest.log | sed 's/^/        /'
+    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-tagcomment-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/tag-comment-gate.mjs > /tmp/uniapp-tagcomment.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-tagcomment.log)"
+  if "$NODE_BIN" scripts/tag-comment-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-tagcomment.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-tagcomment.log")"
   else
     bad "注释卡在标签属性之间 — 挪到标签外那一行"
-    tail -8 /tmp/uniapp-tagcomment.log | sed 's/^/        /'
+    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-tagcomment.log" | sed 's/^/        /'
   fi
 }
 tag_comment_gate
@@ -3162,18 +3164,18 @@ tag_comment_gate
 # 任何人在 hosted-card-vault 之外再写一个卡号 / CVV 输入框,承诺即变不实陈述。
 # 判据认「数据绑定」不认关键词(cvvLength / cvvFocused / kind="cvv" 均放行)。
 card_data_boundary_gate() {
-  if "$NODE_BIN" scripts/card-data-boundary.mjs --selftest > /tmp/uniapp-cardboundary-selftest.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-cardboundary-selftest.log)"
+  if "$NODE_BIN" scripts/card-data-boundary.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log")"
   else
     bad "card-data-boundary selftest 失败(判据失效即门失效;node scripts/card-data-boundary.mjs --selftest 看明细)"
-    tail -6 /tmp/uniapp-cardboundary-selftest.log | sed 's/^/        /'
+    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log" | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/card-data-boundary.mjs > /tmp/uniapp-cardboundary.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-cardboundary.log)"
+  if "$NODE_BIN" scripts/card-data-boundary.mjs > "${VERIFY_LOG_PREFIX}-uniapp-cardboundary.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary.log")"
   else
     bad "明文卡字段出现在托管组件之外 — 文案承诺「不会接触你的完整卡号」会变成不实陈述"
-    tail -10 /tmp/uniapp-cardboundary.log | sed 's/^/        /'
+    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary.log" | sed 's/^/        /'
   fi
 }
 card_data_boundary_gate
@@ -3182,11 +3184,11 @@ card_data_boundary_gate
 # 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空
 # + 不溢出 + 无 console error。「接上了组件」和「空态真能显示」是两回事。
 empty_state_gate() {
-  if probe_retry /tmp/uniapp-empty-state.log "$NODE_BIN" scripts/empty-state-probe.mjs; then
-    ok "$(tail -1 /tmp/uniapp-empty-state.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log" "$NODE_BIN" scripts/empty-state-probe.mjs; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log")"
   else
     bad "空状态渲染失败 — node scripts/empty-state-probe.mjs 看明细(插画路径 / 标题 key / 布局溢出)"
-    grep -E "^FAIL" /tmp/uniapp-empty-state.log | head -8 | sed 's/^/        /'
+    grep -E "^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log" | head -8 | sed 's/^/        /'
   fi
 }
 if scope_hit empty-state-runtime; then route_scope empty-state-runtime; empty_state_gate; fi
@@ -3195,7 +3197,7 @@ if scope_hit empty-state-runtime; then route_scope empty-state-runtime; empty_st
 # 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 可见(visibility/opacity/fill 链)· 在 svg 盒内 · 文档内 · 未被祖先裁
 # · svg 内 uni-text=0 · 全页 svg 元素呈现属性==计算值(attributify 劫持在这里现形)· console error 与 Vue resolve warn 0;svg 里有文字候选的文件必须登记路由(未登记即红,不静默跳过)。
 svg_text_render_gate() {
-  local slog="${TMPDIR:-/tmp}/uniapp-svg-text-render-selftest.$.log" glog="${TMPDIR:-/tmp}/uniapp-svg-text-render.$.log"
+  local slog="${VERIFY_LOG_PREFIX}-uniapp-svg-text-render-selftest.log" glog="${VERIFY_LOG_PREFIX}-uniapp-svg-text-render.log"
   if probe_retry "$slog" "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
     ok "$(tail -1 "$slog")"
   else
@@ -3219,11 +3221,11 @@ if scope_hit svg-text-runtime; then svg_text_render_gate; fi
 # 逐条补发先低后高 ③ .ms-overlay < .nx-toast-host < .nx-mask ④普通页即时弹 +
 # 白名单前缀不过宽(pages/store/store 等近亲不误伤)。
 milestone_queue_gate() {
-  if "$NODE_BIN" scripts/selfcheck-milestone-queue.mjs > /tmp/uniapp-milestone-queue.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-milestone-queue.log)"
+  if "$NODE_BIN" scripts/selfcheck-milestone-queue.mjs > "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log")"
   else
     bad "里程碑庆祝队列门失败 — node scripts/selfcheck-milestone-queue.mjs 看明细"
-    grep -E "^  FAIL" /tmp/uniapp-milestone-queue.log | head -8 | sed 's/^/        /'
+    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log" | head -8 | sed 's/^/        /'
   fi
 }
 milestone_queue_gate
@@ -3236,11 +3238,11 @@ milestone_queue_gate
 # ①越界拒单零扣款 ②grace 内正常成交 ③$0 路径同样受守卫 ④展示净额==扣款净额
 # ⑤convert 返回 false 零扣款零建单 + 接线门(摘掉任一守卫即红)。
 checkout_trial_quote_gate() {
-  if "$NODE_BIN" scripts/selfcheck-checkout-trial-quote.mjs > /tmp/uniapp-checkout-trial-quote.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-checkout-trial-quote.log)"
+  if "$NODE_BIN" scripts/selfcheck-checkout-trial-quote.mjs > "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log")"
   else
     bad "结算页试用报价单源门失败 — node scripts/selfcheck-checkout-trial-quote.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-checkout-trial-quote.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log" | head -8 | sed 's/^/        /'
   fi
 }
 checkout_trial_quote_gate
@@ -3254,11 +3256,11 @@ checkout_trial_quote_gate
 # (含失败路径必解锁的反向靶) ⑤正常路径不受影响 + 结构纪律(快照冻在首个 await 前 /
 # 复验拿当前权威值 / 守卫非模块级 / 按钮 disabled 派生)。
 exchange_genesis_guard_gate() {
-  if "$NODE_BIN" scripts/selfcheck-exchange-genesis-guard.mjs > /tmp/uniapp-exchange-genesis-guard.log 2>&1; then
-    ok "$(tail -1 /tmp/uniapp-exchange-genesis-guard.log)"
+  if "$NODE_BIN" scripts/selfcheck-exchange-genesis-guard.mjs > "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log")"
   else
     bad "兑换/创世重入守卫门失败 — node scripts/selfcheck-exchange-genesis-guard.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-exchange-genesis-guard.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log" | head -8 | sed 's/^/        /'
   fi
 }
 exchange_genesis_guard_gate
@@ -3274,11 +3276,11 @@ exchange_genesis_guard_gate
 # 调用方(28 处在用)行为逐项不变 + 爆炸半径只有 staking ⑤建仓冲突重放不丢仓、id 不重号
 # ⑥接线门(判定对不对 / 有没有被接上是两道门)。
 staking_cas_gate() {
-  if "$NODE_BIN" scripts/selfcheck-staking-cas.mjs > /tmp/uniapp-staking-cas.log 2>&1; then
-    ok "质押持仓乐观并发门 — $(tail -1 /tmp/uniapp-staking-cas.log)"
+  if "$NODE_BIN" scripts/selfcheck-staking-cas.mjs > "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log" 2>&1; then
+    ok "质押持仓乐观并发门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log")"
   else
     bad "质押持仓乐观并发门失败 — node scripts/selfcheck-staking-cas.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-staking-cas.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log" | head -8 | sed 's/^/        /'
   fi
 }
 staking_cas_gate
@@ -3296,11 +3298,11 @@ staking_cas_gate
 # 仍在裸调 bills 写入的存量点只许减不许增 ⑦多腿交易(兑换一进一出)原子性:两条分录
 # 一次落盘(数写盘次数),任一环失败 → 两腿资金一起还原、账上零残留(不许只剩一条)。
 money_receipt_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-receipt.mjs > /tmp/uniapp-money-receipt.log 2>&1; then
-    ok "资金 ⊗ 收据门 — $(tail -1 /tmp/uniapp-money-receipt.log)"
+  if "$NODE_BIN" scripts/selfcheck-money-receipt.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log" 2>&1; then
+    ok "资金 ⊗ 收据门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log")"
   else
     bad "资金 ⊗ 收据门失败 — node scripts/selfcheck-money-receipt.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-receipt.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log" | head -8 | sed 's/^/        /'
   fi
 }
 money_receipt_gate
@@ -3375,17 +3377,17 @@ bill_producer_gate() {
   # 记账文件冒充 / 多生产者只删其一 / 主行符号反 / 抵扣腿符号反 / 冲正行删 / 新类型未登记 /
   # 种子删 / 嵌套掩护 / 币种改错)+ 1 条负控(无关改动不许红)+ 样本量自校。
   # 注入锚点失配会自曝为 FAIL,不会静默当成「测过了」。
-  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs --selftest > /tmp/uniapp-bill-producers-selftest.log 2>&1; then
-    ok "bill-producers selftest: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' /tmp/uniapp-bill-producers-selftest.log | tail -1)"
+  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" 2>&1; then
+    ok "bill-producers selftest: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" | tail -1)"
   else
     bad "bill-producers selftest 失败(哨兵失效即门失效;node scripts/selfcheck-bill-producers.mjs --selftest 看明细)"
-    grep -E "^  FAIL" /tmp/uniapp-bill-producers-selftest.log | head -8 | sed 's/^/        /'
+    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" | head -8 | sed 's/^/        /'
   fi
-  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs > /tmp/uniapp-bill-producers.log 2>&1; then
-    ok "账单生产者门 — $(tail -1 /tmp/uniapp-bill-producers.log)"
+  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs > "${VERIFY_LOG_PREFIX}-uniapp-bill-producers.log" 2>&1; then
+    ok "账单生产者门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-bill-producers.log")"
   else
     bad "账单生产者门失败 — node scripts/selfcheck-bill-producers.mjs 看明细;改了账单写入就同步台账(--print 看实测)"
-    grep -E "^  FAIL" /tmp/uniapp-bill-producers.log | head -8 | sed 's/^/        /'
+    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-bill-producers.log" | head -8 | sed 's/^/        /'
   fi
 }
 bill_producer_gate
@@ -3403,20 +3405,20 @@ bill_producer_gate
 # (verify-h5-runtime.mjs --remote-withdraw,同 H5 运行时门的隔离起服机制)—— 裸跑 verify 不再因为只有 mock 靶而必红。
 withdraw_bill_runtime_gate() {
   if [ -z "${REMOTE_BASE_URL:-}" ]; then
-    if probe_retry /tmp/uniapp-withdraw-bill-runtime.log "$NODE_BIN" scripts/verify-h5-runtime.mjs --remote-withdraw; then
-      ok "提现账单行 runtime 门(远端档隔离起服)— $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
+    if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" "$NODE_BIN" scripts/verify-h5-runtime.mjs --remote-withdraw; then
+      ok "提现账单行 runtime 门(远端档隔离起服)— $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log")"
     else
       bad "提现账单行 runtime 门失败 — node scripts/verify-h5-runtime.mjs --remote-withdraw 看明细(或给 REMOTE_BASE_URL 指一台远端档 server)"
-      grep -E "^  FAIL|Error" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
+      grep -E "^  FAIL|Error" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" | head -8 | sed 's/^/        /'
     fi
     return
   fi
   local withdraw_base_url="$REMOTE_BASE_URL"
-  if probe_retry /tmp/uniapp-withdraw-bill-runtime.log env BASE_URL="$withdraw_base_url" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
-    ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" env BASE_URL="$withdraw_base_url" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
+    ok "提现账单行 runtime 门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log")"
   else
     bad "提现账单行 runtime 门失败 — BASE_URL=$withdraw_base_url node scripts/withdraw-bill-runtime.mjs 看明细"
-    grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
+    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" | head -8 | sed 's/^/        /'
   fi
 }
 if scope_hit withdraw-bill-runtime; then withdraw_bill_runtime_gate; fi
@@ -3436,11 +3438,11 @@ if scope_hit withdraw-bill-runtime; then withdraw_bill_runtime_gate; fi
 # 判据:扫全部注释行的 /api/ 引用,对哨兵脚本内的台账逐条比对(台账不写在被查文件里,
 # 否则改注释顺手改台账 = 门等于没有)。三向红:代码有台账没 / 台账有代码没 / 扫到 0 条。
 endpoint_citation_gate() {
-  if "$NODE_BIN" scripts/endpoint-citation-sentinel.mjs > /tmp/uniapp-endpoint-citation.log 2>&1; then
-    ok "接口引用台账门 — $(tail -1 /tmp/uniapp-endpoint-citation.log)"
+  if "$NODE_BIN" scripts/endpoint-citation-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uniapp-endpoint-citation.log" 2>&1; then
+    ok "接口引用台账门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-endpoint-citation.log")"
   else
     bad "接口引用台账门失败 — node scripts/endpoint-citation-sentinel.mjs 看明细"
-    grep -E "^  [0-9]+\." /tmp/uniapp-endpoint-citation.log | head -8 | sed 's/^/        /'
+    grep -E "^  [0-9]+\." "${VERIFY_LOG_PREFIX}-uniapp-endpoint-citation.log" | head -8 | sed 's/^/        /'
   fi
 }
 endpoint_citation_gate
@@ -3461,11 +3463,11 @@ endpoint_citation_gate
 # ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(五个 store
 # 全路径走 CAS + 六处页面调用点真的读了 ok/conflict + 3 语 i18n)。
 money_cas_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > /tmp/uniapp-money-cas.log 2>&1; then
-    ok "P1 涉钱/配额乐观并发门 — $(tail -1 /tmp/uniapp-money-cas.log)"
+  if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log" 2>&1; then
+    ok "P1 涉钱/配额乐观并发门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log")"
   else
     bad "P1 涉钱/配额乐观并发门失败 — node scripts/selfcheck-money-cas.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-cas.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log" | head -8 | sed 's/^/        /'
   fi
 }
 money_cas_gate
@@ -3477,11 +3479,11 @@ money_cas_gate
 # 根治 = 失败路径的行为断言必须有一条注入该失败的测试;本门就是那条测试。
 # 判据:载真 app store + 真 account-cloud + 真 storage 语义,注入写失败与刷新。
 withdraw_failpaths_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-failpaths.mjs > /tmp/uniapp-withdraw-failpaths.log 2>&1; then
-    ok "提现失败路径门 — $(tail -1 /tmp/uniapp-withdraw-failpaths.log)"
+  if "$NODE_BIN" scripts/selfcheck-withdraw-failpaths.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log" 2>&1; then
+    ok "提现失败路径门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log")"
   else
     bad "提现失败路径门失败 — node scripts/selfcheck-withdraw-failpaths.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-withdraw-failpaths.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log" | head -8 | sed 's/^/        /'
   fi
 }
 withdraw_failpaths_gate
@@ -3496,11 +3498,11 @@ withdraw_failpaths_gate
 # 与幂等、方向判重、缺陷本体回归。红测实测 R1 删生产者 / R2 换错证据源 / R3 摘不变量 /
 # R4 判据丢方向 / R5 删断言,五种改法各自判红。
 withdraw_nex_refund_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-nex-refund.mjs > /tmp/uniapp-withdraw-nex-refund.log 2>&1; then
-    ok "失败提现退还 NEX 冲正门 — $(tail -1 /tmp/uniapp-withdraw-nex-refund.log)"
+  if "$NODE_BIN" scripts/selfcheck-withdraw-nex-refund.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log" 2>&1; then
+    ok "失败提现退还 NEX 冲正门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log")"
   else
     bad "失败提现退还 NEX 冲正门失败 — node scripts/selfcheck-withdraw-nex-refund.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-withdraw-nex-refund.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log" | head -8 | sed 's/^/        /'
   fi
 }
 withdraw_nex_refund_gate
@@ -3511,11 +3513,11 @@ withdraw_nex_refund_gate
 # 红测实测三种拆法各自判红:A 调用点不过 applyRefundEvidence(5 红)/ B 同档位改回整行择一(1 红)/
 # C 金额与时刻拆开各取(1 红)。C 是第一版靶漏掉的覆盖洞,由红测本身抓出后补的。
 withdrawal_merge_union_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdrawal-merge-union.mjs > /tmp/uniapp-withdrawal-merge-union.log 2>&1; then
-    ok "提现单合并两修法并存门 — $(tail -1 /tmp/uniapp-withdrawal-merge-union.log)"
+  if "$NODE_BIN" scripts/selfcheck-withdrawal-merge-union.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log" 2>&1; then
+    ok "提现单合并两修法并存门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log")"
   else
     bad "提现单合并两修法并存门失败 — node scripts/selfcheck-withdrawal-merge-union.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|union-probe FAIL)" /tmp/uniapp-withdrawal-merge-union.log | head -8 | sed "s/^/        /"
+    grep -E "^(FAIL|  FAIL|union-probe FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log" | head -8 | sed "s/^/        /"
   fi
 }
 withdrawal_merge_union_gate
@@ -3533,11 +3535,11 @@ withdrawal_merge_union_gate
 # 红测:A 去掉「确定拒绝」档的 !isReplay → 红;B 日限档改回无条件退役 → 红;
 #       C 给 409 档也加 !isReplay → 红;D 删掉抠段锚点 → 判据自失效判红。
 withdraw_replay_triage_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-replay-triage.mjs > /tmp/uniapp-replay-triage.log 2>&1; then
-    ok "提现分诊重放感知门 — $(tail -1 /tmp/uniapp-replay-triage.log)"
+  if "$NODE_BIN" scripts/selfcheck-withdraw-replay-triage.mjs > "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log" 2>&1; then
+    ok "提现分诊重放感知门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log")"
   else
     bad "提现分诊重放感知门失败 — node scripts/selfcheck-withdraw-replay-triage.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-replay-triage.log | head -8 | sed "s/^/        /"
+    grep -E "^(FAIL|  FAIL|AssertionError)" "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log" | head -8 | sed "s/^/        /"
   fi
 }
 withdraw_replay_triage_gate
@@ -3548,11 +3550,11 @@ withdraw_replay_triage_gate
 # 红测:页面谎报 isReplay/isDailyLimit/isGeo → 全红;拿掉日限线型守卫 → 红;
 #       结果未知也退役 → 红;409 档早退绕过退役 → 红。
 withdraw_triage_dataflow_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-triage-dataflow.mjs > /tmp/uniapp-triage-dataflow.log 2>&1; then
-    ok "提现分诊数据流门 — $(tail -1 /tmp/uniapp-triage-dataflow.log)"
+  if "$NODE_BIN" scripts/selfcheck-withdraw-triage-dataflow.mjs > "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log" 2>&1; then
+    ok "提现分诊数据流门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log")"
   else
     bad "提现分诊数据流门失败 — node scripts/selfcheck-withdraw-triage-dataflow.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-triage-dataflow.log | head -8 | sed "s/^/        /"
+    grep -E "^(FAIL|  FAIL|AssertionError)" "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log" | head -8 | sed "s/^/        /"
   fi
 }
 withdraw_triage_dataflow_gate
@@ -3572,11 +3574,11 @@ withdraw_triage_dataflow_gate
 # ⑥接线门(两处回滚返回值真被消费 / stake 分支真删了内存兜底 / 两个页面按归因分文案 /
 # 结算页 convert 真排在扣款之后)⑦三语文案真解析取值、互不相同、正文含 {id}。
 money_rollback_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-rollback.mjs > /tmp/uniapp-money-rollback.log 2>&1; then
-    ok "冲正(回滚)自身门 — $(tail -1 /tmp/uniapp-money-rollback.log)"
+  if "$NODE_BIN" scripts/selfcheck-money-rollback.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log" 2>&1; then
+    ok "冲正(回滚)自身门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log")"
   else
     bad "冲正(回滚)自身门失败 — node scripts/selfcheck-money-rollback.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-rollback.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log" | head -8 | sed 's/^/        /'
   fi
 }
 money_rollback_gate
@@ -3591,11 +3593,11 @@ money_rollback_gate
 #    (定时器在 step 开头已无条件 delete —— 这个前提本身也是一条断言,它变了上面三条要重新论证)
 # 外加红测自证:摘掉判据的目标串,对应断言必须转 false(不许空转)。
 deposit_resume_gate() {
-  if "$NODE_BIN" scripts/selfcheck-deposit-resume.mjs > /tmp/uniapp-deposit-resume.log 2>&1; then
-    ok "在途入金续推门 — $(tail -1 /tmp/uniapp-deposit-resume.log)"
+  if "$NODE_BIN" scripts/selfcheck-deposit-resume.mjs > "${VERIFY_LOG_PREFIX}-uniapp-deposit-resume.log" 2>&1; then
+    ok "在途入金续推门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-deposit-resume.log")"
   else
     bad "在途入金续推门失败 — node scripts/selfcheck-deposit-resume.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-deposit-resume.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-deposit-resume.log" | head -8 | sed 's/^/        /'
   fi
 }
 deposit_resume_gate
@@ -3609,11 +3611,11 @@ deposit_resume_gate
 #      ② 首次路径与 postMoneyBills 等价 ③ 空 ref 直接抛错(不静默降级成假幂等)
 #      ④ 5 个调用点的 ref 全部稳定(带时间戳 = 判重永不命中) ⑤ 顺序门 + 反不过来那两处的自愈门
 deposit_claim_idem_gate() {
-  if "$NODE_BIN" scripts/selfcheck-claim-idempotency.mjs > /tmp/uniapp-claim-idem.log 2>&1; then
-    ok "领奖幂等门 — $(tail -1 /tmp/uniapp-claim-idem.log)"
+  if "$NODE_BIN" scripts/selfcheck-claim-idempotency.mjs > "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log" 2>&1; then
+    ok "领奖幂等门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log")"
   else
     bad "领奖幂等门失败 — node scripts/selfcheck-claim-idempotency.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-claim-idem.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log" | head -8 | sed 's/^/        /'
   fi
 }
 deposit_claim_idem_gate
@@ -3627,11 +3629,11 @@ deposit_claim_idem_gate
 # 少一个字段照样过编译。判据判**集合**不判成员 —— 判成员的话每加一个字段就要记得加一条判据,
 # 而「忘了加」正是本门要防的那件事。外加与类型声明对齐 + 判据红测自证。
 snapshot_literals_gate() {
-  if "$NODE_BIN" scripts/selfcheck-snapshot-literals.mjs > /tmp/uniapp-snap-literals.log 2>&1; then
-    ok "快照字面量一致门 — $(tail -1 /tmp/uniapp-snap-literals.log)"
+  if "$NODE_BIN" scripts/selfcheck-snapshot-literals.mjs > "${VERIFY_LOG_PREFIX}-uniapp-snap-literals.log" 2>&1; then
+    ok "快照字面量一致门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-snap-literals.log")"
   else
     bad "快照字面量一致门失败 — node scripts/selfcheck-snapshot-literals.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-literals.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-snap-literals.log" | head -8 | sed 's/^/        /'
   fi
 }
 snapshot_literals_gate
@@ -3644,11 +3646,11 @@ snapshot_literals_gate
 # (红测把 todayEarnings 塞进排除名单 → 钱当场少算,当时全部哨兵照样绿)。
 # 本门拦的不是「跳过写一定错」,而是「没量就凭直觉再走一遍这个方向」。
 snapshot_write_gate() {
-  if "$NODE_BIN" scripts/selfcheck-snapshot-write.mjs > /tmp/uniapp-snap-write.log 2>&1; then
-    ok "快照无条件写盘门 — $(tail -1 /tmp/uniapp-snap-write.log)"
+  if "$NODE_BIN" scripts/selfcheck-snapshot-write.mjs > "${VERIFY_LOG_PREFIX}-uniapp-snap-write.log" 2>&1; then
+    ok "快照无条件写盘门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-snap-write.log")"
   else
     bad "快照无条件写盘门失败 — node scripts/selfcheck-snapshot-write.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-write.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-snap-write.log" | head -8 | sed 's/^/        /'
   fi
 }
 snapshot_write_gate
@@ -3660,11 +3662,11 @@ snapshot_write_gate
 # ① 的地基是分位表单调性,所以门拒收非单调表不是洁癖 —— 表一非单调,承诺①当场失效
 # 而界面毫无察觉(名次会随算力上升往后掉)。
 network_rank_gate() {
-  if "$NODE_BIN" scripts/selfcheck-network-rank.mjs > /tmp/uniapp-net-rank.log 2>&1; then
-    ok "排名派生行为门 — $(tail -1 /tmp/uniapp-net-rank.log)"
+  if "$NODE_BIN" scripts/selfcheck-network-rank.mjs > "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log" 2>&1; then
+    ok "排名派生行为门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log")"
   else
     bad "排名派生行为门失败 — node scripts/selfcheck-network-rank.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-net-rank.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log" | head -8 | sed 's/^/        /'
   fi
 }
 network_rank_gate
@@ -3689,11 +3691,11 @@ network_rank_gate
 #   展示用抖动流进排名会每秒抖;任务量递减(算力恒定,降的是接单量)流进排名,
 #   会让用户什么都不做名次也往后掉。
 account_hashrate_gate() {
-  if "$NODE_BIN" scripts/selfcheck-account-hashrate.mjs > /tmp/uniapp-acct-hash.log 2>&1; then
-    ok "总有效算力聚合门 — $(tail -1 /tmp/uniapp-acct-hash.log)"
+  if "$NODE_BIN" scripts/selfcheck-account-hashrate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log" 2>&1; then
+    ok "总有效算力聚合门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log")"
   else
     bad "总有效算力聚合门失败 — node scripts/selfcheck-account-hashrate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-acct-hash.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log" | head -8 | sed 's/^/        /'
   fi
 }
 account_hashrate_gate
@@ -3704,11 +3706,11 @@ account_hashrate_gate
 # 机型引用集必须等于「全集 / 递减豁免集 / 其补集」之一(全集从真模块导出派生,SKU 一变大
 # 所有涉机型的门当场红);点名语言文件必须三语齐点;例外台账逐条带理由且 0 命中即红。
 gate_targets_meta() {
-  if "$NODE_BIN" scripts/selfcheck-gate-targets.mjs > /tmp/uniapp-gate-targets.log 2>&1; then
-    ok "门的门(靶完整性)— $(tail -1 /tmp/uniapp-gate-targets.log)"
+  if "$NODE_BIN" scripts/selfcheck-gate-targets.mjs > "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log" 2>&1; then
+    ok "门的门(靶完整性)— $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log")"
   else
     bad "门的门(靶完整性)失败 — node scripts/selfcheck-gate-targets.mjs 看明细"
-    grep -E "^  FAIL" /tmp/uniapp-gate-targets.log | head -8 | sed 's/^/        /'
+    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log" | head -8 | sed 's/^/        /'
   fi
 }
 gate_targets_meta
@@ -3718,11 +3720,11 @@ gate_targets_meta
 # 一个凭空的安全感,同轮验收抓到的 4 条缺陷全是这条不变量失守的样本。
 # 守两件事:① 优先级链对不对(行为验证,不读源码顺序)② 有没有人绕过它自判(结构验证)。
 genesis_gate() {
-  if "$NODE_BIN" scripts/selfcheck-genesis-gate.mjs > /tmp/uniapp-gen-gate.log 2>&1; then
-    ok "创世单一派生门 — $(tail -1 /tmp/uniapp-gen-gate.log)"
+  if "$NODE_BIN" scripts/selfcheck-genesis-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log" 2>&1; then
+    ok "创世单一派生门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log")"
   else
     bad "创世单一派生门失败 — node scripts/selfcheck-genesis-gate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-gen-gate.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log" | head -8 | sed 's/^/        /'
   fi
 }
 genesis_gate
@@ -3733,11 +3735,11 @@ genesis_gate
 # 用户已挣到的 CLAIMABLE 奖励,比它想防的问题更坏)—— 过滤归派发端(交接书 U-16),
 # 客户端只留报警,并焊住「任务面新增跳创世入口必须问闸」这条反向钉。
 quest_genesis_tripwire_gate() {
-  if "$NODE_BIN" scripts/selfcheck-quest-genesis-tripwire.mjs > /tmp/uniapp-quest-genesis-tripwire.log 2>&1; then
-    ok "周任务创世观测门 — $(tail -1 /tmp/uniapp-quest-genesis-tripwire.log)"
+  if "$NODE_BIN" scripts/selfcheck-quest-genesis-tripwire.mjs > "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log" 2>&1; then
+    ok "周任务创世观测门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log")"
   else
     bad "周任务创世观测门失败 — node scripts/selfcheck-quest-genesis-tripwire.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-quest-genesis-tripwire.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log" | head -8 | sed 's/^/        /'
   fi
 }
 quest_genesis_tripwire_gate
@@ -3749,11 +3751,11 @@ quest_genesis_tripwire_gate
 # 都会顺手关掉全站唯一的周期守卫;H5 的 App 级 onShow 不随应用内跳转触发 = 关了就没得再开。
 # 本门守四条不变量,并每次运行对内存副本做四组缺陷注入自证判据还活着(判据死了也判红)。
 guard_liveness_gate() {
-  if "$NODE_BIN" scripts/selfcheck-guard-liveness.mjs > /tmp/uniapp-guard-liveness.log 2>&1; then
-    ok "守卫存活性门 — $(tail -1 /tmp/uniapp-guard-liveness.log)"
+  if "$NODE_BIN" scripts/selfcheck-guard-liveness.mjs > "${VERIFY_LOG_PREFIX}-uniapp-guard-liveness.log" 2>&1; then
+    ok "守卫存活性门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-guard-liveness.log")"
   else
     bad "守卫存活性门失败 — node scripts/selfcheck-guard-liveness.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-guard-liveness.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-guard-liveness.log" | head -8 | sed 's/^/        /'
   fi
 }
 guard_liveness_gate
@@ -3762,11 +3764,11 @@ guard_liveness_gate
 # 所有直接读 DOM 的脚本必须绕过 device-shell；视觉/DOM/鉴权探针零覆盖、崩溃或
 # 预期路由不符一律判红。权限白名单使用的路由在比较前折叠 dot segments。
 probe_safety_gate() {
-  if "$NODE_BIN" --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs > /tmp/uniapp-probe-safety.log 2>&1; then
-    ok "探针覆盖与路由归一化门 — $(grep -E '^ℹ pass ' /tmp/uniapp-probe-safety.log | tail -1)"
+  if "$NODE_BIN" --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs > "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" 2>&1; then
+    ok "探针覆盖与路由归一化门 — $(grep -E '^ℹ pass ' "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" | tail -1)"
   else
     bad "探针覆盖与路由归一化门失败 — npm run test:probe-safety 看明细"
-    tail -16 /tmp/uniapp-probe-safety.log | sed 's/^/        /'
+    tail -16 "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" | sed 's/^/        /'
   fi
 }
 probe_safety_gate
@@ -3775,11 +3777,11 @@ probe_safety_gate
 # 静态评审页必须停业务，但 H5 站内返回业务页不会重发 App.onShow；由常驻守卫
 # 重新鉴权并经唯一集中出口幂等恢复。门内含十一组撤回/漏接/孤儿/递归 interval/timeout 变异红测。
 business_loop_liveness_gate() {
-  if "$NODE_BIN" scripts/selfcheck-business-loop-liveness.mjs > /tmp/uniapp-business-loop-liveness.log 2>&1; then
-    ok "业务循环存活性门 — $(tail -1 /tmp/uniapp-business-loop-liveness.log)"
+  if "$NODE_BIN" scripts/selfcheck-business-loop-liveness.mjs > "${VERIFY_LOG_PREFIX}-uniapp-business-loop-liveness.log" 2>&1; then
+    ok "业务循环存活性门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-business-loop-liveness.log")"
   else
     bad "业务循环存活性门失败 — node scripts/selfcheck-business-loop-liveness.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)|AssertionError" /tmp/uniapp-business-loop-liveness.log | head -8 | sed 's/^/        /'
+    grep -E "^(FAIL|  FAIL)|AssertionError" "${VERIFY_LOG_PREFIX}-uniapp-business-loop-liveness.log" | head -8 | sed 's/^/        /'
   fi
 }
 business_loop_liveness_gate
@@ -3788,11 +3790,11 @@ business_loop_liveness_gate
 # 进入评审页、会话失效或 App 后台时，不只清下一轮 timer；已在飞的 report/apply
 # 也必须经 AbortSignal + 代次栅栏停止，禁止停机后继续写 runtime 或发送 ACK。
 janus_stop_cancellation_gate() {
-  if "$NODE_BIN" scripts/janus-stop-cancellation.test.mjs > /tmp/uniapp-janus-stop-cancellation.log 2>&1; then
-    ok "Janus C2 停机取消门 — $(tail -1 /tmp/uniapp-janus-stop-cancellation.log)"
+  if "$NODE_BIN" scripts/janus-stop-cancellation.test.mjs > "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log" 2>&1; then
+    ok "Janus C2 停机取消门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log")"
   else
     bad "Janus C2 停机取消门失败 — node scripts/janus-stop-cancellation.test.mjs 看明细"
-    tail -12 /tmp/uniapp-janus-stop-cancellation.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log" | sed 's/^/        /'
   fi
 }
 janus_stop_cancellation_gate
@@ -3810,28 +3812,28 @@ janus_stop_cancellation_gate
 # 判据遍历全仓每一个模板元素,不枚举控件名——枚举式判据在这仓被绕过过太多次。
 # selftest = 逐条注入违例证明每条判据真的会红(含行为门),哨兵失效即门失效。
 a11y_activate_gate() {
-  if "$NODE_BIN" scripts/a11y-activate-gate.redtest.mjs > /tmp/uni-a11y-activate-selftest.log 2>&1; then
-    ok "a11y-activate selftest — $(tail -1 /tmp/uni-a11y-activate-selftest.log)"
+  if "$NODE_BIN" scripts/a11y-activate-gate.redtest.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log" 2>&1; then
+    ok "a11y-activate selftest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log")"
   else
     bad "a11y-activate selftest 失败(哨兵失效即门失效;node scripts/a11y-activate-gate.redtest.mjs 看明细)"
-    tail -12 /tmp/uni-a11y-activate-selftest.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log" | sed 's/^/        /'
   fi
-  if "$NODE_BIN" scripts/a11y-activate-gate.mjs > /tmp/uni-a11y-activate.log 2>&1; then
+  if "$NODE_BIN" scripts/a11y-activate-gate.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" 2>&1; then
     # 🔴 取带 ✓ 的那行,不能用 head -1:门会先把「判不出」清单打到 stderr,
     # head -1 抓到的是空行 → PASS 不带样本量,一眼看不出它到底扫了多少(本仓禁止这种绿)。
-    ok "$(grep -a '✓' /tmp/uni-a11y-activate.log | head -1 | sed 's/^ *✓ *//')"
-    grep -a 'ⓘ' /tmp/uni-a11y-activate.log | sed 's/^/        /'
+    ok "$(grep -a '✓' "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" | head -1 | sed 's/^ *✓ *//')"
+    grep -a 'ⓘ' "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" | sed 's/^/        /'
   else
     bad "自造控件键盘可达性门失败 — node scripts/a11y-activate-gate.mjs 看明细"
-    tail -14 /tmp/uni-a11y-activate.log | sed 's/^/        /'
+    tail -14 "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" | sed 's/^/        /'
   fi
   # --experimental-strip-types:行为门 import 的是 .ts 源,Node <23.6 不带这个 flag 会直接炸。
-  if "$NODE_BIN" --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs > /tmp/uni-a11y-behavior.log 2>&1; then
+  if "$NODE_BIN" --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" 2>&1; then
     # 用 -o 只取计数片段:node --test 的行首是多字节的 ℹ,拿 `^.` 去锚会匹配不上 → PASS 又变空消息。
-    ok "a11y 键盘激活行为门 — $(grep -aoE '(pass|fail) [0-9]+' /tmp/uni-a11y-behavior.log | tr '\n' ' ')"
+    ok "a11y 键盘激活行为门 — $(grep -aoE '(pass|fail) [0-9]+' "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" | tr '\n' ' ')"
   else
     bad "a11y 键盘激活行为门失败 — node --test scripts/a11y-activate-behavior.test.mjs 看明细"
-    tail -14 /tmp/uni-a11y-behavior.log | sed 's/^/        /'
+    tail -14 "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" | sed 's/^/        /'
   fi
 }
 a11y_activate_gate
@@ -3845,11 +3847,11 @@ _h5_tree_now=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null 
 if [ -n "${H5_RUNTIME_REUSED_TREE:-}" ] && [ -n "$_h5_tree_now" ] && [ "$H5_RUNTIME_REUSED_TREE" = "$_h5_tree_now" ]; then
   ok "H5 运行时门 — 复用本轮 runner 已跑过的同树结果(tree ${_h5_tree_now:0:10}${H5_RUNTIME_ONLY:+ · scoped 子探针 $H5_RUNTIME_ONLY});未另起服"
 else
-  if probe_retry /tmp/uni-h5-runtime-gates.log "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
-    ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
+  if probe_retry "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log" "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
+    ok "H5 运行时门隔离起服 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log")"
   else
     bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
-    tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
+    tail -12 "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log" | sed 's/^/        /'
   fi
 fi
 fi
