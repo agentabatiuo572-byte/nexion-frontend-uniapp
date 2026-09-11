@@ -114,13 +114,15 @@ import {
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
 import { recordLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
+import { pendingProfileLocaleHydration, isProfileLocaleHydrationError } from "@/lib/locale-profile-hydration";
+import { retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
 import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
 
 const t = useT();
 const locale = useLocaleStore();
 const serverTerms = ref<LegalTermsCurrent | null>(null);
-type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed";
+type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed" | "languageSyncFailed";
 const loadErrorKey = ref<TermsErrorKey | null>(null);
 const loadError = computed(() => loadErrorKey.value ? t.value.terms[loadErrorKey.value] : null);
 const confirming = ref(false);
@@ -207,6 +209,15 @@ async function loadTerms() {
   const requestFence = currentSessionFence();
   try {
     const authenticated = !!requestFence;
+    // Let the synchronous language-selection watcher register its profile write
+    // before choosing a document that the server will later require for business.
+    await Promise.resolve();
+    if (requestFence) {
+      const hydration = pendingProfileLocaleHydration({ accountId: `user:${requestFence.userId}`, revision: requestFence.sessionRevision ?? 0 });
+      if (hydration) await hydration;
+      if (!termsRequests.isCurrent(request, locale.code) || !termsPageVisible) return;
+      if (!sameLegalTermsSession(requestFence, currentSessionFence())) throw new Error("LEGAL_TERMS_SESSION_CHANGED");
+    }
     const snapshot = await legalTermsApi.current(request.locale, "GLOBAL", authenticated);
     if (!termsRequests.isCurrent(request, locale.code, snapshot.requestedLocale)) {
       // A current response that claims a different requested locale is not an
@@ -226,7 +237,7 @@ async function loadTerms() {
     }
     serverTerms.value = snapshot;
     if (snapshot.acknowledged) recordLegalTermsAcknowledged(snapshot);
-  } catch {
+  } catch (error) {
     if (!termsRequests.isCurrent(request, locale.code)) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       serverTerms.value = null;
@@ -234,7 +245,7 @@ async function loadTerms() {
       return;
     }
     serverTerms.value = null;
-    loadErrorKey.value = "loadFailed";
+    loadErrorKey.value = isProfileLocaleHydrationError(error) ? "languageSyncFailed" : "loadFailed";
   } finally {
     if (termsRequests.isCurrent(request, locale.code)) {
       loaded.value = true;
@@ -253,6 +264,7 @@ function repeatedKeyboardActivation(event?: Event): boolean {
 
 function retryTerms(event?: Event) {
   if (repeatedKeyboardActivation(event) || loadingTerms.value) return;
+  if (loadErrorKey.value === "languageSyncFailed") retryCurrentProfileLocale();
   void loadTerms();
 }
 

@@ -47,7 +47,7 @@ export function createApp() {
   watch(() => locale.code, (next) => {
     void runtimeI18n.refresh(next);
   });
-  watch(() => locale.explicitRevision, () => syncExplicitProfileLocale(locale.code));
+  watch(() => locale.explicitRevision, () => syncExplicitProfileLocale(locale.code), { flush: "sync" });
   if (import.meta.env.DEV) {
     // DEV-only: SPEC-7 演示桥(模拟后台处置下发)。
     mountSpec7DevBridge();

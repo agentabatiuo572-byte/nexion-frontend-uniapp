@@ -23,7 +23,7 @@ test("the global route watcher re-enforces the pending Terms requirement after a
   assert.match(runtime, /let pendingRequirement:/);
   assert.match(runtime, /export function enforcePendingLegalTermsGate/);
   assert.match(runtime, /export function recordLegalTermsAcknowledged/);
-  assert.match(runtime, /\.catch\(\(\) => \{[\s\S]*pendingRequirement = \{ key, locale: requestLocale, version: "", reason: "acknowledgement" \}/);
+  assert.match(runtime, /\.catch\(\(\) => \{[\s\S]*pendingRequirement = \{\s*key, locale: requestLocale, version: "", reason: "acknowledgement"\s*[,}]/);
   assert.match(source, /serverTerms\.value = snapshot;[\s\S]{0,120}if \(snapshot\.acknowledged\) recordLegalTermsAcknowledged\(snapshot\)/);
   assert.match(source, /recordLegalTermsAcknowledged\(acknowledged, snapshotLocale\)/);
   assert.match(app, /if \(enforcePendingLegalTermsGate\(`\/\$\{route\}`\)\)/);

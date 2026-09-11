@@ -4,18 +4,20 @@ import fs from "node:fs";
 
 const estimator = fs.readFileSync("src/pages/onboarding/estimator.vue", "utf8");
 const api = fs.readFileSync("src/api/onboarding-calibration-api.ts", "utf8");
+const readState = fs.readFileSync("src/lib/estimator-calibration-read-state.ts", "utf8");
 
 test("estimator only reveals a server-confirmed usable calibration", () => {
-  assert.match(estimator, /!result\.calibrationAvailable/);
-  assert.match(estimator, /result\.activationStatus !== "CALIBRATED"/);
-  assert.match(estimator, /result\.activationStatus !== "ACTIVE"/);
-  assert.match(estimator, /calibration\.value = result;\s*scheduleReveal\(\)/);
+  assert.match(readState, /result\.calibrationAvailable/);
+  assert.match(readState, /result\.activationStatus === "CALIBRATED"/);
+  assert.match(readState, /result\.activationStatus === "ACTIVE"/);
+  assert.match(estimator, /const nextState = estimatorCalibrationReadState\(result\);\s*if \(nextState !== "ready"\)/);
+  assert.match(estimator, /calibration\.value = result;\s*readState\.value = "ready";\s*scheduleReveal\(\)/);
   assert.doesNotMatch(estimator, /onMounted\(\(\) => \{[\s\S]*?loadCalibration\(\);\s*scheduleReveal\(\)/);
   assert.match(estimator, /!detected\.value \|\| !calibration\.value\?\.calibrationAvailable/);
 });
 
 test("estimator exposes retry and defer controls without inventing a result", () => {
-  assert.match(estimator, /v-if="loadFailed"/);
+  assert.match(estimator, /v-if="readState !== 'loading' && readState !== 'ready'"/);
   assert.match(estimator, /@click="retryCalibration"/);
   assert.match(estimator, /@click="deferPhoneActivation"/);
   assert.match(estimator, /activationRewardGate/);

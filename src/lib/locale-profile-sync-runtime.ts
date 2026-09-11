@@ -2,7 +2,8 @@ import { profileApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { ref } from "vue";
-import { canHydrateProfileLocale } from "./locale-profile-hydration";
+import { canHydrateProfileLocale, trackProfileLocaleHydration } from "./locale-profile-hydration";
+import type { LocaleCode } from "@/i18n";
 import { createLocaleProfileSync, type LocaleProfileScope } from "./locale-profile-sync";
 
 function currentScope(): LocaleProfileScope | null {
@@ -25,9 +26,20 @@ const sync = createLocaleProfileSync({
   onState: (state) => { profileLocaleSyncState.value = state; },
 });
 
+function requestProfileLocale(language: string, scope: LocaleProfileScope): void {
+  sync.request(language);
+  trackProfileLocaleHydration(scope, sync.flush().then(() => {
+    const pending = sync.pending();
+    if (pending?.scope.accountId === scope.accountId && pending.scope.revision === scope.revision) {
+      throw new Error("PROFILE_LANGUAGE_SYNC_FAILED");
+    }
+  }));
+}
+
 /** The server subject is derived by the bearer transport; account ids are never sent. */
 export function syncExplicitProfileLocale(language: string): void {
-  if (!currentScope()) {
+  const scope = currentScope();
+  if (!scope) {
     pendingAnonymousSelection = language;
     hydrationFailed = false;
     profileLocaleSyncState.value = "idle";
@@ -35,14 +47,14 @@ export function syncExplicitProfileLocale(language: string): void {
   }
   pendingAnonymousSelection = null;
   hydrationFailed = false;
-  sync.request(language);
+  requestProfileLocale(language, scope);
 }
 
 /**
  * A completed sign-in reads the account-owned language before changing the UI.
  * An explicit picker action made during that read wins and is queued instead.
  */
-export function hydrateCurrentProfileLocale(): void {
+export function hydrateCurrentProfileLocale(registrationLocale?: LocaleCode): void {
   const scope = currentScope();
   if (!scope) {
     profileLocaleSyncState.value = "idle";
@@ -55,22 +67,27 @@ export function hydrateCurrentProfileLocale(): void {
   profileLocaleSyncState.value = "idle";
   const locale = useLocaleStore();
   const explicitRevision = locale.explicitRevision;
-  const chosenBeforeSignIn = pendingAnonymousSelection;
+  const chosenBeforeSignIn = pendingAnonymousSelection ?? registrationLocale;
   pendingAnonymousSelection = null;
   if (chosenBeforeSignIn) {
-    sync.request(chosenBeforeSignIn);
+    // A new registration keeps the language already used in the form. Existing
+    // account logins continue to hydrate their saved preference below.
+    locale.applyServerLocale(chosenBeforeSignIn as LocaleCode);
+    requestProfileLocale(chosenBeforeSignIn, scope);
     return;
   }
-  void profileApi.profile().then((profile) => {
+  const hydration = profileApi.profile().then((profile) => {
     if (!canHydrateProfileLocale(scope, currentScope(), explicitRevision, locale.explicitRevision)) return;
     locale.applyServerLocale(profile.language);
     hydrationFailed = false;
   }).catch(() => {
-    if (currentScope()?.accountId === scope.accountId && currentScope()?.revision === scope.revision) {
+    if (canHydrateProfileLocale(scope, currentScope(), explicitRevision, locale.explicitRevision)) {
       hydrationFailed = true;
       profileLocaleSyncState.value = "failed";
+      throw new Error("PROFILE_LANGUAGE_LOAD_FAILED");
     }
   });
+  trackProfileLocaleHydration(scope, hydration);
 }
 
 export function retryCurrentProfileLocale(): void {

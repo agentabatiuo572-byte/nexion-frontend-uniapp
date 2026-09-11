@@ -50,8 +50,8 @@ async function loadRuntime() {
 }
 
 async function settleGate(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  if (vi.isFakeTimers()) { await vi.advanceTimersByTimeAsync(0); return; }
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("legal terms runtime gate", () => {
@@ -85,6 +85,53 @@ describe("legal terms runtime gate", () => {
     expect(runtime.enforcePendingLegalTermsGate("/pages/me/risk-disclosure")).toBe(false);
     expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+  });
+
+  it.each(["/pages/register/success", "/pages/onboarding/estimator"])("preserves registration return %s on failed reads without changing public or business routes", async (destination) => {
+    state.current.mockRejectedValue(new Error("Terms unavailable"));
+    const runtime = await loadRuntime();
+    await runtime.scheduleLegalTermsGate(destination);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/register/register")).toBe(true);
+    expect(uni.reLaunch).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      url: `/pages/onboarding/terms?return=${encodeURIComponent(destination)}`,
+    }));
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/terms")).toBe(false);
+    expect(uni.reLaunch).toHaveBeenCalledOnce();
+    expect(runtime.enforcePendingLegalTermsGate("/pages/me/me")).toBe(true);
+    expect(uni.reLaunch).toHaveBeenLastCalledWith(expect.objectContaining({
+      url: "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme",
+    }));
+  });
+
+  it("waits for account language before presenting Terms and never shows the earlier default", async () => {
+    const runtime = await loadRuntime();
+    const { trackProfileLocaleHydration } = await import("./locale-profile-hydration");
+    let resolve!: () => void;
+    trackProfileLocaleHydration({ accountId: "user:7", revision: 1 }, new Promise<void>((done) => { resolve = done; }));
+    state.current.mockResolvedValue({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
+    const first = runtime.scheduleLegalTermsGate("/pages/onboarding/estimator");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(state.current).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    state.locale = "zh";
+    resolve();
+    await first;
+    expect(state.current).toHaveBeenCalledOnce();
+    expect(uni.reLaunch).toHaveBeenCalledOnce();
+  });
+
+  it("does not send an old account's Terms read when its language finishes after sign-out", async () => {
+    const runtime = await loadRuntime();
+    const { trackProfileLocaleHydration } = await import("./locale-profile-hydration");
+    let resolve!: () => void;
+    trackProfileLocaleHydration({ accountId: "user:7", revision: 1 }, new Promise<void>((done) => { resolve = done; }));
+    const first = runtime.scheduleLegalTermsGate("/pages/onboarding/estimator");
+    state.session = null;
+    resolve();
+    await first;
+    expect(state.current).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
   });
 
   it("keeps the public privacy policy readable through an async unacknowledged Terms result", async () => {
@@ -289,6 +336,7 @@ describe("legal terms runtime gate", () => {
       .mockResolvedValueOnce(snapshot(false));
     const runtime = await loadRuntime();
     const pending = runtime.scheduleLegalTermsGate("/pages/index/index");
+    await settleGate();
     state.sessionRevision += 2;
     resolveOld(snapshot(true));
     await pending;
@@ -304,6 +352,7 @@ describe("legal terms runtime gate", () => {
     const runtime = await loadRuntime();
 
     runtime.scheduleLegalTermsGate("/pages/index/index");
+    await settleGate();
     state.session = { accessToken: "token-b", user: { userId: 7 } };
     resolveOld(snapshot(true));
     await settleGate();
@@ -322,8 +371,10 @@ describe("legal terms runtime gate", () => {
       .mockImplementationOnce(() => new Promise((ok) => { resolveNew = ok; }));
     const runtime = await loadRuntime();
     const old = runtime.scheduleLegalTermsGate("/pages/me/language");
+    await settleGate();
     state.locale = "zh";
     const current = runtime.scheduleLegalTermsGate("/pages/me/language");
+    await settleGate();
     expect(state.current).toHaveBeenCalledTimes(2);
     if (completion === "resolve") resolveOld(snapshot(true));
     else rejectOld(new Error("OLD_LANGUAGE_FAILURE"));
@@ -354,6 +405,7 @@ describe("legal terms runtime gate", () => {
       .mockResolvedValueOnce({ ...snapshot(false), requestedLocale: "zh", resolvedLocale: "zh" });
     const runtime = await loadRuntime();
     const old = runtime.scheduleLegalTermsGate("/pages/me/language");
+    await settleGate();
     state.locale = "zh";
     resolveOld(snapshot(true));
     await old;
@@ -387,8 +439,10 @@ describe("legal terms runtime gate", () => {
       .mockImplementationOnce(() => new Promise((ok) => { resolveNew = ok; }));
     const runtime = await loadRuntime();
     const old = runtime.scheduleLegalTermsGate("/pages/me/me");
+    await settleGate();
     state.locale = "zh";
     const current = runtime.scheduleLegalTermsGate("/pages/onboarding/privacy");
+    await settleGate();
     expect(state.current).toHaveBeenCalledTimes(2);
     expect(uni.hideLoading).toHaveBeenCalled();
     expect(uni.reLaunch).not.toHaveBeenCalled();
