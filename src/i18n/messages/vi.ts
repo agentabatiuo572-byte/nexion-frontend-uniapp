@@ -842,6 +842,7 @@ export const vi: Messages = {
   },
 
   preferences: {
+    loading: "Đang tải tùy chọn thông báo…",
     unavailable: "Chưa thể tải tùy chọn. Vui lòng thử lại sau.",
     updateFailed: "Chưa lưu được tùy chọn. Vui lòng thử lại.",
     navTitle: "Tùy chọn",
