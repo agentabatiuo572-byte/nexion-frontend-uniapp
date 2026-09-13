@@ -2477,10 +2477,12 @@ export const zh: Messages = {
     mobileComputeEstimate: "服务端估算",
   },
   session: {
+    restoreRetryNotice: "暂时无法恢复登录，正在自动重试。",
     kickedTitle: "登录已结束",
-    kickedBodyKicked: "当前登录已退出,重新登录即可继续;账户与资金不受影响。",
-    kickedBodyLoggedOut: "你已退出登录,本设备的算力任务已暂停。",
-    kickedTaskNote: "本设备进行中的任务已中断,未结算部分不计入;重新上线即可继续赚取,有疑问可联系客服。",
+    kickedBodyKicked: "当前登录已结束。请重新登录后查看任务和结算记录。",
+    kickedBodySessionEnded: "当前登录已结束。请重新登录后查看任务和结算记录。",
+    kickedBodyLoggedOut: "你已退出登录。请重新登录后查看任务和结算记录。",
+    kickedTaskNote: "任务和结算以重新登录后的服务器记录为准。",
     kickedCta: "重新登录",
   },
   me: {

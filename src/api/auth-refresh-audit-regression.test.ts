@@ -176,7 +176,7 @@ describe("auth refresh adversarial regressions", () => {
     vault.save(snapshot(userB, "new-login-access", "cookie"));
     refresh.resolve({ status: 200, data: { code: 0, message: "success", data: sessionResponse(userA, "late-restore-access", "cookie") }, headers: {} });
 
-    await expect(restore).resolves.toBeNull();
+    await expect(restore).rejects.toThrow("SESSION_CHANGED_DURING_REFRESH");
     expect(vault.read()).toMatchObject({ accessToken: "new-login-access", user: userB });
   });
 

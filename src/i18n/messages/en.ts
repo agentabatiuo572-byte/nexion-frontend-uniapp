@@ -2551,10 +2551,12 @@ export const en = {
     mobileComputeEstimate: "Server estimate",
   },
   session: {
+    restoreRetryNotice: "Unable to restore your session right now. Retrying automatically.",
     kickedTitle: "Session ended",
-    kickedBodyKicked: "You've been signed out. Sign back in to continue — your account and funds are unaffected.",
-    kickedBodyLoggedOut: "You've been signed out. Compute tasks are paused on this device.",
-    kickedTaskNote: "Tasks running on this device were stopped; unsettled portions aren't counted. Go back online to keep earning — contact support with any questions.",
+    kickedBodyKicked: "This sign-in has ended. Sign in again to view your task and settlement records.",
+    kickedBodySessionEnded: "This sign-in has ended. Sign in again to view your task and settlement records.",
+    kickedBodyLoggedOut: "You have signed out. Sign in again to view your task and settlement records.",
+    kickedTaskNote: "Task and settlement status is based on the server records shown after you sign in again.",
     kickedCta: "Sign in again",
   },
   me: {

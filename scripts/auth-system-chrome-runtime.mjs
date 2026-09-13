@@ -6,6 +6,11 @@ import fs from "node:fs";
 const baseUrl = process.env.BASE_URL || "http://localhost:5173";
 const runId = Date.now();
 const flowRoutePattern = /^pages\/(?:onboarding|login|register|ref|session)\//;
+const authenticatedRoutes = new Set([
+  "/pages/onboarding/estimator",
+  "/pages/onboarding/connect",
+  "/pages/register/success",
+]);
 const pagesManifest = JSON.parse(fs.readFileSync(new URL("../src/pages.json", import.meta.url), "utf8"));
 const pages = pagesManifest.pages
   .map(({ path }) => path)
@@ -59,14 +64,16 @@ async function appFrame(rootSelector) {
 const results = {};
 try {
   for (const viewport of viewports) {
-    if (page) await page.close();
-    page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
-    await installFormalProbeSession(page, { authenticated: false });
-    page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
-    page.on("pageerror", (error) => consoleErrors.push(error.message));
     results[viewport.name] = {};
     for (let index = 0; index < pages.length; index += 1) {
       const { name, route, delay } = pages[index];
+      if (page) await page.close();
+      page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+      // Private onboarding pages require a restored session. A fresh carrier
+      // also prevents one page's restore or navigation leaking into the next.
+      await installFormalProbeSession(page, { authenticated: authenticatedRoutes.has(route) });
+      page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
+      page.on("pageerror", (error) => consoleErrors.push(error.message));
       const deviceParam = viewport.devicePreview ? "" : "&nx_device=off&nx_device_inner=1";
       await page.goto(`${baseUrl}/?systemChrome=${runId}-${viewport.name}-${index}${deviceParam}#${route}`, { waitUntil: "domcontentloaded" });
       const frame = await appFrame("[data-system-chrome-primary]").catch(async (error) => {
@@ -86,6 +93,8 @@ try {
         throw new Error(`${viewport.name}/${name}: primary chrome control missing at ${page.url()}; body=${body}; ${error.message}`);
       });
       if (delay) await frame.waitForTimeout(delay);
+      assert(await frame.evaluate(() => location.hash.split("?")[0]) === `#${route}`,
+        `${viewport.name}/${name}: refusing to measure a redirected page at ${frame.url()}`);
       let initialReachability;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const reachability = await frame.evaluate(() => {
@@ -138,6 +147,8 @@ try {
       });
 
       const row = results[viewport.name][name];
+      assert(await frame.evaluate(() => location.hash.split("?")[0]) === `#${route}`,
+        `${viewport.name}/${name}: route changed during geometry measurement at ${frame.url()}`);
       row.initialControl = initialReachability.control;
       assert(row.paddingTop >= 54, `${viewport.name}/${name}: status-bar space is ${row.paddingTop}px`);
       assert(row.status.display !== "none" && row.status.bottom <= row.paddingTop, `${viewport.name}/${name}: status bar is missing or overlaps content`);

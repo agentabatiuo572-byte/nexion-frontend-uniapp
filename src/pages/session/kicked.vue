@@ -1,8 +1,7 @@
 <!--
-  Session-ended screen. Shown when this carrier's session was signed out,
-  deleted, or ops-revoked. SPEC-4 multi-carrier login does not kick just because
-  another device signs in. In-flight tasks were already voided + rolled back by
-  App.vue's checkSession() before routing here.
+  Public session-ended screen. A remote authentication failure does not itself
+  establish a task cancellation or settlement result. Those records are shown
+  only after the user signs in again.
 -->
 <template>
   <StandalonePageShell class="ks-root">
@@ -46,7 +45,7 @@ const session = useSession();
 const bodyText = computed(() =>
   session.kickedReason === "logged-out"
     ? t.value.session.kickedBodyLoggedOut
-    : t.value.session.kickedBodyKicked,
+    : t.value.session.kickedBodySessionEnded,
 );
 
 function reLogin() {

@@ -2459,10 +2459,12 @@ export const vi: Messages = {
     mobileComputeEstimate: "Ước tính từ máy chủ",
   },
   session: {
+    restoreRetryNotice: "Tạm thời chưa thể khôi phục phiên đăng nhập. Đang tự động thử lại.",
     kickedTitle: "Phiên đã kết thúc",
-    kickedBodyKicked: "Bạn đã đăng xuất khỏi phiên này. Đăng nhập lại để tiếp tục — tài khoản và tiền của bạn không bị ảnh hưởng.",
-    kickedBodyLoggedOut: "Bạn đã đăng xuất. Tác vụ tính toán trên thiết bị này đã tạm dừng.",
-    kickedTaskNote: "Nhiệm vụ đang chạy trên thiết bị này đã dừng; phần chưa quyết toán không được tính. Online trở lại để tiếp tục kiếm — có thắc mắc cứ liên hệ hỗ trợ.",
+    kickedBodyKicked: "Phiên đăng nhập này đã kết thúc. Hãy đăng nhập lại để xem các bản ghi tác vụ và quyết toán.",
+    kickedBodySessionEnded: "Phiên đăng nhập này đã kết thúc. Hãy đăng nhập lại để xem các bản ghi tác vụ và quyết toán.",
+    kickedBodyLoggedOut: "Bạn đã đăng xuất. Hãy đăng nhập lại để xem các bản ghi tác vụ và quyết toán.",
+    kickedTaskNote: "Trạng thái tác vụ và quyết toán dựa trên bản ghi máy chủ được hiển thị sau khi bạn đăng nhập lại.",
     kickedCta: "Đăng nhập lại",
   },
   me: {
