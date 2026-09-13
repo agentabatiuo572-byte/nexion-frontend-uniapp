@@ -824,6 +824,7 @@ export const zh: Messages = {
   },
 
   preferences: {
+    loading: "正在读取通知偏好…",
     unavailable: "暂时无法加载偏好设置，请稍后重试。",
     updateFailed: "偏好设置未保存，请重试。",
     navTitle: "偏好设置",

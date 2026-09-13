@@ -886,6 +886,7 @@ export const en = {
   },
 
   preferences: {
+    loading: "Loading notification preferences…",
     unavailable: "Preferences could not be loaded. Please try again later.",
     updateFailed: "Preferences were not saved. Please try again.",
     navTitle: "Preferences",

@@ -41,7 +41,8 @@
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <view :style="cardStyle">
+        <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
+        <view v-if="prefs.remoteReady" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
