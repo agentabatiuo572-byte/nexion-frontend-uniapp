@@ -1,5 +1,20 @@
 export interface DailyRule { key: string; value: string }
 
+export function dailyBaseReward(rules: readonly DailyRule[]): number | null {
+  const value = rules.find(rule => rule.key.toLowerCase() === 'baseline')?.value.trim();
+  if (!value || !/^\d+$/.test(value)) return null;
+  const amount = Number(value);
+  return Number.isSafeInteger(amount) && amount > 0 && amount <= 2147483647 ? amount : null;
+}
+
+export function dailyUpcomingMilestone(streak: number, milestones: readonly {
+  day: number; rewardText: string; claimed: boolean;
+}[]): { remainingDays: number; rewardText: string } | null {
+  const next = milestones.filter(m => !m.claimed && m.day > streak)
+    .reduce<(typeof milestones)[number] | null>((nearest, m) => !nearest || m.day < nearest.day ? m : nearest, null);
+  return next ? { remainingDays: next.day - streak, rewardText: next.rewardText } : null;
+}
+
 export function dailyLuckyHint(rules: readonly DailyRule[], fallback: string): string {
   const probability = (key: string): string | null => {
     const value = rules.find((rule) => rule.key.toLowerCase() === key)?.value.trim() ?? "";

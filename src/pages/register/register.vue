@@ -544,6 +544,26 @@ function registrationErrorText(cause: unknown): string {
   return geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
 }
 
+function recoverRejectedRegistration(cause: unknown): boolean {
+  if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
+  const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
+  const signupLimited = cause.status === 409 && cause.message === "USER_REGISTRATION_K1_IP_LIMIT";
+  if (!invalidOtp && !signupLimited) return false;
+  // Both refusals leave no new account; the challenge cannot be reused.
+  // A user-requested resend must still pass the normal CAPTCHA and rate limits.
+  invalidateOtpFlow();
+  otpRequestId.value = null;
+  verifiedToken.value = null;
+  code.value = ["", "", "", "", "", ""];
+  focusIdx.value = 0;
+  if (resendTimer) clearInterval(resendTimer);
+  resendTimer = undefined;
+  resendLeft.value = 0;
+  step.value = invalidOtp ? 2 : 1;
+  error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired : t.value.register.errorSignupLimited;
+  return true;
+}
+
 async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
@@ -672,10 +692,12 @@ async function finish() {
       password: password.value,
       sponsorCode: currentSponsorCode(),
     }, () => isCurrentRemoteRegistrationAttempt(registrationAttempt));
-    if (registration.kind === "stale") return;
+    if (registration.kind === "stale" || !isCurrentRemoteRegistrationAttempt(registrationAttempt)) return;
     if (registration.kind === "registration_error") {
       completing.value = false;
-      error.value = registrationErrorText(registration.error);
+      if (!recoverRejectedRegistration(registration.error)) {
+        error.value = registrationErrorText(registration.error);
+      }
       return;
     }
     if (registration.kind === "login_error") {

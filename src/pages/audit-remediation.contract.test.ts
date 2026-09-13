@@ -46,7 +46,7 @@ describe("read-only audit remediation contracts", () => {
   it("keeps daily authoritative facts hidden during the first remote load", () => {
     const source = read("./daily/daily.vue");
     expect(source).toContain("remoteInitialLoading");
-    expect(source).toContain('v-if="remoteInitialLoading"');
+    expect(source).toContain('v-if="remoteInitialLoading || (remoteApiEnabled && [\'idle\', \'loading\'].includes(faucet.remoteReadState))"');
     expect(source).toContain('role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting ? \'true\' : \'false\'"');
     expect(source).toContain('@keydown.enter.prevent="handleCheckIn"');
     expect(source).toContain('@keydown.space.prevent="handleUseSaver"');

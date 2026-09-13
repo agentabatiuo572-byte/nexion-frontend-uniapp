@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { pointsApi, remoteApiEnabled } from "@/api/runtime";
+import { pointsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import type { CanonicalTopStreaker, CanonicalDailyMilestone, CanonicalDailyPowerUp } from "@/api/points-api";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { captureRuntimeRevision } from "@/api/order-api";
 
 /**
  * NEX 水龙头 + 提现闸 — 由旧 points.ts 演化(积分系统下线,NEX 接管)。
@@ -104,9 +105,11 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const remoteCheckedInToday = ref(false);
   const remoteNextResetAt = ref(0);
   const remoteAccountEpoch = createRemoteAccountEpoch();
+  const remoteReadState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   let remoteRefreshGeneration = 0;
 
   function clearRemoteFacts() {
+    remoteReadState.value = "idle";
     history.value = [];
     lastSignedInAt.value = 0;
     signInStreak.value = 0;
@@ -123,9 +126,29 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
     remoteNextResetAt.value = 0;
   }
 
-  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+  let readInFlight: { key: string; promise: Promise<boolean> } | null = null;
+  function readScopeKey(request: RemoteAccountRequest) {
+    const runtime = captureRuntimeRevision();
+    return JSON.stringify([request.accountKey, request.epoch, runtime.runId, runtime.epoch]);
+  }
+  function ensureRemote(): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
+    return readInFlight?.key === readScopeKey(request) ? readInFlight.promise : refreshRemote(request);
+  }
+  function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+    const promise = readRemote(request);
+    readInFlight = { key: readScopeKey(request), promise };
+    const clear = () => { if (readInFlight?.promise === promise) readInFlight = null; };
+    void promise.then(clear, clear);
+    return promise;
+  }
+  async function readRemote(request: RemoteAccountRequest): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    const session = sessionVault.read();
+    if (!session || request.accountKey !== `user:${session.user.userId}`
+        || !remoteAccountEpoch.isCurrent(request)) return false;
     const refreshGeneration = ++remoteRefreshGeneration;
+    remoteReadState.value = "loading";
     try {
       const snapshot = await pointsApi.state();
       if (!remoteAccountEpoch.isCurrent(request) || refreshGeneration !== remoteRefreshGeneration) return false;
@@ -146,8 +169,12 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
         .map((milestone) => milestone.milestoneDay);
       remoteMilestoneIds.value = Object.fromEntries(snapshot.dailyMilestones
         .map((milestone) => [milestone.milestoneDay, milestone.milestoneId]));
+      remoteReadState.value = "ready";
       return true;
     } catch {
+      if (remoteAccountEpoch.isCurrent(request) && refreshGeneration === remoteRefreshGeneration) {
+        remoteReadState.value = "error";
+      }
       return false;
     }
   }
@@ -365,9 +392,9 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
-    remoteCheckedInToday, remoteNextResetAt,
+    remoteCheckedInToday, remoteNextResetAt, remoteReadState,
     topStreakers, remoteMilestones, remotePowerUps, remoteRules,
-    signIn, useSaver, claimMilestone, bindAccount, refreshRemote,
+    signIn, useSaver, claimMilestone, bindAccount, refreshRemote, ensureRemote,
     checkInRemote, claimMilestoneRemote, useSaverRemote,
   };
 });
