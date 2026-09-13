@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 import { directAppUrl } from "./lib/direct-app-url.mjs";
+import { captureTapRouteErrors, measureTapRoute } from "./lib/tap-route-coverage.mjs";
 import {
   assertAuthGuardRoutes,
   assertCaptureCoverage,
@@ -20,6 +21,56 @@ const DIRECT_PROBES = [
   "scripts/backnav-check.mjs",
   "scripts/page-check.mjs",
 ];
+
+test("tap measurement rejects redirects before and during observation, and zero targets per route", async () => {
+  const witness = (actualRoute) => ({ actualRoute, appChildren: 1, iframeCount: 0, bodyElements: 4, bodyTextLength: 20 });
+  let measured = false;
+  await assert.rejects(measureTapRoute({ evaluate: async () => witness("/pages/login/login") }, "pages/me/me", async () => {
+    measured = true;
+    return { targets: [{ i: 0 }] };
+  }), /before measurement.*landed \/pages\/login\/login/);
+  assert.equal(measured, false, "a redirected page is rejected before collecting its tap targets");
+
+  let actualRoute = "/pages/me/me";
+  const page = { evaluate: async () => witness(actualRoute) };
+  await assert.rejects(measureTapRoute(page, "pages/me/me", async () => {
+    actualRoute = "/pages/onboarding/terms";
+    return { targets: [{ i: 0 }] };
+  }), /after measurement.*landed \/pages\/onboarding\/terms/);
+
+  actualRoute = "/pages/me/me";
+  await assert.rejects(measureTapRoute(page, "pages/me/me", async () => ({ targets: [] })), /zero tap targets/);
+  const result = await measureTapRoute(page, "pages/me/me", async () => ({ targets: [{ i: 0 }], tooSmall: [], noFeedback: [] }));
+  assert.equal(result.coverage.before.actualRoute, actualRoute);
+  assert.equal(result.coverage.after.actualRoute, actualRoute);
+  assert.deepEqual(result.targets, [{ i: 0 }]);
+});
+
+test("tap probe authenticates each lane and warmup page and binds the actual measurement to route coverage", () => {
+  const source = fs.readFileSync("scripts/tap-feedback-probe.mjs", "utf8");
+  assert.match(source, /await installFormalProbeSession\(wp\)/);
+  assert.match(source, /await installFormalProbeSession\(lane\)/);
+  assert.match(source, /return measureTapRoute\(page, route, async \(\) => \{[\s\S]*?page\.evaluate\(markTargets/);
+  assert.match(source, /routeCoverage: results\.map/);
+  assert.match(source, /laneErrors\.set\(lane, captureTapRouteErrors\(lane, BASE\)\)/);
+  assert.match(source, /probeRoute\(lane, c, r, allRoutes\.indexOf\(r\), laneErrors\.get\(lane\)\)/);
+});
+
+test("tap runtime errors fail even when the target hash and populated DOM remain unchanged", async () => {
+  const listeners = new Map();
+  const page = {
+    on: (event, listener) => listeners.set(event, listener),
+    evaluate: async () => ({ actualRoute: "/pages/me/me", appChildren: 1, iframeCount: 0, bodyElements: 4, bodyTextLength: 20 }),
+  };
+  const errors = captureTapRouteErrors(page, "http://candidate.test");
+  listeners.get("pageerror")(new Error("render exploded"));
+  await assert.rejects(measureTapRoute(page, "pages/me/me", async () => ({ targets: [{ i: 0 }] }), errors), /before measurement.*render exploded/);
+  errors.pageErrors.length = 0;
+  await assert.rejects(measureTapRoute(page, "pages/me/me", async () => {
+    listeners.get("console")({ type: () => "error", text: () => "computed state exploded", location: () => ({ url: "http://candidate.test/src/main.ts" }) });
+    return { targets: [{ i: 0 }] };
+  }, errors), /after measurement.*computed state exploded/);
+});
 
 test("directAppUrl always renders the app document and preserves the hash route", () => {
   assert.equal(
