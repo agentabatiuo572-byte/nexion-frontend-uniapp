@@ -74,7 +74,7 @@
           <view :style="quickDividerStyle" />
 
           <!-- Royalty network -->
-          <view class="nx-team-royalty-network-link" :class="remoteApiEnabled ? '' : 'active:opacity-95'" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" :style="quickRowStyle" @click="openReferralNetwork">
+          <view class="nx-team-royalty-network-link active:opacity-95" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" :style="quickRowStyle" @click="openReferralNetwork">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-brand)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -142,7 +142,7 @@
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
         />
-        <view v-else :style="toolCellStyle(0)" role="button" tabindex="0" :aria-label="t.network.retry" @click="refreshRemoteLedger" @keydown.enter.prevent="refreshRemoteLedger" @keydown.space.prevent="refreshRemoteLedger">
+        <view v-else class="active:opacity-95" :style="toolCellStyle(0)" role="button" tabindex="0" :aria-label="t.network.retry" @click="refreshRemoteLedger" @keydown.enter.prevent="refreshRemoteLedger" @keydown.space.prevent="refreshRemoteLedger">
           <text class="block" :style="toolTitleStyle">{{ t.network.projectionErrorDesc }}</text>
           <text class="block" :style="toolSubStyle">{{ t.network.retry }}</text>
         </view>
