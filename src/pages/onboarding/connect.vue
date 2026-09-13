@@ -489,7 +489,7 @@ onUnmounted(() => {
 .cn-go__t { font-size: 15px; font-weight: 600; color: var(--v5-on-brand); }
 .cn-go__t--on { font-size: 15px; }
 .cn-error-actions { display: flex; flex-direction: column; gap: 10px; }
-.cn-go--secondary { background: var(--v5-surface); border: 1px solid var(--v5-border); }
+.cn-go--secondary { background: var(--v5-surface); }
 .cn-go__t--secondary { color: var(--v5-ink); }
 
 .anim-up { animation: cn-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }

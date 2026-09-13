@@ -30,6 +30,8 @@ import {
   normalizeRoute,
   routeFromH5Location,
 } from "@/lib/static-review-routes";
+import { isPublicAuthRoute } from "@/lib/auth-route-visibility";
+import { resolveBootstrapAccountKey } from "@/lib/bootstrap-account-key";
 import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
@@ -79,6 +81,9 @@ let pendingServerSessionRecovery = false;
 type ServerSessionRestoreState = "idle" | "restoring" | "ready" | "failed";
 let serverSessionRestoreState: ServerSessionRestoreState = h5RefreshCookieEnabled ? "idle" : "ready";
 let serverSessionRestoreInFlight: Promise<boolean> | null = null;
+const SERVER_SESSION_RESTORE_RETRY_MS = 15_000;
+let serverSessionRestoreRetryAt = 0;
+let serverSessionRestoreNoticeShown = false;
 const SERVER_SESSION_PROBE_MIN_MS = 60_000;
 let serverSessionProbeAt = 0;
 let serverSessionProbeInFlight: Promise<boolean> | null = null;
@@ -451,20 +456,11 @@ function stopMilestonePoll() {
 // (no loop). Runs every route tick + on app show. Never edits the 5 tab pages.
 // Production: replace the local auth store with the real session (the guard
 // logic is identical against GET /api/auth/session).
-const AUTH_WHITELIST_PREFIXES = [
-  "pages/onboarding/",
-  "pages/login/",
-  "pages/register/",
-  "pages/ref/",
-  "pages/tx/",
-  "pages/session/", // kicked screen — never auth/session-redirect away from it
-];
 function isAuthWhitelisted(route: string): boolean {
   // 🔴 两个判据必须同形:normalizeRoute 吃得下 `pages/x` 与冷启动时的 `#/pages/x?q=1`。
   //    原来后半段直接 startsWith,喂 hash 形态时白名单判不中 —— 守卫会在 intro 页
   //    自己把自己踢回 intro(死循环),所以下面 checkAuthGuard 敢回退到 hash 的前提就是这里。
-  const r = normalizeRoute(route);
-  return isStaticReviewRoute(route) || AUTH_WHITELIST_PREFIXES.some((p) => r.startsWith(p));
+  return isPublicAuthRoute(route);
 }
 
 /**
@@ -551,12 +547,33 @@ function beginServerSessionRestore(): Promise<boolean> {
     return Promise.resolve(true);
   }
   if (serverSessionRestoreInFlight) return serverSessionRestoreInFlight;
+  if (serverSessionRestoreRetryAt && canRefreshRemoteAccount(useAuth())) {
+    // A successful explicit login is stronger evidence than an older retry.
+    serverSessionRestoreState = "ready";
+    serverSessionRestoreRetryAt = 0;
+    serverSessionRestoreNoticeShown = false;
+    return Promise.resolve(true);
+  }
+  if (Date.now() < serverSessionRestoreRetryAt) return Promise.resolve(false);
   serverSessionRestoreState = "restoring";
   serverSessionRestoreInFlight = (async () => {
     const restored = await authApi.restore();
     if (!restored) {
-      pendingServerSessionRecovery = hasServerAuthenticatedAccountTrace(useAuth());
+      const hadServerAccount = hasServerAuthenticatedAccountTrace(useAuth());
+      pendingServerSessionRecovery = pendingServerSessionRecovery || hadServerAccount;
+      serverAuthenticatedAccountTraceAtBoot = false;
+      // The API client's unauthorized callback may already have cleaned up.
+      // An anonymous static entry has no account stores to initialize/reset.
+      if (hadServerAccount) clearInvalidRemoteSessionState(useAuth());
       serverSessionRestoreState = "failed";
+      return false;
+    }
+    const currentSession = sessionVault.read();
+    if (!currentSession || currentSession.accessToken !== restored.accessToken
+        || currentSession.user.userId !== restored.user.userId) {
+      // Another sign-in/logout won after the refresh response. Never apply
+      // the old profile using the newer vault's revision as its proof.
+      serverSessionRestoreState = canRefreshRemoteAccount(useAuth()) ? "ready" : "idle";
       return false;
     }
     const route = readCurrentRoute();
@@ -577,9 +594,27 @@ function beginServerSessionRestore(): Promise<boolean> {
     pendingServerSessionRecovery = false;
     serverAuthenticatedAccountTraceAtBoot = false;
     serverSessionRestoreState = "ready";
+    serverSessionRestoreRetryAt = 0;
+    serverSessionRestoreNoticeShown = false;
     serverSessionProbeAt = Date.now();
     return true;
-  })().finally(() => {
+  })().catch(() => {
+    if (canRefreshRemoteAccount(useAuth())) {
+      serverSessionRestoreState = "ready";
+      serverSessionRestoreRetryAt = 0;
+      serverSessionRestoreNoticeShown = false;
+      return false;
+    }
+    // No authentication verdict was received. Keep the account shell, stop
+    // short of authenticated work, and let the foreground guard retry.
+    serverSessionRestoreState = "idle";
+    serverSessionRestoreRetryAt = Date.now() + SERVER_SESSION_RESTORE_RETRY_MS;
+    if (!serverSessionRestoreNoticeShown) {
+      serverSessionRestoreNoticeShown = true;
+      toast.warn(useT().value.session.restoreRetryNotice);
+    }
+    return false;
+  }).finally(() => {
     serverSessionRestoreInFlight = null;
   });
   return serverSessionRestoreInFlight;
@@ -635,9 +670,7 @@ function checkAuthGuard(): boolean {
     // startup requests can reject together; a later callback must not replace
     // this recovery redirect with first-time onboarding.
     pendingServerSessionRecovery = requiresServerSessionRecovery;
-    sessionVault.clear();
-    useSession().signOutSession();
-    auth.signOut();
+    clearInvalidRemoteSessionState(auth);
     navReset({
       url: requiresServerSessionRecovery
         ? "/pages/login/login?notice=server-session-reload"
@@ -650,6 +683,21 @@ function checkAuthGuard(): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Clears this carrier only after a confirmed remote authentication failure.
+ * Server task and settlement state stays untouched and is read after sign-in.
+ */
+function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
+  sessionVault.clear();
+  useSession().signOutSession();
+  auth.signOut();
+  const app = useApp();
+  app.bindAccount("default");
+  // Rebinding increments the account epoch so old-account responses are stale.
+  rebindAccountScopedStores("default");
+  stopBusinessLoops();
 }
 
 // ── Account session guard ──
@@ -804,10 +852,21 @@ function bootstrapAccountSession() {
   // 自愈路径对该标签的余生失效(登出态被踢到引导页那一拍正好烧掉它)。
   // 今天没有可达危害(两个认证入口各自 claim),但那是巧合,不是设计。
   if (auth.isAuthenticated) {
-    const key = auth.email || auth.accountId || "default";
     const app = useApp();
     const session = useSession();
     const serverSession = remoteApiEnabled ? sessionVault.read() : null;
+    // A persisted email is only a local-mode scope key. Remote account state
+    // must be bound to the current server session user, otherwise the fleet
+    // and withdrawal-list session fences correctly reject their own refreshes.
+    const key = resolveBootstrapAccountKey({
+      remote: remoteApiEnabled,
+      email: auth.email,
+      accountId: auth.accountId,
+      sessionUserId: serverSession?.user.userId,
+    });
+    // Keep this bootstrap eligible to retry after session restore. Binding a
+    // mismatched remote session would let one account project into another.
+    if (!key) return;
     // completeSignIn already binds every account-scoped store and claims this
     // carrier before it navigates away from Login. The periodic guard can reach
     // this one-shot bootstrap a moment later. Rebinding again would clear the
@@ -1099,10 +1158,7 @@ onLaunch(() => {
         || (!sessionVault.read() && hasServerAuthenticatedAccountTrace(auth));
       serverAuthenticatedAccountTraceAtBoot = false;
       pendingServerSessionRecovery = requiresServerSessionRecovery;
-      sessionVault.clear();
-      useSession().signOutSession();
-      auth.signOut();
-      stopBusinessLoops();
+      clearInvalidRemoteSessionState(auth);
       const route = readCurrentRoute();
       if (route && !isAuthWhitelisted(route)) {
         navReset({

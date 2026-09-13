@@ -450,7 +450,16 @@ export function createAuthApi(
       if (refreshCredentialMode === "token" && !vault.read()?.refreshToken) return Promise.resolve(null);
       if (!restoreInFlight) {
         // Bootstrap and ordinary token renewal share one rotation request.
-        restoreInFlight = client.refreshSession().catch(() => null).finally(() => {
+        restoreInFlight = client.refreshSession().catch((error: unknown) => {
+          // Only an authoritative rejection means that no session can be
+          // restored. Transport/protocol failures must remain retryable, and
+          // a rejected older request cannot invalidate a newer login.
+          if (error instanceof ApiError
+              && (error.kind === "auth" || error.status === 401 || error.status === 403)
+              && error.message !== "SESSION_CHANGED_DURING_REFRESH"
+              && !vault.read()) return null;
+          throw error;
+        }).finally(() => {
           restoreInFlight = null;
         });
       }
