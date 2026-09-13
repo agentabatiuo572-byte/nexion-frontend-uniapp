@@ -77,12 +77,15 @@ test("unknown registration outcome performs one authoritative password-login rec
   expect(result).toMatchObject({ kind: "authenticated", registrationMayBeCommitted: true });
 });
 
-test("authoritative registration rejection stays on the form and never calls login", async () => {
+test.each([
+  { status: 422, message: "USER_REGISTRATION_OTP_INVALID" },
+  { status: 409, message: "USER_REGISTRATION_K1_IP_LIMIT" },
+])("authoritative registration rejection $status $message never calls login", async ({ status, message }) => {
   const failure = new ApiError({
     kind: "http",
-    message: "USER_REGISTRATION_OTP_INVALID",
-    status: 422,
-    code: 422,
+    message,
+    status,
+    code: status,
   });
   const authApi = api({ register: vi.fn().mockRejectedValue(failure) });
 

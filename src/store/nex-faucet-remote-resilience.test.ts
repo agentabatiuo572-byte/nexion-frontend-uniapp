@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from "pinia";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
+  sessionUserId: 1 as number | null,
+  sessionVault: { read: (): {user:{userId:number}} | null => remote.sessionUserId === null ? null : {user:{userId:remote.sessionUserId}} },
   pointsApi: {
     state: vi.fn(),
     checkIn: vi.fn(),
@@ -14,6 +16,11 @@ const remote = vi.hoisted(() => ({
 vi.mock("@/api/runtime", () => remote);
 
 const { useNexFaucet } = await import("./nex-faucet");
+function createBoundStore() {
+  const store = useNexFaucet();
+  store.bindAccount('user:1');
+  return store;
+}
 
 function dailySnapshot(currentStreak = 3, serverDate = "2026-08-22", checkedInToday = false) {
   return {
@@ -54,6 +61,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   setActivePinia(createPinia());
+  remote.sessionUserId = 1;
   remote.pointsApi.state.mockReset();
   remote.pointsApi.checkIn.mockReset();
   remote.pointsApi.claimMilestone.mockReset();
@@ -61,9 +69,58 @@ beforeEach(() => {
 });
 
 describe("NEX faucet remote failure resilience", () => {
-  it("keeps the last confirmed daily state when check-in is rejected", async () => {
+  it('shares the pending bound-account read with the page instead of racing another read', async () => {
+    const pending = deferred<ReturnType<typeof dailySnapshot>>();
+    remote.pointsApi.state.mockReturnValueOnce(pending.promise).mockRejectedValueOnce(new Error('second read failed'));
+    const store = createBoundStore();
+    const pageRead = store.ensureRemote();
+    expect(remote.pointsApi.state).toHaveBeenCalledTimes(1);
+    pending.resolve(dailySnapshot(4));
+    expect(await pageRead).toBe(true);
+    expect(store.remoteReadState).toBe('ready');
+    expect(store.signInStreak).toBe(4);
+    await store.ensureRemote();
+    expect(remote.pointsApi.state).toHaveBeenCalledTimes(2);
+    expect(store.remoteReadState).toBe('error');
+  });
+  it('does not issue a protected bootstrap read before a matching session is bound', async () => {
+    remote.sessionUserId = null;
     remote.pointsApi.state.mockResolvedValue(dailySnapshot());
     const store = useNexFaucet();
+    await flush();
+    expect(store.remoteReadState).toBe('idle');
+    expect(remote.pointsApi.state).not.toHaveBeenCalled();
+    store.bindAccount('user:1'); await flush();
+    expect(remote.pointsApi.state).not.toHaveBeenCalled();
+    remote.sessionUserId = 1; store.bindAccount('user:1'); await flush();
+    expect(remote.pointsApi.state).toHaveBeenCalledTimes(1);
+    expect(store.remoteReadState).toBe('ready');
+  });
+  it("separates unknown, failed and confirmed-zero streak reads", async () => {
+    const pending = deferred<ReturnType<typeof dailySnapshot>>();
+    remote.pointsApi.state.mockReturnValueOnce(pending.promise);
+    const store = createBoundStore();
+    expect(store.remoteReadState).toBe("loading");
+    pending.resolve(dailySnapshot(0)); await flush();
+    expect(store.remoteReadState).toBe("ready"); expect(store.signInStreak).toBe(0);
+    remote.pointsApi.state.mockRejectedValueOnce(new Error("offline"));
+    await store.refreshRemote(); expect(store.remoteReadState).toBe("error");
+    remote.pointsApi.state.mockResolvedValueOnce(dailySnapshot(2));
+    await store.refreshRemote(); expect(store.remoteReadState).toBe("ready");
+    expect(store.signInStreak).toBe(2);
+  });
+  it("does not let an old account failure erase the new account ready status", async () => {
+    let rejectOld!: (error: Error) => void;
+    remote.pointsApi.state.mockImplementationOnce(() => new Promise((_, reject) => { rejectOld = reject; }))
+      .mockResolvedValueOnce(dailySnapshot(8));
+    const store = createBoundStore(); remote.sessionUserId = 2; store.bindAccount("user:2"); await flush();
+    expect(store.remoteReadState).toBe("ready");
+    rejectOld(new Error("old offline")); await flush();
+    expect(store.remoteReadState).toBe("ready"); expect(store.signInStreak).toBe(8);
+  });
+  it("keeps the last confirmed daily state when check-in is rejected", async () => {
+    remote.pointsApi.state.mockResolvedValue(dailySnapshot());
+    const store = createBoundStore();
     await flush();
 
     expect(store.signInStreak).toBe(3);
@@ -80,7 +137,7 @@ describe("NEX faucet remote failure resilience", () => {
 
   it("keeps the last confirmed daily state when a state refresh fails", async () => {
     remote.pointsApi.state.mockResolvedValue(dailySnapshot());
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
 
     remote.pointsApi.state.mockRejectedValueOnce(new Error("temporary network failure"));
@@ -95,7 +152,7 @@ describe("NEX faucet remote failure resilience", () => {
       .mockResolvedValueOnce(dailySnapshot(3, "2026-08-21"))
       .mockResolvedValueOnce(dailySnapshot(3, "2026-08-22"))
       .mockRejectedValueOnce(new Error("refresh unavailable"));
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
     remote.pointsApi.checkIn.mockResolvedValue({
       checkInDate: "2026-08-22",
@@ -113,7 +170,7 @@ describe("NEX faucet remote failure resilience", () => {
 
   it("takes both daily UI boundary facts from the canonical snapshot", async () => {
     remote.pointsApi.state.mockResolvedValue(dailySnapshot(3, "2026-08-22", true));
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
 
     expect(store.remoteCheckedInToday).toBe(true);
@@ -125,7 +182,7 @@ describe("NEX faucet remote failure resilience", () => {
       .mockResolvedValueOnce(dailySnapshot(0, "2026-08-22"))
       .mockResolvedValueOnce(dailySnapshot(0, "2026-08-23"))
       .mockRejectedValueOnce(new Error("refresh unavailable"));
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
     remote.pointsApi.useSaver.mockResolvedValue({
       restoredStreak: 2,
@@ -144,7 +201,7 @@ describe("NEX faucet remote failure resilience", () => {
     remote.pointsApi.state
       .mockResolvedValueOnce(dailySnapshot())
       .mockRejectedValueOnce(new Error("refresh unavailable"));
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
     remote.pointsApi.claimMilestone.mockResolvedValue({
       milestoneId: 7,
@@ -163,7 +220,7 @@ describe("NEX faucet remote failure resilience", () => {
 
   it("does not let an older same-account refresh overwrite a newer snapshot", async () => {
     remote.pointsApi.state.mockResolvedValueOnce(dailySnapshot(1));
-    const store = useNexFaucet();
+    const store = createBoundStore();
     await flush();
     const older = deferred<ReturnType<typeof dailySnapshot>>();
     const newer = deferred<ReturnType<typeof dailySnapshot>>();
