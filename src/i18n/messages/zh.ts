@@ -2855,6 +2855,8 @@ export const zh: Messages = {
     serverMutationFailed: "暂时无法确认服务端资料,请重试。",
     walletAddress: "提现地址",
     walletEmpty: "尚未设置",
+    walletUnknown: "暂无法确认提现地址状态",
+    rankUnavailable: "暂时无法读取等级信息。",
     walletPair: "设置地址",
     walletPaired: "管理",
     sectionAccount: "账户",

@@ -2946,6 +2946,8 @@ export const en = {
     serverMutationFailed: "The server profile could not be confirmed. Try again.",
     walletAddress: "Wallet address",
     walletEmpty: "Not set yet",
+    walletUnknown: "Address status unavailable",
+    rankUnavailable: "Rank information is temporarily unavailable.",
     walletPair: "Set address",
     walletPaired: "Manage",
     sectionAccount: "Account",

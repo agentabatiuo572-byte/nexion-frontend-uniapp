@@ -72,7 +72,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "notifications.vue": "7731130ef5eda24778d0c4604afa45d5a0df0ff89dde3ac26a7e51f6a06bd81e",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
-  "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
+  "profile.vue": "9b4c697705d19d9553d8a02a9affcb119e320ddb8763032194a7d019af02ee6b",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // the formal page also uses the shared BrandLockup without changing the surrounding layout.
   "proof.vue": "7de4caeb6ac8cfa9bfd48a0f216af7ac712f9966e0c727dbf259d26f362f29e9",

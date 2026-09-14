@@ -2835,6 +2835,8 @@ export const vi: Messages = {
     serverMutationFailed: "Chưa thể xác nhận hồ sơ trên máy chủ. Vui lòng thử lại.",
     walletAddress: "Địa chỉ ví",
     walletEmpty: "Chưa thiết lập",
+    walletUnknown: "Chưa thể xác nhận trạng thái địa chỉ",
+    rankUnavailable: "Thông tin cấp bậc tạm thời không khả dụng.",
     walletPair: "Thiết lập địa chỉ",
     walletPaired: "Quản lý",
     sectionAccount: "Tài khoản",
