@@ -84,7 +84,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Same ticket styles; current remote read state governs loading, retry and definite empty.
   "rewards-list.vue": "e94eda52ff2176ff9fe6e46b5837433b062a7953934302da732281703042fbf5",
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
-  "risk-disclosure.vue": "4fcb42f5d5245fe23b1269ac36de0eeba2b5a9e4e74a80ad219311b52013d64f",
+  "risk-disclosure.vue": "2bcf159899f17dedb684b06eda7ccd3363b3aa1b9131df1bbc60b50615b53edc",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.
   "security.vue": "8eb2584d7f83472ec1eac4dd1d4de4f49ea226cabf5ccb9a185131af34ddd7f7",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.

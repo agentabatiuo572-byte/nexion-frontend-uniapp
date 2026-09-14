@@ -8,7 +8,7 @@
 -->
 <template>
   <AppChassis active="me">
-    <scroll-view scroll-y style="height: 100vh" @scrolltolower="onScrollToLower">
+    <scroll-view :key="nativeScrollSurface.key" scroll-y :scroll-top="scrollTop" style="height: 100vh" :onScroll="nativeScrollSurface.events.scroll" :onScrolltolower="nativeScrollSurface.events.scrolltolower">
     <view style="padding-bottom: 32px">
       <SubPageHeader :back="returnTo" />
 
@@ -22,13 +22,15 @@
         </view>
         <text class="block" :style="heroTitleStyle">{{ w.heroTitle }}</text>
         <text class="block" :style="heroSubStyle">{{ w.heroSubtitle }}</text>
+        <text v-if="disclosure" class="block" :style="heroContextStyle">{{ disclosureContext }}</text>
+        <text v-if="languageFallback" class="block" :style="languageFallbackStyle">{{ w.languageFallback }}</text>
         <view v-if="accepted" class="flex items-center" :style="acceptedChipStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <text>{{ w.alreadyAccepted }}</text>
         </view>
         <view v-else-if="loadError" :style="hintStyle">
           <text :style="hintTextStyle">{{ loadError }}</text>
-          <text class="block active:opacity-70" :style="retryStyle" @click="reload">{{ w.reloadRegionCta }}</text>
+          <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ w.reloadRegionCta }}</text>
         </view>
       </view>
 
@@ -111,27 +113,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, nextTick, ref, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { navBack } from "@/lib/route";
-import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
-import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/payout-address-core";
-import { useConfig } from "@/store/config";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
+import { resolveRiskDisclosureDisplayLanguage, riskDisclosureChapterCopy } from "@/lib/risk-disclosure-language";
+import {
+  canAcknowledgeRiskDisclosure,
+  canCompleteRiskDisclosureReadingFromScrollEvent,
+  EMPTY_RISK_DISCLOSURE_READING_STATE,
+  riskDisclosureDocumentIdentity,
+  updateRiskDisclosureReadingState,
+} from "@/lib/risk-disclosure-reading-gate";
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
-import { withdrawalApi } from "@/api/runtime";
-import { remoteApiEnabled } from "@/api/runtime";
-import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 const SCROLL_THRESHOLD_PX = 24;
 
-const cfg = useConfig();
 const t = useT();
 const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
@@ -139,7 +142,16 @@ const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
 const disclosure = computed(() => risk.current);
 const loadError = computed(() => risk.error ? w.value.loadErrorRegion : "");
-const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
+const displayLanguage = computed(() => disclosure.value
+  ? resolveRiskDisclosureDisplayLanguage(locale.code, disclosure.value.languageScope)
+  : null);
+const languageFallback = computed(() => displayLanguage.value?.fallback ?? false);
+const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishedContext, {
+  jurisdiction: disclosure.value.jurisdictionName,
+  version: disclosure.value.version,
+  effectiveDate: disclosure.value.effectiveDate,
+}) : "");
+const documentIdentity = computed(() => riskDisclosureDocumentIdentity(disclosure.value));
 
 const returnTo = ref("/pages/me/me");
 onLoad((options) => {
@@ -149,19 +161,69 @@ onLoad((options) => {
 const scrolledToBottom = ref(false);
 const checked = ref(false);
 const selectedBlock = ref<number | null>(null);
+const readingIdentity = ref<string | null>(null);
+const scrollEventIdentity = ref<string | null>(null);
+const scrollTop = ref(0);
 const sentinelRef = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
+let observerGeneration = 0;
+let disposed = false;
+let pageActive = true;
+let pageGeneration = 0;
+let nativeGeneration = 0;
+const nativeScrollSurface = ref(createNativeScrollSurface(null));
+
+function createNativeScrollSurface(identity: string | null) {
+  const generation = ++nativeGeneration;
+  const isCurrent = () => !disposed && pageActive && generation === nativeGeneration
+    && identity === scrollEventIdentity.value
+    && canCompleteRiskDisclosureReadingFromScrollEvent(identity, documentIdentity.value, readingIdentity.value);
+  return { key: generation, identity, events: {
+    scroll: (event: { detail?: { scrollTop?: number } }) => {
+      if (!isCurrent()) return;
+      const position = Number(event.detail?.scrollTop);
+      if (Number.isFinite(position) && position >= 0) scrollTop.value = position;
+    },
+    scrolltolower: () => { if (isCurrent()) scrolledToBottom.value = true; },
+  } };
+}
+
+function resetScrollSurface(identity: string | null) {
+  stopBottomObserver();
+  scrollEventIdentity.value = null;
+  scrollTop.value = 0;
+  // Remount the native view: its queued callbacks must retain their original
+  // document and generation, rather than use Vue's updated event invoker.
+  nativeScrollSurface.value = createNativeScrollSurface(identity);
+  return nativeScrollSurface.value.key;
+}
+
+async function armReading(identity: string | null, generation: number) {
+  await nextTick();
+  if (disposed || !pageActive || generation !== nativeGeneration || !identity
+      || documentIdentity.value !== identity || readingIdentity.value !== identity) return;
+  scrollEventIdentity.value = identity;
+  startBottomObserver(identity);
+}
 
 function stopBottomObserver() {
+  observerGeneration += 1;
   observer?.disconnect();
   observer = null;
 }
 
-function startBottomObserver() {
+function setReadingState(state = EMPTY_RISK_DISCLOSURE_READING_STATE) {
+  scrolledToBottom.value = state.scrolledToBottom;
+  checked.value = state.checked;
+  selectedBlock.value = state.selectedBlock;
+}
+
+function startBottomObserver(identity = documentIdentity.value) {
+  if (disposed || !pageActive) return;
   stopBottomObserver();
   // A failed current-disclosure request leaves the chapter list empty. Do not
   // let that short page satisfy the reading gate before a later retry succeeds.
-  if (!disclosure.value) return;
+  if (!disclosure.value || !identity || readingIdentity.value !== identity) return;
   // App webviews without DOM IntersectionObserver still use scrolltolower.
   // We intentionally do not auto-pass the gate when IO is unavailable.
   if (typeof IntersectionObserver === "undefined") return;
@@ -173,75 +235,86 @@ function startBottomObserver() {
       : null;
   if (!el) return;
 
+  const generation = observerGeneration;
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) scrolledToBottom.value = true;
+      if (!disposed && pageActive && generation === observerGeneration
+          && documentIdentity.value === identity
+          && readingIdentity.value === identity
+          && entries.some((entry) => entry.isIntersecting)) {
+        scrolledToBottom.value = true;
+      }
     },
     { rootMargin: `0px 0px -${SCROLL_THRESHOLD_PX}px 0px` },
   );
   observer.observe(el);
 }
 
-onMounted(async () => {
-  await risk.refresh();
-  // The chapters arrive from Java. Attach only after they render; observing an
-  // empty page first would mark the document read before the real text exists.
-  await nextTick();
-  startBottomObserver();
-  if (remoteApiEnabled) {
-    try {
-      withdrawalPolicy.value = await withdrawalApi.policy();
-    } catch {
-      withdrawalPolicy.value = null;
-    }
-  }
+watch(documentIdentity, (nextIdentity, previousIdentity) => {
+  if (nextIdentity === previousIdentity) return;
+  stopBottomObserver();
+  scrollEventIdentity.value = null;
+  const generation = nextIdentity && pageActive && !disposed ? resetScrollSurface(nextIdentity) : ++nativeGeneration;
+  setReadingState(updateRiskDisclosureReadingState(previousIdentity, nextIdentity, {
+    scrolledToBottom: scrolledToBottom.value,
+    checked: checked.value,
+    selectedBlock: selectedBlock.value,
+  }));
+  readingIdentity.value = nextIdentity;
+  if (pageActive) void armReading(nextIdentity, generation);
+}, { flush: "sync" });
+
+onMounted(reload);
+onHide(() => {
+  pageActive = false;
+  pageGeneration += 1;
+  nativeGeneration += 1;
+  stopBottomObserver();
+  scrollEventIdentity.value = null;
+  setReadingState();
+});
+onShow(async () => {
+  if (disposed || pageActive) return;
+  pageActive = true;
+  await reload();
 });
 onUnmounted(() => {
+  disposed = true;
+  pageActive = false;
+  pageGeneration += 1;
+  nativeGeneration += 1;
   stopBottomObserver();
+  scrollEventIdentity.value = null;
 });
-function onScrollToLower() { scrolledToBottom.value = true; }
 
-/**
- * 🔴 提现窗口这一段的数字必须从配置来(2026-08-01 走查 P0-2)。
- * 原文写死「标准提现从申请到入账约 30 天 / > $1,000 进入 45 天增强审查窗口」,
- * 而系统实际是提交 + payoutSlaHours(默认 24 小时),大额审查窗口当前阶段配置为 0 天。
- * 这段是**提交提现前强制勾选确认**的文件 —— 写着系统根本不执行的时限,是最硬的谎。
- * 大额审查窗口配成 0(该阶段不开)时,整句不出现,而不是显示「0 天窗口」。
- */
-/** FEAT-WD02:按金额比例的旧费率已删除 —— 费用是按网络固定的网络确认费,s4Body 不再插费率;
- *  时限阈值 {h} 仍从配置插值(合规文本阈值必插值铁律)。 */
-const withdrawWindowBody = computed(() => {
-  if (remoteApiEnabled && !withdrawalPolicy.value) return w.value.s4Body;
-  const payoutSlaHours = remoteApiEnabled && withdrawalPolicy.value
-    ? withdrawalPolicy.value.payoutSlaHours
-    : cfg.config.withdrawRules.payoutSlaHours;
-  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(payoutSlaHours) });
-  if (remoteApiEnabled) return base;
-  const rules = cfg.config.withdrawRules;
-  if (normalizeReviewWindowDays(rules.payoutReviewWindowDays) <= 0) return base;
-  return `${base} ${fmt(w.value.s4BodyLargeAmount, {
-    large: NEW_ADDRESS_LARGE_AMOUNT_USDT.toFixed(0),
-    d: normalizeReviewWindowDays(rules.payoutReviewWindowDays),
-  })}`;
-});
 const blocks = computed(() => disclosure.value?.chapters.map((chapter) => ({
   n: Number(chapter.no),
-  title: locale.code === "vi" ? chapter.vi : locale.code === "en" ? chapter.en : chapter.zh,
-  body: Number(chapter.no) === 4 ? withdrawWindowBody.value
-    : locale.code === "vi" ? chapter.viBody : locale.code === "en" ? chapter.enBody : chapter.zhBody,
+  title: riskDisclosureChapterCopy(chapter, displayLanguage.value?.language ?? "zh").title,
+  body: riskDisclosureChapterCopy(chapter, displayLanguage.value?.language ?? "zh").body,
 })) ?? []);
 
 function sectionSelectedLabel(n: number): string {
   return fmt(w.value.sectionSelected, { n: String(n).padStart(2, "0") });
 }
 
-const canAccept = computed(() => Boolean(disclosure.value) && scrolledToBottom.value && checked.value && !accepted.value && !risk.loading);
+const canAccept = computed(() => canAcknowledgeRiskDisclosure({
+  disclosure: disclosure.value,
+  documentIdentity: documentIdentity.value,
+  readingIdentity: readingIdentity.value,
+  reading: {
+    scrolledToBottom: scrolledToBottom.value,
+    checked: checked.value,
+    selectedBlock: selectedBlock.value,
+  },
+  accepted: accepted.value,
+  loading: risk.loading,
+}));
 
 function toggleCheck() {
-  if (scrolledToBottom.value && !accepted.value) checked.value = !checked.value;
+  if (!disposed && pageActive && scrolledToBottom.value && !accepted.value) checked.value = !checked.value;
 }
 async function onAccept() {
-  if (!disclosure.value || risk.loading || accepted.value) return;
+  if (disposed || !pageActive || !disclosure.value || risk.loading || accepted.value) return;
   if (!scrolledToBottom.value) {
     toast.info(w.value.scrollHint);
     return;
@@ -251,7 +324,10 @@ async function onAccept() {
     return;
   }
   if (!canAccept.value) return;
+  const generation = pageGeneration;
   if (!await risk.accept()) return;
+  await nextTick();
+  if (disposed || !pageActive || generation !== pageGeneration) return;
   toast.success(w.value.acceptToast);
   // 🔴 用 navigateBack 回到**原来那个页面实例**。navigateTo 是压一个新页:
   // 用户在提现页输的金额随新实例重置为空、原实例被压在栈底,提交意图 100% 丢失,
@@ -260,12 +336,22 @@ async function onAccept() {
   navBack(returnTo.value);
 }
 async function reload() {
+  if (disposed || !pageActive) return;
+  const generation = ++pageGeneration;
+  nativeGeneration += 1;
   stopBottomObserver();
-  scrolledToBottom.value = false;
-  checked.value = false;
+  scrollEventIdentity.value = null;
+  setReadingState();
   await risk.refresh();
-  await nextTick();
-  startBottomObserver();
+  if (disposed || !pageActive || generation !== pageGeneration) return;
+  const identity = documentIdentity.value;
+  readingIdentity.value = identity;
+  const surface = nativeScrollSurface.value;
+  // The identity watcher may already have mounted the new native view. Avoid
+  // replacing it again while uni-app's mounted nextTick is still pending.
+  const nativeKey = surface.identity === identity && surface.key === nativeGeneration
+    ? surface.key : identity ? resetScrollSurface(identity) : nativeGeneration;
+  await armReading(identity, nativeKey);
 }
 
 // Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——
@@ -285,6 +371,8 @@ const heroIconBoxStyle: CSSProperties = {
 const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const heroSubStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const heroContextStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
+const languageFallbackStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-warning)", lineHeight: 1.5 };
 const acceptedChipStyle: CSSProperties = {
   marginTop: "10px",
   alignSelf: "flex-start",

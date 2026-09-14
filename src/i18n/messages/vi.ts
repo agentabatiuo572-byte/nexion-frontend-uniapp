@@ -1069,10 +1069,12 @@ export const vi: Messages = {
   },
 
   riskDisclosure: {
+    publishedContext: "{jurisdiction} · {version} · Hiệu lực {effectiveDate}",
+    languageFallback: "Công bố này chưa có bản ngôn ngữ bạn đã chọn. Bên dưới hiển thị văn bản đã công bố bằng ngôn ngữ có sẵn.",
     navTitle: "Công bố rủi ro nền tảng",
     heroLabel: "TÀI LIỆU BẮT BUỘC ĐỌC",
-    heroTitle: "Đọc phần này trước khi staking, khóa hay rút tiền.",
-    heroSubtitle: "NexGrid là một chợ tính toán dựa trên hợp đồng thông minh, có thưởng token. Lợi nhuận là dự phóng, không phải cam kết. Đọc 7 mục bên dưới và xác nhận để tiếp tục.",
+    heroTitle: "Hãy đọc công bố rủi ro hiện hành trước khi tiếp tục.",
+    heroSubtitle: "Nội dung bên dưới là phiên bản đã công bố áp dụng cho khu vực pháp lý hiện tại của bạn.",
     alreadyAccepted: "Đã xác nhận",
     alreadyAcceptedCta: "Đã xác nhận",
     s1Title: "Dự phóng thu nhập là dự báo, không phải lời hứa",
@@ -1091,7 +1093,7 @@ export const vi: Messages = {
     s7Title: "Lưu ký, tuân thủ và thẩm quyền pháp lý",
     s7Body: "NexGrid được vận hành bởi NexGrid Ltd. theo đăng ký FinCEN MSB #MSB1234567, với quy trình tuân thủ theo chuẩn MiCA. Tiền được giữ trong các tài khoản dự trữ tách biệt, do PwC kiểm toán hằng quý. NexGrid không phục vụ các khu vực bị OFAC cấm vận.",
     scrollHint: "Vui lòng cuộn qua hết các mục trước khi xác nhận.",
-    checkboxLabel: "Tôi đã đọc 7 mục trên và hiểu rằng thu nhập là dự phóng, số tác vụ nhận được giảm dần khi kho tác vụ nâng cấp, token có rủi ro thị trường, và lệnh rút lớn có thể cần thêm một bước xác nhận an toàn.",
+    checkboxLabel: "Tôi đã đọc và hiểu các thông tin công bố rủi ro trong cả 7 mục ở trên.",
     checkboxRequired: "Vui lòng đánh dấu mục xác nhận đã đọc ở phía trên trước.",
     acceptCta: "Tôi xác nhận — tiếp tục",
     disclaimer: "Việc xác nhận được ghi lại kèm dấu thời gian. Bạn có thể đọc lại bất cứ lúc nào qua Của tôi → Công bố rủi ro.",

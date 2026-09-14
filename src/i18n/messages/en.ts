@@ -1113,10 +1113,12 @@ export const en = {
   },
 
   riskDisclosure: {
+    publishedContext: "{jurisdiction} · {version} · Effective {effectiveDate}",
+    languageFallback: "This disclosure is not published in your selected language. The available published language is shown below.",
     navTitle: "Platform risk disclosure",
     heroLabel: "REQUIRED READING",
-    heroTitle: "Read this before staking, locking, or withdrawing.",
-    heroSubtitle: "NexGrid is a smart-contract-based compute marketplace with token rewards. Returns are projections, not guarantees. Read the 7 sections below and acknowledge to continue.",
+    heroTitle: "Read the current applicable risk disclosure before continuing.",
+    heroSubtitle: "The content below is the published version applicable to your current jurisdiction.",
     alreadyAccepted: "Already acknowledged",
     alreadyAcceptedCta: "Acknowledged",
     s1Title: "Earnings projections are forecasts, not promises",
@@ -1135,7 +1137,7 @@ export const en = {
     s7Title: "Custody, compliance, and regulatory jurisdiction",
     s7Body: "NexGrid is operated by NexGrid Ltd. under FinCEN MSB registration #MSB1234567, with MiCA-aligned compliance procedures. Funds are held in segregated reserve accounts audited quarterly by PwC. NexGrid is not available in OFAC-sanctioned jurisdictions.",
     scrollHint: "Please scroll through all sections before acknowledging.",
-    checkboxLabel: "I have read the 7 sections above and understand that earnings are projections, bookable task volume declines as the task pool upgrades, tokens carry market risk, and large withdrawals may need an extra security check.",
+    checkboxLabel: "I have read and understood the risk disclosures in all 7 sections above.",
     checkboxRequired: "Please tick the acknowledgement above first.",
     acceptCta: "I acknowledge — continue",
     disclaimer: "Acknowledgment is logged with timestamp. Re-reading is available anytime via Me → Risk disclosure.",
