@@ -76,8 +76,11 @@
         </view>
 
         <view v-else :style="formCardStyle">
-          <text class="block" :style="providerHoldTitleStyle">{{ t.authOtp.errorServiceUnavailable }}</text>
-          <text class="block" :style="providerHoldBodyStyle">{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <text class="block" :style="providerHoldTitleStyle">{{ t.cards.bindingUnavailableTitle }}</text>
+          <text class="block" :style="providerHoldBodyStyle">{{ t.cards.bindingUnavailableBody }}</text>
+          <view class="flex items-center justify-center active:opacity-80" :style="providerHoldCtaStyle" role="button" tabindex="0" @click="returnFromUnavailable" @keydown.enter.prevent="returnFromUnavailable" @keydown.space.prevent="returnFromUnavailable">
+            <text :style="providerHoldCtaTextStyle">{{ t.cards.bindingUnavailableCta }}</text>
+          </view>
         </view>
 
         <!-- Submit -->
@@ -86,7 +89,7 @@
           <text :style="submitTextStyle">{{ canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled }}</text>
         </view>
 
-        <text class="block" :style="disclaimerStyle">{{ t.cards.formDisclaimer }}</text>
+        <text v-if="cardBindingAvailable && developmentPaymentEnabled" class="block" :style="disclaimerStyle">{{ t.cards.formDisclaimer }}</text>
       </view>
     </view>
   </AppChassis>
@@ -169,6 +172,10 @@ function onDefaultGroupChange(e: Event) {
   setAsDefault.value = value.includes("default");
 }
 
+function returnFromUnavailable() {
+  navBack(returnTo.value);
+}
+
 const validHolder = computed(() => holder.value.trim().length >= 2);
 const valid = computed(() => cardReady.value && validHolder.value);
 const canSubmit = computed(() => cardBindingAvailable.value && valid.value && !isBinding.value);
@@ -244,6 +251,8 @@ async function handleBind() {
 const bodyStyle: CSSProperties = { padding: "0 16px" };
 const providerHoldTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const providerHoldBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
+const providerHoldCtaStyle: CSSProperties = { minHeight: "44px", marginTop: "16px", borderRadius: "999px", background: "var(--v5-surface-2)" };
+const providerHoldCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink-2)" };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
 // floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the

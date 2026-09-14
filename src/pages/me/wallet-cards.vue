@@ -11,21 +11,22 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="t.cards.listSubtitle" />
+      <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="cardBindingAvailable ? t.cards.listSubtitle : t.cards.bindingUnavailableTitle" />
       <CardSimulationBadge />
 
       <view :style="bodyStyle">
-        <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
-          <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
-          <view class="inline-flex items-center justify-center active:opacity-80" :style="refreshRetryStyle" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
-            <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+        <template v-if="cardBindingAvailable">
+          <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
+            <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
+            <view class="inline-flex items-center justify-center active:opacity-80" :style="refreshRetryStyle" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
+              <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+            </view>
           </view>
-        </view>
-        <!-- Empty -->
-        <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="cardBindingAvailable ? t.empty.cardsCta : undefined" @cta="goNew" />
+          <!-- Empty -->
+          <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="t.empty.cardsCta" @cta="goNew" />
 
-        <!-- Card rows -->
-        <view v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
+          <!-- Card rows -->
+          <view v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
           <view class="flex items-center" :style="cardRowHeadStyle">
             <view class="grid place-items-center shrink-0" :style="cardIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
@@ -55,22 +56,30 @@
               </view>
             </view>
           </view>
+          </view>
+
+          <!-- Add new -->
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" @click="goNew">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+            <text style="margin-left: 6px" :style="addBtnTextStyle">{{ t.cards.addNew }}</text>
+          </view>
+        </template>
+        <view v-else :style="unavailableStyle">
+          <text class="block" :style="unavailableTitleStyle">{{ t.cards.bindingUnavailableTitle }}</text>
+          <text class="block" :style="unavailableBodyStyle">{{ t.cards.bindingUnavailableBody }}</text>
+          <view class="flex items-center justify-center active:opacity-80" :style="unavailableCtaStyle" role="button" tabindex="0" @click="returnToWallet" @keydown.enter.prevent="returnToWallet" @keydown.space.prevent="returnToWallet">
+            <text :style="unavailableCtaTextStyle">{{ t.cards.bindingUnavailableCta }}</text>
+          </view>
         </view>
 
-        <!-- Add new -->
-        <view v-if="cardBindingAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" @click="goNew">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-          <text style="margin-left: 6px" :style="addBtnTextStyle">{{ t.cards.addNew }}</text>
-        </view>
-
-        <text class="block" :style="disclaimerStyle">{{ t.cards.listDisclaimer }}</text>
+        <text v-if="cardBindingAvailable && developmentPaymentEnabled" class="block" :style="disclaimerStyle">{{ t.cards.listDisclaimer }}</text>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -96,7 +105,7 @@ const remoteCardsError = ref(false);
 const remoteCardsRefreshing = ref(false);
 
 async function refreshCards() {
-  if (!remoteApiEnabled || remoteCardsRefreshing.value) return;
+  if (!cardBindingAvailable.value || !remoteApiEnabled || remoteCardsRefreshing.value) return;
   remoteCardsRefreshing.value = true;
   try {
     remoteCardsError.value = !(await cardsStore.refreshRemote());
@@ -137,6 +146,10 @@ async function handleRemove(card: SavedCard) {
 function goNew() {
   if (!cardBindingAvailable.value) return;
   navTo("/pages/me/wallet-cards-new");
+}
+
+function returnToWallet() {
+  navBack("/pages/me/wallet");
 }
 
 // ── styles ──
@@ -197,6 +210,11 @@ const disclaimerStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };
+const unavailableStyle: CSSProperties = { padding: "4px 2px" };
+const unavailableTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const unavailableBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
+const unavailableCtaStyle: CSSProperties = { minHeight: "44px", marginTop: "16px", borderRadius: "999px", background: "var(--v5-surface-2)" };
+const unavailableCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink-2)" };
 const refreshErrorStyle: CSSProperties = {
   padding: "12px 14px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface))",

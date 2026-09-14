@@ -2355,6 +2355,9 @@ export const zh: Messages = {
     withdrawInsufficient: "余额不足,无法提现",
   },
   cards: {
+    bindingUnavailableTitle: "当前暂不支持银行卡绑定",
+    bindingUnavailableBody: "银行卡绑定功能尚未开放。你的余额和已有支付方式不受影响。",
+    bindingUnavailableCta: "返回",
     // List page
     listTitle: "我的银行卡",
     listSubtitle: "本地开发卡片生命周期验证",

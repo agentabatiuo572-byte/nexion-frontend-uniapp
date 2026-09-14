@@ -2428,6 +2428,9 @@ export const en = {
     withdrawInsufficient: "Insufficient balance for withdrawal",
   },
   cards: {
+    bindingUnavailableTitle: "Bank-card binding is not available yet",
+    bindingUnavailableBody: "Bank-card binding has not been enabled. Your balance and any saved payment methods are unaffected.",
+    bindingUnavailableCta: "Back",
     // List page
     listTitle: "My bank cards",
     listSubtitle: "Local development card lifecycle testing",

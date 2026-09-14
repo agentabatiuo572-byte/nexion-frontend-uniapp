@@ -247,6 +247,8 @@
         "src/pages/team/commissions.vue",
         "src/pages/me/help.vue",
         "src/pages/me/wallet-cards.vue",
+        "src/pages/me/wallet-cards-new.vue",
+        "src/pages/me/wallet.vue",
         "src/pages/store/orders.vue",
         "src/pages/me/notifications.vue",
         "src/pages/me/receipts.vue",
