@@ -1051,10 +1051,12 @@ export const zh: Messages = {
   },
 
   riskDisclosure: {
+    publishedContext: "{jurisdiction} · {version} · 生效日期 {effectiveDate}",
+    languageFallback: "当前披露未提供所选语言，以下显示已发布的可用语言文本。",
     navTitle: "平台风险提示书",
     heroLabel: "必读文档",
-    heroTitle: "Staking / 锁仓 / 提现前请阅读本文。",
-    heroSubtitle: "NexGrid 是基于智能合约的算力市场,带代币奖励。所有收益数字均为预估,非承诺。请阅读以下 7 个章节并确认知悉后继续。",
+    heroTitle: "继续前请阅读当前适用的风险披露。",
+    heroSubtitle: "以下内容以当前地区适用的已发布版本为准。",
     alreadyAccepted: "已确认",
     alreadyAcceptedCta: "已确认",
     s1Title: "收益预估只是预测,不是承诺",
@@ -1073,7 +1075,7 @@ export const zh: Messages = {
     s7Title: "托管 / 合规 / 监管管辖",
     s7Body: "NexGrid 由 NexGrid Ltd. 运营,持有 FinCEN MSB 注册号 #MSB1234567,遵循 MiCA 合规流程。资金存于 PwC 季度审计的隔离储备账户。NexGrid 不向 OFAC 制裁地区开放。",
     scrollHint: "请滚动浏览所有章节后再确认。",
-    checkboxLabel: "我已阅读以上 7 个章节,并理解:收益是预估、设备可接任务量随任务池升级递减、代币有市场风险、大额提现可能需要额外安全确认。",
+    checkboxLabel: "我已阅读并理解以上 7 个章节的风险披露。",
     checkboxRequired: "请先勾选上方的已阅读确认项。",
     acceptCta: "我已知悉 — 继续",
     disclaimer: "确认操作会记录时间戳。可通过 Me → 风险提示书 重读。",

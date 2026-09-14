@@ -12,49 +12,66 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
   const acceptedAt = ref<number | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  let requestGeneration = 0;
 
   function apply(snapshot: RiskDisclosureCurrent | null) {
     current.value = snapshot;
     accepted.value = snapshot?.acknowledged ?? false;
     acceptedAt.value = snapshot?.acknowledgedAt ? Date.parse(snapshot.acknowledgedAt) || null : null;
   }
+  function beginRequest() {
+    return { request: remoteAccountScope.snapshot(), generation: ++requestGeneration };
+  }
+  function requestIsCurrent(request: ReturnType<typeof remoteAccountScope.snapshot>, generation: number) {
+    return requestGeneration === generation && remoteAccountScope.isCurrent(request);
+  }
+  function invalidateRequests() { requestGeneration += 1; }
   async function refresh() {
-    const request = remoteAccountScope.snapshot();
+    const { request, generation } = beginRequest();
     apply(null);
     error.value = null;
-    if (!remoteApiEnabled) { error.value = "RISK_DISCLOSURE_REMOTE_REQUIRED"; return; }
+    if (!remoteApiEnabled) {
+      if (requestIsCurrent(request, generation)) {
+        error.value = "RISK_DISCLOSURE_REMOTE_REQUIRED";
+        loading.value = false;
+      }
+      return;
+    }
     loading.value = true;
     try {
       const snapshot = await riskDisclosureApi.current();
-      if (remoteAccountScope.isCurrent(request)) apply(snapshot);
+      if (requestIsCurrent(request, generation)) apply(snapshot);
     } catch (cause) {
-      if (remoteAccountScope.isCurrent(request)) {
+      if (requestIsCurrent(request, generation)) {
         apply(null);
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_UNAVAILABLE";
       }
     } finally {
-      if (remoteAccountScope.isCurrent(request)) loading.value = false;
+      if (requestIsCurrent(request, generation)) loading.value = false;
     }
   }
   async function accept() {
     if (!current.value || accepted.value) return false;
-    const request = remoteAccountScope.snapshot();
+    const { request, generation } = beginRequest();
     const disclosure = current.value;
     loading.value = true;
     error.value = null;
     try {
-      const snapshot = await riskDisclosureApi.acknowledge(disclosure);
-      if (!remoteAccountScope.isCurrent(request)) return false;
+      await riskDisclosureApi.acknowledge(disclosure);
+      if (!requestIsCurrent(request, generation)) return false;
+      // The command response cannot supersede a newer authoritative snapshot.
+      const snapshot = await riskDisclosureApi.current();
+      if (!requestIsCurrent(request, generation)) return false;
       apply(snapshot);
       return accepted.value;
     } catch (cause) {
-      if (remoteAccountScope.isCurrent(request)) {
+      if (requestIsCurrent(request, generation)) {
         apply(null);
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_ACKNOWLEDGEMENT_FAILED";
       }
       return false;
     } finally {
-      if (remoteAccountScope.isCurrent(request)) loading.value = false;
+      if (requestIsCurrent(request, generation)) loading.value = false;
     }
   }
   async function checkGate(actionKey: string, operationId?: string): Promise<void> {
@@ -74,7 +91,7 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
       throw new ApiError({ kind: "protocol", message: "RISK_DISCLOSURE_ACCOUNT_CONTEXT_STALE" });
     }
   }
-  function bindAccount() { apply(null); void refresh(); }
-  function reset() { apply(null); void refresh(); }
+  function bindAccount() { invalidateRequests(); apply(null); void refresh(); }
+  function reset() { invalidateRequests(); apply(null); void refresh(); }
   return { current, accepted, acceptedAt, loading, error, refresh, accept, checkGate, reset, bindAccount };
 });
