@@ -83,7 +83,7 @@
       </view>
     </view>
     <view
-      v-else-if="remoteApiEnabled && (app.remoteAssignmentStatus === 'idle' || app.remoteAssignmentStatus === 'loading')"
+      v-else-if="remoteApiEnabled && (app.remoteAssignmentStatus === 'idle' || (app.remoteAssignmentStatus === 'loading' && !app.remoteAssignmentHasSnapshot))"
       class="pb-4" role="status" aria-live="polite"
     >
       <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>

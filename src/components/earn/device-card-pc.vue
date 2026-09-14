@@ -218,7 +218,8 @@
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct }}%</text>
       </view>
       <view class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
-        <text>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
+        <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+        <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
         <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} +${{ task.reward.toFixed(3) }}</text>
       </view>
     </view>
@@ -237,7 +238,7 @@
           @keydown.enter.stop.prevent="goTaskHistory"
           @keydown.space.stop.prevent="goTaskHistory"
         >
-          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAll }}</text>
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAllAccountReceipts }}</text>
         </view>
       </view>
       <view v-if="deviceTodayCompleted.length" class="space-y-1.5">
@@ -363,6 +364,7 @@ import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
+import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import type { LockedTeaser } from "@/mock/tasks";
@@ -447,6 +449,10 @@ const elapsedRatio = computed(() => {
   return Math.min(1, Math.max(0, (liveTaskNow.value - tk.startedAt) / 1000 / tk.totalSec));
 });
 const progressPct = computed(() => Math.round(elapsedRatio.value * 100));
+const awaitingExecutionResultConfirmation = computed(() => {
+  const tk = task.value;
+  return tk !== null && awaitsExecutionResultConfirmation(tk, liveTaskNow.value);
+});
 
 const idleGated = computed(
   () => props.device.kind === "phone" && !!props.device.pausedReason && !reconnecting.value && !task.value,

@@ -70,8 +70,9 @@ export function deviceGpuLabel(t: Messages, d: Device): string {
  *  the stored `location?: string` the card already treats as optional. */
 export function deviceLocation(t: Messages, d: Device): string {
   if (!d.location) return "";
-  if (d.kind === "pc-gpu") return t.device.locLinkedComputer;
-  if (d.kind.startsWith("stellarrack")) return t.device.locFrankfurtDc;
-  if (d.kind.startsWith("stellarbox")) return t.device.locSingaporeDc;
+  if (d.location === "Linked computer") return t.device.locLinkedComputer;
+  // Translate a known place name, never infer a physical location from a SKU.
+  if (d.location === "Frankfurt Data Center") return t.device.locFrankfurtDc;
+  if (d.location === "Singapore Data Center") return t.device.locSingaporeDc;
   return d.location;
 }

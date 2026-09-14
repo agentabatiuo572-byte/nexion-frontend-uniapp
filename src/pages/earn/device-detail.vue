@@ -10,10 +10,27 @@
         @toggle="expanded = !expanded"
       />
 
-      <!-- 《06》recoverable-error:设备查不到是可恢复错误,给重试出口(回收益页)。
-           class 保留 nx-device-detail__empty —— 走查脚本按它定位这块。 -->
+      <!-- A valid deep link starts from an empty remote account snapshot. Keep
+           it visibly loading until this account's fleet authority settles. -->
+      <view v-else-if="waitingForFleet" class="nx-device-detail__loading mx-4" role="status" aria-live="polite" :style="loadingStyle">
+        <view :style="loadingBarStyle" />
+        <view :style="loadingBarStyle" />
+        <text :style="loadingTextStyle">{{ t.earn.deviceLoading }}</text>
+      </view>
       <EmptyState
-        v-else-if="loaded"
+        v-else-if="fleetFailed"
+        class="nx-device-detail__error mx-4"
+        kind="recoverable-error"
+        :title="t.empty.errorTitle"
+        :desc="t.empty.errorDesc"
+        :cta-label="t.empty.errorCta"
+        emphasis
+        @cta="retryFleet"
+      />
+      <!-- A not-found result is only meaningful after the current fleet is
+           ready. This class remains the explicit route-check anchor. -->
+      <EmptyState
+        v-else-if="showNotFound"
         class="nx-device-detail__empty mx-4"
         kind="recoverable-error"
         :title="t.earn.deviceNotFound"
@@ -21,7 +38,7 @@
       />
       <!-- back 按钮独立保留:走查脚本 r7-device-detail-runtime.mjs 按 .nx-device-detail__back 定位它 -->
       <view
-        v-if="loaded && !device"
+        v-if="showNotFound"
         class="nx-device-detail__back mx-4 inline-flex items-center justify-center active:scale-[0.98] transition-transform"
         :style="backButtonStyle"
         role="button"
@@ -48,6 +65,7 @@ import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const app = useApp();
 const t = useT();
@@ -68,6 +86,15 @@ onLoad((options) => {
 const device = computed(
   () => app.visibleDevices.find((item) => item.id === id.value && item.activatedAt !== null) ?? null,
 );
+const hasDeviceId = computed(() => id.value.trim().length > 0);
+const waitingForFleet = computed(() => remoteApiEnabled && hasDeviceId.value
+  && loaded.value
+  && (app.remoteFleetStatus === "idle" || app.remoteFleetStatus === "loading"));
+const fleetFailed = computed(() => remoteApiEnabled && hasDeviceId.value
+  && loaded.value
+  && app.remoteFleetStatus === "error");
+const showNotFound = computed(() => loaded.value && !device.value
+  && (!remoteApiEnabled || !hasDeviceId.value || app.remoteFleetStatus === "ready"));
 const deviceTitle = computed(() =>
   device.value ? deviceName(t.value, device.value) : t.value.earn.deviceDetailTitle,
 );
@@ -78,6 +105,33 @@ const deviceSubtitle = computed(() =>
 function goEarn() {
   navTo("/earn");
 }
+
+function retryFleet() {
+  if (!remoteApiEnabled || !hasDeviceId.value) return;
+  // The request captures the active account epoch. The store ignores every
+  // late response after an account switch, and this page performs no writes.
+  const request = app.captureRemoteAccountRequest();
+  void app.refreshRemoteFleet(request).catch(() => undefined);
+}
+
+const loadingStyle: CSSProperties = {
+  marginTop: "12px",
+  padding: "24px",
+  borderRadius: "16px",
+  background: "var(--v5-surface)",
+};
+const loadingBarStyle: CSSProperties = {
+  height: "14px",
+  marginBottom: "10px",
+  borderRadius: "7px",
+  background: "var(--v5-surface-2)",
+};
+const loadingTextStyle: CSSProperties = {
+  display: "block",
+  marginTop: "16px",
+  fontSize: "13px",
+  color: "var(--v5-ink-3)",
+};
 
 const emptyStyle: CSSProperties = {
   marginTop: "12px",

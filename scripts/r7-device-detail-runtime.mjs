@@ -25,7 +25,39 @@ async function waitUntil(check, message, timeoutMs = 30_000) {
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-await installFormalProbeSession(page);
+let coldFleetReads = 0;
+let coldFleetFixture = false;
+let coldNavigation = 0;
+await installFormalProbeSession(page, { responseFor(url, request) {
+  if (!coldFleetFixture || request.method() !== "GET") return undefined;
+  const authority = { sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true };
+  if (url.pathname === "/api/devices/earnings") {
+    coldFleetReads += 1;
+    return { ...authority, source: "nx_user_device + nx_compute_receipt + nx_compute_e3_config",
+      dailyUsdt: 0, dailyNex: 0, realizedTodayUsdt: 0, realizedTodayNex: 0,
+      walletUsdt: 0, walletNex: 0, userJoinedAt: Date.now() - 86400000,
+      serverNow: Date.now(), timezone: "UTC", slotCap: 6, devices: [{
+        id: 701, rowVersion: 1, instanceNo: "R7-INACTIVE-701", name: "StellarBox Pro V2",
+        deviceType: "STELLARBOX_PRO_V2", productCode: "stellarbox-pro-v2", status: "INACTIVE",
+        runtimeStatus: "OFFLINE", pendingDeactivate: false, activatedAt: null, deactivatedAt: null,
+        purchasedAt: Date.now() - 86400000, dailyUsdt: 0, dailyNex: 0,
+        todayEarningsUsdt: 0, todayEarningsNex: 0, gpuModel: "Fixture GPU", vramTotalGb: 8,
+        basePowerW: 100, location: "Fixture inventory", capacityPct: 100, capacityAgeMonths: 0,
+        capacityConfigKey: "pro-v2", capacitySubsidized: false, capacitySubsidyDays: 0,
+        capacitySubsidyRemainingDays: 0, capacitySubsidyEndsAt: null, actualPaidUsdt: 0,
+        cumulativeOutputUsdt: 0,
+      }],
+      capacitySchedule: { stageEarlyEnd: "3", stageMidEnd: "8", capacityFloorPct: "22",
+        capacitySubsidyDays: "30", capacityBand1DeltaPct: "-4", capacityBand2DeltaPct: "-6",
+        capacityBand3DeltaPct: "-23.7", capacityApplyToPhone: "false", capacityApplyToCloudShare: "false",
+        capacityApplyToPcGpu: "false", capacityApplyToS1: "true", capacityApplyToPro: "true",
+        capacityApplyToProV2: "true", capacityApplyToRackP1: "true", capacityApplyToRackP2: "true" } };
+  }
+  if (url.pathname === "/api/tasks/assignments") {
+    return { ...authority, source: "server", serverNow: Date.now(), devices: [] };
+  }
+  return undefined;
+} });
 // 🔴 首页 1300ms 会自动弹代金券领取层(z=800 全屏遮罩),本探针随后要点首页设备格 ——
 // 谁先到全看机器负载:空闲时探针先点到(绿),套件满载时弹层先弹出(红)。这不是断言
 // 该管的变量,与上面 12s→30s 那次同源。按 chrome-baseline / trial-check 的既有家法预置
@@ -63,7 +95,8 @@ async function resolveAppFrame(selector) {
 }
 
 async function goto(route, selector) {
-  await page.goto(`${baseUrl}/?nx_device=off&r7detail=${runId}${route}`, { waitUntil: "domcontentloaded" });
+  const coldQuery = coldFleetFixture ? `&cold=${++coldNavigation}` : "";
+  await page.goto(`${baseUrl}/?nx_device=off&r7detail=${runId}${coldQuery}${route}`, { waitUntil: "domcontentloaded" });
   let frame;
   try {
     frame = await resolveAppFrame(selector);
@@ -339,13 +372,23 @@ try {
   await firstRow.press("Enter");
   await waitUntil(() => page.url().includes(`/pages/earn/device-detail?id=${encodeURIComponent(logic.activeIds[0])}`), "device row did not open instance detail");
 
+  // A cold remote detail may conclude "not found" only after its account's
+  // fleet GET succeeds. These fixtures replace the local lifecycle seed for
+  // the two cold routes; they are not evidence of a real backend read.
+  coldFleetFixture = true;
   const inactive = await goto(
-    `#/pages/earn/device-detail?id=${encodeURIComponent(logic.inactiveId)}`,
+    "#/pages/earn/device-detail?id=701",
     ".nx-device-detail__empty",
   );
   assert((await inactive.locator(".nx-device-card__details").count()) === 0, "inactive inventory device rendered as earning detail");
+  assert(coldFleetReads > 0, "cold inactive route skipped its canonical fleet GET");
+  assert(await inactive.evaluate(async () => (await import("/src/store/app.ts")).useApp().remoteFleetStatus === "ready"), "inactive route concluded before fleet ready");
+  assert(await inactive.evaluate(async () => (await import("/src/store/app.ts")).useApp().devices.some(device => device.id === "701" && device.activatedAt === null)), "inactive fixture was dropped instead of retained in inventory");
 
+  const readsBeforeMissing = coldFleetReads;
   const missing = await goto("#/pages/earn/device-detail?id=missing-sentinel", ".nx-device-detail__empty");
+  assert(coldFleetReads > readsBeforeMissing, "cold missing route reused an earlier fleet verdict");
+  assert(await missing.evaluate(async () => (await import("/src/store/app.ts")).useApp().remoteFleetStatus === "ready"), "missing route concluded before fleet ready");
   const back = missing.locator(".nx-device-detail__back");
   await back.focus();
   await back.press("Enter");

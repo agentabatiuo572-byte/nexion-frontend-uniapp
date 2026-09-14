@@ -189,11 +189,15 @@ describe("App remote fleet refresh wiring", () => {
 
     remote.sessionVault.read.mockReturnValue({ user: { userId: 2002 } });
     app.bindAccount("user:2002");
+    expect(app.remoteFleetHasSnapshot).toBe(false);
+    expect(app.remoteAssignmentHasSnapshot).toBe(false);
     const currentRead = app.refreshRemoteFleet();
 
     currentFleet.resolve(fleet(420));
     await expect(currentRead).resolves.toBe(true);
     expect(app.user.usdtBalance).toBe(420);
+    expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.remoteAssignmentHasSnapshot).toBe(true);
 
     oldFleet.resolve(fleet(900));
     await expect(oldRead).resolves.toBe(false);
@@ -209,12 +213,52 @@ describe("App remote fleet refresh wiring", () => {
 
     await expect(app.refreshRemoteFleet()).resolves.toBe(true);
     expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.remoteAssignmentHasSnapshot).toBe(true);
     expect(app.user.usdtBalance).toBe(680);
 
     await expect(app.refreshRemoteFleet()).resolves.toBe(false);
     expect(app.remoteFleetStatus).toBe("error");
     expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.remoteAssignmentHasSnapshot).toBe(true);
     expect(app.user.usdtBalance).toBe(680);
+  });
+
+  it("keeps confirmed fleet and assignment evidence while a background refresh is pending", async () => {
+    const pendingFleet = deferred<CanonicalE3Fleet>();
+    remote.deviceE3Api.fleet
+      .mockResolvedValueOnce(fleet(680))
+      .mockReturnValueOnce(pendingFleet.promise);
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    await expect(app.refreshRemoteFleet()).resolves.toBe(true);
+    const pending = app.refreshRemoteFleet();
+
+    expect(app.remoteFleetStatus).toBe("loading");
+    expect(app.remoteAssignmentStatus).toBe("loading");
+    expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.remoteAssignmentHasSnapshot).toBe(true);
+
+    pendingFleet.resolve(fleet(681));
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it("keeps the first remote read unknown until current-account evidence arrives", async () => {
+    const pendingFleet = deferred<CanonicalE3Fleet>();
+    remote.deviceE3Api.fleet.mockReturnValueOnce(pendingFleet.promise);
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    const pending = app.refreshRemoteFleet();
+    expect(app.remoteFleetStatus).toBe("loading");
+    expect(app.remoteAssignmentStatus).toBe("loading");
+    expect(app.remoteFleetHasSnapshot).toBe(false);
+    expect(app.remoteAssignmentHasSnapshot).toBe(false);
+
+    pendingFleet.resolve(fleet(680));
+    await expect(pending).resolves.toBe(true);
+    expect(app.remoteFleetHasSnapshot).toBe(true);
+    expect(app.remoteAssignmentHasSnapshot).toBe(true);
   });
 
   it("retains an authenticated Genesis wallet receipt when the first fleet read fails", async () => {
