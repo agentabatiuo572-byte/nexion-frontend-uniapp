@@ -3168,6 +3168,10 @@ export const en = {
     supportReply4: "Done. You'll get a confirmation shortly. Anything else I can help with?",
   },
   exchange: {
+    swapPaused: "Exchange is paused by the current platform setting. You can still review history or cancel an eligible queued order.",
+    pendingRecoveryHint: "An exchange result is still unconfirmed. Check the original request to avoid a duplicate exchange.",
+    recoverPending: "Check pending exchange",
+    recoveryChecking: "Checking…",
     netReceive: "Net amount received",
     exchangeFee: "Exchange fee",
     belowFee: "Amount does not cover the exchange fee. Increase the amount or refresh the quote.",

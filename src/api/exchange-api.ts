@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { parseServerTimestamp } from "./server-time";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
+import { historySnapshotQuery, parseHistorySnapshotId } from "./history-snapshot";
 
 export type ExchangeDirection = "USDT_TO_NEX" | "NEX_TO_USDT";
 export type ExchangeAsset = "USDT" | "NEX";
@@ -51,7 +52,7 @@ export interface ExchangeSnapshot {
   todayPlatformUsedUsdt: number;
   lifetimeExchangedUsdt: number;
   orders: ExchangeOrder[];
-  ordersPage: { total: number; pageNum: number; pageSize: number };
+  ordersPage: { total: number; pageNum: number; pageSize: number; snapshotId?: string };
   order?: ExchangeOrder;
   gate?: "USER_CAP" | "PLATFORM_CAP" | "GEO_BLOCKED";
   feeUsdt?: number;
@@ -60,9 +61,18 @@ export interface ExchangeSnapshot {
   runId: string;
 }
 
+export interface ExchangeRecovery {
+  status: "SUCCEEDED" | "FAILED" | "PROCESSING" | "UNKNOWN" | "NOT_FOUND" | "MISMATCH";
+  order?: ExchangeOrder;
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string;
+}
+
 export interface ExchangeApi {
   fetchCaps(): Promise<ExchangeCaps>;
-  fetchState(pageNum?: number, pageSize?: number): Promise<ExchangeSnapshot>;
+  fetchState(pageNum?: number, pageSize?: number, snapshotId?: string): Promise<ExchangeSnapshot>;
+  recover(direction: ExchangeDirection, fromAmount: number, queueIfCapped: boolean,
+    idempotencyKey: string): Promise<ExchangeRecovery>;
   swap(
     direction: ExchangeDirection,
     fromAmount: number,
@@ -221,6 +231,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
   if (caps.sourceEnvironment !== row.sourceEnvironment || caps.runId !== row.runId) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
+  const snapshotId = parseHistorySnapshotId(ordersPage.snapshotId);
   return {
     caps,
     wallet: { usdtAvailable, nexAvailable },
@@ -228,7 +239,7 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
     todayPlatformUsedUsdt,
     lifetimeExchangedUsdt,
     orders,
-    ordersPage: { total, pageNum, pageSize },
+    ordersPage: { total, pageNum, pageSize, snapshotId },
     order: row.order === undefined ? undefined : parseOrder(row.order),
     gate: gate as ExchangeSnapshot["gate"],
     feeUsdt: optionalNumber(row, "feeUsdt"),
@@ -245,10 +256,28 @@ export function createExchangeApi(client: ApiClient, mode: ApiEnvironment = "pro
       path: "/api/config/exchange/caps",
       authenticated: false,
     }), mode),
-    fetchState: async (pageNum = 1, pageSize = 20) => parseSnapshot(await client.request({
+    fetchState: async (pageNum = 1, pageSize = 20, snapshotId) => parseSnapshot(await client.request({
       method: "GET",
-      path: `/api/exchange?pageNum=${pageNum}&pageSize=${pageSize}`,
+      path: `/api/exchange?pageNum=${pageNum}&pageSize=${pageSize}${historySnapshotQuery(snapshotId)}`,
     }), mode),
+    recover: async (direction, fromAmount, queueIfCapped, idempotencyKey) => {
+      const row = record(await client.request({
+        method: "GET",
+        path: `/api/exchange/recovery?direction=${encodeURIComponent(direction)}&fromAmount=${encodeURIComponent(fromAmount)}&queueIfCapped=${queueIfCapped}`,
+        idempotencyKey,
+      }));
+      if (!row || !["dev", "prod"].includes(mode) || row.sourceEnvironment !== "PRODUCTION" || row.runId !== ""
+          || typeof row.status !== "string"
+          || !["SUCCEEDED", "FAILED", "PROCESSING", "UNKNOWN", "NOT_FOUND", "MISMATCH"].includes(row.status)
+          || (row.status !== "SUCCEEDED" && row.order !== undefined)) {
+        return invalid("EXCHANGE_RECOVERY_RESPONSE_INVALID");
+      }
+      return {
+        status: row.status as ExchangeRecovery["status"],
+        order: row.status === "SUCCEEDED" ? parseOrder(row.order) : undefined,
+        sourceEnvironment: "PRODUCTION", runId: "",
+      };
+    },
     swap: async (direction, fromAmount, queueIfCapped, idempotencyKey) =>
       parseSnapshot(await client.request({
         method: "POST",

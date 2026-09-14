@@ -19,8 +19,8 @@ describe("wallet exchange stale notification fences", () => {
   });
 
   it("keeps the original account/run scope through confirmation and submit stale branches", () => {
-    expect(source).toMatch(/async function syncRemoteState\(\s*scope = captureAccountScope\(\),\s*runScope = captureRuntimeRevision\(\)/);
-    expect(source).toMatch(/const requestScope = captureAccountScope\(\);[\s\S]*const requestRunScope = captureRuntimeRevision\(\);/);
+    expect(source).toMatch(/async function syncRemoteState\(\s*scope = captureExchangeScope\(\),\s*runScope = captureRuntimeRevision\(\)/);
+    expect(source).toMatch(/const requestScope = captureExchangeScope\(\);[\s\S]*const requestRunScope = captureRuntimeRevision\(\);/);
     expect(source).toMatch(/syncRemoteState\(requestScope, requestRunScope\)/);
     expect(source).toMatch(/const applied = await syncRemoteState\(requestScope, requestRunScope\)\.catch\(\(\) => false\);[\s\S]{0,200}if \(!applied\) return;/);
     expect(source).toMatch(/if \(!applied\) return;/);

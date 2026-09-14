@@ -316,6 +316,7 @@ const LEDGER = {
   // 🔴 裸 /api/exchange ≠ PRD 的 /api/exchange/swap(§9.4.3)。回源核过:PRD 只定义了
   //    带 /swap 的那条,裸路径全 PRD 零命中。**别把它当成 §9.4.3 登记** —— 那是假引用。
   "/api/exchange": "TBD-NAME: 兑换单读/建;PRD §9.4.3 只定义了 POST /api/exchange/swap,裸路径未定义",
+  "/api/exchange/recovery": "BACKEND: AppExchangeController GET recovery (6cdbf8fa);认证用户+原参数+Idempotency-Key只读原收据及当前订单，不重放兑换;见后端 docs/exchange-recovery.md",
   "/api/exchange/:param/cancel": "NOT-PRD: 🔴 死路径 —— wallet-exchange.vue 定义了 cancelRemoteOrder() 并在里面调本端点,但**没有任何东西调 cancelRemoteOrder**(模板无绑定、全文件仅定义处一处命中),用户点不到。与本轮开头删掉的卡时代早购镜像同型,只深一层。⚠️ 服务端仍可能把单据置为 CANCELLED(到期等),页面的 CANCELLED 展示是合法的——死的只是「客户端发起撤销」这条路。立卡见 docs/changes/2026-08-14-card-dead-exchange-cancel.md",
   "/api/genesis/account": "TBD-NAME: 创世账户读;PRD 未定义",
   "/api/genesis/purchase": "TBD-NAME: 创世购买;PRD 未定义该路径(§10.1 有业务规则)",

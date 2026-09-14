@@ -18,6 +18,17 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  // An unavailable exchange read is not an empty history. Supply the complete
+  // canonical response so this probe exercises the actual empty-list branch.
+  if (url.pathname === "/api/exchange") {
+    const caps = { asset: "NEX", currency: "USDT", currentPrice: 0.125,
+      userDailyCapUsdt: 50, platformDailyCapUsdt: 20000, feePct: 0, feeMinUsdt: 0.5,
+      minUsdt: 3, minNex: 42, queueMode: "QUEUE", swapEnabled: false,
+      serverCanonical: true, source: "G2/G3 server configuration", sourceEnvironment: "PRODUCTION", runId: "" };
+    return { ...caps, caps, wallet: { usdtAvailable: 0, nexAvailable: 0 },
+      todayUserUsedUsdt: 0, todayPlatformUsedUsdt: 0, lifetimeExchangedUsdt: 0,
+      orders: [], ordersPage: { total: 0, pageNum: 1, pageSize: 20 } };
+  }
   // Voucher emptiness requires a successful canonical catalog, not an empty
   // object that the production parser correctly treats as an unavailable read.
   if (url.pathname === "/api/vouchers") return {

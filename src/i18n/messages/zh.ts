@@ -3068,6 +3068,10 @@ export const zh: Messages = {
     supportReply4: "搞定。你很快会收到确认。还有别的需要帮忙吗?",
   },
   exchange: {
+    swapPaused: "当前平台设置已暂停兑换。你仍可查看历史记录，或取消符合条件的已排队订单。",
+    pendingRecoveryHint: "有一笔兑换结果尚待确认。请查询原请求结果，避免重复兑换。",
+    recoverPending: "查询待确认的兑换",
+    recoveryChecking: "正在查询…",
     netReceive: "预计净到账",
     exchangeFee: "兑换手续费",
     belowFee: "金额不足以支付兑换手续费，请增加金额或刷新报价。",
