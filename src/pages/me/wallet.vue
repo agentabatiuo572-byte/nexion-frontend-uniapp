@@ -134,7 +134,7 @@ import { evaluateAccountCluster } from "@/store/risk-cluster";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
 import { onShow } from "@dcloudio/uni-app";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
 import { resolveWalletTodayEarnings } from "@/lib/wallet-today-earnings";
 
 const t = useT();
@@ -220,7 +220,9 @@ const allTimeSublabel = computed(() =>
 // (no i18n key) — see PORT report for the missing wallet.myBankCards keys.
 const cardsCount = computed(() => cards.cards.length);
 const cardsSub = computed(() =>
-  cardsCount.value > 0
+  remoteApiEnabled && !developmentPaymentEnabled
+    ? t.value.cards.bindingUnavailableTitle
+    : cardsCount.value > 0
     ? fmt(t.value.wallet.cardsBound, { n: cardsCount.value })
     : t.value.wallet.cardsReuseHint,
 );

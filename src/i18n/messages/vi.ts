@@ -2345,6 +2345,9 @@ export const vi: Messages = {
     withdrawInsufficient: "Số dư không đủ để rút",
   },
   cards: {
+    bindingUnavailableTitle: "Chưa hỗ trợ liên kết thẻ ngân hàng",
+    bindingUnavailableBody: "Tính năng liên kết thẻ ngân hàng chưa được mở. Số dư và các phương thức thanh toán đã lưu của bạn không bị ảnh hưởng.",
+    bindingUnavailableCta: "Quay lại",
     listTitle: "Thẻ ngân hàng của tôi",
     listSubtitle: "Dùng lại khi thanh toán",
     emptyTitle: "Chưa lưu thẻ ngân hàng nào",

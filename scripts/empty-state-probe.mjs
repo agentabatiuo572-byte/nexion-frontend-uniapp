@@ -115,7 +115,10 @@ const ROUTES = [
   { r: "pages/events/events", unreachable: "按 tab 过滤 EVENTS 常量,需切到无结果的 tab" },
   { r: "pages/team/commissions" },
   { r: "pages/me/help", type: TYPE_JUNK },
-  { r: "pages/me/wallet-cards" },
+  // An unopened rail is unavailable, not an empty saved-card list. Assert the
+  // real hold state and its exit instead of manufacturing an empty illustration.
+  { r: "pages/me/wallet-cards", unavailableReturn: "pages/me/wallet" },
+  { r: "pages/me/wallet-cards-new", unavailableReturn: "pages/me/wallet-cards" },
   { r: "pages/store/orders" },
   { r: "pages/me/notifications" },
   { r: "pages/me/receipts" },
@@ -224,6 +227,27 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
     await page.goto(`${BASE}/?nx_device=off&es=${i}#/${route}`, { waitUntil: "domcontentloaded" });
     await settleNetwork(page, 5000, lanes); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;实际 1 lane 时空转(F-04 / R2-03)
     await page.waitForTimeout(1300);
+    if (spec.unavailableReturn) {
+      if (!page.url().includes(`#/${route}`)) throw new Error("Unavailable route was not reached");
+      await page.getByText("Bank-card binding is not available yet", { exact: true }).last().waitFor({ state: "visible" });
+      await page.getByText("Bank-card binding has not been enabled. Your balance and any saved payment methods are unaffected.", { exact: true }).waitFor({ state: "visible" });
+      const backButtons = page.getByRole("button", { name: "Back", exact: true });
+      if (await backButtons.count() !== 2) throw new Error("Unavailable page must retain header and in-page exits");
+      const back = backButtons.last();
+      await back.waitFor({ state: "visible" });
+      const bounds = await back.boundingBox();
+      if (!bounds || bounds.height < 44 || bounds.width < 44) throw new Error("Unavailable exit smaller than 44px");
+      if (await back.getAttribute("tabindex") !== "0") throw new Error("Unavailable exit is not keyboard reachable");
+      const forbidden = page.locator('input, .nx-empty, [data-testid="card-simulation-badge"], [data-testid="wallet-card-set-default"], [data-testid="wallet-card-unbind"], [data-testid="wallet-cards-retry"]');
+      if (await forbidden.count()) throw new Error("Unavailable page exposes card controls or an empty-list claim");
+      if (await page.getByText("Add a new card", { exact: true }).count()) throw new Error("Unavailable page exposes an add-card entry");
+      if (await page.getByText(/Local development simulation:|Test cards only verify bind/).count()) throw new Error("Unavailable page exposes development disclosure");
+      const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth > document.scrollingElement.clientWidth + 1);
+      if (overflow) throw new Error("Unavailable page overflows horizontally");
+      await back.press("Enter");
+      await page.waitForURL(url => url.hash.split("?")[0] === `#/${spec.unavailableReturn}`);
+      return { route, unavailable: true, exitVerified: true, tabs: 0, newErrors: consoleErrors.length - before };
+    }
     // 常量数据源的页面:往搜索框打不可能命中的词
     if (spec.type) {
       await page.evaluate((junk) => {
@@ -296,6 +320,10 @@ for (const r of rows) {
   const bad = [];
   if (r.unreachable) { console.log(`skip  ${r.route.padEnd(30)} 探针够不着:${r.unreachable}`); continue; }
   if (r.err) bad.push("异常:" + r.err);
+  else if (r.unavailable) {
+    if (!r.exitVerified) bad.push("不可用页面返回未验证");
+    if (r.newErrors) bad.push(`console error ×${r.newErrors}`);
+  }
   else if (!r.empty) bad.push("清空数组后仍未渲染 .nx-empty");
   else {
     if (!r.artOk) bad.push("插画没加载出来(路径错或文件缺)");
@@ -307,7 +335,7 @@ for (const r of rows) {
   if (bad.length) fail++;
   // 🔴 tabs=N 恒打印:认不出页签(0)也要显形。静默跳过 = 判据失效却看不出来。
   const tabInfo = r.tabs === undefined ? "" : r.tabs > 0 ? ` [页签 ${r.tabs}: ${(r.tabLabels || []).join("/")}]` : " [无页签]";
-  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
+  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.unavailable ? "unavailable · no card controls · keyboard exit verified" : r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
 }
 const withTabs = rows.filter((r) => r.tabs > 0).length;
 console.log(`\n${rows.length - fail}/${rows.length} 通过 · 其中 ${withTabs} 页做了页签遍历`);

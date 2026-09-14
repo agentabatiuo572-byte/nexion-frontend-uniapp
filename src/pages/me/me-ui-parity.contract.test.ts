@@ -99,8 +99,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-address-rebind.vue": "a24907e30eec77cda6495fff61782daacd487ef76f3e0bf273baac60bbc2bffd",
   // Wallet filter pills expose keyboard button semantics and their selected state; styles are unchanged.
   "wallet-bills.vue": "c16daae93135450d6f3b383abdf3fcb58398dfac1c30c338a15eebb254cc3658",
-  "wallet-cards-new.vue": "d0134756c231552e9068b064b664c5ef1cc7ee3242272f03d4ed1744f9696c97",
-  "wallet-cards.vue": "3d1ab2de2b31a61e95bf2a388ba334b6d785a977421f7de75d9ab6e147171622",
+  // Disabled bank-card routes hide card management/hosted fields and expose a keyboard return action.
+  // Development disclosures are confined to the enabled development-card path.
+  "wallet-cards-new.vue": "c07b7b4aa4e45add4013942a658badb07891cb346e3b47676128f4a72527dc13",
+  "wallet-cards.vue": "4b41a06e08823d9ee900b18eaf2fe6d838f90971e7bfd21d3411e9da0c22c7c3",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
   // Server fee and six-decimal net proceeds are disclosed before confirmation.
