@@ -94,9 +94,12 @@
             </view>
           </view>
         </view>
-        <view v-else class="rounded-2xl" :style="unavailableStyle" @click="retryRank">
+        <view v-else-if="vState.remoteError" class="rounded-2xl" :style="unavailableStyle" @click="retryRank">
           <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ t.rank.loadError }}</text>
           <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ t.rank.retry }}</text>
+        </view>
+        <view v-else class="rounded-2xl" :style="unavailableStyle" role="status" aria-live="polite" aria-busy="true">
+          <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ t.rank.loading }}</text>
         </view>
       </view>
     </view>

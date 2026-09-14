@@ -213,7 +213,7 @@ let pulseCursor = 0;
 // page-level interval (P-034): deterministic decorative pulse every 1.2s.
 // It never fabricates a member or metric and does not use client randomness.
 onMounted(() => {
-  if (remoteApiEnabled) void network.refreshCanonicalNetwork();
+  if (remoteApiEnabled) void network.ensureCanonicalNetwork();
   pulseTimer = setInterval(() => {
     const pool = members.value.filter((m) => m.status === "active");
     if (pool.length === 0) return;
@@ -223,7 +223,7 @@ onMounted(() => {
   }, 1200);
 });
 onShow(() => {
-  if (remoteApiEnabled) void network.refreshCanonicalNetwork();
+  if (remoteApiEnabled) void network.ensureCanonicalNetwork();
 });
 onUnmounted(() => {
   if (pulseTimer) clearInterval(pulseTimer);
