@@ -1,11 +1,17 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
-import type { PayoutAddressNetwork, PayoutAddressProvenance, PayoutAddressSnapshot } from "@/api/payout-address-api";
+import {
+  payoutAddressEpochMs,
+  type PayoutAddressNetwork,
+  type PayoutAddressProvenance,
+  type PayoutAddressSnapshot,
+} from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { mockServerNow } from "./server-time";
+import { readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useApp } from "./app";
 import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
@@ -47,13 +53,20 @@ const TO_SERVER_NETWORK: Record<ChainDepositChannel, PayoutAddressNetwork> = {
   "usdt-erc20": "USDT-ERC20",
 };
 
+export interface PayoutAddressServerClock {
+  serverNowEpochMs: number;
+  receivedMonotonicAt: number;
+}
+
+export type PayoutAddressChangeBlockReason = PayoutChangeBlockReason | "time-unknown";
+
 function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
   const result = emptyBook();
   for (const row of snapshot.addresses) {
     const network = PAYOUT_NETWORKS.find((candidate) => TO_SERVER_NETWORK[candidate] === row.network);
     if (!network) continue;
-    const createdAt = Date.parse(row.createdAt);
-    const effectiveAt = Date.parse(row.effectiveAt);
+    const createdAt = payoutAddressEpochMs(row.createdAt)!;
+    const effectiveAt = payoutAddressEpochMs(row.effectiveAt)!;
     result[network] = {
       current: {
         address: row.address,
@@ -64,7 +77,7 @@ function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
       },
       history: [],
       freezeUntil: row.changePending ? effectiveAt : null,
-      nextChangeAt: Date.parse(row.nextChangeAllowedAt),
+      nextChangeAt: payoutAddressEpochMs(row.nextChangeAllowedAt),
     };
   }
   return result;
@@ -162,7 +175,21 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   const remoteChangeCooldownDays = ref<number | null>(payoutAddressServerEnabled ? null : cooldownDaysNow());
   const remoteEffectiveDelayHours = ref<number | null>(payoutAddressServerEnabled ? null : 24);
   const remoteProvenance = ref<PayoutAddressProvenance | null>(null);
+  // The anchor comes from the same canonical snapshot as the address state.  Never
+  // fall back to wall time in remote mode: an old response must not reopen a gate.
+  const remoteServerClock = ref<PayoutAddressServerClock | null>(null);
   let remoteLoadVersion = 0;
+
+  function applyRemoteSnapshot(snapshot: PayoutAddressSnapshot) {
+    book.value = remoteBook(snapshot);
+    remoteProvenance.value = snapshot;
+    remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
+    remoteEffectiveDelayHours.value = snapshot.effectiveDelayHours;
+    const receivedMonotonicAt = readTrustedMonotonicNowMs();
+    remoteServerClock.value = snapshot.serverNowEpochMs === null || receivedMonotonicAt === null
+      ? null
+      : { serverNowEpochMs: snapshot.serverNowEpochMs, receivedMonotonicAt };
+  }
 
   function persist(): boolean {
     if (payoutAddressServerEnabled) return false;
@@ -194,10 +221,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
       const snapshot = await payoutAddressApi.list();
       if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
       if (!runtimeProvenanceValid(snapshot)) return false;
-      book.value = remoteBook(snapshot);
-      remoteProvenance.value = snapshot;
-      remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
-      remoteEffectiveDelayHours.value = snapshot.effectiveDelayHours;
+      applyRemoteSnapshot(snapshot);
       return true;
     } catch {
       // A stale failure belongs to the previous account/request and must not
@@ -260,8 +284,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteLoadVersion += 1;
     if (!scopeIsCurrent(request)) throw scopeChangedError();
     if (!runtimeProvenanceValid(snapshot)) throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
-    book.value = remoteBook(snapshot);
-    remoteProvenance.value = snapshot;
+    applyRemoteSnapshot(snapshot);
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
@@ -274,6 +297,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
       remoteChangeCooldownDays.value = null;
       remoteEffectiveDelayHours.value = null;
       remoteProvenance.value = null;
+      remoteServerClock.value = null;
       void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
@@ -311,9 +335,22 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   }
 
   /** 更换前的禁止动作判定(null = 可更换;页面与提交动作共用同一判据)。 */
-  function changeBlockReason(network: ChainDepositChannel): PayoutChangeBlockReason | null {
+  function changeBlockReason(
+    network: ChainDepositChannel,
+    serverNowEpochMs?: number | null,
+  ): PayoutAddressChangeBlockReason | null {
+    if (payoutAddressServerEnabled) {
+      if (hasInFlightWithdrawalOn(network)) return "withdrawal-in-flight";
+      // A response from a pre-clock server is still safe to display, but may not
+      // make a time-gated change appear available.
+      if (!remoteServerClock.value || serverNowEpochMs == null
+          || !Number.isFinite(serverNowEpochMs) || serverNowEpochMs < 0
+          || readTrustedMonotonicNowMs() === null) {
+        return "time-unknown";
+      }
+    }
     return payoutChangeBlockReason({
-      now: mockServerNow(),
+      now: serverNowEpochMs ?? mockServerNow(),
       hasInFlightWithdrawal: hasInFlightWithdrawalOn(network),
       nextChangeAt: stateFor(network).nextChangeAt,
     });
@@ -352,7 +389,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     address: string,
   ):
     | { ok: true }
-    | { ok: false; reason: PayoutChangeBlockReason | "invalid-address" | "no-current" | "same-address" | "persist-failed" } {
+    | { ok: false; reason: PayoutAddressChangeBlockReason | "invalid-address" | "no-current" | "same-address" | "persist-failed" } {
     if (payoutAddressServerEnabled) return { ok: false, reason: "persist-failed" };
     const blocked = changeBlockReason(network);
     if (blocked) return { ok: false, reason: blocked };
@@ -410,6 +447,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     changeCooldownDays: computed(() => remoteChangeCooldownDays.value),
     effectiveDelayHours: computed(() => remoteEffectiveDelayHours.value),
     provenance: computed(() => remoteProvenance.value),
+    serverClock: computed(() => remoteServerClock.value),
     hasAnyAddress,
     stateFor,
     currentFor,

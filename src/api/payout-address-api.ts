@@ -25,6 +25,8 @@ export interface PayoutAddressRow extends PayoutAddressProvenance {
 
 export interface PayoutAddressSnapshot extends PayoutAddressProvenance {
   addresses: PayoutAddressRow[];
+  /** Null means a legacy response without a trustworthy clock; time gates stay closed. */
+  serverNowEpochMs: number | null;
   changeCooldownDays: number;
   effectiveDelayHours: number;
   inFlightWithdrawalBlocked: true;
@@ -48,12 +50,26 @@ export interface PayoutAddressApi {
 }
 
 const NETWORKS = new Set<PayoutAddressNetwork>(["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"]);
+const BUSINESS_TIME_ZONE_OFFSET = "+08:00";
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? value as Record<string, unknown> : null;
 }
 
+/** Backend serializes LocalDateTime in its fixed Asia/Shanghai business zone. */
+export function payoutAddressEpochMs(value: unknown): number | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const normalized = value.trim().replace(" ", "T");
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  const epochMs = Date.parse(hasOffset ? normalized : `${normalized}${BUSINESS_TIME_ZONE_OFFSET}`);
+  return Number.isFinite(epochMs) ? epochMs : null;
+}
+
 function timestamp(value: unknown): value is string {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
+  return payoutAddressEpochMs(value) !== null;
+}
+
+function epochMilliseconds(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function provenance(value: unknown, mode: ApiEnvironment): PayoutAddressProvenance {
@@ -114,9 +130,14 @@ function parseSnapshot(value: unknown, mode: ApiEnvironment): PayoutAddressSnaps
   if (new Set(addresses.map((item) => item.network)).size !== addresses.length) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_RESPONSE_INVALID" });
   }
+  const serverNowEpochMs = row.serverNowEpochMs == null ? null : epochMilliseconds(row.serverNowEpochMs);
+  if (row.serverNowEpochMs != null && serverNowEpochMs === null) {
+    throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_RESPONSE_INVALID" });
+  }
   return {
     addresses,
     ...proof,
+    serverNowEpochMs,
     changeCooldownDays: row.changeCooldownDays,
     effectiveDelayHours: row.effectiveDelayHours,
     inFlightWithdrawalBlocked: true,

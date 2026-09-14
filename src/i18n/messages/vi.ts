@@ -5822,6 +5822,9 @@ export const vi: Messages = {
     sheetOk: "Đã hiểu",
   },
   addrRebind: {
+    timeStatusUnavailable: "Chưa thể xác nhận trạng thái thời gian bảo vệ. Hãy làm mới rồi thử lại.",
+    refreshTimeStatusCta: "Làm mới trạng thái",
+    refreshingStatus: "Đang làm mới…",
     title: "Địa chỉ rút tiền",
     subtitle: "Quản lý địa chỉ",
     manageCta: "Quản lý",

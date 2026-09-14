@@ -5968,6 +5968,9 @@ export const en = {
     sheetOk: "Got it",
   },
   addrRebind: {
+    timeStatusUnavailable: "We cannot confirm the protection-window status yet. Refresh and try again.",
+    refreshTimeStatusCta: "Refresh status",
+    refreshingStatus: "Refreshing…",
     title: "Withdrawal address",
     subtitle: "Address management",
     manageCta: "Manage",
