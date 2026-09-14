@@ -92,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo } from "@/lib/route";
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -152,8 +153,8 @@ const titleText = computed(() => (props.term !== null ? fmt(t.value.stakingV3.sh
 const subtitleText = computed(() =>
   props.term !== null
     ? fmt(t.value.stakingV3.sheet.subtitle, {
-        apy: (apyRate.value * 100).toFixed(0),
-        penalty: (penaltyRate.value * 100).toFixed(0),
+        apy: formatStakingPercentage(apyRate.value),
+        penalty: formatStakingPercentage(penaltyRate.value),
       })
     : "",
 );
@@ -176,7 +177,7 @@ const ctaText = computed(() =>
 );
 const lockedNoticeText = computed(() =>
   props.term !== null
-    ? fmt(t.value.stakingV3.sheet.lockedNotice, { penalty: (penaltyRate.value * 100).toFixed(0) })
+    ? fmt(t.value.stakingV3.sheet.lockedNotice, { penalty: formatStakingPercentage(penaltyRate.value) })
     : "",
 );
 
@@ -298,7 +299,7 @@ async function submit() {
   }
   toast.success(
     t.value.stakingV3.toast.stakeSuccess,
-    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: apyRate.value * 100, n: term }),
+    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: formatStakingPercentage(apyRate.value), n: term }),
   );
   emitClose();
 }

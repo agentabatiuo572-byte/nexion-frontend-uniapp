@@ -2779,7 +2779,7 @@ export const en = {
       stakingGenesisLowCta: "Claim seat",
       stakingLockNow: "Lock your $NEX now to boost your emission priority when it lists.",
       stakingLockNowCta: "Lock 180d",
-      stakingMatures: "Your 90-day stake matures in 12 days · auto-claim or extend for 35% bonus APY.",
+      stakingMatures: "Your 90-day stake matures in 12 days · claim after maturity or extend for 35% bonus APY.",
       stakingMaturesCta: "Manage",
       marketPriceBreak: "📈 $NEX just broke ${price} · +{change}% in 24h · new ATH this week.",
       marketPriceBreakCta: "Buy NEX",
@@ -3892,7 +3892,7 @@ export const en = {
     noPositions: "No positions yet · Choose a plan above to start earning",
     apy: "APY",
     apyVariableNotice:
-      "APY is variable. Yields are denominated in USDT and credited to your wallet on unlock.",
+      "APY is variable. Yields are denominated in USDT and available to claim after maturity.",
     blurb: {
       30: "Short lock · safe entry",
       90: "Balanced · most chosen",
@@ -3942,7 +3942,7 @@ export const en = {
       returnedToWallet: "Returned to wallet",
       penaltyDeducted: "Penalty deducted",
       startedOn: "Started",
-      autoClaimToast: "Auto-claim on unlock",
+      autoClaimToast: "Claim after maturity",
       autoClaimSubtitle: "Unlocks in {n}d",
       statusLabel: "Status",
       remainingLabel: "Remaining",
@@ -3979,58 +3979,56 @@ export const en = {
   stakingHowItWorks: {
     navTitle: "How staking works",
     heroLabel: "STAKING VAULT",
-    heroTitle: "Lock USDT, earn interest. Like a fixed-term deposit, but on-chain.",
+    heroTitle: "Choose a USDT lock term and accrue interest under the plan rules.",
     heroSub:
       "Choose a lock period. Your money stays locked for that duration and earns a fixed annual rate. Unlock at maturity and claim principal + interest.",
     s1Title: "What is staking?",
     s1Para1:
-      "Staking means you agree to lock a chunk of your USDT for a set period (30, 90, 180, or 365 days). In exchange, the platform pays you a higher annual interest rate than free balance.",
+      "Staking locks an amount of your account's USDT for the selected term: 30, 90, 180, or 365 days. Current rates and minimum amounts are shown in the plan table.",
     s1Para2:
-      "The longer you lock, the higher the rate. Once locked, your funds sit in a vault and accumulate interest day by day. At the end of the term, your principal + earned interest both come back to your wallet.",
+      "Rates for each term follow the current plan. After a position opens successfully, interest follows its recorded rate and term. You can request principal and accrued interest at maturity.",
     s2Title: "4 plans · pick your term",
     s2Caption: "Each plan trades off lock duration for annual yield. Example: staking $100.",
     colTerm: "Term",
     colApy: "APY",
+    colMin: "Minimum",
     colReturn: "Interest earned",
     s2Footnote:
-      "Interest amounts shown assume you stake $100 and hold to maturity. Larger stakes scale proportionally.",
+      "$100 is used only to compare maturity interest on equal amounts and may be below a plan's minimum. An actual stake must meet that plan's minimum; interest is calculated on the amount staked.",
     s3Title: "How to stake (3 steps)",
     s3Intro:
-      "Whole flow takes 30 seconds. Funds are immediately locked once confirmed.",
+      "Review the term, amount and rules before submitting. Check your positions and wallet records for the result.",
     s3Step1Title: "Pick a plan and amount",
     s3Step1Body:
-      "Choose 30/90/180/365 days, then enter how much USDT to lock (minimum ${min}). The interface shows the exact interest you'll earn at maturity.",
+      "Choose 30/90/180/365 days, then enter how much USDT to lock. Each plan's minimum is shown above, and the interface shows the exact interest you'll earn at maturity.",
     s3Step2Title: "Lock in",
     s3Step2Body:
-      "Confirm. Your USDT moves from your free balance into the staking vault. The unlock date is fixed and visible on your position card.",
+      "After a position opens successfully, the corresponding USDT moves from available to locked funds. Its amount, rate and maturity date appear on the position card.",
     s3Step3Title: "Wait for maturity, then claim",
     s3Step3Body:
-      "Interest accrues day by day. Once the unlock date arrives, the position auto-matures — tap Claim, and principal + interest land back in your wallet instantly.",
+      "When a position is eligible, request a claim from its card. Check the position status and wallet records for the outcome and credited amount.",
     s4Title: "What you need to know about risk",
     s4Intro:
-      "Staking trades flexibility for higher yield. Three honest facts before you lock:",
+      "Locked funds have limited availability. Review these rules before submitting:",
     r1Label: "Funds are locked for the full term",
     r1Body:
       "Once you stake, the money cannot be used for anything else until the unlock date — no withdrawal, no spend, no transfer.",
     r2Label: "Early withdrawal forfeits accrued interest",
     r2Body:
-      "You can early-withdraw at any time, but the penalty is 5% (30d), 15% (90d), 30% (180d), or 50% (365d) of principal. All interest accrued so far is forfeited.",
+      "Early withdrawal deducts a share of principal according to the term. Current rates for new stakes: {penalties}. All accrued interest is forfeited; existing positions follow the rules recorded for that position.",
     r3Label: "APY is variable and can adjust",
     r3Body:
       "The rate shown when you lock is your guaranteed rate for the term. New stakes after a market change use the new rate, but existing positions are honored at the original rate.",
-    s4SafetyTitle: "Why it's safe to stake here",
-    s4SafetyBody:
-      "Funds are held in the platform's audited vault contract. Reserves are reported in the Trust Center, and the platform commits to redemption with 102.4% over-collateralization.",
     faqTitle: "Common questions",
     faqQ1: "What's the minimum stake amount?",
     faqA1:
-      "${min} USDT minimum per position. Below this, the interest amounts are too small to be meaningful after the lock period.",
+      "Minimum amounts differ by term. Check the minimum shown for each plan above before you lock.",
     faqQ2: "Can I stake from NEX balance instead of USDT?",
     faqA2:
       "No — staking is USDT-only. Convert NEX to USDT in Wallet → Exchange first, then stake.",
     faqQ3: "What happens at maturity if I don't claim?",
     faqA3:
-      "Nothing bad. The position sits in matured state and waits for you. Interest doesn't keep accruing past maturity — to keep earning, claim and stake again.",
+      "Interest stops accruing at maturity. Open your positions to request a claim, then check the displayed status and wallet records for the outcome. After claiming, you can open a new position under an available plan.",
     faqQ4: "Can I have multiple positions at once?",
     faqA4:
       "Yes — you can run as many independent positions as you want, each with its own term and amount. Common strategy: ladder several 90-day positions so something unlocks each month.",
@@ -5608,7 +5606,7 @@ export const en = {
 
     // Tier 1 quest copy
     tier1_nex_v2_lock_title: "Lock $1,000+ USDT into 365-day Staking",
-    tier1_nex_v2_lock_body: "Highest-yield commitment on the platform. 180% APY over 365 days; principal + interest auto-credited at maturity.",
+    tier1_nex_v2_lock_body: "Highest-yield commitment on the platform. 180% APY over 365 days; claim principal + interest after maturity.",
     tier1_nex_v2_lock_cta: "Go to Staking",
     tier1_buy_genesis_title: "Acquire a Genesis Node",
     tier1_buy_genesis_body: "Limited 1,000-issue founder NFT. Unlocks lifetime perks + secondary marketplace access.",

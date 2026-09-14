@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -89,7 +90,7 @@ const isClaimed = computed(() => props.p.status === "claimed");
 const isEarlyOut = computed(() => props.p.status === "early-withdrawn");
 
 const amountText = computed(() => props.p.amountUSDT.toLocaleString());
-const apyPct = computed(() => (props.p.apy * 100).toFixed(0));
+const apyPct = computed(() => formatStakingPercentage(props.p.apy));
 const daysIn = computed(() => Math.floor(elapsed.value / ONE_DAY_MS));
 const accruedText = computed(() => accrued.value.toFixed(2));
 const claimText = computed(() => fmt(t.value.stakingV3.position.claim, { amount: (props.p.amountUSDT + accrued.value).toFixed(2) }));

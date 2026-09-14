@@ -2683,7 +2683,7 @@ export const vi: Messages = {
       stakingGenesisLowCta: "Giành suất",
       stakingLockNow: "Khóa $NEX ngay để tăng ưu tiên phát hành khi lên sàn.",
       stakingLockNowCta: "Khóa 180 ngày",
-      stakingMatures: "Gói stake 90 ngày của bạn đáo hạn sau 12 ngày · tự động nhận hoặc gia hạn để thêm 35% APY.",
+      stakingMatures: "Gói stake 90 ngày của bạn đáo hạn sau 12 ngày · nhận sau khi đáo hạn hoặc gia hạn để thêm 35% APY.",
       stakingMaturesCta: "Quản lý",
       marketPriceBreak: "📈 $NEX vừa vượt ${price} · +{change}% trong 24h · đỉnh mới tuần này.",
       marketPriceBreakCta: "Mua NEX",
@@ -3757,7 +3757,7 @@ export const vi: Messages = {
     noPositions: "Chưa có vị thế nào · Chọn một gói phía trên để bắt đầu kiếm lãi",
     apy: "APY",
     apyVariableNotice:
-      "APY là biến động. Lợi nhuận tính bằng USDT và được cộng vào ví của bạn khi mở khóa.",
+      "APY là biến động. Lợi nhuận tính bằng USDT và có thể nhận sau khi đáo hạn.",
     blurb: {
       30: "Khóa ngắn · vào an toàn",
       90: "Cân bằng · được chọn nhiều nhất",
@@ -3808,7 +3808,7 @@ export const vi: Messages = {
       returnedToWallet: "Đã về ví",
       penaltyDeducted: "Đã trừ phí phạt",
       startedOn: "Bắt đầu",
-      autoClaimToast: "Tự động nhận khi mở khóa",
+      autoClaimToast: "Nhận sau khi đáo hạn",
       autoClaimSubtitle: "Mở khóa sau {n} ngày",
       statusLabel: "Trạng thái",
       remainingLabel: "Còn lại",
@@ -3845,58 +3845,56 @@ export const vi: Messages = {
   stakingHowItWorks: {
     navTitle: "Cách staking hoạt động",
     heroLabel: "KHO STAKING",
-    heroTitle: "Khóa USDT, nhận lãi. Giống gửi tiết kiệm có kỳ hạn, nhưng trên blockchain.",
+    heroTitle: "Chọn kỳ hạn khóa USDT và tính lãi theo quy tắc của gói.",
     heroSub:
       "Chọn một kỳ hạn khóa. Tiền của bạn được khóa trong suốt thời gian đó và sinh lãi theo lãi suất năm cố định. Mở khóa khi đáo hạn và nhận cả gốc + lãi.",
     s1Title: "Staking là gì?",
     s1Para1:
-      "Staking nghĩa là bạn đồng ý khóa một phần USDT của mình trong một khoảng thời gian nhất định (30, 90, 180 hoặc 365 ngày). Đổi lại, nền tảng trả cho bạn lãi suất năm cao hơn số dư tự do.",
+      "Staking khóa một khoản USDT trong tài khoản theo kỳ hạn đã chọn: 30, 90, 180 hoặc 365 ngày. Lãi suất và số tiền tối thiểu hiện tại được hiển thị trong bảng gói.",
     s1Para2:
-      "Khóa càng lâu, lãi suất càng cao. Khi đã khóa, tiền của bạn nằm trong kho và tích lũy lãi mỗi ngày. Kết thúc kỳ hạn, cả gốc + lãi đã kiếm được đều quay về ví của bạn.",
+      "Lãi suất từng kỳ hạn theo gói hiện tại. Sau khi mở vị thế thành công, lãi được tính theo lãi suất và kỳ hạn đã ghi nhận. Khi đáo hạn, bạn có thể yêu cầu nhận gốc và lãi tích lũy.",
     s2Title: "4 gói · chọn kỳ hạn của bạn",
     s2Caption: "Mỗi gói đánh đổi thời gian khóa lấy lợi suất năm. Ví dụ: khóa $100.",
     colTerm: "Kỳ hạn",
     colApy: "APY",
+    colMin: "Tối thiểu",
     colReturn: "Lãi nhận được",
     s2Footnote:
-      "Số lãi hiển thị giả định bạn khóa $100 và giữ đến đáo hạn. Số tiền lớn hơn tăng theo tỷ lệ.",
+      "$100 chỉ dùng để so sánh lãi đáo hạn trên cùng số tiền và có thể thấp hơn mức tối thiểu của một gói. Khoản khóa thực tế phải đáp ứng mức tối thiểu của gói; lãi được tính trên số tiền thực khóa.",
     s3Title: "Cách staking (3 bước)",
     s3Intro:
-      "Toàn bộ quá trình mất 30 giây. Tiền được khóa ngay khi bạn xác nhận.",
+      "Kiểm tra kỳ hạn, số tiền và quy tắc trước khi gửi. Xem vị thế và lịch sử ví để biết kết quả.",
     s3Step1Title: "Chọn gói và số tiền",
     s3Step1Body:
-      "Chọn 30/90/180/365 ngày, rồi nhập số USDT muốn khóa (tối thiểu ${min}). Giao diện hiển thị chính xác số lãi bạn nhận khi đáo hạn.",
+      "Chọn 30/90/180/365 ngày, rồi nhập số USDT muốn khóa. Mức tối thiểu của từng gói hiển thị ở trên, và giao diện cho biết chính xác số lãi khi đáo hạn.",
     s3Step2Title: "Khóa vốn",
     s3Step2Body:
-      "Xác nhận. USDT của bạn chuyển từ số dư tự do vào kho staking. Ngày mở khóa cố định và hiển thị trên thẻ vị thế của bạn.",
+      "Sau khi mở vị thế thành công, khoản USDT tương ứng chuyển từ số dư khả dụng sang tiền khóa. Thẻ vị thế hiển thị số tiền, lãi suất và ngày đáo hạn.",
     s3Step3Title: "Chờ đáo hạn, rồi nhận",
     s3Step3Body:
-      "Lãi tích lũy mỗi ngày. Đến ngày mở khóa, vị thế tự động đáo hạn — chạm Nhận, cả gốc + lãi về ví bạn ngay lập tức.",
+      "Khi đủ điều kiện, bạn có thể yêu cầu nhận tiền từ thẻ vị thế. Xem trạng thái vị thế và lịch sử ví để biết kết quả và số tiền đã ghi có.",
     s4Title: "Những điều bạn cần biết về rủi ro",
     s4Intro:
-      "Staking đánh đổi tính linh hoạt lấy lợi suất cao hơn. Ba điều thẳng thắn trước khi bạn khóa:",
+      "Tiền khóa bị hạn chế sử dụng. Hãy xem các quy tắc sau trước khi gửi:",
     r1Label: "Tiền bị khóa suốt kỳ hạn",
     r1Body:
       "Khi đã khóa, số tiền không thể dùng vào việc gì khác cho tới ngày mở khóa — không rút, không tiêu, không chuyển.",
     r2Label: "Rút sớm sẽ mất lãi đã tích lũy",
     r2Body:
-      "Bạn có thể rút sớm bất cứ lúc nào, nhưng mức phạt tiền gốc là 5% (30 ngày), 15% (90 ngày), 30% (180 ngày) hoặc 50% (365 ngày). Toàn bộ lãi tích lũy đến thời điểm đó đều bị mất.",
+      "Rút sớm sẽ bị khấu trừ một phần tiền gốc theo kỳ hạn. Tỷ lệ hiện tại cho khoản khóa mới: {penalties}. Toàn bộ lãi tích lũy bị mất; vị thế hiện có áp dụng quy tắc đã ghi nhận cho vị thế đó.",
     r3Label: "APY biến động và có thể điều chỉnh",
     r3Body:
       "Lãi suất hiển thị khi bạn khóa là mức được đảm bảo cho cả kỳ hạn. Các khoản khóa mới sau khi thị trường thay đổi sẽ dùng mức mới, nhưng các vị thế hiện có vẫn giữ nguyên mức ban đầu.",
-    s4SafetyTitle: "Vì sao staking ở đây an toàn",
-    s4SafetyBody:
-      "Tiền được giữ trong hợp đồng kho đã kiểm toán của nền tảng. Dự trữ được công bố tại Trung tâm Tin cậy, và nền tảng cam kết chi trả với mức bảo chứng vượt 102.4%.",
     faqTitle: "Câu hỏi thường gặp",
     faqQ1: "Số tiền khóa tối thiểu là bao nhiêu?",
     faqA1:
-      "Tối thiểu ${min} USDT mỗi vị thế. Dưới mức này, số lãi quá nhỏ nên không đáng kể sau kỳ khóa.",
+      "Mức tối thiểu khác nhau theo kỳ hạn. Hãy xem mức tối thiểu hiển thị cho từng gói ở trên trước khi khóa.",
     faqQ2: "Tôi có thể khóa bằng số dư NEX thay vì USDT không?",
     faqA2:
       "Không — staking chỉ dùng USDT. Trước tiên đổi NEX sang USDT ở Ví → Quy đổi, rồi mới khóa.",
     faqQ3: "Nếu đáo hạn mà tôi không nhận thì sao?",
     faqA3:
-      "Không vấn đề gì. Vị thế ở trạng thái đã đáo hạn và chờ bạn. Lãi không tiếp tục tích lũy sau khi đáo hạn — nếu muốn tiếp tục sinh lời, hãy nhận rồi khóa lại.",
+      "Lãi ngừng tích lũy khi đáo hạn. Mở danh sách vị thế để yêu cầu nhận tiền, rồi kiểm tra trạng thái hiển thị và lịch sử ví để biết kết quả. Sau khi nhận, bạn có thể mở vị thế mới theo gói đang khả dụng.",
     faqQ4: "Tôi có thể có nhiều vị thế cùng lúc không?",
     faqA4:
       "Được — bạn có thể mở bao nhiêu vị thế độc lập tùy thích, mỗi cái có kỳ hạn và số tiền riêng. Chiến lược phổ biến: chia thành nhiều vị thế 90 ngày lệch nhau để tháng nào cũng có một khoản mở khóa.",
@@ -5464,7 +5462,7 @@ export const vi: Messages = {
 
     // Tier 1 quest copy
     tier1_nex_v2_lock_title: "Khóa $1,000+ USDT vào Staking 365 ngày",
-    tier1_nex_v2_lock_body: "Cam kết lợi nhuận cao nhất nền tảng. 180% APY trong 365 ngày; gốc + lãi tự động ghi có khi đáo hạn.",
+    tier1_nex_v2_lock_body: "Cam kết lợi nhuận cao nhất nền tảng. 180% APY trong 365 ngày; nhận cả gốc + lãi sau khi đáo hạn.",
     tier1_nex_v2_lock_cta: "Đến Staking",
     tier1_buy_genesis_title: "Sở hữu một Genesis Node",
     tier1_buy_genesis_body: "NFT nhà sáng lập giới hạn 1,000 bản. Mở khóa đặc quyền trọn đời + quyền vào sàn thứ cấp.",

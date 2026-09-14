@@ -124,6 +124,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -258,7 +259,7 @@ const avgAPY = computed(() => {
 const totalLockedText = computed(() => totalLocked.value.toFixed(2));
 const todayAccruedText = computed(() => todayAccrued.value.toFixed(2));
 const totalAccruedText = computed(() => totalAccrued.value.toFixed(2));
-const avgApyText = computed(() => (totalLocked.value > 0 ? `${(avgAPY.value * 100).toFixed(1)}%` : "—"));
+const avgApyText = computed(() => (totalLocked.value > 0 ? `${formatStakingPercentage(avgAPY.value)}%` : "—"));
 
 function openSheet(term: StakingTerm) {
   if (!canOpenPool(term)) return;
@@ -318,7 +319,7 @@ async function handleEarlyWithdraw(p: StakingPosition) {
   const ok = await uiConfirm({
     title: t.value.stakingV3.toast.earlyConfirmTitle,
     message: fmt(t.value.stakingV3.toast.earlyConfirmMessage, {
-      penaltyPct: (penaltyRate * 100).toFixed(0),
+      penaltyPct: formatStakingPercentage(penaltyRate),
       penalty,
       refund,
     }),
