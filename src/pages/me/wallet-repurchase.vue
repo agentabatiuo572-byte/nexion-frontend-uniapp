@@ -43,11 +43,10 @@
           <text class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
         </view>
 
-        <view v-else-if="isRemote && !remoteReady" :style="unavailableStyle">
-          <text class="block" :style="unavailableTitleStyle">{{ unavailableTitle }}</text>
-          <text class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
-          <view v-if="repurchase.loading" class="block" :style="unavailableBodyStyle"><text>{{ loadingLabel }}</text></view>
-          <view v-else class="nx-repurchase-submit-cta w-full flex items-center justify-center" :style="retryCtaStyle" role="button" tabindex="0" @click="refreshRemote">
+        <view v-else-if="isRemote && !remoteReady" :style="unavailableStyle" role="status" :aria-busy="repurchase.loading">
+          <text class="block" :style="unavailableTitleStyle">{{ repurchase.loading ? loadingLabel : unavailableTitle }}</text>
+          <text v-if="!repurchase.loading" class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
+          <view v-if="!repurchase.loading" class="nx-repurchase-submit-cta w-full flex items-center justify-center" :style="retryCtaStyle" role="button" tabindex="0" @click="refreshRemote">
             <text>{{ retryLabel }}</text>
           </view>
         </view>
@@ -167,7 +166,8 @@ watch(() => repurchase.pendingOpenAmount, (pending) => {
 }, { immediate: true });
 const presets = computed(() => (isRemote.value ? (repurchase.config?.presets ?? []) : PRESETS));
 const displayBalance = computed(() => (isRemote.value ? repurchase.walletBalanceUsdt : user.value.usdtBalance));
-const remoteReady = computed(() => isRemote.value && repurchase.config !== null && !repurchase.error);
+const remoteReady = computed(() => isRemote.value && repurchase.config !== null
+  && !repurchase.loading && repurchase.serverTime > 0 && !repurchase.error);
 
 const projectedYield = computed<number | null>(() => {
   if (!isRemote.value) return amount.value * 0.35 * (90 / 365);
@@ -178,7 +178,7 @@ const canSubmit = computed(() => {
   if (isRemote.value) {
     const config = repurchase.config;
     return Boolean(
-      (config?.enabled || recovering.value)
+      remoteReady.value && (config?.enabled || recovering.value)
       && !confirming.value
       && !repurchase.submitting
       && Number.isFinite(amount.value)
