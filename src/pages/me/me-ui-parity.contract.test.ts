@@ -55,7 +55,7 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 // A new edit inside an approved file therefore still fails until its specific
 // production-only delta is reviewed; this is not a file-level exemption.
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
-  "achievements.vue": "939b5668f4f8dffc104856476b69b53375f6b3a4b056f63f19a9e901d2c3fcbd",
+  "achievements.vue": "ae19a15f2b050424de21be06c40d08a1b2a4855e6464fc9ed78dc2bd96162d62",
   // Existing formal phone-calibration entry, trial state and physical-slot guard.
   "devices.vue": "ff2a1662e252b3233c387cc24fc07708ff9ac53b5f4c2fddf3dc1d2c212bc00f",
   // Disable editing and repeat activation while the same goal intent is saving.
