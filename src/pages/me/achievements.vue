@@ -35,13 +35,13 @@
         <view v-if="remoteLoading && !remoteSnapshot" class="mx-4" :style="listStyle">
           <text class="block" style="padding: 18px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
         </view>
-        <view v-else-if="remoteError && !remoteSnapshot" class="mx-4" :style="listStyle">
+        <view v-else-if="remoteError" class="mx-4" :style="listStyle">
           <text class="block" style="padding: 18px 18px 6px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
           <view class="active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" :aria-label="w.retry" @click="refreshRemote">
             <text>{{ w.retry }}</text>
           </view>
         </view>
-        <template v-else>
+        <template v-if="remoteSnapshot">
           <view v-for="grp in remoteGroups" :key="grp.key" class="mx-4">
             <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
             <view :style="listStyle">
@@ -128,8 +128,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { dailyMilestoneRewardText } from "@/pages/daily/daily-reward-view";
@@ -140,8 +140,12 @@ import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
-import { pointsApi, remoteApiEnabled } from "@/api/runtime";
+import { pointsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import type { BadgeAchievementStatus, DailySnapshot, DailyMilestoneStatus, EarningMilestoneStatus } from "@/api/points-api";
+import {
+  readAchievementsForCurrentSession,
+  type AchievementRemoteReadFailure,
+} from "./achievements-remote-read";
 
 const t = useT();
 const w = computed(() => t.value.achievements);
@@ -150,17 +154,29 @@ const ach = useAchievements();
 const remoteSnapshot = ref<DailySnapshot | null>(null);
 const remoteLoading = ref(false);
 const remoteError = ref(false);
+// Safe diagnostic class only: never expose a server response/body or token in UI/logs.
+const remoteFailure = ref<AchievementRemoteReadFailure | null>(null);
 const remoteBusy = ref("");
 let accountGeneration = 0;
 let readGeneration = 0;
-watch(() => app.accountKey, () => {
+let pageVisible = true;
+let disposed = false;
+function invalidateRemote() {
   accountGeneration += 1;
   readGeneration += 1;
-  remoteSnapshot.value = null;
   remoteLoading.value = false;
+  remoteError.value = false;
+  remoteFailure.value = null;
   remoteBusy.value = "";
-  if (remoteApiEnabled) void refreshRemote();
-});
+}
+function isCurrentRemote(account: number): boolean {
+  return !disposed && pageVisible && account === accountGeneration;
+}
+watch(() => [app.accountKey, app.accountBindingEpoch], () => {
+  invalidateRemote();
+  remoteSnapshot.value = null;
+  if (remoteApiEnabled && pageVisible && !disposed) void refreshRemote();
+}, { flush: "sync" });
 
 type RemoteStatus = DailyMilestoneStatus | EarningMilestoneStatus | BadgeAchievementStatus;
 interface RemoteMilestoneRow {
@@ -205,26 +221,44 @@ function evaluate() {
   if (earningsTotal > 0) ach.unlock("first_contribution");
 }
 async function refreshRemote() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || !pageVisible || disposed) return;
   const account = accountGeneration;
   const request = ++readGeneration;
+  const isCurrent = () => isCurrentRemote(account) && request === readGeneration;
   remoteLoading.value = true;
   remoteError.value = false;
-  try {
-    const snapshot = await pointsApi.state();
-    if (account === accountGeneration && request === readGeneration) remoteSnapshot.value = snapshot;
-  } catch {
-    if (account !== accountGeneration || request !== readGeneration) return;
+  remoteFailure.value = null;
+  const result = await readAchievementsForCurrentSession({
+    accountKey: () => app.accountKey,
+    session: () => sessionVault.read(),
+    isCurrent,
+    read: () => pointsApi.state(),
+  });
+  if (!isCurrent() || result.kind === "stale") return;
+  if (result.kind === "success") {
+    remoteSnapshot.value = result.snapshot;
+  } else {
+    remoteFailure.value = result.failure;
     remoteError.value = true;
     if (remoteSnapshot.value) toast.warn(w.value.remoteUnavailable);
-  } finally {
-    if (account === accountGeneration && request === readGeneration) remoteLoading.value = false;
   }
+  remoteLoading.value = false;
 }
 
 onShow(() => {
+  if (disposed) return;
+  pageVisible = true;
   if (remoteApiEnabled) void refreshRemote();
   else evaluate();
+});
+onHide(() => {
+  pageVisible = false;
+  invalidateRemote();
+});
+onUnmounted(() => {
+  disposed = true;
+  pageVisible = false;
+  invalidateRemote();
 });
 
 const remoteGroups = computed(() => {
@@ -290,13 +324,13 @@ const percent = computed<number | null>(() => total.value === null || unlocked.v
 const percentLabel = computed(() => percent.value === null ? "—" : `${percent.value}%`);
 
 async function claimRemote(row: RemoteMilestoneRow) {
-  if (!remoteApiEnabled || row.status !== "CLAIMABLE" || remoteBusy.value) return;
+  if (!remoteApiEnabled || !pageVisible || disposed || row.status !== "CLAIMABLE" || remoteBusy.value) return;
   remoteBusy.value = row.key;
   const account = accountGeneration;
   try {
     if (row.kind === "daily") {
       const receipt = await pointsApi.claimMilestone(Number(row.id), `h5-achievement-daily:${row.id}`);
-      if (account !== accountGeneration) return;
+      if (!isCurrentRemote(account)) return;
       if (remoteSnapshot.value) remoteSnapshot.value = {
         ...remoteSnapshot.value,
         dailyMilestones: remoteSnapshot.value.dailyMilestones.map((item) => item.milestoneId === receipt.milestoneId
@@ -304,7 +338,7 @@ async function claimRemote(row: RemoteMilestoneRow) {
       };
     } else {
       const receipt = await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`, String(row.id));
-      if (account !== accountGeneration) return;
+      if (!isCurrentRemote(account)) return;
       if (remoteSnapshot.value) remoteSnapshot.value = {
         ...remoteSnapshot.value,
         earningMilestones: remoteSnapshot.value.earningMilestones.map((item) => receipt.fired.some((fired) => fired.milestoneId === item.milestoneId)
@@ -315,9 +349,9 @@ async function claimRemote(row: RemoteMilestoneRow) {
     toast.success(w.value.claimToast);
     await refreshRemote();
   } catch {
-    if (account === accountGeneration) toast.error(w.value.remoteUnavailable);
+    if (isCurrentRemote(account)) toast.error(w.value.remoteUnavailable);
   } finally {
-    if (account === accountGeneration) remoteBusy.value = "";
+    if (isCurrentRemote(account)) remoteBusy.value = "";
   }
 }
 
