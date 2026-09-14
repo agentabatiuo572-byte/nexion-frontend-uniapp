@@ -1380,6 +1380,7 @@ export const vi: Messages = {
     pageTitle: "Thị trường",
     nexHero: {
       yourToken: "Token nền tảng của bạn",
+      loading: "Đang tải dữ liệu thị trường…",
       buy: "Mua NEX",
       sell: "Bán NEX",
       chartTitle: "Giá",

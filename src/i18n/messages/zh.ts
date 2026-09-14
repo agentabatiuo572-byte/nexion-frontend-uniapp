@@ -1360,6 +1360,7 @@ export const zh: Messages = {
     pageTitle: "行情",
     nexHero: {
       yourToken: "你的平台代币",
+      loading: "正在读取市场数据…",
       buy: "买入 NEX",
       sell: "卖出 NEX",
       chartTitle: "价格走势",

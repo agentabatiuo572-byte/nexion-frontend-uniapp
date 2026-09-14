@@ -1424,6 +1424,7 @@ export const en = {
     pageTitle: "Markets",
     nexHero: {
       yourToken: "Your platform token",
+      loading: "Loading market data…",
       buy: "Buy NEX",
       sell: "Sell NEX",
       chartTitle: "Price",
