@@ -139,6 +139,7 @@ export const useNetwork = defineStore("network", () => {
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   let accountEpoch = 0;
   let refreshSequence = 0;
+  let inFlight: { epoch: number; runtime: ReturnType<typeof captureRuntimeRevision>; promise: Promise<boolean> } | null = null;
 
   function clearRemoteNetwork(): void {
     refreshSequence += 1;
@@ -156,7 +157,22 @@ export const useNetwork = defineStore("network", () => {
   });
   onScopeDispose(unsubscribeCommerceRun);
 
-  async function refreshCanonicalNetwork(): Promise<boolean> {
+  function ensureCanonicalNetwork(): Promise<boolean> {
+    return inFlight && inFlight.epoch === accountEpoch && isCurrentRuntimeRevision(inFlight.runtime)
+      ? inFlight.promise : refreshCanonicalNetwork();
+  }
+
+  function refreshCanonicalNetwork(): Promise<boolean> {
+    const epoch = accountEpoch;
+    const runtime = captureRuntimeRevision();
+    const promise = readCanonicalNetwork();
+    inFlight = { epoch, runtime, promise };
+    const clear = () => { if (inFlight?.promise === promise) inFlight = null; };
+    void promise.then(clear, clear);
+    return promise;
+  }
+
+  async function readCanonicalNetwork(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const epoch = accountEpoch;
     const request = ++refreshSequence;
@@ -267,6 +283,6 @@ export const useNetwork = defineStore("network", () => {
   return {
     members, totalMembers, totalMonthVolumeUSD, totalAllTimeVolumeUSD,
     byLayer, byBinary, leftVolumeMonth, rightVolumeMonth,
-    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, refreshCanonicalNetwork, bindAccount,
+    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, refreshCanonicalNetwork, ensureCanonicalNetwork, bindAccount,
   };
 });

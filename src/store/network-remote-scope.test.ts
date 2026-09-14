@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, disposePinia, getActivePinia, setActivePinia } from "pinia";
 import { advanceRuntimeRevision } from "@/api/order-api";
 import { ApiError } from "@/api/errors";
 
@@ -26,8 +26,61 @@ beforeEach(() => {
   remote.teamNetworkApi.snapshot.mockReset();
   advanceRuntimeRevision("TEAM-RUN-20260816");
 });
+afterEach(() => { const pinia = getActivePinia(); if (pinia) disposePinia(pinia); });
 
 describe("team network remote scope", () => {
+  it.each(["account", "runtime", "explicit refresh"])("keeps the replacement flight when an old %s read settles", async (replacement) => {
+    let resolveOld!: (value: ReturnType<typeof snapshot>) => void;
+    let resolveNew!: (value: ReturnType<typeof snapshot>) => void;
+    remote.teamNetworkApi.snapshot
+      .mockReturnValueOnce(new Promise(done => { resolveOld = done; }))
+      .mockReturnValueOnce(new Promise(done => { resolveNew = done; }));
+    const store = useNetwork();
+    const oldRead = store.ensureCanonicalNetwork();
+    if (replacement === "account") store.bindAccount("new-account");
+    else if (replacement === "runtime") advanceRuntimeRevision("TEAM-RUN-20260818");
+    else void store.refreshCanonicalNetwork();
+    const currentRead = store.ensureCanonicalNetwork();
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(2);
+    resolveOld(snapshot("stale-member"));
+    await expect(oldRead).resolves.toBe(false);
+    expect(store.members).toEqual([]);
+    const joinedAgain = store.ensureCanonicalNetwork();
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(2);
+    resolveNew(snapshot("current-member"));
+    await expect(currentRead).resolves.toBe(true);
+    await expect(joinedAgain).resolves.toBe(true);
+    expect(store.members[0]?.id).toBe("current-member");
+    expect(store.remoteStatus).toBe("ready");
+  });
+
+  it("retries after a joined failure without treating the old flight as current", async () => {
+    remote.teamNetworkApi.snapshot.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValueOnce(snapshot("recovered"));
+    const store = useNetwork();
+    const first = store.ensureCanonicalNetwork(), joined = store.ensureCanonicalNetwork();
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(1);
+    await expect(first).resolves.toBe(false);
+    await expect(joined).resolves.toBe(false);
+    expect(store.remoteStatus).toBe("error");
+    await expect(store.ensureCanonicalNetwork()).resolves.toBe(true);
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(2);
+    expect(store.members[0]?.id).toBe("recovered");
+  });
+
+  it("joins the current bind read and starts fresh after it completes", async () => {
+    let resolve!: (value: ReturnType<typeof snapshot>) => void;
+    remote.teamNetworkApi.snapshot.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const store = useNetwork();
+    store.bindAccount("a");
+    const joined = store.ensureCanonicalNetwork();
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(1);
+    resolve(snapshot("a"));
+    await expect(joined).resolves.toBe(true);
+    remote.teamNetworkApi.snapshot.mockResolvedValueOnce(snapshot("a-new"));
+    await store.ensureCanonicalNetwork();
+    expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(2);
+    expect(store.members[0]?.id).toBe("a-new");
+  });
   it("drops a response captured before the sandbox run changes", async () => {
     let resolve!: (value: ReturnType<typeof snapshot>) => void;
     remote.teamNetworkApi.snapshot
