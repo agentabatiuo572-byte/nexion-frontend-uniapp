@@ -228,7 +228,7 @@ test("remote globe and search refresh when account or canonical catalog changes"
     read("src/pages/globe/globe.vue"),
     read("src/pages/search/search.vue"),
   ]);
-  assert.match(globe, /watch\(\(\) => String\(app\.accountKey\)/);
+  assert.match(globe, /watch\(\(\) => \[String\(app\.accountKey\), app\.accountBindingEpoch\]/);
   assert.match(globe, /networkProjection\.value = null/);
   assert.match(globe, /void loadRegions\(\)/);
   assert.match(search, /productCatalogState/);
