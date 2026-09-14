@@ -6045,6 +6045,8 @@ export const en = {
     courseVersionMeta: "Version {version} · {nex} NEX reward",
     courseOffline: "Courses load over a trusted network; please go back to the learning center and retry.",
     courseUnavailable: "This course is unavailable right now; please retry.",
+    courseStartConfirming: "Course content is loaded and its start record is being confirmed. Answers and rewards are unavailable for now.",
+    courseStartUnconfirmed: "Course content is loaded, but its start record is not confirmed. Tap here to reload before submitting or claiming a reward.",
     submitQuiz: "Submit quiz",
     answerAllFirst: "Answer every question before submitting.",
     completeCourse: "Complete course",

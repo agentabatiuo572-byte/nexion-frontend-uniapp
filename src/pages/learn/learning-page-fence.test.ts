@@ -8,6 +8,7 @@ describe("learning page async fence", () => {
   it("drops late responses after account, run, generation, or mount changes", () => {
     let account = "user-a";
     let epoch = 1;
+    let route = "course-a";
     let generation = 1;
     let mounted = true;
     advanceRuntimeRevision("run-20260816");
@@ -17,9 +18,13 @@ describe("learning page async fence", () => {
       () => captureRuntimeRevision(),
       () => generation,
       () => mounted,
+      () => route,
     );
     const scope = reader.capture();
     expect(reader.isCurrent(scope)).toBe(true);
+    route = "course-b";
+    expect(reader.isCurrent(scope)).toBe(false);
+    route = "course-a";
     account = "user-b";
     expect(reader.isCurrent(scope)).toBe(false);
     account = "user-a";

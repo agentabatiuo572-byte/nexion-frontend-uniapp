@@ -11,10 +11,12 @@
         <text class="block" style="font-size: 20px; font-weight: 600">{{ course.title }}</text>
         <text class="block" style="margin-top: 10px; color: var(--v5-ink-2); text-wrap: pretty">{{ course.body }}</text>
         <text class="block" style="margin-top: 8px; color: var(--v5-ink-3)">{{ versionLine }}</text>
+        <text v-if="startState === 'pending'" class="block" style="margin-top: 8px; color: var(--v5-ink-3); text-wrap: pretty" role="status" aria-live="polite">{{ t.learning.courseStartConfirming }}</text>
+        <text v-else-if="startState === 'unconfirmed'" class="block active:opacity-70" style="margin-top: 8px; color: var(--v5-ink-3); text-wrap: pretty" role="alert" aria-live="assertive" tabindex="0" :aria-label="t.learning.courseStartUnconfirmed" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.learning.courseStartUnconfirmed }}</text>
 
         <view v-for="(question, index) in course.questions" :key="question.questionId" style="margin-top: 16px">
           <text>{{ question.question }}</text>
-          <view v-for="(option, optionIndex) in question.options" :key="option" :class="pendingAttempt ? '' : 'active:opacity-70'" style="margin-top: 8px" role="button" :tabindex="pendingAttempt ? -1 : 0" :aria-label="option" :aria-pressed="answers[index] === optionIndex" :aria-disabled="!!pendingAttempt" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))">
+          <view v-for="(option, optionIndex) in question.options" :key="option" :class="interactionLocked ? '' : 'active:opacity-70'" style="margin-top: 8px" role="button" :tabindex="interactionLocked ? -1 : 0" :aria-label="option" :aria-pressed="answers[index] === optionIndex" :aria-disabled="interactionLocked" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))">
             <text>{{ answers[index] === optionIndex ? "●" : "○" }} {{ option }}</text>
           </view>
         </view>
@@ -41,7 +43,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import {
@@ -60,11 +62,14 @@ import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
+import { createLearningCourseStartLoadCoalescer, loadPublishedCourseWithStart } from "./learning-course-start";
 import { learningAttemptRecoveryAction, learningResultDetails, matchingCourseResult, matchingReceiptResult, validAnswersForCourse } from "./learning-result-details";
 
 // 存 key 不存译文：译好的串快照进 ref 后不再跟随语言（见 courses.vue 同处注释）。
 type CourseError = "" | "courseOffline" | "courseUnavailable" | "courseUpdated" | "submitUnconfirmed";
+type CourseStartState = "idle" | "pending" | "confirmed" | "unconfirmed";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -75,6 +80,7 @@ const result = ref<LearningResult | null>(null);
 const answers = ref<number[]>([]);
 const pendingAttempt = ref<LearningPendingAttempt | null>(null);
 const pendingReceiptStatus = ref<LearningQuizReceiptStatus | null>(null);
+const startState = ref<CourseStartState>("idle");
 const loading = ref(true);
 const error = ref<CourseError>("");
 
@@ -87,9 +93,12 @@ const serverCompleted = computed(() => !!course.value?.completed || !!result.val
 const pendingAnswersValid = computed(() => !!course.value
   && !!pendingAttempt.value
   && validAnswersForCourse(course.value, pendingAttempt.value.answers));
+const startConfirmed = computed(() => startState.value === "confirmed");
+const interactionLocked = computed(() => !startConfirmed.value || !!pendingAttempt.value);
 // 失败结果允许重新作答；已通过的服务端结果才禁止重复提交。
 const canSubmit = computed(() => !!course.value
   && !loading.value
+  && startConfirmed.value
   && !serverCompleted.value
   && (!course.value.questions.length || (pendingAttempt.value
     ? pendingAnswersValid.value && ["ABSENT", "FAILED"].includes(String(pendingReceiptStatus.value))
@@ -123,6 +132,7 @@ const fenceReader = createLearningPageFenceReader(
   captureRuntimeRevision,
   () => generation,
   () => mounted,
+  () => courseId.value,
 );
 
 function fence(): LearningPageFence { return fenceReader.capture(); }
@@ -134,7 +144,7 @@ function attemptIdentity(expectedCourse: LearningCourse): LearningAttemptIdentit
   return { accountKey, courseId: expectedCourse.id, version: expectedCourse.version };
 }
 function selectAnswer(questionIndex: number, optionIndex: number) {
-  if (loading.value || pendingAttempt.value) return;
+  if (loading.value || interactionLocked.value) return;
   answers.value[questionIndex] = optionIndex;
 }
 function isCourseVersionConflict(cause: unknown): boolean {
@@ -180,7 +190,8 @@ async function recoverPendingReceipt(scope: LearningPageFence, expectedCourse: L
   }
 }
 
-async function load() {
+async function performLoad() {
+  generation += 1;
   const scope = fence();
   const requestedCourseId = courseId.value;
   loading.value = true;
@@ -189,6 +200,7 @@ async function load() {
   result.value = null;
   pendingAttempt.value = null;
   pendingReceiptStatus.value = null;
+  startState.value = "idle";
   if (!remoteApiEnabled || !requestedCourseId) {
     if (!current(scope)) return;
     loading.value = false;
@@ -196,19 +208,37 @@ async function load() {
     return;
   }
   try {
-    const loaded = await learningApi.course(requestedCourseId, language.value);
-    if (!current(scope)) return;
-    const started = await learningApi.start(loaded.id, language.value, loaded.version);
-    if (!current(scope)) return;
-    course.value = started;
-    answers.value = Array(started.questions.length).fill(-1);
-    await recoverPendingReceipt(scope, started);
+    const loaded = await loadPublishedCourseWithStart({
+      courseId: requestedCourseId,
+      language: language.value,
+      read: learningApi.course,
+      start: learningApi.start,
+      isCurrent: () => current(scope),
+      publish: (published, start) => {
+        if (!current(scope)) return;
+        course.value = published;
+        answers.value = Array(published.questions.length).fill(-1);
+        startState.value = start;
+        loading.value = false;
+      },
+    });
+    if (loaded.kind === "stale" || !current(scope)) return;
+    if (loaded.kind === "invalid") {
+      error.value = "courseUnavailable";
+      return;
+    }
+    startState.value = loaded.start;
+    if (startConfirmed.value) await recoverPendingReceipt(scope, loaded.course);
   } catch {
     if (current(scope)) error.value = "courseUnavailable";
   } finally {
     if (current(scope)) loading.value = false;
   }
 }
+
+let startLoad = createLearningCourseStartLoadCoalescer(performLoad);
+function load(): Promise<void> { return startLoad(); }
+function resetLoadCoalescer() { startLoad = createLearningCourseStartLoadCoalescer(performLoad); }
 
 // 回读服务端课程快照。completed、lastScore、attempts、rewardGranted 都是当前
 // API 契约中的权威字段；不再把刷新后的结果降级成笼统的“已完成”。
@@ -235,7 +265,7 @@ function acceptResult(
 }
 
 async function finish() {
-  if (!course.value || loading.value || !canSubmit.value) return;
+  if (!course.value || loading.value || !startConfirmed.value || !canSubmit.value) return;
   const scope = fence();
   const submittedCourse = course.value;
   let submittedAnswers = [...answers.value];
@@ -314,18 +344,45 @@ async function finish() {
   }
 }
 
-onLoad((options) => { courseId.value = typeof options?.id === "string" ? options.id : ""; });
-onMounted(() => { mounted = true; void load(); });
-onUnmounted(() => { mounted = false; generation += 1; });
-watch(() => String(app.accountKey), () => {
-  accountEpoch += 1;
-  generation += 1;
+function resetCourseState() {
   course.value = null;
   result.value = null;
   answers.value = [];
   pendingAttempt.value = null;
   pendingReceiptStatus.value = null;
+  startState.value = "idle";
   error.value = "";
+}
+function refreshForScopeChange() {
+  accountEpoch += 1;
+  generation += 1;
+  resetLoadCoalescer();
+  resetCourseState();
+  if (mounted) void load();
+}
+onLoad((options) => {
+  const nextCourseId = typeof options?.id === "string" ? options.id : "";
+  if (courseId.value === nextCourseId) return;
+  courseId.value = nextCourseId;
+  generation += 1;
+  resetLoadCoalescer();
+  resetCourseState();
   if (mounted) void load();
 });
+const courseVisibility = createPageVisibilityRefresh(() => { void load(); });
+bindPageVisibilityRefresh(courseVisibility, {
+  mounted: (callback) => onMounted(() => { mounted = true; callback(); }),
+  shown: (callback) => onShow(() => { mounted = true; callback(); }),
+  hidden: (callback) => onHide(() => {
+    mounted = false;
+    generation += 1;
+    resetLoadCoalescer();
+    resetCourseState();
+    callback();
+  }),
+});
+onUnmounted(() => { mounted = false; generation += 1; resetLoadCoalescer(); });
+watch(() => String(app.accountKey), refreshForScopeChange);
+watch(() => app.accountBindingEpoch, refreshForScopeChange);
+watch(() => language.value, refreshForScopeChange);
 </script>
