@@ -2807,10 +2807,10 @@ export const zh: Messages = {
     preferenceSyncFailed: "语言已在本机切换，但尚未同步到账户。请重试。",
     preferenceSyncRetry: "重试同步",
     pageTitle: "语言",
-    intro: "选择你偏好的语言。翻译按优先级分批上线 —— 每种语言都可预览布局与 RTL 效果。",
+    intro: "选择此应用的界面语言。",
     autoDetect: "自动识别即将推出",
     backToAccount: "返回个人中心",
-    countLine: "{n} 种语言",
+    countLine: "现可用 {n} 种界面语言",
   },
   ui: {
     confirm: "确认",

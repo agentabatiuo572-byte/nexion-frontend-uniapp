@@ -2898,11 +2898,10 @@ export const en = {
     preferenceSyncFailed: "Language changed on this device but has not synced to your account. Please retry.",
     preferenceSyncRetry: "Retry sync",
     pageTitle: "Language",
-    intro:
-      "Choose your preferred language. Translation coverage rolls out per priority tier — layout & RTL preview available for every option.",
+    intro: "Choose the interface language for this app.",
     autoDetect: "auto-detect coming soon",
     backToAccount: "Back to Account",
-    countLine: "{n} languages",
+    countLine: "Available in {n} interface languages",
   },
   ui: {
     confirm: "Confirm",
