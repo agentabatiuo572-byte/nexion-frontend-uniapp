@@ -117,7 +117,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
   // Confirmed operations retain the form while a separate history-sync notice offers GET-only retry.
   // Formal G7 now exposes historical orders, claim/early actions and server-configured copy.
-  "wallet-repurchase.vue": "6e3844e14cd7dd5505034f9452cf47cf427fb156aa7dc7076216fd0193fe7269",
+  "wallet-repurchase.vue": "d20879fd3550c32bff34861b3fb196a205edeee4fd94cf1a330916ee43000e39",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
