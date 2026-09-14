@@ -218,6 +218,7 @@ import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
 import type { NetworkRegionProjection } from "@/api/network-regions-api";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const app = useApp();
@@ -242,6 +243,9 @@ const selected = ref<GlobeRegion | null>(null);
 const networkProjection = ref<NetworkRegionProjection | null>(null);
 const projectionStatus = ref<"loading" | "ready" | "empty" | "error">(remoteApiEnabled ? "loading" : "ready");
 let projectionRequest = 0;
+let projectionFlight: { scope: string; promise: Promise<void> } | null = null;
+let disposed = false;
+let pageActive = true;
 const pulseTick = ref(0);
 let pulseTimer = 0;
 
@@ -330,20 +334,34 @@ function regionJobsText(r: GlobeRegion): string {
   return fmt(t.value.globe.regionJobs, { n: r.jobsPerHour.toLocaleString() });
 }
 
-async function loadRegions() {
-  if (!remoteApiEnabled) return;
+function projectionScope(): string {
+  return `${String(app.accountKey)}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`;
+}
+
+function loadRegions(): Promise<void> {
+  if (!remoteApiEnabled || disposed || !pageActive) return Promise.resolve();
+  const scope = projectionScope();
+  if (projectionFlight?.scope === scope) return projectionFlight.promise;
   const request = ++projectionRequest;
-  const accountKey = String(app.accountKey);
   projectionStatus.value = "loading";
-  try {
-    const next = await networkRegionsApi.list();
-    if (request !== projectionRequest || accountKey !== String(app.accountKey)) return;
-    networkProjection.value = next;
-    projectionStatus.value = next.regions.length > 0 ? "ready" : "empty";
-  } catch {
-    if (request !== projectionRequest || accountKey !== String(app.accountKey)) return;
-    projectionStatus.value = "error";
-  }
+  const promise = (async () => {
+    try {
+      const next = await networkRegionsApi.list();
+      if (request !== projectionRequest || scope !== projectionScope()) return;
+      networkProjection.value = next;
+      projectionStatus.value = next.regions.length > 0 ? "ready" : "empty";
+    } catch {
+      if (request !== projectionRequest || scope !== projectionScope()) return;
+      projectionStatus.value = "error";
+    }
+  })();
+  const flight = { scope, promise };
+  projectionFlight = flight;
+  const clear = () => {
+    if (projectionFlight === flight) projectionFlight = null;
+  };
+  void promise.then(clear, clear);
+  return promise;
 }
 
 let releaseActiveRefresh = () => {};
@@ -358,19 +376,33 @@ onMounted(() => {
   }, 1800) as unknown as number;
 });
 onShow(() => {
+  if (disposed) return;
+  pageActive = true;
   activatePageRefresh();
   void loadRegions();
 });
-onHide(() => releaseActiveRefresh());
-watch(() => String(app.accountKey), () => {
+onHide(() => {
+  pageActive = false;
+  projectionRequest += 1;
+  projectionFlight = null;
+  selected.value = null;
+  releaseActiveRefresh();
+});
+function resetProjection() {
+  if (disposed) return;
   projectionRequest += 1;
   selected.value = null;
   networkProjection.value = null;
   projectionStatus.value = remoteApiEnabled ? "loading" : "ready";
   void loadRegions();
-});
+}
+watch(() => [String(app.accountKey), app.accountBindingEpoch] as const, resetProjection);
+const unsubscribeRuntime = subscribeRuntimeRevision(resetProjection);
 onUnmounted(() => {
+  disposed = true;
   projectionRequest += 1;
+  projectionFlight = null;
+  unsubscribeRuntime();
   releaseActiveRefresh();
   if (pulseTimer) clearInterval(pulseTimer);
 });
