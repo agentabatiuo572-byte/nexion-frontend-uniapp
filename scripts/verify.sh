@@ -913,9 +913,22 @@ else
   ok "staking disclosure includes canonical high-tier penalties"
 fi
 sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of principal'
-sentinel_present "staking how-it-works EN maps all four penalties" src/i18n/messages/en.ts '5% \(30d\).*15% \(90d\).*30% \(180d\).*50% \(365d\)'
 sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '5% / 15% / 30% / 50% 本金'
-sentinel_present "staking how-it-works ZH maps all four penalties" src/i18n/messages/zh.ts '30 天扣 5%.*90 天扣 15%.*180 天扣 30%.*365 天扣 50%'
+# The explanation renders current pool penalties. Fixed default strings cannot
+# prove that operator changes (including fractional rates) reach all locales.
+staking_display_log="${VERIFY_LOG_PREFIX}-staking-display.log"
+if npx vitest run src/lib/staking-percentage.test.ts src/pages/staking/staking-risk-copy.test.ts src/pages/staking/how-it-works.contract.test.ts > "$staking_display_log" 2>&1; then
+  staking_display_count=$(sed 's/\x1b\[[0-9;]*m//g' "$staking_display_log" | grep -Eo 'Tests[[:space:]]+[0-9]+ passed' | tail -1 | awk '{print $2}')
+  if [ "${staking_display_count:-0}" -ge 18 ]; then
+    ok "staking dynamic display: three locales, nondefault penalties and percentage precision — $staking_display_count tests"
+  else
+    bad "staking dynamic display test sample missing (expected at least 18)"
+    tail -15 "$staking_display_log"
+  fi
+else
+  bad "staking dynamic display behavior failed"
+  tail -20 "$staking_display_log"
+fi
 if grep -qE 'simulation engine|simulated\. Real deployments|DEMO CONNECTION|Simulate linking|Simulate connection|模拟引擎|模拟生成|演示连接|模拟连接' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "user-facing copy exposes mock/simulation internals"
 else

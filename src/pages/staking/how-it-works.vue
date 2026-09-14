@@ -29,11 +29,13 @@
           <view class="flex" :style="tableHeadStyle">
             <text class="text-left" :style="thCellLeft">{{ w.colTerm }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colApy }}</text>
+            <text class="text-right" :style="thCellRight">{{ w.colMin }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colReturn }}</text>
           </view>
           <view v-for="(row, i) in visibleRows" :key="row.term" class="flex" :style="tableRowStyle(i === 0)">
             <text class="text-left tabular-nums" :style="tdTermStyle">{{ row.term }}d</text>
             <text class="text-right tabular-nums" :style="tdApyStyle">{{ row.apyPct }}</text>
+            <text class="text-right tabular-nums" :style="tdMinStyle">{{ row.minText }}</text>
             <text class="text-right tabular-nums" :style="tdReturnStyle">{{ row.ret }}</text>
           </view>
         </view>
@@ -50,7 +52,7 @@
         </template>
         <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
         <view style="display: flex; flex-direction: column; gap: 14px">
-          <HowStepRow :n="1" :title="w.s3Step1Title" :body="fmt(w.s3Step1Body, { min: minAmountText })" accent="amber" />
+          <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" accent="amber" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" accent="amber" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" accent="amber" />
         </view>
@@ -66,7 +68,6 @@
           <IconRow emoji="⚠️" :label="w.r2Label" :body="fmt(w.r2Body, { penalties: penaltiesText })" />
           <IconRow emoji="📉" :label="w.r3Label" :body="w.r3Body" />
         </view>
-        <CalloutBox :title="`✓ ${w.s4SafetyTitle}`" :body="w.s4SafetyBody" tone="lemon" />
       </HowSection>
 
       <HowSection :title="w.faqTitle" accent="purple">
@@ -74,7 +75,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z" /><path d="M2 9v1c0 1.1.9 2 2 2h1" /><path d="M16 11h.01" /></svg>
         </template>
         <view style="display: flex; flex-direction: column; gap: 10px">
-          <HowFaqRow :q="w.faqQ1" :a="fmt(w.faqA1, { min: minAmountText })" />
+          <HowFaqRow :q="w.faqQ1" :a="w.faqA1" />
           <HowFaqRow :q="w.faqQ2" :a="w.faqA2" />
           <HowFaqRow :q="w.faqQ3" :a="w.faqA3" />
           <HowFaqRow :q="w.faqQ4" :a="w.faqA4" />
@@ -102,7 +103,7 @@ import HowSection from "@/components/how/how-section.vue";
 import HowStepRow from "@/components/how/how-step-row.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import IconRow from "@/components/how/how-icon-row.vue";
-import CalloutBox from "@/components/how/how-callout-box.vue";
+import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
@@ -112,6 +113,7 @@ const t = useT();
 const w = computed(() => t.value.stakingHowItWorks);
 const staking = useStaking();
 const retrying = ref(false);
+const STAKING_RULE_EXAMPLE_PRINCIPAL = 100;
 onMounted(() => {
   if (!staking.isMockMode) void staking.syncRemote();
 });
@@ -122,7 +124,7 @@ async function retryRemote() {
 }
 
 // APY table — derived from canonical pools, with the local table available only
-// in mock mode; $100 demo stake held to maturity.
+// in mock mode; the displayed $100 example is held to maturity.
 const tableRows = computed(() =>
   ([30, 90, 180, 365] as StakingTerm[]).map((termDays) => {
     const pool = resolveStakingPool(
@@ -134,21 +136,14 @@ const tableRows = computed(() =>
     const apy = pool.apy;
     return {
       term: termDays,
-      apyPct: `${(apy * 100).toFixed(0)}%`,
-      ret: `$${(1000 * apy * (termDays / 365)).toFixed(2)}`,
+      apyPct: `${formatStakingPercentage(apy)}%`,
+      minText: `$${pool.minAmountUsdt.toFixed(2).replace(/\.00$/, "")}`,
+      ret: `$${(STAKING_RULE_EXAMPLE_PRINCIPAL * apy * (termDays / 365)).toFixed(2)}`,
     };
   }),
 );
 const configAvailable = computed(() => tableRows.value.every((row) => row !== null));
 const visibleRows = computed(() => tableRows.value.filter((row): row is NonNullable<typeof row> => row !== null));
-const minAmountText = computed(() => {
-  const pool = resolveStakingPool(
-    { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
-    30,
-    { apy: STAKING_APY[30], penalty: STAKING_PENALTY[30], minAmountUsdt: STAKING_MIN[30] },
-  );
-  return pool?.minAmountUsdt.toFixed(2).replace(/\.00$/, "") ?? "—";
-});
 const penaltiesText = computed(() => {
   const values = ([30, 90, 180, 365] as StakingTerm[]).map((termDays) => {
     const pool = resolveStakingPool(
@@ -156,7 +151,7 @@ const penaltiesText = computed(() => {
       termDays,
       { apy: STAKING_APY[termDays], penalty: STAKING_PENALTY[termDays], minAmountUsdt: STAKING_MIN[termDays] },
     );
-    return pool ? `${(pool.penalty * 100).toFixed(0)}% (${termDays}d)` : null;
+    return pool ? `${formatStakingPercentage(pool.penalty)}% (${termDays}d)` : null;
   });
   return values.every(Boolean) ? values.join(", ") : "—";
 });
@@ -196,6 +191,7 @@ const tdTermStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
 const tdApyStyle: CSSProperties = { flex: "1", padding: "8px 12px", fontFamily: "var(--font-v5)", color: "var(--v5-brand)" };
+const tdMinStyle: CSSProperties = { flex: "1", padding: "8px 12px", fontFamily: "var(--font-v5)", color: "var(--v5-ink-2)" };
 const tdReturnStyle: CSSProperties = {
   flex: "1",
   padding: "8px 12px",

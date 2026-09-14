@@ -18,7 +18,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
           <text>{{ w.label }}</text>
         </text>
-        <text class="tabular-nums" :style="apyChipStyle">{{ apy * 100 }}% · {{ term }}d</text>
+        <text class="tabular-nums" :style="apyChipStyle">{{ formatStakingPercentage(apy) }}% · {{ term }}d</text>
       </view>
 
       <!-- Input row -->
@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { ref, computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
