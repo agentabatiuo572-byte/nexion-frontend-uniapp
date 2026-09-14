@@ -5528,6 +5528,7 @@ export const zh: Messages = {
   },
 
   notifs: {
+    moreToCheck: "较早的通知尚未读完，请继续加载查看。",
     minutesAgo: "{n} 分钟前",
     hoursAgo: "{n} 小时前",
     daysAgo: "{n} 天前",

@@ -49,6 +49,7 @@ function formalEmptyResponse(url) {
       todayUserUsedUsdt: 0, todayPlatformUsedUsdt: 0, lifetimeExchangedUsdt: 0,
       orders: [], ordersPage: { total: 0, pageNum: 1, pageSize: 20 } };
   }
+  if (url.pathname === "/api/notifications") return { items: [], nextCursor: null, unread: 0 };
   // Voucher emptiness requires a successful canonical catalog, not an empty
   // object that the production parser correctly treats as an unavailable read.
   if (url.pathname === "/api/vouchers") return {

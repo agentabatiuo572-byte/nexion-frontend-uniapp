@@ -69,7 +69,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "help.vue": "bfb23c862c905608072b5f6f5da68122d8364afa5faa463164333b21cf79d9e4",
   "language.vue": "13447b1d8aa9e01afb78d7f65d5f9cb4dcc89e947c843eb172d79b34a40ea2fb",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
-  "notifications.vue": "a5364e90ea9b5111df247207a486ac094a1839fecccb7f63b6e11f95df4706b5",
+  "notifications.vue": "7731130ef5eda24778d0c4604afa45d5a0df0ff89dde3ac26a7e51f6a06bd81e",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
   "profile.vue": "08bbb8611dfef4d895ea64766fb067e59cdba9fc8487089da91785bbbf0e696a",
