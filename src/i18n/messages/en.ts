@@ -492,7 +492,7 @@ export const en = {
     rankReward: "+{n} NEX",
     rankTopTier: "You've reached the top tier.",
     poolTitle: "Leadership pool",
-    poolThisWeek: "this week's pool · 5% of platform volume",
+    poolThisWeek: "this week's pool · {rate}% of platform volume",
     poolShare: "{n}% share",
     poolV3Unlock: "V3+ to unlock",
     // DoTheMathCard (ZONE 5)
@@ -4440,6 +4440,8 @@ export const en = {
   },
 
   unilevel: {
+    canonicalPolicy: "{days}-day cooling period · promotional multiplier ×{multiplier}",
+    periods: { today: "Today", week: "This week", month: "This month", all: "All time" },
     pausedLayersTitle: "Some royalty layers are paused",
     pausedLayersDesc: "Settlement and new accrual are paused for {layers}. Amounts already recorded remain unchanged.",
     serverRewardHold: "The server returns team volume only; authoritative reward settlement is not available yet",
@@ -4575,15 +4577,16 @@ export const en = {
   },
 
   binary: {
+    memberDetailsUnavailable: "Member details are unavailable. The current Balance Match status still comes from the server.",
     pageTitle: "Balance Match",
     settlePeriodLabel: { daily: "daily", weekly: "weekly", monthly: "monthly" },
     periodEstimateLabel: { daily: "Today's", weekly: "This week's", monthly: "This month's" },
     periodUnitLabel: { daily: "day", weekly: "week", monthly: "month" },
     estimate: "{period} Balance Match estimate",
-    formula: "min(Track A, Track B) × 10% · daily cap ${cap} · {freq} settlement",
+    formula: "min(Track A, Track B) × {rate}% · daily cap ${cap} · {freq} settlement",
     blocked: "Balance Match paused",
     blockedDetail:
-      "Track {side} is at ${vol} this month, below the $1,000 threshold — match earnings pause and resume once you're back over.",
+      "Track {side} is at ${vol} this month, below the $1,000 threshold. Settlement is not currently eligible; check the server status after the threshold is met.",
     blockReasons: {
       F3_BINARY_PAUSED: "Balance Match settlement is paused by operations.",
       BINARY_REFUND_REVERSAL_REQUIRED: "A refund reversal must finish before settlement can resume.",
@@ -4594,8 +4597,8 @@ export const en = {
       F3_SETTLEMENT_NOT_DUE: "The configured settlement date has not arrived yet.",
       UNKNOWN: "Settlement conditions are not currently met. Try again later.",
     },
-    blockedAction: "Grow the smaller track to lift this month's payout.",
-    inviteCta: "Invite to balance the smaller track",
+    blockedAction: "You can review invite options; the server will determine whether settlement becomes eligible.",
+    inviteCta: "Review invite options",
     leftWing: "Track A",
     rightWing: "Track B",
     weakBadge: "SMALLER",
@@ -4604,7 +4607,7 @@ export const en = {
     strong: "Larger",
     weak: "Smaller",
     gapHint:
-      "Balance Match is calculated on the smaller track. Grow the smaller track to lift your {freq} payout.",
+      "Balance Match is calculated on the smaller track. Members are placed by the placement rules; server status determines settlement eligibility.",
     spilloverTitle: "Auto-placement: {n} members across both tracks",
     spilloverHint: "Members may be placed in either track according to placement rules.",
     recentMatches: "Recent matches",

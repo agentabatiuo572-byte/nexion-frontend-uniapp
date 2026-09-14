@@ -434,7 +434,7 @@ export const zh: Messages = {
     rankReward: "+{n} NEX",
     rankTopTier: "已达最高等级。",
     poolTitle: "领导奖池",
-    poolThisWeek: "本周奖池 · 平台交易额的 5%",
+    poolThisWeek: "本周奖池 · 平台交易额的 {rate}%",
     poolShare: "占比 {n}%",
     poolV3Unlock: "V3+ 解锁",
     // DoTheMathCard (ZONE 5)
@@ -4304,6 +4304,8 @@ export const zh: Messages = {
   },
 
   unilevel: {
+    canonicalPolicy: "冷静期 {days} 天 · 活动倍率 ×{multiplier}",
+    periods: { today: "今日", week: "本周", month: "本月", all: "全部时间" },
     pausedLayersTitle: "部分版税层级已暂停",
     pausedLayersDesc: "{layers} 暂停结算与新增计提，已记录的金额不受影响。",
     serverRewardHold: "服务器仅返回团队业绩；权威奖励结算尚未提供，金额暂不展示",
@@ -4434,14 +4436,15 @@ export const zh: Messages = {
   },
 
   binary: {
+    memberDetailsUnavailable: "成员明细暂时无法读取；当前双轨结算状态仍以服务端结果为准。",
     pageTitle: "平衡匹配",
     settlePeriodLabel: { daily: "每日", weekly: "每周", monthly: "每月" },
     periodEstimateLabel: { daily: "今日", weekly: "本周", monthly: "本月" },
     periodUnitLabel: { daily: "日", weekly: "周", monthly: "月" },
     estimate: "{period}平衡匹配奖估算",
-    formula: "min(A 轨, B 轨) × 10% · 日上限 ${cap} · {freq}结算",
+    formula: "min(A 轨, B 轨) × {rate}% · 日上限 ${cap} · {freq}结算",
     blocked: "平衡匹配暂停",
-    blockedDetail: "{side} 轨道本月业绩 ${vol},未达 $1,000;本月匹配奖金暂停,达标后自动恢复。",
+    blockedDetail: "{side} 轨道本月业绩 ${vol},未达 $1,000；当前不满足结算条件，达标后请查看服务端状态。",
     blockReasons: {
       F3_BINARY_PAUSED: "后台已暂停平衡匹配结算。",
       BINARY_REFUND_REVERSAL_REQUIRED: "存在待处理退款冲正，完成冲正后恢复结算。",
@@ -4452,8 +4455,8 @@ export const zh: Messages = {
       F3_SETTLEMENT_NOT_DUE: "当前尚未到后台配置的结算日。",
       UNKNOWN: "当前结算条件未满足，请稍后重试。",
     },
-    blockedAction: "邀请较小一轨补齐业绩,本月奖励即可恢复。",
-    inviteCta: "去邀请较小一轨",
+    blockedAction: "可查看邀请选项；是否恢复结算以服务端后续资格判定为准。",
+    inviteCta: "查看邀请选项",
     leftWing: "A 轨道",
     rightWing: "B 轨道",
     weakBadge: "较小",
@@ -4461,7 +4464,7 @@ export const zh: Messages = {
     strongWeakGap: "轨道差距(较大 vs 较小)",
     strong: "较大",
     weak: "较小",
-    gapHint: "平衡匹配按较小一轨计算。继续邀请较小一轨提升{freq}发放。",
+    gapHint: "平衡匹配按较小一轨计算。成员按安置规则分配，是否结算以服务端状态为准。",
     spilloverTitle: "自动安置：双轨共 {n} 位成员",
     spilloverHint: "成员按安置规则分配，可能进入 A 轨或 B 轨。",
     recentMatches: "最近匹配",

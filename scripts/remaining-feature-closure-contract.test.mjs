@@ -171,7 +171,9 @@ test("remote unilevel page renders only the server cycle/source/layer/split proj
   assert.match(page, /filter\.value === "all" \|\| \(filter\.value === "direct" \? event\.layer === 1 : event\.layer > 1\)/);
   assert.match(page, /v-for="\(event, i\) in remoteFilteredEvents"/);
   assert.match(page, /v-if="remoteFilteredEvents\.length === 0"/);
-  assert.match(page, /remoteState === 'error'/);
+  assert.match(page, /remoteState\.value === "error"/);
+  assert.match(page, /v-if="remoteApiEnabled && unilevelLoadError"/);
+  assert.match(page, /const unilevelLoadError = computed\(\(\) => network\.remoteStatus === "error"[\s\S]*remoteState\.value === "error" \|\| commission\.configStatus === "error"/);
   assert.match(page, /const runScope = captureRuntimeRevision\(\)/);
   assert.match(page, /accountKey === app\.accountKey[\s\S]*isCurrentAccountScope\(accountScope\)[\s\S]*isCurrentRuntimeRevision\(runScope\)/);
   assert.doesNotMatch(page, /remoteApiEnabled[\s\S]{0,220}Math\.log10/);

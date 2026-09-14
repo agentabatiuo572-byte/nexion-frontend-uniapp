@@ -18,13 +18,12 @@
       <SubPageHeader back="/pages/team/team" :title="t.unilevel.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
-        <view v-if="remoteApiEnabled && (network.remoteStatus === 'error' || remoteState === 'error' || commission.configStatus === 'error')" :style="errorStateStyle">
+        <view v-if="remoteApiEnabled && unilevelLoadError" :style="errorStateStyle">
           <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
           <view role="button" tabindex="0" :style="retryStyle" @click="retryRemote"><text>{{ t.network.retry }}</text></view>
         </view>
-        <view v-if="remoteApiEnabled && commission.configStatus !== 'ready' && remoteState !== 'error' && commission.configStatus !== 'error'" class="text-center" style="padding: 24px 20px">
-          <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
+        <view v-else-if="remoteApiEnabled && unilevelLoading" class="rounded-2xl" style="height: 112px; background: color-mix(in srgb, var(--v5-surface-2) 65%, transparent)" role="status" aria-live="polite" aria-busy="true">
         </view>
         <view v-if="remoteApiEnabled && commission.configStatus === 'ready' && pausedLayers.length" :style="pausedLayersStyle">
           <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-warning)">{{ t.unilevel.pausedLayersTitle }}</text>
@@ -49,10 +48,6 @@
           </view>
         </view>
 
-        <view v-if="remoteApiEnabled && commission.configStatus === 'ready' && remoteState !== 'ready' && remoteState !== 'error'" class="text-center" style="padding: 24px 20px">
-          <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-        </view>
-
         <view v-if="remoteApiEnabled && remoteState === 'ready' && commission.configStatus === 'ready'" :style="remoteBreakdownStyle">
           <view class="flex items-start" style="gap: 12px">
             <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
@@ -70,7 +65,7 @@
             </view>
             <text class="font-display tabular-nums" :style="remoteAmountStyle">${{ remoteExtended.amountUSDT.toFixed(2) }}</text>
           </view>
-          <text class="block font-mono-tabular" :style="remoteSplitNoteStyle">+{{ remoteTotalNEX.toLocaleString() }} NEX · {{ remoteSnapshot?.period }} · {{ canonicalPolicyText }}</text>
+          <text class="block font-mono-tabular" :style="remoteSplitNoteStyle">+{{ remoteTotalNEX.toLocaleString() }} NEX · {{ canonicalPeriodText }} · {{ canonicalPolicyText }}</text>
         </view>
 
         <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
@@ -152,17 +147,17 @@
           <view class="inline-flex" style="gap: 6px">
             <view class="nx-unilevel-filter-all shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'all')" @click="filter = 'all'">
               <text :style="pillTextStyle(filter === 'all')">{{ t.unilevel.filterAll }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'all')">· {{ directMembers.length + extendedMembers.length }}</text>
+              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'all')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length + extendedMembers.length : '—' }}</text>
             </view>
             <view class="nx-unilevel-filter-direct shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'direct')" @click="filter = 'direct'">
               <view v-if="filter !== 'direct'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-brand)' }" />
               <text :style="pillTextStyle(filter === 'direct')">{{ t.unilevel.filterDirect }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'direct')">· {{ directMembers.length }}</text>
+              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'direct')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length : '—' }}</text>
             </view>
             <view class="nx-unilevel-filter-extended shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'extended')" @click="filter = 'extended'">
               <view v-if="filter !== 'extended'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-tech-cyan)' }" />
               <text :style="pillTextStyle(filter === 'extended')">{{ t.unilevel.filterExtended }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'extended')">· {{ extendedMembers.length }}</text>
+              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'extended')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? extendedMembers.length : '—' }}</text>
             </view>
           </view>
         </scroll-view>
@@ -228,8 +223,8 @@
             </view>
           </template>
         </view>
-        <view v-else :style="memberGroupStyle">
-          <EmptyState kind="empty-list" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" />
+        <view v-else-if="remoteApiEnabled && unilevelLoading" :style="memberGroupStyle" role="status" aria-live="polite" aria-busy="true">
+          <view class="rounded-2xl" style="height: 96px; background: color-mix(in srgb, var(--v5-surface-2) 65%, transparent)" />
         </view>
       </view>
     </view>
@@ -246,12 +241,15 @@ import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
-import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import { remoteApiEnabled, teamInsightsApi, sessionVault } from "@/api/runtime";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
+import { createScopedReadCoalescer } from "@/lib/binary-read-coalescer";
 import type { TeamUnilevelSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { navTo } from "@/lib/route";
 
 type RateTierId = "standard" | "verified" | "elite" | "diamond";
@@ -283,6 +281,15 @@ type PlottedMember = NetworkMember & { kind: "direct" | "extended" };
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
+const readCoalescer = createScopedReadCoalescer();
+const remoteSessionReady = computed(() => accountSessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 const network = useNetwork();
 const commission = useCommission();
 const remoteSnapshot = ref<TeamUnilevelSnapshot | null>(null);
@@ -290,16 +297,23 @@ const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loadi
 const remoteLoadMoreStatus = ref<"idle" | "loading" | "error">("idle");
 let remoteRequest = 0;
 let mounted = true;
-onMounted(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void network.refreshCanonicalNetwork(); void loadRemote(); } });
-onShow(() => { if (remoteApiEnabled) { void commission.refreshCanonicalConfig(); void network.refreshCanonicalNetwork(); void loadRemote(); } });
-watch(() => app.accountKey, () => {
+onMounted(retryRemote);
+onShow(retryRemote);
+const unsubscribeRuntimeRevision = subscribeRuntimeRevision(() => {
+  retryRemote();
+});
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (!remoteApiEnabled) return;
   remoteSnapshot.value = null;
-  void commission.refreshCanonicalConfig();
-  void loadRemote();
+  remoteState.value = "loading";
+  remoteLoadMoreStatus.value = "idle";
+  retryRemote();
 });
+watch(remoteSessionReady, (ready, wasReady) => {
+  if (ready && !wasReady) retryRemote();
+}, { immediate: true, flush: "post" });
 async function loadRemote() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || !remoteSessionReady.value || !mounted) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
@@ -311,29 +325,32 @@ async function loadRemote() {
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   try {
     const snapshot = await teamInsightsApi.unilevel("month", 1, 20);
-    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
+    if (!current()) return;
     remoteSnapshot.value = snapshot;
     remoteState.value = "ready";
   } catch {
-    if (!current()) { if (request === remoteRequest) { remoteSnapshot.value = null; remoteState.value = "error"; } return; }
+    if (!current()) return;
     remoteSnapshot.value = null;
     remoteState.value = "error";
   }
 }
 async function loadMoreRemote() {
   const currentSnapshot = remoteSnapshot.value;
-  if (!remoteApiEnabled || remoteState.value !== "ready" || !currentSnapshot
+  if (!remoteApiEnabled || !remoteSessionReady.value || !mounted || remoteState.value !== "ready" || !currentSnapshot
       || remoteLoadMoreStatus.value === "loading"
       || currentSnapshot.events.length >= currentSnapshot.totalRows) return;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const nextPage = currentSnapshot.page + 1;
+  const request = remoteRequest;
+  const current = () => mounted && request === remoteRequest && remoteSnapshot.value === currentSnapshot
+    && accountKey === app.accountKey && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   remoteLoadMoreStatus.value = "loading";
   try {
     const next = await teamInsightsApi.unilevel("month", nextPage, currentSnapshot.pageSize, currentSnapshot.snapshotAt);
-    if (!mounted || accountKey !== app.accountKey || !isCurrentAccountScope(accountScope)
-        || !isCurrentRuntimeRevision(runScope) || next.page !== nextPage) return;
+    if (!current()) return;
+    if (next.page !== nextPage) throw new Error("UNILEVEL_PAGE_MISMATCH");
     const seen = new Set(currentSnapshot.events.map((event) => event.id));
     remoteSnapshot.value = {
       ...next,
@@ -341,8 +358,7 @@ async function loadMoreRemote() {
     };
     remoteLoadMoreStatus.value = "idle";
   } catch {
-    if (mounted && accountKey === app.accountKey && isCurrentAccountScope(accountScope)
-        && isCurrentRuntimeRevision(runScope)) remoteLoadMoreStatus.value = "error";
+    if (current()) remoteLoadMoreStatus.value = "error";
   }
 }
 function activateRemoteLoadMore(event: KeyboardEvent) {
@@ -350,11 +366,23 @@ function activateRemoteLoadMore(event: KeyboardEvent) {
   event.preventDefault();
   void loadMoreRemote();
 }
-onUnmounted(() => { mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
-function retryRemote() { void Promise.all([commission.refreshCanonicalConfig(), network.refreshCanonicalNetwork(), loadRemote()]); }
+onUnmounted(() => { unsubscribeRuntimeRevision(); mounted = false; remoteRequest += 1; remoteSnapshot.value = null; });
+function retryRemote() {
+  if (!remoteApiEnabled || !remoteSessionReady.value || !mounted) return;
+  void readCoalescer.run({
+    accountKey: app.accountKey,
+    accountBindingEpoch: app.accountBindingEpoch,
+    runtime: captureRuntimeRevision(),
+  }, () => Promise.all([commission.ensureCanonicalConfig(), network.ensureCanonicalNetwork(), loadRemote()]).then(() => undefined));
+}
 const filter = ref<FilterId>("all");
 const remoteFilteredEvents = computed(() => (remoteSnapshot.value?.events ?? []).filter((event) =>
   filter.value === "all" || (filter.value === "direct" ? event.layer === 1 : event.layer > 1),
+));
+const unilevelLoadError = computed(() => network.remoteStatus === "error"
+  || remoteState.value === "error" || commission.configStatus === "error");
+const unilevelLoading = computed(() => !unilevelLoadError.value && (
+  network.remoteStatus !== "ready" || remoteState.value !== "ready" || commission.configStatus !== "ready"
 ));
 
 const byLayer = computed(() => network.byLayer());
@@ -399,8 +427,10 @@ const remoteExtended = computed(() => remoteSnapshot.value?.split.extended ?? { 
 const remoteTotalUSDT = computed(() => remoteDirect.value.amountUSDT + remoteExtended.value.amountUSDT);
 const remoteTotalNEX = computed(() => remoteDirect.value.amountNEX + remoteExtended.value.amountNEX);
 const canonicalPolicyText = computed(() => commission.config
-  ? `${commission.config.coolingDays}d cooling · ×${commission.config.promoMultiplier} promo`
+  ? fmt(t.value.unilevel.canonicalPolicy, { days: commission.config.coolingDays, multiplier: commission.config.promoMultiplier })
   : "");
+const canonicalPeriodText = computed(() => remoteSnapshot.value
+  ? t.value.unilevel.periods[remoteSnapshot.value.period] : "");
 const pausedLayers = computed(() => commission.config
   ? ([1, 2, 3, 4, 5, 6, 7] as const).filter((layer) => commission.config?.unilevelPaused[layer])
   : []);
