@@ -2787,10 +2787,10 @@ export const vi: Messages = {
     preferenceSyncFailed: "Ngôn ngữ đã đổi trên thiết bị nhưng chưa đồng bộ với tài khoản. Vui lòng thử lại.",
     preferenceSyncRetry: "Đồng bộ lại",
     pageTitle: "Ngôn ngữ",
-    intro: "Chọn ngôn ngữ bạn thích. Bản dịch được triển khai theo mức ưu tiên — mọi lựa chọn đều xem trước được bố cục & RTL.",
+    intro: "Chọn ngôn ngữ giao diện cho ứng dụng này.",
     autoDetect: "tự động nhận diện sắp ra mắt",
     backToAccount: "Về Tài khoản",
-    countLine: "{n} ngôn ngữ",
+    countLine: "Có {n} ngôn ngữ giao diện",
   },
   ui: {
     confirm: "Xác nhận",

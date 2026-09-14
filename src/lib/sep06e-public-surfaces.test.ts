@@ -11,7 +11,8 @@ describe("public config and localized surfaces", () => {
   it("refreshes PC platform config on foreground", () => {
     expect(sources["../App.vue"].slice(sources["../App.vue"].indexOf("onShow(() =>"))).toContain("useConfig().load()");
   });
-  it("resolves group headings from the current locale", () => {
-    expect(sources["../pages/me/language.vue"]).toContain("computed(() => t.value.language.priorityLabels)");
+  it("lists the shipped interface languages without rollout labels", () => {
+    expect(sources["../pages/me/language.vue"]).toContain("v-for=\"(l, i) in LOCALES\"");
+    expect(sources["../pages/me/language.vue"]).not.toContain("priorityLabels");
   });
 });
