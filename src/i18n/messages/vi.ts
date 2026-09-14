@@ -588,6 +588,8 @@ export const vi: Messages = {
     liveFeedEmpty: "Chưa có hoạt động nhiệm vụ.",
   },
   earn: {
+    deviceLoading: "Đang tải thiết bị…",
+    taskAwaitingExecutionResultConfirmation: "Đã hết thời gian dự kiến · đang chờ xác nhận kết quả thực thi",
     title: "Sinh lời",
     subtitle: "Thiết bị, thu nhập, nhiệm vụ của bạn — trực tiếp.",
     myDevices: "Thiết bị của tôi",
@@ -3604,6 +3606,7 @@ export const vi: Messages = {
     downloadErrorToast: "Không thể tạo hoặc lưu PNG. Vui lòng thử lại.",
   },
   taskHistory: {
+    viewAllAccountReceipts: "Xem biên nhận của tài khoản",
     loading: "Đang tải lịch sử tác vụ…",
     tabHistory: "Lịch sử",
     viewAll: "Xem tất cả",

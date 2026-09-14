@@ -632,6 +632,8 @@ export const en = {
     liveFeedEmpty: "No task activity available.",
   },
   earn: {
+    deviceLoading: "Loading device…",
+    taskAwaitingExecutionResultConfirmation: "Estimated time elapsed · awaiting execution result confirmation",
     title: "Earn",
     subtitle: "Your devices, your earnings, your tasks — live.",
     myDevices: "My Devices",
@@ -3732,6 +3734,7 @@ export const en = {
     downloadErrorToast: "PNG generation or save failed. Please try again.",
   },
   taskHistory: {
+    viewAllAccountReceipts: "View account receipts",
     loading: "Loading task history…",
     tabHistory: "History",
     viewAll: "View all",

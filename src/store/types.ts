@@ -52,6 +52,10 @@ export interface CurrentTask {
   totalSec: number;
   startedAt: number;   // epoch ms
   reward: number;      // USDT
+  /** Server status is present only for the remote authority projection. */
+  status?: "CLAIMED" | "RUNNING" | "COMPLETED";
+  /** Server-issued estimated completion time; it never certifies settlement. */
+  completableAt?: number | null;
 }
 
 export interface CompletedTask extends CurrentTask {

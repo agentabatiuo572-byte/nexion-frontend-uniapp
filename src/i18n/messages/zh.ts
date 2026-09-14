@@ -573,6 +573,8 @@ export const zh: Messages = {
     liveFeedEmpty: "暂无任务动态。",
   },
   earn: {
+    deviceLoading: "正在读取设备…",
+    taskAwaitingExecutionResultConfirmation: "预计时长已到，等待执行结果确认",
     title: "赚取",
     subtitle: "你的设备、收益、任务,实时展示。",
     myDevices: "我的设备",
@@ -3619,6 +3621,7 @@ export const zh: Messages = {
     downloadErrorToast: "PNG 生成或保存失败，请重试",
   },
   taskHistory: {
+    viewAllAccountReceipts: "查看全账户收据",
     loading: "正在读取任务历史…",
     tabHistory: "历史",
     viewAll: "查看全部",

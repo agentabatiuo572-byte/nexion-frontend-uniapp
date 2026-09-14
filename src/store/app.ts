@@ -404,6 +404,10 @@ export const useApp = defineStore("app", () => {
   const remoteWalletReceiptHasSnapshot = ref(false);
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
+  // This belongs to the bound account generation only. It lets read-only Earn
+  // history remain visible while a subsequent assignment poll is in flight;
+  // it is deliberately reset before a different account can render anything.
+  const remoteAssignmentHasSnapshot = ref(!remoteApiEnabled);
   let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments } | null = null;
   let remoteTaskSyncInFlight = false;
   let remoteTaskSyncAfter = 0;
@@ -674,6 +678,8 @@ export const useApp = defineStore("app", () => {
       totalSec: task.requiredSeconds,
       startedAt: task.startedAt,
       reward: task.rewardUsdt,
+      status: task.status,
+      completableAt: task.completableAt,
     };
   }
 
@@ -739,6 +745,7 @@ export const useApp = defineStore("app", () => {
       // before applying remote task assignments, reject any response from a prior account bind.
       if (!remoteAccountEpoch.isCurrent(request)) return;
       devices.value = applyRemoteAssignments(devices.value, state);
+      remoteAssignmentHasSnapshot.value = true;
       remoteAssignmentStatus.value = "ready";
       remoteAssignmentError.value = "";
       // Dev and production clients are equally read-only. Task creation, completion,
@@ -855,6 +862,7 @@ export const useApp = defineStore("app", () => {
             ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
         } else {
           remoteAssignmentStatus.value = "ready";
+          remoteAssignmentHasSnapshot.value = true;
           lastConfirmedAssignments = { request: { ...request }, state: assignmentResult.value };
         }
         if (fleetResult.status === "rejected") throw fleetResult.reason;
@@ -926,6 +934,7 @@ export const useApp = defineStore("app", () => {
       remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
       remoteAssignmentError.value = "";
+      remoteAssignmentHasSnapshot.value = false;
       lastConfirmedAssignments = null;
       taskAssignmentSnapshot = null;
       taskAssignmentSnapshotInFlight = null;
@@ -2333,7 +2342,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,

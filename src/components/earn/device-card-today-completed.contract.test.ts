@@ -17,9 +17,9 @@ describe("per-device today-completed section", () => {
     expect(source).not.toContain("今日已完成（5）");
   });
 
-  it("keeps the 5174 task-row language and makes view-all keyboard accessible", () => {
+  it("labels view-all as the account-wide receipt history and keeps it keyboard accessible", () => {
     expect(source).toContain("t.earn.todayRecentCompleted");
-    expect(source).toContain("t.taskHistory.viewAll");
+    expect(source).toContain("t.taskHistory.viewAllAccountReceipts");
     expect(source).toContain('@click.stop="goTaskHistory"');
     expect(source).toContain('@keydown.enter.stop.prevent="goTaskHistory"');
     expect(source).toContain('@keydown.space.stop.prevent="goTaskHistory"');
@@ -30,5 +30,11 @@ describe("per-device today-completed section", () => {
     expect(zh).toContain('todayRecentCompleted: "今日最近完成"');
     expect(en).toContain('todayRecentCompleted: "Recent completions today"');
     expect(vi).toContain('todayRecentCompleted: "Hoàn thành gần đây hôm nay"');
+  });
+
+  it("identifies the destination as account-wide receipts in every supported language", () => {
+    expect(zh).toContain('viewAllAccountReceipts: "查看全账户收据"');
+    expect(en).toContain('viewAllAccountReceipts: "View account receipts"');
+    expect(vi).toContain('viewAllAccountReceipts: "Xem biên nhận của tài khoản"');
   });
 });

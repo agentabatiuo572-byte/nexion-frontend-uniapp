@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { onUnmounted, computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -132,10 +132,9 @@ import { fmt } from "@/i18n/format";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useFreeTrial } from "@/store/free-trial";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
-
-import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -163,8 +162,10 @@ onHide(() => {
   earnPageVisible = false;
   earnObservationEpoch += 1;
 });
-
-onUnmounted(() => { earnPageVisible = false; earnObservationEpoch += 1; });
+onUnmounted(() => {
+  earnPageVisible = false;
+  earnObservationEpoch += 1;
+});
 
 async function observeDayOneEarnPage(): Promise<void> {
   if (!remoteApiEnabled || !earnPageVisible || app.homeTruthStatus !== "ready"
@@ -207,7 +208,12 @@ function toggleDevice(id: string) {
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
+// A background refresh remains authoritative only for fresh mutations. For
+// read-only presentation, keep the bound account's last confirmed fleet visible
+// until the next response resolves; a first read and every error stay unknown.
+const fleetReady = computed(() => !remoteApiEnabled
+  || app.remoteFleetStatus === "ready"
+  || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
 const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
   n: devices.value.filter(isActiveSlotDevice).length,
   max: app.slotCap,
