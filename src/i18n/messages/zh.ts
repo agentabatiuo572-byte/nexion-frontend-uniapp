@@ -5806,6 +5806,9 @@ export const zh: Messages = {
     sheetOk: "知道了",
   },
   addrRebind: {
+    timeStatusUnavailable: "暂时无法确认保护期状态，请刷新后重试。",
+    refreshTimeStatusCta: "刷新状态",
+    refreshingStatus: "正在刷新…",
     title: "提现地址",
     subtitle: "地址管理",
     manageCta: "管理",

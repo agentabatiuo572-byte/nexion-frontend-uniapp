@@ -1,7 +1,22 @@
 const DAY_MS = 86_400_000;
 
+export function hasMonotonicClock(): boolean {
+  return typeof performance !== "undefined" && typeof performance.now === "function";
+}
+
+/** A remote deadline must never substitute the device wall clock. */
+export function readTrustedMonotonicNowMs(): number | null {
+  try {
+    if (!hasMonotonicClock()) return null;
+    const now = performance.now();
+    return Number.isFinite(now) && now >= 0 ? now : null;
+  } catch {
+    return null;
+  }
+}
+
 export function readMonotonicNowMs(): number {
-  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+  if (hasMonotonicClock()) {
     return performance.now();
   }
   return Date.now();

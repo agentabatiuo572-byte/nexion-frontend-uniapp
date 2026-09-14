@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type { PayoutAddressOtpChallenge, PayoutAddressRow, PayoutAddressSnapshot } from "@/api/payout-address-api";
 
 const remote = vi.hoisted(() => ({
   apiRuntimeConfig: { environment: "prod", mode: "prod" },
+  remoteApiEnabled: false,
   sandboxRunCurrent: true,
   payoutAddressServerEnabled: true,
   payoutAddressApi: {
@@ -56,6 +57,7 @@ function row(account: string): PayoutAddressRow & { source: "server"; sourceEnvi
 function snapshot(account: string): PayoutAddressSnapshot {
   return {
     addresses: [row(account)],
+    serverNowEpochMs: 1_800_000_000_000,
     source: "server",
     sourceEnvironment: "PRODUCTION",
     runId: "",
@@ -91,6 +93,8 @@ const saveInput = {
   idempotencyKey: "payout-A",
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   setActivePinia(createPinia());
   remote.payoutAddressApi.list.mockReset();
@@ -101,6 +105,54 @@ beforeEach(() => {
 });
 
 describe("payout address remote account scope", () => {
+  it("keeps an address visible without a monotonic clock and recovers on a new snapshot", async () => {
+    vi.stubGlobal("performance", undefined);
+    remote.payoutAddressApi.list.mockResolvedValue(snapshot("A"));
+    const store = usePayoutAddress();
+    store.bindAccount("A");
+    await flush();
+    expect(store.currentFor("usdt-trc20")?.address).toBe(row("A").address);
+    expect(store.serverClock).toBeNull();
+    vi.stubGlobal("performance", { now: () => 100 });
+    expect(store.changeBlockReason("usdt-trc20", 1_800_000_000_000)).toBe("time-unknown");
+    await store.refreshRemote();
+    expect(store.serverClock?.receivedMonotonicAt).toBe(100);
+    for (const bad of [NaN, Infinity, -1, null, undefined]) {
+      expect(store.changeBlockReason("usdt-trc20", bad)).toBe("time-unknown");
+    }
+    expect(store.changeBlockReason("usdt-trc20", 1_800_000_000_000)).toBeNull();
+  });
+  it("keeps a legacy address visible but never opens a time-gated change", async () => {
+    const legacy = snapshot("A");
+    legacy.serverNowEpochMs = null;
+    remote.payoutAddressApi.list.mockResolvedValueOnce(legacy);
+    const store = usePayoutAddress();
+
+    store.bindAccount("A");
+    await flush();
+
+    expect(store.currentFor("usdt-trc20")?.address).toBe(row("A").address);
+    expect(store.serverClock).toBeNull();
+    expect(store.changeBlockReason("usdt-trc20", null)).toBe("time-unknown");
+  });
+
+  it("recovers a closed time gate only after a later canonical snapshot has a clock", async () => {
+    const legacy = snapshot("A");
+    legacy.serverNowEpochMs = null;
+    remote.payoutAddressApi.list.mockResolvedValueOnce(legacy).mockResolvedValueOnce({
+      ...snapshot("A"),
+    });
+    const store = usePayoutAddress();
+
+    store.bindAccount("A");
+    await flush();
+    expect(store.changeBlockReason("usdt-trc20", null)).toBe("time-unknown");
+
+    await expect(store.refreshRemote()).resolves.toBe(true);
+    expect(store.serverClock).not.toBeNull();
+    expect(store.changeBlockReason("usdt-trc20", store.serverClock?.serverNowEpochMs)).toBeNull();
+  });
+
   it("drops a late list success after switching accounts", async () => {
     const listA = deferred<PayoutAddressSnapshot>();
     const listB = deferred<PayoutAddressSnapshot>();

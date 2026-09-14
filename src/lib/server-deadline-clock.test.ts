@@ -1,12 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   advanceMonotonicHighWater,
   deadlineRemainingDays,
   deadlineRemainingMs,
   projectServerNow,
+  readTrustedMonotonicNowMs,
 } from "./server-deadline-clock";
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("server deadline clock", () => {
+  it("requires a finite monotonic clock and never substitutes wall time", () => {
+    for (const performance of [undefined, {}, { now: () => NaN }, { now: () => Infinity },
+      { now: () => -1 }, { now: () => { throw new Error("unavailable"); } }]) {
+      vi.stubGlobal("performance", performance);
+      expect(readTrustedMonotonicNowMs()).toBeNull();
+    }
+    vi.stubGlobal("performance", { now: () => 0 });
+    expect(readTrustedMonotonicNowMs()).toBe(0);
+  });
   it("never moves backward when a wall-clock-like candidate is rolled back", () => {
     const serverNow = 1_800_000_000_000;
     const receivedAt = 1_000;
