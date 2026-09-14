@@ -3044,6 +3044,10 @@ export const vi: Messages = {
     supportReply4: "Đã hoàn tất. Bạn sẽ nhận được xác nhận trong ít phút nữa. Mình có thể giúp gì thêm cho bạn không?",
   },
   exchange: {
+    swapPaused: "Quy đổi hiện tạm dừng theo cài đặt nền tảng. Bạn vẫn có thể xem lịch sử hoặc hủy lệnh đang chờ đủ điều kiện.",
+    pendingRecoveryHint: "Một giao dịch quy đổi chưa được xác nhận. Hãy kiểm tra yêu cầu ban đầu để tránh quy đổi trùng lặp.",
+    recoverPending: "Kiểm tra quy đổi chờ xác nhận",
+    recoveryChecking: "Đang kiểm tra…",
     netReceive: "Số tiền ròng dự kiến",
     exchangeFee: "Phí quy đổi",
     belowFee: "Số tiền không đủ trả phí. Hãy tăng số tiền hoặc làm mới báo giá.",

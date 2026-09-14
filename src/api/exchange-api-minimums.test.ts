@@ -54,4 +54,30 @@ describe("exchange server minimums", () => {
     await expect(createExchangeApi(client(sandbox), "dev").fetchCaps())
       .rejects.toMatchObject({ message: "EXCHANGE_CAPS_RESPONSE_INVALID" });
   });
+
+  it("pins later exchange history pages to the first server snapshot", async () => {
+    const orders = [0, 1].map((index) => ({
+      exchangeNo: `EX-SNAPSHOT-000${index}`, fromAsset: "USDT", toAsset: "NEX",
+      fromAmount: 10, toAmount: 10, rate: 1, status: "COMPLETED",
+    }));
+    const snapshot = { ...caps, caps, wallet: { usdtAvailable: 20, nexAvailable: 10 },
+      todayUserUsedUsdt: 0, todayPlatformUsedUsdt: 0, lifetimeExchangedUsdt: 0,
+      orders: [orders[1]], ordersPage: { total: 2, pageNum: 2, pageSize: 1, snapshotId: "9001" } };
+    const apiClient = client(snapshot);
+
+    await expect(createExchangeApi(apiClient).fetchState(2, 1, "9001"))
+      .resolves.toMatchObject({ ordersPage: { snapshotId: "9001" } });
+
+    expect((apiClient.request as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.path)
+      .toBe("/api/exchange?pageNum=2&pageSize=1&snapshotId=9001");
+  });
+
+  it("rejects malformed exchange history snapshots before a later page can shift", async () => {
+    const snapshot = { ...caps, caps, wallet: { usdtAvailable: 20, nexAvailable: 10 },
+      todayUserUsedUsdt: 0, todayPlatformUsedUsdt: 0, lifetimeExchangedUsdt: 0,
+      orders: [], ordersPage: { total: 0, pageNum: 1, pageSize: 20, snapshotId: "01" } };
+
+    await expect(createExchangeApi(client(snapshot)).fetchState()).rejects
+      .toMatchObject({ message: "HISTORY_SNAPSHOT_INVALID" });
+  });
 });

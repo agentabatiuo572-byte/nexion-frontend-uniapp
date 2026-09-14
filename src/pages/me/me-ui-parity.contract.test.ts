@@ -106,7 +106,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
   // Server fee and six-decimal net proceeds are disclosed before confirmation.
-  "wallet-exchange.vue": "48c7571b34de2737fb0b8d4e1a395813a7b4a11c583a29f91fe394e3a1107041",
+  // Authority loading and unavailable states precede empty history; paused swaps retain queue recovery.
+  // Existing pending requests retain a keyboard-operable, read-only result lookup while swaps are paused.
+  "wallet-exchange.vue": "4519797f84ffd4c236aac22fe2ab663ac1d3a78a373a217a7d5c9dece5668b22",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
   "wallet-nex.vue": "f6c9f05d530a6069210e11253b7929385b728c17b548619a4572ab0439e71e17",

@@ -123,7 +123,7 @@ console.log("selfcheck-exchange-genesis-guard — 兑换成交快照单源化 + 
 
 // ══ A. 兑换页 handleConfirm 的快照纪律(结构) ═══════════════════════════════
 const confirmBody = strip(grabBlock(strip(exRaw), "async function handleConfirm()"));
-const iGuard = confirmBody.indexOf("if (submitting.value) return");
+const iGuard = confirmBody.indexOf("if (submitting.value || !exchangeSubmissionAllowed.value) return");
 const iSnap = confirmBody.indexOf("const snap = {");
 const iLock = confirmBody.indexOf("submitting.value = true");
 const iAwait = confirmBody.indexOf("await ");
@@ -192,7 +192,7 @@ const iDebit = Math.min(
     && confirmBody.indexOf("!v3.canExchange(snap.usd).ok") < iDebit,
     `acctCmp@${iAcctCmp} await@${iAwait} debit@${iDebit}`);
   check("A③ 守卫复位在 finally(所有出口统一解锁,不会有分支漏掉 → 不会永久锁死)",
-    /finally \{[\s\S]{0,200}submitting\.value = false;[\s\S]{0,40}\}/.test(confirmBody));
+    /finally \{\s*submitting\.value = false;\s*pendingExchangeRevision\.value \+= 1;\s*\}/.test(confirmBody));
   check("A③ 结算延迟写成 await(setTimeout 回调版守卫在函数返回时就复位了 = 等于没守)",
     /await new Promise\(\(r\) => setTimeout\(r, 900\)\)/.test(confirmBody));
   // 🔴 守的是**性质**(成交入参必须来自快照),不是「调用了哪个函数」。
@@ -231,7 +231,7 @@ const iDebit = Math.min(
     && remoteAmountLabel(1.123456) === (1.123456).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }));
   // 🔴 四个展示口逐个点名 —— 「新写法在不在」是弱判据,四处**全部**经由 amtLabel 才算数。
   const SITES = [
-    ["收款卡", /const toAmountLabel = computed\(\(\) => feeInvalid\.value \? "—" : amtLabel\(toAmount\.value\)\)/],
+    ["收款卡", /const toAmountLabel = computed\(\(\) => !exchangeSnapshotReady\.value \|\| feeInvalid\.value \? "—" : amtLabel\(toAmount\.value\)\)/],
     ["确认弹窗", /message: `\$\{snap\.fromSym\} \$\{amtLabel\(snap\.fromAmount\)\} → \$\{snap\.toSym\} \$\{amtLabel\(snap\.toAmount\)\}`/],
     ["成功 toast", /\.replace\("\{fromAmt\}", amtLabel\(snap\.fromAmount\)\)[\s\S]{0,80}\.replace\("\{toAmt\}", amtLabel\(snap\.toAmount\)\)/],
     ["历史行", /return `\$\{amtLabel\(h\.fromAmount\)\} \$\{h\.fromSym\} → \$\{amtLabel\(h\.toAmount\)\} \$\{h\.toSym\}`/],
@@ -450,12 +450,14 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     // stable sandbox run; cross-run rejection is covered by the order/exchange
     // authority contract tests.
     captureCommerceSandboxRun: () => ({ environment: "SANDBOX", runId: "legacy-exchange-guard" }),
-    captureAccountScope: () => ({ accountKey: app.accountKey, epoch: 0 }),
+    captureExchangeScope: () => ({ accountKey: app.accountKey, epoch: 0, pageEpoch: 0 }),
     captureRuntimeRevision: () => ({ revision: 1 }),
     remoteScopeCurrent: () => true,
     toastIfRemoteScopeCurrent: (_scope, _runScope, action) => action(),
     exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
     geoPolicyUserMessage,
+    exchangeSubmissionAllowed: { value: true },
+    pendingExchangeRevision: { value: 0 },
     submitting: { value: false },
     valid: { value: true },
     direction, fromAmount, toAmount, rate, swapUSDValue,
