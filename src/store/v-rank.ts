@@ -4,6 +4,7 @@ import { remoteApiEnabled, vRankApi } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/v-rank.ts (zustand persist → Pinia + uni storage).
@@ -270,10 +271,15 @@ export const useVRank = defineStore("vRank", () => {
   }
 
   let refreshGeneration = 0;
-  async function refreshCanonicalVRank(request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch)) {
+  async function refreshCanonicalVRank(
+    request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch),
+    runScope: RuntimeRevisionScope = captureRuntimeRevision(),
+  ) {
     if (!remoteApiEnabled) return;
     const generation = ++refreshGeneration;
-    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
+    const isCurrent = () => generation === refreshGeneration
+      && remoteAccountEpoch.isCurrent(request)
+      && isCurrentRuntimeRevision(runScope);
     if (isCurrent()) {
       remoteReady.value = false;
       remoteError.value = null;

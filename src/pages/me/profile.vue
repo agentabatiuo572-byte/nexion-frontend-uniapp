@@ -78,6 +78,19 @@
         <text :style="tierLabelStyle">{{ tierLabel }}</text>
       </view>
       <text class="block" :style="tierProgressStyle">{{ tierProgressLine }}</text>
+      <view v-if="remoteApiEnabled && vRank.remoteError" class="mx-4 mt-2" role="status" aria-live="polite">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ t.profile.rankUnavailable }}</text>
+        <view
+          class="nx-profile-rank-retry inline-flex items-center active:opacity-80"
+          style="min-height: 44px; font-size: 13px; color: var(--v5-brand)"
+          role="button"
+          tabindex="0"
+          :aria-label="t.rank.retry"
+          @click="refreshVRankForCurrentAccount"
+          @keydown.enter.prevent="refreshVRankForCurrentAccount"
+          @keydown.space.prevent="refreshVRankForCurrentAccount"
+        >{{ t.rank.retry }}</view>
+      </view>
 
       <!-- Wallet binding -->
       <view class="mx-4 flex items-center active:opacity-90" :style="walletCardStyle" @click="goWallet">
@@ -91,7 +104,7 @@
           </view>
           <text class="block truncate" :style="walletSubStyle">{{ walletSub }}</text>
         </view>
-        <text :style="walletActionStyle">{{ paired ? t.profile.walletPaired : t.profile.walletPair }}</text>
+        <text :style="walletActionStyle">{{ walletAction }}</text>
       </view>
 
       <!-- Save bar -->
@@ -131,6 +144,8 @@ import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
 import { usePayoutAddress } from "@/store/payout-address";
 import { useQuest } from "@/store/quest";
+import { useVRank } from "@/store/v-rank";
+import { useLocaleStore } from "@/store/locale";
 import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -138,6 +153,8 @@ import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { formatJoinedDate } from "@/lib/profile-date";
+import { profileVRankProjection, type ProfileVRankDefinition } from "@/lib/profile-vrank-display";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
@@ -149,6 +166,8 @@ const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
 const quest = useQuest();
+const vRank = useVRank();
+const locale = useLocaleStore();
 const profilePageFence = createP318AccountPageFence(
   () => String(app.accountKey),
   () => app.accountBindingEpoch,
@@ -200,6 +219,19 @@ function refreshProfileForCurrentAccount() {
   void refreshPayoutForCurrentAccount();
   void loadProfileCandidates();
   void loadRemoteProfile();
+  void refreshVRankForCurrentAccount();
+}
+
+async function refreshVRankForCurrentAccount() {
+  const pageScope = profilePageFence.capture("v-rank");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
+  await vRank.refreshCanonicalVRank();
+  // The store fences account, request generation, and runtime revision before
+  // applying its projection; this page fence prevents a hidden/rebound page
+  // from treating the completed read as current work.
+  if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
 }
 
 async function refreshPayoutForCurrentAccount() {
@@ -215,11 +247,15 @@ onShow(() => {
   profilePageVisible = true;
   refreshProfileForCurrentAccount();
 });
+const unsubscribeProfileRankRuntime = subscribeRuntimeRevision(() => {
+  if (profilePageVisible && remoteApiEnabled) void refreshVRankForCurrentAccount();
+});
 onHide(() => {
   profilePageVisible = false;
   clearProfileAccountState();
 });
 onUnmounted(() => {
+  unsubscribeProfileRankRuntime();
   profilePageVisible = false;
   clearProfileAccountState();
 });
@@ -241,13 +277,35 @@ const paired = computed(() => payout.hasAnyAddress);
 // 否则 BEP20/ERC20 用户点「管理」落到 TRC20 空槽,看起来像地址丢失(审计 P1)。
 const walletNetwork = computed(() => PAYOUT_NETWORKS.find((network) => payout.currentFor(network)));
 const walletAddress = computed(() => (walletNetwork.value ? payout.currentFor(walletNetwork.value)?.address : undefined));
+const walletReadConfirmed = computed(() => !remoteApiEnabled || payout.provenance !== null);
 const walletSub = computed(() =>
-  walletAddress.value ? maskAddressMid(walletAddress.value) : t.value.profile.walletEmpty,
+  walletAddress.value
+    ? maskAddressMid(walletAddress.value)
+    : walletReadConfirmed.value ? t.value.profile.walletEmpty : t.value.profile.walletUnknown,
+);
+const walletAction = computed(() =>
+  paired.value || !walletReadConfirmed.value ? t.value.profile.walletPaired : t.value.profile.walletPair,
 );
 
 const userTier = computed<Tier>(() => (app.user.tier as Tier) ?? "L0");
-const tierLabel = computed(() => t.value.profile.tierLabels[userTier.value]);
+const remoteTier = computed(() => profileVRankProjection(vRank.remoteReady, vRank.myRank, vRank.ladder));
+function configuredRankName(rank: ProfileVRankDefinition): string {
+  return locale.code === "zh" ? rank.cnTitle : rank.title;
+}
+const tierLabel = computed(() => {
+  if (!remoteApiEnabled) return t.value.profile.tierLabels[userTier.value];
+  const projection = remoteTier.value;
+  return projection ? `V${projection.current.v} · ${configuredRankName(projection.current)}` : "—";
+});
 const tierProgressLine = computed(() => {
+  if (remoteApiEnabled) {
+    const projection = remoteTier.value;
+    if (!projection || !projection.next) return "—";
+    return t.value.profile.tierProgress.replace(
+      "{next}",
+      `V${projection.next.v} · ${configuredRankName(projection.next)}`,
+    );
+  }
   const idx = TIERS.indexOf(userTier.value);
   const nextTier: Tier = idx >= 0 && idx < TIERS.length - 1 ? TIERS[idx + 1] : "L5";
   return t.value.profile.tierProgress.replace("{next}", t.value.profile.tierLabels[nextTier]);

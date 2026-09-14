@@ -75,3 +75,26 @@ describe("V-rank remote authority state", () => {
     expect(store.ladder).toHaveLength(13);
   });
 });
+
+  it("discards a late canonical response after its runtime revision changes", async () => {
+    let resolveLadder!: (value: unknown) => void;
+    let resolveCurrent!: (value: unknown) => void;
+    remote.vRankApi.ladder.mockReturnValue(new Promise((resolve) => { resolveLadder = resolve; }));
+    remote.vRankApi.current.mockReturnValue(new Promise((resolve) => { resolveCurrent = resolve; }));
+    const store = useVRank();
+
+    const pending = store.refreshCanonicalVRank();
+    advanceRuntimeRevision("account-refresh");
+    resolveLadder({ source: "stale", ranks: Array.from({ length: 13 }, (_, v) => ({
+      v, title: `V${v}`, cnTitle: `V${v}`, directBonus: 0, unilevelDepth: 1,
+      peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
+    })) });
+    resolveCurrent({ source: "stale", rankCode: "V5", progress: {
+      selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {},
+    } });
+    await pending;
+
+    expect(store.remoteReady).toBe(false);
+    expect(store.myRank).toBe(0);
+    expect(store.ladder).toEqual([]);
+  });
