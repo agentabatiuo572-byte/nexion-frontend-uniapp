@@ -27,7 +27,9 @@
             </view>
             <view class="text-right">
               <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ nexPriceText }}</text>
-              <text v-if="market.isMockMode || market.remoteReady" class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
+              <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="nexChangeStyle" role="status" aria-live="polite">{{ t.marketPage.nexHero.loading }}</text>
+              <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="nexChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
+              <text v-else class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
                 {{ market.change24hAvailable ? `${nexDirection} ${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
               </text>
             </view>
@@ -77,10 +79,11 @@
           </view>
           <view class="flex items-center justify-between border-t" :style="athRowStyle">
             <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.marketPage.stats.ath }}</text>
-            <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-2)' }">
-              {{ nex.ath > 0 ? fmtPrice(nex.ath) : "—" }}
+            <text v-if="nex.ath > 0" class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-2)' }">
+              {{ fmtPrice(nex.ath) }}
               <text :style="{ color: 'var(--v5-brand-2)' }">({{ athDeltaPct.toFixed(1) }}% {{ t.marketPage.stats.athFromNow }})</text>
             </text>
+            <text v-else class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-2)' }">—</text>
           </view>
         </view>
 
@@ -99,9 +102,16 @@ import { useT } from "@/i18n/use-t";
 import { useMarket } from "@/store/market";
 import { selectMarketHistoryWindow, type MarketTimeframe } from "@/lib/market-history-window";
 import { fmt } from "@/i18n/format";
+import { remoteApiEnabled } from "@/api/runtime";
+import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 
 const t = useT();
 const market = useMarket();
+const marketAuthorityStatus = computed(() => remoteAuthorityStatus({
+  remoteApiEnabled,
+  hasSnapshot: market.remoteReady,
+  hasError: market.remoteError !== null,
+}));
 
 type Timeframe = MarketTimeframe;
 const TIMEFRAMES: Timeframe[] = ["1H", "24H", "7D", "1M", "1Y"];
