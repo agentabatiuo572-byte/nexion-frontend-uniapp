@@ -5543,6 +5543,7 @@ export const vi: Messages = {
   },
 
   notifs: {
+    moreToCheck: "Chưa tải hết các thông báo cũ. Hãy tải thêm để tiếp tục xem.",
     minutesAgo: "{n} phút trước",
     hoursAgo: "{n} giờ trước",
     daysAgo: "{n} ngày trước",

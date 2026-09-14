@@ -3,8 +3,8 @@ import source from "./notifications.vue?raw";
 
 describe("notification foreground and clear-read accessibility", () => {
   it("refreshes server notifications whenever the page returns to foreground", () => {
-    expect(source).toContain('import { onShow } from "@dcloudio/uni-app"');
-    expect(source).toContain("onShow(() => { void notifs.refreshRemote(); });");
+    expect(source).toContain('import { onShow, onHide } from "@dcloudio/uni-app"');
+    expect(source).toMatch(/onShow\(\(\) => \{\s*if \(disposed\) return;\s*pageVisible = true;\s*void notifs.refreshRemote\(\);/);
   });
 
   it("gives the clear-read action an accessible label, 44px target, and confirmation", () => {

@@ -5687,6 +5687,7 @@ export const en = {
   },
 
   notifs: {
+    moreToCheck: "Older notifications have not all loaded yet. Load more to continue checking.",
     minutesAgo: "{n}m ago",
     hoursAgo: "{n}h ago",
     daysAgo: "{n}d ago",

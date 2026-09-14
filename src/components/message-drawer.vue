@@ -45,7 +45,7 @@
         <view class="md-tabs-inner">
           <template v-for="id in filterIds" :key="id">
             <view
-              v-if="id === 'all' || countOf(id) > 0"
+              v-if="id === 'all' || filter === id || countOf(id) > 0"
               class="md-tab"
               :class="{ 'md-tab--on': filter === id }"
               role="tab"
@@ -73,8 +73,11 @@
           <text class="md-empty-t">{{ notifsErrorText }}</text>
           <view class="md-detail-cta" data-testid="drawer-notification-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">{{ t.ui.retry }}</text></view>
         </view>
-        <view v-if="filtered.length === 0" class="md-empty">
+        <view v-if="!notifs.loading && !notifs.error && !notifs.nextCursor && filtered.length === 0" class="md-empty">
           <text class="md-empty-t">{{ emptyText }}</text>
+        </view>
+        <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" class="md-empty" role="status">
+          <text class="md-empty-t">{{ t.notifs.moreToCheck }}</text>
         </view>
 
         <view
@@ -132,13 +135,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications, type NotifKind, type Notification } from "@/store/notifications";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { navTo } from "@/lib/route";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 const t = useT();
 const drawer = useMessageDrawer();
@@ -217,12 +221,20 @@ function close() {
 // 本轮改成 fixed 后门立刻判红(a11y-activate [G]),按仓内统一写法接平台层。
 // Enter/Space 由 lib/a11y-activate.ts 自动补,故上面只声明 role + tabindex,不手写 @keydown。
 useDialogA11y(computed(() => drawer.open), ".md-root", close);
+let drawerGeneration = 0;
+let disposed = false;
 watch(() => drawer.open, (open) => {
-  if (open) void notifs.refreshRemote();
-});
+  drawerGeneration += 1;
+  if (open && !disposed) void notifs.refreshRemote();
+}, { flush: "sync" });
+onUnmounted(() => { disposed = true; drawerGeneration += 1; });
 async function onCta(notification: Notification) {
+  if (disposed || !drawer.open) return;
+  const generation = drawerGeneration;
+  const account = remoteAccountScope.snapshot();
   const canonicalRoute = await notifs.recordCta(notification.id);
-  if (!canonicalRoute) return;
+  if (!canonicalRoute || disposed || !drawer.open || generation !== drawerGeneration
+    || !remoteAccountScope.isCurrent(account)) return;
   close();
   navTo(canonicalRoute);
 }

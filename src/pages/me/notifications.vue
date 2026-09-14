@@ -43,7 +43,7 @@
       <scroll-view scroll-x class="px-4" style="margin-bottom: 12px; white-space: nowrap">
         <template v-for="id in filterIds" :key="id">
           <view
-            v-if="id === 'all' || countOf(id) > 0"
+            v-if="id === 'all' || filter === id || countOf(id) > 0"
             class="active:opacity-70"
             :style="pillStyle(filter === id)"
             role="button"
@@ -74,7 +74,10 @@
             @keydown.space.stop.prevent="notifs.retryRemote()"
           >{{ t.ui.retry }}</text>
         </view>
-        <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+        <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" role="status" :style="emptyCardStyle">
+          <text>{{ t.notifs.moreToCheck }}</text>
+        </view>
+        <EmptyState v-if="!notifs.loading && !notifs.error && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.empty.listDesc : undefined" />
         <view v-else :style="listStyle">
           <view
             v-for="(n, i) in filtered"
@@ -123,8 +126,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -134,10 +137,26 @@ import { useNotifications, type NotifKind, type Notification } from "@/store/not
 import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
-import { confirm as uiConfirm } from "@/store/ui";
+import { confirm as uiConfirm, useUI } from "@/store/ui";
+import { useApp } from "@/store/app";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 const t = useT();
 const notifs = useNotifications();
+const app = useApp();
+const ui = useUI();
+const confirmOwner = `notifications:${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+  ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+let pageGeneration = 0;
+let pageVisible = true;
+let disposed = false;
+function captureIntent() {
+  return { generation: pageGeneration, account: remoteAccountScope.snapshot() };
+}
+function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
+  return !disposed && pageVisible && intent.generation === pageGeneration
+    && remoteAccountScope.isCurrent(intent.account);
+}
 // store 保留机器码(SESSION_EXPIRED / NOTIFICATION_UNAVAILABLE / 服务端 envelope 原文…),
 // 视图侧统一映射成用户文案 —— 裸插值会把工程码上屏,违反「页面文案禁止错误码」。
 // 写法与 risk-disclosure.vue:108 同源。
@@ -196,6 +215,8 @@ function timeAgo(ts: number): string {
 }
 
 async function onTap(n: Notification) {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent)) return;
   if (suppressedClick?.id === n.id && Date.now() <= suppressedClick.until) {
     suppressedClick = null;
     return;
@@ -203,10 +224,10 @@ async function onTap(n: Notification) {
   if (n.ctaHref) {
     if (remoteApiEnabled) {
       const canonicalRoute = await notifs.recordCta(n.id);
-      if (canonicalRoute) navTo(canonicalRoute);
+      if (canonicalRoute && isCurrentIntent(intent)) navTo(canonicalRoute);
     } else {
       await notifs.markRead(n.id);
-      navTo(n.ctaHref);
+      if (isCurrentIntent(intent)) navTo(n.ctaHref);
     }
     return;
   }
@@ -215,17 +236,20 @@ async function onTap(n: Notification) {
 }
 
 async function confirmClearRead() {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent)) return;
   const accepted = await uiConfirm({
+    owner: confirmOwner,
     title: t.value.notifs.clearReadAria,
     message: t.value.notifs.clearReadAria,
     confirmLabel: t.value.notifs.clearReadAria,
     icon: "warn",
   });
-  if (accepted) await notifs.clearRead();
+  if (accepted && isCurrentIntent(intent)) await notifs.clearRead();
 }
 
 type UniTouchEvent = { changedTouches?: ArrayLike<{ clientX: number; clientY: number }> };
-const touchStarts = new Map<string, SwipePoint>();
+const touchStarts = new Map<string, { point: SwipePoint; intent: ReturnType<typeof captureIntent> }>();
 let suppressedClick: { id: string; until: number } | null = null;
 
 function touchPoint(event: UniTouchEvent): SwipePoint | null {
@@ -234,8 +258,10 @@ function touchPoint(event: UniTouchEvent): SwipePoint | null {
 }
 
 function onTouchStart(n: Notification, event: UniTouchEvent) {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent)) return;
   const point = touchPoint(event);
-  if (point) touchStarts.set(n.id, point);
+  if (point) touchStarts.set(n.id, { point, intent });
 }
 
 async function onTouchEnd(n: Notification, event: UniTouchEvent) {
@@ -243,13 +269,30 @@ async function onTouchEnd(n: Notification, event: UniTouchEvent) {
   touchStarts.delete(n.id);
   const end = touchPoint(event);
   if (!remoteApiEnabled) return;
-  if (!start || !end || !isLeftConversionSwipe(start, end)) return;
+  if (!start || !end || !isCurrentIntent(start.intent) || !isLeftConversionSwipe(start.point, end)) return;
   suppressedClick = { id: n.id, until: Date.now() + 800 };
   const canonicalRoute = await notifs.recordSwipeConversion(n.id);
-  if (canonicalRoute) navTo(canonicalRoute);
+  if (canonicalRoute && isCurrentIntent(start.intent)) navTo(canonicalRoute);
 }
-onMounted(() => { void notifs.refreshRemote(); });
-onShow(() => { void notifs.refreshRemote(); });
+function invalidatePendingIntents() {
+  pageGeneration += 1;
+  touchStarts.clear();
+  suppressedClick = null;
+  ui.clearConfirmsBy(confirmOwner);
+}
+function invalidatePage() {
+  pageVisible = false;
+  invalidatePendingIntents();
+}
+watch(() => [app.accountKey, app.accountBindingEpoch], invalidatePendingIntents, { flush: "sync" });
+onMounted(() => { if (!disposed && pageVisible) void notifs.refreshRemote(); });
+onShow(() => {
+  if (disposed) return;
+  pageVisible = true;
+  void notifs.refreshRemote();
+});
+onHide(invalidatePage);
+onUnmounted(() => { disposed = true; invalidatePage(); });
 
 const unreadBadgeStyle: CSSProperties = {
   fontSize: "12px",
