@@ -5898,6 +5898,8 @@ export const vi: Messages = {
     courseVersionMeta: "Phiên bản {version} · Thưởng {nex} NEX",
     courseOffline: "Bài học cần được tải qua mạng tin cậy; vui lòng quay lại trung tâm hướng dẫn rồi thử lại.",
     courseUnavailable: "Bài học tạm thời không khả dụng; vui lòng thử lại.",
+    courseStartConfirming: "Nội dung bài học đã tải và bản ghi bắt đầu đang được xác nhận. Tạm thời không thể trả lời hoặc nhận thưởng.",
+    courseStartUnconfirmed: "Nội dung bài học đã tải, nhưng bản ghi bắt đầu chưa được xác nhận. Nhấn vào đây để tải lại trước khi nộp bài hoặc nhận thưởng.",
     submitQuiz: "Nộp bài kiểm tra",
     answerAllFirst: "Trả lời hết các câu hỏi rồi mới nộp được.",
     completeCourse: "Hoàn thành bài học",

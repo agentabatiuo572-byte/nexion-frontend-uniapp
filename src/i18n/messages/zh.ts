@@ -5880,6 +5880,8 @@ export const zh: Messages = {
     courseVersionMeta: "版本 {version} · 奖励 {nex} NEX",
     courseOffline: "课程需要在受信任网络中获取;请返回教程中心后重试。",
     courseUnavailable: "课程暂不可用;请重试。",
+    courseStartConfirming: "课程内容已加载，正在确认开始记录；答题和奖励暂不可用。",
+    courseStartUnconfirmed: "课程内容已加载，但开始记录尚未确认；请点击此处重新加载后再提交或领取奖励。",
     submitQuiz: "提交测验",
     answerAllFirst: "全部答完才能提交。",
     completeCourse: "完成课程",

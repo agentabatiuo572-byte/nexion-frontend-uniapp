@@ -3,6 +3,7 @@ import { isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order
 export interface LearningPageFence {
   accountKey: string;
   accountEpoch: number;
+  routeKey: string;
   runScope: RuntimeRevisionScope;
   generation: number;
 }
@@ -13,12 +14,14 @@ export function createLearningPageFenceReader(
   getRunScope: () => RuntimeRevisionScope,
   getGeneration: () => number,
   isMounted: () => boolean,
+  getRouteKey: () => string = () => "",
 ) {
   return {
     capture(): LearningPageFence {
       return {
         accountKey: getAccountKey(),
         accountEpoch: getAccountEpoch(),
+        routeKey: getRouteKey(),
         runScope: getRunScope(),
         generation: getGeneration(),
       };
@@ -27,6 +30,7 @@ export function createLearningPageFenceReader(
       return isMounted()
         && scope.accountKey === getAccountKey()
         && scope.accountEpoch === getAccountEpoch()
+        && scope.routeKey === getRouteKey()
         && scope.generation === getGeneration()
         && isCurrentRuntimeRevision(scope.runScope);
     },

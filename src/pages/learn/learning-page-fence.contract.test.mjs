@@ -16,6 +16,10 @@ test("learning list and course pages guard async state with account/run/generati
   }
   assert.match(course, /const scope = fence\(\);[\s\S]*learningApi\.start/);
   assert.match(course, /recoverAuthoritative\(scope, submittedCourse\)/);
+  assert.match(course, /watch\(\(\) => app\.accountBindingEpoch, refreshForScopeChange\)/);
+  assert.match(course, /watch\(\(\) => language\.value, refreshForScopeChange\)/);
+  assert.match(course, /\(\) => courseId\.value/);
+  assert.match(course, /!startConfirmed\.value/);
 });
 
 test("course page restores canonical result details and committed quiz receipts", () => {
