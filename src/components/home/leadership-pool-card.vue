@@ -22,7 +22,7 @@
     <view v-else class="mt-1.5 grid gap-3 items-end" style="grid-template-columns: 1fr auto">
       <view>
         <text class="block tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 26px; color: var(--v5-ink); letter-spacing: -0.022em; line-height: 1">${{ poolKText }}K</text>
-        <text class="block mt-1.5" style="font-size: 12px; color: var(--v5-ink-3); font-family: var(--font-v5)">{{ t.home.poolThisWeek }}</text>
+        <text class="block mt-1.5" style="font-size: 12px; color: var(--v5-ink-3); font-family: var(--font-v5)">{{ poolThisWeekText }}</text>
       </view>
       <view v-if="unlocked" class="text-right whitespace-nowrap">
         <text class="block tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-success); letter-spacing: -0.014em; line-height: 1">+${{ payoutText }}</text>
@@ -37,7 +37,7 @@
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useVRank } from "@/store/v-rank";
 import type { VRank } from "@/store/v-rank";
 import { useLeadershipPool } from "@/store/leadership-pool";
@@ -66,6 +66,12 @@ const myShare = computed(() => remoteApiEnabled ? remotePool.value?.mySharePct ?
 const myPayout = computed(() => remoteApiEnabled ? remotePool.value?.projectedPayoutUSDT ?? 0 : pool.myProjectedPayout(myRank.value));
 const unlocked = computed(() => myRank.value >= 3);
 
+const poolThisWeekText = computed(() => {
+  const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
+  return rate == null ? "" : fmt(t.value.home.poolThisWeek, {
+    rate: (rate * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }),
+  });
+});
 const poolKText = computed(() => (poolUSDT.value / 1000).toFixed(1));
 const payoutText = computed(() => myPayout.value.toFixed(2));
 const shareText = computed(() => fmt(t.value.home.poolShare, { n: (myShare.value * 100).toFixed(2) }));

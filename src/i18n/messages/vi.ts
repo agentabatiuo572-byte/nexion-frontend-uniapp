@@ -449,7 +449,7 @@ export const vi: Messages = {
     rankReward: "+{n} NEX",
     rankTopTier: "Bạn đã lên hạng cao nhất.",
     poolTitle: "Quỹ lãnh đạo",
-    poolThisWeek: "quỹ tuần này · 5% khối lượng nền tảng",
+    poolThisWeek: "quỹ tuần này · {rate}% khối lượng nền tảng",
     poolShare: "chia {n}%",
     poolV3Unlock: "V3+ để mở",
     // DoTheMathCard (ZONE 5)
@@ -4302,6 +4302,8 @@ export const vi: Messages = {
   },
 
   unilevel: {
+    canonicalPolicy: "Thời gian chờ {days} ngày · hệ số khuyến mãi ×{multiplier}",
+    periods: { today: "Hôm nay", week: "Tuần này", month: "Tháng này", all: "Toàn bộ thời gian" },
     pausedLayersTitle: "Một số tầng hoa hồng đang tạm dừng",
     pausedLayersDesc: "Tạm dừng quyết toán và ghi nhận mới ở {layers}. Các khoản đã ghi nhận không thay đổi.",
     serverRewardHold: "Máy chủ chỉ trả doanh số đội nhóm; chưa có quyết toán thưởng chính thức nên chưa hiển thị số tiền",
@@ -4431,15 +4433,16 @@ export const vi: Messages = {
     ctaBack: "Đã hiểu · xem mạng lưới của tôi",
   },
   binary: {
+    memberDetailsUnavailable: "Chưa thể tải chi tiết thành viên. Trạng thái Ghép Cân Bằng hiện tại vẫn theo máy chủ.",
     pageTitle: "Ghép Cân Bằng",
     settlePeriodLabel: { daily: "hằng ngày", weekly: "hằng tuần", monthly: "hằng tháng" },
     periodEstimateLabel: { daily: "Hôm nay", weekly: "Tuần này", monthly: "Tháng này" },
     periodUnitLabel: { daily: "ngày", weekly: "tuần", monthly: "tháng" },
     estimate: "Ước tính Ghép Cân Bằng {period}",
-    formula: "min(Nhánh A, Nhánh B) × 10% · trần ngày ${cap} · kết toán {freq}",
+    formula: "min(Nhánh A, Nhánh B) × {rate}% · trần ngày ${cap} · kết toán {freq}",
     blocked: "Ghép Cân Bằng tạm dừng",
     blockedDetail:
-      "Nhánh {side} tháng này đạt ${vol}, dưới ngưỡng $1,000 — thưởng ghép tạm dừng, đạt lại ngưỡng sẽ tự khôi phục.",
+      "Nhánh {side} tháng này đạt ${vol}, dưới ngưỡng $1,000. Hiện chưa đủ điều kiện kết toán; hãy kiểm tra trạng thái máy chủ sau khi đạt ngưỡng.",
     blockReasons: {
       F3_BINARY_PAUSED: "Vận hành đã tạm dừng kết toán Ghép Cân Bằng.",
       BINARY_REFUND_REVERSAL_REQUIRED: "Cần hoàn tất bút toán đảo hoàn tiền trước khi kết toán tiếp tục.",
@@ -4450,8 +4453,8 @@ export const vi: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Chưa đến ngày kết toán đã cấu hình.",
       UNKNOWN: "Điều kiện kết toán hiện chưa được đáp ứng. Vui lòng thử lại sau.",
     },
-    blockedAction: "Bồi thêm nhánh nhỏ hơn để nâng khoản thưởng tháng này.",
-    inviteCta: "Mời người để cân lại nhánh nhỏ hơn",
+    blockedAction: "Bạn có thể xem các lựa chọn mời; máy chủ sẽ xác định liệu kết toán có đủ điều kiện hay không.",
+    inviteCta: "Xem các lựa chọn mời",
     leftWing: "Nhánh A",
     rightWing: "Nhánh B",
     weakBadge: "NHỎ HƠN",
@@ -4460,7 +4463,7 @@ export const vi: Messages = {
     strong: "Lớn hơn",
     weak: "Nhỏ hơn",
     gapHint:
-      "Ghép Cân Bằng tính theo nhánh nhỏ hơn. Bồi thêm nhánh nhỏ để nâng khoản thưởng {freq} của bạn.",
+      "Ghép Cân Bằng được tính theo nhánh nhỏ hơn. Thành viên được phân theo quy tắc sắp xếp; trạng thái máy chủ quyết định điều kiện kết toán.",
     spilloverTitle: "Tự động xếp: tổng cộng {n} thành viên ở hai nhánh",
     spilloverHint: "Thành viên được phân vào nhánh A hoặc B theo quy tắc sắp xếp.",
     recentMatches: "Ghép gần đây",

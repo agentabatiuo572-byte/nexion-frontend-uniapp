@@ -182,12 +182,20 @@ export const useCommission = defineStore("commission", () => {
   const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch, commerceRun: captureRuntimeRevision() });
   const isCurrentScope = (scope: RequestScope): boolean =>
     scope.accountKey === boundKey && scope.epoch === bindingEpoch && isCurrentRuntimeRevision(scope.commerceRun);
+  const sameScope = (left: RequestScope, right: RequestScope): boolean =>
+    left.accountKey === right.accountKey
+      && left.epoch === right.epoch
+      && left.commerceRun.runId === right.commerceRun.runId
+      && left.commerceRun.epoch === right.commerceRun.epoch;
+  let binaryInFlight: { scope: RequestScope; promise: Promise<void> } | null = null;
+  let configInFlight: { scope: RequestScope; promise: Promise<void> } | null = null;
 
   const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
     // A catalogue environment/RunID change invalidates every remote snapshot;
     // stale requests are also fenced by isCurrentRuntimeRevision().
     configRefreshGeneration += 1;
+    binaryInFlight = null;
     config.value = null;
     binarySnapshot.value = null;
     events.value = [];
@@ -198,6 +206,18 @@ export const useCommission = defineStore("commission", () => {
     eventsPage.value = 0;
     eventsTotalRows.value = 0;
     binaryStatus.value = "idle";
+
+    // A completed catalogue revision must also establish a new canonical
+    // snapshot for the account already bound to this store.  Otherwise the
+    // revision fence correctly drops the old in-flight responses, but the
+    // page remains indefinitely in its reset/idle state.
+    if (boundKey === "default") return;
+    const scope = requestScope();
+    void Promise.allSettled([
+      refreshCanonicalConfig(scope),
+      refreshCanonicalBinary(scope),
+      refreshCanonicalEvents(scope),
+    ]);
   });
   onScopeDispose(unsubscribeCommerceRun);
 
@@ -212,6 +232,7 @@ export const useCommission = defineStore("commission", () => {
     bindingEpoch += 1;
     if (remoteApiEnabled) {
       configRefreshGeneration += 1;
+      binaryInFlight = null;
       config.value = null;
       binarySnapshot.value = null;
       events.value = [];
@@ -229,7 +250,21 @@ export const useCommission = defineStore("commission", () => {
     events.value = hydrate(boundKey);
   }
 
-  async function refreshCanonicalConfig(scope = requestScope()) {
+  function ensureCanonicalConfig(): Promise<void> {
+    const scope = requestScope();
+    return configInFlight && sameScope(configInFlight.scope, scope)
+      ? configInFlight.promise : refreshCanonicalConfig(scope);
+  }
+
+  function refreshCanonicalConfig(scope = requestScope()): Promise<void> {
+    const promise = readCanonicalConfig(scope);
+    configInFlight = { scope, promise };
+    const clear = () => { if (configInFlight?.promise === promise) configInFlight = null; };
+    void promise.then(clear, clear);
+    return promise;
+  }
+
+  async function readCanonicalConfig(scope: RequestScope) {
     if (!remoteApiEnabled) return;
     const generation = ++configRefreshGeneration;
     config.value = null;
@@ -247,18 +282,32 @@ export const useCommission = defineStore("commission", () => {
     }
   }
 
-  async function refreshCanonicalBinary(scope = requestScope()) {
-    if (!remoteApiEnabled) return;
+  function refreshCanonicalBinary(scope = requestScope()): Promise<void> {
+    if (!remoteApiEnabled) return Promise.resolve();
+    if (binaryInFlight && sameScope(binaryInFlight.scope, scope)) return binaryInFlight.promise;
     const generation = ++binaryRefreshGeneration;
     binaryStatus.value = "loading";
-    try {
-      const snapshot = await commissionConfigApi.binary();
-      if (generation !== binaryRefreshGeneration || !isCurrentScope(scope)) return;
-      binarySnapshot.value = snapshot;
-      binaryStatus.value = "ready";
-    } catch {
-      if (generation === binaryRefreshGeneration && isCurrentScope(scope)) binaryStatus.value = "error";
-    }
+    let operation!: Promise<void>;
+    operation = (async () => {
+      try {
+        const snapshot = await commissionConfigApi.binary();
+        if (generation !== binaryRefreshGeneration || !isCurrentScope(scope)) return;
+        binarySnapshot.value = snapshot;
+        binaryStatus.value = "ready";
+      } catch {
+        if (generation === binaryRefreshGeneration && isCurrentScope(scope)) {
+          // The team home consumes this same snapshot.  Clear it with the
+          // current-scope failure so no page can present an older estimate as
+          // current authority.
+          binarySnapshot.value = null;
+          binaryStatus.value = "error";
+        }
+      }
+    })();
+    binaryInFlight = { scope, promise: operation };
+    const clear = () => { if (binaryInFlight?.promise === operation) binaryInFlight = null; };
+    void operation.then(clear, clear);
+    return operation;
   }
 
   async function refreshCanonicalEvents(scope = requestScope()) {
@@ -397,7 +446,7 @@ export const useCommission = defineStore("commission", () => {
   return {
     events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, eventsLoadMoreStatus,
     eventsPage, eventsTotalRows, binaryStatus, bindAccount,
-    refreshCanonicalConfig, refreshCanonicalBinary, refreshCanonicalEvents, loadMoreCanonicalEvents, unilevelRate,
+    refreshCanonicalConfig, ensureCanonicalConfig, refreshCanonicalBinary, refreshCanonicalEvents, loadMoreCanonicalEvents, unilevelRate,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

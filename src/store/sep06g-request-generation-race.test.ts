@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPinia, setActivePinia } from "pinia";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, disposePinia, setActivePinia, type Pinia } from "pinia";
+import { advanceRuntimeRevision } from "@/api/order-api";
 
 const commissionRuntime = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -136,47 +137,89 @@ function current(rankCode: string) {
   };
 }
 
+let testPinia: Pinia;
 beforeEach(() => {
-  setActivePinia(createPinia());
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  testPinia = createPinia();
+  setActivePinia(testPinia);
 });
+afterEach(() => disposePinia(testPinia));
 
 describe("Sep 06G same-account request generation fences", () => {
-  it("keeps the newer binary snapshot when an older same-account request finishes last", async () => {
-    const older = deferred<ReturnType<typeof binary>>();
-    const newer = deferred<ReturnType<typeof binary>>();
+  it.each([
+    ["account", "success"], ["account", "failure"],
+    ["runtime", "success"], ["runtime", "failure"],
+  ] as const)("keeps the new binary scope joinable after old %s scope %s", async (change, outcome) => {
+    const oldRead = deferred<ReturnType<typeof binary>>();
+    const currentRead = deferred<ReturnType<typeof binary>>();
+    commissionRuntime.commissionConfigApi.rates.mockResolvedValue({});
+    commissionRuntime.teamInsightsApi.commissions.mockResolvedValue(commissionPage("current-event", 1, 1));
     commissionRuntime.commissionConfigApi.binary
-      .mockReturnValueOnce(older.promise)
-      .mockReturnValueOnce(newer.promise);
+      .mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(currentRead.promise);
     const store = useCommission();
-
+    store.bindAccount("account-a");
     const first = store.refreshCanonicalBinary();
+    if (change === "account") store.bindAccount("account-b");
+    else advanceRuntimeRevision();
     const second = store.refreshCanonicalBinary();
-    newer.resolve(binary("newer-binary"));
-    await second;
-    older.resolve(binary("older-binary"));
+    expect(commissionRuntime.commissionConfigApi.binary).toHaveBeenCalledTimes(2);
+    if (outcome === "success") oldRead.resolve(binary("stale"));
+    else oldRead.reject(new Error("stale read failed"));
     await first;
-
-    expect(store.binarySnapshot?.source).toBe("newer-binary");
+    expect(store.binaryStatus).toBe("loading");
+    expect(store.binarySnapshot).toBeNull();
+    let joinedSettled = false;
+    const joined = store.refreshCanonicalBinary().then(() => { joinedSettled = true; });
+    await flush();
+    expect(joinedSettled).toBe(false);
+    expect(commissionRuntime.commissionConfigApi.binary).toHaveBeenCalledTimes(2);
+    currentRead.resolve(binary("current"));
+    await Promise.all([second, joined]);
+    expect(store.binaryStatus).toBe("ready");
+    expect(store.binarySnapshot?.source).toBe("current");
+    commissionRuntime.commissionConfigApi.binary.mockResolvedValueOnce(binary("fresh"));
+    await store.refreshCanonicalBinary();
+    expect(commissionRuntime.commissionConfigApi.binary).toHaveBeenCalledTimes(3);
+    expect(store.binarySnapshot?.source).toBe("fresh");
   });
 
-  it("keeps a newer same-account binary success ready when the older request fails last", async () => {
-    const older = deferred<ReturnType<typeof binary>>();
-    const newer = deferred<ReturnType<typeof binary>>();
-    commissionRuntime.commissionConfigApi.binary
-      .mockReturnValueOnce(older.promise)
-      .mockReturnValueOnce(newer.promise);
+  it("can retry a synchronous binary reader failure without retaining a settled flight", async () => {
+    commissionRuntime.commissionConfigApi.binary.mockImplementationOnce(() => { throw new Error("reader unavailable"); });
+    const store = useCommission();
+    await store.refreshCanonicalBinary();
+    expect(store.binaryStatus).toBe("error");
+    commissionRuntime.commissionConfigApi.binary.mockResolvedValueOnce(binary("recovered"));
+    await store.refreshCanonicalBinary();
+    expect(commissionRuntime.commissionConfigApi.binary).toHaveBeenCalledTimes(2);
+    expect(store.binarySnapshot?.source).toBe("recovered");
+  });
+
+  it("coalesces concurrent same-scope F3 reads into one request", async () => {
+    const pending = deferred<ReturnType<typeof binary>>();
+    commissionRuntime.commissionConfigApi.binary.mockReturnValue(pending.promise);
     const store = useCommission();
 
     const first = store.refreshCanonicalBinary();
     const second = store.refreshCanonicalBinary();
-    newer.resolve(binary("newer-binary"));
-    await second;
-    older.reject(new Error("older binary failed"));
-    await first;
+    expect(commissionRuntime.commissionConfigApi.binary).toHaveBeenCalledTimes(1);
 
-    expect(store.binaryStatus).toBe("ready");
-    expect(store.binarySnapshot?.source).toBe("newer-binary");
+    pending.resolve(binary("coalesced-binary"));
+    await Promise.all([first, second]);
+    expect(store.binarySnapshot?.source).toBe("coalesced-binary");
+  });
+
+  it("clears a confirmed F3 snapshot when the newest same-scope refresh fails", async () => {
+    commissionRuntime.commissionConfigApi.binary
+      .mockResolvedValueOnce(binary("confirmed-binary"))
+      .mockRejectedValueOnce(new Error("newest binary read failed"));
+    const store = useCommission();
+
+    await store.refreshCanonicalBinary();
+    expect(store.binarySnapshot?.source).toBe("confirmed-binary");
+
+    await store.refreshCanonicalBinary();
+    expect(store.binaryStatus).toBe("error");
+    expect(store.binarySnapshot).toBeNull();
   });
 
   it("keeps the newer first page when an older same-account event refresh finishes last", async () => {
@@ -314,7 +357,7 @@ describe("Sep 06G same-account request generation fences", () => {
     newLadder.resolve(ladder("account-b"));
     newCurrent.resolve(current("V5"));
     await flush();
-    oldBinary.resolve(binary("account-a"));
+    oldBinary.reject(new Error("account-a binary failed"));
     oldEvents.reject(new Error("account-a events failed"));
     oldLadder.resolve(ladder("account-a"));
     oldCurrent.reject(new Error("account-a V-rank failed"));

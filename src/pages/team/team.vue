@@ -204,6 +204,7 @@ import InviteEarnCard from "@/components/team/invite-earn-card.vue";
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
 import NetworkOrbBackdrop from "@/components/team/network-orb-backdrop.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useVRank, nextRankProgress } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
@@ -336,8 +337,14 @@ const leadershipPoolPrimary = computed(() =>
 const leadershipPoolLineA = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHold : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
+const poolThisWeekText = computed(() => {
+  const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
+  return rate == null ? "" : fmt(t.value.home.poolThisWeek, {
+    rate: (rate * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }),
+  });
+});
 const leadershipPoolLineB = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "error" ? t.value.network.retry : "") : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "error" ? t.value.network.retry : "") : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : poolThisWeekText.value,
 );
 
 function go(url: string) {

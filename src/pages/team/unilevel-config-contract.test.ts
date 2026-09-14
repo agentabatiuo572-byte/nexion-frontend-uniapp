@@ -12,8 +12,17 @@ describe("unilevel canonical commission consumer contract", () => {
 
   it("does not render remote content while commission config is loading or failed", () => {
     expect(source).toContain("commission.configStatus === 'ready'");
-    expect(source).toContain("commission.configStatus === 'error'");
-    expect(source).toContain("commission.configStatus !== 'ready'");
+    expect(source).toContain('commission.configStatus === "error"');
+    expect(source).toContain('commission.configStatus !== "ready"');
+  });
+
+  it("reloads the page-local projection after a runtime revision invalidates it", () => {
+    expect(source).toContain("subscribeRuntimeRevision");
+    expect(source).toContain("const unsubscribeRuntimeRevision");
+    expect(source).toMatch(/subscribeRuntimeRevision\(\(\) => \{\s*retryRemote\(\);/);
+    expect(source).toContain("commission.ensureCanonicalConfig(), network.ensureCanonicalNetwork(), loadRemote()");
+    expect(source).toContain("if (!current()) return;");
+    expect(source).not.toContain('remoteState.value = "error"; } return;');
   });
 
   it("keeps canonical F2 policy visible without exposing provenance internals or inventing earnings", () => {

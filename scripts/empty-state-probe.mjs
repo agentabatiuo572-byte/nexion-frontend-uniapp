@@ -18,6 +18,26 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  // An empty commission history is a successful canonical read. The page
+  // also needs valid policy and member projections before showing its empty state.
+  if (url.pathname === "/api/config/commission/rates") return {
+    source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: null,
+    unilevel: [10, 5, 3, 2, 1, 0.5, 0.5].map((usdtPct, i) => ({ level: `L${i + 1}`, usdtPct, nexReward: 0 })),
+    unilevelPaused: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`L${i + 1}`, false])),
+    partnerTiersJson: JSON.stringify({ standard: 0, verified: 5000, premium: 50000, diamond: 500000 }),
+    influenceClampMin: 1, influenceClampMax: 5, coolingDays: 12, promoMultiplier: 1,
+  };
+  if (url.pathname === "/api/app/team/network") return {
+    source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    totalMembers: 0, directMembers: 0, activeMembers: 0, monthVolumeUsdt: 0, lifetimeVolumeUsdt: null,
+    members: [], generatedAt: "2026-09-14T00:00:00Z", nextCursor: null,
+  };
+  if (url.pathname === "/api/app/team/insights/unilevel") return {
+    source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+    period: "month", page: 1, pageSize: 20, totalRows: 0, events: [],
+    split: { direct: { amountUSDT: 0, amountNEX: 0, count: 0 }, extended: { amountUSDT: 0, amountNEX: 0, count: 0 } },
+    generatedAt: "2026-09-14T00:00:00Z", snapshotAt: "2026-09-14T00:00:00Z",
+  };
   // An unavailable exchange read is not an empty history. Supply the complete
   // canonical response so this probe exercises the actual empty-list branch.
   if (url.pathname === "/api/exchange") {

@@ -1,6 +1,6 @@
 <!--
   Binary — ported from Nexion-prototype/app/(main)/team/binary/page.tsx.
-  Balance Match (Track A vs Track B): match = min(A,B)/30 × 10%, daily cap from
+  Balance Match (Track A vs Track B): remote amounts and rates come from the canonical projection. Demo daily cap from
   phase (P1-P3 $5K → P4+ $2K). Blocked if either track < $1,000/mo. De-carded:
   floor hero → tint block warning → 2 filled wing columns (top member + VBadge)
   → transparent gap block → auto-placement tint row → recent matches
@@ -15,15 +15,23 @@
 
         <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
           <EmptyState
-            v-if="remoteApiEnabled && (commission.binaryStatus !== 'ready' || network.remoteStatus !== 'ready')"
-            :kind="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? 'recoverable-error' : 'empty-list'"
-            :title="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
-            :desc="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.projectionErrorDesc : undefined"
-            :cta-label="commission.binaryStatus === 'error' || network.remoteStatus === 'error' ? t.network.retry : undefined"
+            v-if="remoteApiEnabled && pageState.primary === 'error'"
+            kind="recoverable-error"
+            :title="t.network.projectionErrorTitle"
+            :desc="t.network.projectionErrorDesc"
+            :cta-label="t.network.retry"
             compact
             @cta="retryCanonicalData"
           />
-          <template v-if="!remoteApiEnabled || (commission.binaryStatus === 'ready' && network.remoteStatus === 'ready')">
+          <view
+            v-else-if="remoteApiEnabled && pageState.primary === 'loading'"
+            class="rounded-2xl"
+            style="height: 184px; background: color-mix(in srgb, var(--v5-surface-2) 65%, transparent)"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          />
+          <template v-if="pageState.primary === 'ready'">
         <!-- match hero — de-carded: the number sits on the page floor. Rules-intro
              pill rides the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
         <view :style="heroStyle">
@@ -71,6 +79,13 @@
                 </view>
               </view>
             </view>
+          </view>
+        </view>
+
+        <view v-if="remoteApiEnabled && pageState.memberDetails === 'error'" class="rounded-xl flex items-center justify-between" :style="memberReadErrorStyle">
+          <text :style="{ fontSize: '12px', color: 'var(--v5-ink-2)' }">{{ t.binary.memberDetailsUnavailable }}</text>
+          <view role="button" tabindex="0" class="active:opacity-70" :style="memberReadRetryStyle" @click="retryNetworkMembers" @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers">
+            <text>{{ t.network.retry }}</text>
           </view>
         </view>
 
@@ -140,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, type CSSProperties } from "vue";
+import { computed, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -151,16 +166,38 @@ import { useNetwork, type NetworkMember } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { onShow } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
+import { binaryPageState } from "@/lib/binary-page-state";
+import { binaryBlockedGuidance } from "@/lib/binary-blocked-guidance";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { createScopedReadCoalescer } from "@/lib/binary-read-coalescer";
+import { captureRuntimeRevision } from "@/api/order-api";
+import { useAuth } from "@/store/auth";
+import { useApp } from "@/store/app";
 
 const t = useT();
 const network = useNetwork();
 const commission = useCommission();
 const phase = useProductPhase();
+const auth = useAuth();
+const app = useApp();
+const canonicalReadCoalescer = createScopedReadCoalescer();
 
 const snapshot = computed(() => commission.binarySnapshot);
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
+const pageState = computed(() => binaryPageState({
+  remote: remoteApiEnabled,
+  binaryStatus: commission.binaryStatus,
+  networkStatus: network.remoteStatus,
+}));
 const remoteTrackA = computed(() => commission.binarySnapshot?.trackA ?? 0);
 const remoteTrackB = computed(() => commission.binarySnapshot?.trackB ?? 0);
 const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
@@ -174,8 +211,8 @@ const rightMonthVol = computed(() => remoteApiEnabled ? remoteTrackB.value : net
 const weakSide = computed(() => (leftMonthVol.value <= rightMonthVol.value ? "left" : "right"));
 const weakVol = computed(() => Math.min(leftMonthVol.value, rightMonthVol.value));
 const strongVol = computed(() => Math.max(leftMonthVol.value, rightMonthVol.value));
-// 预计奖金随结算周期联动:较小轨「该周期业绩」(月业绩 × 周期天数/30) × 10%,封顶 = 日封顶 × 周期天数。
-// 默认每月 → min(月两轨)×10%,与可见的两轨月业绩 + 「{period}…估算」标签 + 「{freq}结算」节奏全自洽。
+// 非远端演示估算按周期业绩和配置比例计算，封顶 = 日封顶 × 周期天数。
+// 正式远端直接读取服务端估算；公式比例来自同一快照，不在页面重算奖金。
 const periodMatch = computed(() => {
   if (remoteApiEnabled) return snapshot.value?.estimatedAmountUsdt ?? 0;
   const factor = settleDays.value / 30;
@@ -211,20 +248,22 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: sides.value.left.length,
+    count: remoteApiEnabled && pageState.value.memberDetails !== "ready"
+      ? snapshot.value?.trackAMembers ?? 0 : sides.value.left.length,
     monthVol: leftMonthVol.value,
     isWeak: weakSide.value === "left",
     color: "var(--v5-brand)",
-    top: topOf(sides.value.left),
+    top: pageState.value.memberDetails === "ready" ? topOf(sides.value.left) : undefined,
   },
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: sides.value.right.length,
+    count: remoteApiEnabled && pageState.value.memberDetails !== "ready"
+      ? snapshot.value?.trackBMembers ?? 0 : sides.value.right.length,
     monthVol: rightMonthVol.value,
     isWeak: weakSide.value === "right",
     color: "var(--v5-tech-cyan)",
-    top: topOf(sides.value.right),
+    top: pageState.value.memberDetails === "ready" ? topOf(sides.value.right) : undefined,
   },
 ]);
 
@@ -237,6 +276,7 @@ const estimateText = computed(() =>
 const gapHintText = computed(() => fmt(t.value.binary.gapHint, { freq: periodFreqLabel.value }));
 const formulaText = computed(() =>
   fmt(t.value.binary.formula, {
+    rate: (MATCH_RATE.value * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }),
     cap: DAILY_CAP.value.toLocaleString(),
     freq: periodFreqLabel.value,
   }),
@@ -252,11 +292,11 @@ const blockedDetailText = computed(() => {
     vol: weakVol.value.toFixed(0),
   });
 });
-const showGrowthRecoveryCta = computed(() => {
-  if (!remoteApiEnabled) return blocked.value;
-  return ["BINARY_LEG_ASSIGNMENT_INCOMPLETE", "BINARY_THRESHOLD_NOT_MET"]
-    .includes(snapshot.value?.blockedReason ?? "");
-});
+const showGrowthRecoveryCta = computed(() => binaryBlockedGuidance({
+  remote: remoteApiEnabled,
+  blocked: blocked.value,
+  reason: snapshot.value?.blockedReason,
+}).showInviteOptions);
 const blockedRecoveryText = computed(() => showGrowthRecoveryCta.value
   ? `${blockedDetailText.value} ${t.value.binary.blockedAction}`
   : blockedDetailText.value,
@@ -287,9 +327,26 @@ function binaryAmountColor(status?: string): string {
 }
 
 function retryCanonicalData(): void {
-  void commission.refreshCanonicalBinary();
+  if (!remoteSessionReady.value) return;
+  const scope = {
+    accountKey: app.accountKey,
+    accountBindingEpoch: app.accountBindingEpoch,
+    runtime: captureRuntimeRevision(),
+  };
+  void canonicalReadCoalescer.run(scope, () => Promise.all([
+    commission.refreshCanonicalBinary(),
+    network.refreshCanonicalNetwork(),
+  ]).then(() => undefined));
+}
+
+function retryNetworkMembers(): void {
+  if (!remoteSessionReady.value) return;
   void network.refreshCanonicalNetwork();
 }
+
+watch(remoteSessionReady, (ready, wasReady) => {
+  if (ready && !wasReady) retryCanonicalData();
+}, { immediate: true, flush: "post" });
 
 onMounted(() => {
   // The projection owns rule/settlement aggregates; the network projection
@@ -362,6 +419,22 @@ const topMemberStyle: CSSProperties = {
   paddingTop: "10px",
   borderColor: "var(--v5-border)",
   gap: "6px",
+};
+const memberReadErrorStyle: CSSProperties = {
+  padding: "10px 12px",
+  gap: "12px",
+  background: "var(--v5-surface-2)",
+};
+const memberReadRetryStyle: CSSProperties = {
+  minHeight: "36px",
+  padding: "0 10px",
+  display: "inline-flex",
+  alignItems: "center",
+  borderRadius: "999px",
+  background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
+  color: "var(--v5-brand)",
+  fontSize: "12px",
+  fontWeight: 600,
 };
 
 // Frosted-glass gap block (owner 2026-07-09) — chassis glass-tile token,
