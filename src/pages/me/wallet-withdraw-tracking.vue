@@ -138,7 +138,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import type { Withdrawal, WithdrawalStatus } from "@/store/types";
-import { navTo } from "@/lib/route";
+import { navTo, navReplace } from "@/lib/route";
 import { riskReasonLines, terminalReasonLine } from "@/lib/risk-reason-text";
 import { dailyLimitStatus } from "@/store/withdrawal-eligibility";
 import {
@@ -226,6 +226,17 @@ const wd = computed(() => {
 });
 const deepLinkMiss = computed(() => deepLinkId.value !== null && !wd.value
   && (!remoteApiEnabled || trackingReadStatus.value === "not-found"));
+
+let bankRedirecting = false;
+function openBankTracking() {
+  const row = wd.value;
+  if (trackingPageVisible && !bankRedirecting && row?.network === "BANK-VND") {
+    bankRedirecting = true;
+    void navReplace(`/pages/me/wallet-withdraw-bank?order=${encodeURIComponent(row.id)}`)
+      .then(ok => { if (!ok) bankRedirecting = false; });
+  }
+}
+watch(() => wd.value, openBankTracking);
 
 function refreshTrackedWithdrawal(): void {
   if (deepLinkId.value) void trackedWithdrawalRead.refresh();
@@ -340,6 +351,7 @@ const stopDayTimer = () => { if (dayTimer) { clearInterval(dayTimer); dayTimer =
 // 每往返一次就多留一个常驻 60s tick。我抄追踪页这段时只抄了「加个定时器」,没抄那条约束。
 onShow(() => {
   trackingPageVisible = true;
+  openBankTracking();
   trackingPageEpoch += 1;
   nowTick.value = mockServerNow();
   stopDayTimer();

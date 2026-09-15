@@ -12,7 +12,7 @@ export interface WithdrawalSubmission {
   targetAddress?: string;
   createdAt?: number;
   amount: number;
-  chain: SupportedWithdrawalNetwork;
+  chain: SupportedWithdrawalNetwork | "BANK-VND";
   status: string;
   /** Required for current non-terminal submissions. Legacy confirmed fast-pass
    * history predates the hold column and carries no synthetic replacement. */
@@ -273,7 +273,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     : riskRoute;
   if (!row || !withdrawalNo || !status || (!holdUntil && !legacyConfirmedFastPass) || !canonicalRiskRoute
       || !allowedRiskRoutes.has(canonicalRiskRoute.toLowerCase())
-      || !["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"].includes(String(chain))
+      || !["USDT-TRC20", "USDT-BEP20", "USDT-ERC20", "BANK-VND"].includes(String(chain))
       || amount === null || networkConfirmUsd === null || networkFee === null || penaltyFee === null || grossFee === null
       || nexBurned === null || feeWaived === null || actualFee === null || netReceive === null
       || !policyVersion || typeof row.useNexFeeOffset !== "boolean"
@@ -289,7 +289,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     ...(targetAddress ? { targetAddress } : {}),
     ...(createdAt !== undefined && Number.isFinite(createdAt) ? { createdAt } : {}),
     amount: amount!,
-    chain: chain as SupportedWithdrawalNetwork,
+    chain: chain as WithdrawalSubmission["chain"],
     status: status!,
     ...(holdUntil ? { holdUntil } : {}),
     networkConfirmUsd: networkConfirmUsd!,
@@ -528,7 +528,8 @@ export function toCanonicalWithdrawal(
   address: string,
   submittedAt = submission.createdAt ?? Date.now(),
 ): Withdrawal {
-  const status = canonicalStatus(submission.status);
+  const status = submission.chain === "BANK-VND" && submission.status.toUpperCase() === "TX_ORPHANED"
+    ? "frozen" : canonicalStatus(submission.status);
   // A confirmed legacy row without a historical hold has no future estimate to
   // display. Its server-created timestamp is the only truthful terminal anchor;
   // never substitute the browser clock or manufacture a hold deadline.
@@ -645,7 +646,7 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
     : null;
   const nexRefundedAt = positive(row.nexRefundedAt);
   return {
-    withdrawalNo, status: canonicalStatus(status), confirmedAt, terminalReason, retriable,
+    withdrawalNo, status: row.chain === "BANK-VND" && status.toUpperCase() === "TX_ORPHANED" ? "frozen" : canonicalStatus(status), confirmedAt, terminalReason, retriable,
     nexRefunded, nexRefundedAt,
   };
 }

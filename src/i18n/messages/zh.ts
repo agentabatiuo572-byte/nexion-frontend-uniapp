@@ -3,6 +3,20 @@ import type { Messages } from "./en";
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  bankWithdrawal: {
+    resultReview: "代付结果存在差异，客服正在核对；请勿重复提现。",
+    requote: "取消未提交报价／重新填写",
+    title: "银行卡提现", entry: "提现到越南银行账户", unavailable: "银行卡提现通道暂未开放，不会提交出款。",
+    bank: "银行", account: "银行账户号码", holder: "开户人完整姓名", code: "短信验证码", sendCode: "获取验证码", bind: "确认绑定银行账户",
+    bindingNotice: "新增或变更账户后 24 小时生效，7 天后可再次变更；存在进行中的提现时不可变更。",
+    effective: "生效时间", changeAfter: "可再次变更时间", amount: "提现金额（USDT）", quote: "获取报价", fee: "手续费（USDT）",
+    net: "兑换本金（USDT）", rate: "每 USDT 兑换 VND", receive: "银行到账金额（VND）", expires: "报价到期时间", confirm: "确认提现",
+    confirmNotice: "确认后所示 USDT 金额将暂时不可用，直至提现处理完成。请勿重复付款或转账。",
+    refresh: "刷新订单状态", unknown: "提交结果暂未确认，请先查询原订单，不要重复发起提现。",
+    review: "等待处理", processing: "银行转账处理中", paid: "银行代付已确认", failed: "提现失败／已退回",
+    held: "客服正在核对，所示金额暂时不可用", error: "操作暂未完成，请重试或联系客服。",
+    otpSent: "验证码已发送", bound: "银行账户已保存", newWithdrawal: "发起新提现", chooseBank: "请选择银行", loading: "加载中…",
+  },
   privacy: {
     "title": "隐私政策",
     "unavailable": "隐私政策的已发布正文暂时不可用，请稍后重试。",

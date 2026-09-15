@@ -304,7 +304,7 @@ export interface WithdrawalFeeSnapshot {
 export interface Withdrawal {
   id: string;
   amount: number;
-  network: "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
+  network: "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20" | "BANK-VND";
   address: string;
   fee: WithdrawalFeeSnapshot;
   status: WithdrawalStatus;

@@ -121,7 +121,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
-  "wallet-withdraw.vue": "07a25252e9a52052f914e8627e6746318c833b27296bf3d50243d8b587eac352",
+  // Authorized new bank-withdrawal entry; the existing USDT controls and styles are unchanged.
+  "wallet-withdraw.vue": "63acb1e4736056d1be80d835bad8d5e0c52fc54f654122b6c26a3ee1f8b2fc33",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",
 };
@@ -179,7 +180,9 @@ describe("Me page 5174 normal-state UI parity", () => {
 
   it("matches the checked-out 5174 Me-page visual baseline when it is available", () => {
     if (!existsSync(prototypeMeDir)) return;
-    const files = readdirSync(formalMeDir).filter((name: string) => name.endsWith(".vue")).sort();
+    // User-requested HDPay payout is a new server-only page, covered by bank-withdrawal-runtime.mjs.
+    expect(existsSync(new URL("wallet-withdraw-bank.vue", formalMeDir))).toBe(true);
+    const files = readdirSync(formalMeDir).filter((name: string) => name.endsWith(".vue") && name !== "wallet-withdraw-bank.vue").sort();
     const prototypeFiles = readdirSync(prototypeMeDir).filter((name: string) => name.endsWith(".vue")).sort();
     expect(files).toEqual(prototypeFiles);
     expect(files).toHaveLength(32);

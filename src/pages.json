@@ -109,6 +109,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/me/wallet-withdraw-bank",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/me/wallet-address-rebind",
       "style": { "navigationStyle": "custom" }
     },

@@ -65,6 +65,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { verifyBankWithdrawalPage } from "./bank-withdrawal-runtime.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -812,6 +813,7 @@ try {
   //   真崩 = protocol(响应回来了却读不懂 —— 解析器炸了,这是本门的正题,绝不放行)
   //          · configuration(门自己把环境配错了,必须炸出来)
   //          · 任何不是 ApiError 的东西(TypeError、Vue 渲染错…)。
+  await verifyBankWithdrawalPage(page, gotoProtected);
   const uncaught = await page.evaluate(() => window.__gateUncaught || []);
   const backendAbsent = (e) => e.name === "ApiError" && ["network", "http", "business", "auth"].includes(e.kind);
   // 门自己的跳转与启动期守卫跳转撞车时,uni 抛的是「本次导航被后一次取消」——

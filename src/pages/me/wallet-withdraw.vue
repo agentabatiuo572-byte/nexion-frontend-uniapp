@@ -25,6 +25,9 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" title="USDT" :subtitle="t.wallet.withdraw" />
+      <view class="mx-4 mb-3">
+        <view class="flex items-center justify-center active:opacity-70" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" :aria-disabled="!!pendingAttempt" @click="!pendingAttempt && navTo('/pages/me/wallet-withdraw-bank')" @keydown.enter.prevent="!pendingAttempt && navTo('/pages/me/wallet-withdraw-bank')" @keydown.space.prevent="!pendingAttempt && navTo('/pages/me/wallet-withdraw-bank')"><text>{{ t.bankWithdrawal.entry }}</text></view>
+      </view>
 
       <view v-if="pendingAttempt" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
         <view class="flex-1 min-w-0">
@@ -432,6 +435,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
+type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 import { withdrawalApi } from "@/api/runtime";
 // 🔴 不再 import isAmbiguousOutcome:本页改用 isSettledRejection + isIdempotencyConflict 分诊。
 // 那行 import 曾经是**全文件唯一**的 isAmbiguousOutcome 出现处(零调用),却正好喂饱了
@@ -441,7 +445,7 @@ import { ApiError } from "@/api/errors";
 import { triageWithdrawFailure } from "@/lib/withdraw-failure-triage";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
-const ALL_NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
+const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
   { id: "USDT-TRC20", label: "TRC20" },
   { id: "USDT-BEP20", label: "BEP20" },
   { id: "USDT-ERC20", label: "ERC20" },
@@ -515,7 +519,7 @@ async function abandonPendingAttempt() {
   }
 }
 // Server policy owns the network allow-list; local mock keeps its fixture.
-const NETWORKS = computed<{ id: Withdrawal["network"]; label: string }[]>(() => fundsServerEnabled
+const NETWORKS = computed<{ id: CryptoNetwork; label: string }[]>(() => fundsServerEnabled
     ? ALL_NETWORKS.filter((item) => withdrawalPolicy.value?.enabledNetworks.includes(item.id))
     : ALL_NETWORKS);
 
@@ -786,7 +790,7 @@ onLoad((options) => {
 
 const amount = ref("");
 // 提现网络可选;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
-const network = ref<Withdrawal["network"]>("USDT-BEP20");
+const network = ref<CryptoNetwork>("USDT-BEP20");
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
 const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.address ?? "");
 // 掩码中段:与地址管理页共用 core.maskAddressMid 同一实现,不各写一份。
@@ -840,7 +844,7 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawal
 
 // 网络也是报价/地址的输入 —— 提交在途一律冻结,与 useMax/useSmallAmountLine/toggleOffset
 // 同一纪律(审计 P2:评估窗口内切网络会让本可成功的提交被确认后校验无谓拒绑)。
-function pickNetwork(id: Withdrawal["network"]) {
+function pickNetwork(id: CryptoNetwork) {
   if (inputsLocked.value) return;
   network.value = id;
 }
@@ -911,7 +915,7 @@ const nexFeeOffsetRate = computed(() => withdrawalPolicy.value?.nexFeeOffsetRate
 /** FEAT-WD02:NEX 抵扣开关(规格 ③:默认关;server 侧无此意图永不烧 NEX)。 */
 const offsetWithNex = ref(false);
 /** 按当前绑定网络取网络确认费键(网络派生自 pairing 响应式 —— 换绑回本页即时刷新)。 */
-const NETWORK_FEE_KEY: Record<Withdrawal["network"], WithdrawNetworkKey> = {
+const NETWORK_FEE_KEY: Record<CryptoNetwork, WithdrawNetworkKey> = {
   "USDT-TRC20": "trc20",
   "USDT-BEP20": "bep20",
   "USDT-ERC20": "erc20",
@@ -937,7 +941,7 @@ const feeCalc = computed(() =>
  * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
  * 等式恒成立、判据恒为真 = 这道门等于没有。
  */
-function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: Withdrawal["network"]): boolean {
+function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: CryptoNetwork): boolean {
   return isWithdrawalFeeSnapshotValid(
     fee,
     offset,
@@ -1284,7 +1288,7 @@ function fmtNex(n: number): string {
 
 const canSubmit = computed(() => submitDisabledReason.value === "");
 
-function networkHint(id: Withdrawal["network"]): string {
+function networkHint(id: CryptoNetwork): string {
   switch (id) {
     case "USDT-TRC20":
       return t.value.wallet.networkHintTrc20;
@@ -1690,7 +1694,7 @@ const addrGuideCtaStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
 };
 // 网络 chips(与地址管理页同语汇;选中 brand-soft,未选 surface)。
-function netChipStyle(id: Withdrawal["network"]): CSSProperties {
+function netChipStyle(id: CryptoNetwork): CSSProperties {
   const on = network.value === id;
   return {
     minHeight: "44px",
@@ -1699,7 +1703,7 @@ function netChipStyle(id: Withdrawal["network"]): CSSProperties {
     background: on ? "var(--v5-brand-soft)" : "var(--v5-surface)",
   };
 }
-function netChipLabelStyle(id: Withdrawal["network"]): CSSProperties {
+function netChipLabelStyle(id: CryptoNetwork): CSSProperties {
   return {
     fontSize: "13px",
     fontWeight: 600,

@@ -3,6 +3,20 @@ import type { Messages } from "./en";
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  bankWithdrawal: {
+    resultReview: "Kết quả chi trả chưa thống nhất, bộ phận hỗ trợ đang đối soát. Vui lòng không gửi yêu cầu rút tiền trùng.",
+    requote: "Hủy báo giá chưa dùng / nhập lại",
+    title: "Rút tiền về ngân hàng", entry: "Rút về tài khoản ngân hàng Việt Nam", unavailable: "Kênh rút tiền ngân hàng chưa mở. Không có lệnh chuyển tiền nào được gửi.",
+    bank: "Ngân hàng", account: "Số tài khoản", holder: "Họ tên đầy đủ của chủ tài khoản", code: "Mã SMS", sendCode: "Gửi mã", bind: "Xác nhận tài khoản ngân hàng",
+    bindingNotice: "Tài khoản mới hoặc thay đổi có hiệu lực sau 24 giờ; được đổi lại sau 7 ngày. Không thể đổi khi đang có lệnh rút tiền.",
+    effective: "Có hiệu lực từ", changeAfter: "Có thể thay đổi sau", amount: "Số tiền rút (USDT)", quote: "Lấy báo giá", fee: "Phí (USDT)",
+    net: "Số tiền quy đổi (USDT)", rate: "VND cho mỗi USDT", receive: "Số tiền ngân hàng nhận (VND)", expires: "Báo giá hết hạn", confirm: "Xác nhận rút tiền",
+    confirmNotice: "Số USDT hiển thị sẽ được tạm giữ trong khi xử lý lệnh rút. Không thanh toán hoặc chuyển tiền lại.",
+    refresh: "Cập nhật trạng thái", unknown: "Chưa xác nhận được kết quả gửi. Hãy kiểm tra lệnh cũ trước khi tạo lệnh mới.",
+    review: "Đang chờ xử lý", processing: "Đang chuyển tiền ngân hàng", paid: "Đã xác nhận chi trả", failed: "Rút tiền thất bại / đã hoàn trả",
+    held: "Bộ phận hỗ trợ đang kiểm tra — tiền vẫn đang được tạm giữ", error: "Chưa thể hoàn tất yêu cầu. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
+    otpSent: "Đã gửi mã", bound: "Đã lưu tài khoản", newWithdrawal: "Tạo lệnh rút mới", chooseBank: "Chọn ngân hàng", loading: "Đang tải…",
+  },
   privacy: {
     "title": "Chính sách quyền riêng tư",
     "unavailable": "Chưa thể tải chính sách quyền riêng tư đã công bố. Vui lòng thử lại sau.",
