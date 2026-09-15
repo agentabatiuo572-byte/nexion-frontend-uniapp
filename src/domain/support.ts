@@ -68,6 +68,8 @@ export interface Conversation {
   messages: ConvMessage[];
   unread: number;
   lastTs: number;
+  /** Server maximum public message ID; list rows do not contain the transcript. */
+  lastPublicMessageId?: number;
   lastMessage: string;
   sessionStatus: ConvSessionStatus;
   /** True when the server intentionally returned only the newest message window. */

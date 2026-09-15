@@ -7,6 +7,7 @@ interface CursorPage<T> extends Page<T> { nextCursor: number | null }
 export interface SupportFaqPage extends Page<SupportFaq> { pageNum: number; pageSize: number }
 interface TicketInput { category: TicketCategory; subject: string; body: string }
 interface ConversationTicketResult { conversation: Conversation; ticket: Ticket }
+export interface ConversationDismissal { conversationNo: string; throughMessageId: number }
 export type SupportCommandResult =
   | { kind: "ticket"; ticket: Ticket }
   | { kind: "conversation"; conversation: Conversation }
@@ -20,6 +21,9 @@ export interface SupportApi {
   replyTicket(ticket: Ticket, body: string, key: string): Promise<Ticket>;
   closeTicket(ticket: Ticket, key: string): Promise<Ticket>;
   conversations(): Promise<Page<Conversation>>;
+  /** null means the backend has not installed this optional inbox capability yet. */
+  conversationDismissals(): Promise<ConversationDismissal[] | null>;
+  dismissConversation(id: string, throughMessageId: number): Promise<ConversationDismissal>;
   conversationCategories(): Promise<ConversationCategoryAvailability>;
   conversation(id: string, beforeMessageId?: number): Promise<Conversation>;
   markConversationRead(conversation: Conversation, lastSeenMessageId: number): Promise<Conversation>;
@@ -33,6 +37,11 @@ export interface SupportApi {
 }
 
 function invalid(message: string): never { throw new ApiError({ kind: "protocol", message }); }
+function parseDismissal(value: unknown): ConversationDismissal {
+  const v = row(value); const conversationNo = text(v?.conversationNo); const throughMessageId = integer(v?.throughMessageId, 1);
+  if (!conversationNo || throughMessageId === null) invalid("SUPPORT_DISMISSAL_RESPONSE_INVALID");
+  return { conversationNo, throughMessageId };
+}
 function row(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function text(value: unknown, empty = false): string | null { if (typeof value !== "string") return null; const v = value.trim(); return v || empty ? v : null; }
 function integer(value: unknown, min = 0): number | null { const v = typeof value === "number" ? value : Number(value); return Number.isSafeInteger(v) && v >= min ? v : null; }
@@ -87,8 +96,10 @@ function parseConversationHeader(value: unknown): Conversation {
   const status = enumValue(v?.status, ["open", "transferred", "resolved", "closed"] as const); const version = integer(v?.version);
   const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt); const unread = integer(v?.unreadCount); const agentName = text(v?.ownerAgentName, true);
   const lastMessage = text(v?.lastMessage, true);
+  const lastPublicMessageId = v?.lastPublicMessageId == null ? 0 : integer(v.lastPublicMessageId);
   if (!v || !id || !type || !status || version === null || lastTs === null || unread === null || agentName === null || lastMessage === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false, historyNextCursor: null };
+  if (lastPublicMessageId === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, lastPublicMessageId, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false, historyNextCursor: null };
 }
 function parseConversationMessage(value: unknown): ConvMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
@@ -204,6 +215,24 @@ export function createSupportApi(client: ApiClient): SupportApi {
     replyTicket: async (ticket, body, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     closeTicket: async (ticket, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/close`), idempotencyKey: requiredKey(key), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     conversations: allConversations,
+    conversationDismissals: async () => {
+      let value: unknown;
+      try { value = await client.request({ method: "GET", path: await supportPath("/conversation-dismissals") }); }
+      catch (cause) {
+        // Rolling upgrades must not break the existing conversation list. Other
+        // failures remain failures; they cannot reset known personal markers.
+        if (cause instanceof ApiError && cause.status === 404) return null;
+        throw cause;
+      }
+      if (!Array.isArray(value)) invalid("SUPPORT_DISMISSAL_RESPONSE_INVALID");
+      return value.map(parseDismissal);
+    },
+    dismissConversation: async (id, throughMessageId) => {
+      if (!Number.isSafeInteger(throughMessageId) || throughMessageId <= 0) invalid("SUPPORT_DISMISSAL_BOUNDARY_INVALID");
+      const result = parseDismissal(await client.request({ method: "POST", path: `${supportRoot}/conversations/${pathId(id)}/dismiss`, body: { throughMessageId } }));
+      if (result.conversationNo !== id || result.throughMessageId < throughMessageId) invalid("SUPPORT_DISMISSAL_RESPONSE_INVALID");
+      return result;
+    },
     conversationCategories: async () => parseConversationCategories(await client.request({
       method: "GET", path: `${supportRoot}/conversation-categories`,
     })),

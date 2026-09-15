@@ -3121,6 +3121,11 @@ export const en = {
     staleSnapshot: "Showing the last confirmed messages. Refresh to check for updates.",
     retry: "Retry",
     startConversation: "Start conversation",
+    contactAdvisor: "Contact advisor",
+    removeFromList: "Remove from list",
+    removing: "Removing…",
+    removeHint: "Chat history is kept. The conversation reappears when a new message arrives.",
+    removeFailed: "Removal was not confirmed. Try again. Your chat history is kept.",
     contactSupport: "Contact support",
     newBadge: "New",
     // Chat

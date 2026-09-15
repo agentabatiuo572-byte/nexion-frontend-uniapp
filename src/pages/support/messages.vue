@@ -36,22 +36,34 @@
 
         <!-- Right conversation list -->
         <view class="nx-conv-listcol">
+          <view
+            v-if="convStore.categoryAvailabilityStatus === 'loading' && TYPES.length === 0"
+            class="nx-conv-category-loading"
+            role="status"
+            aria-live="polite"
+          >
+            <text>{{ t.help.loadingMore }}</text>
+          </view>
+          <template v-else>
           <!-- A new turn opens a composer first. The authenticated user's text is the
                first durable timeline entry; this surface never invents an opening. -->
           <view
-            v-if="selectedType === 'support' && rows.length > 0 && !hasActiveSupport"
+            v-if="canStartConversation"
             class="nx-conv-contact active:opacity-80"
+            :class="{ 'nx-conv-contact--advisor': selectedType === 'advisor' }"
             role="button"
             tabindex="0"
-            :aria-label="t.conversations.contactSupport"
-            @click="onStartConversation('support')"
+            :aria-label="contactLabel"
+            @click="onStartConversation()"
+            @keydown.enter.prevent="onStartConversation()"
+            @keydown.space.prevent="onStartConversation()"
           >
-            <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="SUPPORT_ICON" /></view>
-            <text class="nx-conv-contact-t">{{ t.conversations.contactSupport }}</text>
+            <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="selectedType === 'advisor' ? ADVISOR_ICON : SUPPORT_ICON" /></view>
+            <text class="nx-conv-contact-t">{{ contactLabel }}</text>
           </view>
 
           <view
-            v-if="selectedType !== 'ai' && convStore.error && rows.length > 0"
+            v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length > 0"
             class="nx-conv-refresh-warning"
           >
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.staleSnapshot }}</text>
@@ -60,7 +72,7 @@
             </view>
           </view>
           <EmptyState
-            v-if="selectedType !== 'ai' && convStore.error && rows.length === 0"
+            v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length === 0"
             kind="recoverable-error"
             :title="t.conversations.loadError"
             :desc="t.conversations.loadErrorDesc"
@@ -68,15 +80,27 @@
             compact
             @cta="retryConversations"
           />
-          <EmptyState v-else-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="emptyHint" :cta-label="startConversationLabel" emphasis compact @cta="onStartConversation" />
+          <EmptyState
+            v-else-if="convStore.categoryAvailabilityStatus === 'ready' && TYPES.length === 0"
+            kind="empty-list"
+            :title="t.conversations.categoryDisabled"
+            compact
+          />
+          <EmptyState v-else-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="emptyHint" compact />
+          <text v-if="removeError" class="nx-conv-remove-error" role="alert">{{ removeError }}</text>
           <view
             v-for="r in rows"
             :key="r.id"
+            class="nx-conv-rowgroup"
+          >
+          <view
             class="nx-conv-row active:opacity-80"
             role="button"
             tabindex="0"
             :aria-label="r.name"
             @click="openRow(r)"
+            @keydown.enter.prevent="openRow(r)"
+            @keydown.space.prevent="openRow(r)"
           >
             <NovaAvatar v-if="r.isAi" :size="44" />
             <view v-else class="nx-conv-ava" :style="avaStyle(r.tint)">
@@ -93,6 +117,16 @@
               </view>
             </view>
           </view>
+          <view v-if="!r.isAi && convStore.dismissalAvailable" class="nx-conv-rowactions">
+            <view role="button" tabindex="0" class="nx-conv-remove"
+              :aria-label="t.conversations.removeFromList + ' · ' + r.name" :aria-disabled="convStore.dismissingIds[r.id] === true"
+              @click="removeRow(r)" @keydown.enter.prevent="removeRow(r)" @keydown.space.prevent="removeRow(r)">
+              <text>{{ convStore.dismissingIds[r.id] ? t.conversations.removing : t.conversations.removeFromList }}</text>
+            </view>
+          </view>
+          </view>
+          <text v-if="selectedType !== 'ai' && rows.length > 0 && convStore.dismissalAvailable" class="nx-conv-remove-hint">{{ t.conversations.removeHint }}</text>
+          </template>
         </view>
       </view>
     </view>
@@ -122,6 +156,8 @@ const nova = useNova();
 const app = useApp();
 
 const selectedType = ref<ConversationType>("advisor");
+const removeError = ref("");
+watch(() => app.accountBindingEpoch, () => { removeError.value = ""; });
 
 // Entering the inbox is a lazy timeout checkpoint (chat entry and session start
 // sweep too): stale-active support sessions flip to closed here (real backend
@@ -147,15 +183,29 @@ function retryConversations() {
   void Promise.allSettled([convStore.refresh(), convStore.refreshCategories()]);
 }
 
-// Contact-support entry shows only when no live session exists.
-const hasActiveSupport = computed(() =>
-  convStore.byType("support").some((c) => c.sessionStatus === "active"),
+// Both human categories expose the same contact path, including a brand-new inbox.
+const canStartConversation = computed(() =>
+  selectedType.value !== "ai"
+    && ((!convStore.error && convStore.categoryEnabled(selectedType.value))
+      || convStore.conversations.some(c => c.type === selectedType.value && (c.sessionStatus === "active" || c.status === "transferred")))
+    && !convStore.byType(selectedType.value).some((c) => c.sessionStatus === "active" || c.status === "transferred"),
 );
 
 function onStartConversation(type?: Exclude<ConversationType, "ai">) {
   const target = type ?? (selectedType.value === "advisor" || selectedType.value === "support" ? selectedType.value : null);
-  if (!target || !convStore.categoryEnabled(target)) return;
+  if (!target) return;
+  const ongoing = convStore.conversations.find(c => c.type === target && (c.sessionStatus === "active" || c.status === "transferred"));
+  if (ongoing) { navTo("/pages/support/chat?cid=" + encodeURIComponent(ongoing.id)); return; }
+  if (!convStore.categoryEnabled(target)) return;
   navTo("/pages/support/chat?start=" + target);
+}
+
+async function removeRow(r: Row) {
+  if (r.isAi || convStore.dismissingIds[r.id]) return;
+  const accountEpoch = app.accountBindingEpoch;
+  removeError.value = "";
+  try { await convStore.dismissConversation(r.id); }
+  catch { if (accountEpoch === app.accountBindingEpoch) removeError.value = t.value.conversations.removeFailed; }
 }
 
 // Inline category icons (stroke=currentColor → tinted via container `color`).
@@ -169,7 +219,7 @@ const TYPES = computed<{ key: ConversationType; tint: string; icon: string }[]>(
     { key: "support", tint: "var(--v5-tech-cyan)", icon: SUPPORT_ICON },
   ];
   available.push({ key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON });
-  return available.filter((row) => convStore.categoryEnabled(row.key));
+  return available.filter((row) => convStore.categoryReadable(row.key));
 });
 
 watch(TYPES, (available) => {
@@ -223,7 +273,7 @@ function relTime(ts: number): string {
 
 const rows = computed<Row[]>(() => {
   const sel = selectedType.value;
-  if (!convStore.categoryEnabled(sel)) return [];
+  if (!convStore.categoryReadable(sel)) return [];
   if (sel === "ai") {
     const msgs = nova.messages;
     const last = msgs.length ? msgs[msgs.length - 1] : null;
@@ -264,7 +314,8 @@ const emptyHint = computed(() =>
     ? t.value.conversations.listEmptySupport
     : t.value.conversations.listEmptyAdvisor,
 );
-const startConversationLabel = computed(() => t.value.conversations.startConversation);
+const contactLabel = computed(() => selectedType.value === "advisor"
+  ? t.value.conversations.contactAdvisor : t.value.conversations.contactSupport);
 
 function openRow(r: Row) {
   if (r.isAi) {
@@ -303,6 +354,11 @@ function avaStyle(tint: string): CSSProperties {
 </script>
 
 <style scoped>
+.nx-conv-rowactions { display: flex; justify-content: flex-end; padding: 0 16px 4px; }
+.nx-conv-remove { min-height: 44px; display: flex; align-items: center; color: var(--v5-ink-3); font-size: 12px; padding: 0 8px; }
+.nx-conv-remove[aria-disabled="true"] { opacity: .5; }
+.nx-conv-remove-hint, .nx-conv-remove-error { display: block; padding: 12px 16px; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; }
+.nx-conv-remove-error { color: var(--v5-danger, #c44); }
 .nx-conv-center {
   display: flex;
   gap: 0;
@@ -350,6 +406,7 @@ function avaStyle(tint: string): CSSProperties {
   padding: 4px 0;
 }
 .nx-conv-contact {
+  --contact-tint: var(--v5-tech-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -357,8 +414,11 @@ function avaStyle(tint: string): CSSProperties {
   min-height: 48px;
   margin: 10px 16px 4px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent);
-  color: var(--v5-tech-cyan);
+  background: color-mix(in srgb, var(--contact-tint) 12%, transparent);
+  color: var(--contact-tint);
+}
+.nx-conv-contact--advisor {
+  --contact-tint: var(--v5-brand);
 }
 .nx-conv-contact-ico {
   display: grid;
@@ -368,7 +428,15 @@ function avaStyle(tint: string): CSSProperties {
   font-family: var(--font-v5);
   font-size: 13px;
   font-weight: 600;
-  color: var(--v5-tech-cyan);
+  color: inherit;
+}
+
+.nx-conv-category-loading {
+  min-height: 144px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--v5-ink-3);
 }
 .nx-conv-refresh-warning {
   display: flex;

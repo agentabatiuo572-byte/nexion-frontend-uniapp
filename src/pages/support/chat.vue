@@ -81,7 +81,7 @@
       :closed="isClosedSession"
       :restart-label="isAi && remoteApiEnabled ? t.nova.localRetry : t.conversations.restartSession"
       :queue-labels="isAi && remoteApiEnabled ? t.nova.queue : undefined"
-      :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : cid"
+      :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : app.accountBindingEpoch + ':' + (cid || startType || '')"
       :max-input-length="isAi && remoteApiEnabled ? 2000 : undefined"
       @send="onSend"
       @queue-action="onQueueAction"
@@ -205,12 +205,35 @@ function restoreCompletedHumanCreate(activateRealtime = false) {
 }
 
 function stopHumanThreadPolling() {
+  humanOpenRequest = null;
   humanRealtime.stop();
 }
 
 function startHumanThreadPolling(openEpoch: number, openId: string) {
   humanRealtime.watchIfCurrent(openEpoch, openId);
 }
+
+let humanOpenRequest: { epoch: number; id: string; binding: number } | null = null;
+async function openHumanConversation(epoch: number, id: string) {
+  const request = { epoch, id, binding: app.accountBindingEpoch };
+  humanOpenRequest = request;
+  const current = () => humanOpenRequest === request && request.binding === app.accountBindingEpoch
+    && humanRealtime.isCurrent(request.epoch, request.id);
+  try {
+    await convStore.open(id, current);
+    if (current()) startHumanThreadPolling(epoch, id);
+  } catch {
+    if (current()) navBack("/pages/support/messages");
+  } finally {
+    if (humanOpenRequest === request) humanOpenRequest = null;
+  }
+}
+
+watch(() => app.accountBindingEpoch, () => {
+  if (isAi.value) return;
+  stopHumanThreadPolling();
+  if (novaPageVisible && cid.value) void openHumanConversation(humanRealtime.show(), cid.value);
+});
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
 // space itself. Match the chassis source (real device height, else the H5
@@ -281,7 +304,7 @@ onShow(async () => {
     };
     categoryGate = gate;
     const categoryOutcome = await gate.promise;
-    if (categoryGate !== gate || categoryOutcome === "stale") return;
+    if (categoryGate !== gate || !novaPageVisible || categoryOutcome === "stale") return;
     if (categoryOutcome === "failed" || !convStore.categoryEnabled(requestedCategory)) {
       toast.info(t.value.conversations.categoryDisabled, "");
       navBack("/pages/support/messages");
@@ -296,18 +319,12 @@ onShow(async () => {
     }
   }
   else if (cid.value && humanOpenEpoch !== null) {
-    const openEpoch = humanOpenEpoch;
-    const openId = cid.value;
-    try { await convStore.open(openId, () => humanRealtime.isCurrent(openEpoch, openId)); } catch {
-      if (!humanRealtime.isCurrent(openEpoch, openId)) return;
-      navBack("/pages/support/messages");
-      return;
-    }
-    startHumanThreadPolling(openEpoch, openId);
+    await openHumanConversation(humanOpenEpoch, cid.value);
   }
 });
 onHide(() => {
   novaPageVisible = false;
+  categoryGate = null;
   ++handoffAttemptEpoch;
   handoffBusy.value = false;
   novaStatusEpoch += 1;
@@ -704,6 +721,7 @@ function cancelNovaThinking() {
 
 function cleanup() {
   novaPageVisible = false;
+  categoryGate = null;
   novaStatusEpoch += 1;
   novaHistoryEpoch += 1;
   useUI().clearConfirmsBy(dialogOwner);
@@ -800,6 +818,17 @@ async function onSend(text: string, restore?: () => void) {
     void drainNovaQueue();
     return;
   }
+  // Do not supersede an in-flight page read; preserve the draft for its result.
+  if (!isAi.value && humanOpenRequest !== null) { restore?.(); return; }
+  if (!isAi.value && !cid.value && startType.value && remoteApiEnabled) {
+    const binding = app.accountBindingEpoch, type = startType.value;
+    if (convStore.categoryAvailabilityStatus !== "ready") {
+      const outcome = await convStore.refreshCategories();
+      if (binding !== app.accountBindingEpoch || !novaPageVisible || startType.value !== type || cid.value) return;
+      if (outcome !== "applied") { restore?.(); return; }
+    }
+    if (!convStore.categoryEnabled(type)) { restore?.(); toast.info(t.value.conversations.categoryDisabled, ""); return; }
+  }
   if (!acquireSendSlot()) {
     restore?.(); // rejected send must not swallow the typed message
     return;
@@ -851,7 +880,11 @@ async function onSend(text: string, restore?: () => void) {
     toast.info(isTransferredSession.value ? t.value.conversations.sessionTransferred : t.value.conversations.sessionEnded, "");
     return;
   }
-  try { await convStore.sendUser(id, text); } catch { restore?.(); toast.error(t.value.conversations.convertTicketFailed, ""); }
+  const replyBinding = app.accountBindingEpoch;
+  try { await convStore.sendUser(id, text); } catch {
+    if (replyBinding !== app.accountBindingEpoch || !novaPageVisible || cid.value !== id) return;
+    restore?.(); toast.error(t.value.conversations.convertTicketFailed, "");
+  }
 }
 
 async function drainNovaQueue() {
@@ -919,13 +952,21 @@ function onQueueSave(turnId: string, text: string) {
   void drainNovaQueue();
 }
 
+let humanConvertRequest: { binding: number; id: string } | null = null;
 async function onConvertToTicket() {
   const current = conv.value;
   if (!current) return;
+  const binding = app.accountBindingEpoch;
+  if (humanConvertRequest?.binding === binding && humanConvertRequest.id === current.id) return;
+  const request = { binding, id: current.id };
+  humanConvertRequest = request;
+  const isCurrent = () => binding === app.accountBindingEpoch && novaPageVisible && cid.value === current.id;
   try {
     const ticketId = await convStore.convertToTicket(current.id, "technical", `Conversation ${current.id}`);
+    if (!isCurrent()) return;
     navTo(`/pages/me/support-tickets?ticket=${encodeURIComponent(ticketId)}`);
-  } catch { toast.error(t.value.conversations.convertTicketFailed, ""); }
+  } catch { if (isCurrent()) toast.error(t.value.conversations.convertTicketFailed, ""); }
+  finally { if (humanConvertRequest === request) humanConvertRequest = null; }
 }
 
 function onChip(key: string) {

@@ -18,7 +18,7 @@ const runtime = vi.hoisted(() => ({
   supportApi: {
     authorityRevision: vi.fn(async () => "run-1"), commandResult: vi.fn(async () => null),
     conversations: vi.fn(async () => ({ items: [] as any[] })), conversation: vi.fn(), markConversationRead: vi.fn(),
-    startConversation: vi.fn(), replyConversation: vi.fn(), convertConversationToTicket: vi.fn(), conversationCategories: vi.fn(),
+    startConversation: vi.fn(), replyConversation: vi.fn(), convertConversationToTicket: vi.fn(), conversationCategories: vi.fn(), conversationDismissals: vi.fn(async () => []),
   },
 }));
 vi.mock("@/api/runtime", () => runtime);
