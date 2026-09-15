@@ -98,8 +98,10 @@ test("human realtime and open snapshots cannot write after hide or regress a new
   assert.match(conversations, /openGeneration\.get\(id\) !== requestGeneration \|\| !active\(\)/);
   assert.match(conversations, /conversation\.version < prior\.version/);
   assert.match(conversations, /conversation\.version === prior\.version && conversation\.lastTs < prior\.lastTs/);
-  assert.match(chat, /await convStore\.open\(openId, \(\) => humanRealtime\.isCurrent\(openEpoch, openId\)\)/);
-  assert.match(chat, /startHumanThreadPolling\(openEpoch, openId\)/);
+  assert.match(chat, /await convStore\.open\(id, current\)/);
+  assert.match(chat, /humanOpenRequest === request && request\.binding === app\.accountBindingEpoch/);
+  assert.match(chat, /humanRealtime\.isCurrent\(request\.epoch, request\.id\)/);
+  assert.match(chat, /if \(current\(\)\) startHumanThreadPolling\(epoch, id\)/);
   assert.match(realtimePage, /return openEpoch === epoch && isVisibleFor\(openId\);/);
   assert.match(realtimePageTest, /const oldHistoryScope = lifecycle\.capture\("CV-1"\);[\s\S]*?lifecycle\.stop\(\);[\s\S]*?lifecycle\.watchIfCurrent\(firstEpoch, "CV-1"\);/);
 });
@@ -115,7 +117,7 @@ test("a late full-list read merges monotonically instead of restoring an older v
   assert.doesNotMatch(tickets, /tickets\.value = items/);
   assert.match(conversations, /let listRequestGeneration = 0/);
   assert.match(conversations, /function mergeConversations\(items: Conversation\[\]\) \{ for \(const conversation of items\) replace\(conversation\); \}/);
-  assert.match(conversations, /requestGeneration === listRequestGeneration\) mergeConversations\(items\)/);
+  assert.match(conversations, /requestGeneration === listRequestGeneration\) \{\s*mergeConversations\(page.items\); mergeDismissals\(dismissals\)/);
   assert.doesNotMatch(conversations, /conversations\.value = items/);
   for (const source of [tickets, conversations]) {
     assert.match(source, /type SnapshotScope = \{ accountKey: string; epoch: number; runId: string \}/);
@@ -135,7 +137,10 @@ test("canonical support uses the development authority and late lifecycle work c
   assert.doesNotMatch(api, /support\/acceptance|sourceEnvironment !== "SANDBOX"/);
   assert.match(api, /supportPath\(`\/commands\//);
   assert.match(chat, /const humanOpenEpoch = isAi\.value \? null : humanRealtime\.show\(\);/);
-  assert.match(chat, /if \(!humanRealtime\.isCurrent\(openEpoch, openId\)\) return;/);
+  assert.match(chat, /humanOpenRequest === request && request\.binding === app\.accountBindingEpoch/);
+  assert.match(chat, /humanRealtime\.isCurrent\(request\.epoch, request\.id\)/);
+  assert.match(chat, /if \(current\(\)\) startHumanThreadPolling\(epoch, id\);/);
+  assert.match(chat, /if \(current\(\)\) navBack\("\/pages\/support\/messages"\)/);
   assert.match(realtimePage, /function watchIfCurrent\(openEpoch: number, openId: string\): void \{\s*if \(isCurrent\(openEpoch, openId\)\) hooks\.watch\(openId\);\s*\}/);
   assert.match(realtimePageTest, /activates a newly-created human thread only while its page is current/);
 });
@@ -172,8 +177,8 @@ test("an empty human conversation lane gives the user an authoritative start pat
     read("src/pages/support/chat.vue"),
     read("src/store/conversations.ts"),
   ]);
-  assert.match(messages, /cta-label="startConversationLabel"/);
-  assert.match(messages, /@cta="onStartConversation"/);
+  assert.match(messages, /v-if="canStartConversation"/);
+  assert.match(messages, /@click="onStartConversation\(\)"/);
   assert.match(messages, /navTo\("\/pages\/support\/chat\?start="/);
   assert.match(chat, /q\?\.start/);
   assert.match(chat, /convStore\.startConversation\(/);
@@ -269,8 +274,11 @@ test("a deferred authority revision cannot send an old account command with the 
     assert.match(source, /const accountKey = accountKeyValue;\s*const epoch = accountEpoch;\s*const startingRunId = pendingRunId;/);
     assert.match(source, /const runId = await supportApi\.authorityRevision\(\);/);
     assert.match(source, /startingRunId !== pendingRunId[\s\S]*?throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\)/);
-    assert.match(source, /const scope = await commandScope\(\);[\s\S]*?if \(!scopeIsCurrent\(scope\)\) throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\);[\s\S]*?const promise = action\(key\);/);
+    assert.match(source, /const scope = await commandScope\(\);[\s\S]*?if \(!scopeIsCurrent\(scope\)\) throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\);[\s\S]*?const (?:promise =|result = await) action\(key\);/);
     assert.match(source, /persistPending\(scope\.accountKey, scope\.runId, scope\.pending\)/);
     assert.match(source, /scope\.pending === pendingKeys && scope\.inFlight === inFlight/);
   }
+  assert.match(conversations, /const promise = Promise\.resolve\(\)\.then\(async \(\) => \{\s*try \{\s*if \(!scopeIsCurrent\(scope\)\) throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\);\s*const result = await action\(key\);/);
+  assert.match(conversations, /const adopted = await recover\(key\);\s*if \(!scopeIsCurrent\(scope\)\) throw new Error\("SUPPORT_ACCOUNT_SCOPE_CHANGED"\);/);
+  assert.match(conversations, /scope\.inFlight\.set\(fingerprint, promise\);[\s\S]*?return promise;/);
 });

@@ -12,7 +12,7 @@ describe("conversation-center refresh failure contract", () => {
   });
 
   it("keeps rows visible when a later refresh fails", () => {
-    expect(source).toMatch(/v-if="selectedType !== 'ai' && convStore\.error && rows\.length === 0"/);
+    expect(source).toContain("convStore.error || convStore.categoryAvailabilityStatus === 'failed'");
     expect(source).toMatch(/v-else-if="rows\.length === 0"/);
   });
 
@@ -23,7 +23,32 @@ describe("conversation-center refresh failure contract", () => {
 
   it("uses the backend M5 availability read model before exposing category entry points", () => {
     expect(source).toContain("convStore.refreshCategories()");
-    expect(source).toContain("convStore.categoryEnabled(row.key)");
-    expect(source).toContain("convStore.categoryEnabled(sel)");
+    expect(source).toContain("convStore.categoryReadable(row.key)");
+    expect(source).toContain("convStore.categoryReadable(sel)");
+    expect(source).toContain("convStore.categoryEnabled(target)");
+  });
+
+  it("keeps only confirmed conversation snapshots readable when category authority is unavailable", () => {
+    expect(source).toContain("convStore.categoryAvailabilityStatus === 'failed'");
+    expect(source).toContain("convStore.categoryReadable(row.key)");
+    expect(source).toContain("convStore.categoryReadable(sel)");
+    expect(source).toContain("convStore.categoryEnabled(selectedType.value)");
+  });
+
+  it("does not present a disabled PC category as an empty inbox with a start CTA", () => {
+    expect(source).toContain("convStore.categoryAvailabilityStatus === 'ready' && TYPES.length === 0");
+    expect(source).toContain(':title="t.conversations.categoryDisabled"');
+  });
+
+  it("shows an initial unknown category read as loading, without an empty-state CTA", () => {
+    expect(source).toContain("convStore.categoryAvailabilityStatus === 'loading'");
+    expect(source).toContain("t.help.loadingMore");
+    expect(source.indexOf("convStore.categoryAvailabilityStatus === 'loading'")).toBeLessThan(source.indexOf('v-if="canStartConversation"'));
+  });
+
+  it("gives a failed prior AI selection the same retry state as a human category", () => {
+    expect(source).not.toContain("selectedType !== 'ai' && (convStore.error || convStore.categoryAvailabilityStatus === 'failed')");
+    expect(source).toContain("convStore.error || convStore.categoryAvailabilityStatus === 'failed'");
+    expect(source).toContain('@cta="retryConversations"');
   });
 });

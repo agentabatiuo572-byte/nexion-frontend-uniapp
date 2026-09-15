@@ -3022,6 +3022,11 @@ export const zh: Messages = {
     staleSnapshot: "当前展示上一次确认的会话，刷新后可查看最新状态。",
     retry: "重试",
     startConversation: "发起会话",
+    contactAdvisor: "联系顾问",
+    removeFromList: "从列表移除",
+    removing: "正在移除…",
+    removeHint: "移除后聊天记录仍保留，有新消息时会重新显示。",
+    removeFailed: "移除未确认，请重试。聊天记录仍然保留。",
     contactSupport: "联系人工客服",
     newBadge: "新",
     // 聊天
