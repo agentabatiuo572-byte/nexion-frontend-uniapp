@@ -2447,6 +2447,9 @@ export const en = {
     withdrawInsufficient: "Insufficient balance for withdrawal",
   },
   cards: {
+    bindingEntryNote: "Enter your bank card details",
+    bindingEntryDisclaimer: "Details stay on this page and are cleared when you leave. Nothing is submitted or saved until the binding service is connected.",
+    bindingConnectionPending: "The binding service is not connected. No card details were submitted or saved.",
     bindingUnavailableTitle: "Bank-card binding is not available yet",
     bindingUnavailableBody: "Bank-card binding has not been enabled. Your balance and any saved payment methods are unaffected.",
     bindingUnavailableCta: "Back",

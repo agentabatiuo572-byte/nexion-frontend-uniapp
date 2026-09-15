@@ -56,13 +56,13 @@ async function renderPage(name: typeof pages[number], remote: boolean, developme
   return renderToString(app);
 }
 
-describe("unavailable bank-card pages", () => {
+describe("open bank-card form with no simulated binding", () => {
   it("uses the same rail availability for the wallet entry instead of advertising saved-card reuse", () => {
     const wallet = readFileSync(new URL("./wallet.vue", import.meta.url), "utf8");
     const statement = wallet.match(/const cardsSub = computed\(\(\) =>[\s\S]*?\n\);/)?.[0];
     if (!statement) throw new Error("Wallet card entry computed missing");
     for (const [remote, development, count, expected] of [
-      [true, false, 0, en.cards.bindingUnavailableTitle], [true, false, 2, en.cards.bindingUnavailableTitle],
+      [true, false, 0, en.cards.newTitle], [true, false, 2, en.cards.newTitle],
       [true, true, 2, "2 bound"], [false, false, 0, en.wallet.cardsReuseHint], [false, false, 2, "2 bound"],
     ] as const) {
       const label = execute(statement, { computed: Vue.computed, remoteApiEnabled: remote, developmentPaymentEnabled: development,
@@ -70,13 +70,19 @@ describe("unavailable bank-card pages", () => {
       expect(label.value).toBe(expected);
     }
   });
-  it.each(pages)("renders a return action, never saved-card controls or hosted fields: %s", async name => {
+  it.each(pages)("opens the original card entry without claiming saved-card or simulation state: %s", async name => {
     const html = await renderPage(name, true, false);
-    expect(html).toContain(en.cards.bindingUnavailableTitle);
-    expect(html).toContain(en.cards.bindingUnavailableBody);
+    expect(html).not.toContain(en.cards.bindingUnavailableTitle);
+    expect(html).not.toContain(en.cards.bindingUnavailableBody);
     expect(html).toContain('role="button"');
     expect(html).toContain('tabindex="0"');
-    for (const forbidden of ["4321", "Saved holder", "wallet-card-set-default", "wallet-card-unbind", "wallet-cards-retry", "data-field=", en.cards.formSubmitDisabled, en.cards.listDisclaimer, en.cards.formDisclaimer, "Development badge"]) expect(html).not.toContain(forbidden);
+    for (const forbidden of ["4321", "Saved holder", "wallet-card-set-default", "wallet-card-unbind", "wallet-cards-retry", en.cards.listDisclaimer, en.cards.formDisclaimer, "Development badge"]) expect(html).not.toContain(forbidden);
+    if (name === "wallet-cards-new.vue") {
+      for (const field of ["pan", "expiry", "cvv"]) expect(html).toContain(`data-field="${field}"`);
+      expect(html).toContain(en.cards.formHolderLabel);
+      expect(html).toContain(en.cards.formDefaultCheckbox);
+      expect(html).toContain(en.cards.formSubmitDisabled);
+    }
   });
   it.each(pages)("keeps enabled development controls and their disclosure: %s", async name => {
     const html = await renderPage(name, true, true);
@@ -85,15 +91,44 @@ describe("unavailable bank-card pages", () => {
     const disclosure = name === "wallet-cards.vue" ? en.cards.listDisclaimer : en.cards.formDisclaimer;
     expect(html).toContain(disclosure.replace(/'/g, "&#39;"));
   });
-  it("never refreshes cards or navigates to binding while unavailable", async () => {
+  it("opens the form without requesting or fabricating saved cards", async () => {
     const source = sources["wallet-cards.vue"], refreshRemote = vi.fn(), navTo = vi.fn();
     const deps = { cardBindingAvailable: Vue.ref(false), remoteApiEnabled: true, remoteCardsRefreshing: Vue.ref(false), remoteCardsError: Vue.ref(false), cardsStore: { refreshRemote }, navTo };
     const refresh = execute("async " + functionSource(source, "refreshCards"), deps, "refreshCards");
     await refresh();
     execute(functionSource(source, "goNew"), deps, "goNew")();
     expect(refreshRemote).not.toHaveBeenCalled();
-    expect(navTo).not.toHaveBeenCalled();
+    expect(navTo).toHaveBeenCalledWith("/pages/me/wallet-cards-new");
     expect(deps.remoteCardsRefreshing.value).toBe(false);
+  });
+  it("does not tokenize, send, persist, or announce success when the real binding adapter is absent", async () => {
+    const tokenize = vi.fn(), error = vi.fn(), success = vi.fn(), bind = vi.fn();
+    const action = execute("async " + functionSource(sources["wallet-cards-new.vue"], "handleBind"), {
+      cardBindingAvailable: Vue.ref(false), canSubmit: Vue.ref(true), vaultRef: Vue.ref({ tokenize }),
+      toast: { error, success }, t: Vue.ref({ cards: { bindingConnectionPending: "Connection pending" } }),
+      paymentMethodApi: { bind },
+    }, "handleBind");
+    await action();
+    expect(error).toHaveBeenCalledWith("Connection pending");
+    expect(tokenize).not.toHaveBeenCalled(); expect(bind).not.toHaveBeenCalled(); expect(success).not.toHaveBeenCalled();
+  });
+  it("routes the existing card entry straight to the original form without a back loop", () => {
+    const navReplace = vi.fn(), refreshCards = vi.fn();
+    execute(functionSource(sources["wallet-cards.vue"], "openCards"), { cardBindingAvailable: Vue.ref(false), navReplace, refreshCards }, "openCards")();
+    expect(navReplace).toHaveBeenCalledWith("/pages/me/wallet-cards-new"); expect(refreshCards).not.toHaveBeenCalled();
+    expect(sources["wallet-cards-new.vue"]).toContain(":back=\"cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/wallet'\"");
+  });
+  it("clears card draft fields on page leave and account/runtime changes", () => {
+    const clear = vi.fn(), holder = Vue.ref("TEST USER"), cardReady = Vue.ref(true), brand = Vue.ref("visa"), setAsDefault = Vue.ref(false), isBinding = Vue.ref(false);
+    execute(functionSource(sources["wallet-cards-new.vue"], "clearForm"), { vaultRef: Vue.ref({ clear }), holder, cardReady, brand, setAsDefault, isBinding }, "clearForm")();
+    expect(clear).toHaveBeenCalledOnce(); expect(holder.value).toBe(""); expect(cardReady.value).toBe(false); expect(brand.value).toBe("unknown");
+    const form = sources["wallet-cards-new.vue"];
+    expect(form).toContain("onHide(clearForm)"); expect(form).toContain("subscribeRuntimeRevision(clearForm)");
+    expect(form).toContain("[app.accountKey, app.accountBindingEpoch] as const, clearForm");
+    const vault = readFileSync(new URL("../../components/me/hosted-card-vault.vue", import.meta.url), "utf8");
+    const fields = { pan: Vue.ref("4111111111111111"), expiry: Vue.ref("12/30"), cvv: Vue.ref("123") };
+    execute(functionSource(vault, "clear"), fields, "clear")();
+    for (const field of Object.values(fields)) expect(field.value).toBe("");
   });
   it.each(pages)("uses the actual navigation fallback when cold-opened: %s", name => {
     const uni = { reLaunch: vi.fn(), navigateBack: vi.fn(), showToast: vi.fn() };

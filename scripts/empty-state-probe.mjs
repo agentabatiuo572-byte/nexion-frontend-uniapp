@@ -147,10 +147,10 @@ const ROUTES = [
   { r: "pages/events/events", unreachable: "按 tab 过滤 EVENTS 常量,需切到无结果的 tab" },
   { r: "pages/team/commissions" },
   { r: "pages/me/help", type: TYPE_JUNK },
-  // An unopened rail is unavailable, not an empty saved-card list. Assert the
-  // real hold state and its exit instead of manufacturing an empty illustration.
-  { r: "pages/me/wallet-cards", unavailableReturn: "pages/me/wallet" },
-  { r: "pages/me/wallet-cards-new", unavailableReturn: "pages/me/wallet-cards" },
+  // Both existing entries open the original editable form. No saved-card
+  // state or successful binding may be invented while its adapter is absent.
+  { r: "pages/me/wallet-cards", cardEntry: true },
+  { r: "pages/me/wallet-cards-new", cardEntry: true },
   { r: "pages/store/orders" },
   { r: "pages/me/notifications" },
   { r: "pages/me/receipts" },
@@ -255,30 +255,61 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
   const route = spec.r;
   const consoleErrors = consoleErrorsFor(page);
   const before = consoleErrors.length;
+  const cardRequests = [];
+  const recordCardRequest = request => {
+    // App boot already reads the server's saved-card projection. Reads are not
+    // binding; no card mutation or field-bearing request may leave this form.
+    if (/\/api\/payment-methods(?:\/|$|\?)/.test(request.url()) && request.method() !== "GET") cardRequests.push(request.method());
+    if (/\/(api|auth)\//.test(request.url()) && /4111\s?1111\s?1111\s?1111|TEST USER/.test(request.postData() || "")) cardRequests.push("FIELD_DATA");
+  };
+  if (spec.cardEntry) page.on("request", recordCardRequest);
   try {
     await page.goto(`${BASE}/?nx_device=off&es=${i}#/${route}`, { waitUntil: "domcontentloaded" });
     await settleNetwork(page, 5000, lanes); // 包 ax:并行时 dev server 忙,先等本页网络空闲(有界),再走原来的固定等待;实际 1 lane 时空转(F-04 / R2-03)
     await page.waitForTimeout(1300);
-    if (spec.unavailableReturn) {
-      if (!page.url().includes(`#/${route}`)) throw new Error("Unavailable route was not reached");
-      await page.getByText("Bank-card binding is not available yet", { exact: true }).last().waitFor({ state: "visible" });
-      await page.getByText("Bank-card binding has not been enabled. Your balance and any saved payment methods are unaffected.", { exact: true }).waitFor({ state: "visible" });
+    if (spec.cardEntry) {
+      await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-cards-new");
+      await page.evaluate(theme => document.querySelector("#app")?.__vue_app__?.config?.globalProperties?.$pinia?._s.get("theme")?.setMode(theme), THEME);
+      await page.getByText("Enter your bank card details", { exact: true }).waitFor({ state: "visible" });
+      const fields = page.locator("input");
+      if (await fields.count() !== 4) throw new Error("Original four card inputs are not present");
+      for (let f = 0; f < 4; f++) if (!await fields.nth(f).isEditable()) throw new Error("Card input is not editable");
       const backButtons = page.getByRole("button", { name: "Back", exact: true });
-      if (await backButtons.count() !== 2) throw new Error("Unavailable page must retain header and in-page exits");
-      const back = backButtons.last();
+      if (await backButtons.count() !== 1) throw new Error("Original header exit missing or duplicated");
+      const back = backButtons.first();
       await back.waitFor({ state: "visible" });
       const bounds = await back.boundingBox();
-      if (!bounds || bounds.height < 44 || bounds.width < 44) throw new Error("Unavailable exit smaller than 44px");
-      if (await back.getAttribute("tabindex") !== "0") throw new Error("Unavailable exit is not keyboard reachable");
-      const forbidden = page.locator('input, .nx-empty, [data-testid="card-simulation-badge"], [data-testid="wallet-card-set-default"], [data-testid="wallet-card-unbind"], [data-testid="wallet-cards-retry"]');
-      if (await forbidden.count()) throw new Error("Unavailable page exposes card controls or an empty-list claim");
-      if (await page.getByText("Add a new card", { exact: true }).count()) throw new Error("Unavailable page exposes an add-card entry");
-      if (await page.getByText(/Local development simulation:|Test cards only verify bind/).count()) throw new Error("Unavailable page exposes development disclosure");
+      if (!bounds || bounds.height < 44 || bounds.width < 44) throw new Error("Header exit smaller than 44px");
+      if (await back.getAttribute("tabindex") !== "0") throw new Error("Header exit is not keyboard reachable");
+      const forbidden = page.locator('.nx-empty, [data-testid="card-simulation-badge"], [data-testid="wallet-card-set-default"], [data-testid="wallet-card-unbind"], [data-testid="wallet-cards-retry"]');
+      if (await forbidden.count()) throw new Error("Card entry invents simulation or saved-card state");
+      if (await page.getByText(/Bank-card binding is not available yet|Local development simulation:|Test cards only verify bind/).count()) throw new Error("Card entry shows the removed hold or simulation copy");
       const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth > document.scrollingElement.clientWidth + 1);
-      if (overflow) throw new Error("Unavailable page overflows horizontally");
+      if (overflow) throw new Error("Card form overflows horizontally");
+      const submit = page.getByTestId("card-bind-submit");
+      if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Empty form can submit");
+      const submitBounds = await submit.boundingBox();
+      if (!submitBounds || submitBounds.height < 44 || await submit.getAttribute("tabindex") !== "0") throw new Error("Submit touch/keyboard target regressed");
+      // Fixture-only values; all API/auth routes are intercepted by the isolated
+      // formal session above. No real account or card is used by this probe.
+      // uni-input paints its placeholder in a sibling view rather than a native attribute.
+      await page.getByText("1234 5678 9012 3456", { exact: true }).waitFor({ state: "visible" });
+      await fields.nth(0).fill("4111111111111111");
+      await fields.nth(1).fill("12/30");
+      await fields.nth(2).fill("123");
+      await fields.nth(3).fill("TEST USER");
+      await page.waitForFunction(() => document.querySelector('[data-testid="card-bind-submit"]')?.getAttribute("aria-disabled") === "false");
+      await submit.press("Enter");
+      await page.getByText("The binding service is not connected. No card details were submitted or saved.", { exact: true }).waitFor({ state: "visible" });
+      if (cardRequests.length) throw new Error("Entry requested/sent card data with no real adapter");
       await back.press("Enter");
-      await page.waitForURL(url => url.hash.split("?")[0] === `#/${spec.unavailableReturn}`);
-      return { route, unavailable: true, exitVerified: true, tabs: 0, newErrors: consoleErrors.length - before };
+      await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet");
+      await page.getByText("My bank cards", { exact: true }).click();
+      await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-cards-new");
+      await fields.nth(0).waitFor({ state: "visible" });
+      for (let f = 0; f < 4; f++) if (await fields.nth(f).inputValue() !== "") throw new Error("Card draft survives leaving the page");
+      if (cardRequests.length) throw new Error("Leaving the form requested/sent card data");
+      return { route, cardEntry: true, exitVerified: true, tabs: 0, newErrors: consoleErrors.length - before };
     }
     // 常量数据源的页面:往搜索框打不可能命中的词
     if (spec.type) {
@@ -336,7 +367,10 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
     const tabRes = res.empty ? await page.evaluate(TAB_SWEEP) : { tabs: 0, note: "落地屏已判红,跳过页签" };
     return { route, unreachable: spec.unreachable, ...res, ...tabRes, newErrors: consoleErrors.length - before };
   } catch (e) {
+    if (spec.cardEntry) console.error(`${route}: ${e.message}`);
     return { route, err: e.message.split("\n")[0].slice(0, 60) };
+  } finally {
+    if (spec.cardEntry) page.off("request", recordCardRequest);
   }
 }, { context: { viewport: { width: 390, height: 844 }, locale: "en-US" } }).then((rs) => rs.map((r, k) => r && !r.error ? r : { route: SPECS[k].r, err: String(r?.error ?? "unknown").slice(0, 60) }));
 await browser.close();
@@ -352,8 +386,8 @@ for (const r of rows) {
   const bad = [];
   if (r.unreachable) { console.log(`skip  ${r.route.padEnd(30)} 探针够不着:${r.unreachable}`); continue; }
   if (r.err) bad.push("异常:" + r.err);
-  else if (r.unavailable) {
-    if (!r.exitVerified) bad.push("不可用页面返回未验证");
+  else if (r.cardEntry) {
+    if (!r.exitVerified) bad.push("绑卡表单返回与草稿清理未验证");
     if (r.newErrors) bad.push(`console error ×${r.newErrors}`);
   }
   else if (!r.empty) bad.push("清空数组后仍未渲染 .nx-empty");
@@ -367,7 +401,7 @@ for (const r of rows) {
   if (bad.length) fail++;
   // 🔴 tabs=N 恒打印:认不出页签(0)也要显形。静默跳过 = 判据失效却看不出来。
   const tabInfo = r.tabs === undefined ? "" : r.tabs > 0 ? ` [页签 ${r.tabs}: ${(r.tabLabels || []).join("/")}]` : " [无页签]";
-  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.unavailable ? "unavailable · no card controls · keyboard exit verified" : r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
+  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.cardEntry ? "original editable form · no simulated binding · exit clears draft" : r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
 }
 const withTabs = rows.filter((r) => r.tabs > 0).length;
 console.log(`\n${rows.length - fail}/${rows.length} 通过 · 其中 ${withTabs} 页做了页签遍历`);
