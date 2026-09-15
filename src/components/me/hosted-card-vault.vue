@@ -105,6 +105,11 @@ function tokenizeCvv(): HostedCvvToken | null {
   return { cvvToken: mintToken("cvv") };
 }
 
-// 只暴露这两个 —— 明文没有任何出口。
-defineExpose({ tokenize, tokenizeCvv });
+// 页面离开或账号变化时清除草稿；不向调用方返回任何明文字段。
+function clear() {
+  pan.value = "";
+  expiry.value = "";
+  cvv.value = "";
+}
+defineExpose({ tokenize, tokenizeCvv, clear });
 </script>

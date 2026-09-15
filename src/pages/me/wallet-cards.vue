@@ -11,7 +11,7 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="cardBindingAvailable ? t.cards.listSubtitle : t.cards.bindingUnavailableTitle" />
+      <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="cardBindingAvailable ? t.cards.listSubtitle : t.cards.newTitle" />
       <CardSimulationBadge />
 
       <view :style="bodyStyle">
@@ -65,10 +65,10 @@
           </view>
         </template>
         <view v-else :style="unavailableStyle">
-          <text class="block" :style="unavailableTitleStyle">{{ t.cards.bindingUnavailableTitle }}</text>
-          <text class="block" :style="unavailableBodyStyle">{{ t.cards.bindingUnavailableBody }}</text>
-          <view class="flex items-center justify-center active:opacity-80" :style="unavailableCtaStyle" role="button" tabindex="0" @click="returnToWallet" @keydown.enter.prevent="returnToWallet" @keydown.space.prevent="returnToWallet">
-            <text :style="unavailableCtaTextStyle">{{ t.cards.bindingUnavailableCta }}</text>
+          <text class="block" :style="unavailableTitleStyle">{{ t.cards.newTitle }}</text>
+          <text class="block" :style="unavailableBodyStyle">{{ t.cards.bindingEntryNote }}</text>
+          <view class="flex items-center justify-center active:opacity-80" :style="unavailableCtaStyle" role="button" tabindex="0" @click="goNew" @keydown.enter.prevent="goNew" @keydown.space.prevent="goNew">
+            <text :style="unavailableCtaTextStyle">{{ t.cards.addNew }}</text>
           </view>
         </view>
 
@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { navBack, navTo } from "@/lib/route";
+import { navBack, navTo, navReplace } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -114,7 +114,11 @@ async function refreshCards() {
   }
 }
 
-onShow(() => { void refreshCards(); });
+function openCards() {
+  if (!cardBindingAvailable.value) { navReplace("/pages/me/wallet-cards-new"); return; }
+  void refreshCards();
+}
+onShow(openCards);
 
 function rowMeta(card: SavedCard): string {
   return fmt(t.value.cards.rowMeta, { expiry: card.expiry, holder: card.holder });
@@ -144,7 +148,6 @@ async function handleRemove(card: SavedCard) {
 }
 
 function goNew() {
-  if (!cardBindingAvailable.value) return;
   navTo("/pages/me/wallet-cards-new");
 }
 

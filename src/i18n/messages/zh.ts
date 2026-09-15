@@ -2374,6 +2374,9 @@ export const zh: Messages = {
     withdrawInsufficient: "余额不足,无法提现",
   },
   cards: {
+    bindingEntryNote: "填写银行卡信息",
+    bindingEntryDisclaimer: "填写内容仅保留在当前页面，离开即清除；绑定接口接入前不会提交或保存。",
+    bindingConnectionPending: "绑定接口尚未接入，本次未提交或保存银行卡信息。",
     bindingUnavailableTitle: "当前暂不支持银行卡绑定",
     bindingUnavailableBody: "银行卡绑定功能尚未开放。你的余额和已有支付方式不受影响。",
     bindingUnavailableCta: "返回",

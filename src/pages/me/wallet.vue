@@ -221,7 +221,7 @@ const allTimeSublabel = computed(() =>
 const cardsCount = computed(() => cards.cards.length);
 const cardsSub = computed(() =>
   remoteApiEnabled && !developmentPaymentEnabled
-    ? t.value.cards.bindingUnavailableTitle
+    ? t.value.cards.newTitle
     : cardsCount.value > 0
     ? fmt(t.value.wallet.cardsBound, { n: cardsCount.value })
     : t.value.wallet.cardsReuseHint,

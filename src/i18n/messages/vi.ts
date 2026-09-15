@@ -2364,6 +2364,9 @@ export const vi: Messages = {
     withdrawInsufficient: "Số dư không đủ để rút",
   },
   cards: {
+    bindingEntryNote: "Nhập thông tin thẻ ngân hàng",
+    bindingEntryDisclaimer: "Thông tin chỉ được giữ trên trang này và sẽ xóa khi bạn rời đi. Chưa gửi hoặc lưu dữ liệu trước khi kết nối dịch vụ liên kết thẻ.",
+    bindingConnectionPending: "Dịch vụ liên kết thẻ chưa được kết nối. Chưa gửi hoặc lưu thông tin thẻ.",
     bindingUnavailableTitle: "Chưa hỗ trợ liên kết thẻ ngân hàng",
     bindingUnavailableBody: "Tính năng liên kết thẻ ngân hàng chưa được mở. Số dư và các phương thức thanh toán đã lưu của bạn không bị ảnh hưởng.",
     bindingUnavailableCta: "Quay lại",

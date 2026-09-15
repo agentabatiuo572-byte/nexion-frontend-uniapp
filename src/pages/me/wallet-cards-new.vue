@@ -14,12 +14,12 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet-cards" :title="t.cards.newTitle" />
+      <SubPageHeader :back="cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/wallet'" :title="t.cards.newTitle" />
       <CardSimulationBadge />
 
       <view :style="bodyStyle">
         <!-- Form card -->
-        <view v-if="cardBindingAvailable" :style="formCardStyle">
+        <view :style="formCardStyle">
           <view class="flex items-center" :style="formHeadStyle">
             <view class="grid place-items-center shrink-0" :style="formHeadIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
@@ -28,7 +28,7 @@
               <text class="block" :style="formHeadTitleStyle">{{ t.cards.formCardType }}</text>
               <view class="flex items-center" :style="formHeadNoteStyle">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                <text style="margin-left: 6px">{{ t.cards.formSecurityNote }}</text>
+                <text style="margin-left: 6px">{{ cardBindingAvailable ? t.cards.formSecurityNote : t.cards.bindingEntryNote }}</text>
               </view>
             </view>
             <text v-if="brand !== 'unknown'" class="font-mono-tabular shrink-0" :style="brandChipStyle">{{ brandLabel(brand) }}</text>
@@ -75,29 +75,21 @@
           </HostedCardVault>
         </view>
 
-        <view v-else :style="formCardStyle">
-          <text class="block" :style="providerHoldTitleStyle">{{ t.cards.bindingUnavailableTitle }}</text>
-          <text class="block" :style="providerHoldBodyStyle">{{ t.cards.bindingUnavailableBody }}</text>
-          <view class="flex items-center justify-center active:opacity-80" :style="providerHoldCtaStyle" role="button" tabindex="0" @click="returnFromUnavailable" @keydown.enter.prevent="returnFromUnavailable" @keydown.space.prevent="returnFromUnavailable">
-            <text :style="providerHoldCtaTextStyle">{{ t.cards.bindingUnavailableCta }}</text>
-          </view>
-        </view>
-
         <!-- Submit -->
         <!-- 字段没填全时点了没用 → 显式 aria-disabled(《05》§6.1),别只靠「没有按下反馈」暗示 -->
-        <view v-if="cardBindingAvailable" class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind">
+        <view class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" data-testid="card-bind-submit" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind" @keydown.enter.prevent="handleBind" @keydown.space.prevent="handleBind">
           <text :style="submitTextStyle">{{ canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled }}</text>
         </view>
 
-        <text v-if="cardBindingAvailable && developmentPaymentEnabled" class="block" :style="disclaimerStyle">{{ t.cards.formDisclaimer }}</text>
+        <text class="block" :style="disclaimerStyle">{{ cardBindingAvailable ? t.cards.formDisclaimer : t.cards.bindingEntryDisclaimer }}</text>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { onLoad, onHide, onUnload } from "@dcloudio/uni-app";
 import { navReplace, navBack } from "@/lib/route";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -112,9 +104,12 @@ import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { paymentMethodApi, remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const cardsStore = useCards();
+const app = useApp();
 const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaymentEnabled);
 
 // Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
@@ -160,6 +155,17 @@ const holder = ref("");
 const setAsDefault = ref(true);
 const isBinding = ref(false);
 
+// Opening the original form does not enable the legacy development payment rail.
+// Sensitive draft fields live only in this page and clear on leave/account/runtime change.
+function clearForm() {
+  vaultRef.value?.clear(); holder.value = ""; cardReady.value = false; brand.value = "unknown";
+  setAsDefault.value = true; isBinding.value = false;
+}
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, clearForm);
+const stopCardRuntime = subscribeRuntimeRevision(clearForm);
+onHide(clearForm);
+onUnload(() => { stopCardRuntime(); clearForm(); });
+
 // uni input event → e.detail.value (typed Event; mirrors topup-card-form).
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -178,11 +184,15 @@ function returnFromUnavailable() {
 
 const validHolder = computed(() => holder.value.trim().length >= 2);
 const valid = computed(() => cardReady.value && validHolder.value);
-const canSubmit = computed(() => cardBindingAvailable.value && valid.value && !isBinding.value);
+const canSubmit = computed(() => valid.value && !isBinding.value);
 const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.formDefaultOn : t.value.cards.formDefaultOff));
 
 async function handleBind() {
-  if (!cardBindingAvailable.value || !canSubmit.value) return;
+  if (!canSubmit.value) return;
+  if (!cardBindingAvailable.value) {
+    toast.error(t.value.cards.bindingConnectionPending);
+    return;
+  }
   // 当前开发态由 <HostedCardVault> 在浏览器内存中生成模拟 token；没有真实 PSP。
   // 本页拿到 token / 后四位 / 卡组织 / 有效期，再加持卡人姓名发送给 Java。
   // 卡号与 CVV 不在请求或 SavedCard 模型中，不会发送到后端或写入数据库。
