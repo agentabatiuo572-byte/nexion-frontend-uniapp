@@ -157,6 +157,7 @@
 </template>
 
 <script setup lang="ts">
+import { privacyPolicyHref } from "@/lib/privacy-return";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { navReset, navTo } from "@/lib/route";
 import { ref, computed, nextTick, onUnmounted } from "vue";
@@ -257,6 +258,7 @@ const sponsorPreview = ref<SponsorPreview | null>(null);
 
 onLoad(async (options) => {
   const raw = options && (options as Record<string, string>).ref;
+  privacyHref.value = privacyPolicyHref("/pages/register/register", raw);
   if (remoteApiEnabled) {
     const norm = normalizeRegistrationSponsorCode(raw, true);
     if (!norm) return;
@@ -891,7 +893,8 @@ function back() {
 function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
 function goLogin() { navReset({ url: "/pages/login/login", fail: () => {} }); }
 function goTerms() { navTo("/pages/onboarding/terms"); }
-function goPrivacy() { navTo("/pages/onboarding/privacy"); }
+const privacyHref = ref(privacyPolicyHref("/pages/register/register"));
+function goPrivacy() { navTo(privacyHref.value); }
 
 function cleanup() {
   mounted = false;

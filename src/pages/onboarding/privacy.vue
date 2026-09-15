@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { onLoad } from "@dcloudio/uni-app";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
@@ -28,12 +29,14 @@ import { useLocaleStore } from "@/store/locale";
 import { privacyPolicyApi } from "@/api/runtime";
 import type { PrivacyPolicy } from "@/api/privacy-policy-api";
 import { navBack } from "@/lib/route";
+import { resolvePrivacyReturn } from "@/lib/privacy-return";
 const t = useT();
 const locale = useLocaleStore();
 const policy = ref<PrivacyPolicy | null>(null);
 const loading = ref(false);
 const failed = ref(false);
 let generation = 0;
+const returnTo = ref("/pages/onboarding/intro");
 async function load() {
   const request = ++generation;
   loading.value = true;
@@ -43,7 +46,8 @@ async function load() {
   catch { if (request === generation) failed.value = true; }
   finally { if (request === generation) loading.value = false; }
 }
-function goBack() { navBack("/pages/register/register"); }
+function goBack() { navBack(returnTo.value); }
+onLoad((options) => { returnTo.value = resolvePrivacyReturn(options?.return); });
 onMounted(() => { void load(); });
 watch(() => locale.code, () => { void load(); });
 onUnmounted(() => { generation += 1; });

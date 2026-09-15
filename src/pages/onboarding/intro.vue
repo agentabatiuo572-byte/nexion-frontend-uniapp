@@ -285,7 +285,7 @@ function goTerms() {
   navTo("/pages/onboarding/terms");
 }
 function goPrivacy() {
-  navTo("/pages/onboarding/privacy");
+  navTo("/pages/onboarding/privacy?return=%2Fpages%2Fonboarding%2Fintro");
 }
 </script>
 
