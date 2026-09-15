@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { privacyPolicyHref } from "@/lib/privacy-return";
 import { navReset, navTo } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
@@ -186,6 +187,7 @@ const giftNex = computed(() => remoteApiEnabled
   : localGift.value.nexAmount);
 // [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
 onLoad(async (options) => {
+  privacyHref.value = privacyPolicyHref("/pages/ref/code", options?.code);
   if (remoteApiEnabled) {
     void networkRegionsApi.list().then((value) => { countryCount.value = value.countryCount; }).catch(() => { countryCount.value = null; });
     const norm = normalizeRegistrationSponsorCode(options?.code ?? "", true);
@@ -249,7 +251,8 @@ function enterApp() {
 function goTrust() {
   navTo("/pages/trust/trust");
 }
-function goPrivacy() { navTo("/pages/onboarding/privacy"); }
+const privacyHref = ref(privacyPolicyHref("/pages/ref/code"));
+function goPrivacy() { navTo(privacyHref.value); }
 function goTerms() {
   navTo("/pages/onboarding/terms");
 }
