@@ -30,7 +30,7 @@ function appEntryPoints() {
   return ts.transpileModule(parts.join("\n") + "\n" + unauthorized, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
 }
 
-function harness(request = vi.fn()) {
+function harness(request = vi.fn(), route = "pages/earn/earn") {
   const vault = createSessionVault();
   const appEpoch = createRemoteAccountEpoch("user:7101");
   const storesEpoch = createRemoteAccountEpoch("user:7101");
@@ -49,7 +49,7 @@ function harness(request = vi.fn()) {
     rebindAccountScopedStores: (key: string) => storesEpoch.bind(key),
     stopBusinessLoops: stop, navReset: nav, completeSignIn: complete,
     hasServerAuthenticatedAccountTrace: () => auth.isAuthenticated && auth.accountId.startsWith("user:"),
-    readCurrentRoute: () => "pages/earn/earn", isAuthWhitelisted: isPublicAuthRoute,
+    readCurrentRoute: () => route, isAuthWhitelisted: isPublicAuthRoute,
     setRemoteUnauthorizedHandler: (fn: () => void) => { onUnauthorized = fn; },
     toast, useT: () => ({ value: { session: { restoreRetryNotice: "Session restore unavailable; retrying" } } }),
   };
@@ -71,6 +71,29 @@ function harness(request = vi.fn()) {
 afterEach(() => vi.useRealTimers());
 
 describe("App cookie restoration and expired account isolation", () => {
+  it.each([
+    ["pages/onboarding/privacy", true, "/pages/onboarding/privacy"],
+    ["pages/login/login", false, "/pages/index/index"],
+    ["pages/onboarding/intro", false, "/pages/index/index"],
+    ["pages/register/register", false, "/pages/index/index"],
+    ["pages/earn/earn", true, "/pages/earn/earn"],
+  ])("restores authority without displacing the intended %s page", async (route, deferNavigation, returnTo) => {
+    const h = harness(vi.fn().mockResolvedValue(response(200, { ...session(), refreshToken: null })), route);
+    await expect(h.restore()).resolves.toBe(true);
+    expect(h.complete).toHaveBeenCalledWith(expect.objectContaining({ identity: "user:7101", deferNavigation, returnTo }));
+    expect(h.vault.read()?.user.userId).toBe(7101);
+  });
+
+  it.each([401, 403])("keeps public privacy readable after a %s cookie rejection while clearing account authority", async (status) => {
+    const h = harness(vi.fn().mockResolvedValue(response(status)), "pages/onboarding/privacy");
+    await expect(h.restore()).resolves.toBe(false);
+    expect(h.guard()).toBe(false);
+    expect(h.auth.isAuthenticated).toBe(false);
+    expect(h.vault.read()).toBeNull();
+    expect(h.complete).not.toHaveBeenCalled();
+    expect(h.nav).not.toHaveBeenCalled();
+  });
+
   it.each(["network", "503", "protocol"])("does not sign out an existing account shell on %s restore failure", async (failure) => {
     const request = vi.fn();
     if (failure === "network") request.mockRejectedValue(new Error("connection lost"));
