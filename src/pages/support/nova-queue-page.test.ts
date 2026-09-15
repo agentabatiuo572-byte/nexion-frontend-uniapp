@@ -50,6 +50,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => ({
       get: () => conversation,
+      categoryAvailabilityStatus: "ready",
       refreshCategories: async () => "applied",
       categoryEnabled: (type: string) => enabled.includes(type),
       startConversation,
