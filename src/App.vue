@@ -577,14 +577,17 @@ function beginServerSessionRestore(): Promise<boolean> {
       return false;
     }
     const route = readCurrentRoute();
-    const protectedRoute = !!route && !isAuthWhitelisted(route);
+    // Public privacy remains readable during cookie restoration, including
+    // its query return target. Login/onboarding entries keep their usual reset.
+    const preserveCurrentRoute = !!route && (!isAuthWhitelisted(route)
+      || route === "pages/onboarding/privacy");
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
-      returnTo: protectedRoute ? `/${route}` : "/pages/index/index",
+      returnTo: preserveCurrentRoute ? `/${route}` : "/pages/index/index",
       onboardingComplete: restored.user.onboardingComplete,
       serverProfile: restored.user,
       serverSessionRevision: sessionVault.revision(),
-      deferNavigation: protectedRoute,
+      deferNavigation: preserveCurrentRoute,
     });
     if (!completed.ok) {
       pendingServerSessionRecovery = true;
