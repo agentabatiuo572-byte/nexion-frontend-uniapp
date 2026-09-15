@@ -38,7 +38,7 @@ async function renderPage(name: typeof pages[number], remote: boolean, developme
     computed: Vue.computed, remoteApiEnabled: remote, developmentPaymentEnabled: development,
   }, "cardBindingAvailable").value;
   const context: Record<string, unknown> = {
-    t: en, cardBindingAvailable: available, developmentPaymentEnabled: development,
+    t: en, cardBindingAvailable: available, developmentPaymentEnabled: development, bankFormVisible: true, returnTo: "/pages/me/wallet",
     cards: [{ tokenId: "saved-card", brand: "visa", last4: "4321", expiry: "12/30", holder: "Saved holder" }],
     defaultTokenId: "other", remoteCardsError: true, remoteCardsRefreshing: false,
     brandLabel: () => "Visa", rowMeta: () => "Saved holder", goNew() {}, refreshCards() {}, setDefault() {}, handleRemove() {}, returnToWallet() {},
@@ -53,6 +53,7 @@ async function renderPage(name: typeof pages[number], remote: boolean, developme
   app.component("CardSimulationBadge", Vue.defineComponent({ setup: () => () => development ? Vue.h("aside", "Development badge") : null }));
   app.component("EmptyState", passthrough);
   app.component("HostedCardField", Vue.defineComponent({ props: ["kind"], setup: props => () => Vue.h("input", { "data-field": props.kind }) }));
+  app.component("BankAccountBinding", Vue.defineComponent({ setup: () => () => Vue.h("section", { "data-testid": "real-bank-binding" }, [Vue.h("button", { role: "button", tabindex: "0" }, en.bankBinding.continue)]) }));
   return renderToString(app);
 }
 
@@ -78,10 +79,9 @@ describe("open bank-card form with no simulated binding", () => {
     expect(html).toContain('tabindex="0"');
     for (const forbidden of ["4321", "Saved holder", "wallet-card-set-default", "wallet-card-unbind", "wallet-cards-retry", en.cards.listDisclaimer, en.cards.formDisclaimer, "Development badge"]) expect(html).not.toContain(forbidden);
     if (name === "wallet-cards-new.vue") {
-      for (const field of ["pan", "expiry", "cvv"]) expect(html).toContain(`data-field="${field}"`);
-      expect(html).toContain(en.cards.formHolderLabel);
-      expect(html).toContain(en.cards.formDefaultCheckbox);
-      expect(html).toContain(en.cards.formSubmitDisabled);
+      expect(html).toContain('data-testid="real-bank-binding"');
+      expect(html).toContain(en.bankBinding.continue);
+      expect(html).not.toContain('data-field="pan"');
     }
   });
   it.each(pages)("keeps enabled development controls and their disclosure: %s", async name => {

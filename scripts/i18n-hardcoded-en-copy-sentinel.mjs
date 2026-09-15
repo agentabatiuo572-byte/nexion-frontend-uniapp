@@ -122,7 +122,8 @@ const NON_COPY_ATTRS = [
   {
     id: "element-mechanics",
     why: "元素机制类属性:类型 / 模式 / 资源地址 / 表单取值 / 画布 id / 无障碍**状态**(取值是 ARIA 规定的枚举,不是文案)",
-    names: ["type", "mode", "name", "id", "src", "href", "value", "min", "maxlength", "rows", "role", "tabindex", "inputmode", "canvas-id",
+    // autocomplete 是浏览器填充策略,aria-required 是读屏必填状态;两者都不是翻译文案。
+    names: ["type", "mode", "name", "id", "src", "href", "value", "min", "maxlength", "rows", "role", "tabindex", "inputmode", "canvas-id", "autocomplete", "aria-required",
       "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-describedby", "aria-controls", "aria-labelledby", "aria-atomic", "aria-haspopup", "aria-busy",
       "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
@@ -670,6 +671,10 @@ function selftest() {
     ["合法:v-if 条件里的枚举不判", P, "<template><view v-if=\"status === 'ready'\" /></template>", 0],
     ["合法:授权的格式掩码", P, '<template><input placeholder="MM/YY" /></template>', 0],
     ["合法:ARIA 状态属性取值是规范枚举", P, '<template><view aria-live="polite" aria-hidden="true" role="status" /></template>', 0],
+    ["合法:表单填充策略和必填状态不是文案", P, '<template><input autocomplete="off" aria-required="true" /></template>', 0],
+    ["合法:绑定形式的表单机制保持相同语义", P, "<template><input :autocomplete=\"'off'\" :aria-required=\"'true'\" /></template>", 0],
+    ["🔴 机制属性不豁免相邻读屏文案", P, '<template><input autocomplete="off" aria-required="true" aria-label="Enter account" /></template>', 1],
+    ["🔴 机制枚举不成为全局词豁免", P, '<template><text>off true</text></template>', 1],
     ["🔴 :class 与 class 同宽严(加个冒号不逃逸 → 都不判)", P, "<template><view :class=\"ok ? 'nx-on' : 'nx-off'\" /></template>", 0],
     // ── I:插值里的展示位字面量 ────────────────────────────────────────────
     ["🔴 三元分支里的英文文案", P, '<template><text>{{ legacy ? "Wallet Verification (legacy)" : "Proof of Compute" }}</text></template>', 2],

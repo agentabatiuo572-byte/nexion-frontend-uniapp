@@ -3,7 +3,7 @@ import { ApiError } from "./errors";
 import { parseServerTimestamp } from "./server-time";
 
 export interface BankBeneficiary { bankCode: string; bankName: string; maskedAccount: string; effectiveAt: string; nextChangeAt: string }
-export interface BankConfig { enabled: boolean; banks: { code: string; name: string }[]; beneficiary: BankBeneficiary | null }
+export interface BankConfig { enabled: boolean; banks: { code: string; name: string }[]; beneficiary: BankBeneficiary | null; bankCodeRequired?: boolean; bindingOtpRequired?: boolean; payType?: string }
 export interface BankQuote {
   quoteNo: string; amountUsdt: number; feeUsdt: number; netUsdt: number; rateVnd: number;
   amountVnd: number; bankCode: string; bankName: string; maskedAccount: string; expiresAt: string;
@@ -16,6 +16,7 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 function text(value: unknown): string { if (typeof value !== "string" || !value.trim()) throw invalid(); return value; }
+function bankCode(value: unknown): string { if (typeof value !== "string" || !/^(?:[A-Za-z0-9]{2,16})?$/.test(value)) throw invalid(); return value; }
 function number(value: unknown): number {
   if ((typeof value !== "number" && typeof value !== "string") || String(value).trim() === "") throw invalid();
   const n = Number(value); if (!Number.isFinite(n) || n < 0) throw invalid(); return n;
@@ -25,13 +26,14 @@ function date(value: unknown): string {
 }
 function beneficiary(value: unknown): BankBeneficiary {
   const r = record(value);
-  return { bankCode: text(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
+  if (typeof r.maskedAccount !== "string" || !/^[*•]{2,}[0-9]{4}$/.test(r.maskedAccount)) throw invalid();
+  return { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
     effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt) };
 }
 export function parseBankQuote(value: unknown): BankQuote {
   const r = record(value);
   const q: BankQuote = { quoteNo: text(r.quoteNo), amountUsdt: number(r.amountUsdt), feeUsdt: number(r.feeUsdt),
-    netUsdt: number(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: text(r.bankCode),
+    netUsdt: number(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: bankCode(r.bankCode),
     bankName: text(r.bankName), maskedAccount: text(r.maskedAccount), expiresAt: date(r.expiresAt) };
   if (!/^BQ-[a-f0-9]{32}$/.test(q.quoteNo) || q.amountUsdt <= 0 || q.netUsdt <= 0 || q.rateVnd <= 0
       || !Number.isSafeInteger(q.amountVnd) || q.amountVnd <= 0 || Math.abs(q.amountUsdt - q.feeUsdt - q.netUsdt) > 0.000001) throw invalid();
@@ -62,15 +64,15 @@ export function createBankWithdrawalApi(client: ApiClient) {
       const r = record(await client.request({ path: `${base}/config`, authenticated: true }));
       if (typeof r.enabled !== "boolean" || !Array.isArray(r.banks)) throw invalid();
       return { enabled: r.enabled, banks: r.banks.map(v => { const b = record(v); return { code: text(b.code), name: text(b.name) }; }),
+        bankCodeRequired: r.bankCodeRequired !== false, bindingOtpRequired: r.bindingOtpRequired !== false,
+        payType: typeof r.payType === "string" ? r.payType : undefined,
         beneficiary: r.beneficiary == null ? null : beneficiary(r.beneficiary) };
     },
-    async otp(): Promise<string> {
-      const r = record(await client.request({ path: `${base}/beneficiary/otp`, method: "POST", authenticated: true }));
-      const no = text(r.challengeNo); if (!/^PAYOUT-BANK-[a-f0-9]{32}$/.test(no)) throw invalid(); return no;
-    },
-    async bind(body: { bankCode: string; account: string; holder: string; challengeNo: string; code: string }, key: string): Promise<BankBeneficiary> {
+    async bind(body: { bankCode: string; account: string; holder: string }, key: string): Promise<BankBeneficiary> {
       const r = record(await client.request({ path: `${base}/beneficiary`, method: "POST", body, idempotencyKey: key, authenticated: true }));
-      return beneficiary(r.beneficiary);
+      const saved = beneficiary(r.beneficiary);
+      if (saved.bankCode !== body.bankCode || !saved.maskedAccount.endsWith(body.account.slice(-4))) throw invalid();
+      return saved;
     },
     async quote(amountUsdt: string): Promise<BankQuote> {
       return parseBankQuote(await client.request({ path: `${base}/quotes`, method: "POST", body: { amountUsdt }, authenticated: true }));

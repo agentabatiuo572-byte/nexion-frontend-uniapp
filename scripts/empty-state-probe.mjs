@@ -18,6 +18,7 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  if (url.pathname === "/api/withdrawals/bank/config") return { enabled: false, banks: [], beneficiary: null };
   // An empty commission history is a successful canonical read. The page
   // also needs valid policy and member projections before showing its empty state.
   if (url.pathname === "/api/config/commission/rates") return {
@@ -260,6 +261,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
     // App boot already reads the server's saved-card projection. Reads are not
     // binding; no card mutation or field-bearing request may leave this form.
     if (/\/api\/payment-methods(?:\/|$|\?)/.test(request.url()) && request.method() !== "GET") cardRequests.push(request.method());
+    if (/\/api\/withdrawals\/bank(?:\/|$|\?)/.test(request.url()) && request.method() !== "GET") cardRequests.push("BANK_MUTATION");
     if (/\/(api|auth)\//.test(request.url()) && /4111\s?1111\s?1111\s?1111|TEST USER/.test(request.postData() || "")) cardRequests.push("FIELD_DATA");
   };
   if (spec.cardEntry) page.on("request", recordCardRequest);
@@ -270,10 +272,11 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
     if (spec.cardEntry) {
       await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-cards-new");
       await page.evaluate(theme => document.querySelector("#app")?.__vue_app__?.config?.globalProperties?.$pinia?._s.get("theme")?.setMode(theme), THEME);
-      await page.getByText("Enter your bank card details", { exact: true }).waitFor({ state: "visible" });
+      await page.getByTestId("bank-account-binding").waitFor({ state: "visible" });
       const fields = page.locator("input");
       if (await fields.count() !== 4) throw new Error("Original four card inputs are not present");
-      for (let f = 0; f < 4; f++) if (!await fields.nth(f).isEditable()) throw new Error("Card input is not editable");
+      for (const f of [0, 3]) if (!await fields.nth(f).isEditable()) throw new Error("Bank account/holder input is not editable");
+      for (const f of [1, 2]) if (await fields.nth(f).isEditable()) throw new Error("Bank binding must not collect expiry or CVV");
       const backButtons = page.getByRole("button", { name: "Back", exact: true });
       if (await backButtons.count() !== 1) throw new Error("Original header exit missing or duplicated");
       const back = backButtons.first();
@@ -286,21 +289,18 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       if (await page.getByText(/Bank-card binding is not available yet|Local development simulation:|Test cards only verify bind/).count()) throw new Error("Card entry shows the removed hold or simulation copy");
       const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth > document.scrollingElement.clientWidth + 1);
       if (overflow) throw new Error("Card form overflows horizontally");
-      const submit = page.getByTestId("card-bind-submit");
+      const submit = page.getByTestId("bank-bind-continue");
       if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Empty form can submit");
       const submitBounds = await submit.boundingBox();
       if (!submitBounds || submitBounds.height < 44 || await submit.getAttribute("tabindex") !== "0") throw new Error("Submit touch/keyboard target regressed");
       // Fixture-only values; all API/auth routes are intercepted by the isolated
       // formal session above. No real account or card is used by this probe.
       // uni-input paints its placeholder in a sibling view rather than a native attribute.
-      await page.getByText("1234 5678 9012 3456", { exact: true }).waitFor({ state: "visible" });
       await fields.nth(0).fill("4111111111111111");
-      await fields.nth(1).fill("12/30");
-      await fields.nth(2).fill("123");
       await fields.nth(3).fill("TEST USER");
-      await page.waitForFunction(() => document.querySelector('[data-testid="card-bind-submit"]')?.getAttribute("aria-disabled") === "false");
+      if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Missing direct-binding capability must prevent submission");
       await submit.press("Enter");
-      await page.getByText("The binding service is not connected. No card details were submitted or saved.", { exact: true }).waitFor({ state: "visible" });
+      if (await page.locator('[data-testid="bank-otp"], [data-testid="bank-select"]').count()) throw new Error("BANKQR must not show bank selection or OTP");
       if (cardRequests.length) throw new Error("Entry requested/sent card data with no real adapter");
       await back.press("Enter");
       await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet");

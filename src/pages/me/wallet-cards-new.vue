@@ -13,7 +13,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="color: var(--v5-ink)">
+    <BankAccountBinding v-if="!cardBindingAvailable" :active="bankFormVisible" :return-to="returnTo" />
+    <view v-else style="color: var(--v5-ink)">
       <SubPageHeader :back="cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/wallet'" :title="t.cards.newTitle" />
       <CardSimulationBadge />
 
@@ -89,10 +90,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
-import { onLoad, onHide, onUnload } from "@dcloudio/uni-app";
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import { navReplace, navBack } from "@/lib/route";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import BankAccountBinding from "@/components/me/bank-account-binding.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
@@ -111,6 +113,9 @@ const t = useT();
 const cardsStore = useCards();
 const app = useApp();
 const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaymentEnabled);
+const bankFormVisible = ref(true);
+onShow(() => { bankFormVisible.value = true; });
+onHide(() => { bankFormVisible.value = false; });
 
 // Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
 // navigation (open-redirect guarded). Initialize from the H5 URL hash query

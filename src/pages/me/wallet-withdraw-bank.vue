@@ -29,17 +29,7 @@
         </view>
         <view v-if="!quote && !uncertain" class="section">
           <text class="muted">{{ c.bindingNotice }}</text>
-          <view class="action" role="button" tabindex="0" :aria-expanded="bankChoicesOpen" :aria-disabled="busy" :aria-label="c.bank" @click="toggleBanks" @keydown.enter.prevent="toggleBanks" @keydown.space.prevent="toggleBanks"><text>{{ config.banks[bankIndex]?.name || c.chooseBank }}</text></view>
-          <view v-if="bankChoicesOpen" class="bank-choices">
-            <view v-for="(bank, index) in config.banks" :key="bank.code" class="action" role="button" tabindex="0" :aria-disabled="busy" @click="selectBank(index)" @keydown.enter.prevent="selectBank(index)" @keydown.space.prevent="selectBank(index)"><text>{{ bank.name }}</text></view>
-          </view>
-          <input v-model="account" class="field" type="text" inputmode="numeric" maxlength="32" :disabled="busy" :placeholder="c.account" :aria-label="c.account" />
-          <input v-model="holder" class="field" type="text" maxlength="100" :disabled="busy" :placeholder="c.holder" :aria-label="c.holder" />
-          <view class="row">
-            <input v-model="code" class="field" type="text" inputmode="numeric" maxlength="6" :disabled="busy" :placeholder="c.code" :aria-label="c.code" />
-            <view class="action" role="button" tabindex="0" :aria-disabled="busy" @click="sendCode" @keydown.enter.prevent="sendCode" @keydown.space.prevent="sendCode"><text>{{ c.sendCode }}</text></view>
-          </view>
-          <view class="action" role="button" tabindex="0" :aria-disabled="busy || !challenge || !account || !holder || code.length !== 6" @click="bind" @keydown.enter.prevent="bind" @keydown.space.prevent="bind"><text>{{ c.bind }}</text></view>
+          <view class="action" role="button" tabindex="0" :aria-disabled="busy" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ useTranslations.bankBinding.manage }}</text></view>
         </view>
         <view v-if="config.beneficiary && !uncertain" class="section">
           <input data-testid="bank-amount" v-if="!quote" v-model="amount" class="field" type="text" inputmode="decimal" :disabled="busy || !config.enabled" :placeholder="c.amount" :aria-label="c.amount" />
@@ -72,6 +62,7 @@ import { apiClient } from "@/api/runtime";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createBankWithdrawalApi, type BankConfig, type BankQuote, type BankOrder } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
+import { navTo } from "@/lib/route";
 
 const c = computed(() => useTranslations.value.bankWithdrawal);
 const useTranslations = useT();
@@ -84,12 +75,6 @@ const busy = ref(false);
 const error = ref("");
 const uncertain = ref(false);
 const amount = ref("");
-const account = ref("");
-const holder = ref("");
-const code = ref("");
-const challenge = ref("");
-const bankIndex = ref(0);
-const bankChoicesOpen = ref(false);
 let requestedOrder = "";
 let revision = 0;
 let alive = true;
@@ -140,18 +125,7 @@ async function load() {
     }
   });
 }
-async function sendCode() { await run(async current => { const value = await api.otp(); if (current()) challenge.value = value; }); }
-async function bind() {
-  if (!challenge.value || !account.value || !holder.value || code.value.length !== 6) return;
-  await run(async current => {
-    const selected = config.value?.banks[bankIndex.value]; if (!selected) return;
-    const saved = await api.bind({ bankCode: selected.code, account: account.value.trim(), holder: holder.value.trim(),
-      challengeNo: challenge.value, code: code.value }, `bank-bind:${challenge.value}`);
-    if (!current()) return;
-    if (config.value) config.value.beneficiary = saved;
-    account.value = ""; holder.value = ""; code.value = ""; challenge.value = "";
-  });
-}
+function manageBank() { if (!busy.value) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
 async function getQuote() {
   if (!config.value?.enabled || !amount.value || uncertain.value) return;
   await run(async current => { const value = await api.quote(amount.value); if (current()) quote.value = value; });
@@ -176,19 +150,13 @@ async function abandon() {
     quote.value = null; uncertain.value = false; uni.removeStorageSync(pendingKey());
   });
 }
-function toggleBanks() { if (!busy.value) bankChoicesOpen.value = !bankChoicesOpen.value; }
-function selectBank(index: number) {
-  if (busy.value || !config.value?.banks[index]) return;
-  bankIndex.value = index; bankChoicesOpen.value = false;
-}
 function startNew() {
   if (!terminal.value || busy.value) return;
   order.value = null; quote.value = null; requestedOrder = ""; amount.value = ""; void load();
 }
 function invalidate() {
   revision++; config.value = null; quote.value = null; order.value = null; busy.value = false; error.value = ""; uncertain.value = false;
-  account.value = ""; holder.value = ""; code.value = ""; challenge.value = ""; amount.value = ""; requestedOrder = "";
-  bankIndex.value = 0; bankChoicesOpen.value = false;
+  amount.value = ""; requestedOrder = "";
   if (alive && visible) void load();
 }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, invalidate);
@@ -196,7 +164,7 @@ const stopRuntime = subscribeRuntimeRevision(invalidate);
 onLoad(params => { if (typeof params?.order === "string" && /^WD-[A-Z0-9]+$/.test(params.order)) requestedOrder = params.order; });
 onShow(() => { visible = true; void load(); });
 onHide(() => { visible = false; });
-onUnload(() => { alive = false; visible = false; stopRuntime(); revision++; account.value = ""; holder.value = ""; code.value = ""; });
+onUnload(() => { alive = false; visible = false; stopRuntime(); revision++; });
 </script>
 
 <style scoped>

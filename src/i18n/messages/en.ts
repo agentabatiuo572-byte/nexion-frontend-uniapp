@@ -2,6 +2,17 @@
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  bankBinding: {
+    type: "Bank account", securityNote: "For bank withdrawals · confirm to save",
+    accountLabel: "Receiving account number", accountPlaceholder: "Enter the bank account number, not necessarily the card number",
+    holderLabel: "Account holder name", holderPlaceholder: "Full name as registered with the bank", notApplicable: "Not applicable", required: "Required", continue: "Confirm binding",
+    defaultLabel: "Default withdrawal account", singleAccount: "One withdrawal account is supported at a time.",
+    disclaimer: "Expiry and CVV are not used or collected. Account details are sent only when you confirm binding; draft details are cleared when you leave.",
+    loadError: "Unable to load account configuration or your saved account. Please retry.", unsupported: "Bank account binding is being updated. Please reload shortly.",
+    bindError: "Account not saved. Check the account number and holder name, or contact support.",
+    unknown: "The binding result is not confirmed. Do not start a new binding; retry this request to check its result.",
+    locked: "Account change is temporarily locked", retry: "Retry loading", retryOriginal: "Check original binding", close: "Close", done: "Done", manage: "Manage my bank account",
+  },
   bankWithdrawal: {
     resultReview: "Payout evidence conflicts and support is reviewing it. Do not submit a duplicate withdrawal.",
     requote: "Cancel unused quote / start again",
