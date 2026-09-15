@@ -2,6 +2,20 @@
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  bankWithdrawal: {
+    resultReview: "Payout evidence conflicts and support is reviewing it. Do not submit a duplicate withdrawal.",
+    requote: "Cancel unused quote / start again",
+    title: "Bank withdrawal", entry: "Withdraw to a Vietnamese bank account", unavailable: "Bank withdrawals are not available yet. No funds have been submitted.",
+    bank: "Bank", account: "Account number", holder: "Account holder's full name", code: "SMS code", sendCode: "Send code", bind: "Confirm bank account",
+    bindingNotice: "A new or changed account takes effect after 24 hours and can be changed again after 7 days. No changes while a withdrawal is in progress.",
+    effective: "Effective from", changeAfter: "Can change after", amount: "Withdrawal amount (USDT)", quote: "Get quote", fee: "Fee (USDT)",
+    net: "Net principal (USDT)", rate: "VND per USDT", receive: "Bank receives (VND)", expires: "Quote expires", confirm: "Confirm withdrawal",
+    confirmNotice: "This reserves the displayed USDT amount while your withdrawal is processed. Do not pay or transfer again.",
+    refresh: "Refresh status", unknown: "Submission result is not confirmed. Check its status before starting another withdrawal.",
+    review: "Awaiting review", processing: "Bank transfer processing", paid: "Bank payout confirmed", failed: "Withdrawal failed / refunded",
+    held: "Awaiting manual verification — funds remain on hold", error: "Unable to complete this request. Please retry or contact support.",
+    otpSent: "Code sent", bound: "Bank account saved", newWithdrawal: "New withdrawal", chooseBank: "Choose a bank", loading: "Loading…",
+  },
   privacy: {
     "title": "Privacy Policy",
     "unavailable": "The published privacy policy is not available yet. Please try again later.",

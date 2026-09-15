@@ -175,6 +175,7 @@ export function requestWithdrawalEligibility(
   requestedUsdt: number | undefined,
   policyVersion: string,
 ): Promise<WithdrawalEligibility> {
+  if (network === "BANK-VND") return Promise.reject(new Error("BANK_WITHDRAWAL_QUOTE_REQUIRED"));
   if (remoteApiEnabled) {
     return withdrawalApi.eligibility({
       amount: requestedUsdt ?? 0,

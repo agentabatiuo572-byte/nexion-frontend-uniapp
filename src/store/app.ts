@@ -2084,6 +2084,7 @@ export const useApp = defineStore("app", () => {
     // commits wallet reservation, optional NEX burn, order and ledgers atomically.
     // The local store only mirrors the returned order for rendering; it never
     // debits balances or chooses a fee bucket.
+    if (network === "BANK-VND") throw new Error("BANK_WITHDRAWAL_QUOTE_REQUIRED");
     const submission = await withdrawalApi.submit(
       amount,
       network,

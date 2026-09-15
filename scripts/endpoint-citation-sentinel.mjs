@@ -103,6 +103,7 @@ const LEDGER = {
   "/api/store/bundle-discount": "BACKEND: AppCanonicalBoundaryController 已实现;PC E1 套餐折扣配置的 App 只读投影,后台 PRD v2 §176",
 
   // ── wallet / withdrawals / deposits ───────────────────────────────────
+  "/api/withdrawals/bank": "BACKEND: BankWithdrawalController authenticated-user resource family; user-approved 2026-09-15 HDPay bank payout; docs/changes/2026-09-15-bank-withdrawal.md",
   "GET /api/withdrawals": "PRD §9.4",
   "GET /api/withdrawals/{withdrawalNo}": "BACKEND: AppWithdrawalController user-owned read by withdrawalNo; same resource as PRD §9.11f /api/withdrawals/:id",
   "/api/auth/captcha/challenge": "TBD-NAME: SelfHostedCaptchaController POST challenge, Redis-backed self-hosted slider; user-approved Sep10 implementation, PRD auth endpoint naming pending sync",
