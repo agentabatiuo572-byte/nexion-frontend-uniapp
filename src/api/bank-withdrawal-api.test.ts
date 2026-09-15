@@ -9,6 +9,26 @@ const quote = {
 };
 const receipt = { state: "COMMITTED", withdrawalNo: "WD-TEST", withdrawal: { withdrawalNo: "WD-TEST", chain: "BANK-VND", status: "SENT" }, providerState: "PENDING", bank: quote };
 describe("bank withdrawal server contract", () => {
+  test("binding rejects a receipt for another bank/account and never accepts an unmasked recipient", async () => {
+    const saved = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z" };
+    const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A" };
+    const request = vi.fn().mockResolvedValue({ beneficiary: saved });
+    const api = createBankWithdrawalApi({ request } as never);
+    await expect(api.bind(body, "bind-test")).resolves.toEqual(saved);
+    for (const invalid of [{ ...saved, bankCode: "ACB" }, { ...saved, maskedAccount: "****1234" }, { ...saved, maskedAccount: "00123456789" }]) {
+      request.mockResolvedValue({ beneficiary: invalid });
+      await expect(api.bind(body, "bind-test")).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");
+    }
+  });
+  test("empty BANKQR codes are valid but missing or malformed bank codes are not", async () => {
+    expect(parseBankQuote({ ...quote, bankCode: "", bankName: "BANKQR" }).bankCode).toBe("");
+    for (const bankCode of [null, undefined, " ", 0]) expect(() => parseBankQuote({ ...quote, bankCode })).toThrow();
+    const request = vi.fn().mockResolvedValue({ enabled: false, banks: [], beneficiary: null });
+    const api = createBankWithdrawalApi({ request } as never);
+    expect(await api.config()).toMatchObject({ bankCodeRequired: true, bindingOtpRequired: true });
+    request.mockResolvedValue({ enabled: false, banks: [], beneficiary: null, bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
+    expect(await api.config()).toMatchObject({ bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
+  });
   test("keeps VND integer amount separate from the USDT balance debit", () => {
     expect(parseBankQuote(quote)).toMatchObject({ amountUsdt: 100, feeUsdt: 1, netUsdt: 99, amountVnd: 2475000 });
     for (const bad of [{ ...quote, netUsdt: 100 }, { ...quote, amountVnd: 2475000.1 }, { ...quote, feeUsdt: true }, { ...quote, rateVnd: 0 }]) {

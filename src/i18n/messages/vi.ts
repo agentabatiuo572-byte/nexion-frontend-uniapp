@@ -3,6 +3,17 @@ import type { Messages } from "./en";
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  bankBinding: {
+    type: "Tài khoản ngân hàng", securityNote: "Dùng để rút tiền · xác nhận để lưu",
+    accountLabel: "Số tài khoản nhận tiền", accountPlaceholder: "Nhập số tài khoản ngân hàng, không nhất thiết là số trên thẻ",
+    holderLabel: "Tên chủ tài khoản", holderPlaceholder: "Họ tên đầy đủ đã đăng ký tại ngân hàng", notApplicable: "Không áp dụng", required: "Bắt buộc", continue: "Xác nhận liên kết",
+    defaultLabel: "Tài khoản rút tiền mặc định", singleAccount: "Hiện chỉ hỗ trợ một tài khoản rút tiền tại một thời điểm.",
+    disclaimer: "Không sử dụng hoặc thu thập ngày hết hạn và CVV. Thông tin chỉ được gửi khi xác nhận liên kết; bản nháp sẽ được xóa khi rời trang.",
+    loadError: "Chưa thể tải cấu hình hoặc tài khoản đã liên kết. Vui lòng thử lại.", unsupported: "Dịch vụ liên kết tài khoản đang cập nhật. Vui lòng tải lại sau.",
+    bindError: "Tài khoản chưa được lưu. Kiểm tra số tài khoản và tên chủ tài khoản hoặc liên hệ hỗ trợ.",
+    unknown: "Chưa xác nhận kết quả liên kết. Không tạo yêu cầu mới; hãy kiểm tra lại yêu cầu ban đầu.",
+    locked: "Tạm thời chưa thể đổi tài khoản", retry: "Tải lại", retryOriginal: "Kiểm tra yêu cầu ban đầu", close: "Đóng", done: "Hoàn tất", manage: "Quản lý tài khoản ngân hàng",
+  },
   bankWithdrawal: {
     resultReview: "Kết quả chi trả chưa thống nhất, bộ phận hỗ trợ đang đối soát. Vui lòng không gửi yêu cầu rút tiền trùng.",
     requote: "Hủy báo giá chưa dùng / nhập lại",

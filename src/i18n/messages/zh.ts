@@ -3,6 +3,17 @@ import type { Messages } from "./en";
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  bankBinding: {
+    type: "银行账户", securityNote: "用于银行卡提现 · 确认后保存",
+    accountLabel: "收款账号", accountPlaceholder: "请输入银行账户号码，不一定等于卡面卡号",
+    holderLabel: "收款户名", holderPlaceholder: "请填写银行登记的完整户名", notApplicable: "不适用", required: "必填", continue: "确认绑定",
+    defaultLabel: "设为默认提现账户", singleAccount: "当前支持一个提现账户，绑定后默认用于银行卡提现。",
+    disclaimer: "有效期、CVV 不用于银行提现，也不会采集。确认绑定后才提交账户资料；离开页面会清除未提交的填写内容。",
+    loadError: "暂时无法读取账户配置或已绑定账户，请重试。", unsupported: "银行卡绑定服务正在更新，请稍后重新加载。",
+    bindError: "账户未保存，请检查收款账号和户名，或联系客服。",
+    unknown: "绑定结果尚未确认，请勿重新绑卡。请核对原绑定请求的结果。",
+    locked: "暂不可变更账户", retry: "重新加载", retryOriginal: "核对原绑定结果", close: "关闭", done: "完成", manage: "管理我的银行卡",
+  },
   bankWithdrawal: {
     resultReview: "代付结果存在差异，客服正在核对；请勿重复提现。",
     requote: "取消未提交报价／重新填写",

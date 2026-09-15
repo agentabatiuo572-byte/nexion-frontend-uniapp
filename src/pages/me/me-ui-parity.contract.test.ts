@@ -99,9 +99,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-address-rebind.vue": "a24907e30eec77cda6495fff61782daacd487ef76f3e0bf273baac60bbc2bffd",
   // Wallet filter pills expose keyboard button semantics and their selected state; styles are unchanged.
   "wallet-bills.vue": "c16daae93135450d6f3b383abdf3fcb58398dfac1c30c338a15eebb254cc3658",
-  // User-requested original editable form; the existing card entry redirects to it.
-  // Truthful connection-pending copy replaces development claims; field layout/styles stay intact.
-  "wallet-cards-new.vue": "d2550c92e4661cb72570cf3d948d278d1e201525f6266457945f7ea6fe6b0a92",
+  // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
+  // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
+  "wallet-cards-new.vue": "5aadc349a1d5a20213a77490ae7433766860b5e0e3751e6e5eef51e9bbe33f13",
   "wallet-cards.vue": "b9800456add8dee31bbf2182901b4d6d30b717f3ad6b54fc55dc11abc8308671",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
