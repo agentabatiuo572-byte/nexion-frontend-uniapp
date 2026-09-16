@@ -5,11 +5,12 @@ import { ApiError } from "@/api/errors";
 const beneficiary = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2099-09-17T00:00:00Z", nextChangeAt: "2099-09-23T00:00:00Z" };
 const config = { enabled: false, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", beneficiary: null };
 function fixture() {
-  const api = { config: vi.fn().mockResolvedValue(config), bind: vi.fn().mockResolvedValue(beneficiary), verify: vi.fn().mockResolvedValue(beneficiary) };
+  const api = { config: vi.fn().mockResolvedValue(config), bind: vi.fn().mockResolvedValue(beneficiary), sendOtp: vi.fn().mockResolvedValue({ challengeNo: "PAYOUT-BANK-"+"a".repeat(32), expiresInSeconds: 300, retryAfterSeconds: 60 }) };
   let current = "user-a:1";
-  const form = createBankBindingForm(api, () => current);
+  let now = Date.now();
+  const form = createBankBindingForm(api, () => current, () => now);
   const fill = () => Object.assign(form.state, { account: "00123456789", holder: "NGUYEN VAN A" });
-  return { api, form, fill, switchUser: () => { current = "user-b:2"; form.reset(); } };
+  return { api, form, fill, advance: (ms: number) => { now += ms; }, switchUser: () => { current = "user-b:2"; form.reset(); } };
 }
 describe("bank binding form", () => {
   it("validates account and holder without requiring a bank, OTP, PAN expiry or CVV", () => {
@@ -63,9 +64,46 @@ describe("bank binding form", () => {
     api.config.mockRejectedValue(new Error("OFFLINE")); await form.load();
     expect(form.state.config).toBe(null); expect(form.canContinue()).toBe(false); expect(form.state.error).toBe("load");
   });
-  it("cooldown blocks fresh binding even with no OTP requirement", async () => {
-    const { form, api, fill } = fixture(); api.config.mockResolvedValue({ ...config, beneficiary }); await form.load(); fill();
-    expect(form.canContinue()).toBe(false); await form.submit(); expect(api.bind).not.toHaveBeenCalled();
+  it("requires SMS for replacement even when the legacy cooldown date is in the future", async () => {
+    const { form, api, fill } = fixture(); api.config.mockResolvedValue({ ...config, bindingOtpRequired: true, beneficiary });
+    await form.load(); fill(); expect(form.canContinue()).toBe(false);
+    expect(form.canSendOtp()).toBe(true); await form.sendOtp(); form.state.code="123456";
+    expect(form.canContinue()).toBe(true); expect(form.canSendOtp()).toBe(false);
+    await form.submit(); expect(form.state.phase).toBe("saved");
+    expect(api.bind.mock.calls[0][0]).toMatchObject({challengeNo:"PAYOUT-BANK-"+"a".repeat(32),code:"123456"});
+    expect(form.state.code).toBe(""); expect(form.state.challengeNo).toBe("");
+  });
+  it("expires SMS, throttles resend, and ignores late responses after identity changes", async () => {
+    const { form, api, fill, advance, switchUser } = fixture();
+    api.config.mockResolvedValue({ ...config, bindingOtpRequired: true, beneficiary }); await form.load(); fill();
+    await form.sendOtp(); form.state.code="123456"; expect(form.canContinue()).toBe(true);
+    advance(300001); expect(form.canContinue()).toBe(false); expect(form.canSendOtp()).toBe(true);
+    let resolve!: (v: {challengeNo:string;expiresInSeconds:number;retryAfterSeconds:number}) => void;
+    api.sendOtp.mockImplementation(()=>new Promise(done=>{resolve=done;}));
+    const pending=form.sendOtp(); switchUser(); resolve({challengeNo:"PAYOUT-BANK-"+"b".repeat(32),expiresInSeconds:300,retryAfterSeconds:60});
+    await pending; expect(form.state.challengeNo).toBe(""); expect(form.state.config).toBe(null);
+  });
+  it("keeps the same OTP and idempotency key when a replacement response is lost", async () => {
+    const { form, api, fill }=fixture(); api.config.mockResolvedValue({...config,bindingOtpRequired:true,beneficiary});
+    await form.load(); fill(); await form.sendOtp(); form.state.code="123456";
+    api.bind.mockRejectedValueOnce(new ApiError({kind:"network",message:"LOST"}));
+    await form.submit(); expect(form.state.phase).toBe("uncertain");
+    form.state.code="999999"; expect(form.canSendOtp()).toBe(false); await form.submit();
+    expect(api.bind.mock.calls[1]).toEqual(api.bind.mock.calls[0]); expect(form.state.phase).toBe("saved");
+  });
+  it("does not permit replacement against an old server that omits the SMS requirement", async () => {
+    const {form,api,fill}=fixture(); api.config.mockResolvedValue({...config,beneficiary});
+    await form.load(); fill(); expect(form.canContinue()).toBe(false); expect(form.canSendOtp()).toBe(false);
+  });
+  it("SMS rejection or unavailable delivery never binds and permits safe correction", async () => {
+    const {form,api,fill,advance}=fixture(); api.config.mockResolvedValue({...config,bindingOtpRequired:true,beneficiary});
+    await form.load(); fill(); api.sendOtp.mockRejectedValueOnce(new ApiError({kind:"network",message:"LOST_SMS"}));
+    await form.sendOtp(); expect(form.state.error).toBe("otpSend"); expect(form.canContinue()).toBe(false);
+    expect(form.canSendOtp()).toBe(false); advance(60001); await form.sendOtp(); form.state.code="111111";
+    api.bind.mockRejectedValueOnce(new ApiError({kind:"business",code:422,message:"BANK_CHANGE_OTP_INVALID"}));
+    await form.submit(); expect(form.state.error).toBe("otpInvalid"); expect(form.state.code).toBe("");
+    form.state.code="123456"; await form.submit(); expect(form.state.phase).toBe("saved");
+    expect(api.bind.mock.calls[1][1]).not.toBe(api.bind.mock.calls[0][1]);
   });
   it("a definite rejection allows correction with a new key; leaving clears the entire draft", async () => {
     const { form, api, fill } = fixture(); await form.load(); fill();

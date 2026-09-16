@@ -10,15 +10,14 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     const quote = { quoteNo: `BQ-${"a".repeat(32)}`, amountUsdt: 100, feeUsdt: 1, netUsdt: 99, rateVnd: 25000,
       amountVnd: 2475000, bankCode: "VCB", bankName: "Vietcombank", maskedAccount: "******6789", expiresAt: new Date(Date.now()+300000).toISOString() };
     const fixture = { status: "SENT", providerState: "PENDING", submits: 0, abandons: 0, quotes: 0, verifies: 0, enabled: true,
-      intent: null, settlementEvidence: null, verificationStatus: "verified", payoutCapability: "supported", canWithdraw: true,
+      intent: null, settlementEvidence: null, canWithdraw: true,
       key: `nexgrid.bank-withdraw.pending:${app.accountKey}` };
     window.__bankFixture = fixture;
     window.__bankRestore = rt.apiClient.request;
     const receipt = () => ({ state: "COMMITTED", withdrawalNo: "WD-BANKTEST123", providerState: fixture.providerState,
       withdrawal: { withdrawalNo: "WD-BANKTEST123", chain: "BANK-VND", status: fixture.status }, bank: quote, settlementEvidence: fixture.settlementEvidence });
     const beneficiary = () => ({ bankCode:"VCB",bankName:"Vietcombank",maskedAccount:"******6789",effectiveAt:"2026-09-01T00:00:00Z",nextChangeAt:"2026-09-08T00:00:00Z",
-      verificationStatus:fixture.verificationStatus,payoutCapability:fixture.payoutCapability,ownershipStatus:"matched",accountType:"payment_account",canWithdraw:fixture.canWithdraw,
-      checkedAt:new Date(Date.now()-60000).toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString(),evidenceRef:"fixture-verification",capabilityVersion:"1" });
+      canWithdraw:fixture.canWithdraw });
     rt.apiClient.request = async request => {
       if (request.path === "/api/app/profile/language") return {language:request.body.language};
       if (request.path.startsWith("/api/legal/terms/current?")) {
@@ -66,7 +65,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await page.getByTestId("withdraw-method-bank").click({force:true});
     assert.match(page.url(),/wallet-withdraw-method/);
     await gotoProtected("/pages/me/wallet-withdraw-bank");
-    await page.getByTestId("bank-verify").waitFor();
+    await page.getByTestId("bank-account-status").waitFor();
     assert.equal(await page.getByTestId("bank-refresh").count(),0,"no order or read failure must not show an order-refresh action");
     assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
     await page.evaluate(() => { window.__bankFixture.configUnavailable=true; });
@@ -129,29 +128,30 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await page.locator('[data-testid="bank-amount"] input').waitFor();
     assert.equal(await page.evaluate(() => window.__bankFixture.abandons),1);
     assert.equal(await page.evaluate(() => window.__bankFixture.submits),1);
-    // All unsupported/unknown account states stay closed in every shipped language and theme.
+    // Server-denied accounts remain closed; bound accounts need no verification action in any locale/theme.
     for (const locale of ["en","vi","zh"]) for (const mode of ["light","dark"]) {
       await page.evaluate(async ({locale,mode}) => {
         (await import("/src/store/locale.ts")).useLocaleStore().setLocale(locale);
         (await import("/src/store/theme.ts")).useTheme().setMode(mode);
-        Object.assign(window.__bankFixture,{verificationStatus:"unavailable",payoutCapability:mode==="dark"?"unsupported":"unknown",canWithdraw:false});
+        Object.assign(window.__bankFixture,{canWithdraw:false});
       },{locale,mode});
       await gotoProtected("/pages/me/wallet-withdraw-bank");
-      await page.getByTestId("bank-verify").waitFor();
+      await page.getByTestId("bank-account-status").waitFor();
       assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
       assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),false);
-      await page.getByTestId("bank-verify").press("Enter");
-      await page.waitForFunction(() => document.querySelector('[data-testid="bank-verify"]')?.getAttribute("aria-disabled")==="false");
-      assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
+      assert.equal(await page.getByTestId("bank-verify").count(),0);
+      await page.evaluate(()=>{window.__bankFixture.canWithdraw=true;});
+      await gotoProtected("/pages/me/wallet-withdraw-bank");
+      assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),true);
       assert.equal(await page.evaluate(()=>document.scrollingElement.scrollWidth>document.scrollingElement.clientWidth+1),false);
       await page.screenshot({path:`.verify-cache/bank-withdrawal/${locale}-${mode}.png`,fullPage:true});
     }
-    assert.equal(await page.evaluate(() => window.__bankFixture.verifies),6);
+    assert.equal(await page.evaluate(() => window.__bankFixture.verifies),0);
     await page.evaluate(() => { window.__bankFixture.enabled=false; });
     await gotoProtected("/pages/me/wallet-withdraw-bank");
     await page.waitForFunction(() => document.querySelector('[data-testid="bank-quote"]')?.getAttribute("aria-disabled") === "true"
       || document.querySelector('[data-testid="bank-quote"]')?.getAttribute("disabled") != null);
-    console.log("PASS bank withdrawal actual page: unavailable empty entry, contextual reload, method selection, cross-device closed-channel recovery without resubmit, evidence-only settlement, durable abandon, verification fail-closed in en/vi/zh and light/dark");
+    console.log("PASS bank withdrawal actual page: unavailable empty entry, contextual reload, method selection, cross-device closed-channel recovery without resubmit, evidence-only settlement, durable abandon, immediate bound-account use without verification in en/vi/zh and light/dark");
   } catch (error) {
     console.error("Bank runtime failure state", await page.evaluate(() => ({ url:location.href, text:document.body.innerText, fixture:window.__bankFixture, uncaught:window.__gateUncaught })));
     await page.screenshot({path:".verify-cache/bank-withdrawal-failure.png",fullPage:true});

@@ -12,14 +12,19 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     rt.apiClient.request = async request => {
       if (request.path === "/api/withdrawals/bank/config") {
         if (fixture.loadFails) throw new ApiError({kind:"network",message:"FIXTURE_OFFLINE"});
-        return {enabled:false,banks:[],bankCodeRequired:!fixture.supported,bindingOtpRequired:!fixture.supported,payType:"BANKQR",beneficiary:fixture.beneficiary};
+        return {enabled:false,banks:[],bankCodeRequired:!fixture.supported,bindingOtpRequired:fixture.supported ? !!fixture.beneficiary : true,payType:"BANKQR",beneficiary:fixture.beneficiary};
       }
-      if (request.path === "/api/withdrawals/bank/beneficiary/otp") { fixture.otps++; throw new Error("BANK_BINDING_MUST_NOT_SEND_OTP"); }
+      if (request.path === "/api/withdrawals/bank/beneficiary/otp") {
+        fixture.otps++; if (!fixture.beneficiary) throw new Error("FIRST_BINDING_MUST_NOT_SEND_SMS");
+        return {challengeNo:"PAYOUT-BANK-"+"a".repeat(32),expiresInSeconds:300,retryAfterSeconds:60};
+      }
       if (request.path === "/api/withdrawals/bank/beneficiary") {
+        const replay=fixture.binds.some(call=>call.key===request.idempotencyKey);
+        if (fixture.beneficiary && !replay && (request.body.challengeNo!=="PAYOUT-BANK-"+"a".repeat(32) || request.body.code!=="123456")) throw new ApiError({kind:"business",code:422,message:"BANK_CHANGE_OTP_INVALID"});
         fixture.binds.push({body:request.body,key:request.idempotencyKey});
-        if (Object.keys(request.body).sort().join(",")!=="account,bankCode,holder" || request.body.account!=="00123456789" || request.body.bankCode!=="") throw new Error("BANK_BINDING_FIELD_MAPPING_INVALID");
+        if ((!fixture.beneficiary && Object.keys(request.body).sort().join(",")!=="account,bankCode,holder") || request.body.account!=="00123456789" || request.body.bankCode!=="") throw new Error("BANK_BINDING_FIELD_MAPPING_INVALID");
         fixture.beneficiary = {bankCode:"",bankName:"BANKQR",maskedAccount:"****6789",
-          effectiveAt:new Date(Date.now()+86400000).toISOString(),nextChangeAt:new Date(Date.now()+604800000).toISOString()};
+          canWithdraw:true,effectiveAt:new Date().toISOString(),nextChangeAt:new Date(Date.now()+604800000).toISOString()};
         if(fixture.loseResponse) { fixture.loseResponse=false; throw new ApiError({kind:"network",message:"FIXTURE_LOST_RESPONSE"}); }
         return {beneficiary:fixture.beneficiary};
       }
@@ -27,6 +32,18 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     };
   });
   const artifact = path.resolve(".verify-cache/bank-binding"); fs.mkdirSync(artifact,{recursive:true});
+  // Reproduce native runtime ordering: App hide, page hide, App show, page show.
+  const visitSmsApp = async () => {
+    await page.evaluate(async () => {
+      const app = getApp().$vm.$, current = getCurrentPages().at(-1).$vm.$;
+      if (!app.onHide?.length || !current.onHide?.length) throw new Error("LIFECYCLE_HOOKS_MISSING");
+      for (const hook of app.onHide) hook();
+      for (const hook of current.onHide) hook();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      for (const hook of app.onShow || []) hook({});
+      for (const hook of current.onShow || []) hook();
+    });
+  };
   try {
     assert.equal((await gotoProtected("/pages/me/wallet-cards")).landed,true);
     await page.waitForURL(url=>url.hash.split("?")[0]==="#/pages/me/wallet-cards-new");
@@ -48,15 +65,40 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     assert.equal(await page.getByRole("dialog").count(),0);
     await submit.press("Enter");
     await page.getByTestId("bank-bind-saved").waitFor();
+    assert.equal(await page.getByTestId("bank-binding-verify").count(),0);
+    assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /24 (hours|小时|giờ)/);
+    assert.match(await page.getByTestId("bank-binding-status").innerText(), /saved|已绑定|Đã liên kết/);
     await page.waitForFunction(()=>document.activeElement?.getAttribute('data-testid')==='bank-bind-done');
     const calls=await page.evaluate(()=>window.__bindingFixture.binds);
     assert.equal(calls.length,2); assert.deepEqual(calls[0],calls[1]);
     assert.equal(await account.count(),0);
     assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes("00123456789") || JSON.stringify(localStorage).includes("NGUYEN VAN A")),false);
-    // Re-entry reads the saved account and enforces server cooldown, even without OTP.
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.otps),0);
+    // Existing bindings can change immediately, even with a legacy nextChangeAt in the future, after SMS.
     await gotoProtected("/pages/me/wallet"); await gotoProtected("/pages/me/wallet-cards-new");
-    await page.locator(".bound-summary").waitFor(); assert.equal(await account.isEditable(),false);
-    await submit.press("Enter"); assert.equal(await page.evaluate(()=>window.__bindingFixture.binds.length),2);
+    await page.locator(".bound-summary").waitFor(); assert.equal(await account.isEditable(),true);
+    assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /7 (days|天|ngày)/);
+    await account.fill("00123456789"); await holder.fill("NGUYEN VAN A");
+    const otp=page.locator('[data-testid="bank-otp"] input'), send=page.getByTestId("bank-send-otp");
+    assert.equal(await submit.getAttribute("aria-disabled"),"true");
+    await send.press("Enter"); await page.getByTestId("bank-otp-status").waitFor();
+    assert.equal(await send.getAttribute("aria-disabled"),"true");
+    await visitSmsApp();
+    assert.equal(await account.inputValue(),"00123456789");
+    assert.equal(await holder.inputValue(),"NGUYEN VAN A");
+    await page.getByTestId("bank-otp-status").waitFor();
+    await otp.fill("123456");
+    await page.waitForFunction(()=>document.querySelector('[data-testid="bank-bind-continue"]')?.getAttribute("aria-disabled")==="false");
+    await page.screenshot({path:path.join(artifact,"bank-change-sms.png"),fullPage:true});
+    await page.evaluate(()=>{window.__bindingFixture.loseResponse=true;});
+    await submit.press("Enter"); await page.locator(".error-note").waitFor();
+    await visitSmsApp();
+    assert.equal(await account.isEditable(),false);
+    await submit.press("Enter"); await page.getByTestId("bank-bind-saved").waitFor();
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.binds.length),4);
+    const replacementCalls=await page.evaluate(()=>window.__bindingFixture.binds.slice(2));
+    assert.deepEqual(replacementCalls[0],replacementCalls[1]);
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.binds[2].body.code),"123456");
     // An old server must not allow incompatible direct binding. Empty bank choices alone do not block BANKQR.
     await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.beneficiary=null;window.__bindingFixture.supported=false;});
     await gotoProtected("/pages/me/wallet-cards-new"); await page.locator(".error-note").waitFor();
@@ -68,10 +110,10 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     assert.equal(await submit.getAttribute("aria-disabled"),"true");
     await gotoProtected("/pages/me/wallet"); await gotoProtected("/pages/me/wallet-cards-new");
     assert.equal(await account.inputValue(),""); assert.equal(await holder.inputValue(),"");
-    assert.equal(await page.evaluate(()=>window.__bindingFixture.otps),0);
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.otps),1);
     await page.setViewportSize({width:320,height:740});
     assert.equal(await page.evaluate(()=>document.scrollingElement.scrollWidth>document.scrollingElement.clientWidth+1),false);
-    console.log("PASS bank binding actual page: no bank selector or OTP, direct account/holder submission, no expiry/CVV collection, same-request recovery, confirmed readback, cooldown, old-server/offline safety and draft cleanup");
+    console.log("PASS bank binding actual page: no bank selector, first binding without SMS and immediate replacement with SMS, no expiry/CVV collection, same-request recovery, confirmed readback, no 7-day interval, old-server/offline safety and draft cleanup");
   } finally {
     await page.setViewportSize({width:390,height:844});
     await page.evaluate(async()=>{const rt=await import("/src/api/runtime.ts");rt.apiClient.request=window.__bindingRestore;delete window.__bindingRestore;delete window.__bindingFixture;});

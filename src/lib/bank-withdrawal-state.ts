@@ -1,28 +1,17 @@
 import type { BankBeneficiary, BankConfig, BankOrder } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
 
-export function bankBeneficiaryReady(beneficiary: BankBeneficiary | null | undefined, now = Date.now()): boolean {
-  return !!beneficiary && beneficiary.canWithdraw === true && beneficiary.verificationStatus === "verified"
-    && beneficiary.payoutCapability === "supported" && beneficiary.ownershipStatus === "matched"
-    && beneficiary.accountType === "payment_account" && !!beneficiary.evidenceRef && !!beneficiary.capabilityVersion
-    && (parseServerTimestamp(beneficiary.checkedAt) ?? Infinity) <= now
-    && (parseServerTimestamp(beneficiary.expiresAt) ?? -Infinity) > now
-    && (parseServerTimestamp(beneficiary.effectiveAt) ?? Infinity) <= now;
+export function bankBeneficiaryReady(beneficiary: BankBeneficiary | null | undefined): boolean {
+  return !!beneficiary && beneficiary.canWithdraw === true;
 }
 
-export function bankCanQuote(config: BankConfig | null, now = Date.now()): boolean {
-  return config?.enabled === true && config.unresolvedIntent === null && bankBeneficiaryReady(config.beneficiary, now);
+export function bankCanQuote(config: BankConfig | null): boolean {
+  return config?.enabled === true && config.unresolvedIntent === null && bankBeneficiaryReady(config.beneficiary);
 }
 
-export type BankAccountNotice = "verified" | "pending" | "unavailable" | "unsupported" | "mismatch" | "expired" | "protected";
-export function bankAccountNotice(beneficiary: BankBeneficiary, now = Date.now()): BankAccountNotice {
-  if (beneficiary.payoutCapability === "unsupported" || ["credit_card", "prepaid"].includes(beneficiary.accountType ?? "")) return "unsupported";
-  if (beneficiary.ownershipStatus === "mismatched" || beneficiary.verificationStatus === "rejected") return "mismatch";
-  if (beneficiary.verificationStatus === "pending") return "pending";
-  if (beneficiary.verificationStatus !== "verified" || beneficiary.payoutCapability !== "supported") return "unavailable";
-  if ((parseServerTimestamp(beneficiary.expiresAt) ?? -Infinity) <= now) return "expired";
-  if ((parseServerTimestamp(beneficiary.effectiveAt) ?? Infinity) > now) return "protected";
-  return bankBeneficiaryReady(beneficiary, now) ? "verified" : "unavailable";
+export type BankAccountNotice = "ready" | "unavailable";
+export function bankAccountNotice(beneficiary: BankBeneficiary): BankAccountNotice {
+  return bankBeneficiaryReady(beneficiary) ? "ready" : "unavailable";
 }
 
 export function bankOrderOutcome(order: BankOrder): "paid" | "refunded" | "review" | "processing" | "held" {

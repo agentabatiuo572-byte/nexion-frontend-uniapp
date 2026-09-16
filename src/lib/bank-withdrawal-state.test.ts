@@ -5,8 +5,7 @@ import { createBankWithdrawalApi, parseBankRecovery, parseBankUnresolvedIntent, 
 const now = Date.parse("2026-09-16T00:00:00Z");
 const beneficiary: BankBeneficiary = {
   bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-15T00:00:00Z", nextChangeAt: "2026-09-21T00:00:00Z",
-  verificationStatus: "verified", payoutCapability: "supported", ownershipStatus: "matched", accountType: "payment_account", canWithdraw: true,
-  checkedAt: "2026-09-15T00:00:00Z", expiresAt: "2026-10-01T00:00:00Z", evidenceRef: "verification-1", capabilityVersion: "1",
+  canWithdraw: true,
 };
 const config: BankConfig = { enabled: true, banks: [], beneficiary, unresolvedIntent: null };
 const quote = { quoteNo: `BQ-${"a".repeat(32)}`, amountUsdt: 100, feeUsdt: 1, netUsdt: 99, rateVnd: 25000,
@@ -25,24 +24,20 @@ describe("bank account authority and settlement evidence", () => {
     const request = vi.fn().mockResolvedValue({...config,beneficiary:{...beneficiary,checkedAt:"invalid"}});
     const loaded = await createBankWithdrawalApi({request} as never).config();
     expect(loaded.beneficiary?.maskedAccount).toBe(beneficiary.maskedAccount);
-    expect(bankCanQuote(loaded,now)).toBe(false);
+    expect(bankCanQuote(loaded)).toBe(true);
     expect(loaded.unresolvedIntent).toBeNull();
   });
-  it("requires all independent gates; waiting 24 hours or possessing a payment card cannot authorize payout", () => {
-    expect(bankCanQuote(config, now)).toBe(true);
-    const changes: Partial<BankBeneficiary>[] = [
-      { canWithdraw: false }, { canWithdraw: undefined }, { verificationStatus: undefined }, { verificationStatus: "pending" },
-      { payoutCapability: "unknown" }, { payoutCapability: "unsupported" }, { ownershipStatus: "mismatched" }, { ownershipStatus: "unknown" },
-      { accountType: "credit_card" }, { accountType: "prepaid" }, { accountType: "unknown" }, { evidenceRef: null }, { checkedAt: null },
-      { capabilityVersion: null }, { expiresAt: null }, { expiresAt: "2026-09-15T00:00:00Z" }, { effectiveAt: "2026-09-17T00:00:00Z" },
-    ];
-    for (const change of changes) expect(bankBeneficiaryReady({ ...beneficiary, ...change }, now), JSON.stringify(change)).toBe(false);
-    expect(bankCanQuote({ ...config, enabled: false }, now)).toBe(false);
-    expect(bankCanQuote({ ...config, beneficiary: null }, now)).toBe(false);
-    expect(bankCanQuote({ ...config, unresolvedIntent: undefined }, now)).toBe(false);
-    expect(bankAccountNotice({ ...beneficiary, payoutCapability: "unsupported" }, now)).toBe("unsupported");
-    expect(bankAccountNotice({ ...beneficiary, effectiveAt: "2026-09-17T00:00:00Z", canWithdraw: false }, now)).toBe("protected");
-    expect(bankBeneficiaryReady({ ...beneficiary, canWithdraw: false }, now + 86400000)).toBe(false);
+  it("accepts a bound account immediately while retaining authoritative channel and intent gates", () => {
+    expect(bankCanQuote(config)).toBe(true);
+    expect(bankBeneficiaryReady({ ...beneficiary, effectiveAt: "2026-09-17T00:00:00Z" })).toBe(true);
+    expect(bankAccountNotice(beneficiary)).toBe("ready");
+    for (const canWithdraw of [false, undefined]) {
+      expect(bankBeneficiaryReady({ ...beneficiary, canWithdraw })).toBe(false);
+      expect(bankAccountNotice({ ...beneficiary, canWithdraw })).toBe("unavailable");
+    }
+    expect(bankCanQuote({ ...config, enabled: false })).toBe(false);
+    expect(bankCanQuote({ ...config, beneficiary: null })).toBe(false);
+    expect(bankCanQuote({ ...config, unresolvedIntent: undefined })).toBe(false);
   });
   it("restores server account intents across devices and rejects ambiguous or malformed pointers", async () => {
     const intent = { state: "NOT_SUBMITTED", quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null };
@@ -51,17 +46,19 @@ describe("bank account authority and settlement evidence", () => {
     const api = createBankWithdrawalApi({ request } as never);
     const loaded = await api.config();
     expect(loaded.unresolvedIntent?.quoteNo).toBe(quote.quoteNo);
-    expect(bankCanQuote(loaded, now)).toBe(false);
+    expect(bankCanQuote(loaded)).toBe(false);
     expect(() => parseBankUnresolvedIntent({ ...unresolvedIntent, quoteNo: `BQ-${"b".repeat(32)}` })).toThrow();
     expect(() => parseBankUnresolvedIntent({ ...unresolvedIntent, state: "UNKNOWN" })).toThrow();
     expect(() => parseBankUnresolvedIntent({ ...unresolvedIntent, state: "MULTIPLE" })).toThrow();
     expect(parseBankRecovery({ state: "EXPIRED" })).toEqual({ state: "EXPIRED" });
   });
-  it("verification retries use the existing account endpoint and keep unavailable capability closed", async () => {
-    const request = vi.fn().mockResolvedValue({ beneficiary: { ...beneficiary, verificationStatus: "unavailable", payoutCapability: "unknown", canWithdraw: false } });
-    const actual = await createBankWithdrawalApi({ request } as never).verify();
-    expect(request).toHaveBeenCalledExactlyOnceWith({ path: "/api/withdrawals/bank/beneficiary/verify", method: "POST", authenticated: true });
-    expect(bankBeneficiaryReady(actual, now)).toBe(false);
+  it("does not expose or call the retired external verification endpoint", async () => {
+    const request = vi.fn().mockResolvedValue({ ...config, beneficiary: { ...beneficiary,
+      verificationStatus: "unavailable", expiresAt: "invalid", ownershipStatus: "unknown" } });
+    const api = createBankWithdrawalApi({ request } as never);
+    expect("verify" in api).toBe(false);
+    expect(bankBeneficiaryReady((await api.config()).beneficiary)).toBe(true);
+    expect(request).toHaveBeenCalledExactlyOnceWith({path: "/api/withdrawals/bank/config", authenticated: true});
   });
   it("terminal labels and new-withdrawal access require matching ledger evidence", () => {
     expect(outcome(receipt)).toBe("paid");
