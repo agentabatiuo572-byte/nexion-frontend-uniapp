@@ -575,18 +575,41 @@ function recoverRejectedRegistration(cause: unknown): boolean {
 async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
-  if (verifiedToken.value) {
+  if (!remoteApiEnabled && verifiedToken.value) {
     verifying.value = true;
     exchangeVerifiedAccount(verifiedToken.value, fullPhone.value, otpFlowVersion);
     return;
   }
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
-  // The remote contract validates the OTP atomically with registration. Do not
-  // mirror a successful verification in local storage before that authority has
-  // accepted it.
+  // Verify before password setup; registration still atomically rechecks and
+  // consumes the code, just like the password-reset flow.
   if (remoteApiEnabled) {
-    if (!otpRequestId.value) { error.value = t.value.authOtp.errorOtpNotFound; return; }
-    step.value = 3;
+    const requestId = otpRequestId.value;
+    if (!requestId) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+    const phoneAtVerify = fullPhone.value;
+    const codeAtVerify = codeStr.value;
+    const flowVersion = otpFlowVersion;
+    const isCurrent = () => mounted && flowVersion === otpFlowVersion
+      && step.value === 2 && otpRequestId.value === requestId && fullPhone.value === phoneAtVerify;
+    verifying.value = true;
+    try {
+      await authApi.verifyRegistrationOtp({
+        countryCode: country.value,
+        phone: phoneClean.value,
+        challengeNo: requestId,
+        code: codeAtVerify,
+      });
+    } catch (cause) {
+      if (isCurrent() && codeStr.value === codeAtVerify) {
+        error.value = cause instanceof ApiError && cause.message === "USER_REGISTRATION_OTP_INVALID"
+          ? t.value.authOtp.errorOtpInvalidOrExpired
+          : registrationErrorText(cause);
+      }
+      return;
+    } finally {
+      if (isCurrent()) verifying.value = false;
+    }
+    if (isCurrent() && codeStr.value === codeAtVerify) step.value = 3;
     return;
   }
   // ⚠️ MOCK-ONLY: PRD 已列的 OTP verify 的 TTL/attempts/一码一与验后账号分流

@@ -12,6 +12,28 @@ const request = {
   sponsorCode: null,
 };
 
+test("registration verification uses the public server endpoint without issuing a session", async () => {
+  const vault = createSessionVault();
+  const send = vi.fn().mockResolvedValue({ status: "REGISTRATION_OTP_VERIFIED" });
+  const authApi = createAuthApi({ request: send } as never, vault);
+  const verification = { countryCode: request.countryCode, phone: request.phone, challengeNo: request.challengeNo, code: request.code };
+  await expect(authApi.verifyRegistrationOtp(verification)).resolves.toEqual({ status: "REGISTRATION_OTP_VERIFIED" });
+  expect(send).toHaveBeenCalledExactlyOnceWith({
+    path: "/auth/users/register/otp/verify", method: "POST", body: verification, authenticated: false,
+  });
+  expect(vault.read()).toBeNull();
+  expect(vault.revision()).toBe(0);
+});
+
+test.each([null, {}, { status: "PASSWORD_RESET_OTP_VERIFIED" }, { status: false }])(
+  "registration verification rejects malformed server confirmations: %s", async (data) => {
+    const authApi = createAuthApi({ request: async () => data } as never, createSessionVault());
+    await expect(authApi.verifyRegistrationOtp(request)).rejects.toMatchObject({
+      kind: "protocol", message: "REGISTRATION_OTP_VERIFY_RESPONSE_INVALID",
+    });
+  },
+);
+
 test.each([
   new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }),
   new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID" }),

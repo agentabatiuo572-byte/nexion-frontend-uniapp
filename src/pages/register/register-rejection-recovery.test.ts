@@ -9,7 +9,7 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 
 const parsed = ts.createSourceFile("register.ts", source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)![1], ts.ScriptTarget.Latest, true);
-const names = ["finish", "recoverRejectedRegistration", "invalidateOtpFlow", "isCurrentRemoteRegistrationAttempt", "registrationErrorText", "resend"];
+const names = ["finish", "verifyCode", "recoverRejectedRegistration", "invalidateOtpFlow", "isCurrentRemoteRegistrationAttempt", "registrationErrorText", "resend"];
 const functions = parsed.statements.filter((node) => ts.isFunctionDeclaration(node) && names.includes(node.name?.text ?? ""));
 if (functions.length !== names.length) throw new Error("Production registration handlers missing");
 const handlers = ts.transpileModule(functions.map((node) => node.getText(parsed)).join("\n"), {
@@ -20,11 +20,11 @@ function fixture(failure: unknown, messages = en) {
   vi.useFakeTimers();
   const code = ref(["1", "2", "3", "4", "5", "6"]);
   const otpRequestId = ref<string | null>("old-challenge");
-  const authApi = { register: vi.fn().mockRejectedValue(failure), login: vi.fn(), discardSessionIfCurrent: vi.fn() };
+  const authApi = { register: vi.fn().mockRejectedValue(failure), verifyRegistrationOtp: vi.fn(), login: vi.fn(), discardSessionIfCurrent: vi.fn() };
   const requestCode = vi.fn(async () => { otpRequestId.value = "fresh-challenge"; });
   const deps = {
     ApiError, registerAndLogin, authApi, requestCode, code, otpRequestId,
-    codeStr: computed(() => code.value.join("")), completing: ref(false), verifying: ref(false),
+    codeStr: computed(() => code.value.join("")), codeOk: computed(() => /^\d{6}$/.test(code.value.join(""))), completing: ref(false), verifying: ref(false),
     error: ref<string | null>(null), step: ref(3), verifiedToken: ref<string | null>("old-token"),
     focusIdx: ref(5), resendLeft: ref(12), pwdOk: ref(true), pwdMatch: ref(true), remoteApiEnabled: true,
     fullPhone: ref("+8619900009112"), country: ref("+86"), phoneClean: ref("19900009112"), password: ref("fixture-only"),
@@ -35,11 +35,77 @@ function fixture(failure: unknown, messages = en) {
   };
   const timer = setInterval(() => { deps.resendLeft.value--; }, 1000);
   const run = new Function(...Object.keys(deps), "timer", `let otpFlowVersion=7; let mounted=true; let resendTimer=timer; ${handlers}
-    return { finish, resend, snapshot: () => ({ version: otpFlowVersion, timer: resendTimer }) };`)(...Object.values(deps), timer);
+    return { finish, verifyCode, resend, invalidateOtpFlow, leave: () => { mounted = false; invalidateOtpFlow(); }, snapshot: () => ({ version: otpFlowVersion, timer: resendTimer }) };`)(...Object.values(deps), timer);
   return { ...deps, ...run };
 }
 
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+describe("Registration verifies with the server before password setup", () => {
+  function otpPage(messages = en) {
+    const page = fixture(null, messages);
+    page.step.value = 2;
+    page.verifiedToken.value = null;
+    return page;
+  }
+
+  it("waits for real verification and suppresses duplicate submissions", async () => {
+    const page = otpPage();
+    let accept!: (value: unknown) => void;
+    page.authApi.verifyRegistrationOtp.mockReturnValue(new Promise((resolve) => { accept = resolve; }));
+    const pending = page.verifyCode();
+    expect(page.step.value).toBe(2);
+    expect(page.verifying.value).toBe(true);
+    await page.verifyCode();
+    expect(page.authApi.verifyRegistrationOtp).toHaveBeenCalledExactlyOnceWith({
+      countryCode: "+86", phone: "19900009112", challengeNo: "old-challenge", code: "123456",
+    });
+    accept({ status: "REGISTRATION_OTP_VERIFIED" });
+    await pending;
+    expect(page.step.value).toBe(3);
+    expect(page.verifying.value).toBe(false);
+    expect(page.authApi.register).not.toHaveBeenCalled();
+    expect(page.completeSignIn).not.toHaveBeenCalled();
+  });
+
+  it.each([en, zh, vietnamese])("keeps rejected codes on the code step with a translated error", async (messages) => {
+    const page = otpPage(messages);
+    page.authApi.verifyRegistrationOtp.mockRejectedValue(new ApiError({ kind: "http", status: 422, message: "USER_REGISTRATION_OTP_INVALID" }));
+    await page.verifyCode();
+    expect(page.step.value).toBe(2);
+    expect(page.error.value).toBe(messages.authOtp.errorOtpInvalidOrExpired);
+    expect(page.otpRequestId.value).toBe("old-challenge");
+    expect(page.verifying.value).toBe(false);
+  });
+
+  it("keeps network failures retryable without claiming the code was wrong", async () => {
+    const page = otpPage();
+    page.authApi.verifyRegistrationOtp.mockRejectedValue(new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE" }));
+    await page.verifyCode();
+    expect(page.step.value).toBe(2);
+    expect(page.error.value).toBe(en.authOtp.errorServiceUnavailable);
+    expect(page.verifying.value).toBe(false);
+    page.authApi.verifyRegistrationOtp.mockResolvedValue({ status: "REGISTRATION_OTP_VERIFIED" });
+    await page.verifyCode();
+    expect(page.step.value).toBe(3);
+  });
+
+  it.each(["phone", "challenge", "code", "back", "leave"])("ignores a success after changing %s", async (change) => {
+    const page = otpPage();
+    let accept!: (value: unknown) => void;
+    page.authApi.verifyRegistrationOtp.mockReturnValue(new Promise((resolve) => { accept = resolve; }));
+    const pending = page.verifyCode();
+    if (change === "phone") page.fullPhone.value = "+8619900009222";
+    if (change === "challenge") page.otpRequestId.value = "fresh-challenge";
+    if (change === "code") page.code.value = ["6", "5", "4", "3", "2", "1"];
+    if (change === "back") { page.invalidateOtpFlow(); page.step.value = 1; }
+    if (change === "leave") page.leave();
+    accept({ status: "REGISTRATION_OTP_VERIFIED" });
+    await pending;
+    expect(page.step.value).not.toBe(3);
+    expect(page.authApi.register).not.toHaveBeenCalled();
+  });
+});
 
 describe("Registration rejection recovery", () => {
   it.each([en, zh, vietnamese])("returns an invalid or expired OTP to a translated fresh-code step", async (messages) => {

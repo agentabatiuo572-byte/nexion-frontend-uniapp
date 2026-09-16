@@ -407,13 +407,16 @@ function isCurrentOtpFlow(context: OtpFlowContext): boolean {
   );
 }
 
-function isCurrentPasswordAttempt(context: PasswordAttemptContext): boolean {
+function isCurrentPasswordFlow(context: PasswordAttemptContext): boolean {
   return mounted
     && context.version === otpFlowVersion
     && mode.value === "password"
     && step.value === 1
-    && fullPhone.value === context.phone
-    && password.value === context.password;
+    && fullPhone.value === context.phone;
+}
+
+function isCurrentPasswordAttempt(context: PasswordAttemptContext): boolean {
+  return isCurrentPasswordFlow(context) && password.value === context.password;
 }
 
 function isCurrentRemoteTwoFactorAttempt(context: RemoteTwoFactorAttemptContext): boolean {
@@ -614,6 +617,7 @@ async function signInWithPassword(captchaTicket?: string) {
     });
     if (!isCurrentPasswordAttempt(passwordAttempt)) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
+      if (isCurrentPasswordFlow(passwordAttempt)) loading.value = false;
       return;
     }
     if (result.kind === "challenge") {
@@ -626,7 +630,10 @@ async function signInWithPassword(captchaTicket?: string) {
     }
     finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
-    if (!isCurrentPasswordAttempt(passwordAttempt)) return;
+    if (!isCurrentPasswordAttempt(passwordAttempt)) {
+      if (isCurrentPasswordFlow(passwordAttempt)) loading.value = false;
+      return;
+    }
     loading.value = false;
     if (loginError instanceof Error && loginError.message === "USER_CAPTCHA_REQUIRED") {
       captchaPurpose.value = "password";
@@ -640,6 +647,7 @@ async function signInWithPassword(captchaTicket?: string) {
 async function verifyRemoteTwoFactor() {
   const challengeNo = remoteTwoFactorChallenge.value;
   if (!challengeNo) return;
+  const codeAtVerify = code.value.join("");
   const twoFactorAttempt: RemoteTwoFactorAttemptContext = {
     version: otpFlowVersion,
     phone: fullPhone.value,
@@ -652,17 +660,23 @@ async function verifyRemoteTwoFactor() {
       phone: phoneClean.value,
       password: password.value,
       challengeNo,
-      code: code.value.join(""),
+      code: codeAtVerify,
     });
     if (result.kind !== "authenticated") throw new Error("TWO_FACTOR_SESSION_MISSING");
     if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) {
       authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
+    if (code.value.join("") !== codeAtVerify) {
+      authApi.discardSessionIfCurrent(result.vaultRevision);
+      loading.value = false;
+      return;
+    }
     finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) return;
     loading.value = false;
+    if (code.value.join("") !== codeAtVerify) return;
     error.value = remoteLoginError(loginError);
   }
 }
@@ -673,6 +687,7 @@ async function verifyCode() {
   if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
   const requestId = otpRequestId.value;
   if (!requestId) { loading.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
+  const codeAtVerify = code.value.join("");
   const context: OtpFlowContext = {
     version: otpFlowVersion,
     phone: fullPhone.value,
@@ -687,17 +702,19 @@ async function verifyCode() {
           countryCode: country.value,
           phone: phoneClean.value,
           challengeNo: requestId,
-          code: code.value.join(""),
+          code: codeAtVerify,
         });
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
+        if (code.value.join("") !== codeAtVerify) return;
         step.value = 3;
       } catch (cause) {
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
+        if (code.value.join("") !== codeAtVerify) return;
         const message = cause instanceof ApiError ? cause.message : "";
         error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
-          ? t.value.login.errorInvalidCode
+          ? t.value.authOtp.errorOtpInvalidOrExpired
           : t.value.authOtp.errorServiceUnavailable;
       }
       return;
@@ -707,11 +724,16 @@ async function verifyCode() {
         countryCode: country.value,
         phone: phoneClean.value,
         challengeNo: requestId,
-        code: code.value.join(""),
+        code: codeAtVerify,
       });
       if (result.kind !== "authenticated") throw new Error("LOGIN_OTP_SESSION_MISSING");
       if (!isCurrentOtpFlow(context)) {
         authApi.discardSessionIfCurrent(result.vaultRevision);
+        return;
+      }
+      if (code.value.join("") !== codeAtVerify) {
+        authApi.discardSessionIfCurrent(result.vaultRevision);
+        loading.value = false;
         return;
       }
       finishSignIn({
@@ -723,6 +745,7 @@ async function verifyCode() {
     } catch (cause) {
       if (!isCurrentOtpFlow(context)) return;
       loading.value = false;
+      if (code.value.join("") !== codeAtVerify) return;
       error.value = remoteLoginError(cause);
     }
     return;
@@ -733,8 +756,9 @@ async function verifyCode() {
   }
   // FEAT-AUTH01: server 同构校验(TTL/attemptsLeft/一码一)。PROD: 用返回的
   // verifyToken 换 session；mock 同样必须由本地 exchange 消费该凭证。
-  const res = await otpVerify(context.phone, context.scene, context.requestId, code.value.join(""));
+  const res = await otpVerify(context.phone, context.scene, context.requestId, codeAtVerify);
   if (!isCurrentOtpFlow(context)) return;
+  if (code.value.join("") !== codeAtVerify) { loading.value = false; return; }
   if (!res.ok) {
     loading.value = false;
     // 与 register.vue 的同名分支消费同一个 otpVerify 结果类型 —— 两边必须一起接,
@@ -785,7 +809,7 @@ async function finishReset() {
     loading.value = false;
     const message = cause instanceof ApiError ? cause.message : "";
     error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
-      ? t.value.login.errorInvalidCode
+      ? t.value.authOtp.errorOtpInvalidOrExpired
       : message === "USER_NEW_PASSWORD_MUST_DIFFER"
         ? t.value.login.errorPasswordUnchanged
         : t.value.authOtp.errorServiceUnavailable;

@@ -84,6 +84,10 @@ export interface AuthApi {
   }): Promise<{ status: "PASSWORD_RESET"; revokedSessionCount: number }>;
   completeTwoFactor(request: TwoFactorLoginRequest): Promise<LoginResult>;
   sendRegistrationOtp(request: RegistrationOtpRequest): Promise<RegistrationOtpResult>;
+  verifyRegistrationOtp(request: RegistrationOtpRequest & {
+    challengeNo: string;
+    code: string;
+  }): Promise<{ status: "REGISTRATION_OTP_VERIFIED" }>;
   register(request: RegistrationRequest): Promise<LoginResult>;
   oauthExchange(request: OAuthExchangeRequest): Promise<OAuthExchangeResult>;
   restore(): Promise<SessionSnapshot | null>;
@@ -404,6 +408,19 @@ export function createAuthApi(
         authenticated: false,
       });
       return registrationOtpFromResponse(data);
+    },
+    async verifyRegistrationOtp(request) {
+      const data = await client.request<unknown>({
+        path: "/auth/users/register/otp/verify",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      });
+      if (!data || typeof data !== "object"
+          || (data as Record<string, unknown>).status !== "REGISTRATION_OTP_VERIFIED") {
+        throw new ApiError({ kind: "protocol", message: "REGISTRATION_OTP_VERIFY_RESPONSE_INVALID" });
+      }
+      return { status: "REGISTRATION_OTP_VERIFIED" };
     },
     async register(request) {
       const revision = vault.revision();

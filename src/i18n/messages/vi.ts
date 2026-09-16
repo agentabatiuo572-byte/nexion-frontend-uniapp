@@ -333,7 +333,7 @@ export const vi: Messages = {
     resetSubtitle: "Nhập số điện thoại để nhận mã xác minh.",
     newPasswordTitle: "Đặt mật khẩu mới",
     newPasswordHint: "Dùng 12–64 ký tự, gồm chữ hoa, chữ thường, số và ký hiệu. Sau khi đặt lại, hãy đăng nhập bằng mật khẩu mới.",
-    newPasswordPlaceholder: "Mật khẩu mới (8–64 ký tự)",
+    newPasswordPlaceholder: "Mật khẩu mới (12–64 ký tự)",
     confirmPasswordPlaceholder: "Nhập lại mật khẩu mới",
     passwordMismatch: "Mật khẩu không khớp.",
     finishReset: "Cập nhật mật khẩu",
