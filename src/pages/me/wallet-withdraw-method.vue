@@ -8,16 +8,16 @@
         <view class="method-copy"><text class="method-title">USDT</text><text class="method-note">{{ pending ? t.bankWithdrawal.resumeUsdt : t.bankWithdrawal.usdtMethodHint }}</text></view>
         <text aria-hidden="true">›</text>
       </view>
-      <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!!pending" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
+      <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!canOpenBank" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
         <view class="method-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m3 9 9-6 9 6H3Zm2 0v10m7-10v10m7-10v10M3 21h18" /></svg></view>
-        <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ bankIntent ? t.bankWithdrawal.resumeBank : t.bankWithdrawal.bankMethodHint }}</text></view>
-        <text aria-hidden="true">›</text>
+        <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ bankIntent ? t.bankWithdrawal.resumeBank : bankUnavailable ? t.bankWithdrawal.unavailable : t.bankWithdrawal.bankMethodHint }}</text></view>
+        <text v-if="canOpenBank" aria-hidden="true">›</text>
       </view>
       <text v-if="pending" class="intro" role="status">{{ t.bankWithdrawal.resumeUsdt }}</text>
       <text v-else-if="checking" class="intro" role="status">{{ t.bankWithdrawal.loading }}</text>
       <text v-else-if="!recoveryKnown" class="intro" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
       <text v-else-if="bankIntent" class="intro" role="status">{{ t.bankWithdrawal.resumeBank }}</text>
-      <view v-if="!checking && !recoveryKnown" class="method" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.refresh }}</text></view>
+      <view v-if="!checking && !recoveryKnown" class="method" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
   </AppChassis>
 </template>
@@ -38,15 +38,18 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 const t = useT(), app = useApp();
 const pending = ref(readWithdrawAttempt(app.accountKey));
 const checking = ref(false), recoveryKnown = ref(false), bankIntent = ref(false);
+const bankEnabled = ref(false);
 let revision = 0, visible = false;
 const canOpenUsdt = computed(() => !!pending.value || (!checking.value && recoveryKnown.value && !bankIntent.value));
+const bankUnavailable = computed(() => recoveryKnown.value && !bankIntent.value && !bankEnabled.value);
+const canOpenBank = computed(() => !pending.value && !checking.value && !bankUnavailable.value);
 async function load() {
   const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
-  pending.value = readWithdrawAttempt(account); checking.value = true; recoveryKnown.value = false; bankIntent.value = false;
+  pending.value = readWithdrawAttempt(account); checking.value = true; recoveryKnown.value = false; bankIntent.value = false; bankEnabled.value = false;
   try {
     const config = await createBankWithdrawalApi(apiClient).config(); if (!current()) return;
-    recoveryKnown.value = config.unresolvedIntent !== undefined; bankIntent.value = !!config.unresolvedIntent;
+    recoveryKnown.value = config.unresolvedIntent !== undefined; bankIntent.value = !!config.unresolvedIntent; bankEnabled.value = config.enabled;
   } catch { /* Keep new withdrawals closed; original bank requests remain reachable. */ }
   finally { if (current()) checking.value = false; }
 }
@@ -59,7 +62,7 @@ onUnload(() => { visible = false; revision++; stopRuntime(); });
 function openUsdt() { if (canOpenUsdt.value) navTo("/pages/me/wallet-withdraw"); }
 function openBank() {
   pending.value = readWithdrawAttempt(app.accountKey);
-  if (!pending.value) navTo("/pages/me/wallet-withdraw-bank");
+  if (canOpenBank.value) navTo("/pages/me/wallet-withdraw-bank");
 }
 </script>
 

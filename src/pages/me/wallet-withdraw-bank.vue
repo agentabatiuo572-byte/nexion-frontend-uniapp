@@ -11,7 +11,7 @@
         <text class="muted">{{ c.multipleIntents }}</text>
         <view v-for="intent in multipleIntents" :key="intent.quoteNo" class="action" role="button" tabindex="0" :aria-disabled="busy" @click="openIntent(intent)" @keydown.enter.prevent="openIntent(intent)" @keydown.space.prevent="openIntent(intent)"><text>{{ intent.withdrawalNo || intent.quoteNo }}</text></view>
       </view>
-      <view class="action" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refresh }}</text></view>
+      <view v-if="order || requestedOrder || quote || uncertain || error || (config && config.unresolvedIntent === undefined)" class="action" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ order || requestedOrder ? c.refresh : c.reload }}</text></view>
       <view class="action" role="button" tabindex="0" data-testid="bank-abandon" v-if="quote && !order" :aria-disabled="busy" @click="abandon" @keydown.enter.prevent="abandon" @keydown.space.prevent="abandon"><text>{{ c.requote }}</text></view>
 
       <view v-if="order" class="section">

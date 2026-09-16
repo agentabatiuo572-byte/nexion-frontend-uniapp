@@ -57,7 +57,26 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
   });
   fs.mkdirSync(".verify-cache/bank-withdrawal",{recursive:true});
   try {
+    // A closed channel without a prior request is availability, not an order to refresh.
+    await page.evaluate(() => { window.__bankFixture.enabled=false; });
+    await gotoProtected("/pages/me/wallet-withdraw-method");
+    await page.waitForFunction(() => document.querySelector('[data-testid="withdraw-method-usdt"]')?.getAttribute("aria-disabled")==="false");
+    assert.equal(await page.getByTestId("withdraw-method-bank").getAttribute("aria-disabled"),"true");
+    await page.getByTestId("withdraw-method-bank").press("Enter");
+    await page.getByTestId("withdraw-method-bank").click({force:true});
+    assert.match(page.url(),/wallet-withdraw-method/);
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    await page.getByTestId("bank-verify").waitFor();
+    assert.equal(await page.getByTestId("bank-refresh").count(),0,"no order or read failure must not show an order-refresh action");
+    assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
+    await page.evaluate(() => { window.__bankFixture.configUnavailable=true; });
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    assert.match(await page.getByTestId("bank-refresh").innerText(),/^(Reload|重新加载|Tải lại)$/);
+    await page.evaluate(() => { Object.assign(window.__bankFixture,{enabled:true,configUnavailable:false}); });
+    await page.getByTestId("bank-refresh").click();
+    await page.getByTestId("bank-refresh").waitFor({state:"hidden"});
     assert.equal((await gotoProtected("/pages/me/wallet-withdraw-method")).landed,true);
+    await page.waitForFunction(() => document.querySelector('[data-testid="withdraw-method-bank"]')?.getAttribute("aria-disabled")==="false");
     await page.screenshot({path:".verify-cache/bank-withdrawal/method.png",fullPage:true});
     await page.getByTestId("withdraw-method-bank").press("Enter");
     await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-withdraw-bank");
@@ -117,8 +136,8 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
         (await import("/src/store/theme.ts")).useTheme().setMode(mode);
         Object.assign(window.__bankFixture,{verificationStatus:"unavailable",payoutCapability:mode==="dark"?"unsupported":"unknown",canWithdraw:false});
       },{locale,mode});
-      await page.getByTestId("bank-refresh").click();
-      await page.waitForFunction(() => document.querySelector('[data-testid="bank-refresh"]')?.getAttribute("aria-disabled")==="false");
+      await gotoProtected("/pages/me/wallet-withdraw-bank");
+      await page.getByTestId("bank-verify").waitFor();
       assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
       assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),false);
       await page.getByTestId("bank-verify").press("Enter");
@@ -129,10 +148,10 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     }
     assert.equal(await page.evaluate(() => window.__bankFixture.verifies),6);
     await page.evaluate(() => { window.__bankFixture.enabled=false; });
-    await page.locator('[data-testid="bank-refresh"]').click();
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
     await page.waitForFunction(() => document.querySelector('[data-testid="bank-quote"]')?.getAttribute("aria-disabled") === "true"
       || document.querySelector('[data-testid="bank-quote"]')?.getAttribute("disabled") != null);
-    console.log("PASS bank withdrawal actual page: method selection, cross-device closed-channel recovery without resubmit, evidence-only settlement, durable abandon, verification fail-closed in en/vi/zh and light/dark");
+    console.log("PASS bank withdrawal actual page: unavailable empty entry, contextual reload, method selection, cross-device closed-channel recovery without resubmit, evidence-only settlement, durable abandon, verification fail-closed in en/vi/zh and light/dark");
   } catch (error) {
     console.error("Bank runtime failure state", await page.evaluate(() => ({ url:location.href, text:document.body.innerText, fixture:window.__bankFixture, uncaught:window.__gateUncaught })));
     await page.screenshot({path:".verify-cache/bank-withdrawal-failure.png",fullPage:true});
