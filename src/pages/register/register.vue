@@ -249,6 +249,7 @@ const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 let otpFlowVersion = 0;
 let mounted = true;
+let sponsorPreviewLoadVersion = 0;
 
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
 // 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
@@ -260,15 +261,20 @@ onLoad(async (options) => {
   const raw = options && (options as Record<string, string>).ref;
   privacyHref.value = privacyPolicyHref("/pages/register/register", raw);
   if (remoteApiEnabled) {
+    const previewLoadVersion = ++sponsorPreviewLoadVersion;
+    remotePreview.value = null;
+    lockedRef.value = null;
+    sponsorPreview.value = null;
     const norm = normalizeRegistrationSponsorCode(raw, true);
     if (!norm) return;
     try {
       const preview = await publicSponsorPreviewApi.preview(norm);
-      if (!mounted) return;
+      if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
       remotePreview.value = preview;
       lockedRef.value = preview.code;
       sponsorPreview.value = preview.sponsor;
     } catch {
+      if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
       remotePreview.value = null;
       lockedRef.value = null;
       sponsorPreview.value = null;
@@ -898,6 +904,7 @@ function goPrivacy() { navTo(privacyHref.value); }
 
 function cleanup() {
   mounted = false;
+  sponsorPreviewLoadVersion += 1;
   invalidateOtpFlow();
   if (resendTimer) clearInterval(resendTimer);
 }

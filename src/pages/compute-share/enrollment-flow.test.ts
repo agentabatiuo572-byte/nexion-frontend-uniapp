@@ -12,6 +12,12 @@ function journalWith(value: unknown = "") {
   return createComputeShareEnrollmentJournal(backing);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 const pending = (pairingCode: string | null) => ({
   enrollmentNo: "CSE-01JXYZ",
   pairingCode,
@@ -114,6 +120,48 @@ describe("compute share enrollment flow", () => {
     })).resolves.toEqual({ kind: "blocked" });
     expect(create).not.toHaveBeenCalled();
     expect(status).not.toHaveBeenCalled();
+  });
+
+  it("retains the original key when a config suspend makes an in-flight create stale, then recovers the same enrollment", async () => {
+    const journal = journalWith();
+    const firstReceipt = deferred<ReturnType<typeof pending>>();
+    const createKey = vi.fn(() => "original-key");
+    const create = vi.fn()
+      .mockReturnValueOnce(firstReceipt.promise)
+      .mockResolvedValueOnce(pending("731904"));
+    const status = vi.fn().mockResolvedValue(pending(null));
+    let current = true;
+    let enabled = true;
+    const options = {
+      accountKey: "account-a", requestedGpuModel: "NVIDIA RTX 4070", journal, createKey,
+      isCurrent: () => current, isEnabled: () => enabled, create, status,
+    };
+
+    const inFlight = runComputeShareEnrollmentFlow(options);
+    expect(create).toHaveBeenCalledWith("NVIDIA RTX 4070", "original-key");
+    current = false;
+    enabled = false;
+    firstReceipt.resolve(pending("731904"));
+    await expect(inFlight).resolves.toEqual({ kind: "blocked" });
+    expect(status).not.toHaveBeenCalled();
+    expect(journal.read("account-a")).toEqual({
+      kind: "ok",
+      pending: expect.objectContaining({ idempotencyKey: "original-key" }),
+    });
+    expect(journal.read("account-a")).not.toEqual({
+      kind: "ok",
+      pending: expect.objectContaining({ enrollmentNo: "CSE-01JXYZ" }),
+    });
+
+    current = true;
+    enabled = true;
+    await expect(runComputeShareEnrollmentFlow(options)).resolves.toEqual({
+      kind: "enrollment", enrollment: pending("731904"),
+    });
+    expect(createKey).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenNthCalledWith(1, "NVIDIA RTX 4070", "original-key");
+    expect(create).toHaveBeenNthCalledWith(2, "NVIDIA RTX 4070", "original-key");
+    expect(status).toHaveBeenCalledExactlyOnceWith("CSE-01JXYZ");
   });
 
   it("reads known enrollment first then replays the original key to safely recover the one-time code", async () => {

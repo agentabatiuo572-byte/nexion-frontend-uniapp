@@ -60,6 +60,7 @@
                 :active="taskSlide === index"
                 :expanded="newcomerExpanded"
                 @update:expanded="onNewcomerExpandedChange"
+                @content-resize="onNewcomerContentResize(index)"
               />
               <ConversionBanner v-else :active="taskSlide === index" />
             </view>
@@ -97,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
@@ -128,6 +129,9 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled } from "@/api/runtime";
 import {
   deriveHomeTaskCards,
+  createHomeNewcomerContentResizer,
+  HOME_TASK_CARD_COLLAPSED_HEIGHT,
+  shouldMeasureHomeNewcomerContent,
   type HomeTaskCardId,
 } from "@/lib/home-task-carousel";
 
@@ -139,8 +143,6 @@ interface TouchPoint {
 }
 
 const TASK_CAROUSEL_INTERVAL_MS = 5000;
-const TASK_CARD_COLLAPSED_HEIGHT = 184;
-
 const t = useT();
 // 🔴 首页承载 QuickActionRow(创世快捷入口,受闸文案),必须跟着重读配置(独立验收 P1:
 //   此前只有 3 个创世页接了 onShow,首页与商城页漏接 —— 用户停在首页,运营切关闭,
@@ -158,7 +160,7 @@ onShow(() => {
 });
 
 const taskSlide = ref(0);
-const taskCarouselHeight = ref(TASK_CARD_COLLAPSED_HEIGHT);
+const taskCarouselHeight = ref(HOME_TASK_CARD_COLLAPSED_HEIGHT);
 const newcomerExpanded = ref(false);
 const prefersReducedMotion = ref(false);
 const taskFocusWithin = ref(false);
@@ -200,36 +202,50 @@ function announceTaskSlide(index = taskSlide.value) {
   });
 }
 
-function measureExpandedNewcomer() {
-  if (!newcomerExpanded.value || currentTaskCard.value !== "newcomer") {
-    taskCarouselHeight.value = TASK_CARD_COLLAPSED_HEIGHT;
+const newcomerContentResizer = createHomeNewcomerContentResizer(
+  () => ({ cards: visibleTaskCards.value, activeIndex: taskSlide.value }),
+  (height) => { taskCarouselHeight.value = height; },
+  (done) => {
+    nextTick(() => {
+      uni
+        .createSelectorQuery()
+        .in(instance)
+        .select("#home-newcomer-task-card")
+        .boundingClientRect((rect) => done((rect as UniApp.NodeInfo | null)?.height))
+        .exec();
+    });
+  },
+);
+
+function resetNewcomerCarouselHeight() {
+  newcomerContentResizer.reset();
+}
+
+function measureNewcomerContent() {
+  if (currentTaskCard.value !== "newcomer") {
+    resetNewcomerCarouselHeight();
     return;
   }
-
-  nextTick(() => {
-    uni
-      .createSelectorQuery()
-      .in(instance)
-      .select("#home-newcomer-task-card")
-      .boundingClientRect((rect) => {
-        const info = rect as UniApp.NodeInfo | null;
-        if (info?.height) {
-          taskCarouselHeight.value = Math.max(TASK_CARD_COLLAPSED_HEIGHT, Math.ceil(info.height));
-        }
-      })
-      .exec();
-  });
+  newcomerContentResizer.measure(taskSlide.value);
 }
 
 function setNewcomerExpanded(value: boolean) {
   newcomerExpanded.value = value;
-  if (!value) taskCarouselHeight.value = TASK_CARD_COLLAPSED_HEIGHT;
-  else measureExpandedNewcomer();
+  if (!value) resetNewcomerCarouselHeight();
+  else measureNewcomerContent();
 }
 
 function onNewcomerExpandedChange(value: boolean) {
   setNewcomerExpanded(value);
   if (!value) blurTaskCarouselFocus();
+}
+
+function onNewcomerContentResize(index: number) {
+  if (!shouldMeasureHomeNewcomerContent(visibleTaskCards.value, taskSlide.value, index)) return;
+  // This fires for the claim CTA, claim error, expand/collapse and localized
+  // copy. The card's collapsed fixed baseline is also measured when its
+  // authoritative content grows beyond it.
+  measureNewcomerContent();
 }
 
 function showRelativeTaskSlide(delta: -1 | 1) {
@@ -242,8 +258,11 @@ function showRelativeTaskSlide(delta: -1 | 1) {
   // #endif
 
   taskSlide.value = next;
-  if (visibleTaskCards.value[next] !== "newcomer" && newcomerExpanded.value) {
-    setNewcomerExpanded(false);
+  if (visibleTaskCards.value[next] !== "newcomer") {
+    if (newcomerExpanded.value) setNewcomerExpanded(false);
+    else resetNewcomerCarouselHeight();
+  } else {
+    measureNewcomerContent();
   }
   announceTaskSlide(next);
 }
@@ -257,10 +276,11 @@ function onTaskSlideChange(event: Event) {
   const next = Math.min(detail.current, Math.max(visibleTaskCards.value.length - 1, 0));
   taskSlide.value = next;
 
-  if (visibleTaskCards.value[next] !== "newcomer" && newcomerExpanded.value) {
-    setNewcomerExpanded(false);
+  if (visibleTaskCards.value[next] !== "newcomer") {
+    if (newcomerExpanded.value) setNewcomerExpanded(false);
+    else resetNewcomerCarouselHeight();
   } else {
-    measureExpandedNewcomer();
+    measureNewcomerContent();
   }
 
   if (detail.source === "touch") {
@@ -331,6 +351,10 @@ watch(taskCardSignature, () => {
   setNewcomerExpanded(false);
   resetTaskTouch();
   taskCarouselAnnouncement.value = "";
+});
+
+onUnmounted(() => {
+  newcomerContentResizer.invalidate();
 });
 
 onLoad(() => {

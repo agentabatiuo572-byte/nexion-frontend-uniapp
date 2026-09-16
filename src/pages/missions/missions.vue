@@ -59,7 +59,7 @@
         <WeeklyQuestList />
       </view>
 
-      <!-- Day One — the six configured conditions unlock one server-owned group reward. -->
+      <!-- Day One — entry-time snapshot conditions unlock one server-owned group reward. -->
       <view :style="sectionStyle">
         <view class="mx-4 flex items-center" :style="sectionHeadStyle">
           <text :style="sectionTitleStyle">{{ t.home.dayOneFirstDayReward }}</text>
@@ -74,7 +74,7 @@
           <text :style="sectionTitleStyle">{{ t.missions.eventsHeading }}</text>
         </view>
         <EmptyState
-          v-if="remoteEventsError"
+          v-if="remoteEventProjection.state === 'error'"
           class="mx-4"
           kind="recoverable-error"
           :title="t.missions.eventsUnavailableTitle"
@@ -89,7 +89,7 @@
           <view class="flex-1 min-w-0">
             <view class="flex items-center" style="gap: 6px">
               <text :style="rowLabelStyle">{{ t.missions.eventsLabel }}</text>
-              <text v-if="eventStats.claimable > 0" class="inline-flex items-center justify-center tabular-nums font-mono-tabular" :style="badgeStyle">{{ eventStats.claimable }}</text>
+              <text v-if="eventStats && eventStats.claimable > 0" class="inline-flex items-center justify-center tabular-nums font-mono-tabular" :style="badgeStyle">{{ eventStats.claimable }}</text>
             </view>
             <text class="block truncate" :style="rowValueStyle">{{ eventStatText }}</text>
           </view>
@@ -142,6 +142,7 @@ import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { createRemotePageRequestFence } from "@/lib/remote-page-request-fence";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { projectMissionRemoteEvents, type MissionRemoteEventsReadState } from "./mission-events-state";
 
 const t = useT();
 const eventQuest = useEventQuest();
@@ -151,7 +152,7 @@ const dayOneExpanded = ref(true);
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
 const remoteEvents = ref<CanonicalEvent[]>([]);
-const remoteEventsError = ref(false);
+const remoteEventsReadState = ref<MissionRemoteEventsReadState>("initial");
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
 let mounted = false;
 const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted);
@@ -165,16 +166,17 @@ function activatePageRefresh() {
 async function refreshRemoteEvents(): Promise<void> {
   if (!remoteApiEnabled) return;
   const scope = remoteRequestFence.capture();
+  remoteEventsReadState.value = remoteEventsReadState.value === "ready" ? "refreshing" : "initial";
   try {
     const snapshot = await eventsApi.state(language.value);
     if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = snapshot.events;
-      remoteEventsError.value = false;
+      remoteEventsReadState.value = "ready";
     }
   } catch {
     if (remoteRequestFence.isCurrent(scope)) {
       remoteEvents.value = [];
-      remoteEventsError.value = true;
+      remoteEventsReadState.value = "error";
     }
   }
 }
@@ -186,7 +188,7 @@ const missionVisibility = createPageVisibilityRefresh((reason) => {
   remoteAccountEpoch.bind(app.accountKey);
   if (reason === "initial") {
     remoteEvents.value = [];
-    remoteEventsError.value = false;
+    remoteEventsReadState.value = "initial";
   }
   void refreshRemoteEvents();
   void quest.refreshRemote();
@@ -219,20 +221,16 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => langua
   remoteAccountEpoch.bind(accountKey);
   remoteRequestFence.invalidate();
   remoteEvents.value = [];
-  remoteEventsError.value = false;
+  remoteEventsReadState.value = "initial";
   void refreshRemoteEvents();
 });
 
 // Live Events row stat — ongoing / joined / claimable from the ported mock +
 // store (claimable = trackable + done + not yet claimed).
+const remoteEventProjection = computed(() => projectMissionRemoteEvents(remoteEventsReadState.value, remoteEvents.value));
 const eventStats = computed(() => {
   if (remoteApiEnabled) {
-    const current = remoteEvents.value;
-    return {
-      ongoing: current.filter((event) => event.state === "ongoing").length,
-      joined: current.filter((event) => event.state !== "ended" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus)).length,
-      claimable: current.filter((event) => event.userStatus === "CLAIMABLE").length,
-    };
+    return remoteEventProjection.value.stats;
   }
   const ongoing = EVENTS.filter((ev) => ev.status === "ongoing").length;
   let joined = 0;
@@ -246,13 +244,20 @@ const eventStats = computed(() => {
   return { ongoing, joined, claimable };
 });
 
-const eventStatText = computed(() =>
-  fmt(t.value.missions.eventsStat, {
-    ongoing: eventStats.value.ongoing,
-    joined: eventStats.value.joined,
-    claimable: eventStats.value.claimable,
-  }),
-);
+const eventStatText = computed(() => {
+  if (remoteApiEnabled) {
+    if (remoteEventProjection.value.state === "initial") return t.value.missions.eventsLoading;
+    if (remoteEventProjection.value.state === "refreshing") return t.value.missions.eventsRefreshing;
+    if (remoteEventProjection.value.state === "error") return "";
+    if (remoteEventProjection.value.empty) return t.value.missions.eventsEmpty;
+  }
+  const stats = eventStats.value;
+  return stats ? fmt(t.value.missions.eventsStat, {
+    ongoing: stats.ongoing,
+    joined: stats.joined,
+    claimable: stats.claimable,
+  }) : "";
+});
 
 function go(url: string) {
   navTo(url);

@@ -10,6 +10,7 @@ vi.mock("@/api/runtime", () => ({
 
 import { useQuest } from "./quest";
 import { useLocaleStore } from "./locale";
+import { ApiError } from "@/api/errors";
 
 describe("PC-managed H3 quest catalogue", () => {
   afterEach(() => {
@@ -221,5 +222,29 @@ describe("PC-managed H3 quest catalogue", () => {
     resolveNewAccount({ quests: [] });
     await vi.waitFor(() => expect(quest.remoteStatus).toBe("ready"));
     expect(quest.remoteQuests).toHaveLength(0);
+  });
+
+  it("refreshes a terminal already-claimed response instead of reporting a new reward", async () => {
+    const current = {
+      questCode: "H3_FIRST_ORDER_STARTED", name: "Start your first order", layer: "DAY_ONE",
+      rewardNex: 50, status: "CLAIMABLE", category: "explore", actionRoute: "/pages/store/store",
+      instanceKey: "DAY_ONE:2026-09-07", eligibleFrom: "2026-09-07T00:00:00+08:00",
+      eligibleUntil: "2099-09-07T00:00:00+08:00", eligible: true,
+    };
+    state.mockResolvedValueOnce({ quests: [current] }).mockResolvedValueOnce({
+      quests: [{ ...current, status: "CLAIMED" }],
+    });
+    claim.mockRejectedValueOnce(new ApiError({
+      kind: "business", message: "QUEST_ALREADY_CLAIMED", code: 409,
+    }));
+    const quest = useQuest();
+    await quest.refreshRemote();
+
+    await expect(quest.claimRemote(current.questCode)).resolves.toBe(false);
+
+    expect(quest.claimNotice).toBe("alreadyClaimed");
+    expect(quest.remoteQuests[0]).toMatchObject({ status: "CLAIMED" });
+    await expect(quest.claimRemote(current.questCode)).resolves.toBe(false);
+    expect(claim).toHaveBeenCalledTimes(1);
   });
 });

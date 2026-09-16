@@ -1884,7 +1884,8 @@ const submitBtnStyle = computed<CSSProperties>(() => ({
   fontSize: "15px",
   fontWeight: 600,
 }));
-// 快车道提示 —— 品牌色浅底(正向信息,不用告警色);超线时那条 CTA 独占一行撑 44px 热区
+
+// 快车道提示 —— 品牌色浅底(正向信息,不用告警色);超线时那条 CTA 独占一行撑 44px 热区
 const fastLaneBoxStyle: CSSProperties = {
   padding: "12px",
   borderRadius: "16px",

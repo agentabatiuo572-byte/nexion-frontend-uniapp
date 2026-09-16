@@ -11,7 +11,7 @@
     <view class="px-4 py-3 flex items-center justify-between" :style="headerStyle">
       <text :style="tier2LabelStyle">{{ w.tier2Label }}</text>
       <view style="text-align: right">
-        <text class="block tabular-nums" :style="countStyle">{{ completedCount }} / {{ tier2Quests.length }}</text>
+        <text class="block tabular-nums" :style="countStyle">{{ progressText }}</text>
         <text v-if="tier2Quests[0]" class="block tabular-nums" :style="periodStyle">{{ periodText }}</text>
       </view>
     </view>
@@ -26,7 +26,7 @@
           </view>
           <view class="flex-1">
             <text class="block" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
-            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+            <text class="block" :style="categoryLabelStyle">{{ t.questClaim.alreadyClaimed }}</text>
           </view>
           <text :style="claimedRewardStyle">+{{ rewardOf(q) }} NEX</text>
         </view>
@@ -37,10 +37,10 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
           <view class="flex-1">
-            <text class="block" :style="claimLabelStyle">{{ claimTextFor(q) }}</text>
-            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+            <text class="block" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
+            <text class="block" :style="categoryLabelStyle">{{ w.rewardReady }}</text>
           </view>
-          <text :style="claimRewardStyle">+{{ rewardOf(q) }} NEX</text>
+          <text :style="claimRewardStyle">{{ claimTextFor(q) }}</text>
         </view>
 
         <!-- pending: navigate to target route -->
@@ -68,12 +68,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
+import { toast } from "@/store/ui";
+import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -81,15 +84,24 @@ const wq = useWeeklyQuest();
 const mounted = ref(false);
 const nowTick = useNow();
 
-onMounted(async () => {
-  await wq.refresh();
-  mounted.value = true;
+const weeklyQuestVisibility = createPageVisibilityRefresh(() => {
+  void wq.refresh().finally(() => { mounted.value = true; });
+});
+bindPageVisibilityRefresh(weeklyQuestVisibility, {
+  mounted: (callback) => onMounted(callback),
+  shown: (callback) => onShow(callback),
+  hidden: (callback) => onHide(callback),
 });
 
 const tier2Quests = computed<CanonicalQuest[]>(() => mounted.value ? wq.tier2Quests : []);
 
 const mult = computed(() => wq.multiplier);
-const completedCount = computed(() => tier2Quests.value.filter((q) => q.status === "CLAIMED").length);
+const completedCount = computed(() => tier2Quests.value.filter((q) =>
+  ["COMPLETED", "CLAIMABLE", "CLAIMED"].includes(q.status)).length);
+const progressText = computed(() => fmt(t.value.quest.progress, {
+  done: completedCount.value,
+  total: tier2Quests.value.length,
+}));
 const periodText = computed(() => {
   const remainingMs = Date.parse(tier2Quests.value[0]?.eligibleUntil ?? "") - nowTick.value * 1000;
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return fmt(w.value.periodEndsIn, { time: "00:00:00" });
@@ -136,8 +148,9 @@ function retry() {
   void wq.refresh();
 }
 
-function onClaimRow(q: CanonicalQuest) {
-  void wq.claim(q);
+async function onClaimRow(q: CanonicalQuest) {
+  const claimed = await wq.claim(q);
+  if (!claimed && wq.claimNotice) toast.info(t.value.questClaim[wq.claimNotice]);
 }
 
 // ── styles ──

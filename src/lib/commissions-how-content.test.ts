@@ -36,7 +36,7 @@ describe("commissions-how presentation", () => {
     const view = buildCommissionsHowContent(facts, "zh");
     expect(view.section("cooling").body).toContain("未配置");
     expect(view.section("binary").body).not.toMatch(/10%|1,000/);
-    expect(view.section("leadership").body).toContain("暂不可结算");
+    expect(view.section("leadership").body).toContain("当前不开放结算");
     expect(view.section("peer").body).toContain("未开放");
     expect(view.section("genesis").body).toContain("未开放");
     expect(view.exampleTotal).not.toMatch(/79|2,000/);
@@ -77,6 +77,45 @@ describe("commissions-how presentation", () => {
     expect(view.amounts.network).toBe("—");
     expect(view.amounts.peer).toBe("Requires settlement");
     expect(view.section("peer").body).toContain("actual events");
+  });
+  it.each([
+    ["zh", "深度门槛", "总出口上限", "当前不开放结算"],
+    ["en", "Depth gate", "Total payout cap", "settlement is not open"],
+    ["vi", "Ngưỡng chiều sâu", "Giới hạn tổng chi", "chưa mở quyết toán"],
+  ])("labels unavailable network facts and gives one leadership hold in %s", (locale, gate, exitCap, leadershipHold) => {
+    const facts = snapshot();
+    facts.guide.network = { depthGateLayer: null, depthGateRank: null, exitCapRate: null };
+    const body = buildCommissionsHowContent(facts, locale).section("network").body;
+    const leadership = buildCommissionsHowContent(facts, locale).section("leadership").body;
+    expect(body).toContain(gate);
+    expect(body).toContain(exitCap);
+    expect(leadership.match(new RegExp(leadershipHold, "g"))?.length).toBe(1);
+    expect(`${body} ${leadership}`).not.toMatch(/team\.ui|configVersion|INVALID_RATE/);
+  });
+  it.each([
+    ["zh", "结算周期", "剩余业绩处理", "每月", "每月清零"],
+    ["en", "Settlement period", "Remaining volume", "monthly", "monthly reset"],
+    ["vi", "Chu kỳ quyết toán", "Xử lý doanh số còn lại", "hằng tháng", "xóa theo tháng"],
+  ])("names the independent monthly period and residual handling in %s", (locale, period, residual, monthly, reset) => {
+    const facts = snapshot();
+    facts.guide.binary!.settlePeriod = "monthly";
+    facts.guide.binary!.residualPolicy = "monthlyClear";
+    const body = buildCommissionsHowContent(facts, locale).section("binary").body;
+    expect(body).toContain(period);
+    expect(body).toContain(residual);
+    expect(body).toContain(monthly);
+    expect(body).toContain(reset);
+  });
+  it.each([
+    ["zh", "按合格周期业务量形成奖池，并依据参与等级、票权及个人上限分配。当前规则：{leadershipRules}。票权：{leadershipVotes}。配置完整不等于已结算，最终份额须等待当期结算记录。", "按合格周期业务量形成奖池，并依据参与等级、票权及个人上限分配。当前规则：领导池当前不开放结算。配置完整不等于已结算，最终份额须等待当期结算记录。"],
+    ["en", "Qualifying period volume funds a pool distributed by eligibility, votes and individual caps. Current rules: {leadershipRules}. Votes: {leadershipVotes}. Complete configuration is not completed settlement; actual shares require the period's settlement records.", "Qualifying period volume funds a pool distributed by eligibility, votes and individual caps. Current rules: Leadership pool settlement is not open. Complete configuration is not completed settlement; actual shares require the period's settlement records."],
+    ["vi", "Doanh số hợp lệ theo kỳ tạo quỹ, chia theo điều kiện, phiếu và giới hạn cá nhân. Quy tắc: {leadershipRules}. Phiếu: {leadershipVotes}. Cấu hình đầy đủ không có nghĩa đã quyết toán; phần thực nhận cần bản ghi của kỳ.", "Doanh số hợp lệ theo kỳ tạo quỹ, chia theo điều kiện, phiếu và giới hạn cá nhân. Quy tắc: Quỹ lãnh đạo hiện chưa mở quyết toán. Cấu hình đầy đủ không có nghĩa đã quyết toán; phần thực nhận cần bản ghi của kỳ."],
+  ])("removes the empty leadership vote clause from the published %s paragraph", (locale, template, expected) => {
+    const facts = snapshot();
+    facts.document.blocks.find(block => block.id === "leadership")!.body = template;
+    const body = buildCommissionsHowContent(facts, locale).section("leadership").body;
+    expect(body).toBe(expected);
+    expect(body).not.toMatch(/票权：。|Votes: \./u);
   });
   it("rounds example amounts half-up at six places like network settlement", () => {
     const facts = snapshot(); facts.rates.unilevelUsdt[1] = .11111111; facts.rates.unilevelNex[1] = 1.5;

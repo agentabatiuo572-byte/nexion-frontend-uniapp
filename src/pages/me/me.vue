@@ -13,7 +13,7 @@
   Wrapped in <AppChassis active="me">; entrance via <CardStagger>.
 
   Secondary settings-row display values are wired to authenticated Java
-  projections (security 2FA / notifications unread / receipts / orders).
+  projections (security 2FA / notifications unread / orders).
 
   Account section's "orders" row was relocated here from store.vue's old
   bottom Orders chip (single canonical entry point, not scroll-buried);
@@ -133,7 +133,6 @@ import { useMarket } from "@/store/market";
 import { confirm as uiConfirm } from "@/store/ui";
 import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
 import type { SecurityState } from "@/api/contracts";
-import { countRemoteReceipts } from "@/lib/remote-me-summary";
 import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
@@ -230,14 +229,6 @@ interface QuickSection {
 const usdtBalance = computed(() => app.user.usdtBalance);
 const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
 const profileName = computed(() => profile.displayName);
-const remoteReceiptProjectionReady = computed(() => remoteApiEnabled
-  && app.remoteFleetStatus === "ready"
-  && deposits.serverStatus === "ready");
-const remoteReceiptCount = computed(() => remoteReceiptProjectionReady.value
-  ? countRemoteReceipts(deposits?.remoteReceipts ?? [], app.visibleDevices)
-  : null);
-const receiptCount = computed(() => remoteApiEnabled ? remoteReceiptCount.value : null);
-const receiptCountMeta = computed(() => receiptCount.value === null ? "—" : String(receiptCount.value));
 const orderCount = computed(() => orders.orders.length);
 const localeUpper = computed(() => locale.code.toUpperCase());
 const activeCount = computed(() => app.activeSlotCount);
@@ -311,7 +302,7 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.me.secAccount,
     items: [
       { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
-      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: receiptCountMeta.value, tone: "brand" },
+      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", tone: "brand" },
       { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
       { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
@@ -402,7 +393,7 @@ async function refreshRemoteMe() {
   ]);
 }
 
-watch(() => app.accountKey, () => {
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (remoteApiEnabled) void refreshRemoteMe();
 });
 onShow(() => {

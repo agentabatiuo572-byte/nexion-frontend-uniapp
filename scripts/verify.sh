@@ -1496,7 +1496,7 @@ sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/ear
 #   红测证据:拆掉任一后门的守卫 / 新增一个没守的后门,派生判据都判红。
 sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
 sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
-sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-if="enabled" class="pb-8"'
+sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-else-if="enabled" class="pb-8"'
 sentinel_present "SPEC-2 copy handler re-checks disabled flag" src/pages/compute-share/download.vue 'function copyDownloadUrl\(\)'
 sentinel_present "SPEC-2 connect handler re-checks disabled flag" src/pages/compute-share/download.vue 'function connectDemoComputer\(\)'
 sentinel_present "SPEC-2 download title reads config content" src/pages/compute-share/download.vue 'cfg\.config\.computeShare\.content'

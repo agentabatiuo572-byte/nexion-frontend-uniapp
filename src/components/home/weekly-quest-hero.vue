@@ -67,6 +67,7 @@ import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { isCurrentQuest } from "@/lib/actionable-quest";
+import { toast } from "@/store/ui";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -130,7 +131,8 @@ function onCta() {
 async function onClaim() {
   const q = quest.value;
   if (!completed.value || !q || periodExpired.value) return;
-  await wq.claim(q);
+  const claimed = await wq.claim(q);
+  if (!claimed && wq.claimNotice) toast.info(t.value.questClaim[wq.claimNotice]);
 }
 
 // ── styles ──

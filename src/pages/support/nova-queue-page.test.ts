@@ -12,8 +12,8 @@ import * as limiter from "@/lib/send-limiter";
 import * as secureId from "@/lib/secure-command-id";
 import * as format from "@/i18n/format";
 import { ApiError } from "@/api/errors";
-import { createSupportApi } from "@/api/support-api";
 import * as realtimePage from "./conversation-realtime-page";
+import { createSupportApi } from "@/api/support-api";
 
 // Execute the actual SFC script with transport/lifecycle boundaries substituted.
 // This tests the page worker, not a second implementation of its algorithm.
@@ -39,6 +39,8 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
   const api = { status: vi.fn(async () => ({ available: true })),
     history: vi.fn(async () => ({ conversationId: null, messages: [] })), chat: vi.fn() };
   const startConversation = vi.fn(async (_type: string, _text: string) => "new-conversation");
+  const openConversation = vi.fn(async () => conversation);
+  const watchRealtime=vi.fn();
   const modules: Record<string, unknown> = {
     vue: { ...vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
@@ -50,17 +52,17 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => ({
       get: () => conversation,
+      open: openConversation,
+      watchRealtime,
+      setTyping: vi.fn(),
+      loadEarlier: vi.fn(async () => conversation),
+      realtimeReady: realtime.ready ?? false,
+      onlineIds: realtime.online === undefined ? {} : { [query.cid ?? ""]: realtime.online },
+      typingIds: realtime.typing === true ? { [query.cid ?? ""]: true } : {},
       categoryAvailabilityStatus: "ready",
       refreshCategories: async () => "applied",
       categoryEnabled: (type: string) => enabled.includes(type),
       startConversation,
-      open: vi.fn(async () => conversation),
-      loadEarlier: vi.fn(async () => conversation),
-      watchRealtime: vi.fn(),
-      setTyping: vi.fn(),
-      realtimeReady: realtime.ready ?? false,
-      onlineIds: realtime.online === undefined ? {} : { [query.cid ?? ""]: realtime.online },
-      typingIds: realtime.typing === true ? { [query.cid ?? ""]: true } : {},
     }) },
     "@/store/nova": { useNova },
     "@/store/app": { useApp: () => app },
@@ -74,7 +76,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     "@/lib/nova-thinking": thinking,
     "./conversation-realtime-page": realtimePage,
   };
-  const page = new Function("require", "exports", script + "; return { headerRole, dotStyle, onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
+  const page = new Function("require", "exports", script + "; return { isClosedSession, headerRole, dotStyle, onRestart, onSend, onQueueAction, onQueueSave, onStartNewConversation, threadMessages, cleanup };")(
     (name: string) => {
       if (name.endsWith(".vue")) return {};
       if (!(name in modules)) throw new Error(`Unmocked dependency: ${name}`);
@@ -82,13 +84,89 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     }, {},
   );
   hooks.onLoad(query);
-  return { page, hooks, app, api, startConversation, nova: useNova(), navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
+  return { page, hooks, app, api, startConversation, openConversation,watchRealtime, nova: useNova(), navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
 }
 
 beforeEach(() => { setActivePinia(createPinia()); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("human conversation restart", () => {
+  it.each([true,false])('resumes the original first-message creation after foreground, responseBeforeShow=%s',async responseBeforeShow=>{
+    const current=mount({start:'advisor'});await current.hooks.onShow();
+    const pending=deferred<string>();current.startConversation.mockReturnValueOnce(pending.promise);
+    const sending=current.page.onSend('Hello');current.hooks.onHide();
+    if(responseBeforeShow){pending.resolve('same-conversation');await sending;await current.hooks.onShow();}
+    else {await current.hooks.onShow();pending.resolve('same-conversation');await sending;}
+    expect(current.startConversation).toHaveBeenCalledTimes(1);
+    expect(current.watchRealtime).toHaveBeenCalledWith('same-conversation');current.page.cleanup();
+  });
+  it("preserves a second draft while the first conversation is being created", async () => {
+    const current = mount({ start: "advisor" });
+    const pending = deferred<string>();
+    current.startConversation.mockReturnValue(pending.promise);
+    await current.hooks.onShow();
+    const first = current.page.onSend("First question");
+    await vi.advanceTimersByTimeAsync(1500);
+    const restore = vi.fn();
+    await current.page.onSend("Second draft", restore);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(current.startConversation).toHaveBeenCalledOnce();
+    pending.resolve("new-conversation");
+    await first;
+    current.page.cleanup();
+  });
+
+  it.each(["advisor", "support"])("watches the new %s conversation and never starts a page polling loop", async type => {
+    const current = mount({ start: type });
+    await current.hooks.onShow();
+    await current.page.onSend("Hello");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(current.watchRealtime).toHaveBeenCalledWith("new-conversation");
+    expect(current.openConversation).not.toHaveBeenCalled();
+    current.hooks.onHide();
+    expect(current.watchRealtime).toHaveBeenLastCalledWith(null);
+    const calls = current.openConversation.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(current.openConversation).toHaveBeenCalledTimes(calls);
+    current.page.cleanup();
+  });
+
+  it.each(["leave", "switch-account", "rebind-account"])("does not attach a late created conversation after %s", async boundary => {
+    const current = mount({ start: "advisor" });
+    const pending = deferred<string>();
+    current.startConversation.mockReturnValue(pending.promise);
+    await current.hooks.onShow();
+    const sending = current.page.onSend("Hello");
+    if (boundary === "leave") current.hooks.onHide();
+    else if (boundary === "switch-account") current.app.accountKey = "account-b";
+    else current.app.accountBindingEpoch += 1;
+    pending.resolve("old-account-conversation");
+    await sending;
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(current.openConversation).not.toHaveBeenCalled();
+    current.page.cleanup();
+  });
+
+  it.each(["advisor", "support"])("opens server-ended %s history and restarts without returning to the center", async type => {
+    const raw = {
+      conversation: { conversationNo: "CV-ended", conversationType: type, status: "CLOSED", version: 2,
+        ownerAgentName: "", unreadCount: 0, lastMessage: "Session ended", lastMessageAt: "2026-09-01T00:05:00Z" },
+      // The App projection filters internal system messages; the user's null
+      // receipt alone must not reject the whole closed conversation.
+      messages: [{ id: 1, senderType: "user", content: "Hello", createdAt: "2026-09-01T00:00:00Z", receiptStatus: null }],
+      historyTruncated: false, nextCursor: null,
+    };
+    const conversation = await createSupportApi({ request: async () => raw } as never).conversation("CV-ended");
+    const current = mount({ cid: conversation.id }, conversation);
+    await current.hooks.onShow();
+    expect(current.navigation.navBack).not.toHaveBeenCalled();
+    expect(current.page.threadMessages.value[0]).toMatchObject({ tone: "user", text: "Hello" });
+    expect(current.page.isClosedSession.value).toBe(true);
+    current.page.onRestart();
+    expect(current.navigation.navTo).toHaveBeenCalledExactlyOnceWith(`/pages/support/chat?start=${type}`);
+    current.page.cleanup();
+  });
+
   it("keeps advisor restart usable when the independent support category is disabled", async () => {
     const old = mount({ cid: "ended-thread" }, { type: "advisor", status: "ended", agentName: "unassigned" }, ["advisor"]);
     old.page.onRestart();

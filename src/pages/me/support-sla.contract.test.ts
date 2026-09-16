@@ -22,4 +22,8 @@ describe("support SLA presentation contract", () => {
     expect(tickets).toContain("slaTargetLabel");
     expect(tickets).toContain("slaStatisticsUnavailable");
   });
+
+  it("keeps every server-supported ticket category selectable from the App", () => {
+    expect(tickets).toContain('"withdrawal", "deposit", "hardware", "account", "earnings", "genesis", "technical", "other"');
+  });
 });

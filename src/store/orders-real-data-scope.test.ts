@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import { nextTick, watch } from "vue";
 import type { CanonicalOrder, CanonicalOrderList } from "@/api/order-api";
 import { advanceRuntimeRevision } from "@/api/order-api";
 
@@ -42,6 +43,33 @@ beforeEach(() => {
 });
 
 describe("orders consume only the current request scope", () => {
+  it("reactively publishes a completed cold-start account rebind", async () => {
+    const store = useOrders();
+    const observed: string[] = [];
+    const stop = watch(() => store.currentAccountKey(), (accountKey) => observed.push(accountKey));
+
+    store.bindAccount("user:restored");
+    await nextTick();
+
+    expect(observed).toEqual(["user:restored"]);
+    stop();
+  });
+
+  it("publishes a new binding revision when the same restored account is rebound", async () => {
+    const store = useOrders();
+    const initialRevision = store.currentAccountBindingRevision();
+    const observed: number[] = [];
+    const stop = watch(() => store.currentAccountBindingRevision(), (revision) => observed.push(revision));
+
+    store.bindAccount("user:restored");
+    await nextTick();
+    store.bindAccount("user:restored");
+    await nextTick();
+
+    expect(observed).toEqual([initialRevision + 1, initialRevision + 2]);
+    stop();
+  });
+
   it("drops an older same-account refresh after a newer response wins", async () => {
     const oldRequest = deferred<CanonicalOrderList>();
     const newRequest = deferred<CanonicalOrderList>();

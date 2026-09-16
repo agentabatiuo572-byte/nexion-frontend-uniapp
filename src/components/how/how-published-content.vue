@@ -12,7 +12,12 @@
       </view>
     </view>
     <view v-else-if="content" class="pb-8">
-      <HowHero :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? content.contentKey" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
+      <HowHero :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? content.contentKey" :sub="content.blocks[0] ? renderBody(content.blocks[0]) : ''" accent="purple" />
+      <view v-if="content.blocks[0]?.items?.length" class="mx-4" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px">
+        <view v-for="(item, itemIndex) in content.blocks[0].items" :key="itemIndex" style="display: flex; gap: 8px">
+          <text style="color: var(--v5-brand);">•</text><text :style="bodyStyle">{{ item }}</text>
+        </view>
+      </view>
       <template v-for="(block, index) in content.blocks.slice(1)" :key="block.id">
         <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="index % 2 ? 'purple' : 'lemon'">
           <text class="block" :style="bodyStyle">{{ renderBody(block) }}</text>

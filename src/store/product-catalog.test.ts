@@ -49,4 +49,26 @@ describe("product catalog refresh", () => {
     expect(catalog.productCatalogState.revision).toBe("new");
     expect(mocks.replace).toHaveBeenCalledTimes(1);
   });
+
+  it("clears a same-account rebind and accepts only the replacement catalog", async () => {
+    const beforeRebind = deferred<any>();
+    const afterRebind = deferred<any>();
+    mocks.catalog.mockReturnValueOnce(beforeRebind.promise).mockReturnValueOnce(afterRebind.promise);
+    const catalog = await import("./product-catalog");
+
+    const oldRequest = catalog.refreshProductCatalog(true);
+    catalog.prepareProductCatalog();
+    expect(catalog.productCatalogState.status).toBe("loading");
+    const currentRequest = catalog.refreshProductCatalog(true);
+
+    beforeRebind.resolve({ products: [{ id: "old" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "old" });
+    await oldRequest;
+    expect(mocks.replace).not.toHaveBeenCalled();
+
+    afterRebind.resolve({ products: [{ id: "current" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "current" });
+    await currentRequest;
+    expect(catalog.productCatalogState.status).toBe("ready");
+    expect(catalog.productCatalogState.revision).toBe("current");
+    expect(mocks.replace).toHaveBeenCalledTimes(1);
+  });
 });

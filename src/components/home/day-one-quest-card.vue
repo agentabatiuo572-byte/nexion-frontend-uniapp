@@ -38,7 +38,8 @@
           <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ t.home.dayOneLoginRequired }}</text>
           <template v-else>
             <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
-            <text style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ nexEarnedText === "—" ? "—" : `+${nexEarnedText}` }} {{ t.home.dayOneEarnedSuffix }}</text>
+            <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
+            <text v-else style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ nexEarnedText === "—" ? "—" : `+${nexEarnedText}` }} {{ t.home.dayOneEarnedSuffix }}</text>
           </template>
         </view>
       </view>
@@ -81,6 +82,17 @@
       </view>
     </view>
 
+    <view v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)"
+      class="newcomer-task__claim" role="button"
+      :tabindex="props.active && !quest.dayOneClaiming ? 0 : -1"
+      :aria-disabled="!props.active || quest.dayOneClaiming"
+      @click="onClaim" @keydown.enter.prevent="onClaim" @keydown.space.prevent="onClaim">
+      <text>{{ quest.dayOneClaiming ? t.home.dayOneClaiming : t.home.dayOneClaimReward }}</text>
+    </view>
+    <text v-if="remoteApiEnabled && quest.dayOneClaimError" role="status" class="newcomer-task__claim-error">
+      {{ quest.claimNotice ? t.questClaim[quest.claimNotice] : t.home.dayOneClaimUnconfirmed }}
+    </text>
+
     <view
       class="newcomer-task__toggle"
       :style="toggleStyle"
@@ -103,7 +115,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, type CSSProperties } from "vue";
+import { computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNow } from "@/composables/use-now";
@@ -112,6 +124,7 @@ import { useQuest } from "@/store/quest";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
+import { dayOneClaimState } from "@/lib/day-one-claim-state";
 
 interface QuestTask {
   id: string;
@@ -134,6 +147,7 @@ const props = withDefaults(defineProps<{ active?: boolean; expanded?: boolean }>
 });
 const emit = defineEmits<{
   (event: "update:expanded", value: boolean): void;
+  (event: "content-resize"): void;
 }>();
 const expanded = computed({
   get: () => props.expanded,
@@ -190,7 +204,14 @@ const tasks = computed<QuestTask[]>(() => selectHomeQuestRows(
 ));
 
 const total = computed(() => tasks.value.length);
-const completedCount = computed(() => tasks.value.filter((task) => quest.isComplete(task.id)).length);
+const claimState = computed(() => dayOneClaimState(
+  quest.remoteQuests, quest.dayOneRequiredTaskCount, quest.dayOneSnapshotStatus, nowTick.value * 1000,
+));
+watch(() => [expanded.value, props.active, claimState.value.claimCode, claimState.value.empty, quest.dayOneClaiming,
+  quest.dayOneClaimError, tasks.value.length, t.value.home.dayOneClaimReward, t.value.home.dayOneClaimUnconfirmed,
+  t.value.home.dayOneNoActiveTasks, t.value.home.dayOneFirstDayReward],
+  () => emit("content-resize"), { flush: "post", immediate: true });
+const completedCount = computed(() => tasks.value.filter(isDone).length);
 const progressPct = computed(() => total.value > 0 ? (completedCount.value / total.value) * 100 : 0);
 const nexEarned = computed(() => {
   const completed = tasks.value.filter((task) => quest.isComplete(task.id));
@@ -228,7 +249,12 @@ const remainingLabel = computed(() => {
 });
 
 function isDone(task: QuestTask) {
-  return quest.isComplete(task.id);
+  return remoteApiEnabled ? claimState.value.completedCodes.includes(task.id) : quest.isComplete(task.id);
+}
+
+function onClaim() {
+  if (!props.active || questUnavailable.value || !claimState.value.claimCode || quest.dayOneClaiming) return;
+  void quest.claimDayOne();
 }
 
 function isActionable(task: QuestTask) {
@@ -315,7 +341,7 @@ function rewardStyle(task: QuestTask): CSSProperties {
 const rootStyle = computed<CSSProperties>(() => ({
   position: "relative",
   boxSizing: "border-box",
-  height: expanded.value ? "auto" : "var(--home-task-card-height, 184px)",
+  height: expanded.value || (remoteApiEnabled && (claimState.value.claimCode || quest.dayOneClaiming || quest.dayOneClaimError)) ? "auto" : "var(--home-task-card-height, 184px)",
   minHeight: "var(--home-task-card-height, 184px)",
   borderRadius: "16px",
   background: "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
@@ -339,6 +365,17 @@ const toggleStyle: CSSProperties = {
 </script>
 
 <style scoped>
+.newcomer-task__claim {
+  margin: 12px 16px 0;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  background: var(--v5-brand);
+  color: var(--v5-on-brand);
+  cursor: pointer;
+}
+.newcomer-task__claim[aria-disabled="true"] { opacity: 0.6; }
+.newcomer-task__claim-error { margin: 8px 16px 0; font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__summary {
   box-sizing: border-box;
   min-height: 112px;

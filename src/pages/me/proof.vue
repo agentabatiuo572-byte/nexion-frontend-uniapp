@@ -331,19 +331,19 @@ const refCode = computed(() => remoteApiEnabled ? remoteSnapshot.value?.referral
 const referralLink = computed(() => refCode.value === "—" ? "" : buildShareLink(refCode.value));
 
 const topPct = computed(() => remoteApiEnabled ? remoteSnapshot.value?.topPercentile ?? null : null);
-const topPctText = computed(() => topPct.value === null ? "Top —" : `Top ${topPct.value}%`);
+const topPctText = computed(() => topPct.value === null ? "—" : `Top ${topPct.value}%`);
 
 const shareText = computed(() => {
   if (variant.value === "streak")
     return `🔥 ${longestOrCurrent.value ?? "—"}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
-    return `🌐 My NexGrid network is ${totalMembers.value ?? "—"} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
+    return `🌐 My NexGrid network has ${totalMembers.value ?? "—"} members. Explore NexGrid: ${referralLink.value}`;
   return `💸 Earned $${earningsTotalText.value} on NexGrid in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
 const memberSinceText = computed(() => fmt(t.value.proof.memberSince, { m: joined.value }));
-const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPct.replace("{n}", "—") : t.value.proof.topPct.replace("{n}", String(topPct.value)));
+const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPctUnavailable : t.value.proof.topPct.replace("{n}", String(topPct.value)));
 const vRankChip = computed(() => myRank.value === null ? "V—" : fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: rankTitle(myRank.value, isZh.value, vRank.ladder) }));
 const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value ?? "—") }));
 const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value ?? "—") }));

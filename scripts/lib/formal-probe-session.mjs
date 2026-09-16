@@ -1,3 +1,5 @@
+import { installProbeConversationRealtime, probeConversationReadFixture } from "./probe-conversation-realtime.mjs";
+
 export async function installFormalProbeSession(page, { authenticated = true, responseFor } = {}) {
   if (authenticated) {
     await page.addInitScript((snapshot) => {
@@ -63,7 +65,8 @@ export async function installFormalProbeSession(page, { authenticated = true, re
         }),
       });
     }
-    const fixture = typeof responseFor === "function" ? responseFor(url, route.request()) : undefined;
+    const custom = typeof responseFor === "function" ? responseFor(url, route.request()) : undefined;
+    const fixture = custom !== undefined ? custom : authenticated ? probeConversationReadFixture(url, route.request()) : undefined;
     if (fixture !== undefined) {
       return route.fulfill({
         status: 200,
@@ -91,4 +94,5 @@ export async function installFormalProbeSession(page, { authenticated = true, re
         : { code: 401, message: "AUTH_REQUIRED", data: null }),
     });
   });
+  await installProbeConversationRealtime(page, { authenticated });
 }

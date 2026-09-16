@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   Checkout — ported from Nexion-prototype/app/(main)/store/checkout/page.tsx.
   Reads ?product=<id> (default stellarbox-s1) &/or ?id= via onLoad. Buy flow
   state machine, top→bottom: stepper → AnimatePresence step card.

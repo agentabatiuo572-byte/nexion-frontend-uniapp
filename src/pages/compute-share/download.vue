@@ -1,6 +1,17 @@
 <template>
   <AppChassis active="earn">
-    <view v-if="enabled" class="pb-8" style="color: var(--v5-ink)">
+    <view v-if="gatePhase === 'pending'" class="mx-4" style="padding-top: 24px; color: var(--v5-ink)" role="status" aria-live="polite" aria-busy="true" data-proof="compute-share-config-pending">
+      <text class="block" :style="headlineStyle">{{ t.computeShare.configLoadingTitle }}</text>
+      <text class="block" :style="bodyStyle">{{ t.computeShare.configLoadingBody }}</text>
+    </view>
+    <view v-else-if="gatePhase === 'failed'" class="mx-4" style="padding-top: 24px; color: var(--v5-ink)" role="status" aria-live="assertive" data-proof="compute-share-config-failed">
+      <text class="block" :style="headlineStyle">{{ t.computeShare.configUnavailableTitle }}</text>
+      <text class="block" :style="bodyStyle">{{ t.computeShare.configUnavailableBody }}</text>
+      <view :style="devicesButtonStyle" role="button" tabindex="0" :aria-label="t.computeShare.configRetryCta" @click="retryConfigGate" @keydown.enter.prevent="retryConfigGate" @keydown.space.prevent="retryConfigGate">
+        <text>{{ t.computeShare.configRetryCta }}</text>
+      </view>
+    </view>
+    <view v-else-if="enabled" class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/devices" :title="downloadTitle" />
 
       <view class="mx-4" :style="heroStyle" data-proof="compute-share-download-page">
@@ -109,6 +120,7 @@ import {
   runComputeShareEnrollmentFlow,
   type InMemoryComputeSharePairingCode,
 } from "./enrollment-flow";
+import { createComputeShareDownloadGate, type ComputeShareDownloadGatePhase } from "./download-gate";
 
 const GPU_MODEL_PRESETS = [
   "Intel Iris Xe",
@@ -125,6 +137,7 @@ const t = useT();
 const selectedModel = ref(GPU_MODEL_PRESETS[2]);
 const enrollment = ref<ComputeShareEnrollment | null>(null);
 const connecting = ref(false);
+const gatePhase = ref<ComputeShareDownloadGatePhase>("pending");
 let accountGeneration = 0;
 let lifecycleGeneration = 0;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,34 +202,53 @@ const connectButtonText = computed(() => {
   return t.value.computeShare.connectCta;
 });
 
-function guardDisabled() {
-  if (enabled.value) return;
+function clearPolling() {
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = null;
+}
+
+function suspendRemoteWork() {
+  lifecycleGeneration += 1;
+  // A late create flow is scoped out by the increment. Clear its visual lock
+  // now so a later authoritative config recovery can resume the retained,
+  // idempotent journal instead of staying permanently "connecting".
+  connecting.value = false;
+  clearPolling();
+}
+
+function closeDisabled() {
+  inMemoryPairingCode = null;
   toast.info(t.value.computeShare.disabledToast);
   navReplace("/pages/me/devices");
 }
 
+const downloadGate = createComputeShareDownloadGate({
+  status: () => cfg.configStatus,
+  enabled: () => enabled.value,
+  settle: () => cfg.ensureLoaded(),
+  setPhase: (phase) => { gatePhase.value = phase; },
+  suspend: suspendRemoteWork,
+  redirectDisabled: closeDisabled,
+  resume: () => {
+    if (remoteApiEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration, lifecycleGeneration);
+  },
+});
+
+function retryConfigGate() {
+  if (gatePhase.value === "failed") void downloadGate.retry();
+}
+
 onMounted(() => {
   lifecycleGeneration += 1;
-  guardDisabled();
-  if (remoteApiEnabled && enabled.value) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration, lifecycleGeneration);
+  void downloadGate.mount();
 });
 onUnmounted(() => {
-  lifecycleGeneration += 1;
+  suspendRemoteWork();
+  downloadGate.unmount();
   inMemoryPairingCode = null;
-  if (pollTimer) clearTimeout(pollTimer);
-  pollTimer = null;
 });
-watch(enabled, (next) => {
-  if (!next) {
-    lifecycleGeneration += 1;
-    inMemoryPairingCode = null;
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    guardDisabled();
-    return;
-  }
-  lifecycleGeneration += 1;
-  if (remoteApiEnabled) void resumeRemoteEnrollment(String(app.accountKey), accountGeneration, lifecycleGeneration);
+watch(() => [cfg.configStatus, enabled.value] as const, () => {
+  downloadGate.reconcile();
 });
 watch(() => String(app.accountKey), (next, previous) => {
   if (next === previous) return;
@@ -224,9 +256,10 @@ watch(() => String(app.accountKey), (next, previous) => {
   connecting.value = false;
   enrollment.value = null;
   inMemoryPairingCode = null;
-  if (pollTimer) clearTimeout(pollTimer);
-  pollTimer = null;
-  if (remoteApiEnabled && enabled.value) void resumeRemoteEnrollment(next, accountGeneration, lifecycleGeneration);
+  clearPolling();
+  if (remoteApiEnabled && gatePhase.value === "ready" && enabled.value) {
+    void resumeRemoteEnrollment(next, accountGeneration, lifecycleGeneration);
+  }
 });
 
 function copyDownloadUrl() {

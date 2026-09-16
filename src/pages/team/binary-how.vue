@@ -11,8 +11,8 @@
 -->
 <template>
   <AppChassis active="team">
-    <HowPublishedContent v-if="remoteApiEnabled && !publishedContentUnavailable" content-key="team-binary-how" back="/pages/team/binary" @unavailable="publishedContentUnavailable = true" />
-    <view v-if="!remoteApiEnabled || publishedContentUnavailable" class="pb-8" style="color: var(--v5-ink)">
+    <HowPublishedContent v-if="howMode === 'published'" content-key="team-binary-how" back="/pages/team/binary" />
+    <view v-if="howMode === 'local'" class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader :title="t.headerTitles.teamBinary + t.headerTitles.howItWorksSuffix" back="/pages/team/binary" />
 
       <!-- Hero -->
@@ -173,11 +173,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import SvgText from "@/components/svg-text";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { remoteApiEnabled } from "@/api/runtime";
+import { howContentMode } from "@/lib/team-how-content-mode";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -189,7 +190,7 @@ import { navBack } from "@/lib/route";
 import { BINARY_SETTLE_PERIOD, BINARY_RESIDUAL_POLICY } from "@/lib/binary-settlement";
 
 const t = useT();
-const publishedContentUnavailable = ref(false);
+const howMode = howContentMode(remoteApiEnabled);
 const w = computed(() => t.value.binaryHowItWorks);
 
 // 结算周期 / 沉淀处置 文案据后台同源配置派生(默认每月 / 每月清零),全页口径一致。

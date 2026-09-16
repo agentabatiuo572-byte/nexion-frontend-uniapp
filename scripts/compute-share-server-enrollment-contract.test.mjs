@@ -23,7 +23,8 @@ test("remote enrollment journals the original key and verifies the canonical enr
 
 test("polling is bound to both account and page lifecycle generations", () => {
   assert.match(page, /let lifecycleGeneration = 0/);
-  assert.match(page, /onUnmounted\(\(\) => \{\s*lifecycleGeneration \+= 1/);
+  assert.match(page, /onUnmounted\(\(\) => \{\s*suspendRemoteWork\(\)/);
+  assert.match(page, /function suspendRemoteWork\(\) \{\s*lifecycleGeneration \+= 1/);
   assert.match(page, /expectedLifecycle === lifecycleGeneration/);
   assert.match(page, /navReplace\("\/pages\/me\/devices"\)/);
 });

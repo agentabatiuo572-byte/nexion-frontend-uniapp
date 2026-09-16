@@ -1,9 +1,5 @@
-export interface RemoteReceiptProjection {
-  receiptNo?: string | null;
-}
-
 export interface RemoteDeviceProjection {
-  recentTasks?: readonly RemoteReceiptProjection[] | null;
+  recentTasks?: readonly { receiptNo?: string | null }[] | null;
 }
 
 export interface RemoteAchievementProjection {
@@ -17,19 +13,15 @@ export interface RemotePointsProjection {
 }
 
 /**
- * Counts the union of server-issued payment and compute receipts. A null
- * source means the server projection has not been confirmed, so callers must
- * render an unavailable value rather than guessing zero.
+ * Counts only server-issued compute receipts. A null source means the server
+ * projection has not been confirmed, so callers must render an unavailable
+ * value rather than guessing zero.
  */
-export function countRemoteReceipts(
-  paymentReceipts: readonly RemoteReceiptProjection[] | null | undefined,
+export function countRemoteComputeReceipts(
   devices: readonly RemoteDeviceProjection[] | null | undefined,
 ): number | null {
-  if (!paymentReceipts || !devices) return null;
+  if (!devices) return null;
   const receiptNos = new Set<string>();
-  for (const receipt of paymentReceipts) {
-    if (typeof receipt.receiptNo === "string" && receipt.receiptNo.trim()) receiptNos.add(receipt.receiptNo.trim());
-  }
   for (const device of devices) {
     for (const task of device.recentTasks ?? []) {
       if (typeof task.receiptNo === "string" && task.receiptNo.trim()) receiptNos.add(task.receiptNo.trim());

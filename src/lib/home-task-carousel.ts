@@ -3,6 +3,8 @@ import { isCurrentQuest } from "./actionable-quest";
 
 export type HomeTaskCardId = "newcomer" | "weekly";
 
+export const HOME_TASK_CARD_COLLAPSED_HEIGHT = 184;
+
 export interface HomeTaskFeatureFlags {
   homeNewcomerTasksEnabled: boolean;
   homeWeeklyPromoEnabled: boolean;
@@ -34,6 +36,65 @@ export function deriveHomeTaskCards(
   if (flags.homeNewcomerTasksEnabled) cards.push("newcomer");
   if (flags.homeWeeklyPromoEnabled) cards.push("weekly");
   return cards;
+}
+
+/**
+ * Only the visible card may change the carousel viewport. A card's own
+ * content-resize notification is indexed by the parent v-for so a hidden
+ * slide, including a late callback after navigation, cannot resize the
+ * active slide.
+ */
+export function shouldMeasureHomeNewcomerContent(
+  cards: readonly HomeTaskCardId[],
+  activeIndex: number,
+  resizedIndex: number,
+): boolean {
+  return activeIndex === resizedIndex && cards[activeIndex] === "newcomer";
+}
+
+/** Converts a measured active-card height to the safe carousel viewport. */
+export function resolveHomeTaskCarouselHeight(measuredHeight: unknown): number {
+  return typeof measuredHeight === "number" && Number.isFinite(measuredHeight) && measuredHeight > 0
+    ? Math.max(HOME_TASK_CARD_COLLAPSED_HEIGHT, Math.ceil(measuredHeight))
+    : HOME_TASK_CARD_COLLAPSED_HEIGHT;
+}
+
+/**
+ * Keeps delayed selector-query callbacks scoped to the slide that requested
+ * them. The page supplies the real Uni selector query while this controller
+ * owns the cancellation fence so a swipe, card removal or unmount cannot
+ * apply an old card's measurement.
+ */
+export function createHomeNewcomerContentResizer(
+  current: () => { cards: readonly HomeTaskCardId[]; activeIndex: number },
+  setHeight: (height: number) => void,
+  scheduleMeasurement: (done: (height: unknown) => void) => void,
+) {
+  let measurementEpoch = 0;
+
+  const reset = () => {
+    measurementEpoch += 1;
+    setHeight(HOME_TASK_CARD_COLLAPSED_HEIGHT);
+  };
+
+  const invalidate = () => {
+    measurementEpoch += 1;
+  };
+
+  const measure = (resizedIndex: number): boolean => {
+    const initial = current();
+    const epoch = ++measurementEpoch;
+    if (!shouldMeasureHomeNewcomerContent(initial.cards, initial.activeIndex, resizedIndex)) return false;
+    scheduleMeasurement((height) => {
+      const latest = current();
+      if (epoch !== measurementEpoch
+          || !shouldMeasureHomeNewcomerContent(latest.cards, latest.activeIndex, resizedIndex)) return;
+      setHeight(resolveHomeTaskCarouselHeight(height));
+    });
+    return true;
+  };
+
+  return { measure, reset, invalidate };
 }
 
 export function selectHomeWeeklySource(

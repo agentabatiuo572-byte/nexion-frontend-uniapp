@@ -368,7 +368,8 @@ async function handleSave() {
       // The nickname is already authoritative at this point. A missing or
       // temporarily unavailable setup-profile reward must never turn the
       // completed profile mutation into a visible profile-service failure.
-      if (setupProfileQuestPending.value) toast.info(t.value.profile.noChangesToast);
+      if (setupProfileQuestPending.value) toast.info(quest.claimNotice
+        ? t.value.questClaim[quest.claimNotice] : t.value.profile.noChangesToast);
       else toast.success(t.value.profile.savedToast);
       return;
     }
@@ -378,17 +379,18 @@ async function handleSave() {
   }
   isSaving.value = true;
   try {
-    let outcome: { saved: boolean; questPending: boolean };
+    let outcome: { saved: boolean; questPending: boolean; claimNotice: typeof quest.claimNotice };
     if (remoteApiEnabled) {
       const saved = await profile.setDisplayName(name.value);
       if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
       const claimed = saved ? await claimSetupProfileQuest(quest).catch(() => false) : false;
+      const claimNotice = saved && !claimed ? quest.claimNotice : null;
       if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
-      outcome = { saved, questPending: saved && !claimed };
+      outcome = { saved, questPending: saved && !claimed, claimNotice };
     } else {
       const saved = await profile.setDisplayName(name.value);
       if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
-      outcome = { saved, questPending: false };
+      outcome = { saved, questPending: false, claimNotice: null };
     }
     if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
     if (!outcome.saved) return;
@@ -396,6 +398,7 @@ async function handleSave() {
     setupProfileQuestPending.value = outcome.questPending;
     saveFeedback.value = t.value.profile.savedToast;
     toast.success(t.value.profile.savedToast);
+    if (outcome.claimNotice) toast.info(t.value.questClaim[outcome.claimNotice]);
   } catch {
     if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
     toast.error(t.value.profile.serverMutationFailed);

@@ -67,6 +67,7 @@ export default defineConfig(({ mode }) => {
         ignored: [`${selfDir}/.claude/**`, "**/dist/**", "**/.trash/**"],
       },
       proxy: {
+        '/ws/conversations': { target: apiPreviewTarget, ws: true, changeOrigin: true },
         // The real H5 UI calls /auth/users/* from its same-origin base URL.
         // The backend intentionally owns that same path, so proxy it without
         // rewriting. Backend-native configuration routes continue under /api.

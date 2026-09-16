@@ -5,6 +5,7 @@ import type { CanonicalQuest, DayOneSnapshotStatus } from "@/api/quest-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { useLocaleStore } from "./locale";
+import { questClaimNoticeFor, type QuestClaimNotice } from "@/lib/quest-claim-notice";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 
 /** Formal mode reads server task facts and explicitly claims the DayOne group.
@@ -81,6 +82,7 @@ export const useQuest = defineStore("quest", () => {
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
   const remoteQuests = ref<CanonicalQuest[]>([]);
+  const claimNotice = ref<QuestClaimNotice | null>(null);
   const dayOneClaiming = ref(false);
   const dayOneClaimError = ref(false);
   const dayOneRewardNex = ref(0);
@@ -123,6 +125,7 @@ export const useQuest = defineStore("quest", () => {
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
+    claimNotice.value = null;
     // Background refreshes use stale-while-revalidate semantics: a route or
     // module switch must not erase the last server-confirmed task catalogue.
     // Account changes explicitly discard it in bindAccount() below.
@@ -182,6 +185,7 @@ export const useQuest = defineStore("quest", () => {
     const epoch = accountEpoch;
     const requestSequence = ++claimSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
+    claimNotice.value = null;
     try {
       const result = await questApi.claim(
         id,
@@ -191,9 +195,14 @@ export const useQuest = defineStore("quest", () => {
       if (!isCurrentRequest()) return false;
       if (result.status !== "CLAIMED" || result.instanceKey !== currentQuest.instanceKey) return false;
       return refreshRemote();
-    } catch {
+    } catch (cause) {
       // A failed route-triggered claim is not evidence that the last confirmed
       // task snapshot became invalid. Leave the read model untouched.
+      const notice = questClaimNoticeFor(cause);
+      if (notice) {
+        await refreshRemote();
+        if (isCurrentRequest()) claimNotice.value = notice;
+      }
       return false;
     }
   }
@@ -245,6 +254,7 @@ export const useQuest = defineStore("quest", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     dayOneClaiming.value = false;
     dayOneClaimError.value = false;
+    claimNotice.value = null;
     discardRemoteSnapshot();
     remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
     if (remoteApiEnabled) {
@@ -302,5 +312,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus, claimDayOne, dayOneClaiming, dayOneClaimError };
+  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus, claimNotice, claimDayOne, dayOneClaiming, dayOneClaimError };
 });

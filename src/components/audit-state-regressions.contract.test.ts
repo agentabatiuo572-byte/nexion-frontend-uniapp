@@ -17,7 +17,7 @@ describe("server state presentation regressions", () => {
   it("places the idle/loading branch ahead of the task-history empty state", () => {
     const template = source("./earn/task-center.vue");
     expect(template).toContain("app.remoteAssignmentStatus === 'idle'");
-    expect(template).toContain("app.remoteAssignmentStatus === 'loading'");
+    expect(template).toContain("app.remoteAssignmentStatus === 'loading' && !app.remoteAssignmentHasSnapshot");
     expect(template.indexOf("t.taskHistory.loading")).toBeGreaterThan(0);
     expect(template.indexOf("t.taskHistory.loading")).toBeLessThan(template.indexOf("t.taskHistory.historyEmpty"));
   });

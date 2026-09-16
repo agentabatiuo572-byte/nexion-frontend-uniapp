@@ -149,6 +149,11 @@ export const useOrders = defineStore("orders", () => {
   // or account switch must not project the prior account into the new session.
   let boundEpoch = 0;
   let refreshGeneration = 0;
+  // Pages that begin their own scoped reads during session restore must be able
+  // to observe the authoritative rebind. `boundKey` remains a plain closure
+  // for request fences; this mirror is read-only reactive UI state.
+  const boundAccountKey = ref("default");
+  const boundAccountRevision = ref(0);
   const orders = ref<Order[]>([]);
   const nextCursor = ref<string | null>(null);
   const loadingMore = ref(false);
@@ -189,6 +194,8 @@ export const useOrders = defineStore("orders", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     boundEpoch += 1;
+    boundAccountKey.value = boundKey;
+    boundAccountRevision.value += 1;
     refreshGeneration += 1;
     orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
     nextCursor.value = null;
@@ -500,7 +507,12 @@ export const useOrders = defineStore("orders", () => {
   }
 
   function currentAccountKey(): string {
-    return boundKey;
+    return boundAccountKey.value;
+  }
+
+  /** Reactive monotonic rebind revision for page-local remote readers. */
+  function currentAccountBindingRevision(): number {
+    return boundAccountRevision.value;
   }
 
   function getById(id: string): Order | undefined {
@@ -520,6 +532,7 @@ export const useOrders = defineStore("orders", () => {
     getById,
     bindAccount,
     currentAccountKey,
+    currentAccountBindingRevision,
     refreshRemote,
     loadMoreRemote,
     ensureRemoteOrder,

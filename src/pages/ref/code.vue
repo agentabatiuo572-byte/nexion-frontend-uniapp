@@ -63,12 +63,16 @@
       </view>
 
       <!-- CTA(已登录 → 进入 NexGrid,隐藏注册入口;异常2) -->
-      <view v-if="!authed && (!remoteApiEnabled || remotePreview)" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+      <view v-if="!authed && referralCta === 'referral'" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
         <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ rewardEnabled ? fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) : t.ref.joinCta }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-if="remoteApiEnabled && !remotePreview" class="text-center" style="padding: 28px 12px">
+      <view v-else-if="!authed && referralCta === 'ordinary'" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+        <text style="margin: 0 8px">{{ t.register.create }}</text>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      </view>
+      <view v-if="remoteApiEnabled && remotePreviewState === 'unavailable'" class="text-center" style="padding: 28px 12px">
         <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.ref.previewUnavailable }}</text>
       </view>
       <view v-if="authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp" @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
@@ -135,8 +139,8 @@
 <script setup lang="ts">
 import { privacyPolicyHref } from "@/lib/privacy-return";
 import { navReset, navTo } from "@/lib/route";
-import { computed, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
+import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
@@ -151,6 +155,11 @@ import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { monthlyPayoutUsdOf, publicStatsHealth } from "@/lib/platform-stats";
 import { visibleReferralGift } from "@/lib/referral-reward-gate";
+import {
+  referralCtaMode,
+  resolveReferralAttributionCode,
+  type ReferralPreviewState,
+} from "@/lib/referral-preview-state";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
 const t = useT();
@@ -158,6 +167,7 @@ const code = ref("");
 const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 const remotePreview = ref<PublicSponsorPreview | null>(null);
+const remotePreviewState = ref<ReferralPreviewState>("idle");
 const countryCount = ref<number | null>(null);
 const countryCountText = computed(() => remoteApiEnabled && countryCount.value !== null ? String(countryCount.value) : "—");
 const paidOutText = computed(() => {
@@ -185,20 +195,51 @@ const giftUsdt = computed(() => remoteApiEnabled
 const giftNex = computed(() => remoteApiEnabled
   ? (rewardEnabled.value ? remotePreview.value?.gift.nexAmount ?? 0 : 0)
   : localGift.value.nexAmount);
-// [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
+const referralCta = computed(() => referralCtaMode(remoteApiEnabled, remotePreviewState.value));
+const referralAttribution = computed(() => resolveReferralAttributionCode(
+  remoteApiEnabled,
+  remotePreviewState.value,
+  code.value,
+));
+let referralLoadVersion = 0;
+let referralMounted = true;
+const isCurrentReferralLoad = (version: number) => referralMounted && version === referralLoadVersion;
+
+// [FEAT-SHARE4] 仅服务端预览确认的码才展示 sponsor / 写归因;非法、失败 = 普通注册。
 onLoad(async (options) => {
   privacyHref.value = privacyPolicyHref("/pages/ref/code", options?.code);
+  referralMounted = true;
+  const loadVersion = ++referralLoadVersion;
   if (remoteApiEnabled) {
-    void networkRegionsApi.list().then((value) => { countryCount.value = value.countryCount; }).catch(() => { countryCount.value = null; });
-    const norm = normalizeRegistrationSponsorCode(options?.code ?? "", true);
-    code.value = norm ?? "";
-    if (!norm) return;
+    code.value = "";
+    remotePreview.value = null;
+    remotePreviewState.value = "idle";
+    countryCount.value = null;
+    void networkRegionsApi.list()
+      .then((value) => {
+        if (isCurrentReferralLoad(loadVersion)) countryCount.value = value.countryCount;
+      })
+      .catch(() => {
+        if (isCurrentReferralLoad(loadVersion)) countryCount.value = null;
+      });
+    const rawCode = String(options?.code ?? "").trim();
+    const norm = normalizeRegistrationSponsorCode(rawCode, true);
+    if (!norm) {
+      remotePreviewState.value = rawCode ? "unavailable" : "idle";
+      return;
+    }
+    remotePreviewState.value = "loading";
     try {
-      remotePreview.value = await publicSponsorPreviewApi.preview(norm);
-      code.value = remotePreview.value.code;
+      const preview = await publicSponsorPreviewApi.preview(norm);
+      if (!isCurrentReferralLoad(loadVersion)) return;
+      remotePreview.value = preview;
+      code.value = preview.code;
+      remotePreviewState.value = "ready";
     } catch {
+      if (!isCurrentReferralLoad(loadVersion)) return;
       code.value = "";
       remotePreview.value = null;
+      remotePreviewState.value = "unavailable";
     }
     return;
   }
@@ -206,6 +247,12 @@ onLoad(async (options) => {
   code.value = norm ?? "";
   if (norm) sponsorship?.capturePending(norm);
 });
+function cleanupReferralLoad() {
+  referralMounted = false;
+  referralLoadVersion += 1;
+}
+onUnload(cleanupReferralLoad);
+onUnmounted(cleanupReferralLoad);
 const hasCode = computed(() => remoteApiEnabled ? !!remotePreview.value : !!code.value);
 const authed = computed(() => auth.isAuthenticated);
 
@@ -238,11 +285,11 @@ function perkLabel(k: PerkKey): string {
 }
 
 function goRegister() {
-  const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
+  const q = referralAttribution.value ? `?ref=${encodeURIComponent(referralAttribution.value)}` : "";
   navTo(`/pages/register/register${q}`);
 }
 function goLogin() {
-  const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
+  const q = referralAttribution.value ? `?ref=${encodeURIComponent(referralAttribution.value)}` : "";
   navTo(`/pages/login/login${q}`);
 }
 function enterApp() {

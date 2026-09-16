@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveStakingPool,
   canOpenStakingPool,
+  canRecommendStakingPool,
   resolvePositionPenalty,
   type StakingConfigState,
 } from "./staking-canonical";
@@ -33,6 +34,31 @@ describe("staking canonical UI config", () => {
     for (const pool of [{ ...canonicalPool, enabled: false }, { ...canonicalPool, killed: true }]) {
       expect(canOpenStakingPool({ ...remoteState, pools: [pool] }, 180)).toBe(false);
     }
+  });
+
+  it("only recommends a pool that is currently buyable for the withdrawal amount", () => {
+    const minimumOneHundred = { ...canonicalPool, minAmountUsdt: 100 };
+
+    expect(canRecommendStakingPool({ ...remoteState, pools: [minimumOneHundred] }, 180, 20, minimumOneHundred)).toBe(false);
+    expect(canRecommendStakingPool({ ...remoteState, pools: [minimumOneHundred] }, 180, 100, minimumOneHundred)).toBe(true);
+    expect(canRecommendStakingPool(
+      { ...remoteState, pools: [{ ...minimumOneHundred, enabled: false, status: "STOPPED" as const }] },
+      180,
+      100,
+      minimumOneHundred,
+    )).toBe(false);
+    expect(canRecommendStakingPool(
+      { ...remoteState, pools: [{ ...minimumOneHundred, killed: true, status: "KILLED" as const }] },
+      180,
+      100,
+      minimumOneHundred,
+    )).toBe(false);
+    expect(canRecommendStakingPool(
+      { ...remoteState, remoteReady: false, pools: [minimumOneHundred] },
+      180,
+      100,
+      minimumOneHundred,
+    )).toBe(false);
   });
   it("uses the server pool when remote config is ready", () => {
     expect(resolveStakingPool(remoteState, 180, { apy: 1.8, penalty: 0.5, minAmountUsdt: 20 })).toEqual(canonicalPool);

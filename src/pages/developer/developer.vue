@@ -132,7 +132,7 @@
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
             <view class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text></view>
-            <view v-if="!apiKeys.length && !resourcesLoading" class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
+            <view v-if="resourcesReady && !apiKeys.length" class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
           </view>
         </view>
       </view>
@@ -157,7 +157,7 @@
               </view>
               <view v-else-if="webhookDeliveries[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.deliveryEmpty }}</text></view>
             </view>
-            <view v-if="!webhooks.length && !resourcesLoading" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
+            <view v-if="resourcesReady && !webhooks.length" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
             <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
@@ -215,6 +215,7 @@ const apiKeys = ref<DeveloperApiKey[]>([]);
 const webhooks = ref<DeveloperWebhook[]>([]);
 const webhookDeliveries = ref<Record<number, DeveloperWebhookDelivery[]>>({});
 const resourcesLoading = ref(false);
+const resourcesReady = ref(false);
 const resourcesLoadFailed = ref(false);
 const resourceBusyKeys = ref(new Set<string>());
 const resourceIntentKeys = new Map<string, string>();
@@ -225,6 +226,7 @@ const newWebhookSecret = ref<string | null>(null);
 let requestKey: string | null = null;
 let requestGeneration = 0;
 let resourceGeneration = 0;
+let resourceReadVersion = 0;
 let docsGeneration = 0;
 let confirmationSequence = 0;
 const developerConfirmOwners = new Set<string>();
@@ -371,11 +373,13 @@ function resourceFenceCurrent(fence: DeveloperResourceFence): boolean {
 }
 function resetResourceScope(): void {
   resourceGeneration += 1;
+  resourceReadVersion += 1;
   apiKeys.value = [];
   webhooks.value = [];
   webhookDeliveries.value = {};
   newWebhookSecret.value = null;
   resourcesLoading.value = false;
+  resourcesReady.value = false;
   resourcesLoadFailed.value = false;
   resourceBusyKeys.value = new Set();
   resourceIntentKeys.clear();
@@ -481,21 +485,26 @@ function loadLatestRequest() {
   });
 }
 async function loadResources(fence = resourceFence()) {
-  if (!remoteApiEnabled || resourceBusy("load") || !resourceFenceCurrent(fence)) return;
+  if (!remoteApiEnabled || !resourceFenceCurrent(fence)) return;
+  // A mutation must start a fresh read even if an older list request is pending.
+  const readVersion = ++resourceReadVersion;
+  const current = () => resourceFenceCurrent(fence) && readVersion === resourceReadVersion;
   setResourceBusy("load", true);
   resourcesLoading.value = true;
+  resourcesReady.value = false;
   resourcesLoadFailed.value = false;
   try {
     const [keys, hooks] = await Promise.all([developerResourcesApi.listKeys(), developerResourcesApi.listWebhooks()]);
-    if (!resourceFenceCurrent(fence)) return;
+    if (!current()) return;
     apiKeys.value = keys;
     webhooks.value = hooks;
     refreshRotationRecovery(hooks);
     resourcesLoadFailed.value = false;
+    resourcesReady.value = true;
   } catch {
-    if (resourceFenceCurrent(fence)) resourcesLoadFailed.value = true;
+    if (current()) resourcesLoadFailed.value = true;
   } finally {
-    if (resourceFenceCurrent(fence)) {
+    if (current()) {
       resourcesLoading.value = false;
       setResourceBusy("load", false);
     }
@@ -533,7 +542,8 @@ async function revokeApiKey(id: number) {
   } catch {
     const keys = await reconcileResourceFailure(fence, () => developerResourcesApi.listKeys(), (items) => isApiKeyRevoked(items, id));
     if (!resourceFenceCurrent(fence)) return;
-    if (keys) apiKeys.value = keys.items;
+    if (keys) await loadResources(fence);
+    if (!resourceFenceCurrent(fence)) return;
     if (keys?.confirmed) {
       completeResourceIntent(intent);
     } else if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionUnknown);
@@ -570,9 +580,9 @@ async function setWebhookEnabled(item: DeveloperWebhook, enabled: boolean) {
     const hooks = await reconcileResourceFailure(fence, () => developerResourcesApi.listWebhooks(), (items) => isWebhookEnabled(items, item.id, enabled));
     if (!resourceFenceCurrent(fence)) return;
     if (hooks) {
-      webhooks.value = hooks.items;
-      refreshRotationRecovery(hooks.items);
+      await loadResources(fence);
     }
+    if (!resourceFenceCurrent(fence)) return;
     if (hooks?.confirmed) {
       completeResourceIntent(intent);
     } else if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionUnknown);
@@ -624,13 +634,13 @@ async function deleteWebhook(id: number) {
     const hooks = await reconcileResourceFailure(fence, () => developerResourcesApi.listWebhooks(), (items) => isWebhookDeleted(items, id));
     if (!resourceFenceCurrent(fence)) return;
     if (hooks) {
-      webhooks.value = hooks.items;
-      refreshRotationRecovery(hooks.items);
+      await loadResources(fence);
     }
+    if (!resourceFenceCurrent(fence)) return;
     if (hooks?.confirmed) {
       webhookDeliveries.value = Object.fromEntries(Object.entries(webhookDeliveries.value).filter(([key]) => Number(key) !== id));
       rotationJournal.clear(journalScope, id);
-      refreshRotationRecovery(hooks.items);
+      refreshRotationRecovery(webhooks.value);
       completeResourceIntent(intent);
     } else if (resourceFenceCurrent(fence)) toast.warn(t.value.developer.resourceActionUnknown);
   } finally {

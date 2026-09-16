@@ -8,8 +8,8 @@
 -->
 <template>
   <AppChassis active="team">
-    <HowPublishedContent v-if="remoteApiEnabled && !publishedContentUnavailable" content-key="team-unilevel-how" back="/pages/team/unilevel" @unavailable="publishedContentUnavailable = true" />
-    <view v-if="!remoteApiEnabled || publishedContentUnavailable" class="pb-8" style="color: var(--v5-ink)">
+    <HowPublishedContent v-if="howMode === 'published'" content-key="team-unilevel-how" back="/pages/team/unilevel" />
+    <view v-if="howMode === 'local'" class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader :title="t.headerTitles.teamUnilevel + t.headerTitles.howItWorksSuffix" back="/pages/team/unilevel" />
 
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="lemon" />
@@ -136,10 +136,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { remoteApiEnabled } from "@/api/runtime";
+import { howContentMode } from "@/lib/team-how-content-mode";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -150,7 +151,7 @@ import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
 
 const t = useT();
-const publishedContentUnavailable = ref(false);
+const howMode = howContentMode(remoteApiEnabled);
 const w = computed(() => t.value.unilevelHowItWorks);
 
 const tiers = computed(() => [

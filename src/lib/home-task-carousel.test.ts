@@ -3,11 +3,16 @@ import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot } from "@/api/
 import conversionBannerSource from "../components/home/conversion-banner.vue?raw";
 import weeklyQuestHeroSource from "../components/home/weekly-quest-hero.vue?raw";
 import weeklyQuestListSource from "../components/home/weekly-quest-list.vue?raw";
+import homePageSource from "../pages/index/index.vue?raw";
 import {
   deriveHomeTaskCards,
+  createHomeNewcomerContentResizer,
+  HOME_TASK_CARD_COLLAPSED_HEIGHT,
   isHomeWeeklyCardReady,
   presentHomeWeeklyCard,
+  resolveHomeTaskCarouselHeight,
   selectHomeWeeklySource,
+  shouldMeasureHomeNewcomerContent,
 } from "./home-task-carousel";
 
 const weeklyQuest: CanonicalQuest = {
@@ -156,5 +161,47 @@ describe("home task carousel", () => {
     expect(conversionBannerSource).not.toContain("managedCopyText");
     expect(conversionBannerSource).toContain(':aria-label="subtitleText"');
     expect(conversionBannerSource).toContain(':title="subtitleText"');
+  });
+
+  it("resizes only the active newcomer slide for collapsed claim/error and localized content", () => {
+    const cards = ["newcomer", "weekly"] as const;
+    let viewportHeight = HOME_TASK_CARD_COLLAPSED_HEIGHT;
+    let activeIndex = 0;
+    const pendingMeasurements: Array<(height: unknown) => void> = [];
+    const resizer = createHomeNewcomerContentResizer(
+      () => ({ cards, activeIndex }),
+      (height) => { viewportHeight = height; },
+      (done) => pendingMeasurements.push(done),
+    );
+
+    // A collapsed card grows when the claim CTA or a claim error appears.
+    expect(resizer.measure(0)).toBe(true);
+    pendingMeasurements.shift()?.(232.1);
+    expect(viewportHeight).toBe(233);
+    expect(resizer.measure(0)).toBe(true);
+    pendingMeasurements.shift()?.(260.8);
+    expect(viewportHeight).toBe(261);
+    // A locale-change resize remains measurable, while a hidden or late card
+    // notification cannot alter the weekly viewport.
+    expect(resizer.measure(0)).toBe(true);
+    activeIndex = 1;
+    pendingMeasurements.shift()?.(320);
+    expect(viewportHeight).toBe(261);
+    expect(resolveHomeTaskCarouselHeight(0)).toBe(HOME_TASK_CARD_COLLAPSED_HEIGHT);
+    expect(shouldMeasureHomeNewcomerContent(cards, 0, 1)).toBe(false);
+
+    activeIndex = 0;
+    expect(resizer.measure(0)).toBe(true);
+    resizer.invalidate();
+    pendingMeasurements.shift()?.(400);
+    expect(viewportHeight).toBe(261);
+    resizer.reset();
+    expect(viewportHeight).toBe(HOME_TASK_CARD_COLLAPSED_HEIGHT);
+
+    // The actual page binds the v-for index to the card event and invokes the
+    // same active-slide gate; this is not a copy of the SFC measurement code.
+    expect(homePageSource).toContain('@content-resize="onNewcomerContentResize(index)"');
+    expect(homePageSource).toContain("createHomeNewcomerContentResizer");
+    expect(homePageSource).toContain("newcomerContentResizer.measure(taskSlide.value)");
   });
 });

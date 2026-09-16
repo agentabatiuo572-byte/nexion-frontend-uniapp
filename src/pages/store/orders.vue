@@ -168,10 +168,15 @@ function requestOrdersRefresh() {
 }
 async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
+  const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
+  const requestedRefresh = refreshEpoch;
   try {
     await orders.loadMoreRemote();
   } catch {
-    if (!ordersPageActive) return;
+    if (!ordersPageActive || requestedRefresh !== refreshEpoch || !remoteCommerceRequestCurrent(request, {
+      accountKey: app.accountKey,
+      epoch: app.accountBindingEpoch,
+    })) return;
     commerceOrdersUnavailable.value = true;
     remoteOrderAvailability.value = "partial";
   }
