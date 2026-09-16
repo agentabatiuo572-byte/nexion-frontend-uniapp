@@ -338,7 +338,7 @@ export const en = {
     resetSubtitle: "Enter your phone to receive a verification code.",
     newPasswordTitle: "Set a new password",
     newPasswordHint: "Use 12–64 characters with uppercase, lowercase, a number, and a symbol. Sign in with the new password after reset.",
-    newPasswordPlaceholder: "New password (8–64 chars)",
+    newPasswordPlaceholder: "New password (12–64 chars)",
     confirmPasswordPlaceholder: "Confirm new password",
     passwordMismatch: "Passwords don't match.",
     finishReset: "Update password",

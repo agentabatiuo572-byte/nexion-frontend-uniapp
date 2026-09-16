@@ -23,6 +23,7 @@ function api(overrides: Partial<AuthApi>): AuthApi {
     completePasswordReset: vi.fn(),
     completeTwoFactor: vi.fn(),
     sendRegistrationOtp: vi.fn(),
+    verifyRegistrationOtp: vi.fn(),
     oauthExchange: vi.fn(),
     restore: vi.fn(),
     discardSessionIfCurrent: vi.fn(),

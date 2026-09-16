@@ -449,6 +449,8 @@ async function submitPasswordChange() {
     err.value = t.value.security.passwordMismatch;
     return;
   }
+  const currentPassword = current.value;
+  const newPassword = next.value;
   securityBusy.value = true;
   let commandKey: string | null = null;
   let recovered = false;
@@ -459,13 +461,13 @@ async function submitPasswordChange() {
         const priorReceipt = await accountApi.passwordCommandReceipt(commandKey);
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (priorReceipt) recovered = true;
-        else await accountApi.changePassword(current.value, next.value, commandKey);
+        else await accountApi.changePassword(currentPassword, newPassword, commandKey);
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", commandKey);
     } else {
-      security.changePassword(current.value, next.value);
+      security.changePassword(currentPassword, newPassword);
     }
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;

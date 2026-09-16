@@ -85,20 +85,19 @@ if ! command -v "$NODE_BIN" >/dev/null 2>&1 && command -v node.exe >/dev/null 2>
   NODE_BIN="node.exe"
 fi
 
-# admin 仓根解析(2026-09-02 改多候选):后台实现面 2026-07-31 起是 `../admin-ops`,原单一候选
-# `../nexion-ops-console`(远端仓名 / 本机 junction)在主检出上早已不存在 → SPEC-7 parity 与
-# platform-config compat 共 3 格恒红两个月。候选按序:`../admin-ops` → `../nexion-ops-console`
+# admin 仓根解析:优先当前正式目录 `../nexion-frontend-pc`,兼容旧检出位置。
+# 候选按序:`../nexion-frontend-pc` → `../admin-ops` → `../nexion-ops-console`
 # → `.claude/worktrees/nexion-ops-console`(pkg.mjs close 在合并树里建的 junction);linked worktree
 # (.claude/worktrees/*)下相对路径落空 → 用 git common-dir 反推主仓根再按同一顺序找。
 # 候选必须真含 admin 仓标志文件(scripts/platform-config-contract-parity.mjs)才算命中,空目录 / 悬空 junction 不算。
 # 全部落空时 ADMIN_ROOT 保持原相对值 → 下游各消费点维持原 bad/skip 行为(判据失效必红,不静默跳过)。
-ADMIN_ROOT="$PROJECT_DIR/../nexion-ops-console"
+ADMIN_ROOT="$PROJECT_DIR/../nexion-frontend-pc"
 resolve_admin_root() {
   local main_git_dir base cand
   main_git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
   for base in "$PROJECT_DIR" "${main_git_dir:+$(dirname "$main_git_dir")}"; do
     [ -n "$base" ] || continue
-    for cand in "$base/../admin-ops" "$base/../nexion-ops-console" "$base/.claude/worktrees/nexion-ops-console"; do
+    for cand in "$base/../nexion-frontend-pc" "$base/../admin-ops" "$base/../nexion-ops-console" "$base/.claude/worktrees/nexion-ops-console"; do
       if [ -f "$cand/scripts/platform-config-contract-parity.mjs" ]; then printf '%s\n' "$cand"; return 0; fi
     done
   done

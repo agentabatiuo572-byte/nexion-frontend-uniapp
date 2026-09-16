@@ -257,6 +257,10 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
     async sendRegistrationOtp(request) {
       return { ...issueChallenge(), deliveryHint: maskedHint(request.phone) };
     },
+    async verifyRegistrationOtp(request) {
+      assertSixDigit(request.code);
+      return { status: "REGISTRATION_OTP_VERIFIED" };
+    },
     async register(request) {
       assertSixDigit(request.code);
       const reg = loadRegistry();

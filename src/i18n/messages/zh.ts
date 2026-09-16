@@ -321,7 +321,7 @@ export const zh: Messages = {
     resetSubtitle: "输入手机号接收验证码。",
     newPasswordTitle: "设置新密码",
     newPasswordHint: "12–64 位，需包含大小写字母、数字和符号。重置后请使用新密码登录。",
-    newPasswordPlaceholder: "新密码(8–64 位)",
+    newPasswordPlaceholder: "新密码(12–64 位)",
     confirmPasswordPlaceholder: "再次输入新密码",
     passwordMismatch: "两次密码不一致。",
     finishReset: "更新密码",

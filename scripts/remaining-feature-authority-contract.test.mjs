@@ -1,10 +1,93 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import test from "node:test";
+import test, { mock } from "node:test";
+import ts from "typescript";
 
 function read(path) {
   return fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 }
+
+function passwordChangeFixture() {
+  const script = read("src/pages/me/security.vue").match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script, "security page script must exist");
+  const parsed = ts.createSourceFile("security.ts", script, ts.ScriptTarget.Latest, true);
+  const handler = parsed.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "submitPasswordChange");
+  assert.ok(handler, "real password handler must exist");
+  const code = ts.transpileModule(handler.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let resolveReceipt;
+  let currentScope = true;
+  const deps = {
+    current: { value: "OldPass1!" }, next: { value: "NewPass2!" }, confirmPwd: { value: "NewPass2!" },
+    securityBusy: { value: false }, editingPwd: { value: true }, err: { value: "" },
+    securityPageFence: { capture: () => ({}) }, captureAccountScope: () => ({}),
+    auth: { accountId: "password-fixture" }, isCurrentSecurityRequest: () => currentScope,
+    isPasswordOk: (value) => value === "NewPass2!", remoteApiEnabled: true,
+    SECURITY_COMMAND_TABLE: "password-fixture-commands", acquireAccountCommandKey: mock.fn(() => "command-fixture"),
+    releaseAccountCommandKey: mock.fn(),
+    accountApi: {
+      passwordCommandReceipt: mock.fn(() => new Promise((resolve) => { resolveReceipt = resolve; })),
+      changePassword: mock.fn(async () => undefined),
+    },
+    security: { changePassword: mock.fn() }, loadRemoteSecurity: mock.fn(async () => true),
+    securityErrorMessage: () => "request failed", toast: { success: mock.fn() },
+    t: { value: { login: { errorInvalidPassword: "missing" }, security: {
+      passwordShort: "short", passwordMismatch: "mismatch", passwordRecovered: "recovered", passwordSaved: "saved",
+    } } },
+  };
+  const submit = new Function(...Object.keys(deps), `${code}; return submitPasswordChange;`)(...Object.values(deps));
+  return { ...deps, submit, resolveReceipt: (receipt) => resolveReceipt(receipt), leave: () => { currentScope = false; } };
+}
+
+test("password change sends only the values validated before awaiting a prior receipt", async () => {
+  const page = passwordChangeFixture();
+  const pending = page.submit();
+  assert.equal(page.securityBusy.value, true);
+  await page.submit();
+  assert.equal(page.accountApi.passwordCommandReceipt.mock.callCount(), 1);
+  page.current.value = "ChangedOld3!";
+  page.next.value = "ChangedNew4!";
+  page.confirmPwd.value = "mismatch";
+  page.resolveReceipt(null);
+  await pending;
+  assert.deepEqual(page.accountApi.changePassword.mock.calls.map((call) => call.arguments), [
+    ["OldPass1!", "NewPass2!", "command-fixture"],
+  ]);
+  assert.equal(page.loadRemoteSecurity.mock.callCount(), 1);
+  assert.equal(page.releaseAccountCommandKey.mock.callCount(), 1);
+  assert.equal(page.security.changePassword.mock.callCount(), 0);
+  assert.equal(page.current.value, "");
+  assert.equal(page.next.value, "");
+});
+
+test("a committed password receipt recovers the old command without submitting edited passwords", async () => {
+  const page = passwordChangeFixture();
+  const pending = page.submit();
+  page.current.value = "ChangedOld3!";
+  page.next.value = "ChangedNew4!";
+  page.resolveReceipt({ status: "PASSWORD_CHANGED" });
+  await pending;
+  assert.equal(page.accountApi.changePassword.mock.callCount(), 0);
+  assert.equal(page.loadRemoteSecurity.mock.callCount(), 1);
+  assert.equal(page.releaseAccountCommandKey.mock.callCount(), 1);
+  assert.deepEqual(page.toast.success.mock.calls[0].arguments, ["recovered"]);
+});
+
+test("password commands reject invalid forms before requests and do not send after leaving", async () => {
+  const page = passwordChangeFixture();
+  page.confirmPwd.value = "mismatch";
+  await page.submit();
+  assert.equal(page.err.value, "mismatch");
+  assert.equal(page.accountApi.passwordCommandReceipt.mock.callCount(), 0);
+  page.confirmPwd.value = page.next.value;
+  const pending = page.submit();
+  page.leave();
+  page.resolveReceipt(null);
+  await pending;
+  assert.equal(page.accountApi.changePassword.mock.callCount(), 0);
+  assert.equal(page.loadRemoteSecurity.mock.callCount(), 0);
+  assert.equal(page.releaseAccountCommandKey.mock.callCount(), 0);
+  assert.equal(page.toast.success.mock.callCount(), 0);
+});
 
 test("remote security center consumes the authoritative account API", () => {
   const page = read("src/pages/me/security.vue");
@@ -18,11 +101,15 @@ test("remote security center consumes the authoritative account API", () => {
   assert.ok(passwordChange, "password command boundary must exist");
   const branches = passwordChange.match(/if \(remoteApiEnabled\) \{([\s\S]*?)\n\s*\} else \{([\s\S]*?)\n\s*\}/);
   assert.ok(branches, "password command must separate server and local authority");
+  assert.match(passwordChange, /const currentPassword = current\.value;/);
+  assert.match(passwordChange, /const newPassword = next\.value;/);
+  assert.ok(passwordChange.indexOf("const newPassword") < passwordChange.indexOf("await accountApi.passwordCommandReceipt"),
+    "the validated passwords must be captured before awaiting command recovery");
   assert.match(branches[1], /accountApi\.passwordCommandReceipt\(commandKey\)/);
-  assert.match(branches[1], /else await accountApi\.changePassword\(current\.value, next\.value, commandKey\)/);
+  assert.match(branches[1], /else await accountApi\.changePassword\(currentPassword, newPassword, commandKey\)/);
   assert.match(branches[1], /await loadRemoteSecurity\(\)/);
   assert.doesNotMatch(branches[1], /security\.changePassword\(/);
-  assert.match(branches[2], /security\.changePassword\(current\.value, next\.value\)/);
+  assert.match(branches[2], /security\.changePassword\(currentPassword, newPassword\)/);
   assert.doesNotMatch(branches[2], /accountApi\./);
   assert.match(page, /accountApi\.updateTwoFactor\(target, twoFactorPassword\.value, twoFactorChallengeNo\.value, twoFactorCode\.value\)/);
   assert.doesNotMatch(page, /ACCOUNT_DELETION_PROVIDER_HOLD/);
