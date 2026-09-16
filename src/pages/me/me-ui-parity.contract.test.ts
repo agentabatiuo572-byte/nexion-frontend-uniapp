@@ -136,8 +136,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
-  // Bank-withdrawal entry and local financial snapshot freshness/retry controls coexist.
-  "wallet-withdraw.vue": "63acb1e4736056d1be80d835bad8d5e0c52fc54f654122b6c26a3ee1f8b2fc33",
+  // Withdrawal methods share the selection page; USDT has no duplicate bank entry.
+  // Local financial snapshot freshness/retry controls remain unchanged.
+  "wallet-withdraw.vue": "60e3ad63c63486cabca84d4815ca5d62c46ca82f5843c33fa4700abb0753eb73",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",
 };
