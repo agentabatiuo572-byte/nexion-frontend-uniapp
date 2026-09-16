@@ -9,6 +9,26 @@ export function bankCanQuote(config: BankConfig | null): boolean {
   return config?.enabled === true && config.unresolvedIntent === null && bankBeneficiaryReady(config.beneficiary);
 }
 
+/** Display capacity never substitutes the D7 single-transaction limit with a wallet balance. */
+export function bankMaximumAmount(config: BankConfig | null): number {
+  const { policy, capacity } = config ?? {};
+  if (!policy || !capacity || !capacity.withdrawalEnabled || capacity.dailyRemainingCount === 0) return 0;
+  return Math.min(policy.maxAmountUsd, capacity.maxWithdrawableUsdt);
+}
+
+export type BankAmountError = "format" | "range" | "balance" | "daily" | "unavailable";
+export function bankAmountError(value: string, config: BankConfig | null): BankAmountError | null {
+  const { policy, capacity } = config ?? {};
+  if (!policy || !capacity || !capacity.withdrawalEnabled) return "unavailable";
+  if (capacity.dailyRemainingCount === 0) return "daily";
+  const normalized = value.trim().replace(",", ".");
+  if (!/^\d+(?:\.\d{1,6})?$/.test(normalized) || !Number.isFinite(Number(normalized)) || Number(normalized) <= 0) return "format";
+  const amount = Number(normalized);
+  if (amount < policy.minAmountUsd || amount > policy.maxAmountUsd) return "range";
+  if (amount > capacity.maxWithdrawableUsdt) return "balance";
+  return null;
+}
+
 export type BankAccountNotice = "ready" | "unavailable";
 export function bankAccountNotice(beneficiary: BankBeneficiary): BankAccountNotice {
   return bankBeneficiaryReady(beneficiary) ? "ready" : "unavailable";

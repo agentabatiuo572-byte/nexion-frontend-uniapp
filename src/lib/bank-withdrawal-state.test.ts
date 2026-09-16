@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome } from "./bank-withdrawal-state";
+import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "./bank-withdrawal-state";
 import { createBankWithdrawalApi, parseBankRecovery, parseBankUnresolvedIntent, type BankBeneficiary, type BankConfig } from "@/api/bank-withdrawal-api";
 
 const now = Date.parse("2026-09-16T00:00:00Z");
@@ -16,6 +16,32 @@ const receipt = { state: "COMMITTED", withdrawalNo: "WD-TEST", withdrawal: { wit
 function outcome(value: unknown) { const order = parseBankRecovery(value); if (order.state !== "COMMITTED") throw new Error("Expected order"); return bankOrderOutcome(order); }
 
 describe("bank account authority and settlement evidence", () => {
+  it("keeps PC single-transaction limits separate from live balance and daily capacity", async () => {
+    const raw = { ...config, policy: { version: 3, minAmountUsd: "5", maxAmountUsd: "80", feeRatePct: 1, feeMinUsd: 1, feeMaxUsd: 25 },
+      capacity: { maxWithdrawableUsdt: "50.123456", dailyRemainingCount: 1, dailyLimitCount: 2, dailyCountResetAt: "2026-10-01T00:00:00Z", withdrawalEnabled: true } };
+    const request = vi.fn().mockResolvedValue(raw);
+    const loaded = await createBankWithdrawalApi({ request } as never).config();
+    expect(loaded.policy?.maxAmountUsd).toBe(80);
+    expect(bankMaximumAmount(loaded)).toBe(50.123456);
+    expect(bankAmountError("5",loaded)).toBeNull();
+    expect(bankAmountError("5,5",loaded)).toBeNull();
+    expect(bankAmountError("4.999999",loaded)).toBe("range");
+    expect(bankAmountError("80.000001",loaded)).toBe("range");
+    expect(bankAmountError("50.123457",loaded)).toBe("balance");
+    for (const value of ["0", "1e1", "0x20", "20.0000001", "-20"])
+      expect(bankAmountError(value,loaded)).toBe("format");
+    loaded.capacity!.dailyRemainingCount = 0;
+    expect(bankMaximumAmount(loaded)).toBe(0);
+    expect(bankAmountError("5",loaded)).toBe("daily");
+    expect(loaded.policy?.maxAmountUsd).toBe(80);
+    for (const policy of [undefined, {...raw.policy, maxAmountUsd:4}, {...raw.policy, minAmountUsd:true}]) {
+      request.mockResolvedValue({...raw,policy});
+      const missing = await createBankWithdrawalApi({request} as never).config();
+      expect(missing.policy).toBeUndefined();
+      expect(bankAmountError("20",missing)).toBe("unavailable");
+      expect(missing.unresolvedIntent).toBeNull();
+    }
+  });
   it("keeps malformed auxiliary evidence readable without authorizing a payout or terminal result", async () => {
     for (const change of [{checkedAt:"invalid"},{amountUsdt:"0x64"},{amountUsdt:"1e200"},{amountUsdt:"100.0000001"},{amountUsdt:100.0000001},{providerStatus:"3"}]) {
       expect(outcome({...receipt,settlementEvidence:{...receipt.settlementEvidence,...change}})).toBe("held");
