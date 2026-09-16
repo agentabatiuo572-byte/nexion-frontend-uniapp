@@ -114,8 +114,15 @@ const cardsStore = useCards();
 const app = useApp();
 const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaymentEnabled);
 const bankFormVisible = ref(true);
+// Native App sends page onHide when opening the SMS app. Preserve the in-memory
+// challenge and pending request then; actual page navigation still clears them.
+let appInBackground = false;
+const bankAppHide = () => { appInBackground = true; };
+const bankAppShow = () => { appInBackground = false; };
+uni.onAppHide(bankAppHide);
+uni.onAppShow(bankAppShow);
 onShow(() => { bankFormVisible.value = true; });
-onHide(() => { bankFormVisible.value = false; });
+onHide(() => { if (!appInBackground) bankFormVisible.value = false; });
 
 // Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
 // navigation (open-redirect guarded). Initialize from the H5 URL hash query
@@ -169,7 +176,10 @@ function clearForm() {
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, clearForm);
 const stopCardRuntime = subscribeRuntimeRevision(clearForm);
 onHide(clearForm);
-onUnload(() => { stopCardRuntime(); clearForm(); });
+onUnload(() => {
+  uni.offAppHide(bankAppHide); uni.offAppShow(bankAppShow);
+  stopCardRuntime(); clearForm();
+});
 
 // uni input event → e.detail.value (typed Event; mirrors topup-card-form).
 function detailVal(e: Event): string {

@@ -4,11 +4,7 @@ import { parseServerTimestamp } from "./server-time";
 
 export interface BankBeneficiary {
   bankCode: string; bankName: string; maskedAccount: string; effectiveAt: string; nextChangeAt: string;
-  beneficiaryNo?: string; verificationStatus?: "pending" | "verified" | "rejected" | "unavailable";
-  payoutCapability?: "supported" | "unsupported" | "unknown"; ownershipStatus?: "matched" | "mismatched" | "unknown";
-  accountType?: "payment_account" | "credit_card" | "prepaid" | "unknown"; canWithdraw?: boolean;
-  reasonCode?: string | null; checkedAt?: string | null; expiresAt?: string | null;
-  evidenceRef?: string | null; capabilityVersion?: string | null;
+  beneficiaryNo?: string; canWithdraw?: boolean;
 }
 export interface BankIntent {
   state: "NOT_SUBMITTED" | "COMMITTED"; quoteNo: string; withdrawalNo: string | null;
@@ -70,13 +66,7 @@ function beneficiary(value: unknown): BankBeneficiary {
   if (typeof r.maskedAccount !== "string" || !/^[*•]{2,}[0-9]{4}$/.test(r.maskedAccount)) throw invalid();
   return { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
     effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt),
-    ...optionalEvidence(() => ({ beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined,
-    verificationStatus: option(r.verificationStatus, ["pending", "verified", "rejected", "unavailable"] as const, "unavailable"),
-    payoutCapability: option(r.payoutCapability, ["supported", "unsupported", "unknown"] as const, "unknown"),
-    ownershipStatus: option(r.ownershipStatus, ["matched", "mismatched", "unknown"] as const, "unknown"),
-    accountType: option(r.accountType, ["payment_account", "credit_card", "prepaid", "unknown"] as const, "unknown"),
-    canWithdraw: r.canWithdraw === true, reasonCode: optionalText(r.reasonCode), checkedAt: optionalDate(r.checkedAt),
-    expiresAt: optionalDate(r.expiresAt), evidenceRef: optionalText(r.evidenceRef), capabilityVersion: optionalText(r.capabilityVersion) })) };
+    beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined, canWithdraw: r.canWithdraw === true };
 }
 export function parseBankUnresolvedIntent(value: unknown): BankUnresolvedIntent | null {
   if (value === null) return null;
@@ -144,11 +134,14 @@ export function createBankWithdrawalApi(client: ApiClient) {
         unresolvedIntent: r.unresolvedIntent === undefined ? undefined : parseBankUnresolvedIntent(r.unresolvedIntent),
         beneficiary: r.beneficiary == null ? null : beneficiary(r.beneficiary) };
     },
-    async verify(): Promise<BankBeneficiary> {
-      const r = record(await client.request({ path: `${base}/beneficiary/verify`, method: "POST", authenticated: true }));
-      return beneficiary(r.beneficiary);
+    async sendOtp(): Promise<{ challengeNo: string; expiresInSeconds: number; retryAfterSeconds: number }> {
+      const r = record(await client.request({ path: `${base}/beneficiary/otp`, method: "POST", authenticated: true }));
+      const challengeNo = text(r.challengeNo), expiresInSeconds = number(r.expiresInSeconds), retryAfterSeconds = number(r.retryAfterSeconds);
+      if (!/^PAYOUT-BANK-[a-f0-9]{32}$/i.test(challengeNo) || !Number.isInteger(expiresInSeconds) || expiresInSeconds <= 0 || expiresInSeconds > 300
+        || !Number.isInteger(retryAfterSeconds) || retryAfterSeconds < 60 || retryAfterSeconds > 86400) throw invalid();
+      return { challengeNo, expiresInSeconds, retryAfterSeconds };
     },
-    async bind(body: { bankCode: string; account: string; holder: string }, key: string): Promise<BankBeneficiary> {
+    async bind(body: { bankCode: string; account: string; holder: string; challengeNo?: string; code?: string }, key: string): Promise<BankBeneficiary> {
       const r = record(await client.request({ path: `${base}/beneficiary`, method: "POST", body, idempotencyKey: key, authenticated: true }));
       const saved = beneficiary(r.beneficiary);
       if (saved.bankCode !== body.bankCode || !saved.maskedAccount.endsWith(body.account.slice(-4))) throw invalid();

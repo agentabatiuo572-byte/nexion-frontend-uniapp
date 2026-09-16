@@ -14,10 +14,19 @@ describe("bank withdrawal server contract", () => {
     const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A" };
     const request = vi.fn().mockResolvedValue({ beneficiary: saved });
     const api = createBankWithdrawalApi({ request } as never);
-    await expect(api.bind(body, "bind-test")).resolves.toMatchObject({ ...saved, canWithdraw: false, verificationStatus: "unavailable", payoutCapability: "unknown" });
+    await expect(api.bind(body, "bind-test")).resolves.toMatchObject({ ...saved, canWithdraw: false });
     for (const invalid of [{ ...saved, bankCode: "ACB" }, { ...saved, maskedAccount: "****1234" }, { ...saved, maskedAccount: "00123456789" }]) {
       request.mockResolvedValue({ beneficiary: invalid });
       await expect(api.bind(body, "bind-test")).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");
+    }
+  });
+  test("replacement SMS accepts only the dedicated challenge with bounded expiry and resend delay", async () => {
+    const receipt={challengeNo:"PAYOUT-BANK-"+"a".repeat(32),expiresInSeconds:300,retryAfterSeconds:60};
+    const request=vi.fn().mockResolvedValue(receipt), api=createBankWithdrawalApi({request} as never);
+    await expect(api.sendOtp()).resolves.toEqual(receipt);
+    expect(request).toHaveBeenCalledWith({path:"/api/withdrawals/bank/beneficiary/otp",method:"POST",authenticated:true});
+    for(const invalid of [{...receipt,challengeNo:"PAYOUT-other"},{...receipt,expiresInSeconds:0},{...receipt,retryAfterSeconds:0}]) {
+      request.mockResolvedValue(invalid); await expect(api.sendOtp()).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");
     }
   });
   test("empty BANKQR codes are valid but missing or malformed bank codes are not", async () => {

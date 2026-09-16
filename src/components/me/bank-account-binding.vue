@@ -16,8 +16,6 @@
         <text class="head-title">{{ state.config.beneficiary.bankName === 'BANKQR' ? c.type : state.config.beneficiary.bankName }} · {{ state.config.beneficiary.maskedAccount }}</text>
         <text class="hint" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <text class="hint">{{ t.bankWithdrawal.effective }}: {{ displayDate(state.config.beneficiary.effectiveAt) }}</text>
-        <text class="hint">{{ t.bankWithdrawal.changeAfter }}: {{ displayDate(state.config.beneficiary.nextChangeAt) }}</text>
-        <view class="text-action" role="button" tabindex="0" data-testid="bank-binding-verify" :aria-disabled="state.busy || state.phase === 'uncertain'" @click="form.verify" @keydown.enter.prevent="form.verify" @keydown.space.prevent="form.verify"><text>{{ t.bankWithdrawal.verifyAgain }}</text></view>
       </view>
       <text v-if="state.busy && !state.config" class="hint" role="status">{{ t.bankWithdrawal.loading }}</text>
       <view v-if="state.error" class="error-note" role="alert"><text>{{ errorMessage }}</text></view>
@@ -29,6 +27,13 @@
           <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
           <text class="field-label">{{ c.holderLabel }} <text class="required">*</text></text>
           <input v-model="state.holder" class="field" type="text" maxlength="100" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.holderPlaceholder" :aria-label="`${c.holderLabel} · ${c.required}`" data-testid="bank-holder" />
+          <view v-if="state.config?.beneficiary" class="otp-fields">
+            <text class="hint">{{ c.otpHint }}</text>
+            <text class="field-label">{{ t.bankWithdrawal.code }} <text class="required">*</text></text>
+            <input v-model="state.code" class="field mono" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" :disabled="fieldsDisabled" :placeholder="c.otpPlaceholder" :aria-label="t.bankWithdrawal.code" data-testid="bank-otp" />
+            <view class="text-action" role="button" tabindex="0" data-testid="bank-send-otp" :aria-disabled="!canSendOtp" @click="sendOtp" @keydown.enter.prevent="sendOtp" @keydown.space.prevent="sendOtp"><text>{{ resendSeconds > 0 ? c.otpResendIn.replace('{s}', String(resendSeconds)) : t.bankWithdrawal.sendCode }}</text></view>
+            <text v-if="state.challengeNo" class="hint" role="status" data-testid="bank-otp-status">{{ state.otpExpiresAt > now ? t.bankWithdrawal.otpSent : c.otpExpired }}</text>
+          </view>
           <view class="default-row" role="group" :aria-label="`${c.defaultLabel} · ${t.cards.formDefaultOn}`">
             <view class="default-check" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4"><path d="m5 12 4 4L19 6" /></svg></view>
             <text>{{ c.defaultLabel }}</text><text class="default-state">{{ t.cards.formDefaultOn }}</text>
@@ -36,7 +41,7 @@
           <text class="hint">{{ c.singleAccount }}</text>
         </view>
         <view class="submit" :class="{ ready: canSubmit }" role="button" tabindex="0" data-testid="bank-bind-continue" :aria-disabled="!canSubmit" @click="submitBinding" @keydown.enter.prevent="submitBinding" @keydown.space.prevent="submitBinding">
-          <text>{{ state.busy ? t.bankWithdrawal.loading : state.phase === 'uncertain' ? c.retryOriginal : locked ? c.locked : canSubmit ? c.continue : t.cards.formSubmitDisabled }}</text>
+          <text>{{ state.busy ? t.bankWithdrawal.loading : state.phase === 'uncertain' ? c.retryOriginal : canSubmit ? c.continue : t.cards.formSubmitDisabled }}</text>
         </view>
         <text class="disclaimer">{{ c.disclaimer }}</text>
       </template>
@@ -68,11 +73,13 @@ const props = defineProps<{ active: boolean; returnTo: string }>();
 const t = useT(), c = computed(() => t.value.bankBinding), app = useApp();
 const form = createBankBindingForm(createBankWithdrawalApi(apiClient), () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`);
 const state = form.state, now = ref(Date.now());
-const accountStatus = computed(() => state.config?.beneficiary ? t.value.bankWithdrawal.accountStatus[bankAccountNotice(state.config.beneficiary, now.value)] : "");
-const locked = computed(() => !!state.config?.beneficiary && (parseServerTimestamp(state.config.beneficiary.nextChangeAt) ?? Infinity) > now.value);
-const fieldsDisabled = computed(() => state.busy || locked.value || state.phase !== "details");
-const canSubmit = computed(() => !state.busy && (state.phase === "uncertain" || (!locked.value && form.canContinue())));
-const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, bind: c.value.bindError, unknown: c.value.unknown }[state.error] || c.value.bindError));
+const accountStatus = computed(() => state.config?.beneficiary ? t.value.bankWithdrawal.accountStatus[bankAccountNotice(state.config.beneficiary)] : "");
+const fieldsDisabled = computed(() => state.busy || state.phase !== "details");
+const canSubmit = computed(() => { void now.value; return !state.busy && (state.phase === "uncertain" || form.canContinue()); });
+const canSendOtp = computed(() => { void now.value; return form.canSendOtp(); });
+const resendSeconds = computed(() => Math.max(0, Math.ceil((state.resendAt - now.value) / 1000)));
+function sendOtp() { if (canSendOtp.value) void form.sendOtp(); }
+const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
 const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString(dateLocale(), { timeZone: "Asia/Ho_Chi_Minh", timeZoneName: "short" });
 function submitBinding() { if (canSubmit.value) void form.submit(); }
 watch(() => state.phase, async phase => {

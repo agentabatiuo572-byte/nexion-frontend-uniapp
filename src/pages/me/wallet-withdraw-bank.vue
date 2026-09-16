@@ -33,8 +33,6 @@
           <text class="title">{{ displayBank(config.beneficiary.bankName) }} · {{ config.beneficiary.maskedAccount }}</text>
           <text class="muted" role="status" data-testid="bank-account-status">{{ accountStatus }}</text>
           <text class="muted">{{ c.effective }}: {{ displayDate(config.beneficiary.effectiveAt) }}</text>
-          <text class="muted">{{ c.changeAfter }}: {{ displayDate(config.beneficiary.nextChangeAt) }}</text>
-          <view class="action" role="button" tabindex="0" data-testid="bank-verify" :aria-disabled="busy || uncertain || !!quote || !!multipleIntents.length" @click="verifyAccount" @keydown.enter.prevent="verifyAccount" @keydown.space.prevent="verifyAccount"><text>{{ c.verifyAgain }}</text></view>
         </view>
         <view v-if="!quote && !uncertain && !multipleIntents.length" class="section">
           <text class="muted">{{ c.bindingNotice }}</text>
@@ -98,12 +96,12 @@ const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
 const money = (value: number) => value.toLocaleString(dateLocale(), { maximumFractionDigits: 6 });
 const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString(dateLocale(), { timeZone: "Asia/Ho_Chi_Minh", timeZoneName: "short" });
 const displayBank = (name: string) => name === "BANKQR" ? useTranslations.value.bankBinding.type : name;
-const canQuote = computed(() => bankCanQuote(config.value, now.value));
+const canQuote = computed(() => bankCanQuote(config.value));
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
-  && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE" && bankBeneficiaryReady(config.value.beneficiary, now.value));
+  && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE" && bankBeneficiaryReady(config.value.beneficiary));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
-const accountStatus = computed(() => config.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(config.value.beneficiary, now.value)] : "");
+const accountStatus = computed(() => config.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(config.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
 const statusLabel = computed(() => c.value[outcome.value]);
@@ -156,14 +154,6 @@ async function openIntent(intent: BankIntent) {
     uncertain.value = true;
     const recovered = await api.recover(intent.quoteNo); if (!current()) return;
     applyRecovery(recovered);
-  });
-}
-async function verifyAccount() {
-  if (!config.value?.beneficiary || uncertain.value || quote.value || multipleIntents.value.length) return;
-  await run(async current => {
-    await api.verify(); if (!current()) return;
-    config.value = null;
-    const loaded = await api.config(); if (current()) config.value = loaded;
   });
 }
 function manageBank() { if (!busy.value && !quote.value && !uncertain.value && !multipleIntents.value.length) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
