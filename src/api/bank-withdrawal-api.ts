@@ -2,14 +2,38 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import { parseServerTimestamp } from "./server-time";
 
-export interface BankBeneficiary { bankCode: string; bankName: string; maskedAccount: string; effectiveAt: string; nextChangeAt: string }
-export interface BankConfig { enabled: boolean; banks: { code: string; name: string }[]; beneficiary: BankBeneficiary | null; bankCodeRequired?: boolean; bindingOtpRequired?: boolean; payType?: string }
+export interface BankBeneficiary {
+  bankCode: string; bankName: string; maskedAccount: string; effectiveAt: string; nextChangeAt: string;
+  beneficiaryNo?: string; verificationStatus?: "pending" | "verified" | "rejected" | "unavailable";
+  payoutCapability?: "supported" | "unsupported" | "unknown"; ownershipStatus?: "matched" | "mismatched" | "unknown";
+  accountType?: "payment_account" | "credit_card" | "prepaid" | "unknown"; canWithdraw?: boolean;
+  reasonCode?: string | null; checkedAt?: string | null; expiresAt?: string | null;
+  evidenceRef?: string | null; capabilityVersion?: string | null;
+}
+export interface BankIntent {
+  state: "NOT_SUBMITTED" | "COMMITTED"; quoteNo: string; withdrawalNo: string | null;
+  expiresAt: string; providerState: string | null;
+}
+export interface BankUnresolvedIntent {
+  state: "NOT_SUBMITTED" | "COMMITTED" | "MULTIPLE"; intents: BankIntent[];
+  quoteNo: string | null; withdrawalNo: string | null;
+}
+export interface BankConfig {
+  enabled: boolean; banks: { code: string; name: string }[]; beneficiary: BankBeneficiary | null;
+  bankCodeRequired?: boolean; bindingOtpRequired?: boolean; payType?: string;
+  // undefined means an older server has not proved there is no unresolved intent.
+  unresolvedIntent?: BankUnresolvedIntent | null;
+}
 export interface BankQuote {
   quoteNo: string; amountUsdt: number; feeUsdt: number; netUsdt: number; rateVnd: number;
   amountVnd: number; bankCode: string; bankName: string; maskedAccount: string; expiresAt: string;
 }
-export interface BankOrder { state: "COMMITTED"; withdrawalNo: string; status: string; providerState: string; bank: BankQuote }
-export type BankRecovery = BankOrder | { state: "NOT_SUBMITTED"; quote: BankQuote } | { state: "ABANDONED" };
+export interface BankSettlementEvidence {
+  status: "unconfirmed" | "paid" | "refunded" | "review_required"; evidenceRef: string | null;
+  providerOrderId: string | null; providerStatus: number | null; checkedAt: string | null; amountUsdt: number | null;
+}
+export interface BankOrder { state: "COMMITTED"; withdrawalNo: string; status: string; providerState: string; bank: BankQuote; settlementEvidence?: BankSettlementEvidence }
+export type BankRecovery = BankOrder | { state: "NOT_SUBMITTED"; quote: BankQuote } | { state: "ABANDONED" | "EXPIRED" };
 const invalid = () => new ApiError({ kind: "protocol", message: "BANK_WITHDRAWAL_RESPONSE_INVALID" });
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid();
@@ -24,24 +48,75 @@ function number(value: unknown): number {
 function date(value: unknown): string {
   const s = text(value); if (parseServerTimestamp(s) == null) throw invalid(); return s;
 }
+function optionalText(value: unknown): string | null { return value == null ? null : text(value); }
+function optionalDate(value: unknown): string | null { return value == null ? null : date(value); }
+function optionalEvidence<T>(read: () => T): T | undefined {
+  try { return read(); } catch (error) {
+    if (error instanceof ApiError && error.kind === "protocol") return undefined;
+    throw error;
+  }
+}
+function usdt(value: unknown): number {
+  if (typeof value === "string" && !/^\d+(?:\.\d{1,6})?$/.test(value.trim())) throw invalid();
+  const amount = number(value);
+  if (amount > Number.MAX_SAFE_INTEGER / 1e6 || Number(amount.toFixed(6)) !== amount) throw invalid();
+  return amount;
+}
+function option<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && allowed.includes(value as T) ? value as T : fallback;
+}
 function beneficiary(value: unknown): BankBeneficiary {
   const r = record(value);
   if (typeof r.maskedAccount !== "string" || !/^[*•]{2,}[0-9]{4}$/.test(r.maskedAccount)) throw invalid();
   return { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
-    effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt) };
+    effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt),
+    ...optionalEvidence(() => ({ beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined,
+    verificationStatus: option(r.verificationStatus, ["pending", "verified", "rejected", "unavailable"] as const, "unavailable"),
+    payoutCapability: option(r.payoutCapability, ["supported", "unsupported", "unknown"] as const, "unknown"),
+    ownershipStatus: option(r.ownershipStatus, ["matched", "mismatched", "unknown"] as const, "unknown"),
+    accountType: option(r.accountType, ["payment_account", "credit_card", "prepaid", "unknown"] as const, "unknown"),
+    canWithdraw: r.canWithdraw === true, reasonCode: optionalText(r.reasonCode), checkedAt: optionalDate(r.checkedAt),
+    expiresAt: optionalDate(r.expiresAt), evidenceRef: optionalText(r.evidenceRef), capabilityVersion: optionalText(r.capabilityVersion) })) };
+}
+export function parseBankUnresolvedIntent(value: unknown): BankUnresolvedIntent | null {
+  if (value === null) return null;
+  const r = record(value);
+  if (!["NOT_SUBMITTED", "COMMITTED", "MULTIPLE"].includes(String(r.state)) || !Array.isArray(r.intents) || !r.intents.length) throw invalid();
+  const intents: BankIntent[] = r.intents.map(item => {
+    const i = record(item), quoteNo = text(i.quoteNo), withdrawalNo = optionalText(i.withdrawalNo);
+    if (!/^BQ-[a-f0-9]{32}$/.test(quoteNo) || !["NOT_SUBMITTED", "COMMITTED"].includes(String(i.state))
+      || (i.state === "COMMITTED" ? !withdrawalNo || !/^WD-[A-Z0-9]+$/.test(withdrawalNo) : withdrawalNo !== null)) throw invalid();
+    return { state: i.state as BankIntent["state"], quoteNo, withdrawalNo, expiresAt: date(i.expiresAt), providerState: optionalText(i.providerState) };
+  });
+  const quoteNo = optionalText(r.quoteNo), withdrawalNo = optionalText(r.withdrawalNo);
+  if (r.state === "MULTIPLE" ? intents.length < 2 || quoteNo !== null || withdrawalNo !== null
+    : intents.length !== 1 || intents[0].state !== r.state || intents[0].quoteNo !== quoteNo || intents[0].withdrawalNo !== withdrawalNo) throw invalid();
+  return { state: r.state as BankUnresolvedIntent["state"], intents, quoteNo, withdrawalNo };
+}
+function settlement(value: unknown): BankSettlementEvidence | undefined {
+  if (value == null) return undefined;
+  return optionalEvidence(() => {
+  const r = record(value);
+  if (r.providerStatus != null && (typeof r.providerStatus !== "number" || !Number.isInteger(r.providerStatus))) throw invalid();
+  return { status: option(r.status, ["unconfirmed", "paid", "refunded", "review_required"], "review_required"),
+    evidenceRef: optionalText(r.evidenceRef), providerOrderId: optionalText(r.providerOrderId),
+    providerStatus: r.providerStatus == null ? null : number(r.providerStatus), checkedAt: optionalDate(r.checkedAt),
+    amountUsdt: r.amountUsdt == null ? null : usdt(r.amountUsdt) };
+  });
 }
 export function parseBankQuote(value: unknown): BankQuote {
   const r = record(value);
-  const q: BankQuote = { quoteNo: text(r.quoteNo), amountUsdt: number(r.amountUsdt), feeUsdt: number(r.feeUsdt),
-    netUsdt: number(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: bankCode(r.bankCode),
+  const q: BankQuote = { quoteNo: text(r.quoteNo), amountUsdt: usdt(r.amountUsdt), feeUsdt: usdt(r.feeUsdt),
+    netUsdt: usdt(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: bankCode(r.bankCode),
     bankName: text(r.bankName), maskedAccount: text(r.maskedAccount), expiresAt: date(r.expiresAt) };
   if (!/^BQ-[a-f0-9]{32}$/.test(q.quoteNo) || q.amountUsdt <= 0 || q.netUsdt <= 0 || q.rateVnd <= 0
-      || !Number.isSafeInteger(q.amountVnd) || q.amountVnd <= 0 || Math.abs(q.amountUsdt - q.feeUsdt - q.netUsdt) > 0.000001) throw invalid();
+      || !Number.isSafeInteger(q.amountVnd) || q.amountVnd <= 0
+      || Math.round(q.amountUsdt * 1e6) !== Math.round(q.feeUsdt * 1e6) + Math.round(q.netUsdt * 1e6)) throw invalid();
   return q;
 }
 export function parseBankRecovery(value: unknown): BankRecovery {
   const r = record(value);
-  if (r.state === "ABANDONED") return { state: "ABANDONED" };
+  if (r.state === "ABANDONED" || r.state === "EXPIRED") return { state: r.state };
   if (r.state === "NOT_SUBMITTED") return { state: "NOT_SUBMITTED", quote: parseBankQuote(r.quote) };
   const withdrawal = record(r.withdrawal);
   const no = text(r.withdrawalNo);
@@ -50,7 +125,7 @@ export function parseBankRecovery(value: unknown): BankRecovery {
   if (!["REVIEW_PENDING", "REVIEWING", "REVIEW_PASSED", "DELAYED", "EXTENDED_HOLD", "FROZEN", "PROCESSING", "SENT", "TX_ORPHANED", "CONFIRMED", "FAILED", "REFUNDED", "REVIEW_REJECTED"].includes(status)) throw invalid();
   const providerState = text(r.providerState);
   if (!["READY", "DISPATCHING", "PENDING", "PAID", "FAILED", "MANUAL_REVIEW"].includes(providerState)) throw invalid();
-  return { state: "COMMITTED", withdrawalNo: no, status, providerState, bank: parseBankQuote(r.bank) };
+  return { state: "COMMITTED", withdrawalNo: no, status, providerState, bank: parseBankQuote(r.bank), settlementEvidence: settlement(r.settlementEvidence) };
 }
 function forQuote(value: BankRecovery, quoteNo: string): BankRecovery {
   if (value.state === "COMMITTED" && value.bank.quoteNo !== quoteNo) throw invalid();
@@ -66,7 +141,12 @@ export function createBankWithdrawalApi(client: ApiClient) {
       return { enabled: r.enabled, banks: r.banks.map(v => { const b = record(v); return { code: text(b.code), name: text(b.name) }; }),
         bankCodeRequired: r.bankCodeRequired !== false, bindingOtpRequired: r.bindingOtpRequired !== false,
         payType: typeof r.payType === "string" ? r.payType : undefined,
+        unresolvedIntent: r.unresolvedIntent === undefined ? undefined : parseBankUnresolvedIntent(r.unresolvedIntent),
         beneficiary: r.beneficiary == null ? null : beneficiary(r.beneficiary) };
+    },
+    async verify(): Promise<BankBeneficiary> {
+      const r = record(await client.request({ path: `${base}/beneficiary/verify`, method: "POST", authenticated: true }));
+      return beneficiary(r.beneficiary);
     },
     async bind(body: { bankCode: string; account: string; holder: string }, key: string): Promise<BankBeneficiary> {
       const r = record(await client.request({ path: `${base}/beneficiary`, method: "POST", body, idempotencyKey: key, authenticated: true }));

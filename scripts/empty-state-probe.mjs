@@ -148,7 +148,7 @@ const ROUTES = [
   { r: "pages/events/events", unreachable: "按 tab 过滤 EVENTS 常量,需切到无结果的 tab" },
   { r: "pages/team/commissions" },
   { r: "pages/me/help", type: TYPE_JUNK },
-  // Both existing entries open the original editable form. No saved-card
+  // Both existing entries open the account/holder binding form. No saved-card
   // state or successful binding may be invented while its adapter is absent.
   { r: "pages/me/wallet-cards", cardEntry: true },
   { r: "pages/me/wallet-cards-new", cardEntry: true },
@@ -262,7 +262,7 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
     // binding; no card mutation or field-bearing request may leave this form.
     if (/\/api\/payment-methods(?:\/|$|\?)/.test(request.url()) && request.method() !== "GET") cardRequests.push(request.method());
     if (/\/api\/withdrawals\/bank(?:\/|$|\?)/.test(request.url()) && request.method() !== "GET") cardRequests.push("BANK_MUTATION");
-    if (/\/(api|auth)\//.test(request.url()) && /4111\s?1111\s?1111\s?1111|TEST USER/.test(request.postData() || "")) cardRequests.push("FIELD_DATA");
+    if (/\/(api|auth)\//.test(request.url()) && /00123456789|TEST USER/.test(request.postData() || "")) cardRequests.push("FIELD_DATA");
   };
   if (spec.cardEntry) page.on("request", recordCardRequest);
   try {
@@ -273,14 +273,16 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-cards-new");
       await page.evaluate(theme => document.querySelector("#app")?.__vue_app__?.config?.globalProperties?.$pinia?._s.get("theme")?.setMode(theme), THEME);
       await page.getByTestId("bank-account-binding").waitFor({ state: "visible" });
-      const fields = page.locator("input");
-      if (await fields.count() !== 4) throw new Error("Original four card inputs are not present");
-      for (const f of [0, 3]) if (!await fields.nth(f).isEditable()) throw new Error("Bank account/holder input is not editable");
-      for (const f of [1, 2]) if (await fields.nth(f).isEditable()) throw new Error("Bank binding must not collect expiry or CVV");
+      const form = page.getByTestId("bank-account-binding");
+      const fields = form.locator("input"), account = form.locator('[data-testid="bank-account"] input'), holder = form.locator('[data-testid="bank-holder"] input');
+      if (await fields.count() !== 2 || await account.count() !== 1 || await holder.count() !== 1) throw new Error("Bank binding must contain only account and holder inputs");
+      for (const field of [account, holder]) if (!await field.isEditable()) throw new Error("Bank account/holder input is not editable");
+      if (await form.locator('[data-testid="bank-expiry"], [data-testid="bank-cvv"]').count()) throw new Error("Bank binding must not display expiry or CVV placeholders");
       const backButtons = page.getByRole("button", { name: "Back", exact: true });
       if (await backButtons.count() !== 1) throw new Error("Original header exit missing or duplicated");
       const back = backButtons.first();
       await back.waitFor({ state: "visible" });
+      await back.click({ trial: true }); // Measure after the page entrance animation, without navigating.
       const bounds = await back.boundingBox();
       if (!bounds || bounds.height < 44 || bounds.width < 44) throw new Error("Header exit smaller than 44px");
       if (await back.getAttribute("tabindex") !== "0") throw new Error("Header exit is not keyboard reachable");
@@ -296,8 +298,8 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       // Fixture-only values; all API/auth routes are intercepted by the isolated
       // formal session above. No real account or card is used by this probe.
       // uni-input paints its placeholder in a sibling view rather than a native attribute.
-      await fields.nth(0).fill("4111111111111111");
-      await fields.nth(3).fill("TEST USER");
+      await account.fill("00123456789");
+      await holder.fill("TEST USER");
       if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Missing direct-binding capability must prevent submission");
       await submit.press("Enter");
       if (await page.locator('[data-testid="bank-otp"], [data-testid="bank-select"]').count()) throw new Error("BANKQR must not show bank selection or OTP");
@@ -306,8 +308,8 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet");
       await page.getByText("My bank cards", { exact: true }).click();
       await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-cards-new");
-      await fields.nth(0).waitFor({ state: "visible" });
-      for (let f = 0; f < 4; f++) if (await fields.nth(f).inputValue() !== "") throw new Error("Card draft survives leaving the page");
+      await account.waitFor({ state: "visible" });
+      for (const field of [account, holder]) if (await field.inputValue() !== "") throw new Error("Bank account draft survives leaving the page");
       if (cardRequests.length) throw new Error("Leaving the form requested/sent card data");
       return { route, cardEntry: true, exitVerified: true, tabs: 0, newErrors: consoleErrors.length - before };
     }
@@ -401,7 +403,7 @@ for (const r of rows) {
   if (bad.length) fail++;
   // 🔴 tabs=N 恒打印:认不出页签(0)也要显形。静默跳过 = 判据失效却看不出来。
   const tabInfo = r.tabs === undefined ? "" : r.tabs > 0 ? ` [页签 ${r.tabs}: ${(r.tabLabels || []).join("/")}]` : " [无页签]";
-  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.cardEntry ? "original editable form · no simulated binding · exit clears draft" : r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
+  console.log(`${bad.length ? "FAIL" : "ok  "}  ${r.route.padEnd(30)} ${r.cardEntry ? "account + holder only · no expiry/CVV · no simulated binding · exit clears draft" : r.empty ? `${r.box} ${r.artSrc} "${r.title}"` : ""}${tabInfo} ${bad.join(" · ")}`);
 }
 const withTabs = rows.filter((r) => r.tabs > 0).length;
 console.log(`\n${rows.length - fail}/${rows.length} 通过 · 其中 ${withTabs} 页做了页签遍历`);

@@ -5,7 +5,7 @@ import { parseServerTimestamp } from "@/api/server-time";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 
 type Recipient = { account: string; holder: string };
-type BindingApi = Pick<ReturnType<typeof createBankWithdrawalApi>, "config" | "bind">;
+type BindingApi = Pick<ReturnType<typeof createBankWithdrawalApi>, "config" | "bind" | "verify">;
 type BindBody = Parameters<BindingApi["bind"]>[0];
 type Phase = "details" | "uncertain" | "saved";
 export function validBankRecipient(draft: Recipient): boolean {
@@ -18,6 +18,7 @@ export function directBankBindingAvailable(config: BankConfig | null): boolean {
 }
 function sameBeneficiary(a: BankBeneficiary | null, b: BankBeneficiary): boolean {
   return !!a && a.bankCode === b.bankCode && a.maskedAccount === b.maskedAccount
+    && a.beneficiaryNo === b.beneficiaryNo
     && a.effectiveAt === b.effectiveAt && a.nextChangeAt === b.nextChangeAt;
 }
 
@@ -71,5 +72,16 @@ export function createBankBindingForm(api: BindingApi, identity: () => string) {
       else { pending = null; state.phase = "details"; state.error = "bind"; }
     } finally { if (current()) state.busy = false; }
   }
-  return { state, canContinue, load, reset, submit };
+  async function verify() {
+    if (state.busy || state.phase === "uncertain" || !state.config?.beneficiary) return;
+    const current = scope(); state.busy = true; state.error = "";
+    try {
+      const receipt = await api.verify(); if (!current()) return;
+      const config = await api.config(); if (!current()) return;
+      if (!sameBeneficiary(config.beneficiary, receipt)) throw new Error("BANK_VERIFY_READBACK_MISMATCH");
+      state.config = config;
+    } catch { if (current()) { state.config = null; state.error = "load"; } }
+    finally { if (current()) state.busy = false; }
+  }
+  return { state, canContinue, load, reset, submit, verify };
 }

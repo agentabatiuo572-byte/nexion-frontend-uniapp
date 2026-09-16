@@ -631,7 +631,7 @@ async function handleUseSaver() {
 }
 
 function goWithdraw() {
-  navTo("/pages/me/wallet-withdraw");
+  navTo("/pages/me/wallet-withdraw-method");
 }
 
 // ── styles ──

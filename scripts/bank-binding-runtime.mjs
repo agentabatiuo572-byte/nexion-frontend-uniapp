@@ -34,8 +34,7 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     await page.evaluate(async () => { const theme=(await import("/src/store/theme.ts")).useTheme(); theme.setMode("dark"); });
     const account=page.locator('[data-testid="bank-account"] input'), holder=page.locator('[data-testid="bank-holder"] input');
     const submit=page.getByTestId("bank-bind-continue");
-    assert.equal(await page.locator('[data-testid="bank-expiry"] input').isEditable(),false);
-    assert.equal(await page.locator('[data-testid="bank-cvv"] input').isEditable(),false);
+    assert.equal(await page.locator('[data-testid="bank-expiry"], [data-testid="bank-cvv"]').count(),0);
     assert.equal(await submit.getAttribute("aria-disabled"),"true");
     assert.equal(await page.locator('[data-testid="card-simulation-badge"], [data-testid="bank-select"], [data-testid="bank-otp"]').count(),0);
     await account.fill("00123456789"); await holder.fill("NGUYEN VAN A");

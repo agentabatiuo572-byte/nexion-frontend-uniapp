@@ -56,7 +56,8 @@ const TECH_TOKENS = [
     why: "币种代码 / 品牌名 / 产品型号 / 支付服务商名:全球单一写法,翻译过去反而是错的",
     // 🔴 `CertiK` 曾在这里,被本门自己的「0 命中即失效」判据赶走 —— 那行原文是 `CertiK audited`,
     //    `audited` 是要翻译的动词,整句收进 t.ref.certikAudited 之后判定面上再没有这个词。
-    tokens: ["NEX", "USDT", "NexGrid", "NexGridBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
+    // VND is the ISO currency code for bank payout amounts, identical in all shipped locales.
+    tokens: ["NEX", "USDT", "VND", "NexGrid", "NexGridBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
   },
   {
     id: "cert-acronym",
@@ -628,6 +629,8 @@ function selftest() {
     ["🔴 跨行文本节点逐行判(两行各一条)", P, "<template><text>\nTask lock\nCooling down\n</text></template>", 2],
     ["合法:纯插值不含字面文案", P, "<template><text>{{ t.wallet.slots }}</text></template>", 0],
     ["合法:授权 ticker", P, "<template><text>{{ n }} USDT</text></template>", 0],
+    ["合法:提现币种代码不是英文文案", P, '<template><WalletActionBtn sub="USDT / VND" /></template>', 0],
+    ["🔴 币种代码不能豁免同行普通英文文案", P, '<template><text>Withdraw VND</text></template>', 1],
     ["合法:授权单位缩写", P, "<template><text>{{ n }}GB VRAM</text></template>", 0],
     ["合法:授权短语整串(PCI DSS Level 1 · 3DS 2.2)", P, "<template><text>PCI DSS Level 1 · 3DS 2.2</text></template>", 0],
     ["🔴 短语拆开的普通名词不放行(Type / Level / Node 单独出现照判)", P, "<template><text>Node Type</text><text>Level II</text></template>", 2],

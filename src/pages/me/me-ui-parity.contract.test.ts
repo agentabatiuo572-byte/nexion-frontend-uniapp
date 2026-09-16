@@ -197,7 +197,7 @@ describe("Me page 5174 normal-state UI parity", () => {
     if (!existsSync(prototypeMeDir)) return;
     // User-requested HDPay payout is a new server-only page, covered by bank-withdrawal-runtime.mjs.
     expect(existsSync(new URL("wallet-withdraw-bank.vue", formalMeDir))).toBe(true);
-    const files = readdirSync(formalMeDir).filter((name: string) => name.endsWith(".vue") && name !== "wallet-withdraw-bank.vue").sort();
+    const files = readdirSync(formalMeDir).filter((name: string) => name.endsWith(".vue") && !["wallet-withdraw-bank.vue", "wallet-withdraw-method.vue"].includes(name)).sort();
     const prototypeFiles = readdirSync(prototypeMeDir).filter((name: string) => name.endsWith(".vue")).sort();
     expect(files).toEqual(prototypeFiles);
     expect(files).toHaveLength(32);

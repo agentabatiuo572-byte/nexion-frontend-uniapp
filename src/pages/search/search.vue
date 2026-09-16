@@ -222,7 +222,7 @@ const ROUTES: ReadonlyArray<{ key: RouteKey; href: string }> = [
   { key: "royalty", href: "/pages/team/unilevel" },
   { key: "networkMap", href: "/pages/team/network" },
   { key: "wallet", href: "/pages/me/wallet" },
-  { key: "withdraw", href: "/pages/me/wallet-withdraw" },
+  { key: "withdraw", href: "/pages/me/wallet-withdraw-method" },
   { key: "staking", href: "/pages/staking/staking" },
   { key: "genesis", href: "/pages/genesis/marketplace" },
   { key: "goals", href: "/pages/me/goals" },
