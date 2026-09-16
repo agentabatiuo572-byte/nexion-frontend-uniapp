@@ -370,7 +370,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   const erc20 = number(networkFees?.erc20);
   const nexFeeOffsetRate = number(row?.nexFeeOffsetRate);
   const policyVersion = text(row?.policyVersion);
-  const cooldownDays = number(row?.cooldownDays, 1);
+  const cooldownDays = typeof row?.cooldownDays === "number" ? number(row.cooldownDays, 0) : null;
   const currentPhase = text(row?.currentPhase);
   const currentMonth = number(row?.currentMonth, 1);
   const rawEnabledNetworks = row?.enabledNetworks;

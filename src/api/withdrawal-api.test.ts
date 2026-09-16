@@ -9,6 +9,23 @@ const row = {
   policyVersion: "p1", useNexFeeOffset: false, riskRoute: "delay", idSource: "server",
 };
 
+test("accepts an explicit zero-day policy and rejects negative, fractional or missing days", async () => {
+  const policy = {
+    minAmount: 20, dailyLimitCount: 10, balanceMaxRatio: 0.8, smallAmountThresholdUsd: 50,
+    strongReviewThresholdUsdt: 1000, payoutSlaHours: 24,
+    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 }, nexFeeOffsetRate: 0.4,
+    policyVersion: "4", cooldownDays: 0, currentPhase: "P2", currentMonth: 3,
+    complianceHoldEnabled: false, withdrawalEnabled: true, gateSource: "J1",
+    enabledNetworks: ["USDT-TRC20"], source: "D5+H1",
+  };
+  const api = createWithdrawalApi({ request: async () => policy } as never);
+  await expect(api.policy()).resolves.toMatchObject({ cooldownDays: 0, dailyLimitCount: 10 });
+  for (const days of [-1, 0.5, undefined, null, "", false]) {
+    const invalid = createWithdrawalApi({ request: async () => ({ ...policy, cooldownDays: days }) } as never);
+    await expect(invalid.policy()).rejects.toThrow("WITHDRAWAL_POLICY_INVALID");
+  }
+});
+
 test("hydrates the durable withdrawal list and sends the server eligibility snapshot request", async () => {
   const requests: any[] = [];
   const api = createWithdrawalApi({ request: async (request: any) => {
