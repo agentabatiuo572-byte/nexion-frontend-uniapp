@@ -19,6 +19,16 @@ export interface BankConfig {
   bankCodeRequired?: boolean; bindingOtpRequired?: boolean; payType?: string;
   // undefined means an older server has not proved there is no unresolved intent.
   unresolvedIntent?: BankUnresolvedIntent | null;
+  policy?: BankWithdrawalPolicy;
+  capacity?: BankWithdrawalCapacity;
+}
+export interface BankWithdrawalPolicy {
+  version: number; minAmountUsd: number; maxAmountUsd: number;
+  feeRatePct: number; feeMinUsd: number; feeMaxUsd: number;
+}
+export interface BankWithdrawalCapacity {
+  maxWithdrawableUsdt: number; dailyRemainingCount: number; dailyLimitCount: number;
+  dailyCountResetAt: string; withdrawalEnabled: boolean;
 }
 export interface BankQuote {
   quoteNo: string; amountUsdt: number; feeUsdt: number; netUsdt: number; rateVnd: number;
@@ -67,6 +77,22 @@ function beneficiary(value: unknown): BankBeneficiary {
   return { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
     effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt),
     beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined, canWithdraw: r.canWithdraw === true };
+}
+function policy(value: unknown): BankWithdrawalPolicy {
+  const r = record(value);
+  const p = { version: number(r.version), minAmountUsd: usdt(r.minAmountUsd), maxAmountUsd: usdt(r.maxAmountUsd),
+    feeRatePct: number(r.feeRatePct), feeMinUsd: usdt(r.feeMinUsd), feeMaxUsd: usdt(r.feeMaxUsd) };
+  if (!Number.isSafeInteger(p.version) || p.maxAmountUsd <= 0 || p.minAmountUsd > p.maxAmountUsd
+      || p.feeRatePct > 5 || p.feeMinUsd > p.feeMaxUsd) throw invalid();
+  return p;
+}
+function capacity(value: unknown): BankWithdrawalCapacity {
+  const r = record(value);
+  const c = { maxWithdrawableUsdt: usdt(r.maxWithdrawableUsdt), dailyRemainingCount: number(r.dailyRemainingCount),
+    dailyLimitCount: number(r.dailyLimitCount), dailyCountResetAt: date(r.dailyCountResetAt), withdrawalEnabled: r.withdrawalEnabled === true };
+  if (typeof r.withdrawalEnabled !== "boolean" || !Number.isSafeInteger(c.dailyRemainingCount)
+      || !Number.isSafeInteger(c.dailyLimitCount) || c.dailyLimitCount < 1 || c.dailyRemainingCount > c.dailyLimitCount) throw invalid();
+  return c;
 }
 export function parseBankUnresolvedIntent(value: unknown): BankUnresolvedIntent | null {
   if (value === null) return null;
@@ -131,6 +157,7 @@ export function createBankWithdrawalApi(client: ApiClient) {
       return { enabled: r.enabled, banks: r.banks.map(v => { const b = record(v); return { code: text(b.code), name: text(b.name) }; }),
         bankCodeRequired: r.bankCodeRequired !== false, bindingOtpRequired: r.bindingOtpRequired !== false,
         payType: typeof r.payType === "string" ? r.payType : undefined,
+        policy: optionalEvidence(() => policy(r.policy)), capacity: optionalEvidence(() => capacity(r.capacity)),
         unresolvedIntent: r.unresolvedIntent === undefined ? undefined : parseBankUnresolvedIntent(r.unresolvedIntent),
         beneficiary: r.beneficiary == null ? null : beneficiary(r.beneficiary) };
     },

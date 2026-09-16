@@ -10,7 +10,9 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     const quote = { quoteNo: `BQ-${"a".repeat(32)}`, amountUsdt: 100, feeUsdt: 1, netUsdt: 99, rateVnd: 25000,
       amountVnd: 2475000, bankCode: "VCB", bankName: "Vietcombank", maskedAccount: "******6789", expiresAt: new Date(Date.now()+300000).toISOString() };
     const fixture = { status: "SENT", providerState: "PENDING", submits: 0, abandons: 0, quotes: 0, verifies: 0, enabled: true,
-      intent: null, settlementEvidence: null, canWithdraw: true,
+      intent: null, settlementEvidence: null, canWithdraw: true, quote,
+      policy: {version:1,minAmountUsd:20,maxAmountUsd:5000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:25},
+      capacity: {maxWithdrawableUsdt:100,dailyRemainingCount:2,dailyLimitCount:2,dailyCountResetAt:"2026-10-01T00:00:00Z",withdrawalEnabled:true},
       key: `nexgrid.bank-withdraw.pending:${app.accountKey}` };
     window.__bankFixture = fixture;
     window.__bankRestore = rt.apiClient.request;
@@ -29,7 +31,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
       }
       if (request.path === "/api/withdrawals/bank/config") {
         if (fixture.configUnavailable) throw new ApiError({kind:"network",message:"FIXTURE_CONFIG_UNAVAILABLE",retryable:true});
-        return { enabled: fixture.enabled, banks: [{code:"VCB",name:"Vietcombank"}], beneficiary: beneficiary(), unresolvedIntent: fixture.intent };
+        return { enabled: fixture.enabled, banks: [{code:"VCB",name:"Vietcombank"}], beneficiary: fixture.unbound ? null : beneficiary(), unresolvedIntent: fixture.intent, policy:fixture.policy, capacity:fixture.capacity };
       }
       if (request.path === "/api/withdrawals/bank/beneficiary/verify") { fixture.verifies++; return { beneficiary:beneficiary() }; }
       if (request.path === "/api/withdrawals/bank/quotes") {
@@ -67,7 +69,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await gotoProtected("/pages/me/wallet-withdraw-bank");
     await page.getByTestId("bank-account-status").waitFor();
     assert.equal(await page.getByTestId("bank-refresh").count(),0,"no order or read failure must not show an order-refresh action");
-    assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
+    assert.equal(await page.getByTestId("bank-continue").getAttribute("aria-disabled"),"true");
     await page.evaluate(() => { window.__bankFixture.configUnavailable=true; });
     await gotoProtected("/pages/me/wallet-withdraw-bank");
     assert.match(await page.getByTestId("bank-refresh").innerText(),/^(Reload|重新加载|Tải lại)$/);
@@ -79,14 +81,24 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await page.screenshot({path:".verify-cache/bank-withdrawal/method.png",fullPage:true});
     await page.getByTestId("withdraw-method-bank").press("Enter");
     await page.waitForURL(url => url.hash.split("?")[0] === "#/pages/me/wallet-withdraw-bank");
+    await page.getByTestId("bank-continue").press("Enter");
+    assert.equal(await page.getByRole("combobox").count(),0,"no prototype scenario selector in the app");
+    await page.getByTestId("bank-max").click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="bank-amount"] input')?.value === "100");
+    assert.match(await page.getByTestId("bank-single-limit").innerText(),/5[,.]000/);
     await page.locator('[data-testid="bank-amount"] input').fill("5");
-    await page.locator('[data-testid="bank-quote"]').click();
-    await page.waitForFunction(() => document.querySelector('[data-testid="bank-quote"]')?.getAttribute("aria-disabled")==="false");
+    await page.locator('[data-testid="bank-quote"]').press("Enter");
+    assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
+    assert.equal(await page.evaluate(()=>window.__bankFixture.quotes),0,"out-of-range amounts never request a quote");
     assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),true,"a definitive amount rejection must preserve editable input");
     await page.locator('[data-testid="bank-amount"] input').fill("100");
     await page.locator('[data-testid="bank-quote"]').click();
     await page.locator('[data-testid="bank-submit"]').waitFor();
     assert.match(await page.locator(".bank-withdraw").innerText(),/2[,.]475[,.]000/);
+    assert.equal(await page.getByTestId("bank-submit").getAttribute("aria-disabled"),"true");
+    await page.getByTestId("bank-submit").press("Enter");
+    assert.equal(await page.evaluate(()=>window.__bankFixture.submits),0,"confirmation is required");
+    await page.getByTestId("bank-consent").press("Space");
     await page.locator('[data-testid="bank-submit"]').click();
     await page.waitForFunction(() => window.__bankFixture.submits === 1);
     // Uncertain submissions hide the form entirely; only readback / abandon remain available.
@@ -122,12 +134,42 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await page.locator('[data-testid="bank-refresh"]').click();
     await page.locator('[data-testid="bank-new"]').waitFor();
     await page.locator('[data-testid="bank-new"]').click();
+    await page.getByTestId("bank-continue").click();
     await page.locator('[data-testid="bank-amount"] input').fill("100");
     await page.locator('[data-testid="bank-quote"]').click();
     await page.locator('[data-testid="bank-abandon"]').click();
     await page.locator('[data-testid="bank-amount"] input').waitFor();
     assert.equal(await page.evaluate(() => window.__bankFixture.abandons),1);
     assert.equal(await page.evaluate(() => window.__bankFixture.submits),1);
+    // Real parsers consume varied PC limits; missing evidence does not become demo values.
+    await page.evaluate(()=>{window.__bankFixture.policy={version:2,minAmountUsd:5,maxAmountUsd:80,feeRatePct:2,feeMinUsd:1,feeMaxUsd:12};});
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    await page.getByTestId("bank-continue").click();
+    assert.match(await page.getByTestId("bank-single-limit").innerText(),/5[–-]80/);
+    await page.getByTestId("bank-max").click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="bank-amount"] input')?.value === "80");
+    await page.locator('[data-testid="bank-amount"] input').fill("80.000001");
+    assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
+    await page.evaluate(()=>{window.__bankFixture.capacity.dailyRemainingCount=0;window.__bankFixture.capacity.dailyCountResetAt=new Date(Date.now()+2500).toISOString();});
+    await gotoProtected("/pages/me/wallet-withdraw-bank"); await page.getByTestId("bank-continue").click();
+    assert.equal(await page.getByTestId("bank-max").getAttribute("aria-disabled"),"true");
+    assert.match(await page.getByTestId("bank-single-limit").innerText(),/5[–-]80/);
+    await page.evaluate(()=>{window.__bankFixture.capacity.dailyRemainingCount=2;window.__bankFixture.capacity.dailyCountResetAt="2026-10-01T00:00:00Z";});
+    await page.waitForFunction(()=>document.querySelector('[data-testid="bank-max"]')?.getAttribute("aria-disabled")==="false");
+    assert.match(await page.getByTestId("bank-single-limit").innerText(),/5[–-]80/);
+    await page.evaluate(()=>{window.__bankFixture.policy=null;});
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    assert.equal(await page.getByTestId("bank-continue").getAttribute("aria-disabled"),"true");
+    assert.equal(await page.getByTestId("bank-refresh").count(),1);
+    await page.evaluate(()=>{window.__bankFixture.policy={version:3,minAmountUsd:20,maxAmountUsd:5000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:25};window.__bankFixture.unbound=true;});
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    assert.equal(await page.getByTestId("bank-continue").count(),0);
+    assert.equal(await page.getByTestId("bank-quote").count(),0);
+    await page.evaluate(()=>{window.__bankFixture.unbound=false;const q=window.__bankFixture.quote;q.expiresAt=new Date(Date.now()-10000).toISOString();window.__bankFixture.intent={state:"NOT_SUBMITTED",quoteNo:q.quoteNo,withdrawalNo:null,intents:[{state:"NOT_SUBMITTED",quoteNo:q.quoteNo,withdrawalNo:null,expiresAt:q.expiresAt,providerState:null}]};});
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    assert.equal(await page.getByTestId("bank-submit").count(),0,"expired recovered quotes cannot submit");
+    await page.getByTestId("bank-abandon").click();
+    assert.equal(await page.evaluate(()=>window.__bankFixture.submits),1);
     // Server-denied accounts remain closed; bound accounts need no verification action in any locale/theme.
     for (const locale of ["en","vi","zh"]) for (const mode of ["light","dark"]) {
       await page.evaluate(async ({locale,mode}) => {
@@ -137,11 +179,12 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
       },{locale,mode});
       await gotoProtected("/pages/me/wallet-withdraw-bank");
       await page.getByTestId("bank-account-status").waitFor();
-      assert.equal(await page.getByTestId("bank-quote").getAttribute("aria-disabled"),"true");
-      assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),false);
+      assert.equal(await page.getByTestId("bank-continue").getAttribute("aria-disabled"),"true");
+      assert.equal(await page.locator('[data-testid="bank-amount"] input').count(),0);
       assert.equal(await page.getByTestId("bank-verify").count(),0);
       await page.evaluate(()=>{window.__bankFixture.canWithdraw=true;});
       await gotoProtected("/pages/me/wallet-withdraw-bank");
+      await page.getByTestId("bank-continue").click();
       assert.equal(await page.locator('[data-testid="bank-amount"] input').isEditable(),true);
       assert.equal(await page.evaluate(()=>document.scrollingElement.scrollWidth>document.scrollingElement.clientWidth+1),false);
       await page.screenshot({path:`.verify-cache/bank-withdrawal/${locale}-${mode}.png`,fullPage:true});
@@ -149,8 +192,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     assert.equal(await page.evaluate(() => window.__bankFixture.verifies),0);
     await page.evaluate(() => { window.__bankFixture.enabled=false; });
     await gotoProtected("/pages/me/wallet-withdraw-bank");
-    await page.waitForFunction(() => document.querySelector('[data-testid="bank-quote"]')?.getAttribute("aria-disabled") === "true"
-      || document.querySelector('[data-testid="bank-quote"]')?.getAttribute("disabled") != null);
+    await page.waitForFunction(() => document.querySelector('[data-testid="bank-continue"]')?.getAttribute("aria-disabled") === "true");
     console.log("PASS bank withdrawal actual page: unavailable empty entry, contextual reload, method selection, cross-device closed-channel recovery without resubmit, evidence-only settlement, durable abandon, immediate bound-account use without verification in en/vi/zh and light/dark");
   } catch (error) {
     console.error("Bank runtime failure state", await page.evaluate(() => ({ url:location.href, text:document.body.innerText, fixture:window.__bankFixture, uncaught:window.__gateUncaught })));

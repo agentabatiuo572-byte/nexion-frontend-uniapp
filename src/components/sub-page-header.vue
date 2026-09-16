@@ -57,7 +57,7 @@ import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
-const props = defineProps<{ back: string; title?: string; subtitle?: string }>();
+const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void }>();
 // 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
 // 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
@@ -107,6 +107,7 @@ const statusBarHeight = computed(() => {
 });
 
 function goBack() {
+  if (props.backAction) { props.backAction(); return; }
   navBack(props.back);
 }
 function goBell() {
