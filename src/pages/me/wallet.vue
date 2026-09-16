@@ -2,8 +2,7 @@
   Wallet — ported from Nexion-prototype/app/(main)/me/wallet/page.tsx.
   iOS-Wallet pattern, top→bottom: balance hero (USDT 48px + NEX link + 3 quick
   actions) → Earnings list (Today / Pending / All-time) → Activity list (Daily
-  check-in / Transaction history / Bank cards / conditional in-flight withdrawal)
-  → NEX boost footer callout.
+  check-in / Transaction history / Bank cards / conditional in-flight withdrawal).
 
   Reads useApp (user/earnings/latestWithdrawal) + useCommission (team lifetime).
   IOSList/IOSListItem (source components) are inlined as a local list primitive.
@@ -103,15 +102,6 @@
         </WalletListRow>
       </view>
 
-      <!-- NEX boost footer callout -->
-      <view v-if="fundsReadable" :style="nexCalloutStyle">
-        <text class="block" :style="nexCalloutLabelStyle">{{ t.wallet.nexBoostActive }}</text>
-        <view :style="nexCalloutBodyStyle">
-          <text>{{ fmt(t.wallet.nexBoostPrefix, { nex: nexLabel }) }}</text>
-          <text style="color: var(--v5-brand); font-weight: 600">{{ t.wallet.nexBoostHighlight }}</text>
-          <text>{{ t.wallet.nexBoostSuffix }}</text>
-        </view>
-      </view>
     </view>
   </AppChassis>
 </template>
@@ -332,25 +322,6 @@ const listCardStyle: CSSProperties = {
   margin: "0 16px",
   padding: "0 2px",
   borderTop: "1px solid var(--v5-border)",
-};
-const nexCalloutStyle: CSSProperties = {
-  margin: "20px 16px 24px",
-  padding: "12px 16px",
-  borderRadius: "12px",
-  background: "var(--v5-brand-2-soft)",
-};
-const nexCalloutLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-brand-2)",
-  letterSpacing: "0.06em",
-};
-const nexCalloutBodyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "13px",
-  color: "var(--v5-ink-2)",
-  lineHeight: 1.45,
 };
 const syncFailBoxStyle: CSSProperties = {
   margin: "8px 16px 0",

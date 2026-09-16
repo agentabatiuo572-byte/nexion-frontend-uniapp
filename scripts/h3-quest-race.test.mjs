@@ -13,20 +13,25 @@ const rawSource = fs.readFileSync("src/store/quest.ts", "utf8");
 const INJECTED_NAMES = [
   "reactive", "ref", "watch", "defineStore", "questApi", "remoteApiEnabled", "useLocaleStore",
   "normalizeAccountKey", "readAccountRow", "writeAccountRow",
+  "questClaimNoticeFor",
   "dayOneClaimState",
 ];
 const importedNames = new Set();
-for (const line of rawSource.match(/^import .*;\r?\n/gm) ?? []) {
-  if (/^import\s+type\s/.test(line)) continue; // 类型导入编译期擦除,无需注入
-  const named = line.match(/\{([^}]*)\}/)?.[1];
-  if (named) {
-    for (const spec of named.split(",")) {
-      const name = spec.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop()?.trim();
-      if (name) importedNames.add(name);
+const importSource = ts.createSourceFile("quest.ts", rawSource, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+for (const statement of importSource.statements) {
+  if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) continue;
+  const clause = statement.importClause;
+  if (!clause) continue;
+  if (clause.name) importedNames.add(clause.name.text);
+  if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+    importedNames.add(clause.namedBindings.name.text);
+  }
+  if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+    for (const element of clause.namedBindings.elements) {
+      // `import { value, type Shape }` has a runtime binding only for value.
+      if (!element.isTypeOnly) importedNames.add(element.name.text);
     }
   }
-  const defaultImport = line.match(/^import\s+([A-Za-z_$][\w$]*)[\s,]/)?.[1];
-  if (defaultImport) importedNames.add(defaultImport);
 }
 const unstubbed = [...importedNames].filter((name) => !INJECTED_NAMES.includes(name));
 if (unstubbed.length) {
@@ -82,6 +87,7 @@ function createStore(replies) {
     normalizeAccountKey: (key) => key,
     readAccountRow: () => null,
     writeAccountRow: () => undefined,
+    questClaimNoticeFor: () => null,
     // The three cases below exercise refresh/account race fencing only; they
     // never call claimDayOne. This fail-closed neutral shape keeps the runtime
     // import harness complete without pretending it verifies Day-One claiming.

@@ -44,7 +44,12 @@ const app = useApp();
 
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const slotDevices = computed(() => devices.value.filter(isActiveSlotDevice));
-const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
+// Read-only fleet presentation may retain this account's last confirmed
+// snapshot while a background refresh is pending. Actions remain governed by
+// their existing authoritative checks.
+const fleetReady = computed(() => !remoteApiEnabled
+  || app.remoteFleetStatus === "ready"
+  || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
 const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
   n: slotDevices.value.length,
   max: app.slotCap,

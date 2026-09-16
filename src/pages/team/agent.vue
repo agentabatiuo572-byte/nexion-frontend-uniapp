@@ -12,7 +12,11 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamAgent" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
+      <view v-if="remoteApiEnabled && pageReadState !== 'ready'" class="px-4 text-center" style="padding-top: 32px" role="status" aria-live="polite" :aria-busy="pageReadState === 'loading'">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ pageReadState === 'loading' ? t.agent.loading : t.agent.loadError }}</text>
+        <view v-if="pageReadState === 'error'" role="button" tabindex="0" style="padding: 14px; color: var(--v5-brand)" @click="retryAgentPage" @keydown.enter.prevent="retryAgentPage" @keydown.space.prevent="retryAgentPage"><text>{{ t.agent.retry }}</text></view>
+      </view>
+      <view v-else class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
         <!-- hero — de-carded: sits on the page floor (radial glow deleted outright) -->
         <view :style="heroStyle">
           <view class="flex items-center" style="gap: 10px">
@@ -24,7 +28,7 @@
               <text class="block font-display" :style="heroHeadlineStyle">{{ t.agent.heroHeadline }}</text>
             </view>
           </view>
-          <text class="block" :style="heroBodyStyle">{{ t.agent.heroBody }}</text>
+          <text class="block" :style="heroBodyStyle">{{ fmt(t.agent.heroBody, { rank: requiredRankLabel }) }}</text>
         </view>
 
         <!-- eligibility -->
@@ -38,7 +42,7 @@
                 <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.eligible }}</text>
                 <VBadge :v="myRank" size="sm" :show-title="false" />
               </view>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.agent.annualBudget }}</text>
+              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.agent.budgetReviewHint }}</text>
             </view>
           </view>
         </view>
@@ -48,7 +52,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             </view>
             <view class="flex-1">
-              <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.lockedReq }}</text>
+              <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ fmt(t.agent.lockedReq, { rank: requiredRankLabel }) }}</text>
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ lockedSubText }}</text>
             </view>
             <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" role="button" tabindex="0" @click="go('/pages/team/rank')">
@@ -141,7 +145,7 @@
             <text>{{ unlocked ? t.agent.submitForReview : t.agent.lockedV5 }}</text>
           </view>
 
-          <text v-if="!unlocked" class="block text-center" :style="previewOnlyStyle">{{ t.agent.previewOnly }}</text>
+          <text v-if="!unlocked" class="block text-center" :style="previewOnlyStyle">{{ fmt(t.agent.previewOnly, { rank: requiredRankLabel }) }}</text>
         </view>
 
         <!-- approved cases — transparent hairline rows -->
@@ -187,7 +191,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import { useVRank } from "@/store/v-rank";
-import { rankTitle } from "@/lib/v-rank-copy";
+import { rankTitle, rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -214,6 +218,7 @@ const app = useApp();
 
 const myRank = computed(() => vrank.myRank);
 const rankReady = computed(() => vrank.remoteReady);
+const requiredRankLabel = computed(() => rankLabel(5, isZh.value, vrank.ladder));
 const unlocked = computed(() => rankReady.value && vrank.myRank >= 5);
 
 interface Bucket {
@@ -231,6 +236,7 @@ const BUCKET_VISUALS: Record<AmbassadorPolicyBucket["id"], Pick<Bucket, "tint" |
   dev: { tint: "var(--v5-tech-cyan)", paths: ["m16 18 6-6-6-6", "m8 6-6 6 6 6"] },
 };
 const policy = ref<AmbassadorPolicy | null>(null);
+const pageReadState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
 const BUCKETS = computed<Bucket[]>(() => (policy.value?.buckets ?? []).map((bucket) => ({
   id: bucket.id, title: bucket.title, range: bucket.range, rule: bucket.rule,
   ...BUCKET_VISUALS[bucket.id],
@@ -297,6 +303,7 @@ function clearAgentFormState(form: AmbassadorAgentFormState = {
 }
 function resetAgentPageState(): void {
   invalidateAgentRequests();
+  pageReadState.value = remoteApiEnabled ? "loading" : "ready";
   clearAgentFormState();
   latestApplication.value = emptyApplication();
   applications.value = [];
@@ -334,7 +341,7 @@ async function refreshHistory(requestScope = captureAgentRequest()): Promise<Amb
 
 async function submit() {
   if (!unlocked.value) {
-    toast.error(t.value.agent.toastV5Required, t.value.agent.toastV5RequiredSub);
+    toast.error(t.value.agent.toastV5Required, fmt(t.value.agent.toastV5RequiredSub, { rank: requiredRankLabel.value }));
     return;
   }
   const input = parseAmbassadorApplicationDraft({
@@ -403,16 +410,26 @@ async function submit() {
 function refreshAgentPage(): void {
   if (!remoteApiEnabled) return;
   const requestScope = captureAgentRequest();
+  pageReadState.value = "loading";
   void Promise.all([
-    refreshLatest(requestScope).catch(() => undefined),
-    refreshHistory(requestScope).catch(() => undefined),
+    refreshLatest(requestScope),
+    refreshHistory(requestScope),
     ambassadorApplicationApi.policy().then((value) => {
       if (!requestIsCurrent(requestScope)) return;
       policy.value = value;
       budgetText.value = String(value.defaultBudgetUsdt);
-    }).catch(() => undefined),
+    }),
     vrank.refreshCanonicalVRank(),
-  ]);
+  ]).then(() => {
+    if (requestIsCurrent(requestScope)) pageReadState.value = vrank.remoteReady && policy.value ? "ready" : "error";
+  }).catch(() => {
+    if (requestIsCurrent(requestScope)) pageReadState.value = "error";
+  });
+}
+
+function retryAgentPage(): void {
+  resetAgentPageState();
+  refreshAgentPage();
 }
 
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {

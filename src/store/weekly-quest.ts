@@ -9,6 +9,7 @@ import {
 } from "@/lib/weekly-quest-command-key";
 import { useLocaleStore } from "@/store/locale";
 import { isCurrentQuest } from "@/lib/actionable-quest";
+import { questClaimNoticeFor, type QuestClaimNotice } from "@/lib/quest-claim-notice";
 
 const UNKNOWN_IDEMPOTENCY_RESULTS = new Set([
   "IDEMPOTENCY_RESULT_UNKNOWN",
@@ -23,6 +24,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const snapshot = ref<QuestSnapshot | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const claimNotice = ref<QuestClaimNotice | null>(null);
   const claiming = ref<string | null>(null);
   let accountKeyValue = "default";
   let accountEpoch = 0;
@@ -99,6 +101,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     }
     loading.value = true;
     error.value = null;
+    claimNotice.value = null;
     try {
       const next = await questApi.state(locale.code);
       if (!isCurrentRequest()) return false;
@@ -131,6 +134,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
     claiming.value = quest.questCode;
     error.value = null;
+    claimNotice.value = null;
     try {
       const key = acquireWeeklyQuestCommandKey(accountKeyValue, quest.questCode, quest.instanceKey);
       const claimResult = await questApi.claim(quest.questCode, key, quest.instanceKey);
@@ -174,11 +178,20 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
         error.value = "WEEKLY_QUEST_CLAIM_OUTCOME_UNKNOWN";
         return false;
       }
+      const notice = questClaimNoticeFor(cause);
       try {
         finishWeeklyQuestCommand(accountKeyValue, quest.questCode, quest.instanceKey);
       } catch (storageCause) {
         error.value = storageCause instanceof Error
           ? storageCause.message : "WEEKLY_QUEST_COMMAND_STORAGE_UNAVAILABLE";
+        return false;
+      }
+      if (notice) {
+        await refresh();
+        if (!isCurrentRequest()) return false;
+        // This is a confirmed terminal reply, never a new reward. Read back
+        // server state before allowing the UI to explain the changed status.
+        claimNotice.value = notice;
         return false;
       }
       error.value = message;
@@ -196,6 +209,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     scheduleRollover(null);
     loading.value = false;
     error.value = null;
+    claimNotice.value = null;
     claiming.value = null;
     accountKeyValue = accountKey.trim().toLowerCase() || "default";
     void refresh();
@@ -205,5 +219,5 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     if (remoteApiEnabled) void refresh();
   });
 
-  return { snapshot, loading, error, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
+  return { snapshot, loading, error, claimNotice, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
 });

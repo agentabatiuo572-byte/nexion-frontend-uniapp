@@ -17,8 +17,11 @@ assert.match(howPage, /useLeadershipPool, V_VOTES/);
 assert.match(howPage, /remoteApiEnabled \? "loading" : "ready"/);
 assert.match(howPage, /if \(!remoteApiEnabled\) return;/);
 assert.match(howPage, /pool\.totalVotes\(\)/);
-assert.match(howPage, /pool\.globalVDistribution\[v\]/);
-assert.match(howPage, /votes: V_VOTES\[v\]/);
+// The local fallback was moved behind the shared row derivation; assert the
+// data inputs and derivation rather than its former inline loop variable.
+assert.match(howPage, /localDistribution\[vRank\] \?\? 0/);
+assert.match(howPage, /localVotes\[vRank\] \?\? 0/);
+assert.match(howPage, /leadershipHowRows\(snapshot, ranks\)/);
 
 const homeCard = source("../src/components/home/leadership-pool-card.vue");
 assert.match(homeCard, /teamInsightsApi\.leadershipPool\(\)/);

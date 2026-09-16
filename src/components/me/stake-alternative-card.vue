@@ -6,7 +6,7 @@
   + headline + "Stake for +$delta in {days} days" CTA → /staking.
 -->
 <template>
-  <view v-if="configAvailable" class="mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
+  <view v-if="hasEligiblePool" class="mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
     <view aria-hidden :style="washStyle" />
     <view class="relative">
       <view class="flex items-center" :style="labelStyle">
@@ -30,9 +30,6 @@
     </view>
     <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
   </view>
-  <view v-else class="mx-4 mt-3" :style="unavailableStyle">
-    <text>{{ t.staking.remoteUnavailableClosed }}</text>
-  </view>
 </template>
 
 <script setup lang="ts">
@@ -41,7 +38,7 @@ import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
-import { resolveStakingPool } from "@/lib/staking-canonical";
+import { canRecommendStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
 
 const props = defineProps<{ amountNum: number }>();
 const t = useT();
@@ -61,10 +58,17 @@ const tiers = computed(() => ([30, 90, 180] as StakingTerm[]).map((days, index) 
     days,
     { apy: STAKING_APY[days], penalty: STAKING_PENALTY[days], minAmountUsdt: STAKING_MIN[days] },
   );
-  return pool ? { days, apy: pool.apy, penalty: pool.penalty, minAmountUsdt: pool.minAmountUsdt, tone } : null;
+  return pool ? { days, apy: pool.apy, penalty: pool.penalty, minAmountUsdt: pool.minAmountUsdt, tone, pool } : null;
 }));
-const configAvailable = computed(() => tiers.value.every((tier) => tier !== null));
-const displayTiers = computed(() => tiers.value.filter((tier): tier is NonNullable<typeof tier> => tier !== null));
+const displayTiers = computed(() => tiers.value.filter((tier): tier is NonNullable<typeof tier> =>
+  tier !== null && canRecommendStakingPool(
+    { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+    tier.days,
+    props.amountNum,
+    tier.pool,
+  ),
+));
+const hasEligiblePool = computed(() => displayTiers.value.length > 0);
 const peak = computed(() => displayTiers.value[displayTiers.value.length - 1]);
 const peakValue = computed(() => {
   const p = peak.value;
@@ -94,6 +98,7 @@ function toneColor(tone: Tone): string {
 }
 
 function goStaking() {
+  if (!hasEligiblePool.value) return;
   navTo("/pages/staking/staking");
 }
 
@@ -168,12 +173,5 @@ const ctaStyle: CSSProperties = {
   fontWeight: 500,
   fontSize: "13px",
   letterSpacing: "-0.005em",
-};
-const unavailableStyle: CSSProperties = {
-  padding: "16px",
-  borderRadius: "16px",
-  background: "var(--v5-warning-soft)",
-  color: "var(--v5-ink-2)",
-  fontSize: "13px",
 };
 </script>

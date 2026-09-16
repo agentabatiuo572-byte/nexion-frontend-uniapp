@@ -121,6 +121,7 @@ export const useConfig = defineStore("config", () => {
   };
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
+  const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
@@ -160,6 +161,7 @@ export const useConfig = defineStore("config", () => {
    */
   const loading = ref(false);
   let reloadAfterCurrentFlight = false;
+  let currentLoad: Promise<void> | null = null;
 
   function clearRemotePlatformAuthority() {
     if (!remoteApiEnabled) return;
@@ -177,19 +179,24 @@ export const useConfig = defineStore("config", () => {
     syncFailed.value = true;
   }
 
-  async function load(): Promise<void> {
-    if (loading.value) {
+  function load(): Promise<void> {
+    if (currentLoad) {
       reloadAfterCurrentFlight = true;
-      return;
+      return currentLoad;
     }
     loading.value = true;
-    try {
-      const remote = await platformConfigApi.platformConfig();
-      if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
-          || remote.publicStatsAuthority.runId !== "") {
-        throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
-      }
-      config.value = {
+    configStatus.value = "loading";
+    let flight!: Promise<void>;
+    // Start in a microtask so even a synchronous API mock/adapter throw cannot
+    // run finally before currentLoad has received this flight.
+    flight = Promise.resolve().then(async () => {
+      try {
+        const remote = await platformConfigApi.platformConfig();
+        if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
+            || remote.publicStatsAuthority.runId !== "") {
+          throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
+        }
+        config.value = {
         // The server snapshot is authoritative for every field it provides.
         // Keep only the client-only structural branches that are not part of
         // this bounded context; no fetched field is allowed to fall back to a
@@ -209,18 +216,30 @@ export const useConfig = defineStore("config", () => {
         rewards: remote.rewards,
         computeShare: remote.computeShare,
         share: remote.share,
-      };
-      publicStatsAuthority.value = remote.publicStatsAuthority;
-      syncFailed.value = false;
-    } catch {
-      clearRemotePlatformAuthority();
-    } finally {
-      loading.value = false;
-      if (reloadAfterCurrentFlight) {
-        reloadAfterCurrentFlight = false;
-        void load();
+        };
+        publicStatsAuthority.value = remote.publicStatsAuthority;
+        syncFailed.value = false;
+        configStatus.value = "ready";
+      } catch {
+        clearRemotePlatformAuthority();
+        configStatus.value = "failed";
+      } finally {
+        loading.value = false;
+        if (currentLoad === flight) currentLoad = null;
+        if (reloadAfterCurrentFlight) {
+          reloadAfterCurrentFlight = false;
+          void load();
+        }
       }
-    }
+    });
+    currentLoad = flight;
+    return flight;
+  }
+
+  /** Join startup work without turning a page's wait into an extra reload. */
+  function ensureLoaded(): Promise<void> {
+    if (currentLoad) return currentLoad;
+    return configStatus.value === "ready" ? Promise.resolve() : load();
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
@@ -252,7 +271,7 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, publicStatsAuthority, syncFailed, loading, load, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, publicStatsAuthority, configStatus, syncFailed, loading, load, ensureLoaded, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
 // currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy

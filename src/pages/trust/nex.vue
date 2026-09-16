@@ -9,7 +9,25 @@
     <view style="padding-bottom: 32px">
       <SubPageHeader back="/pages/trust/trust" />
 
-      <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="nex" />
+      <view v-if="narrative.state === 'loading'" class="mx-4" :style="stateCardStyle">
+        <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeLoading }}</text>
+      </view>
+      <view v-else-if="narrative.state === 'error'" class="mx-4" :style="stateCardStyle">
+        <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeError }}</text>
+        <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)">{{ t.ui.retry }}</text>
+      </view>
+      <view v-else-if="narrative.state === 'unpublished'" class="mx-4" :style="stateCardStyle">
+        <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeUnavailable }}</text>
+        <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)">{{ t.ui.retry }}</text>
+      </view>
+
+      <template v-else>
+      <HowHero :label="`${w.heroLabel} · ${narrative.version}`" :title="narrative.hero" :sub="narrative.subhero ?? ''" accent="nex" />
+      <view class="mx-4" :style="publishedStatStyle">
+        <text class="block" :style="publishedStatLabelStyle">{{ fmt(w.publishedDataVersion, { version: narrative.version }) }} / {{ w.activeAiClientsLabel }}</text>
+        <text class="block font-mono-tabular" :style="publishedStatValueStyle">{{ activeAiClientsText }}</text>
+        <text class="block" :style="publishedStatNoticeStyle">{{ w.activeAiClientsNotice }}</text>
+      </view>
 
       <HowSection :title="w.s1Title" accent="nex">
         <template #icon>
@@ -95,13 +113,15 @@
           <text>{{ w.ctaBack }}</text>
         </view>
       </view>
+      </template>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, onMounted, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
@@ -110,15 +130,72 @@ import HowFaqRow from "@/components/how/how-faq-row.vue";
 import IconRow from "@/components/how/how-icon-row.vue";
 import CalloutBox from "@/components/how/how-callout-box.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
 import { useMarket } from "@/store/market";
+import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
+import { subscribeRuntimeRevision } from "@/api/order-api";
+import type { TrustLocale } from "@/api/trust-section-api";
+import { resolvePublishedNexNarrative } from "@/lib/nex-published-content";
 
 const t = useT();
 const w = computed(() => t.value.nexHowItWorks);
+const locale = useLocaleStore();
+const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
+const { sections, status, refresh } = usePublishedTrust();
+const narrative = computed(() => resolvePublishedNexNarrative(sections.value, status.value, language.value));
+const activeAiClientsText = computed(() => {
+  const activeAiClients = narrative.value.state === "ready" ? narrative.value.activeAiClients : null;
+  return activeAiClients === null
+    ? "—"
+    : activeAiClients.toLocaleString({ zh: "zh-CN", vi: "vi-VN", en: "en-US" }[language.value]);
+});
+
+let narrativePageVisible = false;
+let narrativeVisibleEpoch = 0;
+let narrativeReadRequest = 0;
+
+function invalidateNarrativePageRead(): void {
+  narrativeVisibleEpoch += 1;
+}
+
+async function loadNarrative(force = false): Promise<boolean> {
+  if (!narrativePageVisible) return false;
+  const visibleEpoch = narrativeVisibleEpoch;
+  const request = ++narrativeReadRequest;
+  const loaded = await refresh(force);
+  if (
+    narrativePageVisible
+    && visibleEpoch === narrativeVisibleEpoch
+    && request === narrativeReadRequest
+    && loaded
+    && narrative.value.state === "ready"
+  ) recordPublishedTrustViews(["nexNarrative"], language.value);
+  return loaded;
+}
+
+const unsubscribeNarrativeRuntime = subscribeRuntimeRevision(() => {
+  if (narrativePageVisible) void loadNarrative(true);
+});
+onShow(() => {
+  narrativePageVisible = true;
+  invalidateNarrativePageRead();
+  void loadNarrative(true);
+});
+onHide(() => {
+  narrativePageVisible = false;
+  invalidateNarrativePageRead();
+});
+onUnmounted(() => {
+  narrativePageVisible = false;
+  invalidateNarrativePageRead();
+  unsubscribeNarrativeRuntime();
+});
 const cfg = useConfig();
 const market = useMarket();
 onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
+
 // 礼包 NEX 数量单源派生自 platform config。
 const src4Body = computed(() => fmt(w.value.src4Body, { nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
@@ -140,6 +217,13 @@ function goBack() {
   navTo("/pages/trust/trust");
 }
 
+const stateCardStyle: CSSProperties = { marginTop: "16px", padding: "16px", borderRadius: "16px", background: "var(--v5-surface)" };
+const stateTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
+const retryStyle: CSSProperties = { marginTop: "8px", minHeight: "44px", display: "inline-flex", alignItems: "center", fontSize: "13px", color: "var(--v5-brand)" };
+const publishedStatStyle: CSSProperties = { marginTop: "12px", padding: "14px 16px", borderRadius: "12px", background: "var(--v5-surface)" };
+const publishedStatLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.08em", color: "var(--v5-ink-3)" };
+const publishedStatValueStyle: CSSProperties = { marginTop: "6px", fontSize: "26px", fontWeight: 600, color: "var(--v5-nex)" };
+const publishedStatNoticeStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const tableStyle: CSSProperties = {

@@ -222,4 +222,43 @@ describe("weekly quest remote claim recovery", () => {
     expect(store.snapshot?.quests[0]?.status).toBe("CLAIMABLE");
     expect(store.error).toBe("weekly service unavailable");
   });
+
+  it("refreshes an already-claimed response without treating it as a new claim", async () => {
+    remote.questApi.state.mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot("CLAIMED"));
+    remote.questApi.claim.mockRejectedValueOnce(new ApiError({
+      kind: "business", message: "QUEST_ALREADY_CLAIMED", code: 409,
+    }));
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+
+    await expect(store.claim(current)).resolves.toBe(false);
+
+    expect(store.claimNotice).toBe("alreadyClaimed");
+    expect(store.snapshot?.quests[0]?.status).toBe("CLAIMED");
+    expect(peekWeeklyQuestCommandKey("user:a", current.questCode, current.instanceKey)).toBeNull();
+    await expect(store.claim(store.snapshot!.quests[0]!)).resolves.toBe(false);
+    expect(remote.questApi.claim).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes a terminal inactive response so a stale claim control closes", async () => {
+    const expired = {
+      ...snapshot(),
+      quests: [{ ...current, status: "EXPIRED" as const, eligible: false }],
+    };
+    remote.questApi.state.mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(expired);
+    remote.questApi.claim.mockRejectedValueOnce(new ApiError({
+      kind: "business", message: "QUEST_DEFINITION_INACTIVE", code: 409,
+    }));
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+
+    await expect(store.claim(current)).resolves.toBe(false);
+
+    expect(store.claimNotice).toBe("definitionInactive");
+    expect(store.snapshot?.quests[0]).toMatchObject({ status: "EXPIRED", eligible: false });
+    await expect(store.claim(store.snapshot!.quests[0]!)).resolves.toBe(false);
+    expect(remote.questApi.claim).toHaveBeenCalledTimes(1);
+  });
 });

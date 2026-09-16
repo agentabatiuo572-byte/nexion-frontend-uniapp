@@ -17,7 +17,13 @@ test("five general How-it-works pages use the shared published-content renderer"
     const source = fs.readFileSync(path.join(root, file), "utf8");
     assert.match(source, /HowPublishedContent/);
     assert.match(source, new RegExp(`content-key=\\"${key}\\"`));
-    assert.match(source, /v-if="remoteApiEnabled(?: && !publishedContentUnavailable)?"/);
+    if (key === "team-binary-how" || key === "team-unilevel-how") {
+      assert.match(source, /const howMode = howContentMode\(remoteApiEnabled\);/);
+      assert.match(source, /v-if="howMode === 'published'"/);
+      assert.match(source, /v-if="howMode === 'local'"/);
+    } else {
+      assert.match(source, /v-if="remoteApiEnabled"/);
+    }
     assert.doesNotMatch(source, /apiRuntimeConfig\.mode/);
   }
 });
@@ -33,7 +39,7 @@ test("the commission guide reads its published document with the canonical commi
   assert.doesNotMatch(source, /apiRuntimeConfig\.mode/);
 });
 
-test("binary and unilevel How pages fall back to their bundled 5174 explanation when publication is unavailable", () => {
+test("binary and unilevel retain the published-content error boundary in remote runtime", () => {
   const teamPages = {
     "src/pages/team/binary-how.vue": "teamBinary",
     "src/pages/team/unilevel-how.vue": "teamUnilevel",
@@ -41,9 +47,10 @@ test("binary and unilevel How pages fall back to their bundled 5174 explanation 
 
   for (const [file, headerKey] of Object.entries(teamPages)) {
     const source = fs.readFileSync(path.join(root, file), "utf8");
-    assert.match(source, /@unavailable="publishedContentUnavailable = true"/);
-    assert.match(source, /v-if="!remoteApiEnabled \|\| publishedContentUnavailable"/);
-    assert.match(source, /publishedContentUnavailable = ref\(false\)/);
+    assert.match(source, /const howMode = howContentMode\(remoteApiEnabled\);/);
+    assert.match(source, /v-if="howMode === 'published'"/);
+    assert.match(source, /v-if="howMode === 'local'"/);
+    assert.doesNotMatch(source, /publishedContentUnavailable|@unavailable=/);
     assert.match(
       source,
       new RegExp(`:title="t\\.headerTitles\\.${headerKey} \\+ t\\.headerTitles\\.howItWorksSuffix"`),
@@ -51,6 +58,7 @@ test("binary and unilevel How pages fall back to their bundled 5174 explanation 
   }
 
   const consumer = fs.readFileSync(path.join(root, "src/components/how/how-published-content.vue"), "utf8");
+  assert.match(consumer, /v-else-if="error"/);
   assert.match(consumer, /defineEmits<\{ unavailable: \[\] \}>\(\)/);
   assert.match(consumer, /emit\("unavailable"\)/);
 });

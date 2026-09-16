@@ -36,7 +36,7 @@
         <view :style="heroStyle">
           <view class="flex items-start justify-between">
             <view>
-              <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-warning)')">{{ t.leaderboard.pool.label }} · {{ prize.label }}</text>
+              <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-warning)')">{{ t.leaderboard.pool.label }} · {{ t.leaderboard.periods[period] }}</text>
               <text class="block font-display tabular-nums" :style="heroBigStyle">{{ fmtCompactUSD(prize.poolUSD) }}</text>
               <text v-if="prize.poolUSD > 0" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '6px' }">{{ payoutToText }}</text>
             </view>
@@ -154,7 +154,7 @@
         </view>
 
         <!-- footer note -->
-        <text class="block text-center" :style="footerNoteStyle">{{ t.leaderboard.note }}</text>
+        <text class="block text-center" :style="footerNoteStyle">{{ period === 'all' ? t.leaderboard.noteAllTime : t.leaderboard.note }}</text>
         </template>
       </view>
     </view>
@@ -299,7 +299,8 @@ const podiumVisuals = [
 const payoutToText = computed(() => fmt(t.value.leaderboard.pool.payoutTo, { n: prize.value.topN }));
 const gapText = computed(() => me.value.rank === null
   ? t.value.leaderboard.myRank.notRanked
-  : fmt(t.value.leaderboard.myRank.gap, { amount: me.value.gapToNext.toLocaleString() }));
+  : me.value.rank === 1 ? t.value.leaderboard.myRank.first
+    : fmt(t.value.leaderboard.myRank.gap, { amount: me.value.gapToNext.toLocaleString() }));
 
 function fmtCompactUSD(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;

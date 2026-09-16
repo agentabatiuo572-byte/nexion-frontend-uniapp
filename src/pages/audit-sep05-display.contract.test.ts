@@ -7,16 +7,14 @@ const source = (file: string) => sources[file.startsWith("pages/") ? `./${file.s
 describe("audit display authority regressions", () => {
   it("does not present default capacity or an add slot while the remote fleet is unavailable", () => {
     for (const file of ["components/home/my-fleet-section.vue", "pages/earn/earn.vue"]) {
-      if (file === "components/home/my-fleet-section.vue") {
-        expect(source(file)).toContain('const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready")');
-      } else {
-        expect(source(file)).toContain('app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot');
-      }
+      expect(source(file)).toContain('app.remoteFleetStatus === "ready"');
+      expect(source(file)).toContain('app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot');
       expect(source(file)).toContain('fleetReady.value ? fmt(');
       expect(source(file)).toContain(': "— / —"');
     }
+    const earn = source("pages/earn/earn.vue");
     expect(source("components/home/my-fleet-section.vue")).toContain('v-if="fleetReady && slotDevices.length < app.slotCap"');
-    expect(source("pages/earn/earn.vue")).toContain('<EmptySlotsHint v-if="fleetReady">');
+    expect(earn).toContain('<EmptySlotsHint v-if="fleetReady">');
   });
   it("keeps only a confirmed same-account fleet visible during background loading", () => {
     const expression = source("pages/earn/earn.vue").match(/const fleetReady = computed\(\(\) => ([\s\S]+?)\);/)?.[1];

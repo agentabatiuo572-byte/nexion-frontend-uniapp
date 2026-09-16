@@ -1,6 +1,37 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import { installProbeConversationRealtime } from "./lib/probe-conversation-realtime.mjs";
+
+test("background realtime fixture requires a single-use ticket and never acknowledges unmodeled writes", async () => {
+  let http, connect;
+  const page = {
+    async route(matches, handler) { assert.equal(matches(new URL("http://local/api/app/support/realtime-ticket")), true); http = handler; },
+    async routeWebSocket(matches, handler) {
+      assert.equal(matches(new URL("ws://local/ws/conversations")), true);
+      assert.equal(matches(new URL("ws://local/?token=hmr")), false);
+      connect = handler;
+    },
+  };
+  await installProbeConversationRealtime(page);
+  let response;
+  await http({ request: () => ({ method: () => "POST" }), fulfill: (value) => { response = JSON.parse(value.body); } });
+  const sent = []; let receive; let closed = false;
+  const socket = { onMessage: (handler) => { receive = handler; }, send: (frame) => sent.push(JSON.parse(frame)), close: () => { closed = true; } };
+  connect(socket);
+  receive(JSON.stringify({ type: "auth", ticket: response.data.ticket }));
+  receive(JSON.stringify({ type: "ping" }));
+  receive(JSON.stringify({ type: "command", requestId: "write-1", operation: "send" }));
+  assert.deepEqual(sent, [{ type: "ready" }, { type: "pong" }]);
+  connect(socket);
+  receive(JSON.stringify({ type: "auth", ticket: response.data.ticket }));
+  assert.equal(sent.at(-1).code, 401);
+  assert.equal(closed, true);
+  await installProbeConversationRealtime(page, { authenticated: false });
+  await http({ request: () => ({ method: () => "POST" }), fulfill: (value) => { response = JSON.parse(value.body); } });
+  assert.equal(response.code, 401);
+  assert.equal(response.data, null);
+});
 
 import { directAppUrl } from "./lib/direct-app-url.mjs";
 import { captureTapRouteErrors, measureTapRoute } from "./lib/tap-route-coverage.mjs";

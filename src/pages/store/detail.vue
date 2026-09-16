@@ -179,8 +179,9 @@
               </view>
               <view :style="roiCellStyle(3)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detPayback }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('brand')">{{ paybackDays }}<text style="font-size: 13px; color: var(--v5-ink-3); font-weight: 500; margin-left: 1px">{{ t.store.detDaySuffix }}</text></text>
-                <text class="block" :style="roiSubStyle">{{ t.store.detToBreakEven }}</text>
+                <text v-if="paybackDays === null" class="block" :style="roiValStyle('brand')">{{ t.store.detPaybackUnavailable }}</text>
+                <text v-else class="block tabular-nums" :style="roiValStyle('brand')">{{ paybackDays }}<text style="font-size: 13px; color: var(--v5-ink-3); font-weight: 500; margin-left: 1px">{{ t.store.detDaySuffix }}</text></text>
+                <text class="block" :style="roiSubStyle">{{ paybackDays === null ? t.store.detPaybackUnavailableNote : t.store.detToBreakEven }}</text>
               </view>
             </view>
           </view>
@@ -276,12 +277,13 @@ import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
+import { estimatePaybackDays } from "@/lib/product-payback";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
-import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import type { PurchaseEligibilityCondition, PurchaseEligibilityPolicy } from "@/api/purchase-eligibility-api";
@@ -309,9 +311,9 @@ function invalidateDetailFacts(): void {
 async function refreshDetailFacts(): Promise<void> {
   const readEpoch = ++detailFactsEpoch;
   const accountScope = captureAccountScope();
-  // A forced catalog settlement advances the runtime revision even when it
-  // fails. Start public Trust after that boundary so a current response is not
-  // discarded as superseded by the catalog listener.
+  // A forced catalog result advances the commerce runtime on both success and
+  // failure. Trust must begin after that boundary or its valid public response
+  // is discarded by the Trust generation fence.
   await refreshProductCatalog(true);
   if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
   await Promise.all([
@@ -345,6 +347,7 @@ async function retryCatalog() {
 
 const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
+
 async function observeCanonicalProductDetail(): Promise<void> {
   const canonicalProduct = product.value;
   if (!remoteApiEnabled || !detailPageVisible || catalogStatus.value !== "ready" || !canonicalProduct?.id) return;
@@ -467,17 +470,15 @@ const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);
 const monthlyYield = computed(() => dailyYield.value * 30);
 const annualYield = computed(() => dailyYield.value * 365);
 const totalPrice = computed(() => (product.value?.price ?? 0) * qty.value);
-const paybackDays = computed(() =>
-  product.value && !isShare.value && dailyYield.value > 0
-    ? Math.round(totalPrice.value / dailyYield.value)
-    : 0,
-);
+const paybackDays = computed(() => product.value && !isShare.value
+  ? estimatePaybackDays(totalPrice.value, dailyYield.value)
+  : null);
 const paybackLabel = computed(() => {
-  if (!product.value || isShare.value) return "";
-  const d = Math.round(product.value.price / product.value.dailyEarn);
-  return d >= 60
-    ? fmt(t.value.store.detPaybackMonths, { n: (d / 30).toFixed(1) })
-    : fmt(t.value.store.detPaybackDays, { n: d });
+  const days = paybackDays.value;
+  if (days === null) return product.value && !isShare.value ? t.value.store.detPaybackUnavailable : "";
+  return days >= 60
+    ? fmt(t.value.store.detPaybackMonths, { n: (days / 30).toFixed(1) })
+    : fmt(t.value.store.detPaybackDays, { n: days });
 });
 
 // Hardware spec rows — per-SKU values are server-owned and optional, so labels
@@ -699,7 +700,9 @@ watch(
       amount: `$${priceText.value}`,
       amountSubtext: isShare.value
         ? undefined
-        : fmt(t.value.store.detCtaPayback, { daily: dailyEarnText.value, payback: paybackLabel.value }),
+        : paybackDays.value === null
+          ? t.value.store.detPaybackUnavailableNote
+          : fmt(t.value.store.detCtaPayback, { daily: dailyEarnText.value, payback: paybackLabel.value }),
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);

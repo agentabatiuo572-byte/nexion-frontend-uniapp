@@ -200,7 +200,7 @@ function activate(action?: () => void) {
 }
 
 /** 配置失败的占位格(规格异常2:骨架→「数据更新中」+ 重试;禁回退写死数字)。 */
-function placeholderCell(label: string): Cell {
+function placeholderCell(label: string, retry?: () => void, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
     v: t.value.home.networkStatUpdating,
@@ -209,8 +209,8 @@ function placeholderCell(label: string): Cell {
     sub: t.value.home.networkStatRetry,
     subTone: "var(--v5-tech-cyan-ink)",
     data: null,
-    skeleton: showSkeleton.value,
-    tap: () => { void cfg.load(); },
+    skeleton,
+    tap: retry ?? (() => { void cfg.load(); }),
   };
 }
 
@@ -250,8 +250,10 @@ const metrics = computed<Cell[]>(() => {
   // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2);rankOk 缺失同走占位
   const r = rank.value;
   let rankCell: Cell;
-  if (failed || !h.rankOk || r.kind === "unavailable") {
-    rankCell = placeholderCell(t.value.home.networkYourRank);
+  if (r.kind === "unavailable" || (!remoteApiEnabled && (failed || !h.rankOk))) {
+    rankCell = remoteApiEnabled
+      ? placeholderCell(t.value.home.networkYourRank, () => { void remoteRank.refresh(); }, remoteRank.status === "loading")
+      : placeholderCell(t.value.home.networkYourRank);
   } else if (r.kind === "unranked") {
     rankCell = {
       k: t.value.home.networkYourRank,

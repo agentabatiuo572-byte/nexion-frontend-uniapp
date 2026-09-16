@@ -3,7 +3,7 @@ import { navReset } from "@/lib/route";
 import { watch } from "vue";
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
-import { useConversations } from "@/store/conversations";
+import { useConversations } from '@/store/conversations';
 import {
   useFreeTrial,
   liveShadowUSD,

@@ -9,7 +9,7 @@
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
-    <view class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none' }">
+    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none' }">
       <view class="rs-main">
         <view class="rs-content">
           <view class="rs-badge">
@@ -98,13 +98,14 @@
         </view>
       </view>
     </view>
+    <view v-else class="rs-pending" role="status" aria-live="polite"><text>…</text></view>
     <GlobalUi />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
@@ -114,8 +115,9 @@ import { useConfig } from "@/store/config";
 import { pickSponsor } from "@/mock/sponsors";
 import { useAuth } from "@/store/auth";
 import { resolveAuthAccountById } from "@/store/auth-account";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { consumeRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
+import { canRenderRegistrationSuccess } from "@/lib/registration-success-session";
 import type { RegistrationReceipt } from "@/api/contracts";
 
 type GiftState = "posted" | "pending" | "none";
@@ -124,6 +126,18 @@ const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
 const remoteReceipt = ref<RegistrationReceipt | null>(consumeRemoteRegistrationReceipt(auth.accountId));
+const sessionGateTick = ref(0);
+const successVisible = computed(() => {
+  sessionGateTick.value;
+  const session = sessionVault.read();
+  return canRenderRegistrationSuccess({
+    remote: remoteApiEnabled,
+    authenticated: auth.isAuthenticated,
+    accountId: auth.accountId,
+    accessToken: session?.accessToken,
+    serverUserId: session?.user.userId,
+  });
+});
 
 // ⚠️ MOCK-ONLY: 成功页只读 active 账号目录中冻结的注册回执，绝不信任 URL。
 // 无回执时 giftState 为 none、礼包卡不渲染；live config 仅保留给旧页降级的
@@ -163,11 +177,29 @@ const subLine = computed(() =>
   sponsor.value ? fmt(t.value.register.doneSubTeam, { name: sponsor.value.name }) : t.value.register.doneSubSolo,
 );
 
-onMounted(() => {
+let sessionGateTimer: ReturnType<typeof setTimeout> | undefined;
+let sessionGateAttempts = 0;
+function focusSuccessTitle() {
   // #ifdef H5
   void nextTick(() => document.querySelector<HTMLElement>(".rs-title")?.focus());
   // #endif
+}
+function checkSuccessSession() {
+  sessionGateTick.value += 1;
+  if (successVisible.value) { focusSuccessTitle(); return; }
+  if (sessionGateAttempts >= 100) {
+    navReset(auth.isAuthenticated && auth.accountId.startsWith("user:")
+      ? "/pages/login/login?notice=server-session-reload"
+      : "/pages/onboarding/intro");
+    return;
+  }
+  sessionGateAttempts += 1;
+  sessionGateTimer = setTimeout(checkSuccessSession, 100);
+}
+onMounted(() => {
+  checkSuccessSession();
 });
+onUnmounted(() => { if (sessionGateTimer) clearTimeout(sessionGateTimer); });
 
 // #ifdef H5
 const officialDownloadUrl = computed(() => {
@@ -202,6 +234,7 @@ onBackPress(() => {
 
 <style scoped>
 .rs-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
+.rs-pending { min-height: 100%; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-3); }
 .rs-wrap { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 100%; padding: 0 24px; box-sizing: border-box; text-align: center; }
 .rs-main { position: absolute; inset: 0 24px; display: flex; align-items: center; justify-content: center; padding: 24px 0; box-sizing: border-box; }
 .rs-content { width: 100%; }

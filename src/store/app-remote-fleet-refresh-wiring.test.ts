@@ -261,6 +261,54 @@ describe("App remote fleet refresh wiring", () => {
     expect(app.remoteAssignmentHasSnapshot).toBe(true);
   });
 
+  it("keeps the first withdrawal-list read unknown instead of treating it as zero rows", async () => {
+    const pendingList = deferred<[]>();
+    remote.withdrawalApi.list.mockReturnValueOnce(pendingList.promise);
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    expect(app.remoteWithdrawalListStatus).toBe("loading");
+    expect(app.remoteWithdrawalListHasSnapshot).toBe(false);
+
+    pendingList.resolve([]);
+    await vi.waitFor(() => expect(app.remoteWithdrawalListStatus).toBe("ready"));
+    expect(app.remoteWithdrawalListHasSnapshot).toBe(true);
+  });
+
+  it("retains a same-account withdrawal-list snapshot but marks it stale after a failed refresh", async () => {
+    remote.withdrawalApi.list
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("withdrawal list unavailable"));
+    const app = useApp();
+    app.bindAccount("user:1001");
+    await vi.waitFor(() => expect(app.remoteWithdrawalListStatus).toBe("ready"));
+
+    await expect(app.refreshRemoteWithdrawalList()).resolves.toBe(false);
+    expect(app.remoteWithdrawalListStatus).toBe("error");
+    expect(app.remoteWithdrawalListHasSnapshot).toBe(true);
+  });
+
+  it("does not let an old-account withdrawal list satisfy the current account's read", async () => {
+    const oldList = deferred<[]>();
+    const currentList = deferred<[]>();
+    remote.withdrawalApi.list
+      .mockReturnValueOnce(oldList.promise)
+      .mockReturnValueOnce(currentList.promise);
+    const app = useApp();
+    app.bindAccount("user:1001");
+
+    remote.sessionVault.read.mockReturnValue({ user: { userId: 2002 } });
+    app.bindAccount("user:2002");
+    oldList.resolve([]);
+    await Promise.resolve();
+
+    expect(app.remoteWithdrawalListStatus).toBe("loading");
+    expect(app.remoteWithdrawalListHasSnapshot).toBe(false);
+    currentList.resolve([]);
+    await vi.waitFor(() => expect(app.remoteWithdrawalListStatus).toBe("ready"));
+    expect(app.remoteWithdrawalListHasSnapshot).toBe(true);
+  });
+
   it("retains an authenticated Genesis wallet receipt when the first fleet read fails", async () => {
     remote.deviceE3Api.fleet.mockRejectedValueOnce(new Error("fleet unavailable"));
     const app = useApp();

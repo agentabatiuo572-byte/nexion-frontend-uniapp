@@ -24,7 +24,8 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   // this surface displays the server-authoritative total rather than invented trend data.
   "proof.vue",
   "receipts.vue",
-  // Voucher reads expose loading and recoverable failure before claiming an empty wallet.
+  // Voucher reads retain the 5174 ticket layout while making initial/failed
+  // remote reads explicit; only a current ready read can claim an empty wallet.
   "rewards-list.vue",
   // Same 5174 cards, plus production-only authoritative-summary unavailable/retry state.
   "rewards.vue",
@@ -58,32 +59,42 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "ae19a15f2b050424de21be06c40d08a1b2a4855e6464fc9ed78dc2bd96162d62",
   // Existing formal phone-calibration entry, trial state and physical-slot guard.
   "devices.vue": "ff2a1662e252b3233c387cc24fc07708ff9ac53b5f4c2fddf3dc1d2c212bc00f",
-  // Disable editing and repeat activation while the same goal intent is saving.
-  // Server no-purchase/unsatisfiable results hide the product CTA; transient
-  // list/recommendation errors retain confirmed goals and expose explicit retry.
+  // Goal reads retain the 5174 structure while current-scope recovery makes
+  // loading/error explicit, preserves a confirmed snapshot, and exposes retry.
+  // Saving remains idempotent; a completed or unavailable recommendation has no purchase CTA.
   "goals.vue": "a3bdd127a981a67e381b587d4760f088c21a4c222e3460b9b36647868ecad512",
-  // R3: preserve layout while enabling keyboard FAQ and category controls.
-  // Complete/current FAQ reads gate empty states and expose refresh retry.
-  // Exact deep links clear on category selection; a withdrawn target shows
-  // generic no-match copy without its internal ID. Styles remain unchanged.
+  // R3 keyboard controls plus reviewed production FAQ empty-state authority:
+  // unread, failed, or incomplete pagination cannot claim no matching content.
+  // Exact FAQ deep links clear on category selection; withdrawn targets use the
+  // generic no-match state without rendering their internal ID. Styles are unchanged.
   "help.vue": "bfb23c862c905608072b5f6f5da68122d8364afa5faa463164333b21cf79d9e4",
+  // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
   "language.vue": "7e45ccd32787f167793f423b3fbb8439c7bdd2ec585fccd19d2789251c07dc93",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
+  // Keep the selected zero-count category visible and show category-specific empty copy;
+  // loading and request failures must not render a successful empty-feed message.
   "notifications.vue": "7731130ef5eda24778d0c4604afa45d5a0df0ff89dde3ac26a7e51f6a06bd81e",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
+  // Unknown canonical payout state retains a neutral management entry; only a
+  // confirmed empty address book offers setup. Layout and styles are unchanged.
   "profile.vue": "9b4c697705d19d9553d8a02a9affcb119e320ddb8763032194a7d019af02ee6b",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
-  // the formal page also uses the shared BrandLockup without changing the surrounding layout.
+  // an unavailable server percentile occupies the same label/value slot as a neutral unknown,
+  // without inventing a rank or changing the surrounding 5174 layout.
   "proof.vue": "7de4caeb6ac8cfa9bfd48a0f216af7ac712f9966e0c727dbf259d26f362f29e9",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // Compute and VietQR receipts render in separately selected, independently
   // recoverable lanes; a VietQR-only account must not be labelled as compute receipts.
   "receipts.vue": "e5458482b51be00830c7879c29857274f7c7a5b1e4a01f4706299308d01fec9b",
-  // Same ticket styles; current remote read state governs loading, retry and definite empty.
+  // L2 keeps the 5174 voucher-ticket styles but distinguishes unknown, retryable
+  // failure, and server-confirmed empty states.
   "rewards-list.vue": "e94eda52ff2176ff9fe6e46b5837433b062a7953934302da732281703042fbf5",
+  // L1's #80 source-only count gate does not alter this template pair.
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
+  // Published-document metadata/language fallback, plus reset of reading proof
+  // whenever server jurisdiction/version/token identity changes.
   "risk-disclosure.vue": "2bcf159899f17dedb684b06eda7ccd3363b3aa1b9131df1bbc60b50615b53edc",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.
   "security.vue": "8eb2584d7f83472ec1eac4dd1d4de4f49ea226cabf5ccb9a185131af34ddd7f7",
@@ -94,8 +105,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
-  // Unknown server time keeps changes closed and exposes a 44px keyboard-operable refresh.
-  // The normal change entry and the existing freezeBannerText binding remain unchanged.
+  // Unknown server time keeps changes closed and exposes an accessible read-only refresh.
   "wallet-address-rebind.vue": "a24907e30eec77cda6495fff61782daacd487ef76f3e0bf273baac60bbc2bffd",
   // Wallet filter pills expose keyboard button semantics and their selected state; styles are unchanged.
   "wallet-bills.vue": "c16daae93135450d6f3b383abdf3fcb58398dfac1c30c338a15eebb254cc3658",
@@ -105,23 +115,28 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-cards.vue": "b9800456add8dee31bbf2182901b4d6d30b717f3ad6b54fc55dc11abc8308671",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
-  // Server fee and six-decimal net proceeds are disclosed before confirmation.
-  // Authority loading and unavailable states precede empty history; paused swaps retain queue recovery.
-  // Existing pending requests retain a keyboard-operable, read-only result lookup while swaps are paused.
+  // Server fee and six-decimal net proceeds are disclosed before confirmation;
+  // an unknown remote snapshot is distinct from an empty transaction history.
+  // A server-paused exchange shows an explicit status above the unchanged form.
   "wallet-exchange.vue": "4519797f84ffd4c236aac22fe2ab663ac1d3a78a373a217a7d5c9dece5668b22",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
-  // The reviewed production delta also labels the P&L calculation as a platform baseline estimate.
+  // Unknown market authority suppresses estimated valuation, and ledger activity
+  // uses the controlled public presentation instead of internal bill vocabulary.
   "wallet-nex.vue": "f6c9f05d530a6069210e11253b7929385b728c17b548619a4572ab0439e71e17",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
   // Confirmed operations retain the form while a separate history-sync notice offers GET-only retry.
   // Formal G7 now exposes historical orders, claim/early actions and server-configured copy.
+  // Readiness audit #59: neutral busy status replaces stale wallet/form output until
+  // the current authoritative snapshot completes; no retry CTA during an active read.
   "wallet-repurchase.vue": "d20879fd3550c32bff34861b3fb196a205edeee4fd94cf1a330916ee43000e39",
   "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
+  // Deep-link tracking waits for an owned exact read and distinguishes loading,
+  // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
-  // Authorized new bank-withdrawal entry; the existing USDT controls and styles are unchanged.
+  // Bank-withdrawal entry and local financial snapshot freshness/retry controls coexist.
   "wallet-withdraw.vue": "63acb1e4736056d1be80d835bad8d5e0c52fc54f654122b6c26a3ee1f8b2fc33",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",

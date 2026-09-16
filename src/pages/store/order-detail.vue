@@ -27,15 +27,19 @@
         </view>
       </view>
 
-      <!-- Order not found -->
-      <view v-if="!order" class="text-center" style="padding: 20px">
+      <view v-if="showRemoteOrderLoading" class="text-center" role="status" aria-live="polite" style="padding: 20px">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
+      </view>
+
+      <!-- Order not found only after the scoped remote read settles. -->
+      <view v-else-if="showOrderNotFound" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
           <text>{{ t.orders.title }} →</text>
         </view>
       </view>
 
-      <template v-else>
+      <template v-else-if="order">
         <!-- Hero status — filled status-tint tile (accent border dropped). -->
         <view class="mx-4 rounded-2xl" :style="heroStyle">
           <view class="flex items-center" style="gap: 12px">
@@ -54,7 +58,7 @@
               <text style="color: var(--v5-ink-3)">{{ t.orders.dataCenter }}</text>
               <text class="tabular-nums" style="color: var(--v5-ink)">{{ order.dataCenter }}</text>
             </view>
-            <text v-if="order.status === 'provisioning' || order.status === 'activated'" class="block" :style="{ fontSize: '12px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
+            <text v-if="order.status === 'provisioning'" class="block" :style="{ fontSize: '12px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
           </view>
         </view>
 
@@ -181,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
@@ -189,6 +193,7 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
@@ -200,6 +205,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 const t = useT();
 const orders = useOrders();
 const app = useApp();
+const auth = useAuth();
 
 const id = ref("");
 let detailMounted = true;
@@ -224,10 +230,15 @@ function isCurrentDetailScope(scope: DetailRequestScope): boolean {
 
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
-  if (o.id) id.value = o.id;
+  id.value = o.id || "";
+  remoteOrderAttempted.value = false;
+  remoteOrderError.value = false;
 });
 const remoteOrderError = ref(false);
 const remoteOrderRefreshing = ref(false);
+const remoteOrderAttempted = ref(false);
+let remoteOrderRefreshSequence = 0;
+let activeRemoteOrderScope: DetailRequestScope | null = null;
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
 async function refreshOrderWallet() {
@@ -242,18 +253,25 @@ async function refreshOrderWallet() {
   }
 }
 async function refreshOrder() {
-  if (!remoteApiEnabled || remoteOrderRefreshing.value) return;
+  if (!remoteApiEnabled || !id.value.trim() || !remoteOrderBoundAccount.value) return;
+  if (remoteOrderRefreshing.value && activeRemoteOrderScope
+    && isCurrentDetailScope(activeRemoteOrderScope)) return;
   const scope = captureDetailScope();
+  const sequence = ++remoteOrderRefreshSequence;
+  activeRemoteOrderScope = scope;
+  remoteOrderAttempted.value = true;
   remoteOrderRefreshing.value = true;
   remoteOrderError.value = false;
   try {
     await orders.ensureRemoteOrder(id.value);
-    if (!isCurrentDetailScope(scope)) return;
   } catch {
-    if (!isCurrentDetailScope(scope)) return;
+    if (sequence !== remoteOrderRefreshSequence || !isCurrentDetailScope(scope)) return;
     remoteOrderError.value = true;
   } finally {
-    if (isCurrentDetailScope(scope)) remoteOrderRefreshing.value = false;
+    if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
+      remoteOrderRefreshing.value = false;
+      activeRemoteOrderScope = null;
+    }
   }
 }
 onShow(() => {
@@ -264,6 +282,32 @@ onShow(() => {
 });
 
 const order = computed(() => orders.orders.find((o) => o.id === id.value));
+const hasOrderId = computed(() => Boolean(id.value.trim()));
+const remoteOrderBinding = computed(() => {
+  const accountKey = auth.isAuthenticated ? auth.accountId : "";
+  const boundAccountKey = orders.currentAccountKey();
+  return {
+    accountKey: remoteApiEnabled && accountKey !== "default" && boundAccountKey === accountKey
+      ? accountKey
+      : "",
+    revision: orders.currentAccountBindingRevision(),
+  };
+});
+const remoteOrderBoundAccount = computed(() => remoteOrderBinding.value.accountKey);
+const showRemoteOrderLoading = computed(() => remoteApiEnabled
+  && hasOrderId.value
+  && !order.value
+  && (!remoteOrderBoundAccount.value || !remoteOrderAttempted.value || remoteOrderRefreshing.value));
+const showOrderNotFound = computed(() => !order.value && (!remoteApiEnabled
+  || !hasOrderId.value
+  || (remoteOrderBoundAccount.value && remoteOrderAttempted.value
+    && !remoteOrderRefreshing.value && !remoteOrderError.value)));
+watch(remoteOrderBinding, (binding, previousBinding) => {
+  if (!binding.accountKey || binding.revision === previousBinding.revision || !id.value.trim()) return;
+  remoteOrderAttempted.value = false;
+  remoteOrderError.value = false;
+  void refreshOrder();
+});
 const fullyVoucherSettled = computed(() => order.value != null
   && order.value.total === 0
   && order.value.paymentMethod?.toUpperCase() === "VOUCHER"
@@ -274,7 +318,9 @@ const fullyVoucherSettled = computed(() => order.value != null
 // backHref="/store/orders"/>). Getter form: title resolves once the order loads
 // (onLoad); falls back to "not found" before then / for a bad id.
 useSetPageHeader(() => ({
-  title: order.value ? order.value.id : t.value.orders.notFound,
+  title: order.value
+    ? order.value.id
+    : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
   subtitle: order.value ? t.value.orders.orderId : undefined,
   backHref: "/store/orders",
 }));

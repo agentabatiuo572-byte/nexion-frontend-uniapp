@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { countRemoteReceipts, summarizeRemoteAchievements } from "./remote-me-summary";
+import { countRemoteComputeReceipts, summarizeRemoteAchievements } from "./remote-me-summary";
 
 describe("remote Me summary", () => {
-  it("deduplicates compute and payment receipts from server projections", () => {
-    expect(countRemoteReceipts(
-      [{ receiptNo: "PAY-1" }, { receiptNo: "PAY-2" }],
-      [{ recentTasks: [{ receiptNo: "TASK-1" }, { receiptNo: "PAY-1" }] }],
-    )).toBe(3);
+  it("counts only compute receipts for the Proof-of-Compute shortcut", () => {
+    expect(countRemoteComputeReceipts(
+      [{ recentTasks: [{ receiptNo: "TASK-1" }, { receiptNo: "TASK-2" }, { receiptNo: "TASK-1" }] }],
+    )).toBe(2);
   });
 
   it("keeps the receipt count unavailable until every required projection is ready", () => {
-    expect(countRemoteReceipts(null, [{ recentTasks: [] }])).toBeNull();
-    expect(countRemoteReceipts([], null)).toBeNull();
+    expect(countRemoteComputeReceipts(null)).toBeNull();
   });
 
   it("counts only canonical claimed or fired point milestones", () => {

@@ -43,10 +43,16 @@ describe("read-only audit remediation contracts", () => {
     expect(source).toContain('@keydown.space.prevent="handleClearAll"');
   });
 
-  it("keeps daily authoritative facts hidden during the first remote load", () => {
+  it("gates daily facts and actions on a ready response, including reload failures", () => {
     const source = read("./daily/daily.vue");
     expect(source).toContain("remoteInitialLoading");
     expect(source).toContain('v-if="remoteInitialLoading || (remoteApiEnabled && [\'idle\', \'loading\'].includes(faucet.remoteReadState))"');
+    expect(source).toContain('<template v-if="dailyFactsReady">');
+    expect(source).toContain("!remoteApiEnabled || faucet.remoteReadState === 'ready'");
+    expect(source).toContain("['idle', 'loading'].includes(faucet.remoteReadState)");
+    for (const handler of ["handleCheckIn", "handleClaimMilestone", "handleUseSaver"]) {
+      expect(source).toMatch(new RegExp(`async function ${handler}\\([^)]*\\) \\{\\s*if \\(!dailyFactsReady.value\\) return;`));
+    }
     expect(source).toContain('role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting ? \'true\' : \'false\'"');
     expect(source).toContain('@keydown.enter.prevent="handleCheckIn"');
     expect(source).toContain('@keydown.space.prevent="handleUseSaver"');

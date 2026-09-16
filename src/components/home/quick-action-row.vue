@@ -50,7 +50,6 @@
 import { navTo } from "@/lib/route";
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
-import { isActionableQuest } from "@/lib/actionable-quest";
 import { useNow } from "@/composables/use-now";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -60,6 +59,7 @@ import { useQuest } from "@/store/quest";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { remoteApiEnabled, stakingApi } from "@/api/runtime";
 import { highestLiveStakingApyPct } from "./home-staking-rate";
+import { quickNumericFact, quickMissionFact, type QuickFact } from "./quick-action-facts";
 
 const t = useT();
 const faucet = useNexFaucet();
@@ -105,11 +105,33 @@ const stakingSubtitle = computed(() => {
   return fmt(t.value.home.quickStakeApyFormat, { n: stakingApyPct.value.toLocaleString() });
 });
 
+function factSubtitle(fact: QuickFact, format: (value: number) => string): string {
+  if (fact.state === "loading") return t.value.home.quickFactsLoading;
+  if (fact.state === "error") return t.value.home.quickFactsFailed;
+  return format(fact.value);
+}
+const missionsSubtitle = computed(() => factSubtitle(
+  quickMissionFact(remoteApiEnabled, quest.remoteStatus, quest.remoteQuests, now.value * 1000),
+  n => fmt(t.value.home.quickMissionsActive, { n }),
+));
+const dailySubtitle = computed(() => factSubtitle(
+  quickNumericFact(remoteApiEnabled, faucet.remoteReadState, faucet.signInStreak), n => fmt(t.value.home.quickDailyStreak, { n }),
+));
+const genesisSubtitle = computed(() => {
+  const supply = quickNumericFact(remoteApiEnabled,
+    genesis.remoteSupplyKnown ? genesis.remotePublicReadState
+      : genesis.remotePublicReadState === "ready" ? "unavailable" : genesis.remotePublicReadState,
+    genesis.totalSlots - genesis.soldSlots);
+  if (supply.state !== "ready") return factSubtitle(supply, n => fmt(t.value.home.quickGenesisLeft, { n }));
+  return genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: supply.value })
+    : (genesisBlockText.value ?? t.value.genesis.ctaSoldOut);
+});
+
 const chips = computed(() => [
   { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: stakingSubtitle.value, tone: "brand" as const },
-  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : (genesisBlockText.value ?? t.value.genesis.ctaSoldOut), tone: "warm" as const },
-  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: fmt(t.value.home.quickMissionsActive, { n: quest.remoteQuests.filter((row) => isActionableQuest(row, now.value * 1000)).length }), tone: "brand" as const },
-  { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: fmt(t.value.home.quickDailyStreak, { n: faucet.signInStreak }), tone: "warm" as const },
+  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisSubtitle.value, tone: "warm" as const },
+  { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: missionsSubtitle.value, tone: "brand" as const },
+  { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: dailySubtitle.value, tone: "warm" as const },
 ]);
 
 function iconColor(tone: "brand" | "warm"): string {

@@ -4,6 +4,7 @@ import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import { assertAuthGuardRoutes } from "./lib/probe-coverage.mjs";
 import { waitForUniAppPage } from "./lib/probe-readiness.mjs";
+import { installProbeConversationRealtime, probeConversationReadFixture } from "./lib/probe-conversation-realtime.mjs";
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const browser = await chromium.launch();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -93,9 +94,10 @@ async function installServerSessionBoundary(page, authenticated) {
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ code: 0, message: "OK", data: {} }),
+      body: JSON.stringify({ code: 0, message: "OK", data: authenticated ? probeConversationReadFixture(url, route.request()) ?? {} : {} }),
     });
   });
+  await installProbeConversationRealtime(page, { authenticated });
 }
 
 async function routeAfter(authenticated, target) {

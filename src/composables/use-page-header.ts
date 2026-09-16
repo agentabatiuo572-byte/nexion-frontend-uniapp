@@ -1,6 +1,7 @@
 import { watch, onUnmounted } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import { usePageHeader, type PageHeaderPayload } from "@/store/page-header";
+import { createPageHeaderVisibilityGate } from "@/lib/page-header-visibility";
 
 type PayloadInput = PageHeaderPayload | (() => PageHeaderPayload);
 
@@ -21,12 +22,16 @@ export function useSetPageHeader(input: PayloadInput) {
   const store = usePageHeader();
   const get = (): PageHeaderPayload => (typeof input === "function" ? input() : input);
   const owner = Symbol("page-header-owner");
+  const visibility = createPageHeaderVisibilityGate(
+    (payload: PageHeaderPayload) => store.set(payload, owner),
+    () => store.clear(owner),
+  );
 
   // Reactive: re-set whenever the getter's deps change (async product load etc.).
-  watch(get, (v) => store.set(v, owner), { immediate: true });
+  watch(get, (v) => visibility.publish(v), { immediate: true });
   // Re-assert on show (another page's onHide may have cleared it before we re-enter).
-  onShow(() => store.set(get(), owner));
+  onShow(() => visibility.show(get()));
   // Clear so the nav header doesn't bleed into the next page — but only our own entry.
-  onHide(() => store.clear(owner));
-  onUnmounted(() => store.clear(owner));
+  onHide(() => visibility.hide());
+  onUnmounted(() => visibility.hide());
 }
