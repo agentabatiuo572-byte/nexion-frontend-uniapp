@@ -14,7 +14,7 @@ describe("bank withdrawal server contract", () => {
     const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A" };
     const request = vi.fn().mockResolvedValue({ beneficiary: saved });
     const api = createBankWithdrawalApi({ request } as never);
-    await expect(api.bind(body, "bind-test")).resolves.toEqual(saved);
+    await expect(api.bind(body, "bind-test")).resolves.toMatchObject({ ...saved, canWithdraw: false, verificationStatus: "unavailable", payoutCapability: "unknown" });
     for (const invalid of [{ ...saved, bankCode: "ACB" }, { ...saved, maskedAccount: "****1234" }, { ...saved, maskedAccount: "00123456789" }]) {
       request.mockResolvedValue({ beneficiary: invalid });
       await expect(api.bind(body, "bind-test")).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");

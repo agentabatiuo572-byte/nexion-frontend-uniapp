@@ -13,9 +13,11 @@
       </view>
 
       <view v-if="state.config?.beneficiary" class="bound-summary" role="status">
-        <text class="head-title">{{ state.config.beneficiary.bankName }} · {{ state.config.beneficiary.maskedAccount }}</text>
+        <text class="head-title">{{ state.config.beneficiary.bankName === 'BANKQR' ? c.type : state.config.beneficiary.bankName }} · {{ state.config.beneficiary.maskedAccount }}</text>
+        <text class="hint" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <text class="hint">{{ t.bankWithdrawal.effective }}: {{ displayDate(state.config.beneficiary.effectiveAt) }}</text>
         <text class="hint">{{ t.bankWithdrawal.changeAfter }}: {{ displayDate(state.config.beneficiary.nextChangeAt) }}</text>
+        <view class="text-action" role="button" tabindex="0" data-testid="bank-binding-verify" :aria-disabled="state.busy || state.phase === 'uncertain'" @click="form.verify" @keydown.enter.prevent="form.verify" @keydown.space.prevent="form.verify"><text>{{ t.bankWithdrawal.verifyAgain }}</text></view>
       </view>
       <text v-if="state.busy && !state.config" class="hint" role="status">{{ t.bankWithdrawal.loading }}</text>
       <view v-if="state.error" class="error-note" role="alert"><text>{{ errorMessage }}</text></view>
@@ -25,10 +27,6 @@
         <view class="binding-fields">
           <text class="field-label">{{ c.accountLabel }} <text class="required">*</text></text>
           <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
-          <view class="expiry-row">
-            <view><text class="field-label">{{ t.cards.formExpiryLabel }}</text><input class="field mono" disabled :placeholder="c.notApplicable" :aria-label="t.cards.formExpiryLabel" autocomplete="off" data-testid="bank-expiry" /></view>
-            <view><text class="field-label">{{ t.cards.formCvvLabel }}</text><input class="field mono" disabled :placeholder="c.notApplicable" :aria-label="t.cards.formCvvLabel" autocomplete="off" data-testid="bank-cvv" /></view>
-          </view>
           <text class="field-label">{{ c.holderLabel }} <text class="required">*</text></text>
           <input v-model="state.holder" class="field" type="text" maxlength="100" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.holderPlaceholder" :aria-label="`${c.holderLabel} · ${c.required}`" data-testid="bank-holder" />
           <view class="default-row" role="group" :aria-label="`${c.defaultLabel} · ${t.cards.formDefaultOn}`">
@@ -56,23 +54,26 @@
 import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { apiClient } from "@/api/runtime";
 import { createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { parseServerTimestamp } from "@/api/server-time";
 import { createBankBindingForm } from "@/lib/bank-binding-form";
+import { bankAccountNotice } from "@/lib/bank-withdrawal-state";
 import { navReplace } from "@/lib/route";
 
 const props = defineProps<{ active: boolean; returnTo: string }>();
 const t = useT(), c = computed(() => t.value.bankBinding), app = useApp();
 const form = createBankBindingForm(createBankWithdrawalApi(apiClient), () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`);
 const state = form.state, now = ref(Date.now());
+const accountStatus = computed(() => state.config?.beneficiary ? t.value.bankWithdrawal.accountStatus[bankAccountNotice(state.config.beneficiary, now.value)] : "");
 const locked = computed(() => !!state.config?.beneficiary && (parseServerTimestamp(state.config.beneficiary.nextChangeAt) ?? Infinity) > now.value);
 const fieldsDisabled = computed(() => state.busy || locked.value || state.phase !== "details");
 const canSubmit = computed(() => !state.busy && (state.phase === "uncertain" || (!locked.value && form.canContinue())));
 const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, bind: c.value.bindError, unknown: c.value.unknown }[state.error] || c.value.bindError));
-const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString();
+const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString(dateLocale(), { timeZone: "Asia/Ho_Chi_Minh", timeZoneName: "short" });
 function submitBinding() { if (canSubmit.value) void form.submit(); }
 watch(() => state.phase, async phase => {
   if (phase !== "saved") return;
@@ -103,7 +104,6 @@ function done() { void navReplace(props.returnTo === "/pages/me/wallet-cards" ? 
 .required { color: var(--v5-brand-2); }
 .field { box-sizing: border-box; width: 100%; height: 40px; min-height: 40px; background: var(--v5-surface-2); border: 1px solid var(--v5-border); border-radius: 8px; padding: 0 12px; margin-bottom: 12px; font-size: 13px; color: var(--v5-ink); }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: .03em; }
-.expiry-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .default-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 44px; color: var(--v5-ink-2); font-size: 13px; }
 .default-check { width: 18px; height: 18px; flex-shrink: 0; background: var(--v5-ink); border-radius: 2px; display: grid; place-items: center; }
 .default-state { margin-left: auto; color: var(--v5-brand); font-size: 12px; font-weight: 600; }
@@ -111,7 +111,7 @@ function done() { void navReplace(props.returnTo === "/pages/me/wallet-cards" ? 
 .submit { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 48px; padding: 8px 16px; margin-top: 16px; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-ink-4); font-size: 13px; font-weight: 600; text-align: center; }
 .submit.ready { background: var(--v5-brand); color: var(--v5-on-brand); cursor: pointer; }
 .submit.ready:active { transform: scale(.98); }
-.disclaimer { display: block; margin-top: 12px; padding: 0 4px; color: var(--v5-ink-4); font-size: 12px; line-height: 1.625; }
+.disclaimer { display: block; margin-top: 12px; padding: 0 4px; color: var(--v5-ink-3); font-size: 12px; line-height: 1.625; }
 .error-note { display: block; margin: 12px 0; padding: 12px; background: color-mix(in srgb, var(--v5-danger) 10%, transparent); border-radius: 8px; color: var(--v5-danger); font-size: 12px; line-height: 1.6; }
 .text-action { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); font-size: 13px; }
 .bound-summary { padding: 14px 2px; border-bottom: 1px solid var(--v5-border); }

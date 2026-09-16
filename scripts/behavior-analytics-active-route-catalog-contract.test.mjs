@@ -11,6 +11,7 @@ const { root: backendRoot, missing: backendMissing } = resolveSiblingRepo("nexio
 const migrationPaths = [
   "20260811_l6_h5_active_route_catalog.sql",
   "20260915_l6_bank_withdrawal_route.sql",
+  "20260916_l6_withdrawal_method_route.sql",
 ].map((name) => resolve(backendRoot, "scripts", "migrations", name));
 
 function manifestRoutes() {

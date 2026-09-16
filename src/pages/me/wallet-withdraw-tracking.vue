@@ -500,7 +500,7 @@ function relTime(ts: number): string {
 
 function goWithdraw() {
   if (againDisabled.value) return; // 置灰按钮不能靠视觉拦,点击也得真的不走
-  navTo("/pages/me/wallet-withdraw");
+  navTo("/pages/me/wallet-withdraw-method");
 }
 function goWallet() {
   navTo("/me/wallet");

@@ -265,7 +265,7 @@ function goTopup() {
   navTo("/pages/me/wallet-topup");
 }
 function goWithdraw() {
-  navTo("/pages/me/wallet-withdraw");
+  navTo("/pages/me/wallet-withdraw-method");
 }
 function goExchange() {
   navTo("/pages/me/wallet-exchange");

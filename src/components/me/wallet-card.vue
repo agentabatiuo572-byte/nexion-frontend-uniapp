@@ -64,7 +64,7 @@
             <WalletActionBtn href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
             </WalletActionBtn>
-            <WalletActionBtn href="/pages/me/wallet-withdraw" :label="t.me.withdraw" sub="USDT">
+            <WalletActionBtn href="/pages/me/wallet-withdraw-method" :label="t.me.withdraw" sub="USDT / VND">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14" /><path d="m6 9 6-6 6 6" /><path d="M19 21H5" /></svg>
             </WalletActionBtn>
             <WalletActionBtn href="/pages/me/wallet-exchange" :label="t.me.exchange" sub="USDT ⇄ NEX">

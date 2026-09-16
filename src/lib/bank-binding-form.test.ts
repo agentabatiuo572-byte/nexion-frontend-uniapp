@@ -5,7 +5,7 @@ import { ApiError } from "@/api/errors";
 const beneficiary = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2099-09-17T00:00:00Z", nextChangeAt: "2099-09-23T00:00:00Z" };
 const config = { enabled: false, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", beneficiary: null };
 function fixture() {
-  const api = { config: vi.fn().mockResolvedValue(config), bind: vi.fn().mockResolvedValue(beneficiary) };
+  const api = { config: vi.fn().mockResolvedValue(config), bind: vi.fn().mockResolvedValue(beneficiary), verify: vi.fn().mockResolvedValue(beneficiary) };
   let current = "user-a:1";
   const form = createBankBindingForm(api, () => current);
   const fill = () => Object.assign(form.state, { account: "00123456789", holder: "NGUYEN VAN A" });
