@@ -59,6 +59,34 @@ function authority(canStart = true, status: TrialAuthorityState["status"] = "non
 }
 beforeEach(() => { setActivePinia(createPinia()); vi.resetAllMocks(); });
 
+describe("Earn hero display remains separate from claim authority", () => {
+  it.each([true, false])("retains an eligible or product-unavailable hero during polling: eligible=%s", async eligible => {
+    const trial = useFreeTrial();
+    const state = { ...authority(eligible), eligibilityReason: eligible ? undefined : "product-unavailable" as const };
+    expect(trial.showHeroPromo()).toBe(false);
+    remote.state.mockResolvedValueOnce(state); await trial.refreshRemote();
+    expect(trial.showHeroPromo()).toBe(true); expect(trial.showPromo()).toBe(eligible);
+    const pending = deferred<TrialAuthorityState>(); remote.state.mockReturnValueOnce(pending.promise);
+    const poll = trial.poll(Date.now());
+    expect(trial.showHeroPromo()).toBe(true); expect(trial.canStart()).toBe(false);
+    pending.reject(Error("offline")); await poll;
+    expect(trial.showHeroPromo()).toBe(true); expect(trial.canStart()).toBe(false);
+    remote.eligibility.mockResolvedValueOnce(authority(false)); await trial.refreshEligibilityRemote();
+    expect(trial.showHeroPromo()).toBe(false); expect(remote.start).not.toHaveBeenCalled();
+  });
+  it("clears retained hero on same-key rebind and cannot inherit old account responses", async () => {
+    const trial = useFreeTrial(); remote.state.mockResolvedValueOnce(authority());
+    trial.bindAccount("account-a"); await trial.refreshRemote(); expect(trial.showHeroPromo()).toBe(true);
+    const old = deferred<TrialAuthorityState>(), fresh = deferred<TrialAuthorityState>();
+    remote.state.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+    const oldRead = trial.refreshRemote(true); trial.bindAccount("account-a");
+    expect(trial.showHeroPromo()).toBe(false);
+    old.resolve(authority()); await oldRead; expect(trial.showHeroPromo()).toBe(false);
+    fresh.resolve(authority(false)); await vi.waitFor(() => expect(trial.authorityStatus).toBe("ready"));
+    expect(trial.showHeroPromo()).toBe(false);
+  });
+});
+
 describe("Me trial promotion display vs claim authority", () => {
   it("blocks the actual banner handler until current authority is ready", async () => {
     const trial = useFreeTrial(), show = vi.fn(), actions = bannerActions(trial, show);

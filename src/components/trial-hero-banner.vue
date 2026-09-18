@@ -7,7 +7,7 @@
   3D Y-flip entrance gated on scroll-into-view (useScrollGrowProgress → `played`),
   one-shot diagonal shimmer. LEFT identity body · dashed perforation · RIGHT value
   stub · dashed separator · scarcity dot + Claim CTA. Hidden unless trial idle &
-  canStart(). Tap opens the trial claim sheet. <button> → <view @click> (uni).
+  confirmed presentation. Claiming still requires fresh authority.
 -->
 <template>
   <!-- 《08》§2:原 active:scale-[0.98] = 0.2% 缩放,肉眼与探针都测不出 —— 声明了等于没有。
@@ -20,15 +20,12 @@
     ref="elRef"
     class="block w-full nx-trial-hero"
     :style="rootStyle"
-    role="button"
-    :tabindex="canClaim ? 0 : -1"
-    :aria-disabled="canClaim ? 'false' : 'true'"
-    @click="onClick"
-    @keydown.enter.prevent="onClick"
-    @keydown.space.prevent="onClick"
+    :aria-busy="trial.authorityStatus === 'loading'"
   >
     <!-- Coupon body — frosted glass purple theme -->
-    <view class="nx-trial-hero__body" :style="bodyStyle">
+    <view class="nx-trial-hero__body" :style="bodyStyle" role="button"
+      :tabindex="canClaim ? 0 : -1" :aria-disabled="canClaim ? 'false' : 'true'"
+      @click="onClick" @keydown.enter.prevent="onClick" @keydown.space.prevent="onClick">
       <!-- Shimmer sweep (gated on played) -->
       <view :style="shimmerStyle" />
 
@@ -95,6 +92,10 @@
         </view>
       </view>
     </view>
+      <view v-if="trial.authorityStatus === 'error'" role="button" tabindex="0" :aria-label="t.trial.entryRetry"
+        style="padding: 8px 16px" @click.stop="retryEligibility" @keydown.enter.stop.prevent="retryEligibility" @keydown.space.stop.prevent="retryEligibility">
+        <text>{{ t.trial.entryRetry }}</text>
+      </view>
   </view>
 </template>
 
@@ -124,7 +125,7 @@ const canClaim = computed(() => trial.status === "none" && eligibility.value.ok)
 const productUnavailable = computed(() => eligibility.value.reason === "product-unavailable");
 const visible = computed(() => trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0
-  && (canClaim.value || productUnavailable.value));
+  && trial.showHeroPromo());
 
 const trialDays = computed(() => trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialCfg.config.shadowDailyUSD);
@@ -135,7 +136,8 @@ const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: tri
 const availabilityText = computed(() => productUnavailable.value
   ? t.value.trial.heroProductUnavailable
   : trialsLeftText.value);
-const claimCtaText = computed(() => productUnavailable.value
+const claimCtaText = computed(() => trial.authorityStatus === "error" ? t.value.trial.entryUnavailable
+  : trial.authorityStatus === "loading" ? t.value.trial.entryChecking : productUnavailable.value
   ? t.value.store.temporarilyOutOfStock
   : t.value.trial.heroClaimCta);
 const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/d × ${trialDays.value}`);
@@ -209,6 +211,11 @@ const shimmerStyle = computed<CSSProperties>(() => ({
 function onClick() {
   if (!canClaim.value) return;
   claimSheet.show();
+}
+
+function retryEligibility() {
+  if (trial.authorityStatus !== "error") return;
+  void trial.refreshEligibilityRemote();
 }
 </script>
 

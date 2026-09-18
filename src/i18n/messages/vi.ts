@@ -801,6 +801,8 @@ export const vi: Messages = {
     capExplainS2Title: "Trợ cấp tác vụ máy mới",
     capExplainS2Body: "Thiết bị vừa kích hoạt được ưu tiên chia tác vụ để luôn chạy đủ công suất; khi hết thời gian trợ cấp, việc chia tác vụ theo đúng cơ cấu kho tác vụ hiện tại.",
     capExplainCta: "Xem thiết bị tính toán mạnh hơn",
+    deviceCapabilityTitle: "Khả năng thiết bị",
+    deviceCapabilityBody: "Khả năng nhận tác vụ phụ thuộc vào thiết bị và phân công thực tế. Hiện chưa có ước tính được xác nhận về tác vụ hoặc thu nhập bổ sung.",
     emptySlotsTitle: "Khe trống",
     emptySlotsHint: "Bạn còn {n} khe đang bỏ trống. Mỗi S1 lấp một khe và kiếm {rate}/ngày.",
     ifAllFilled: "nếu lấp hết bằng S1",

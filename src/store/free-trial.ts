@@ -170,6 +170,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // Presentation only: keep the last confirmed promotion mounted during reads.
   // Never use this retained value to authorize a claim; canStart stays fail-closed.
   const confirmedPromoVisible = ref(false);
+  const confirmedHeroVisible = ref(false);
   const remoteEligibilityReason = ref<TrialIneligibleReason>("unknown");
   const authorityClaimNo = ref<string | null>(null);
   const authorityServerState = ref<TrialAuthorityState["serverState"] | null>(null);
@@ -256,6 +257,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authoritativeShadowNEX.value = next.shadowNEX;
     remoteCanStart.value = next.canStart;
     confirmedPromoVisible.value = next.canStart && next.status === "none";
+    confirmedHeroVisible.value = next.status === "none"
+      && (next.canStart || next.eligibilityReason === "product-unavailable");
     remoteEligibilityReason.value = next.eligibilityReason ?? "unknown";
     authorityClaimNo.value = next.claimNo;
     authorityServerState.value = next.serverState;
@@ -321,6 +324,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     if (remoteApiEnabled) {
       lastAppliedSequence = ++authorityRequestSequence;
       confirmedPromoVisible.value = false;
+      confirmedHeroVisible.value = false;
       clearRemoteFacts();
       // A rebind invalidates even same-key responses. Start this generation's
       // own read instead of deduplicating onto the request we just invalidated.
@@ -356,6 +360,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   function showPromo(): boolean {
     return remoteApiEnabled ? confirmedPromoVisible.value : canStart();
+  }
+
+  function showHeroPromo(): boolean {
+    return remoteApiEnabled ? confirmedHeroVisible.value
+      : status.value === "none" && (canStart() || eligibility().reason === "product-unavailable");
   }
 
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
@@ -566,7 +575,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
     authorityClaimNo, authorityVersion, authorityServerState,
-    eligibility, canStart, showPromo, start, convert, cancel, poll, bindAccount, snapshot,
+    eligibility, canStart, showPromo, showHeroPromo, start, convert, cancel, poll, bindAccount, snapshot,
     refreshRemote, refreshEligibilityRemote,
   };
 });

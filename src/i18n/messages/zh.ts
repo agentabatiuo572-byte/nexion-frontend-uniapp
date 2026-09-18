@@ -785,6 +785,8 @@ export const zh: Messages = {
     capExplainS2Title: "新机任务补贴",
     capExplainS2Body: "新激活的设备享有任务优先派单补贴,保障满负荷接单;补贴期结束后,按当前任务池结构正常派单。",
     capExplainCta: "查看更高算力设备",
+    deviceCapabilityTitle: "设备能力",
+    deviceCapabilityBody: "任务可用性取决于设备能力与实际分配。当前暂无可确认的新增任务或收益估算。",
     emptySlotsTitle: "空置算力槽位",
     emptySlotsHint: "你还有 {n} 个槽位空置。每填入 1 台 S1 = {rate}/d。",
     ifAllFilled: "全部填满 S1",

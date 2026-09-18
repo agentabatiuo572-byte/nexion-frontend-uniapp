@@ -17,8 +17,8 @@
       </view>
 
       <view v-if="orderPanels.showSourceOutage" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
-        <view v-for="source in unavailableOrderSources" :key="source" class="flex items-center justify-between" style="gap: 12px">
-          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source }} · {{ t.authOtp.errorServiceUnavailable }}</text>
+        <view v-for="source in unavailableOrderSources" :key="source.label" class="flex items-center justify-between" style="gap: 12px">
+          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source.label }} · {{ source.message }}</text>
           <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
@@ -119,8 +119,9 @@ const remoteOrdersResolved = ref(false);
 const commerceOrdersUnavailable = ref(false);
 const genesisOrdersUnavailable = ref(false);
 const unavailableOrderSources = computed(() => [
-  ...(commerceOrdersUnavailable.value ? [t.value.headerTitles.storeOrders] : []),
-  ...(genesisOrdersUnavailable.value ? [t.value.me.genesisNode] : []),
+  ...(commerceOrdersUnavailable.value ? [{ label: t.value.headerTitles.storeOrders, message: t.value.authOtp.errorServiceUnavailable }] : []),
+  ...(genesisOrdersUnavailable.value ? [{ label: t.value.me.genesisNode, message: genesis.remoteEligibilityError === "GENESIS_SERIES_UNAVAILABLE"
+    ? t.value.genesis.marketClosed.seriesUnavailable : t.value.authOtp.errorServiceUnavailable }] : []),
 ]);
 const orderPanels = computed(() => orderListPanels({
   loading: isInitialOrderReadLoading({

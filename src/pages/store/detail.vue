@@ -223,10 +223,13 @@
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Label }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Body }}</text>
               </view>
-              <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle" role="button" tabindex="0" :aria-label="row.Primary" @click="openTrustUrl(row.Url)">
+              <view v-for="row in productAuditRows" :key="row.Primary" :class="safeTrustUrl(row.Url) ? 'active:opacity-70' : ''" :style="trustDisclosureRowStyle"
+                role="link" :tabindex="safeTrustUrl(row.Url) ? 0 : -1" :aria-disabled="!safeTrustUrl(row.Url)" :aria-label="row.Primary"
+                @click="openTrustUrl(row.Url)" @keydown.enter.prevent="openTrustUrl(row.Url)">
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
-                <text v-if="row.Url" class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
+                <text v-if="safeTrustUrl(row.Url)" class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
+                <text v-else class="block" :style="trustBodyStyle">{{ t.trust.linkUnavailable }}</text>
               </view>
             </template>
             <template v-else>
@@ -282,6 +285,7 @@ import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { toast } from "@/store/ui";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
@@ -531,20 +535,27 @@ async function refreshTrustMaterial() {
   if (await refreshTrust(true)) recordPublishedTrustViews(["complianceBadges", "auditsReserves"], trustLanguage.value);
 }
 
-function openTrustUrl(raw: string) {
+function safeTrustUrl(raw: string): string | null {
   const value = raw.trim();
-  if (!value) return;
-  if (/^\/pages\/[A-Za-z0-9/_-]+$/.test(value)) { navTo(value); return; }
+  if (/^\/pages\/[A-Za-z0-9/_-]+$/.test(value)) return value;
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return;
-    // #ifdef H5
-    window.open(parsed.toString(), "_blank");
-    // #endif
-    // #ifndef H5
-    (globalThis as { plus?: { runtime?: { openURL: (url: string) => void } } }).plus?.runtime?.openURL(parsed.toString());
-    // #endif
-  } catch { /* Invalid CMS link remains non-interactive. */ }
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.toString() : null;
+  } catch { return null; }
+}
+function openTrustUrl(raw: string) {
+  const href = safeTrustUrl(raw);
+  if (!href) { toast.error(t.value.trust.linkUnavailable); return; }
+  if (href.startsWith("/")) { navTo(href); return; }
+  let opened = false;
+  // #ifdef H5
+  opened = !!window.open(href, "_blank");
+  // #endif
+  // #ifndef H5
+  const runtime = (globalThis as { plus?: { runtime?: { openURL: (url: string) => void } } }).plus?.runtime;
+  if (runtime) { runtime.openURL(href); opened = true; }
+  // #endif
+  if (!opened) toast.error(t.value.trust.openFailed);
 }
 const faqs = computed(() => {
   const f = t.value.store.faq;
