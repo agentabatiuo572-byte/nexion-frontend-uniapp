@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { parseServerTimestamp } from "./server-time";
 
 export type CanonicalNotificationPriority = "critical" | "high" | "normal" | "low";
 
@@ -64,8 +65,8 @@ function integer(value: unknown, min = 0): number | null {
 function timestamp(value: unknown, nullable = false): number | null {
   if (nullable && (value === null || value === undefined || value === "")) return null;
   if (typeof value !== "string" && typeof value !== "number") return null;
-  const parsed = typeof value === "number" ? value : Date.parse(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const parsed = typeof value === "number" ? value : parseServerTimestamp(value);
+  return parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function parseNotification(value: unknown): CanonicalNotification {
