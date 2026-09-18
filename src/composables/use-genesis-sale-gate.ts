@@ -169,7 +169,8 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
     const notices = t.value.genesis.marketClosed;
     switch (block.value) {
       case "configUnavailable":
-        return notices.configUnavailable;
+        return remoteApiEnabled && genesis.remotePublicError === "GENESIS_SERIES_UNAVAILABLE"
+          ? notices.seriesUnavailable : notices.configUnavailable;
       case "halted":
         return notices.halted;
       case "marketClosed":

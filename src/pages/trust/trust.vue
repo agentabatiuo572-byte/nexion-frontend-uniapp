@@ -55,12 +55,15 @@
           <template v-if="auditSection && auditRows.length">
             <SectionHeader :label="sectionLabel(sectionKey.auditsReserves)" :suffix="auditSection.version" />
             <view :style="listCardStyle">
-              <view v-for="(row, index) in auditRows" :key="row.Primary" class="active:opacity-75" :style="listRowStyle(index === auditRows.length - 1)" @click="openHref(row.Url)">
+              <view v-for="(row, index) in auditRows" :key="row.Primary" :class="safeHref(row.Url) ? 'active:opacity-75' : ''" :style="listRowStyle(index === auditRows.length - 1)"
+                role="link" :tabindex="safeHref(row.Url) ? 0 : -1" :aria-disabled="safeHref(row.Url) ? 'false' : 'true'"
+                @click="openHref(row.Url)" @keydown.enter.prevent="openHref(row.Url)">
                 <view class="min-w-0" style="flex: 1">
                   <text class="block" :style="titleStyle">{{ row.Primary }}</text>
                   <text v-if="row.Secondary" class="block" :style="bodyStyle">{{ row.Secondary }}</text>
+                  <text v-if="!safeHref(row.Url)" class="block" :style="bodyStyle">{{ tr.linkUnavailable }}</text>
                 </view>
-                <text v-if="row.Url" :style="linkStyle">↗</text>
+                <text v-if="safeHref(row.Url)" :style="linkStyle">↗</text>
               </view>
             </view>
           </template>
@@ -205,7 +208,7 @@ function safeHref(raw: string): string | null {
 
 function openHref(raw: string) {
   const href = safeHref(raw);
-  if (!href) return;
+  if (!href) { toast.error(t.value.trust.linkUnavailable); return; }
   if (href.startsWith("/")) { navTo(href); return; }
   let opened = false;
   // #ifdef H5

@@ -292,6 +292,7 @@ export const useGenesis = defineStore("genesis", () => {
   const remoteRoyaltyPct = ref<number | null>(null);
   const remoteEligibility = ref<GenesisEligibility | null>(null);
   const remoteEligibilityError = ref<string | null>(null);
+  const remotePublicError = ref<string | null>(null);
   const remotePublicReadState = ref<GenesisRemoteReadState>(remoteApiEnabled ? "loading" : "ready");
   const remoteAccountReadState = ref<GenesisRemoteReadState>(remoteApiEnabled ? "loading" : "ready");
   const remoteHalted = ref(remoteApiEnabled);
@@ -310,6 +311,7 @@ export const useGenesis = defineStore("genesis", () => {
   const tokenIdFor = genesisHoldingId;
 
   function applyPublicState(state: GenesisPublicState): void {
+    remotePublicError.value = null;
     remoteSecondaryCommandProtocol.value = state.secondaryCommandProtocol === 2 ? 2 : 0;
     remotePublicReadState.value = "ready";
     totalSlots.value = state.series.totalSupply;
@@ -391,6 +393,7 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function clearRemotePublicFacts(): void {
+    remotePublicError.value = null;
     remoteSecondaryCommandProtocol.value = 0;
     remotePublicReadState.value = "unavailable";
     // Zero means the public supply is unknown. Do not render the local 1,000-slot
@@ -442,6 +445,7 @@ export const useGenesis = defineStore("genesis", () => {
         remoteAccountReadState.value = "unavailable";
         remoteEligibilityError.value = reason;
       },
+      applyPublicError: (reason) => { remotePublicError.value = reason; },
       applyPublicState,
       applyAccount: applyAccountState,
       applyEligibility: (eligibility) => {
@@ -925,7 +929,7 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, remoteSupplyKnown, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, remoteTransactions, remoteMarketStats, remoteRoyaltyPct, remoteEligibility, remoteEligibilityError,
+    remoteListings, remoteTransactions, remoteMarketStats, remoteRoyaltyPct, remoteEligibility, remoteEligibilityError, remotePublicError,
     remotePublicReadState, remoteAccountReadState, remoteHalted,
     activityPage: activityPager.state, loadMoreActivity: activityPager.more,
     orderPage: orderPager.state, loadMoreGenesisOrders: orderPager.more,
