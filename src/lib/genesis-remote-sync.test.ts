@@ -37,6 +37,54 @@ function account(): GenesisAccountState {
 }
 
 describe("Genesis remote fact orchestration", () => {
+  const unavailable = () => new ApiError({ kind: "http", status: 503, code: 503, message: "GENESIS_SERIES_UNAVAILABLE" });
+  function failedScope(current = true, authority = true) {
+    return { hasAuthority: () => authority, isCurrent: () => current,
+      clear: vi.fn(), clearAccount: vi.fn(), clearPublic: vi.fn(),
+      applyPublicError: vi.fn(), applyEligibilityError: vi.fn(),
+      applyPublicState: vi.fn(), applyAccount: vi.fn(), applyEligibility: vi.fn() };
+  }
+  it("preserves an explicit missing-series classification after clearing failed facts", async () => {
+    const scope = failedScope();
+    const api = { state: vi.fn().mockRejectedValue(unavailable()), account: vi.fn().mockRejectedValue(unavailable()),
+      eligibility: vi.fn().mockRejectedValue(unavailable()) };
+    expect(await readGenesisRemoteFacts(api, scope)).toBe(false);
+    expect(scope.clear).toHaveBeenCalledOnce();
+    expect(scope.applyPublicError).toHaveBeenCalledWith("GENESIS_SERIES_UNAVAILABLE");
+    expect(scope.applyEligibilityError).toHaveBeenCalledWith("GENESIS_SERIES_UNAVAILABLE");
+    expect(scope.clear.mock.invocationCallOrder[0]).toBeLessThan(scope.applyPublicError.mock.invocationCallOrder[0]);
+    expect(scope.applyAccount).not.toHaveBeenCalled();
+    expect(scope.applyEligibility).not.toHaveBeenCalled();
+  });
+  it.each([
+    new Error("GENESIS_SERIES_UNAVAILABLE"),
+    new ApiError({kind:"http",status:503,code:503,message:"genesis_series_unavailable"}),
+    new ApiError({kind:"http",status:500,code:503,message:"GENESIS_SERIES_UNAVAILABLE"}),
+    new ApiError({kind:"http",status:503,code:500,message:"GENESIS_SERIES_UNAVAILABLE"}),
+    new ApiError({kind:"auth",status:503,code:503,message:"GENESIS_SERIES_UNAVAILABLE"}),
+    new ApiError({kind:"network",message:"private database detail"}),
+  ])("does not classify other errors as unpublished or expose raw detail: %s", async (error) => {
+    const scope=failedScope();
+    await readGenesisRemoteFacts({state:async()=>{throw error;}, account:async()=>{throw unavailable();},
+      eligibility:async()=>{throw error;}},scope);
+    expect(scope.applyPublicError).toHaveBeenCalledWith("GENESIS_PUBLIC_UNAVAILABLE");
+    expect(scope.applyEligibilityError).toHaveBeenCalledWith("GENESIS_ELIGIBILITY_UNAVAILABLE");
+  });
+  it("classifies anonymous public failure without reading or claiming account facts", async () => {
+    const scope=failedScope(true,false);
+    const api={state:vi.fn().mockRejectedValue(unavailable()),account:vi.fn(),eligibility:vi.fn()};
+    await readGenesisRemoteFacts(api,scope);
+    expect(scope.applyPublicError).toHaveBeenCalledWith("GENESIS_SERIES_UNAVAILABLE");
+    expect(scope.applyEligibilityError).not.toHaveBeenCalled();
+    expect(api.account).not.toHaveBeenCalled();expect(api.eligibility).not.toHaveBeenCalled();
+  });
+  it("never commits a missing-series error from an old account/run", async () => {
+    const scope=failedScope(false);
+    await readGenesisRemoteFacts({state:async()=>{throw unavailable();},account:async()=>{throw unavailable();},
+      eligibility:async()=>{throw unavailable();}},scope);
+    expect(scope.clear).not.toHaveBeenCalled();expect(scope.applyPublicError).not.toHaveBeenCalled();
+    expect(scope.applyEligibilityError).not.toHaveBeenCalled();
+  });
   it("keeps holder facts when the unrelated public state projection is unavailable", async () => {
     const applied: { account?: GenesisAccountState; eligibility?: GenesisEligibility } = {};
     const applyPublicState = vi.fn();

@@ -21,13 +21,13 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
               </view>
               <view class="flex-1 min-w-0">
-                <text class="block" :style="ctaTitleStyle">{{ t.genesisHolder.notHolderTitle }}</text>
+                <text class="block" :style="ctaTitleStyle">{{ remoteApiEnabled && genesis.remoteAccountReadState !== "ready" ? t.holderFacts.unconfirmed : t.genesisHolder.notHolderTitle }}</text>
                 <text class="block" :style="ctaBodyStyle">{{ notHolderBodyText }}</text>
               </view>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <view :style="previewStyle">
+          <view v-if="!remoteApiEnabled || genesis.remoteAccountReadState === 'ready'" :style="previewStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text :style="previewTextStyle">{{ t.genesisHolder.previewModeBanner }}</text>
           </view>
@@ -302,7 +302,8 @@ const reasonText = (code: string): string =>
 const holderFactText = computed(() => {
   const fact = remoteHolderFact.value;
   const copy = t.value.holderFacts;
-  if (!fact) return copy.unavailable;
+  if (!fact) return genesis.remoteEligibilityError === "GENESIS_SERIES_UNAVAILABLE"
+    ? t.value.genesis.marketClosed.seriesUnavailable : copy.unavailable;
   if (holderFactStale.value) return copy.stale;
   if (fact.holderStatus === "CONFIG_UNAVAILABLE") return copy.unpublished;
   if (fact.holderStatus === "NOT_EFFECTIVE") return copy.notEffective;

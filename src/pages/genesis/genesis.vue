@@ -293,6 +293,8 @@ function answerKey(k: "q1" | "q2" | "q3"): "a1" | "a2" | "a3" {
 function faqAnswer(k: "q1" | "q2" | "q3"): string {
   const answer = t.value.genesis.faq[answerKey(k)];
   if (k !== "q2") return answer;
+  if (remoteApiEnabled && genesis.remotePublicError === "GENESIS_SERIES_UNAVAILABLE")
+    return t.value.genesis.marketClosed.seriesUnavailable;
   const royalty = presentGenesisRoyalty(genesis.remoteRoyaltyPct);
   return royalty === null ? t.value.genesis.royaltyUnavailable : fmt(answer, { royalty });
 }
@@ -334,7 +336,8 @@ const dockActive = computed(() => block.value === null);
 const dockDisabled = computed(() => block.value !== null && block.value !== "soldOut");
 /** 阻断态的副说明(toast 第二行)。配置未知给「可重试」,其余给「持仓不受影响」定心。 */
 const blockHintSub = computed(() => {
-  if (block.value === "configUnavailable") return t.value.genesis.marketClosed.retryHint;
+  if (block.value === "configUnavailable") return genesis.remotePublicError === "GENESIS_SERIES_UNAVAILABLE"
+    ? t.value.genesis.marketClosed.seriesUnavailable : t.value.genesis.marketClosed.retryHint;
   if (block.value === "preSale") return "";
   return t.value.genesis.marketClosed.holdingsSafe;
 });

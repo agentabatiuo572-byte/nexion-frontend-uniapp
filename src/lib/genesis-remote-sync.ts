@@ -3,6 +3,7 @@ import type {
   GenesisEligibility,
   GenesisPublicState,
 } from "@/api/genesis-api";
+import { ApiError } from "@/api/errors";
 
 export interface GenesisRemoteReadApi {
   state(): Promise<GenesisPublicState>;
@@ -19,15 +20,27 @@ export interface GenesisRemoteReadScope {
   clearPublic?(): void;
   clearAccount(): void;
   applyEligibilityError?(reason: GenesisEligibilityReadError): void;
+  applyPublicError?(reason: GenesisPublicReadError): void;
   applyPublicState(state: GenesisPublicState): void;
   applyAccount(state: GenesisAccountState): void;
   applyEligibility(eligibility: GenesisEligibility): void;
 }
 
-export type GenesisEligibilityReadError = "GENESIS_ELIGIBILITY_UNAVAILABLE";
+export type GenesisEligibilityReadError = "GENESIS_ELIGIBILITY_UNAVAILABLE" | "GENESIS_SERIES_UNAVAILABLE";
+export type GenesisPublicReadError = "GENESIS_PUBLIC_UNAVAILABLE" | "GENESIS_SERIES_UNAVAILABLE";
 
-function eligibilityReadError(..._errors: unknown[]): GenesisEligibilityReadError {
-  return "GENESIS_ELIGIBILITY_UNAVAILABLE";
+function seriesUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.kind === "http" && error.status === 503
+    && error.code === 503 && error.message === "GENESIS_SERIES_UNAVAILABLE";
+}
+
+function eligibilityReadError(...errors: unknown[]): GenesisEligibilityReadError {
+  return errors.length > 0 && errors.every(seriesUnavailable)
+    ? "GENESIS_SERIES_UNAVAILABLE" : "GENESIS_ELIGIBILITY_UNAVAILABLE";
+}
+
+function publicReadError(error: unknown): GenesisPublicReadError {
+  return seriesUnavailable(error) ? "GENESIS_SERIES_UNAVAILABLE" : "GENESIS_PUBLIC_UNAVAILABLE";
 }
 
 /**
@@ -48,10 +61,12 @@ export async function readGenesisRemoteFacts(
     // Supply, sale and market state are intentionally public. Anonymous users
     // may read those facts, but protected account/eligibility endpoints must
     // remain untouched and any prior account projection must be removed.
-    const publicState = await api.state().catch(() => null);
+    let failure: unknown;
+    const publicState = await api.state().catch((error) => { failure = error; return null; });
     if (!scope.isCurrent()) return false;
     if (!publicState) {
       scope.clear();
+      scope.applyPublicError?.(publicReadError(failure));
       return false;
     }
     scope.clearAccount();
@@ -77,13 +92,21 @@ export async function readGenesisRemoteFacts(
     && eligibilityResult.status === "fulfilled";
   if (!publicAvailable && !accountAvailable) {
     scope.clear();
+    scope.applyPublicError?.(publicReadError(publicResult.reason));
+    scope.applyEligibilityError?.(eligibilityReadError(
+      accountResult.status === "rejected" ? accountResult.reason : null,
+      eligibilityResult.status === "rejected" ? eligibilityResult.reason : null,
+    ));
     return false;
   }
   // Commit the public control plane first, then let an authenticated account
   // projection overlay only its explicitly scoped facts. This keeps a
   // just-confirmed purchase visible without changing public supply ownership.
   if (publicAvailable) scope.applyPublicState(publicResult.value);
-  else scope.clearPublic?.();
+  else {
+    scope.clearPublic?.();
+    scope.applyPublicError?.(publicReadError(publicResult.reason));
+  }
   if (accountAvailable) {
     scope.applyAccount(accountResult.value);
     scope.applyEligibility(eligibilityResult.value);

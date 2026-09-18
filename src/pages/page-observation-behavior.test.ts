@@ -145,7 +145,7 @@ it("actual Genesis sync separates public readiness from account-only success and
     applyAccountState: () => {}, clearRemoteAccountFacts: () => {},
     totalSlots: ref(), soldSlots: ref(), nexListed: ref(), remoteMarketStats: ref(), remoteHalted: ref(),
     remoteListings: ref(), listingNoByTokenId: ref(), tokenIdFor: (id: string) => id,
-    remoteEligibility: ref(), remoteEligibilityError: ref(),
+    remoteEligibility: ref(), remoteEligibilityError: ref(), remotePublicError: ref(),
     remoteSupplyKnown: ref(), remoteRoyaltyPct: ref(), remoteAccountReadState: ref(),
     remoteSecondaryCommandProtocol: ref(), nexListedAt: ref(),
   };
