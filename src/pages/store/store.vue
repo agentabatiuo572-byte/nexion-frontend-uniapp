@@ -21,28 +21,38 @@
 
       <!-- Server mode has no seeded purchase inventory. Keep the live catalog
            state visible so a malformed or empty response cannot hide every CTA. -->
-      <view v-if="catalogStatus === 'loading'" data-testid="store-catalog-loading" :style="catalogStateStyle">
+      <view v-if="catalogStatus === 'loading' && !catalogHasProducts" data-testid="store-catalog-loading" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
-      <view v-else-if="catalogStatus === 'error'" data-testid="store-catalog-error" :style="catalogStateStyle">
+      <view v-else-if="catalogStatus === 'error' && !catalogHasProducts" data-testid="store-catalog-error" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
         <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
           <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
-      <view v-else-if="!catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
+      <view v-if="catalogStatus === 'ready' && !catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogEmptyTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogEmptyBody }}</text>
       </view>
-      <template v-else>
-        <SectionHeader :title="t.store.secRecommended">
+      <template v-if="catalogHasProducts">
+        <SectionHeader :title="t.store.secRecommended" style="height: 44px">
           <template #right>
-            <text class="font-mono-tabular inline-flex items-center gap-1" :style="amberTagStyle">{{ t.store.secRecommendedTag }}</text>
+            <view style="height: 44px; max-width: 65%; display: flex; align-items: center; overflow: hidden">
+              <text v-if="catalogStatus === 'loading'" role="status" style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ t.store.catalogLoadingTitle }}</text>
+              <view v-else-if="catalogStatus === 'error'" role="button" tabindex="0"
+                :aria-label="`${t.store.catalogErrorTitle} · ${t.store.catalogRetry}`"
+                style="height: 44px; min-width: 0; display: flex; flex-direction: column; justify-content: center; font-size: 12px; line-height: 18px"
+                @click="retryCatalog" @keydown.enter.prevent="retryCatalog" @keydown.space.prevent="retryCatalog">
+                <text style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ t.store.catalogErrorTitle }}</text>
+                <text style="color: var(--v5-brand)">{{ t.store.catalogRetry }}</text>
+              </view>
+              <text v-else class="font-mono-tabular inline-flex items-center gap-1" :style="amberTagStyle">{{ t.store.secRecommendedTag }}</text>
+            </view>
           </template>
         </SectionHeader>
-        <ProductCard v-if="featured" :product="featured" featured />
+        <ProductCard v-if="featured" :key="featured.id" :product="featured" featured />
 
         <PurchaseTicker />
 
@@ -94,7 +104,7 @@ import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesis } from "@/store/genesis";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
-import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
@@ -108,7 +118,9 @@ import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-o
 
 const t = useT();
 const app = useApp();
-const ownedDevices = computed(() => app.remoteFleetStatus === "ready" ? app.visibleDevices : []);
+// The fleet store clears this flag on every account binding. Retained devices
+// are presentation only and never supply purchase eligibility.
+const ownedDevices = computed(() => app.remoteFleetHasSnapshot ? app.visibleDevices : []);
 const ownedHardware = computed(() => highestOwnedHardware(ownedDevices.value));
 const genesisCfg = useGenesisConfig();
 const genesis = useGenesis();
@@ -170,28 +182,27 @@ async function observeDayOneStorePage(): Promise<void> {
 watch(catalogStatus, () => {
   void observeDayOneStorePage();
 });
-const catalogHasProducts = computed(() => {
-  const status = productCatalogState.status;
-  return status === "ready" && PRODUCTS.length > 0;
-});
+const displayCatalog = computed(() => remoteApiEnabled ? productCatalogPresentation.value : null);
+const displayProducts = computed(() => remoteApiEnabled ? displayCatalog.value?.products ?? [] : PRODUCTS);
+const catalogHasProducts = computed(() => displayProducts.value.length > 0);
 const yieldAuthority = computed(() => buildStoreYieldAuthority(
-  productCatalogState.status === "ready" ? PRODUCTS : [],
+  displayProducts.value,
   earnConfig.phoneTiers.value?.tiers ?? [],
   {
-    source: productCatalogState.source,
-    sourceEnvironment: productCatalogState.sourceEnvironment,
-    runId: productCatalogState.runId,
-    serverCanonical: productCatalogState.serverCanonical,
+    source: displayCatalog.value?.source ?? productCatalogState.source,
+    sourceEnvironment: displayCatalog.value?.sourceEnvironment ?? productCatalogState.sourceEnvironment,
+    runId: displayCatalog.value?.runId ?? productCatalogState.runId,
+    serverCanonical: displayCatalog.value?.serverCanonical ?? productCatalogState.serverCanonical,
   },
 ));
 const unlockedProducts = computed(() =>
-  (productCatalogState.status === "ready" ? PRODUCTS : []).filter((p) => {
+  displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
     return isProductAvailable(p, phase.value);
   }),
 );
 const lockedProducts = computed(() =>
-  PRODUCTS.filter((p) => {
+  displayProducts.value.filter((p) => {
     if (!mounted.value) return true;
     return !isProductAvailable(p, phase.value);
   }),

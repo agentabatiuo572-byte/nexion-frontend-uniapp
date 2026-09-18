@@ -279,7 +279,7 @@
     </view>
 
     <!-- Phone: locked-tasks loss-ad -->
-    <view v-if="device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
+    <view v-if="!remoteApiEnabled && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
@@ -303,6 +303,15 @@
       </view>
       <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0" @click="goUnlock" @keydown.enter.stop.prevent="goUnlock" @keydown.space.stop.prevent="goUnlock">
         <text :style="unlockCtaLabelStyle">{{ unlockText }}</text>
+      </view>
+    </view>
+
+    <view v-if="remoteApiEnabled && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
+      <text class="block" :style="sectionLabelStyle">{{ t.earn.deviceCapabilityTitle }}</text>
+      <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.deviceCapabilityBody }}</text>
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0"
+        @click="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
+        <text :style="unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
 

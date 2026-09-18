@@ -26,7 +26,34 @@ function deferred<T>() {
 describe("product catalog refresh", () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+  });
+
+  it("keeps only a presentation snapshot during refresh/error, accepts real deletions, and clears on rebind", async () => {
+    const snapshot = { products: [{ id: "confirmed" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "one" };
+    mocks.catalog.mockResolvedValueOnce(snapshot);
+    const catalog = await import("./product-catalog");
+    expect(catalog.productCatalogPresentation.value).toBeNull();
+    await catalog.refreshProductCatalog(true);
+    const confirmed = catalog.productCatalogPresentation.value;
+    const pending = deferred<any>();
+    mocks.catalog.mockReturnValueOnce(pending.promise);
+    const refresh = catalog.refreshProductCatalog(true);
+    expect(catalog.productCatalogState.status).toBe("loading");
+    expect(catalog.productCatalogPresentation.value).toBe(confirmed);
+    pending.resolve({ ...snapshot, revision: "two" });
+    await refresh;
+    mocks.catalog.mockRejectedValueOnce(new Error("offline"));
+    await catalog.refreshProductCatalog(true);
+    expect(catalog.productCatalogState.status).toBe("error");
+    expect(catalog.productCatalogState.serverCanonical).toBe(false);
+    expect(mocks.clear).toHaveBeenCalled();
+    expect(catalog.productCatalogPresentation.value?.products).toEqual(snapshot.products);
+    mocks.catalog.mockResolvedValueOnce({ ...snapshot, products: [], revision: "deleted" });
+    await catalog.refreshProductCatalog(true);
+    expect(catalog.productCatalogPresentation.value?.products).toEqual([]);
+    catalog.prepareProductCatalog();
+    expect(catalog.productCatalogPresentation.value).toBeNull();
   });
 
   it("lets a forced refresh supersede an older request and ignores its late response", async () => {

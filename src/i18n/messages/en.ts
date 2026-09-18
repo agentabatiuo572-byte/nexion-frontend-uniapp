@@ -845,6 +845,8 @@ export const en = {
     capExplainS2Title: "New-device task subsidy",
     capExplainS2Body: "Newly activated devices get task-priority dispatch that keeps them booked at full capacity; once the subsidy window ends, dispatch follows the current task-pool mix.",
     capExplainCta: "Browse higher-compute devices",
+    deviceCapabilityTitle: "Device capabilities",
+    deviceCapabilityBody: "Task availability depends on device capabilities and actual assignments. No estimate of additional tasks or earnings is currently available.",
     emptySlotsTitle: "Idle slots",
     emptySlotsHint: "Your {n} empty slots are sitting idle. Each S1 fills one and earns {rate}/d.",
     ifAllFilled: "if all filled with S1",

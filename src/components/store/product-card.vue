@@ -116,7 +116,7 @@
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="stockUnavailable ? -1 : 0" :aria-disabled="stockUnavailable ? 'true' : 'false'" @click.stop="onBuy" @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="stockUnavailable ? -1 : 0" :aria-disabled="stockUnavailable || catalogUnavailable ? 'true' : 'false'" @click.stop="onBuy" @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -138,6 +138,7 @@ import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
+import { productCatalogState } from "@/store/product-catalog";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>(), {
   featured: false,
@@ -154,6 +155,7 @@ const PRODUCT_PHOTO: Record<string, { src: string; tierCode: string }> = {
 };
 
 const isShare = computed(() => props.product.productType === "SHARE");
+const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
 const stockUnavailable = computed(() => !isShare.value
   && props.product.inventoryMode === "FINITE"
   && (props.product.stock ?? 0) <= 0);
@@ -241,7 +243,9 @@ const gateProgressText = computed(() =>
   fmt(t.value.store.gateProgress, { pct: Math.round(gate.value.progressPct * 100) }),
 );
 const buyLabel = computed(() =>
-  stockUnavailable.value
+  catalogUnavailable.value
+    ? productCatalogState.status === "loading" ? t.value.store.catalogLoadingTitle : t.value.store.catalogErrorTitle
+    : stockUnavailable.value
     ? t.value.store.temporarilyOutOfStock
     : remoteApiEnabled && (eligibility.value.status === "loading" || eligibility.value.status === "idle")
     ? t.value.store.purchaseEligibilityLoading
@@ -254,7 +258,7 @@ const buyLabel = computed(() =>
       : t.value.store.cardBuyNow,
 );
 function onBuy() {
-  if (stockUnavailable.value) return;
+  if (stockUnavailable.value || catalogUnavailable.value) return;
   if (remoteApiEnabled) {
     if (eligibility.value.status === "error") void retryEligibility();
     else if (eligibility.value.status === "ready" && eligibility.value.eligible) goCheckout();
@@ -456,7 +460,7 @@ const buyBtnStyle: CSSProperties = {
 // 用 surface-3 不用 surface-2 —— 按钮就落在 footerStyle 上,而 footer 本身是 surface-2,
 // 同值会让「解锁后购买」整颗按钮隐形(双主题实测 ΔE=0)。muted 的本意是弱化,不是消失。
 const buyBtnDynStyle = computed<CSSProperties>(() =>
-  gate.value.blocked
+  gate.value.blocked || catalogUnavailable.value
     ? { ...buyBtnStyle, background: "var(--v5-surface-3)", color: "var(--v5-ink-3)" }
     : buyBtnStyle,
 );

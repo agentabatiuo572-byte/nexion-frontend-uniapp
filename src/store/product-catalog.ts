@@ -1,4 +1,5 @@
-import { reactive } from "vue";
+import { reactive, shallowRef, shallowReadonly } from "vue";
+import type { ProductCatalogSnapshot } from "@/api/product-catalog-api";
 import { productCatalogApi, remoteApiEnabled } from "@/api/runtime";
 import { advanceRuntimeRevision } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
@@ -35,6 +36,10 @@ export const productCatalogState = reactive<{
 
 let refreshInFlight: Promise<boolean> | null = null;
 let catalogEpoch = 0;
+// Display only. Purchase authority remains productCatalogState + a fresh
+// eligibility response; a failed read still clears the compatibility catalog.
+const presentation = shallowRef<ProductCatalogSnapshot | null>(null);
+export const productCatalogPresentation = shallowReadonly(presentation);
 
 export function prepareProductCatalog(): void {
   if (!remoteApiEnabled) return;
@@ -44,6 +49,7 @@ export function prepareProductCatalog(): void {
   // account can immediately start its own request.
   catalogEpoch += 1;
   refreshInFlight = null;
+  presentation.value = null;
   clearProductCatalog();
   productCatalogState.status = "loading";
   productCatalogState.error = "";
@@ -75,6 +81,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
     .then((snapshot) => {
       if (requestEpoch !== catalogEpoch) return false;
       replaceProductCatalog(snapshot.products);
+      presentation.value = snapshot;
       productCatalogState.status = "ready";
       productCatalogState.source = snapshot.source;
       productCatalogState.sourceEnvironment = snapshot.sourceEnvironment;

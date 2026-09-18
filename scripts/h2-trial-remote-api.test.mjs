@@ -153,14 +153,16 @@ test("eligible first-time users retain a visible H2 claim entry which opens the 
   const hero = read("src/components/trial-hero-banner.vue");
   const sheet = read("src/components/trial-claim-sheet.vue");
   assert.match(earn, /<TrialHeroBanner class="w-full"/);
-  // The hero now uses the authoritative detailed eligibility result rather
-  // than the legacy canStart() wrapper. Keep the three gates together: idle
-  // account, positive server quota, and an eligible claim. The exceptional
-  // product-unavailable branch remains visible only to disclose stock, while
-  // canClaim still controls whether the sheet may open.
+  // Display retains the bound account's confirmed offer during a refresh;
+  // opening the sheet still requires the current detailed eligibility result.
+  // The store's product-unavailable offer discloses stock without permitting a claim.
   assert.match(hero, /const eligibility = computed\(\(\) => trial\.eligibility\(\)\);/);
   assert.match(hero, /const canClaim = computed\(\(\) => trial\.status === "none" && eligibility\.value\.ok\);/);
-  assert.match(hero, /const visible = computed\(\(\) => trial\.status === "none"\s+&& trialCfg\.config\.seatsLeftToday > 0\s+&& \(canClaim\.value \|\| productUnavailable\.value\)\);/);
+  assert.match(hero, /const visible = computed\(\(\) => trial\.status === "none"\s+&& trialCfg\.config\.seatsLeftToday > 0\s+&& trial\.showHeroPromo\(\)\);/);
+  const trialStore = read("src/store/free-trial.ts");
+  assert.match(trialStore, /confirmedHeroVisible\.value = next\.status === "none"\s+&& \(next\.canStart \|\| next\.eligibilityReason === "product-unavailable"\)/);
+  assert.match(trialStore, /confirmedHeroVisible\.value = false/);
+  assert.match(trialStore, /authorityStatus\.value !== "ready"\) return \{ ok: false, reason: "unknown" \}/);
   assert.match(hero, /@click="onClick"/);
   assert.match(hero, /function onClick\(\) \{\s+if \(!canClaim\.value\) return;\s+claimSheet\.show\(\);/);
   assert.match(sheet, /await freeTrial\.start\(\)/);
