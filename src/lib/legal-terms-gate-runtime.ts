@@ -1,6 +1,7 @@
 import { navReset } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
+import { getT } from "@/i18n/use-t";
 import { captureRuntimeRevision } from "@/api/order-api";
 import { pendingProfileLocaleHydration } from "./locale-profile-hydration";
 import {
@@ -28,9 +29,45 @@ let pendingRequirement: {
   version: string;
   reason: "verification" | "verification-failed" | "acknowledgement";
   sessionFence: LegalTermsSessionFence;
+  retryInPlace?: boolean;
+  retryReturnTo?: string;
   registrationCompletionReturnTo?: string;
 } | null = null;
 const latestGateRouteByKey = new Map<string, string>();
+let acknowledgedSession: { locale: string; sessionFence: LegalTermsSessionFence } | null = null;
+let retryPrompt: object | null = null;
+
+function hasPriorAcknowledgement(locale: string): boolean {
+  const current = fence();
+  const previous = acknowledgedSession;
+  return !!current && !!previous && previous.locale === locale && previous.sessionFence.userId === current.userId
+    && (sameLegalTermsSession(previous.sessionFence, current)
+      || sessionVault.isRefreshContinuation(previous.sessionFence.sessionRevision ?? -1));
+}
+
+function promptVerificationRetry(returnTo: string): void {
+  const pending = currentPendingRequirement();
+  if (!pending?.retryInPlace || pending.reason !== "verification-failed" || retryPrompt) return;
+  const prompt = {};
+  retryPrompt = prompt;
+  const t = getT();
+  uni.showModal({
+    title: t.terms.navTitle, content: t.terms.loadFailed, confirmText: t.ui.retry, showCancel: false,
+    success(result) {
+      if (retryPrompt === prompt) retryPrompt = null;
+      const current = currentPendingRequirement();
+      // A modal opened for an earlier identity, language or read cannot retry on its behalf.
+      if (result.confirm && current?.reason === "verification-failed" && current.retryInPlace
+          && pending.locale === useLocaleStore().code && current.locale === pending.locale
+          && pending.sessionFence.userId === current.sessionFence.userId
+          && (sameLegalTermsSession(pending.sessionFence, fence())
+            || sessionVault.isRefreshContinuation(pending.sessionFence.sessionRevision ?? -1))) {
+        void scheduleLegalTermsGate(current.retryReturnTo ?? returnTo);
+      }
+    },
+    complete() { if (retryPrompt === prompt) retryPrompt = null; },
+  });
+}
 
 function registrationCompletionReturnTo(returnTo: string): string | undefined {
   return returnTo === "/pages/register/success" || returnTo === "/pages/onboarding/estimator"
@@ -111,6 +148,11 @@ export function enforcePendingLegalTermsGate(returnTo: string): boolean {
   // already-acknowledged user through the Terms page merely to verify state.
   if (pending.reason === "verification") return true;
   if (isLegalTermsGateExemptRoute(path)) return false;
+  if (pending.reason === "verification-failed" && pending.retryInPlace) {
+    pending.retryReturnTo = returnTo;
+    promptVerificationRetry(returnTo);
+    return true;
+  }
   // The route watcher can still see the form while its async reset to Terms
   // is rendering. Preserve the registration-owned destination in that window;
   // the in-flight route map has already been cleared after the Terms read.
@@ -129,6 +171,7 @@ export function recordLegalTermsAcknowledged(
   if (!current || !sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)
       || !isLegalTermsAcknowledged(snapshot) || requestedLocale !== useLocaleStore().code) return;
   const key = sessionKey(current);
+  acknowledgedSession = { locale: requestedLocale, sessionFence: current };
   // A page-owned confirmation may supersede a still-pending global read. The
   // selected request locale also permits an explicitly displayed fallback doc.
   if (inFlight?.key === key) inFlight = null;
@@ -147,9 +190,9 @@ export function recordLegalTermsAcknowledged(
 /**
  * Check the server's current version after login and on session restore.
  * The request is fenced to the exact in-memory bearer + account; a late
- * response can never redirect a subsequent account. A failed check redirects
- * once to the Terms page and retains a fail-closed in-memory obligation until
- * the server confirms the current account has acknowledged its current terms.
+ * response can never redirect a subsequent account. A failed recheck of an
+ * acknowledged login stays on its page with a retry prompt; the obligation
+ * remains closed until a fresh authoritative response confirms acknowledgement.
  */
 export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise<void> {
   if (!remoteApiEnabled) return Promise.resolve();
@@ -209,6 +252,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       if (snapshot.requestedLocale !== requestLocale) throw new Error("LEGAL_TERMS_LOCALE_MISMATCH");
       if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) return;
       if (!isLegalTermsAcknowledged(snapshot)) {
+        acknowledgedSession = null;
         finishVerification(key);
         const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
         pendingRequirement = {
@@ -237,11 +281,16 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
       pendingRequirement = {
         key, locale: requestLocale, version: "", reason: "verification-failed", sessionFence: requestFence,
+        retryInPlace: hasPriorAcknowledgement(requestLocale),
+        retryReturnTo: currentReturnTo,
         registrationCompletionReturnTo: registrationCompletionReturnTo(currentReturnTo),
       };
       failedKeys.add(key);
       const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
-      if (currentPath !== PRIVACY_POLICY_ROUTE) redirectToRequiredTerms(key, currentReturnTo);
+      if (currentPath !== PRIVACY_POLICY_ROUTE) {
+        if (pendingRequirement.retryInPlace) promptVerificationRetry(currentReturnTo);
+        else redirectToRequiredTerms(key, currentReturnTo);
+      }
     })
     .finally(() => {
       // Same-account locale reads share a loading mask; only its current owner

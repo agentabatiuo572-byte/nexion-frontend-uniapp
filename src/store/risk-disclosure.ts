@@ -12,9 +12,11 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
   const acceptedAt = ref<number | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const publicationUnavailable = ref(false);
   let requestGeneration = 0;
 
   function apply(snapshot: RiskDisclosureCurrent | null) {
+    publicationUnavailable.value = false;
     current.value = snapshot;
     accepted.value = snapshot?.acknowledged ?? false;
     acceptedAt.value = snapshot?.acknowledgedAt ? Date.parse(snapshot.acknowledgedAt) || null : null;
@@ -44,6 +46,9 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
     } catch (cause) {
       if (requestIsCurrent(request, generation)) {
         apply(null);
+        publicationUnavailable.value = cause instanceof ApiError && cause.kind === "http"
+          && cause.status === 404 && cause.code === 404
+          && cause.message === "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND";
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_UNAVAILABLE";
       }
     } finally {
@@ -67,6 +72,9 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
     } catch (cause) {
       if (requestIsCurrent(request, generation)) {
         apply(null);
+        publicationUnavailable.value = cause instanceof ApiError && cause.kind === "http"
+          && cause.status === 404 && cause.code === 404
+          && cause.message === "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND";
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_ACKNOWLEDGEMENT_FAILED";
       }
       return false;
@@ -93,5 +101,5 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
   }
   function bindAccount() { invalidateRequests(); apply(null); void refresh(); }
   function reset() { invalidateRequests(); apply(null); void refresh(); }
-  return { current, accepted, acceptedAt, loading, error, refresh, accept, checkGate, reset, bindAccount };
+  return { current, accepted, acceptedAt, loading, error, publicationUnavailable, refresh, accept, checkGate, reset, bindAccount };
 });

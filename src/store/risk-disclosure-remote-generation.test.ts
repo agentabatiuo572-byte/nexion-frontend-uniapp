@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/api/errors";
 import { createPinia, setActivePinia } from "pinia";
 import type { RiskDisclosureCurrent } from "@/api/risk-disclosure-api";
 
@@ -64,6 +65,58 @@ describe("risk disclosure remote request generation", () => {
     remote.riskDisclosureApi.acknowledge.mockReset();
     remote.riskDisclosureApi.checkGate.mockReset();
     remoteAccountScope.bind(`risk-disclosure-test-${Date.now()}-${Math.random()}`);
+  });
+
+  it("classifies only the exact missing published version and never acknowledges it", async () => {
+    remote.riskDisclosureApi.current.mockRejectedValue(new ApiError({ kind: "http", status: 404, code: 404, message: "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND" }));
+    const store = useRiskDisclosure();
+    await store.refresh();
+    expect(store.publicationUnavailable).toBe(true);
+    expect(store.current).toBeNull();
+    expect(store.accepted).toBe(false);
+    expect(await store.accept()).toBe(false);
+    expect(remote.riskDisclosureApi.acknowledge).not.toHaveBeenCalled();
+    remote.riskDisclosureApi.current.mockRejectedValue(new ApiError({ kind: "network", message: "offline" }));
+    await store.refresh();
+    expect(store.publicationUnavailable).toBe(false);
+    remote.riskDisclosureApi.current.mockResolvedValue(disclosure("v2", false));
+    await store.refresh();
+    expect(store.error).toBeNull();
+    expect(store.publicationUnavailable).toBe(false);
+    expect(store.current?.version).toBe("v2");
+  });
+
+  it.each([
+    new Error("RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND"),
+    new ApiError({ kind: "business", status: 404, code: 404, message: "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND" }),
+    new ApiError({ kind: "http", status: 503, code: 404, message: "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND" }),
+    new ApiError({ kind: "http", status: 404, code: 503, message: "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND" }),
+    new ApiError({ kind: "http", status: 404, code: 404, message: "RISK_DISCLOSURE_JURISDICTION_NOT_CONFIGURED" }),
+  ])("keeps other errors on the existing retry path: %s", async (error) => {
+    remote.riskDisclosureApi.current.mockRejectedValue(error);
+    const store = useRiskDisclosure();
+    await store.refresh();
+    expect(store.publicationUnavailable).toBe(false);
+    expect(store.error).toBe(error.message);
+    expect(store.current).toBeNull();
+  });
+
+  it("ignores a stale missing-publication response after account rebind", async () => {
+    const old = deferred<RiskDisclosureCurrent>();
+    const next = deferred<RiskDisclosureCurrent>();
+    remote.riskDisclosureApi.current.mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise);
+    const store = useRiskDisclosure();
+    const pending = store.refresh();
+    remoteAccountScope.bind("new-risk-account");
+    store.bindAccount();
+    expect(store.publicationUnavailable).toBe(false);
+    next.resolve(disclosure("v2", false));
+    await flush();
+    old.reject(new ApiError({ kind: "http", status: 404, code: 404, message: "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND" }));
+    await pending;
+    expect(store.current?.version).toBe("v2");
+    expect(store.publicationUnavailable).toBe(false);
+    expect(store.error).toBeNull();
   });
 
   it("keeps the latest same-account refresh when an earlier refresh resolves late", async () => {

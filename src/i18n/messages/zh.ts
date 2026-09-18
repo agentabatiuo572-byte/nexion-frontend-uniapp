@@ -1164,6 +1164,7 @@ export const zh: Messages = {
     acceptToast: "风险提示已确认 · 可进入 withdraw / staking / 锁仓功能。",
     sectionSelected: "已选中第 {n} 节",
     reloadRegionCta: "重新获取适用于当前地区的披露",
+    publicationUnavailable: "当前地区的风险披露内容暂不可用，请稍后再来。内容加载前不能确认。",
     loadErrorRegion: "当前地区的风险披露暂不可用;请检查网络后重试。未加载前不能确认。",
     gateUnavailable: "暂时无法验证风险提示闸门,本次未提交,请稍后重试。",
   },

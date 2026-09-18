@@ -1226,6 +1226,7 @@ export const en = {
     acceptToast: "Risk disclosure acknowledged · You can now access withdraw / staking / lock features.",
     sectionSelected: "Section {n} selected",
     reloadRegionCta: "Reload the disclosures for your region",
+    publicationUnavailable: "Risk disclosure content for your region is temporarily unavailable. Please come back later. You cannot confirm until the content loads.",
     loadErrorRegion: "Risk disclosures for your region are unavailable; check your connection and retry. Nothing is confirmed until they load.",
     gateUnavailable: "We couldn't verify the disclosure gate. Nothing was submitted; please retry.",
   },

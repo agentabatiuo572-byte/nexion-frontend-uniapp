@@ -22,6 +22,7 @@ vi.mock("@/api/runtime", () => ({
 vi.mock("@/store/locale", () => ({
   useLocaleStore: () => ({ code: state.locale }),
 }));
+vi.mock("@/i18n/use-t", () => ({ getT: () => ({ terms: { navTitle: "服务条款", loadFailed: "暂时无法核验，请重试" }, ui: { retry: "重试" } }) }));
 
 vi.mock("@/api/order-api", () => ({
   captureRuntimeRevision: () => state.revision,
@@ -82,7 +83,110 @@ describe("legal terms runtime gate", () => {
       reLaunch: vi.fn(),
       showLoading: vi.fn(),
       hideLoading: vi.fn(),
+      showModal: vi.fn(),
     });
+  });
+
+  it.each(["network", "HTTP_503", "LEGAL_TERMS_RESPONSE_INVALID"])("keeps an acknowledged user on the current page after %s, gated until retry succeeds", async (failure) => {
+    const runtime = await loadRuntime();
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    state.current.mockRejectedValueOnce(new Error(failure));
+    await runtime.scheduleLegalTermsGate("/pages/tx/usdt");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/me/rewards")).toBe(true);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(uni.showModal).toHaveBeenCalledOnce();
+    const prompt = vi.mocked(uni.showModal).mock.calls[0][0]!;
+    expect(prompt.showCancel).toBe(false);
+    state.current.mockResolvedValueOnce(snapshot(true));
+    prompt.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(state.current).toHaveBeenCalledTimes(3);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect after another navigation fails, but a confirmed new unacknowledged version still redirects", async () => {
+    const runtime = await loadRuntime();
+    state.current.mockResolvedValueOnce(snapshot(true));await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    state.current.mockRejectedValueOnce(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/tx/usdt");
+    state.current.mockRejectedValueOnce(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/tx/nex");
+    expect(runtime.enforcePendingLegalTermsGate("/pages/tx/nex")).toBe(true);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    state.current.mockResolvedValueOnce({...snapshot(false),version:"v5"});await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);expect(uni.reLaunch).toHaveBeenCalledOnce();
+  });
+
+  it("retries the latest ordinary route from one open prompt and allows deliberate Terms entry", async () => {
+    const runtime=await loadRuntime();state.current.mockResolvedValueOnce(snapshot(true));await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValue(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/tx/usdt");
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    expect(uni.showModal).toHaveBeenCalledOnce();expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/terms")).toBe(false);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/onboarding/privacy")).toBe(false);
+    state.current.mockResolvedValueOnce({...snapshot(false),version:"v5"});
+    vi.mocked(uni.showModal).mock.calls[0][0]!.success?.({confirm:true,cancel:false,errMsg:"showModal:ok"});await settleGate();
+    expect(uni.reLaunch).toHaveBeenLastCalledWith(expect.objectContaining({url:"/pages/onboarding/terms?return=%2Fpages%2Fme%2Frewards"}));
+  });
+
+  it.each(["refresh","relogin","other-account","language"])("scopes an earlier acknowledgement correctly across %s",async(change)=>{
+    const runtime=await loadRuntime();state.current.mockResolvedValueOnce(snapshot(true));await runtime.scheduleLegalTermsGate("/pages/me/me");
+    if(change==="language")state.locale="zh";
+    else{state.session={accessToken:"token-new",user:{userId:change==="other-account"?8:7}};state.sessionRevision++;state.refreshContinuation=change==="refresh";}
+    state.current.mockRejectedValueOnce(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.reLaunch).toHaveBeenCalledTimes(change==="refresh"?0:1);
+    expect(uni.showModal).toHaveBeenCalledTimes(change==="refresh"?1:0);
+  });
+
+  it("never lets an old retry prompt request with a new same-user login",async()=>{
+    const runtime=await loadRuntime();state.current.mockResolvedValueOnce(snapshot(true));await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValueOnce(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    const prompt=vi.mocked(uni.showModal).mock.calls[0][0]!;
+    state.sessionRevision+=2;state.refreshContinuation=false;
+    prompt.success?.({confirm:true,cancel:false,errMsg:"showModal:ok"});await settleGate();
+    expect(state.current).toHaveBeenCalledTimes(2);expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
+
+  it("a page-owned acknowledged response supersedes a failing global recheck without a new prompt",async()=>{
+    const runtime=await loadRuntime();let reject!:(error:Error)=>void;
+    state.current.mockReturnValueOnce(new Promise((_ok,fail)=>{reject=fail;}));
+    const read=runtime.scheduleLegalTermsGate("/pages/me/rewards");await settleGate();
+    runtime.recordLegalTermsAcknowledged(snapshot(true));reject(new Error("late global failure"));await read;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);expect(uni.reLaunch).not.toHaveBeenCalled();expect(uni.showModal).not.toHaveBeenCalled();
+    state.current.mockRejectedValueOnce(new Error("network"));await runtime.scheduleLegalTermsGate("/pages/me/me");
+    expect(uni.showModal).toHaveBeenCalledOnce();expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the replacement retry prompt when the old modal completes after another failure", async () => {
+    const runtime = await loadRuntime();
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValue(new Error("network"));
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    const first = vi.mocked(uni.showModal).mock.calls[0][0]!;
+    first.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(uni.showModal).toHaveBeenCalledTimes(2);
+    first.complete?.({ errMsg: "showModal:ok" });
+    runtime.enforcePendingLegalTermsGate("/pages/me/rewards");
+    expect(uni.showModal).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("does not let a previous-language retry prompt issue a request", async () => {
+    const runtime = await loadRuntime();
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValueOnce(new Error("network"));
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    state.locale = "zh";
+    vi.mocked(uni.showModal).mock.calls[0][0]!.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
   });
 
   it("re-enforces an unacknowledged requirement after leaving Terms", async () => {

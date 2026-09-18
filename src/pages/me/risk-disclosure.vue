@@ -141,7 +141,7 @@ const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
 const disclosure = computed(() => risk.current);
-const loadError = computed(() => risk.error ? w.value.loadErrorRegion : "");
+const loadError = computed(() => risk.error ? (risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion) : "");
 const displayLanguage = computed(() => disclosure.value
   ? resolveRiskDisclosureDisplayLanguage(locale.code, disclosure.value.languageScope)
   : null);
