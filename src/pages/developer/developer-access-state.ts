@@ -1,4 +1,11 @@
 import type { DeveloperAccessReceipt, DeveloperAccessStatus } from "@/api/developer-access-api";
+import { ApiError } from "@/api/errors";
+
+/** Only the explicit server prerequisite is an approval state; other 403s stay failures. */
+export function isDeveloperApprovalRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.kind === "http" && error.status === 403 && error.code === 403
+    && error.message === "DEVELOPER_ACCESS_APPROVAL_REQUIRED";
+}
 
 type DeveloperAccessStatusCopyKey =
   | "requestStatusPending"

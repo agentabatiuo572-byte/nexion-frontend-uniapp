@@ -45,6 +45,24 @@ beforeEach(() => {
 afterEach(() => disposePinia(testPinia));
 
 describe("commission runtime-revision recovery", () => {
+  it("keeps confirmed aggregate only through a same-account refresh, never after failure or rebind", async () => {
+    const store = useCommission();
+    store.bindAccount("account-a");
+    await vi.waitFor(() => expect(store.eventsStatus).toBe("ready"));
+    const previous = store.eventsEvidence;
+    let reject!: (error: Error) => void;
+    remote.teamInsightsApi.commissions.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    const read = store.refreshCanonicalEvents();
+    expect(store.eventsStatus).toBe("loading");
+    expect(store.eventsEvidence).toBe(previous);
+    reject(new Error("network")); await read;
+    expect(store.eventsStatus).toBe("error");
+    expect(store.eventsEvidence).toBeNull();
+    await store.refreshCanonicalEvents();
+    remote.teamInsightsApi.commissions.mockReturnValue(new Promise(() => {}));
+    store.bindAccount("account-a");
+    expect(store.eventsEvidence).toBeNull();
+  });
   it("reloads canonical binary and rate state after a product-catalog revision", async () => {
     const store = useCommission();
 

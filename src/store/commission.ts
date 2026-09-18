@@ -314,7 +314,8 @@ export const useCommission = defineStore("commission", () => {
     if (!remoteApiEnabled) return;
     const generation = ++eventsRefreshGeneration;
     events.value = [];
-    eventsEvidence.value = null;
+    // Keep the last confirmed aggregate during this account's read only.
+    // Account/runtime resets and a failed read still remove its authority.
     eventsStatus.value = "loading";
     eventsLoadMoreStatus.value = "idle";
     eventsPage.value = 0;
@@ -328,7 +329,10 @@ export const useCommission = defineStore("commission", () => {
       eventsTotalRows.value = snapshot.totalRows;
       eventsStatus.value = "ready";
     } catch {
-      if (generation === eventsRefreshGeneration && isCurrentScope(scope)) eventsStatus.value = "error";
+      if (generation === eventsRefreshGeneration && isCurrentScope(scope)) {
+        eventsEvidence.value = null;
+        eventsStatus.value = "error";
+      }
     }
   }
 

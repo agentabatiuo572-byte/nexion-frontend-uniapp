@@ -29,6 +29,18 @@ beforeEach(() => {
 afterEach(() => { const pinia = getActivePinia(); if (pinia) disposePinia(pinia); });
 
 describe("team network remote scope", () => {
+  it("retains a confirmed same-account snapshot while loading but clears it on rebind", async () => {
+    remote.teamNetworkApi.snapshot.mockResolvedValueOnce(snapshot("confirmed"));
+    const store = useNetwork();
+    await store.ensureCanonicalNetwork();
+    remote.teamNetworkApi.snapshot.mockReturnValue(new Promise(() => {}));
+    void store.refreshCanonicalNetwork();
+    expect(store.remoteStatus).toBe("loading");
+    expect(store.hasRemoteSnapshot).toBe(true);
+    store.bindAccount("replacement");
+    expect(store.hasRemoteSnapshot).toBe(false);
+    expect(store.members).toEqual([]);
+  });
   it.each(["account", "runtime", "explicit refresh"])("keeps the replacement flight when an old %s read settles", async (replacement) => {
     let resolveOld!: (value: ReturnType<typeof snapshot>) => void;
     let resolveNew!: (value: ReturnType<typeof snapshot>) => void;

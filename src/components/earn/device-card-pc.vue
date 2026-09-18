@@ -278,26 +278,26 @@
       </view>
     </view>
 
-    <!-- Phone: locked-tasks loss-ad -->
-    <view v-if="!remoteApiEnabled && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
+    <!-- Phone: locked-tasks loss-ad(从服务端 VRAM 门控任务池派生;无投影或无锁定项时隐藏) -->
+    <view v-if="device.kind === 'phone' && phoneLockedVisible && phoneTeasers.length" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">−${{ lockedTotalDaily }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">−${{ phoneLockedDaily }}</text>
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
       <view class="space-y-1.5">
-        <view v-for="(it, i) in LOCKED_ITEMS" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
+        <view v-for="(it, i) in phoneTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <text class="truncate">{{ it.model }}</text>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
             <!-- spec-sentinel-ok: workload VRAM requirement from lockedTeasers, not a catalog Product field -->
-            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 40px">{{ it.vram }}</text>
+            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
           </view>
         </view>
       </view>
@@ -306,7 +306,7 @@
       </view>
     </view>
 
-    <view v-if="remoteApiEnabled && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
+    <view v-else-if="device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.deviceCapabilityTitle }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.deviceCapabilityBody }}</text>
       <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0"
@@ -606,16 +606,13 @@ const sparkPoints = computed(() => {
     .join(" ");
 });
 
-// Phone locked-tasks loss-ad
+// Phone locked-tasks loss-ad — derived from the server task-pricing projection
+// (same VRAM gate as the hardware card), never from baked constants.
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const phoneLockedVisible = computed(() => promo.value.baseKind === "phone");
-const LOCKED_ITEMS: { model: string; daily: number; vram: string }[] = [
-  { model: "Llama 70B inference", daily: 110, vram: "16 GB" },
-  { model: "Flux.1 [dev] HD", daily: 38, vram: "12 GB" },
-  { model: "SDXL Turbo bulk", daily: 9, vram: "8 GB" },
-];
-const lockedTotalDaily = computed(() => LOCKED_ITEMS.reduce((s, it) => s + it.daily, 0));
-const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", "142"));
+const phoneTeasers = computed<LockedTeaser[]>(() => earnConfig.lockedTeasers(props.device.vramTotal, 3));
+const phoneLockedDaily = computed(() => phoneTeasers.value.reduce((s, it) => s + it.dailyPotentialUSD, 0));
+const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", String(phoneTeasers.value.length)));
 function goUnlock() {
   navTo(`/pages/store/detail?id=${promo.value.targetKind}`);
 }

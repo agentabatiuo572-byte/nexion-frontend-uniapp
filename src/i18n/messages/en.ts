@@ -2,6 +2,15 @@
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  pageLoad: {
+    module: "Page resources could not be loaded",
+    timeout: "The page is taking too long to load",
+    unknown: "The page could not be loaded",
+    staleVersionHint: "This page needs resources from a newer version. Reload to get the latest version; you will stay signed in.",
+    recoveryHint: "Reload this page to try again. Unsaved changes on this page may be lost.",
+    retry: "Reload page",
+    reloading: "Reloading…",
+  },
   bankBinding: {
     otpHint: "Verify the phone number linked to your account to change your bank account.",
     otpPlaceholder: "6-digit SMS code",
@@ -3743,6 +3752,7 @@ export const en = {
     secretOnce: "Save this secret now. It will not be shown again.",
     deliveryDisabled: "Secret saved. Delivery is enabled; recent attempts appear in the endpoint status.",
     remoteRequired: "Connect to the server to manage developer resources.",
+    approvalRequired: "Developer access approval is required to manage API keys and Webhooks. View or submit your request in Overview.",
     resourceLoadFailed: "Developer resources could not be loaded.",
     resourceActionFailed: "The developer resource action failed; nothing was marked successful.",
     badgeEnterprise: "Enterprise-grade",
@@ -5130,6 +5140,7 @@ export const en = {
     status: "Status",
     badgeDirect: "DIRECT",
     badgeExtended: "EXTENDED",
+    projectionRefreshing: "Refreshing team data; showing the last confirmed result.",
     projectionLoadingTitle: "Loading team network…",
     projectionErrorTitle: "Team network unavailable",
     projectionErrorDesc: "The authoritative server projection could not be loaded. A failed request is never shown as zero members or zero volume.",

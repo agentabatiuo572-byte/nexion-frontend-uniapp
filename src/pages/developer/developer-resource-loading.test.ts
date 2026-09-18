@@ -1,6 +1,8 @@
 // @ts-expect-error Node is used only by the test runner.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { ApiError } from "@/api/errors";
+import { isDeveloperApprovalRequired } from "./developer-access-state";
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
 function deferred<T>(): Deferred<T> {
@@ -33,18 +35,22 @@ function createHarness() {
   const resourcesLoading = { value: false };
   const resourcesReady = { value: false };
   const resourcesLoadFailed = { value: false };
+  const resourcesApprovalRequired = { value: false };
+  const newWebhookSecret = { value: "one-time-fixture-secret" as string | null };
   const busy = new Set<string>();
   const makeLoadResources = new Function("deps", `
-    const { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed,
+    const { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, isDeveloperApprovalRequired, newWebhookSecret,
       developerResourcesApi, resourceFence, resourceFenceCurrent, resourceBusy,
       setResourceBusy, refreshRotationRecovery } = deps;
     const remoteApiEnabled = true;
+    const webhookDeliveries = { value: {} };
     let resourceReadVersion = 0;
     ${loadResourcesSource}
     return loadResources;
   `) as (deps: Record<string, unknown>) => (fence?: { scope: string }) => Promise<void>;
   const loadResources = makeLoadResources({
-    apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed,
+    apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, newWebhookSecret,
+    isDeveloperApprovalRequired,
     developerResourcesApi: {
       listKeys: () => { const read = deferred<unknown[]>(); keyReads.push(read); return read.promise; },
       listWebhooks: () => { const read = deferred<unknown[]>(); hookReads.push(read); return read.promise; },
@@ -56,7 +62,7 @@ function createHarness() {
     refreshRotationRecovery: () => undefined,
   });
   return {
-    loadResources, keyReads, hookReads, state: { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed },
+    loadResources, keyReads, hookReads, state: { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, newWebhookSecret },
     changeScope: () => { currentScope = "scope-b"; },
   };
 }
@@ -71,6 +77,28 @@ async function startTwoReads(harness: ReturnType<typeof createHarness>) {
 }
 
 describe("developer loadResources concurrent read authority", () => {
+  it("shows the authoritative approval prerequisite instead of a generic resource failure", async () => {
+    const h = createHarness(); const read = h.loadResources();
+    const denied = new ApiError({ kind: "http", status: 403, code: 403, message: "DEVELOPER_ACCESS_APPROVAL_REQUIRED" });
+    h.keyReads[0].reject(denied); h.hookReads[0].reject(denied); await read;
+    expect(h.state.resourcesApprovalRequired.value).toBe(true);
+    expect(h.state.resourcesLoadFailed.value).toBe(false);
+    expect(h.state.resourcesReady.value).toBe(false);
+    expect(h.state.newWebhookSecret.value).toBeNull();
+    const recovered = h.loadResources();
+    h.keyReads[1].resolve([]); h.hookReads[1].resolve([]); await recovered;
+    expect(h.state.resourcesApprovalRequired.value).toBe(false);
+    expect(h.state.resourcesReady.value).toBe(true);
+  });
+  it("keeps a one-time secret hidden but recoverable after a generic readback failure", async () => {
+    const h = createHarness(); const read = h.loadResources();
+    h.keyReads[0].reject(new ApiError({ kind: "network", message: "offline" }));
+    h.hookReads[0].resolve([]); await read;
+    expect(h.state.resourcesReady.value).toBe(false);
+    expect(h.state.resourcesLoadFailed.value).toBe(true);
+    expect(h.state.resourcesApprovalRequired.value).toBe(false);
+    expect(h.state.newWebhookSecret.value).toBe("one-time-fixture-secret");
+  });
   it("does not let an old empty result overwrite mutation-triggered nonempty readback", async () => {
     const h = createHarness();
     const { first, second } = await startTwoReads(h);

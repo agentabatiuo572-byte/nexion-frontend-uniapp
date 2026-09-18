@@ -132,7 +132,7 @@
 
         <!-- This month ledger -->
         <TeamLedgerCard
-          v-if="!remoteApiEnabled || (network.remoteStatus === 'ready' && commission.eventsStatus === 'ready')"
+          v-if="ledgerVisible"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
           :contributors="commissionAggregate.contributorCount"
           :direct-u-s-d-t="directUSDT"
@@ -142,9 +142,12 @@
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
         />
-        <view v-else class="active:opacity-95" :style="toolCellStyle(0)" role="button" tabindex="0" :aria-label="t.network.retry" @click="refreshRemoteLedger" @keydown.enter.prevent="refreshRemoteLedger" @keydown.space.prevent="refreshRemoteLedger">
+        <view v-else-if="ledgerFailed" class="active:opacity-95" :style="toolCellStyle(0)" role="button" tabindex="0" :aria-label="t.network.retry" @click="refreshRemoteLedger" @keydown.enter.prevent="refreshRemoteLedger" @keydown.space.prevent="refreshRemoteLedger">
           <text class="block" :style="toolTitleStyle">{{ t.network.projectionErrorDesc }}</text>
           <text class="block" :style="toolSubStyle">{{ t.network.retry }}</text>
+        </view>
+        <view v-if="ledgerLoading" :style="toolCellStyle(0)" role="status" aria-live="polite">
+          <text class="block" :style="toolSubStyle">{{ ledgerVisible ? t.network.projectionRefreshing : t.network.projectionLoadingTitle }}</text>
         </view>
 
         <!-- Team tools -->
@@ -229,6 +232,11 @@ const vrank = useVRank();
 const isZh = computed(() => useLocaleStore().code === "zh");
 const network = useNetwork();
 const commission = useCommission();
+const ledgerFailed = computed(() => remoteApiEnabled && (network.remoteStatus === "error" || commission.eventsStatus === "error"));
+const ledgerLoading = computed(() => remoteApiEnabled && !ledgerFailed.value
+  && (network.remoteStatus !== "ready" || commission.eventsStatus !== "ready"));
+const ledgerVisible = computed(() => !remoteApiEnabled || (!ledgerFailed.value
+  && network.hasRemoteSnapshot && commission.eventsEvidence !== null));
 const pool = useLeadershipPool();
 const referralRewards = useReferralReward();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
