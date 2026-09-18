@@ -1149,9 +1149,13 @@ sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-sco
 sentinel_present "AUTH02 sponsorship stores bindings per account" src/store/sponsorship.ts 'bindingsByAccount'
 sentinel_present "AUTH02 dev bridge is entrypoint DEV-gated" src/main.ts 'if \(import\.meta\.env\.DEV\)'
 sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
-# 2026-07-24 A6:reason code → 话术码表收口进 lib/risk-reason-text.ts 单源(三渲染源共用,
-# 防散抄 dict 漏新增码被 filter(Boolean) 静默吞行);页面哨兵改钉共享函数消费。
-sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 'riskReasonLines\(t\.value'
+# Bug7:钱包释放说明只使用服务端回执；零余额、不可读、限制及在线阈值由实际页面函数测试覆盖。
+if npx vitest run src/pages/me/wallet-release-message.test.ts >"${VERIFY_LOG_PREFIX}-wallet-release-message.log" 2>&1; then
+  ok "SPEC-7 wallet release explanations follow server receipts"
+else
+  bad "SPEC-7 wallet release explanations follow server receipts"
+  cat "${VERIFY_LOG_PREFIX}-wallet-release-message.log"
+fi
 sentinel_present "SPEC-7 risk reason dict single-source in lib" src/lib/risk-reason-text.ts 't\.wallet\.riskReasons'
 sentinel_present "SPEC-7 risk reason dict carries PAY04 rebind codes" src/lib/risk-reason-text.ts '"new-address-large-amount"'
 sentinel_present "SPEC-7 payment-instrument overuse mapped (en)" src/i18n/messages/en.ts '"payment-instrument-overuse"'
