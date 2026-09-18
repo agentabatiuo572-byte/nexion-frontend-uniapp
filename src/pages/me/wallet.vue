@@ -115,13 +115,11 @@ import WalletListRow from "@/components/me/wallet-list-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { earningsReleaseSnapshot } from "@/store/earning-release";
+import { earningsReleaseSnapshot, earningsReleaseStatus, refreshEarningsReleaseStatus, type LedgerRoute } from "@/store/earning-release";
 import { useCommission } from "@/store/commission";
 import { useCards } from "@/store/cards";
 import { useConfig } from "@/store/config";
 import { confirm as uiConfirm } from "@/store/ui";
-import { evaluateAccountCluster } from "@/store/risk-cluster";
-import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
 import { onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled, developmentPaymentEnabled } from "@/api/runtime";
@@ -137,7 +135,10 @@ const cfg = useConfig();
 // wallet projection whenever this page becomes visible so a completed exchange
 // cannot send the user back to a stale pre-exchange balance.
 onShow(() => {
-  if (remoteApiEnabled) void app.refreshRemoteFleet();
+  if (remoteApiEnabled) {
+    void app.refreshRemoteFleet();
+    void refreshEarningsReleaseStatus().catch(() => undefined);
+  }
 });
 
 const configSyncFailed = computed(() => cfg.syncFailed);
@@ -149,28 +150,37 @@ function retryFundsAuthority() {
   void app.refreshRemoteFleet();
 }
 
-// SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要
-// (reason code → i18n 业务话术,工程码不直出;R5: 原因现算不读缓存)。
-function riskReasonSummary(): string {
-  // 码表单源 lib/risk-reason-text(簇码 + 换绑扩展码同一 dict,防散抄漏码)。
-  const lines = riskReasonLines(t.value, evaluateAccountCluster(app.accountKey).reasons);
-  return lines.length ? `\n· ${lines.join("\n· ")}` : "";
+// Release explanations use the same account-scoped server receipt as the
+// buckets. Local device clustering and configuration defaults are not facts
+// about the user's held funds or their release eligibility.
+function releaseSheetMessage(route: LedgerRoute): string {
+  const snapshot = earningsReleaseSnapshot.value;
+  if (earningsReleaseStatus.value !== "ready" || !snapshot?.serverCanonical) {
+    return t.value.wallet.releaseDetailsUnavailable;
+  }
+  if (snapshot.buckets[route] === 0) {
+    return route === "pending_review" ? t.value.wallet.pendingSheetEmpty : t.value.wallet.lockedSheetEmpty;
+  }
+  const body = route === "pending_review" ? t.value.wallet.pendingSheetBody : t.value.wallet.lockedSheetBody;
+  if (snapshot.releaseMode !== "attest_or_manual" || snapshot.clusterRestricted
+    || snapshot.requiredAttestationSeconds <= 0) return body;
+  return body + "\n" + fmt(t.value.wallet.releaseAttestationInfo, {
+    hours: Math.ceil(snapshot.requiredAttestationSeconds / 3600 * 100) / 100,
+  });
 }
 function showPendingSheet() {
-  const hours = cfg.config.riskCluster.appAttestationReleaseHours;
   uiConfirm({
     title: t.value.wallet.pendingSheetTitle,
-    message: fmt(t.value.wallet.pendingSheetBody, { hours }) + riskReasonSummary(),
+    message: releaseSheetMessage("pending_review"),
     confirmLabel: t.value.wallet.sheetOk,
     hideCancel: true,
     icon: "info",
   });
 }
 function showLockedSheet() {
-  const hours = cfg.config.riskCluster.appAttestationReleaseHours;
   uiConfirm({
     title: t.value.wallet.lockedSheetTitle,
-    message: fmt(t.value.wallet.lockedSheetBody, { hours }) + riskReasonSummary(),
+    message: releaseSheetMessage("bonus_locked"),
     confirmLabel: t.value.wallet.sheetOk,
     hideCancel: true,
     icon: "info",
