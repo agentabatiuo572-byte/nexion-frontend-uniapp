@@ -36,7 +36,9 @@ describe("adversarial fix-batch contracts", () => {
     const source = read("./support/messages.vue");
     expect(source).toContain("registerActivePageRefresh");
     expect(source).toContain("releaseActiveRefresh");
-    expect(source).toContain("onHide(() => releaseActiveRefresh())");
+    expect(source).toContain("onHide(leaveInbox)");
+    expect(source).toContain("onUnmounted(leaveInbox)");
+    expect(source).toMatch(/function leaveInbox\(\)\s*\{\s*inboxVisible = false;\s*releaseActiveRefresh\(\);/);
   });
 
   it("rejects drifting exchange pages and wrong first-page metadata", () => {

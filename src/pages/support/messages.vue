@@ -37,7 +37,7 @@
         <!-- Right conversation list -->
         <view class="nx-conv-listcol">
           <view
-            v-if="convStore.categoryAvailabilityStatus === 'loading' && TYPES.length === 0"
+            v-if="convStore.categoryAvailabilityStatus === 'loading' && TYPES.length === 0 && !convStore.error"
             class="nx-conv-category-loading"
             role="status"
             aria-live="polite"
@@ -157,12 +157,19 @@ const app = useApp();
 
 const selectedType = ref<ConversationType>("advisor");
 const removeError = ref("");
-watch(() => app.accountBindingEpoch, () => { removeError.value = ""; });
+let inboxVisible = false;
+watch(() => [app.accountKey, app.accountBindingEpoch], () => {
+  removeError.value = "";
+  // Account binding invalidates in-flight store reads. A visible page must start
+  // replacements after the synchronous account-scoped stores have been rebound.
+  if (inboxVisible) void refreshInbox();
+});
 
 // Entering the inbox is a lazy timeout checkpoint (chat entry and session start
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
 async function refreshInbox(): Promise<void> {
+  if (!inboxVisible) return;
   const tasks: Promise<unknown>[] = [convStore.refresh(), convStore.refreshCategories()];
   if (remoteApiEnabled) {
     tasks.push(nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history()));
@@ -172,15 +179,20 @@ async function refreshInbox(): Promise<void> {
 
 let releaseActiveRefresh = () => {};
 onShow(async () => {
+  inboxVisible = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshInbox);
   await refreshInbox();
 });
-onHide(() => releaseActiveRefresh());
-onUnmounted(() => releaseActiveRefresh());
+function leaveInbox() {
+  inboxVisible = false;
+  releaseActiveRefresh();
+}
+onHide(leaveInbox);
+onUnmounted(leaveInbox);
 
 function retryConversations() {
-  void Promise.allSettled([convStore.refresh(), convStore.refreshCategories()]);
+  void refreshInbox();
 }
 
 // Both human categories expose the same contact path, including a brand-new inbox.
