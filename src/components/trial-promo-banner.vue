@@ -3,15 +3,15 @@
   Flat prompt: benefit headline + zero-commitment subtext (left) and a restrained
   soft-tint "Claim now" CTA (right), with generous top/bottom breathing so it reads
   as a light prompt amid the surrounding cards. No card chrome, no leading icon.
-  Visible only while the trial is idle & startable; tapping anywhere opens the
-  trial-claim sheet, where the full value, limits, and terms are shown.
+  The last confirmed promotion stays mounted during refresh, while claiming
+  requires current authority. A failed refresh offers a read-only retry.
 
   Single source of truth for this card — used by both pages/index/index.vue and
   components/me/trial-entry.vue so design tweaks land in one place.
 -->
 <template>
-  <view v-if="visible" class="block active:opacity-90" :style="bannerOuterStyle" data-me-action="trial-claim" role="button" tabindex="0" :aria-label="t.trial.entryBenefitTitle" @click="openClaim" @keydown.enter.prevent="openClaim" @keydown.space.prevent="openClaim">
-    <view class="flex items-center" :style="bannerBodyStyle">
+  <view v-if="visible" class="block" :style="bannerOuterStyle">
+    <view class="flex items-center" :style="bannerBodyStyle" data-me-action="trial-claim" role="button" :tabindex="canClaim ? 0 : -1" :aria-disabled="!canClaim" :aria-busy="trial.authorityStatus === 'loading'" :aria-label="t.trial.entryBenefitTitle" @click="openClaim" @keydown.enter.prevent="openClaim" @keydown.space.prevent="openClaim">
       <!-- Copy — left-aligned -->
       <view style="flex: 1; min-width: 0">
         <text class="block" :style="headlineStyle">{{ t.trial.entryBenefitTitle }}</text>
@@ -20,9 +20,12 @@
 
       <!-- CTA — right-aligned -->
       <view class="inline-flex items-center shrink-0 active:opacity-70" :style="claimBtnStyle">
-        <text>{{ t.trial.entryClaimCta }}</text>
+        <text>{{ claimLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
+    </view>
+    <view v-if="trial.authorityStatus === 'error'" role="button" tabindex="0" data-me-action="trial-retry" :aria-label="t.trial.entryRetry" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
+      <text>{{ t.trial.entryRetry }}</text>
     </view>
   </view>
 </template>
@@ -41,13 +44,22 @@ const claimSheet = useTrialClaimSheet();
 const trialConfig = useTrialConfig();
 
 const isActive = computed(() => trial.status === "active" || trial.status === "grace");
-const visible = computed(() => !isActive.value && trial.canStart());
+const visible = computed(() => !isActive.value && trial.showPromo());
+const canClaim = computed(() => trial.canStart());
+const claimLabel = computed(() => canClaim.value ? t.value.trial.entryClaimCta
+  : trial.authorityStatus === "error" ? t.value.trial.entryUnavailable : t.value.trial.entryChecking);
 
 const cfg = computed(() => trialConfig.config);
 const offerDesc = computed(() => fmt(t.value.trial.entryDescription, { days: cfg.value.trialDays }));
 
 function openClaim() {
+  if (!canClaim.value) return;
   claimSheet.show();
+}
+
+function retryEligibility() {
+  if (trial.authorityStatus !== "error") return;
+  void trial.refreshEligibilityRemote();
 }
 
 // ── styles ──

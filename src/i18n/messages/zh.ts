@@ -1537,6 +1537,9 @@ export const zh: Messages = {
     entryDescription: "免费试用 {days} 天 · 随时取消",
     entryBenefitTitle: "您有免费的试用设备福利待领取",
     entryClaimCta: "马上领取",
+    entryChecking: "正在核实资格…",
+    entryUnavailable: "暂不可领取",
+    entryRetry: "重新核实资格",
     // /me TrialEntry — active state
     activeTitle: "试用进行中 · {state}",
     activeStateActive: "体验中",
@@ -5770,6 +5773,7 @@ export const zh: Messages = {
     billsDesc: "每一笔充值和到账都会记在这里",
     rewardsTitle: "还没有奖励",
     rewardsDesc: "代金券和礼包会收在这里",
+    rewardsTokenDesc: "你获得的 {asset} 奖励记录会显示在这里。",
     messagesTitle: "还没有会话",
     messagesDesc: "找客服聊两句,回复会出现在这里",
     commissionsTitle: "还没有佣金",

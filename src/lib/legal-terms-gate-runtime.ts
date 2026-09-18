@@ -26,7 +26,8 @@ let pendingRequirement: {
   key: string;
   locale: string;
   version: string;
-  reason: "verification" | "acknowledgement";
+  reason: "verification" | "verification-failed" | "acknowledgement";
+  sessionFence: LegalTermsSessionFence;
   registrationCompletionReturnTo?: string;
 } | null = null;
 const latestGateRouteByKey = new Map<string, string>();
@@ -58,7 +59,11 @@ function rescheduleAfterSessionChange(expected: LegalTermsSessionFence, returnTo
 
 function currentPendingRequirement(): typeof pendingRequirement {
   const current = fence();
-  return current && pendingRequirement?.key === sessionKey(current) ? pendingRequirement : null;
+  if (!current || !pendingRequirement) return null;
+  return pendingRequirement.key === sessionKey(current)
+    || (pendingRequirement.sessionFence.userId === current.userId
+      && sessionVault.isRefreshContinuation(pendingRequirement.sessionFence.sessionRevision ?? -1))
+    ? pendingRequirement : null;
 }
 
 function beginVerification(key: string): void {
@@ -128,7 +133,12 @@ export function recordLegalTermsAcknowledged(
   // selected request locale also permits an explicitly displayed fallback doc.
   if (inFlight?.key === key) inFlight = null;
   finishVerification(key);
-  if (pendingRequirement?.key === key) pendingRequirement = null;
+  const pending = currentPendingRequirement();
+  if (pending) {
+    finishVerification(pending.key);
+    pendingRequirement = null;
+    if (lastRedirectAttempt?.key === pending.key) lastRedirectAttempt = null;
+  }
   if (lastRedirectAttempt?.key === key) lastRedirectAttempt = null;
   failedKeys.delete(key);
   latestGateRouteByKey.delete(key);
@@ -167,7 +177,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
   // Every authoritative recheck is fail-closed, including a previously
   // acknowledged session: a newly published version must not gain a network
   // response window in which business activity can continue.
-  pendingRequirement = { key, locale: requestLocale, version: "", reason: "verification" };
+  pendingRequirement = { key, locale: requestLocale, version: "", reason: "verification", sessionFence: requestFence };
   const generation = ++readGeneration;
   const ownsRead = () => inFlight?.generation === generation;
   failedKeys.delete(key);
@@ -202,7 +212,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
         finishVerification(key);
         const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
         pendingRequirement = {
-          key, locale: requestLocale, version: snapshot.version, reason: "acknowledgement",
+          key, locale: requestLocale, version: snapshot.version, reason: "acknowledgement", sessionFence: requestFence,
           registrationCompletionReturnTo: registrationCompletionReturnTo(currentReturnTo),
         };
         const currentPath = `/${currentReturnTo.replace(/^#?\/?/, "").split("?", 1)[0]}`;
@@ -226,7 +236,7 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
       finishVerification(key);
       const currentReturnTo = latestGateRouteByKey.get(key) ?? returnTo;
       pendingRequirement = {
-        key, locale: requestLocale, version: "", reason: "acknowledgement",
+        key, locale: requestLocale, version: "", reason: "verification-failed", sessionFence: requestFence,
         registrationCompletionReturnTo: registrationCompletionReturnTo(currentReturnTo),
       };
       failedKeys.add(key);

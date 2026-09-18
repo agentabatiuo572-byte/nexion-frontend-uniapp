@@ -92,7 +92,7 @@
           <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
         </view>
         <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
-        <EmptyState v-else-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
+        <EmptyState v-else-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="fmt(t.empty.rewardsTokenDesc, { asset: symbol })" />
 
         <view v-else :style="recordListStyle">
           <view v-for="(b, i) in visibleRecords" :key="b.id" class="flex items-center" :style="recordRowStyle(i)">

@@ -8,13 +8,14 @@ const state = vi.hoisted(() => ({
   } as { accessToken: string; user: { userId: number } } | null,
   revision: { epoch: 1, runId: "" },
   sessionRevision: 1,
+  refreshContinuation: false,
   locale: "en",
   current: vi.fn<() => Promise<LegalTermsCurrent>>(),
 }));
 
 vi.mock("@/api/runtime", () => ({
   remoteApiEnabled: true,
-  sessionVault: { read: () => state.session, revision: () => state.sessionRevision },
+  sessionVault: { read: () => state.session, revision: () => state.sessionRevision, isRefreshContinuation: () => state.refreshContinuation },
   legalTermsApi: { current: () => state.current() },
 }));
 
@@ -55,11 +56,26 @@ async function settleGate(): Promise<void> {
 }
 
 describe("legal terms runtime gate", () => {
+  it("retries a verification failure instead of treating it as a known unacknowledged version", async () => {
+    state.current.mockRejectedValueOnce(new Error("network"));
+    const runtime=await loadRuntime();await runtime.scheduleLegalTermsGate("/pages/me/me");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    state.current.mockResolvedValue(snapshot(true));await runtime.scheduleLegalTermsGate("/pages/store/store");
+    expect(state.current).toHaveBeenCalledTimes(2);expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
+  it("retains an unresolved obligation across only token rotation until a fresh acknowledgement", async () => {
+    state.current.mockResolvedValue(snapshot(false));const runtime=await loadRuntime();
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.session={accessToken:"rotated",user:{userId:7}};state.sessionRevision++;state.refreshContinuation=true;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    runtime.recordLegalTermsAcknowledged(snapshot(true));expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+  });
   beforeEach(() => {
     vi.useRealTimers();
     state.session = { accessToken: "token-a", user: { userId: 7 } };
     state.revision = { epoch: 1, runId: "" };
     state.sessionRevision = 1;
+    state.refreshContinuation = false;
     state.locale = "en";
     state.current.mockReset();
     vi.stubGlobal("uni", {

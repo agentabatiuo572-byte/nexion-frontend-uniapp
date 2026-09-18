@@ -193,7 +193,7 @@ function currentSessionFence(): LegalTermsSessionFence | null {
   return { accessToken: session.accessToken, userId: session.user.userId, sessionRevision: sessionVault.revision() };
 }
 
-async function loadTerms() {
+async function loadTerms(retryRotation = true) {
   if (!remoteApiEnabled || !termsPageVisible) return;
   // A duplicate retry for the same language must share the in-flight read. A
   // language switch intentionally starts a fresh request so the new gate can
@@ -226,6 +226,11 @@ async function loadTerms() {
       return;
     }
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
+      if (retryRotation && isCurrentRefreshContinuation(requestFence)) {
+        loadingTerms.value = false;
+        await loadTerms(false);
+        return;
+      }
       serverTerms.value = null;
       loadErrorKey.value = "sessionChanged";
       return;
@@ -240,6 +245,11 @@ async function loadTerms() {
   } catch (error) {
     if (!termsRequests.isCurrent(request, locale.code)) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
+      if (retryRotation && isCurrentRefreshContinuation(requestFence)) {
+        loadingTerms.value = false;
+        await loadTerms(false);
+        return;
+      }
       serverTerms.value = null;
       loadErrorKey.value = "sessionChanged";
       return;
@@ -254,6 +264,11 @@ async function loadTerms() {
   }
 }
 
+function isCurrentRefreshContinuation(expected: LegalTermsSessionFence | null): boolean {
+  const current = currentSessionFence();
+  return !!expected && !!current && expected.userId === current.userId
+    && sessionVault.isRefreshContinuation(expected.sessionRevision ?? -1);
+}
 function switchTermsLanguage(next: LocaleCode) {
   if (next !== locale.code) locale.setLocale(next);
 }
@@ -321,6 +336,11 @@ async function confirmTerms(event?: Event) {
   try {
     const acknowledged = await legalTermsApi.acknowledge(snapshot);
     if (!ownsSnapshot()) return;
+    if (!sameLegalTermsSession(requestFence, currentSessionFence()) && isCurrentRefreshContinuation(requestFence)) {
+      confirming.value = false;
+      await loadTerms();
+      return;
+    }
     if (!sameLegalTermsSession(requestFence, currentSessionFence())
       || acknowledged.version !== snapshot.version
       || acknowledged.resolvedLocale !== snapshot.resolvedLocale

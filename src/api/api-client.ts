@@ -241,7 +241,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         user: data.user,
         refreshCredentialMode,
       };
-      if (!options.vault.saveIfUnchanged(next, revision)) {
+      if (!options.vault.refreshIfUnchanged(next, revision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
       }
       return next;
@@ -309,12 +309,16 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
       }
       const latest = options.vault.read();
-      if (!session || !latest || latest.user.userId !== session.user.userId) {
+      if (!session || !latest || latest.user.userId !== session.user.userId
+          || (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision))) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
       }
       const refreshed = latest?.accessToken && latest.accessToken !== session?.accessToken
         ? latest
         : await refreshSession();
+      if (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision)) {
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      }
       return execute<T>(
         {
           ...httpRequest,
@@ -362,11 +366,15 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
       }
       const latest = options.vault.read();
-      if (!session || !latest || latest.user.userId !== session.user.userId) {
+      if (!session || !latest || latest.user.userId !== session.user.userId
+          || (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision))) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
       }
       const refreshed = latest.accessToken && latest.accessToken !== session.accessToken
         ? latest : await refreshSession();
+      if (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision)) {
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      }
       uploadRequest.headers.Authorization = `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`;
       return executeUpload();
     }

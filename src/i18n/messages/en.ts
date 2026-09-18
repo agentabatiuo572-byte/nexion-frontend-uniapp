@@ -1599,6 +1599,9 @@ export const en = {
     entryDescription: "Free for {days} days · cancel anytime",
     entryBenefitTitle: "You have a free trial device waiting to claim",
     entryClaimCta: "Claim now",
+    entryChecking: "Checking eligibility…",
+    entryUnavailable: "Claim unavailable",
+    entryRetry: "Retry eligibility check",
     // /me TrialEntry — active state
     activeTitle: "Trial in progress · {state}",
     activeStateActive: "Active",
@@ -5931,6 +5934,7 @@ export const en = {
     billsDesc: "Every top-up and payout lands here",
     rewardsTitle: "No rewards yet",
     rewardsDesc: "Vouchers and gifts collect here",
+    rewardsTokenDesc: "Your {asset} reward records will appear here.",
     messagesTitle: "No conversations",
     messagesDesc: "Reach out and support will reply here",
     commissionsTitle: "No commissions yet",
