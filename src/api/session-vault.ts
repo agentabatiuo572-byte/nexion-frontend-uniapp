@@ -28,6 +28,9 @@ export interface SessionVault {
   revision(): number;
   save(snapshot: SessionSnapshot): void;
   saveIfUnchanged(snapshot: SessionSnapshot, expectedRevision: number): boolean;
+  /** Only a successful refresh may preserve authentication continuity. */
+  refreshIfUnchanged(snapshot: SessionSnapshot, expectedRevision: number): boolean;
+  isRefreshContinuation(expectedRevision: number): boolean;
   clear(): void;
   clearIfUnchanged(expectedRevision: number): boolean;
 }
@@ -49,6 +52,7 @@ function parsePersisted(value: unknown): PersistedSession | null {
 export function createSessionVault(storage?: KeyValueStorage): SessionVault {
   let current: SessionSnapshot | null = null;
   let revision = 0;
+  let identityRevision = 0;
   if (storage) {
     try {
       const storedValue = storage.get();
@@ -85,7 +89,8 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
     }
   }
 
-  function persistAndCommit(snapshot: SessionSnapshot): void {
+  function persistAndCommit(snapshot: SessionSnapshot, refresh = false): void {
+    const sameIdentity = current?.user.userId === snapshot.user.userId;
     const next = { ...snapshot, user: { ...snapshot.user } };
     if (storage) {
       try {
@@ -102,6 +107,7 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
       } catch (error) {
         current = null;
         revision += 1;
+        identityRevision = revision;
         try {
           storage.remove();
         } catch {
@@ -112,11 +118,13 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
     }
     current = next;
     revision += 1;
+    if (!refresh || !sameIdentity) identityRevision = revision;
   }
 
   function clearAndAdvance(): void {
     current = null;
     revision += 1;
+    identityRevision = revision;
     if (!storage) return;
     try {
       storage.remove();
@@ -141,6 +149,16 @@ export function createSessionVault(storage?: KeyValueStorage): SessionVault {
       if (revision !== expectedRevision) return false;
       persistAndCommit(snapshot);
       return true;
+    },
+    refreshIfUnchanged(snapshot, expectedRevision) {
+      validateSnapshot(snapshot);
+      if (revision !== expectedRevision || (current && current.user.userId !== snapshot.user.userId)) return false;
+      persistAndCommit(snapshot, true);
+      return true;
+    },
+    isRefreshContinuation(expectedRevision) {
+      return current !== null && Number.isSafeInteger(expectedRevision)
+        && expectedRevision >= identityRevision && expectedRevision < revision;
     },
     clear() {
       clearAndAdvance();

@@ -256,7 +256,7 @@ const trialStatus = computed(() => trial.status);
 const trialIsActive = computed(
   () => trialStatus.value === "active" || trialStatus.value === "grace",
 );
-const trialIsHero = computed(() => !trialIsActive.value && trial.canStart());
+const trialIsHero = computed(() => !trialIsActive.value && trial.showPromo());
 
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.

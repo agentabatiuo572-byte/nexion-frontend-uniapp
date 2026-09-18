@@ -11,7 +11,7 @@ import { vi as viMessages } from "@/i18n/messages/vi";
 
 const compiled = ts.transpileModule(
   source.slice(source.indexOf("function showTermsPage()"), source.indexOf("onMounted(showTermsPage)"))
-    + source.slice(source.indexOf("async function loadTerms()"), source.indexOf("</script>"))
+    + source.slice(source.indexOf("async function loadTerms("), source.indexOf("</script>"))
     + "\nreturn { loadTerms, confirmTerms, showTermsPage, hideTermsPage, retryTerms };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
 ).outputText;
@@ -28,6 +28,7 @@ function harness(messages = en) {
     t, confirming: ref(false), locale: { code: "en" }, returnTo: ref("/pages/me/me"), explicitReturn: ref(false),
     termsRequests: createLegalTermsRequestFence(), termsPageVisible: true, confirmationGeneration: 0,
     currentSessionFence: () => ({ ...current }), sameLegalTermsSession, sameLegalTermsRun,
+    sessionVault: { isRefreshContinuation: vi.fn(() => false) },
     captureRuntimeRevision: () => ({ runId: "", epoch: current.runEpoch }),
     legalTermsApi: { current: vi.fn().mockResolvedValue(snapshot), acknowledge: vi.fn().mockResolvedValue(snapshot) },
     recordLegalTermsAcknowledged: vi.fn(), shouldBlockLegalTermsExit,
@@ -43,6 +44,38 @@ function harness(messages = en) {
 }
 
 describe("terms localized failure behavior", () => {
+  it("automatically re-reads acknowledged v6 after same-authentication token rotation", async () => {
+    const h=harness(); h.sessionVault.isRefreshContinuation.mockReturnValue(true);
+    h.legalTermsApi.current.mockImplementationOnce(async () => {
+      h.current.accessToken="rotated";h.current.sessionRevision++;
+      return {...h.snapshot,version:"v6",acknowledged:true};
+    }).mockResolvedValue({...h.snapshot,version:"v6",acknowledged:true});
+    await h.loadTerms();
+    expect(h.legalTermsApi.current).toHaveBeenCalledTimes(2);
+    expect(h.error.value).toBeNull(); expect(h.serverTerms.value?.version).toBe("v6");
+    expect(h.recordLegalTermsAcknowledged).toHaveBeenCalledOnce();
+  });
+  it("does not recover an old result through logout and same-user re-login", async () => {
+    const h=harness(); h.sessionVault.isRefreshContinuation.mockReturnValue(false);
+    h.legalTermsApi.current.mockImplementationOnce(async () => {
+      h.current.accessToken="new-login";h.current.sessionRevision+=2;
+      return {...h.snapshot,acknowledged:true};
+    });
+    await h.loadTerms();
+    expect(h.legalTermsApi.current).toHaveBeenCalledTimes(1);
+    expect(h.error.value).toBe(en.terms.sessionChanged); expect(h.serverTerms.value).toBeNull();
+  });
+  it("bounds automatic rotation recovery and retains explicit retry after repeated races", async () => {
+    const h=harness(); h.sessionVault.isRefreshContinuation.mockReturnValue(true);
+    h.legalTermsApi.current.mockImplementation(async () => {
+      h.current.accessToken+="-rotated";h.current.sessionRevision++;
+      return {...h.snapshot,acknowledged:true};
+    });
+    await h.loadTerms();
+    expect(h.legalTermsApi.current).toHaveBeenCalledTimes(2);
+    expect(h.error.value).toBe(en.terms.sessionChanged); expect(h.serverTerms.value).toBeNull();
+    expect(h.loadingTerms.value).toBe(false);
+  });
   it.each(["/pages/register/success", "/pages/onboarding/estimator"])("returns an acknowledged registration to its explicit target %s", async (returnTo) => {
     const h = harness();
     h.returnTo.value = returnTo;
