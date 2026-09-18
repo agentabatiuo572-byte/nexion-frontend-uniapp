@@ -123,11 +123,15 @@
         <view class="rounded-2xl" :style="formCardStyle">
           <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
           <view v-else>
+            <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
+              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
+            </view>
             <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
               <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
-            <view v-for="item in apiKeys" :key="item.id" class="flex items-center" :style="resourceRowStyle">
+            <view v-for="item in (canManageResources ? apiKeys : [])" :key="item.id" class="flex items-center" :style="resourceRowStyle">
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
@@ -142,11 +146,15 @@
         <view class="rounded-2xl" :style="formCardStyle">
           <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
           <view v-else>
+            <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
+              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
+            </view>
             <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
               <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
-            <view v-for="item in webhooks" :key="item.id" :style="resourceRowStyle">
+            <view v-for="item in (canManageResources ? webhooks : [])" :key="item.id" :style="resourceRowStyle">
               <view class="flex items-center">
                 <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
                 <view v-if="item.status !== 'DELETED'" class="flex" style="gap: 5px; flex-wrap: wrap; justify-content: flex-end"><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `toggle-webhook:${item.id}`)" role="button" tabindex="0" @click="setWebhookEnabled(item, item.status !== 'ACTIVE')"><text style="font-size: 12px">{{ item.status === 'ACTIVE' ? t.developer.disable : t.developer.enable }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `deliveries-webhook:${item.id}`)" role="button" tabindex="0" @click="loadWebhookDeliveries(item)"><text style="font-size: 12px">{{ t.developer.deliveryAttempts }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `rotate-webhook:${item.id}`)" role="button" tabindex="0" @click="rotateWebhook(item)"><text style="font-size: 12px">{{ t.developer.rotate }}</text></view><view class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `delete-webhook:${item.id}`)" role="button" tabindex="0" @click="deleteWebhook(item.id)"><text style="font-size: 12px">{{ t.developer.delete }}</text></view></view>
@@ -158,11 +166,13 @@
               <view v-else-if="webhookDeliveries[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.deliveryEmpty }}</text></view>
             </view>
             <view v-if="resourcesReady && !webhooks.length" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
+            <template v-if="canManageResources">
             <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-webhook')" role="button" tabindex="0" @click="createWebhook"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text></view>
-            <view v-if="newWebhookSecret" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
+            </template>
+            <view v-if="newWebhookSecret && canManageResources" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
           </view>
         </view>
       </view>
@@ -194,7 +204,7 @@ import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperWebhook } from "./developer-form-validation";
-import { developerAccessReviewReasonKey, developerAccessState, type DeveloperAccessCopyKey } from "./developer-access-state";
+import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, type DeveloperAccessCopyKey } from "./developer-access-state";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -217,6 +227,8 @@ const webhookDeliveries = ref<Record<number, DeveloperWebhookDelivery[]>>({});
 const resourcesLoading = ref(false);
 const resourcesReady = ref(false);
 const resourcesLoadFailed = ref(false);
+const resourcesApprovalRequired = ref(false);
+const canManageResources = computed(() => resourcesReady.value && !resourcesLoading.value && !resourcesApprovalRequired.value);
 const resourceBusyKeys = ref(new Set<string>());
 const resourceIntentKeys = new Map<string, string>();
 const webhookName = ref("");
@@ -381,6 +393,7 @@ function resetResourceScope(): void {
   resourcesLoading.value = false;
   resourcesReady.value = false;
   resourcesLoadFailed.value = false;
+  resourcesApprovalRequired.value = false;
   resourceBusyKeys.value = new Set();
   resourceIntentKeys.clear();
   rotationRecovery.value = {};
@@ -500,9 +513,17 @@ async function loadResources(fence = resourceFence()) {
     webhooks.value = hooks;
     refreshRotationRecovery(hooks);
     resourcesLoadFailed.value = false;
+    resourcesApprovalRequired.value = false;
     resourcesReady.value = true;
-  } catch {
-    if (current()) resourcesLoadFailed.value = true;
+  } catch (cause) {
+    if (current()) {
+      resourcesApprovalRequired.value = isDeveloperApprovalRequired(cause);
+      resourcesLoadFailed.value = !resourcesApprovalRequired.value;
+      apiKeys.value = [];
+      webhooks.value = [];
+      webhookDeliveries.value = {};
+      if (resourcesApprovalRequired.value) newWebhookSecret.value = null;
+    }
   } finally {
     if (current()) {
       resourcesLoading.value = false;
@@ -526,6 +547,7 @@ async function loadDocs() {
 }
 function retryLoadResources(): void { void loadResources(); }
 async function revokeApiKey(id: number) {
+  if (!canManageResources.value) return;
   const intent = `revoke-key:${id}`;
   if (resourceBusy(intent)) return;
   const fence = resourceFence();
@@ -533,7 +555,7 @@ async function revokeApiKey(id: number) {
   try {
     const result = await runConfirmedDeveloperMutation(
       () => askDeveloperConfirmation(t.value.developer.revokeConfirmTitle, t.value.developer.revokeConfirmBody),
-      () => resourceFenceCurrent(fence),
+      () => resourceFenceCurrent(fence) && canManageResources.value,
       () => developerResourcesApi.revokeKey(id, resourceKey(intent)),
     );
     if (!result.confirmed || !resourceFenceCurrent(fence)) return;
@@ -552,6 +574,7 @@ async function revokeApiKey(id: number) {
   }
 }
 async function loadWebhookDeliveries(item: DeveloperWebhook) {
+  if (!canManageResources.value) return;
   const intent = `deliveries-webhook:${item.id}`;
   if (resourceBusy(intent)) return;
   const fence = resourceFence();
@@ -567,6 +590,7 @@ async function loadWebhookDeliveries(item: DeveloperWebhook) {
   }
 }
 async function setWebhookEnabled(item: DeveloperWebhook, enabled: boolean) {
+  if (!canManageResources.value) return;
   const intent = `toggle-webhook:${item.id}`;
   if (resourceBusy(intent)) return;
   const fence = resourceFence();
@@ -591,6 +615,7 @@ async function setWebhookEnabled(item: DeveloperWebhook, enabled: boolean) {
   }
 }
 async function createWebhook() {
+  if (!canManageResources.value) return;
   const events = webhookEvents.value.split(",").map((value) => value.trim()).filter(Boolean);
   const name = webhookName.value.trim();
   const url = webhookUrl.value.trim();
@@ -615,6 +640,7 @@ async function createWebhook() {
   }
 }
 async function deleteWebhook(id: number) {
+  if (!canManageResources.value) return;
   const intent = `delete-webhook:${id}`;
   if (resourceBusy(intent)) return;
   const fence = resourceFence();
@@ -623,7 +649,7 @@ async function deleteWebhook(id: number) {
   try {
     const result = await runConfirmedDeveloperMutation(
       () => askDeveloperConfirmation(t.value.developer.deleteConfirmTitle, t.value.developer.deleteConfirmBody),
-      () => resourceFenceCurrent(fence),
+      () => resourceFenceCurrent(fence) && canManageResources.value,
       () => developerResourcesApi.deleteWebhook(id, resourceKey(intent)),
     );
     if (!result.confirmed || !resourceFenceCurrent(fence)) return;
@@ -648,6 +674,7 @@ async function deleteWebhook(id: number) {
   }
 }
 async function rotateWebhook(item: DeveloperWebhook) {
+  if (!canManageResources.value) return;
   const intent = `rotate-webhook:${item.id}`;
   if (resourceBusy(intent)) return;
   const fence = resourceFence();
@@ -666,7 +693,7 @@ async function rotateWebhook(item: DeveloperWebhook) {
         t.value.developer.rotateConfirmTitle,
         journalStatus.state ? t.value.developer.rotateRecoveryConfirmBody : t.value.developer.rotateConfirmBody,
       ),
-      () => resourceFenceCurrent(fence),
+      () => resourceFenceCurrent(fence) && canManageResources.value,
       () => {
         // A rotation response is the only place the new secret exists. Never retry
         // this request with the same key; persist and read back uncertainty first.

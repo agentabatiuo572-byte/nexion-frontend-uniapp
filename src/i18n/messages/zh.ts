@@ -3,6 +3,15 @@ import type { Messages } from "./en";
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  pageLoad: {
+    module: "页面资源加载失败",
+    timeout: "页面加载时间过长",
+    unknown: "页面暂时无法加载",
+    staleVersionHint: "本页所需资源属于更新后的版本。重新加载即可获取最新版本，当前登录状态会保留。",
+    recoveryHint: "重新加载当前页面后再试。此页面未保存的内容可能丢失。",
+    retry: "重新加载页面",
+    reloading: "正在重新加载…",
+  },
   bankBinding: {
     otpHint: "换卡需验证当前账号绑定手机号。",
     otpPlaceholder: "6 位短信验证码",
@@ -3633,6 +3642,7 @@ export const zh: Messages = {
     secretOnce: "请立即保存此密钥，之后不会再次显示。",
     deliveryDisabled: "密钥已保存，投递已启用；最近投递结果会显示在端点状态中。",
     remoteRequired: "连接真实后端后才能管理开发者资源。",
+    approvalRequired: "需先获得开发者访问审批，才能管理 API 密钥和 Webhooks。请在概览查看或提交申请。",
     resourceLoadFailed: "开发者资源加载失败。",
     resourceActionFailed: "开发者资源操作失败，页面没有假成功。",
     badgeEnterprise: "企业级",
@@ -4981,6 +4991,7 @@ export const zh: Messages = {
     status: "状态",
     badgeDirect: "直推",
     badgeExtended: "扩展",
+    projectionRefreshing: "正在刷新团队数据，暂显示上次确认的结果。",
     projectionLoadingTitle: "正在读取团队网络…",
     projectionErrorTitle: "团队网络读取失败",
     projectionErrorDesc: "未能取得服务器权威团队数据；当前不会把失败显示成零成员或零金额。",

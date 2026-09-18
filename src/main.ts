@@ -1,6 +1,9 @@
 import { createSSRApp, watch } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
+// #ifdef H5
+import PageLoadError from "./components/page-load-error.vue";
+// #endif
 import { mountSpec7DevBridge } from "@/lib/spec7-dev-bridge";
 import { mountAuthOtpDevBridge } from "@/store/auth-otp";
 import { useI18nRuntime } from "@/store/i18n-runtime";
@@ -40,6 +43,9 @@ export function createApp() {
 
   const pinia = createPinia();
   app.use(pinia);
+  // #ifdef H5
+  app.component("NexGridPageLoadError", PageLoadError);
+  // #endif
   const locale = useLocaleStore(pinia);
   const runtimeI18n = useI18nRuntime(pinia);
   runtimeI18n.prepare();

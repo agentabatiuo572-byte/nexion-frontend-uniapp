@@ -3,6 +3,15 @@ import type { Messages } from "./en";
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  pageLoad: {
+    module: "Không thể tải tài nguyên trang",
+    timeout: "Trang mất quá nhiều thời gian để tải",
+    unknown: "Không thể tải trang",
+    staleVersionHint: "Trang này cần tài nguyên của phiên bản mới hơn. Tải lại để nhận phiên bản mới nhất; bạn vẫn giữ nguyên đăng nhập.",
+    recoveryHint: "Tải lại trang này để thử lại. Nội dung chưa lưu trên trang có thể bị mất.",
+    retry: "Tải lại trang",
+    reloading: "Đang tải lại…",
+  },
   bankBinding: {
     otpHint: "Đổi tài khoản ngân hàng cần xác minh số điện thoại đã liên kết.",
     otpPlaceholder: "Mã SMS 6 chữ số",
@@ -3616,6 +3625,7 @@ export const vi: Messages = {
     secretOnce: "Hãy lưu secret ngay; secret sẽ không hiển thị lại.",
     deliveryDisabled: "Đã lưu secret, gửi webhook đã bật; trạng thái lần gửi gần nhất sẽ hiển thị tại endpoint.",
     remoteRequired: "Kết nối backend để quản lý tài nguyên developer.",
+    approvalRequired: "Cần có sự chấp thuận quyền truy cập nhà phát triển để quản lý khóa API và Webhooks. Xem hoặc gửi yêu cầu trong Tổng quan.",
     resourceLoadFailed: "Không thể tải tài nguyên developer.",
     resourceActionFailed: "Thao tác tài nguyên developer thất bại; không báo thành công giả.",
     badgeEnterprise: "Chuẩn doanh nghiệp",
@@ -4986,6 +4996,7 @@ export const vi: Messages = {
     status: "Trạng thái",
     badgeDirect: "TRỰC TIẾP",
     badgeExtended: "MỞ RỘNG",
+    projectionRefreshing: "Đang làm mới dữ liệu đội nhóm; hiển thị kết quả đã xác nhận gần nhất.",
     projectionLoadingTitle: "Đang tải mạng lưới đội nhóm…",
     projectionErrorTitle: "Không thể tải mạng lưới đội nhóm",
     projectionErrorDesc: "Không lấy được dữ liệu quyền lực từ máy chủ. Lỗi tải sẽ không được hiển thị giả thành 0 thành viên hoặc 0 doanh số.",
