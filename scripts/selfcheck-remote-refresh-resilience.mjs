@@ -225,6 +225,11 @@ globalThis.uni = {
   setStorageSync(k, v) { disk.set(k, JSON.stringify(v)); },
   removeStorageSync(k) { disk.delete(k); },
   getSystemInfoSync() { return { language: "en" }; },
+  // Authenticated legal verification masks the page before making its request.
+  // Supply platform UI boundaries so the probe reaches the throwing API.
+  showLoading() {},
+  hideLoading() {},
+  reLaunch(options) { options.success?.({ errMsg: "reLaunch:ok" }); },
 };
 
 // runtime-stub 手写成「remote 开 + 全 API 抛」:这是本门的靶态,与共享 runtimeStub

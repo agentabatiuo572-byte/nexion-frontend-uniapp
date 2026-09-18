@@ -1182,6 +1182,7 @@ export const vi: Messages = {
     acceptToast: "Đã xác nhận công bố rủi ro · Bạn đã có thể dùng các tính năng rút tiền / staking / khóa.",
     sectionSelected: "Đã chọn mục {n} để xem lại",
     reloadRegionCta: "Tải lại công bố áp dụng cho khu vực của bạn",
+    publicationUnavailable: "Nội dung công bố rủi ro cho khu vực của bạn tạm thời chưa có. Vui lòng quay lại sau. Bạn chưa thể xác nhận khi nội dung chưa được tải.",
     loadErrorRegion: "Công bố rủi ro cho khu vực của bạn tạm thời không khả dụng; vui lòng kiểm tra mạng rồi thử lại. Chưa tải được thì chưa thể xác nhận.",
     gateUnavailable: "Không thể xác minh cổng công bố rủi ro. Chưa gửi lệnh nào; vui lòng thử lại.",
   },
