@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -100,8 +100,16 @@ async function refreshRewardSummary() {
 onShow(() => { rewardViewActive = true; void refreshRewardSummary(); });
 
 const voucherReady = computed(() => !remoteApiEnabled || voucher.remoteStatus === "ready");
-const availableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
-const expiredCount = computed<number | null>(() => voucherReady.value ? voucher.expiredVouchers.length : null);
+const remoteAvailableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
+const remoteExpiredCount = computed<number | null>(() => voucherReady.value ? voucher.expiredVouchers.length : null);
+// Voucher re-reads happen on every return from a detail page. Keep the last
+// successful counts so the cards never flash "--" for values already known.
+const lastAvailableCount = ref<number | null>(null);
+const lastExpiredCount = ref<number | null>(null);
+watch(remoteAvailableCount, (value) => { if (value !== null) lastAvailableCount.value = value; }, { immediate: true });
+watch(remoteExpiredCount, (value) => { if (value !== null) lastExpiredCount.value = value; }, { immediate: true });
+const availableCount = computed(() => remoteAvailableCount.value ?? lastAvailableCount.value);
+const expiredCount = computed(() => remoteExpiredCount.value ?? lastExpiredCount.value);
 
 // Reward totals per symbol — same reward-family predicate as the dot and
 // the L2 records (bills.ts isRewardBill, single source).
@@ -115,8 +123,21 @@ const summaryFailed = computed(() => (fundsServerEnabled && bills.summaryStatus 
   || (remoteApiEnabled && voucher.remoteStatus === "error"));
 const remoteUsdtTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsUsdt ?? null : null);
 const remoteNexTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsNex ?? null : null);
-const displayUsdtTotal = computed(() => fundsServerEnabled ? remoteUsdtTotal.value : usdtTotal.value);
-const displayNexTotal = computed(() => fundsServerEnabled ? remoteNexTotal.value : nexTotal.value);
+// A background refresh (this page re-shows on every return from a detail page)
+// must not blank out totals the user already saw. The store drops its snapshot
+// to null only on a failed read, so keep the last successful figures while a
+// re-read is in flight, and surface the failure through summaryFailed instead of
+// replacing known values with "--".
+const lastUsdtTotal = ref<number | null>(null);
+const lastNexTotal = ref<number | null>(null);
+watch(remoteUsdtTotal, (value) => { if (value !== null) lastUsdtTotal.value = value; }, { immediate: true });
+watch(remoteNexTotal, (value) => { if (value !== null) lastNexTotal.value = value; }, { immediate: true });
+const displayUsdtTotal = computed(() =>
+  fundsServerEnabled ? (remoteUsdtTotal.value ?? lastUsdtTotal.value) : usdtTotal.value,
+);
+const displayNexTotal = computed(() =>
+  fundsServerEnabled ? (remoteNexTotal.value ?? lastNexTotal.value) : nexTotal.value,
+);
 
 const allZero = computed(
   () => summaryReady.value && voucherReady.value && availableCount.value === 0 && expiredCount.value === 0 && displayUsdtTotal.value === 0 && displayNexTotal.value === 0,
