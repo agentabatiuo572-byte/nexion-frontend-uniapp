@@ -37,7 +37,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /></svg>
           <text :style="sectionTitleStyle">{{ t.missions.todayHeading }}</text>
         </view>
-        <view class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/daily/daily')">
+        <!-- 三张带箭头的入口卡原先只是带 @click 的 container:读屏念不出、Tab 也到不了
+             (实测 tab 序只有 Back/Notifications/重试,三张卡全被跳过)。改 role="button"
+             + tabindex + aria-label,键盘激活由平台层合成(Enter/Space),名称含入口用途。 -->
+        <view class="mx-4 flex items-center active:opacity-80 nx-mission-entry" :style="rowStyle" role="button" tabindex="0" :aria-label="todayEntryLabel" @click="go('/pages/daily/daily')">
           <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-brand-2)')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -82,7 +85,7 @@
           :cta-label="t.missions.retry"
           @cta="retryRemoteEvents"
         />
-        <view v-else class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/events/events')">
+        <view v-else class="mx-4 flex items-center active:opacity-80 nx-mission-entry" :style="rowStyle" role="button" tabindex="0" :aria-label="eventsEntryLabel" @click="go('/pages/events/events')">
           <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-warning)')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -103,7 +106,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
           <text :style="sectionTitleStyle">{{ t.missions.achievementsHeading }}</text>
         </view>
-        <view class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/me/achievements')">
+        <view class="mx-4 flex items-center active:opacity-80 nx-mission-entry" :style="rowStyle" role="button" tabindex="0" :aria-label="achievementsEntryLabel" @click="go('/pages/me/achievements')">
           <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-success)')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
           </view>
@@ -263,6 +266,13 @@ function go(url: string) {
   navTo(url);
 }
 
+// 入口卡的可访问名 = 卡面标签(与 team.vue 的 nx-team-*-link 同一写法)。
+// 卡面是「标签 + 数值」两行,只给 container 时读屏念不出这是什么,也不知道能进哪里;
+// 名称取入口用途那一行,三张卡各自稳定唯一。
+const todayEntryLabel = computed(() => t.value.missions.todayLabel);
+const eventsEntryLabel = computed(() => t.value.missions.eventsLabel);
+const achievementsEntryLabel = computed(() => t.value.missions.achievementsLabel);
+
 // ── styles ──
 // De-carded hero — content on the page floor (2px optical inset); surface/border
 // + aurora/grid glows deleted outright, not re-tuned.
@@ -342,3 +352,12 @@ const badgeStyle: CSSProperties = {
   fontWeight: 500,
 };
 </script>
+
+<style scoped>
+/* 三张入口卡现在可聚焦(role=button + tabindex),必须有可见焦点环:
+   卡片是圆角 surface 块,默认 outline 贴着圆角被裁,键盘用户看不出焦点落在哪一张。 */
+.nx-mission-entry:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+}
+</style>

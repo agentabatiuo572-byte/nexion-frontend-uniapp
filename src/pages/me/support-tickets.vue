@@ -54,8 +54,11 @@
       <view v-else-if="mode.kind === 'create'" class="px-4" style="display: flex; flex-direction: column; gap: 16px">
         <view>
           <text class="block" :style="formLabelStyle">{{ t.tickets.create.catLabel }}</text>
-          <view class="flex" style="flex-wrap: wrap; gap: 6px">
-            <view v-for="c in categoriesForNew" :key="c" :style="catChipStyle(newCat === c)" role="button" tabindex="0" :aria-label="catLabel(c)" @click="newCat = c">
+          <!-- 分类是互斥单选(选一个,其余取消)。原先每个 chip 都是 role="button":
+               读屏念「按钮」、没有组名,也读不出当前选中哪一个(默认「提现」无任何状态)。
+               改 radiogroup/radio + aria-checked,roving tabindex + 方向键(与提现网络选择器同形)。 -->
+          <view class="flex" style="flex-wrap: wrap; gap: 6px" role="radiogroup" :aria-label="t.tickets.create.catLabel">
+            <view v-for="c in categoriesForNew" :key="c" class="nx-ticket-cat-radio" :style="catChipStyle(newCat === c)" role="radio" :tabindex="newCat === c ? 0 : -1" :aria-checked="newCat === c ? 'true' : 'false'" :aria-label="catLabel(c)" @click="selectCategory(c)" @keydown.left.prevent="moveCategory(-1)" @keydown.right.prevent="moveCategory(1)" @keydown.up.prevent="moveCategory(-1)" @keydown.down.prevent="moveCategory(1)">
               <text>{{ catLabel(c) }}</text>
             </view>
           </view>
@@ -77,11 +80,18 @@
         </view>
         <view>
           <text class="block" :style="formLabelStyle">{{ t.tickets.create.subjectLabel }}</text>
-          <input :value="subject" :placeholder="t.tickets.create.subjectPlaceholder" placeholder-class="ph" :style="inputStyle" @input="onSubject" />
+          <!-- 输入框必须带可访问名:可见 <text> 标签与 uni 的 <input> 之间没有程序化关联,
+               读屏只念「文本框」。名称 + 必填 + 长度提示都写在控件上,由平台层
+               lib/a11y-field-label.ts 镜像到内部真控件(宿主上的 aria-* 不会自己下去)。 -->
+          <input :value="subject" :maxlength="SUBJECT_MAX" :placeholder="t.tickets.create.subjectPlaceholder" placeholder-class="ph" :style="inputStyle" :aria-label="t.tickets.create.subjectLabel" aria-required="true" aria-describedby="ticket-subject-hint" :aria-invalid="subjectInvalid ? 'true' : 'false'" :aria-errormessage="subjectInvalid ? 'ticket-subject-error' : undefined" @input="onSubject" />
+          <text id="ticket-subject-hint" class="block" :style="fieldHintStyle">{{ t.tickets.create.subjectHint }}</text>
+          <text v-if="subjectInvalid" id="ticket-subject-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.tickets.create.subjectRequired }}</text>
         </view>
         <view>
           <text class="block" :style="formLabelStyle">{{ t.tickets.create.descLabel }}</text>
-          <textarea :value="desc" :placeholder="t.tickets.create.descPlaceholder" placeholder-class="ph" :style="textareaStyle" @input="onDesc" />
+          <textarea :value="desc" :maxlength="DESC_MAX" :placeholder="t.tickets.create.descPlaceholder" placeholder-class="ph" :style="textareaStyle" :aria-label="t.tickets.create.descLabel" aria-required="true" aria-describedby="ticket-desc-hint" :aria-invalid="descInvalid ? 'true' : 'false'" :aria-errormessage="descInvalid ? 'ticket-desc-error' : undefined" @input="onDesc" />
+          <text id="ticket-desc-hint" class="block" :style="fieldHintStyle">{{ t.tickets.create.descHint }}</text>
+          <text v-if="descInvalid" id="ticket-desc-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.tickets.create.descRequired }}</text>
         </view>
         <view class="grid grid-cols-2" style="gap: 8px">
           <view class="flex items-center justify-center active:scale-[0.98]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.cancel" @click="setMode({ kind: 'list' })">
@@ -206,6 +216,14 @@ const newCat = ref<TicketCategory>("withdrawal");
 const subject = ref("");
 const desc = ref("");
 const reply = ref("");
+// 服务端 AppSupportService 对这两个字段的界:title 1–160、body 1–2000。
+// 客户端只是把同一个界前移(maxlength + 提示),提交守卫仍在服务端。
+const SUBJECT_MAX = 160;
+const DESC_MAX = 2000;
+// 校验态只在用户按过提交之后出现 —— 一进表单就把空字段标红是误报。
+const submitAttempted = ref(false);
+const subjectInvalid = computed(() => submitAttempted.value && !subject.value.trim());
+const descInvalid = computed(() => submitAttempted.value && !desc.value.trim());
 // An account switch must drop the previous account's draft, but it must not
 // discard the intent the address carries: a reload of ?mode=create has to keep
 // showing the create form rather than silently falling back to the list.
@@ -213,6 +231,7 @@ watch(() => app.accountKey, () => {
   subject.value = "";
   desc.value = "";
   reply.value = "";
+  submitAttempted.value = false;
   if (mode.value.kind === "detail") mode.value = { kind: "list" };
 }, { flush: "sync" });
 const filterFeedback = ref("");
@@ -244,7 +263,7 @@ onLoad((query) => {
   if (query?.mode === "create") mode.value = { kind: "create" };
   // 入口可带 ?cat= 预选分类(如充值页「充值未到账?」→ deposit);白名单外忽略。
   if (typeof query?.cat === "string" && (categoriesForNew as string[]).includes(query.cat)) {
-    newCat.value = query.cat as TicketCategory;
+    selectCategory(query.cat as TicketCategory);
   }
   if (typeof query?.ticket === "string") mode.value = { kind: "detail", id: query.ticket };
 });
@@ -405,6 +424,21 @@ const updatedLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.de
 function catLabel(c: TicketCategory): string {
   return t.value.tickets.category[c];
 }
+/** 选中一个分类。`?cat=` 预选与 chips 点击都走这里,免得两处状态更新漂移。 */
+function selectCategory(c: TicketCategory) {
+  newCat.value = c;
+}
+/** roving tabindex 的标准行为:方向键移一格并选上,焦点跟到新选中项。 */
+function moveCategory(delta: number): void {
+  const index = categoriesForNew.indexOf(newCat.value);
+  const next = categoriesForNew[(index + delta + categoriesForNew.length) % categoriesForNew.length];
+  if (!next) return;
+  selectCategory(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>(".nx-ticket-cat-radio[tabindex=\"0\"]")?.focus();
+  });
+}
 function statusLabel(s: TicketStatus): string {
   return t.value.tickets.status[s];
 }
@@ -454,6 +488,7 @@ function onReply(e: Event) {
 
 async function submitCreate() {
   if (ticketsStore.mutating) return;
+  submitAttempted.value = true;
   if (!subject.value.trim() || !desc.value.trim()) {
     toast.info(t.value.tickets.create.missingFields, "");
     return;
@@ -463,6 +498,7 @@ async function submitCreate() {
     toast.success(t.value.tickets.create.submittedToast, "");
     subject.value = "";
     desc.value = "";
+    submitAttempted.value = false;
     mode.value = { kind: "detail", id };
   } catch { toast.error(t.value.security.opFailed); }
 }
@@ -521,6 +557,9 @@ const emptyTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3
 const noteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
 const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const formLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "8px" };
+// 必填/长度提示与字段错误:两者都在输入框下方,由 aria-describedby / aria-errormessage 关联。
+const fieldHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: "16px", marginTop: "6px" };
+const fieldErrorStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-danger)", lineHeight: "16px", marginTop: "4px" };
 function catChipStyle(active: boolean): CSSProperties {
   return {
     height: "44px",

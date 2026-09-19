@@ -97,9 +97,21 @@
 
         <!-- CTA -->
         <text v-if="recovering" class="block" :style="lockedNoticeStyle">{{ w.recoveryHint }}</text>
-        <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" @click="handleRepurchase">
+        <!-- 置灰必须**说出来**:光换配色 + handler 里静默 return,读屏念的还是「按钮」、
+             眼睛看到的还是「复投 $100.00」——实测复现单(#165)正是这么读成「仍启用」的。
+             aria-disabled 同时是平台键盘激活层的第三道闸(a11y-activate 不激活置灰控件)。 -->
+        <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="repurchase.submitting" @click="handleRepurchase">
           <text>{{ ctaLabel }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSubmit ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        </view>
+
+        <!-- 余额不足:原因 + 下一步(充值)。只说「余额不足」不给出口 = 把用户堵在死路上。 -->
+        <view v-if="insufficientBalance" :style="insufficientNoticeStyle" role="status">
+          <text class="block" :style="insufficientTitleStyle">{{ w.insufficient }}</text>
+          <text class="block" :style="insufficientBodyStyle">{{ fmt(w.insufficientSub, { a: displayBalance.toFixed(2) }) }}</text>
+          <view class="active:opacity-80" :style="topupCtaStyle" role="button" tabindex="0" :aria-label="t.me.topup" @click="goTopup">
+            <text>{{ t.me.topup }}</text>
+          </view>
         </view>
 
         <text class="block" :style="lockedNoticeStyle">{{ isRemote ? fmt(w.confirmMessage, { amount: formatCommandAmount(amount), days: repurchase.config?.lockDays ?? '—', penalty: repurchase.config?.earlyPenaltyPct ?? '—' }) : w.lockedNotice }}</text>
@@ -189,6 +201,24 @@ const canSubmit = computed(() => {
   return amount.value > 0 && amount.value <= user.value.usdtBalance;
 });
 
+/**
+ * 主按钮此刻**只因余额**而不可提交 —— 判据要窄,窄到「把余额补上就能提交」:
+ * · 恢复态(上一笔结果未确认)按原金额重放,**豁免**余额门(与 canSubmit 同一条豁免),
+ *   否则用户会被永久卡在恢复路径上;
+ * · 产品未开放/快照未就绪时不报「余额不足」—— 那是另一件事,报错会指错方向;
+ * · 余额取 displayBalance(remote 走权威快照),与按钮、与余额行**同源**,
+ *   不会出现「行里写着 $0.00、门却按另一个数判」的自相矛盾。
+ */
+const insufficientBalance = computed(() => {
+  if (recovering.value || !Number.isFinite(amount.value)) return false;
+  if (!(amount.value > displayBalance.value)) return false;
+  if (isRemote.value) {
+    const config = repurchase.config;
+    return remoteReady.value && Boolean(config?.enabled);
+  }
+  return amount.value > 0;
+});
+
 const ctaLabel = computed(() => recovering.value
   ? fmt(w.value.recoveryCta, { amount: formatCommandAmount(amount.value) })
   : fmt(w.value.cta, { amount: formatCommandAmount(amount.value) }));
@@ -269,7 +299,16 @@ async function refreshRemote() {
 
 async function handleRepurchase() {
   if (isRemote.value) {
-    if (!remoteReady.value || !canSubmit.value || !isMounted.value) return;
+    if (!isMounted.value) return;
+    // 快照未就绪 = 整页 HOLD,那时根本没有可点的按钮。
+    if (!remoteReady.value) return;
+    // 🔴 余额门(第一道,按钮禁用之外的独立一道):余额不足**明确拒绝并说明原因**,
+    //    不是静默 return —— 静默 return 在用户看来和「点了没反应」无法区分。
+    if (insufficientBalance.value) {
+      toast.error(w.value.insufficient, fmt(w.value.insufficientSub, { a: displayBalance.value.toFixed(2) }));
+      return;
+    }
+    if (!canSubmit.value) return;
     confirming.value = true;
     const generation = accountGeneration;
     const quoteAmount = normalizeCommandAmount(amount.value);
@@ -430,6 +469,11 @@ function goHow() {
   navTo("/pages/me/wallet-repurchase-how");
 }
 
+/** 余额不足的出口:充值页(与 store 结算/订单详情的引导同一目标)。 */
+function goTopup() {
+  navTo("/pages/me/wallet-topup");
+}
+
 onMounted(() => {
   if (isRemote.value) void refreshRemote();
 });
@@ -509,4 +553,10 @@ const unavailableStyle: CSSProperties = { padding: "16px", borderRadius: "12px",
 const unavailableTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const unavailableBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const retryCtaStyle: CSSProperties = { marginTop: "12px", height: "44px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "13px", fontWeight: 600 };
+// 余额不足提示:warning 描边 + 一句原因 + 一个充值出口。读屏靠 role="status" 播报,
+// 视觉靠 warning 色与主按钮的置灰形成对照。
+const insufficientNoticeStyle: CSSProperties = { padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--v5-warning) 40%, transparent)" };
+const insufficientTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-warning)" };
+const insufficientBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-2)" };
+const topupCtaStyle: CSSProperties = { marginTop: "10px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
 </script>
