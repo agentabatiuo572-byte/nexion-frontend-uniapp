@@ -8,13 +8,13 @@
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text><text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
       <view
-        class="font-mono-tabular inline-flex items-center active:opacity-70"
+        class="market-board-open font-mono-tabular inline-flex items-center active:opacity-70"
         style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500"
         role="link"
         tabindex="0"
         data-home-action="compute-market-open"
-        @click="goMarket"
-        @keydown.enter.stop.prevent="goMarket"
+        @click="marketNavigation.openMarket"
+        @keydown.enter.stop.prevent="marketNavigation.openMarketFromKeyboard"
       >{{ t.home.marketBoardOpen }} →</view>
     </view>
 
@@ -70,6 +70,7 @@ import type { AppHomeWorkload } from "@/api/app-home-api";
 import { useApp } from "@/store/app";
 import HomeSparkline from "./home-sparkline.vue";
 import { presentHomeMarketWorkload } from "./home-market-board";
+import { createMarketBoardNavigation } from "./market-board-navigation";
 
 const t = useT();
 const app = useApp();
@@ -80,6 +81,7 @@ const unavailableVolumeText = computed(() => fmt(t.value.home.marketBoardVol, { 
 const marketBoardStatusText = computed(() => app.homeTruthStatus === "loading" || app.homeTruthStatus === "idle"
   ? t.value.home.networkStatUpdating
   : t.value.uiChrome.unavailable);
+const marketNavigation = createMarketBoardNavigation(navTo);
 
 function displayRow(row: AppHomeWorkload) {
   return presentHomeMarketWorkload(row);
@@ -90,13 +92,19 @@ function deltaColor(row: AppHomeWorkload) {
     ? "var(--v5-success)"
     : tone === "negative" ? "var(--v5-danger)" : "var(--v5-ink-4)";
 }
-function goMarket() {
-  navTo("/pages/market/market");
-}
 function goEarn() {
-  navTo("/pages/earn/earn");
+  void navTo("/pages/earn/earn");
 }
 function retryHome() {
   void app.refreshHomeTruth();
 }
 </script>
+
+<style scoped>
+.market-board-open:focus,
+.market-board-open:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+</style>

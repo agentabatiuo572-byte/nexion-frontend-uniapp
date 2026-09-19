@@ -703,7 +703,21 @@ async function testHomeInteractions() {
   }
   await clickRoute({ label: "收益账本：查看全部", locator: (home) => home.locator("[data-home-action='earnings-ledger-all']"), route: "/pages/me/wallet-bills" });
   await clickRoute({ label: "NEX 行情", locator: (home) => home.locator("[data-home-action='nex-market-link']"), route: "/pages/market/market" });
-  await clickRoute({ label: "算力市场：打开", locator: (home) => home.locator("[data-home-section='compute-market'] [role='link']").first(), route: "/pages/market/market" });
+  const computeMarketHome = await returnHome();
+  const computeMarketOpen = computeMarketHome.locator("[data-home-action='compute-market-open']");
+  await computeMarketOpen.focus();
+  const computeMarketFocus = await computeMarketOpen.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth, outlineColor: style.outlineColor };
+  });
+  assert(computeMarketFocus.outlineStyle !== "none" && Number.parseFloat(computeMarketFocus.outlineWidth) >= 2,
+    `COMPUTE_MARKET_FOCUS_NOT_VISIBLE:${JSON.stringify(computeMarketFocus)}`);
+  controlledUiAssertions.push({
+    contract: "compute-market-keyboard-focus",
+    proof: `outline ${computeMarketFocus.outlineWidth} ${computeMarketFocus.outlineStyle} ${computeMarketFocus.outlineColor}`,
+    result: "PASS",
+  });
+  await clickRoute({ label: "算力市场：打开", locator: (home) => home.locator("[data-home-action='compute-market-open']"), route: "/pages/market/market" });
   await clickRoute({ label: "产品信任卡", locator: (home) => home.getByText("商品信任资料", { exact: true }).locator("xpath=ancestor::uni-view[@role='link'][1]"), route: "/pages/store/detail" });
   await clickRoute({ label: "信任与合规", locator: (home) => home.getByText("Trust 专项", { exact: true }).locator("xpath=ancestor::uni-view[@role='link'][1]"), route: "/pages/trust/trust" });
 
