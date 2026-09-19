@@ -165,32 +165,66 @@ export function navBack(fallbackHref?: string): void {
   uni.reLaunch({ url: "/pages/index/index", fail: reportNavigationFailure });
 }
 
+type NavigationAttempt = (
+  success: (result: unknown) => void,
+  fail: (result: unknown) => void,
+) => void;
+
+function runNavigationChain(attempts: NavigationAttempt[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let cursor = 0;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (!ok) reportNavigationFailure();
+      resolve(ok);
+    };
+    const attemptNext = () => {
+      if (settled) return;
+      const attempt = attempts[cursor++];
+      if (!attempt) {
+        finish(false);
+        return;
+      }
+      let responded = false;
+      const success = (result: unknown) => {
+        if (responded || settled) return;
+        responded = true;
+        finish(true);
+      };
+      const fail = (result: unknown) => {
+        if (responded || settled) return;
+        responded = true;
+        attemptNext();
+      };
+      try { attempt(success, fail); } catch (cause) { fail(cause); }
+    };
+    attemptNext();
+  });
+}
+
 /** Navigate to a logical-or-uni href, picking reLaunch for tab roots. */
-export function navTo(href: string): void {
+export function navTo(href: string): Promise<boolean> {
   // A transient Home offer must never remain above the destination page and
   // steal its first tap. Persistent cooldown state is intentionally untouched;
   // this only arbitrates the in-memory overlay before navigation.
   closeTransientNavigationSheets();
   if (!isUsableNavigationHref(href)) {
     reportNavigationFailure();
-    return;
+    return Promise.resolve(false);
   }
   const { url, tab } = toUniRoute(href);
   if (tab) {
-    uni.reLaunch({
-      url,
-      fail: () => uni.redirectTo({
-        url,
-        fail: () => uni.navigateTo({ url, fail: reportNavigationFailure }),
-      }),
-    });
-    return;
+    return runNavigationChain([
+      (success, fail) => uni.reLaunch({ url, success, fail }),
+      (success, fail) => uni.redirectTo({ url, success, fail }),
+      (success, fail) => uni.navigateTo({ url, success, fail }),
+    ]);
   }
-  uni.navigateTo({
-    url,
-    fail: () => uni.redirectTo({
-      url,
-      fail: () => uni.reLaunch({ url, fail: reportNavigationFailure }),
-    }),
-  });
+  return runNavigationChain([
+    (success, fail) => uni.navigateTo({ url, success, fail }),
+    (success, fail) => uni.redirectTo({ url, success, fail }),
+    (success, fail) => uni.reLaunch({ url, success, fail }),
+  ]);
 }

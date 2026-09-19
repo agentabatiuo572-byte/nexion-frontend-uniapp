@@ -48,14 +48,14 @@ describe("route navigation failure handling", () => {
     mocks.throwVoucherStore = false;
   });
 
-  it("reports a visible error after all normal-page fallbacks fail", () => {
+  it("reports a visible error and resolves false after all normal-page fallbacks fail", async () => {
     vi.stubGlobal("uni", {
       navigateTo: vi.fn((options: NavigationOptions) => options.fail?.()),
       redirectTo: vi.fn((options: NavigationOptions) => options.fail?.()),
       reLaunch: vi.fn((options: NavigationOptions) => options.fail?.()),
     });
 
-    navTo("/pages/team/commissions");
+    await expect(navTo("/pages/team/commissions")).resolves.toBe(false);
 
     expect(uni.navigateTo).toHaveBeenCalledTimes(1);
     expect(uni.redirectTo).toHaveBeenCalledTimes(1);
@@ -64,14 +64,14 @@ describe("route navigation failure handling", () => {
     expect(mocks.navigationError).toHaveBeenCalledWith("Navigation failed");
   });
 
-  it("does not report an error when a fallback succeeds", () => {
+  it("resolves true when a fallback succeeds", async () => {
     vi.stubGlobal("uni", {
       navigateTo: vi.fn((options: NavigationOptions) => options.fail?.()),
-      redirectTo: vi.fn(),
+      redirectTo: vi.fn((options: NavigationOptions) => options.success?.()),
       reLaunch: vi.fn(),
     });
 
-    navTo("/pages/me/wallet-withdraw");
+    await expect(navTo("/pages/me/wallet-withdraw")).resolves.toBe(true);
 
     expect(uni.navigateTo).toHaveBeenCalledTimes(1);
     expect(uni.redirectTo).toHaveBeenCalledTimes(1);
@@ -79,14 +79,14 @@ describe("route navigation failure handling", () => {
     expect(mocks.navigationError).not.toHaveBeenCalled();
   });
 
-  it("reports a visible error after all tab-page fallbacks fail", () => {
+  it("reports a visible error after all tab-page fallbacks fail", async () => {
     vi.stubGlobal("uni", {
       navigateTo: vi.fn((options: NavigationOptions) => options.fail?.()),
       redirectTo: vi.fn((options: NavigationOptions) => options.fail?.()),
       reLaunch: vi.fn((options: NavigationOptions) => options.fail?.()),
     });
 
-    navTo("/team");
+    await expect(navTo("/team")).resolves.toBe(false);
 
     expect(uni.reLaunch).toHaveBeenCalledTimes(1);
     expect(uni.redirectTo).toHaveBeenCalledTimes(1);
@@ -112,6 +112,47 @@ describe("route navigation failure handling", () => {
     expect(uni.navigateTo).toHaveBeenCalledWith(expect.objectContaining({
       url: "/pages/team/commissions",
     }));
+  });
+
+  it("dismisses transient Home overlays before starting the single route chain", async () => {
+    vi.stubGlobal("uni", {
+      navigateTo: vi.fn((options: NavigationOptions) => options.success?.()),
+      redirectTo: vi.fn(),
+      reLaunch: vi.fn(),
+    });
+
+    await expect(navTo("/pages/market/market")).resolves.toBe(true);
+
+    expect(mocks.closeTrial).toHaveBeenCalledOnce();
+    expect(mocks.closeVoucher).toHaveBeenCalledOnce();
+    expect(uni.navigateTo).toHaveBeenCalledOnce();
+    expect(mocks.closeTrial.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(uni.navigateTo).mock.invocationCallOrder[0],
+    );
+    expect(mocks.closeVoucher.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(uni.navigateTo).mock.invocationCallOrder[0],
+    );
+    expect(uni.redirectTo).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("settles one normal navigation chain when an SDK emits duplicate callbacks", async () => {
+    vi.stubGlobal("uni", {
+      navigateTo: vi.fn((options: NavigationOptions) => {
+        options.success?.();
+        options.fail?.();
+        options.success?.();
+      }),
+      redirectTo: vi.fn(),
+      reLaunch: vi.fn(),
+    });
+
+    await expect(navTo("/pages/market/market")).resolves.toBe(true);
+
+    expect(uni.navigateTo).toHaveBeenCalledOnce();
+    expect(uni.redirectTo).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(mocks.navigationError).not.toHaveBeenCalled();
   });
 
   it("reports invalid runtime href values instead of throwing or navigating", () => {
