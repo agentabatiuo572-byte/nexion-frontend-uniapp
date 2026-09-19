@@ -101,7 +101,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.
-  "support-tickets.vue": "c058bea3b141432c95f151d342bb509cf456b709237737f776edcf6ea9d40d10",
+  // Every mode change now routes through setMode so the address tracks the visible
+  // form (back-to-list clears ?mode=create; a create deep link survives reload).
+  "support-tickets.vue": "32b01522dec69ebd35f9b9fd9da5ff9a89f09d9aa987169b7894ce9bdeb3c570",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",

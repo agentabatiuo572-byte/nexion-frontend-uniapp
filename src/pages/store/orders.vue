@@ -25,8 +25,11 @@
         </view>
       </view>
 
-      <!-- Empty state -->
-      <EmptyState v-if="orderPanels.mainPresentation === 'empty'" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <!-- Main content when the successfully-read sources hold no rows. A single
+           unavailable source is supplemental, not the page's content state: a
+           partial read still shows the normal empty state with its store CTA
+           beside the outage banner, instead of letting the outage fill the page. -->
+      <EmptyState v-if="mainContentEmpty" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
@@ -131,6 +134,14 @@ const orderPanels = computed(() => orderListPanels({
   availability: remoteOrderAvailability.value,
   orderCount: orderList.value.length,
 }));
+// Both an authoritative empty read and a partial read with no rows show the
+// normal empty state; only the outage banner differs. Keeping this as its own
+// predicate means a new presentation value cannot silently leave the main
+// content area blank again.
+const mainContentEmpty = computed(() =>
+  orderPanels.value.mainPresentation === "empty"
+  || orderPanels.value.mainPresentation === "partial",
+);
 let refreshEpoch = 0;
 let ordersPageActive = true;
 async function refreshOrders() {

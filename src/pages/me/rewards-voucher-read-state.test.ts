@@ -1,4 +1,4 @@
-import { computed, createSSRApp, h, reactive, ref } from 'vue';
+import { computed, createSSRApp, h, reactive, ref, watch } from 'vue';
 import * as Vue from 'vue';
 import { renderToString } from '@vue/server-renderer';
 import { compileTemplate, parse } from '@vue/compiler-sfc';
@@ -112,14 +112,38 @@ describe('Rewards voucher list remote read states', () => {
       catVouchers: 'Vouchers', unitVouchers: 'vouchers', catVouchersDesc: 'Voucher rewards', expiredCount: '{n} expired',
       catUsdt: 'USDT', catNex: 'NEX', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
     } });
-    const result = new Function('computed', 'voucher', 'remoteApiEnabled', 'fundsServerEnabled', 'bills', 'isRewardBill', 't', 'fmt',
+    const result = new Function('computed', 'voucher', 'remoteApiEnabled', 'fundsServerEnabled', 'bills', 'isRewardBill', 't', 'fmt', 'ref', 'watch',
       `${l1Block}\nreturn { voucherReady, availableCount, expiredCount, allZero, cats };`,
-    )(computed, voucher, true, true, bills, () => false, t, (template: string, args: { n: number }) => template.replace('{n}', String(args.n)));
+    )(computed, voucher, true, true, bills, () => false, t, (template: string, args: { n: number }) => template.replace('{n}', String(args.n)), ref, watch);
 
     expect(result.cats.value[0].big).toBe('--');
     expect(result.allZero.value).toBe(false);
     voucher.remoteStatus = 'ready';
     expect(result.cats.value[0].big).toBe('0');
     expect(result.allZero.value).toBe(true);
+  });
+
+  // Returning from a detail page re-runs the summary read. The cards used to
+  // flash "--" on every return because a loading status blanked values the user
+  // had already seen. A background re-read must keep the last successful figures.
+  it('keeps the last successful totals and counts while a background re-read is loading', () => {
+    const voucher = reactive({ remoteStatus: 'ready', claimedUnused: [1, 2], expiredVouchers: [1] });
+    const bills = reactive({ bills: [], summaryStatus: 'ready', summary: { rewardsUsdt: 12.5, rewardsNex: 340 } });
+    const t = ref({ rewards: {
+      catVouchers: 'Vouchers', unitVouchers: 'vouchers', catVouchersDesc: 'Voucher rewards', expiredCount: '{n} expired',
+      catUsdt: 'USDT', catNex: 'NEX', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
+    } });
+    const view = new Function('computed', 'voucher', 'remoteApiEnabled', 'fundsServerEnabled', 'bills', 'isRewardBill', 't', 'fmt', 'ref', 'watch',
+      `${l1Block}\nreturn { availableCount, expiredCount, displayUsdtTotal, displayNexTotal, cats };`,
+    )(computed, voucher, true, true, bills, () => false, t, (template: string, args: { n: number }) => template.replace('{n}', String(args.n)), ref, watch);
+
+    // A successful read has landed: every card shows its real value.
+    expect(view.cats.value.map((c: { big: string }) => c.big)).toEqual(['2', '$12.50', '340']);
+
+    // Background re-read in flight: status leaves "ready" and the store snapshot
+    // is briefly unavailable, but no known value may fall back to "--".
+    bills.summaryStatus = 'loading';
+    voucher.remoteStatus = 'loading';
+    expect(view.cats.value.map((c: { big: string }) => c.big)).toEqual(['2', '$12.50', '340']);
   });
 });

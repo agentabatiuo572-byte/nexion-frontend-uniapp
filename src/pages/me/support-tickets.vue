@@ -10,7 +10,7 @@
     <view style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/support" />
       <view v-if="mode.kind !== 'list'" class="px-4" style="padding-bottom: 8px">
-        <view class="flex items-center active:opacity-50" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="mode = { kind: 'list' }">
+        <view class="flex items-center active:opacity-50" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="setMode({ kind: 'list' })">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           <text style="margin-left: 4px">{{ t.tickets.backToTickets }}</text>
         </view>
@@ -24,7 +24,7 @@
           <StatBox tint="var(--v5-brand)" :label="t.tickets.statsResolved" :value="stats.resolved" :icon="checkIcon" @select="selectTab('resolved')" />
         </view>
 
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="newBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.newTicketCta" @click="mode = { kind: 'create' }">
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="newBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.newTicketCta" @click="setMode({ kind: 'create' })">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text style="margin-left: 8px">{{ t.tickets.newTicketCta }}</text>
         </view>
@@ -81,7 +81,7 @@
           <textarea :value="desc" :placeholder="t.tickets.create.descPlaceholder" placeholder-class="ph" :style="textareaStyle" @input="onDesc" />
         </view>
         <view class="grid grid-cols-2" style="gap: 8px">
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.cancel" @click="mode = { kind: 'list' }">
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.cancel" @click="setMode({ kind: 'list' })">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.cancel }}</text>
           </view>
@@ -161,6 +161,7 @@ import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { supportApi } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
+import { navReplace } from "@/lib/route";
 import {
   STATUS_COLOR,
   type Ticket,
@@ -182,17 +183,34 @@ const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
 const tabs: Tab[] = ["all", "open", "resolved", "closed"];
 
+// The URL owns the create/list intent so a refresh or a shared deep link
+// reproduces what the user sees. `?mode=create` is the only query this page
+// reflects; detail stays local because a ticket id would need its own load path.
+function modeQueryHref(next: Mode): string {
+  return next.kind === "create" ? "/pages/me/support-tickets?mode=create" : "/pages/me/support-tickets";
+}
+function setMode(next: Mode) {
+  mode.value = next;
+  // Replace (not push) keeps the back stack intact while making the visible
+  // address match the visible form. Routed through the failure-aware adapter so
+  // a rejected navigation still reports instead of failing silently.
+  void navReplace(modeQueryHref(next));
+}
+
 // 新工单不再提供已下线的身份核验类目;历史工单仍可渲染(标签中性化)。
 const categoriesForNew: TicketCategory[] = ["withdrawal", "deposit", "hardware", "account", "earnings", "genesis", "technical", "other"];
 const newCat = ref<TicketCategory>("withdrawal");
 const subject = ref("");
 const desc = ref("");
 const reply = ref("");
+// An account switch must drop the previous account's draft, but it must not
+// discard the intent the address carries: a reload of ?mode=create has to keep
+// showing the create form rather than silently falling back to the list.
 watch(() => app.accountKey, () => {
-  mode.value = { kind: "list" };
   subject.value = "";
   desc.value = "";
   reply.value = "";
+  if (mode.value.kind === "detail") mode.value = { kind: "list" };
 }, { flush: "sync" });
 const filterFeedback = ref("");
 const slaTargets = ref<SupportSlaTarget[]>([]);
@@ -229,9 +247,15 @@ onLoad((query) => {
 });
 
 onShow(async () => {
+  // The create form renders from its own sources (categories, FAQ suggestions,
+  // SLA targets). The ticket list only feeds the list view, so a list read that
+  // fails while the user is composing a ticket must not surface as a blocking
+  // failure about content they cannot see — that was the "unrelated failure"
+  // toast on a ?mode=create refresh.
+  const listIsVisible = mode.value.kind === "list";
   try {
     const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets(), loadTicketSuggestions()]);
-    if (tickets.status === "rejected") throw tickets.reason;
+    if (tickets.status === "rejected" && listIsVisible) throw tickets.reason;
     if (mode.value.kind === "detail") await openTicket(mode.value.id);
   } catch {
     toast.warn(t.value.security.opFailed);
