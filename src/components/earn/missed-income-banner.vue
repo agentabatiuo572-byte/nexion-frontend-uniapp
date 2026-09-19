@@ -1,13 +1,18 @@
 <!--
   MissedIncomeBanner — ported from Nexion-prototype/app/components/missed-income-banner.tsx.
 
-  Loss-aversion hook for /earn — surfaces today's "missed income" vs the S1
-  ceiling and cumulative miss since signup. Warning-orange tone (var(--v5-brand-2)),
-  separate from the lemon "you earned" semantics. Dual progress bars (phone tiny
-  vs S1 ceiling full), the phone bar grows-on-scroll via useScrollGrowProgress
-  (P-019 $el-aware). A free trial does not hide this comparison: trial credit and
-  missed long-term device income answer different questions. Hidden only when
-  there is no authoritative upgrade comparison. Taps route to /store.
+  Device earning-ceiling comparison for /earn. The server projection
+  (homeTruth.doTheMath, basis OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT) supplies the
+  daily USDT ceiling of the next catalog product against the user's current
+  device, plus the product to open. Every figure here is that ceiling gap — a
+  pricing comparison, not income the user lost, tasks they were denied, or
+  entitlement they forfeited; the copy says so and carries no minus sign.
+  Warning-orange tone (var(--v5-brand-2)) keeps it distinct from the lemon
+  "you earned" semantics. Dual progress bars (current device vs ceiling), the
+  current bar grows-on-scroll via useScrollGrowProgress (P-019 $el-aware). A free
+  trial does not hide this comparison: trial credit and the ceiling comparison
+  answer different questions. Hidden when no authoritative comparison exists, so
+  an absent projection never renders a money figure.
 
   TickerNumber (source) → plain reactive value: the interval re-render already
   ramps the number; uni has no tween component, matching trial-ghost-slot.vue.
@@ -24,12 +29,11 @@
         <text style="color: var(--v5-brand-2-ink)">{{ t.earn.missedToday }}</text>
       </view>
 
-      <!-- Big missed-today number -->
+      <!-- Ceiling gap at today's elapsed progress -->
       <view class="relative mt-2 flex items-baseline gap-2">
         <view class="flex items-baseline">
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em; font-size: 34px; font-weight: 600">−</text>
           <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2-ink); opacity: 0.75">$</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em">{{ ceilingGapToday.toFixed(2) }}</text>
         </view>
         <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
       </view>
@@ -56,17 +60,20 @@
         </view>
       </view>
 
-      <!-- Cumulative miss + CTA -->
+      <!-- Cumulative ceiling gap + CTA -->
       <view class="relative mt-4 flex items-center justify-between gap-3">
         <view class="min-w-0" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.cumulativeMissed }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2-ink); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2-ink); margin-top: 2px">${{ cumulativeCeilingGapRounded }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
         </view>
         <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
-          <text :style="ctaLabelStyle">{{ t.earn.stopBleeding }}</text>
+          <text :style="ctaLabelStyle">{{ t.earn.capExplainCta }}</text>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
       </view>
+
+      <!-- Estimate basis: this is a pricing comparison, not a realised loss. -->
+      <text class="relative block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px; line-height: 1.35">{{ t.earn.ceilingGapDisclaimer }}</text>
     </view>
   </view>
 </template>
@@ -138,9 +145,9 @@ const joinedAtValid = computed(() =>
   && app.user.joinedAt <= authoritativeNow.value,
 );
 
-// Trial credit and missed long-term device income are separate concepts, so an
+// Trial credit and the device ceiling comparison are separate concepts, so an
 // active trial must not remove the comparison card. Top tier (multiplier 0) has
-// nothing higher to miss and remains hidden.
+// no higher catalog product to compare against and remains hidden.
 const show = computed(() =>
   promo.value !== null
   && authoritativeNow.value > 0
@@ -150,20 +157,23 @@ const show = computed(() =>
 
 const baseDaily = computed(() => promo.value?.baseDaily ?? 0);
 const targetDaily = computed(() => promo.value?.targetDaily ?? 0);
-const gap = computed(() => targetDaily.value - baseDaily.value);
+/** Daily ceiling gap between the current device and the next catalog product. */
+const dailyCeilingGap = computed(() => targetDaily.value - baseDaily.value);
 const dayProgress = computed(() => {
   const todayStart = new Date(authoritativeNow.value).setHours(0, 0, 0, 0);
   const elapsedHoursToday = (authoritativeNow.value - todayStart) / (60 * 60 * 1000);
   return Math.min(1, elapsedHoursToday / 24);
 });
-const missedToday = computed(() => gap.value * dayProgress.value);
+// Today's share of the ceiling gap, prorated by elapsed day progress. This is a
+// pricing comparison the server projection defines, never income actually lost.
+const ceilingGapToday = computed(() => dailyCeilingGap.value * dayProgress.value);
 
 const daysSinceJoin = computed(() => {
   if (!joinedAtValid.value) return 0;
   return Math.max(1, Math.floor((authoritativeNow.value - app.user.joinedAt) / ONE_DAY_MS));
 });
-const cumulativeMissedRounded = computed(() =>
-  Math.round(gap.value * daysSinceJoin.value).toLocaleString(),
+const cumulativeCeilingGapRounded = computed(() =>
+  Math.round(dailyCeilingGap.value * daysSinceJoin.value).toLocaleString(),
 );
 
 const phoneWidthPct = computed(() =>
