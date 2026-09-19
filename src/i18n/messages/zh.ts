@@ -778,7 +778,8 @@ export const zh: Messages = {
     taskLockCtaUpgrade: "查看高阶设备",
     taskLockCtaTradein: "升级更高算力设备",
     lockedTasksTitle: "你被锁定无法接的任务",
-    lockedMissedDaily: "每天流失",
+    lockedMissedDaily: "预计日收益",
+    lockedPotentialDisclaimer: "按任务平均时长、奖励与队列饱和度估算的潜在收益，并非你实际已损失的收入。",
     unlockNMoreTasks: "解锁 {n} 个高价任务 →",
     // FEAT-DEV01: 任务产能口径 + 新机补贴 + 任务池说明弹层(W-CAP1)
     capacityChipLabel: "产能",

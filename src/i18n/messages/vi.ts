@@ -794,7 +794,8 @@ export const vi: Messages = {
     taskLockCtaUpgrade: "Xem các bậc cao hơn",
     taskLockCtaTradein: "Nâng lên máy tính toán mạnh hơn",
     lockedTasksTitle: "Tác vụ bạn đang bị khóa",
-    lockedMissedDaily: "mất mỗi ngày",
+    lockedMissedDaily: "ước tính/ngày",
+    lockedPotentialDisclaimer: "Ước tính từ thời lượng trung bình, phần thưởng và độ lấp đầy hàng đợi của các tác vụ này — không phải thu nhập bạn thực sự đã mất.",
     unlockNMoreTasks: "Mở khóa thêm {n} tác vụ →",
     // FEAT-DEV01: task-capacity readout + new-device subsidy + task-pool explainer sheet (W-CAP1)
     capacityChipLabel: "công suất",
