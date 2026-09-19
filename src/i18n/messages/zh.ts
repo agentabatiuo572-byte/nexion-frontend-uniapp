@@ -752,8 +752,8 @@ export const zh: Messages = {
     phoneBatteryThreshold: "电量阈值",
     phoneWifiOnly: "仅 WiFi 时运行",
     phoneChargingOnly: "仅充电时运行",
-    // v3.6 损失厌恶 hook
-    missedToday: "今天错过的",
+    // v3.6 设备收益上限对比(原「损失厌恶」hook)
+    missedToday: "按今日进度折算的上限差额",
     vsDeviceCeiling: "对比 {name} 上限",
     yourPhone: "你的手机",
     deviceDetailTitle: "设备详情",
@@ -761,8 +761,8 @@ export const zh: Messages = {
     deviceNotFound: "未找到这台设备。",
     backToEarn: "返回算力页",
     deviceCeiling: "{name} 上限",
-    cumulativeMissed: "注册以来累计错过",
-    stopBleeding: "止血",
+    cumulativeMissed: "注册以来上限差额累计",
+    ceilingGapDisclaimer: "按当前设备与更高阶设备的日收益上限差额估算，随当日进度与注册天数折算，仅用于对比设备收益上限，并非你实际已损失的收入或已错过的任务。",
     // FEAT-DEV01: 车队任务产能 banner(原设备生命周期,等效换皮)
     lifecycleLabel: "车队任务产能",
     lifecycleSubtitle: "{n} 台硬件平均",

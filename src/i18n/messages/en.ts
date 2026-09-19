@@ -812,8 +812,8 @@ export const en = {
     phoneBatteryThreshold: "Battery threshold",
     phoneWifiOnly: "Only on WiFi",
     phoneChargingOnly: "Only when charging",
-    // v3.6 loss-aversion hooks
-    missedToday: "Missed today",
+    // v3.6 device earning-ceiling comparison (was the loss-aversion hook)
+    missedToday: "Ceiling gap at today's progress",
     vsDeviceCeiling: "vs {name} ceiling",
     yourPhone: "Your phone",
     deviceDetailTitle: "Device details",
@@ -821,8 +821,8 @@ export const en = {
     deviceNotFound: "This device could not be found.",
     backToEarn: "Back to Earn",
     deviceCeiling: "{name} ceiling",
-    cumulativeMissed: "Cumulative missed since signup",
-    stopBleeding: "Stop the bleeding",
+    cumulativeMissed: "Ceiling gap since signup",
+    ceilingGapDisclaimer: "Estimated from the daily earning-ceiling difference between your current device and a higher tier, prorated by today's elapsed progress and days since signup. This compares device earning ceilings — it is not income you lost or tasks you were denied.",
     // FEAT-DEV01: fleet task-capacity banner (successor of the lifecycle-degradation banner)
     lifecycleLabel: "Fleet task capacity",
     lifecycleSubtitle: "average across {n} hardware devices",

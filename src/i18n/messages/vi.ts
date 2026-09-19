@@ -768,8 +768,8 @@ export const vi: Messages = {
     phoneBatteryThreshold: "Ngưỡng pin",
     phoneWifiOnly: "Chỉ khi có WiFi",
     phoneChargingOnly: "Chỉ khi đang sạc",
-    // v3.6 loss-aversion hooks
-    missedToday: "Bỏ lỡ hôm nay",
+    // v3.6 so sánh trần thu nhập thiết bị (trước là hook "sợ mất mát")
+    missedToday: "Chênh lệch trần theo tiến độ hôm nay",
     vsDeviceCeiling: "so với trần {name}",
     yourPhone: "Điện thoại của bạn",
     deviceDetailTitle: "Chi tiết thiết bị",
@@ -777,8 +777,8 @@ export const vi: Messages = {
     deviceNotFound: "Không tìm thấy thiết bị này.",
     backToEarn: "Về trang Sinh lời",
     deviceCeiling: "Trần {name}",
-    cumulativeMissed: "Tổng bỏ lỡ kể từ khi đăng ký",
-    stopBleeding: "Chặn thất thoát",
+    cumulativeMissed: "Chênh lệch trần kể từ khi đăng ký",
+    ceilingGapDisclaimer: "Ước tính từ chênh lệch trần thu nhập mỗi ngày giữa thiết bị hiện tại và bậc cao hơn, quy đổi theo tiến độ hôm nay và số ngày kể từ khi đăng ký. Đây là so sánh trần thu nhập thiết bị — không phải thu nhập bạn đã mất hay tác vụ bạn bị từ chối.",
     // FEAT-DEV01: fleet task-capacity banner (successor of the lifecycle-degradation banner)
     lifecycleLabel: "Công suất tác vụ của đội máy",
     lifecycleSubtitle: "trung bình trên {n} thiết bị phần cứng",
