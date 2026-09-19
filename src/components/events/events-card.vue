@@ -52,11 +52,11 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
         <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
       </view>
-      <view v-else-if="showJoinAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" @click="emitUnlessBusy('join')">
+      <view v-else-if="showJoinAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="ev.ctaLabel ?? t.events.joinCta" @click="emitUnlessBusy('join')">
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else-if="ev._claimed" class="mt-3 w-full rounded-full flex items-center justify-center transition-transform" :class="{ 'active:scale-[0.98]': !!ev.useHref }" :style="claimedUseBtnStyle" :role="ev.useHref ? 'button' : undefined" :tabindex="ev.useHref ? 0 : undefined" :aria-label="claimedAriaLabel" @click="onClaimedUse">
+      <view v-else-if="ev._claimed" class="mt-3 w-full rounded-full flex items-center justify-center transition-transform" :class="{ 'active:scale-[0.98]': !!ev.useHref }" :style="claimedUseBtnStyle" :role="ev.useHref ? 'button' : undefined" :tabindex="ev.useHref ? 0 : -1" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
         <template v-if="ev.useHref">
@@ -65,11 +65,11 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
         </template>
       </view>
-      <view v-else-if="showProgressAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" @click="openHref">
+      <view v-else-if="showProgressAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" role="button" tabindex="0" :aria-label="t.events.viewProgress" @click="openHref" @keydown.enter.prevent="openHref" @keydown.space.prevent="openHref">
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ t.events.viewProgress }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else-if="showDecorativeAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="onDecorativeCta">
+      <view v-else-if="showDecorativeAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" tabindex="0" :aria-label="ev.ctaLabel" @click="onDecorativeCta" @keydown.enter.prevent="onDecorativeCta" @keydown.space.prevent="onDecorativeCta">
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>

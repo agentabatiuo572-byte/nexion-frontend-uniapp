@@ -681,6 +681,8 @@ export const vi: Messages = {
   earn: {
     title: "Sinh lời",
     subtitle: "Thiết bị, thu nhập, nhiệm vụ của bạn — trực tiếp.",
+    summaryUnavailableTitle: "Chưa làm mới được tổng thu nhập",
+    summaryUnavailableBody: "Chưa đọc được tổng thu nhập từ máy chủ nên mục này không hiển thị số. Thẻ thiết bị và lịch sử không bị ảnh hưởng.",
     myDevices: "Thiết bị của tôi",
     gpuUsage: "Mức dùng GPU",
     gpuTemp: "Nhiệt độ",
@@ -832,6 +834,7 @@ export const vi: Messages = {
     hashCarrierH5Network: "Mạng lưới sức mạnh tính toán đã đăng ký",
     hashCarrierUpgradeHook: "Nâng lên app để nhận thưởng online",
     rangeToday: "Hôm nay",
+    rangeGroupLabel: "Khoảng thời gian thu nhập",
     rangeWeek: "Tuần",
     rangeMonth: "Tháng",
     rangeAll: "Tất cả",
@@ -1035,6 +1038,7 @@ export const vi: Messages = {
   search: {
     navTitle: "Tìm kiếm",
     placeholder: "Tìm thiết bị, thành viên, FAQ, trang…",
+    inputLabel: "Tìm thiết bị, thành viên, FAQ hoặc trang",
     emptyTitle: "Tìm kiếm NexGrid",
     emptyBody: "Gõ để tìm trang, thiết bị, sản phẩm, thành viên mạng lưới hoặc mục FAQ.",
     noResults: "Không có kết quả, vui lòng thử từ khóa khác.",
@@ -1112,6 +1116,10 @@ export const vi: Messages = {
     savedToast: "Đã lưu mục tiêu · ${amount} trong {days} ngày",
     minTargetWarn: "Mục tiêu tối thiểu là $100",
     activeGoals: "Mục tiêu đang chạy",
+    targetPresetsLabel: "Mục tiêu nhanh",
+    targetPresetOption: "Mục tiêu {amount} USDT",
+    deadlinePresetOption: "Kỳ hạn {days} ngày",
+    removeGoalLabel: "Xóa mục tiêu ${amount}",
     deadlineRow: "Còn {n} ngày",
     achievedBadge: "Đã đạt",
     shopCta: "Mua bậc thiết bị gợi ý",
@@ -1392,6 +1400,9 @@ export const vi: Messages = {
       closedToast: "Đã đóng yêu cầu · cảm ơn bạn đã xác nhận",
     },
     note: "Yêu cầu hỗ trợ là trao đổi riêng 1:1 với đội hỗ trợ. Với câu hỏi chung, kênh Telegram nhanh hơn.",
+    // Bản production chỉ mở kênh trong App (trò chuyện trực tiếp / yêu cầu hỗ trợ);
+    // câu này không được trỏ tới kênh ngoài App mà người dùng không thể tìm thấy. #90
+    noteInternal: "Yêu cầu hỗ trợ là trao đổi riêng 1:1 với đội hỗ trợ. Với câu hỏi chung, trò chuyện trực tiếp nhanh hơn.",
     backToTickets: "Về danh sách yêu cầu",
   },
 
@@ -1437,6 +1448,7 @@ export const vi: Messages = {
 
   events: {
     claimRewardCta: "Nhận {reward}",
+    categoryGroupLabel: "Danh mục sự kiện",
     claimedReward: "Đã nhận {reward}",
     wheelPool: "Quỹ thưởng vòng quay",
     pageTitle: "Sự kiện",
@@ -1509,6 +1521,8 @@ export const vi: Messages = {
       sell: "Bán NEX",
       chartTitle: "Giá",
       historyUnavailable: "Chưa đủ lịch sử giá cho {range}",
+      timeframeLabel: "Khung thời gian giá",
+      timeframeOption: "Khung {range}",
     },
     stats: {
       marketCap: "Vốn hóa",
@@ -2902,6 +2916,8 @@ export const vi: Messages = {
     footerNote: "Biên lai được ghi trên sổ cái nền tảng. Mỗi tx_hash liên kết tới trình duyệt mạng lưới để kiểm chứng.",
     loadMore: "Tải thêm",
     tabAll: "Tất cả",
+    kindGroupLabel: "Loại biên lai",
+    categoryGroupLabel: "Danh mục biên lai",
     catIG: "Hình ảnh",
     catVG: "Video",
     catLL: "LLM",
@@ -2970,6 +2986,7 @@ export const vi: Messages = {
     avatar: "Ảnh đại diện",
     avatarHint: "Tạo từ tài khoản của bạn · tạo lại để đổi",
     regenerate: "Tạo lại",
+    avatarRegenerate: "Đổi ảnh đại diện",
     saveChanges: "Lưu thay đổi",
     savedToast: "Đã cập nhật hồ sơ",
     noChangesToast: "Không có thay đổi nào để lưu",
@@ -3075,6 +3092,10 @@ export const vi: Messages = {
     title: "Trung tâm trợ giúp",
     back: "Quay lại",
     searchPlaceholder: "Tìm chủ đề, câu hỏi hoặc từ khóa…",
+    searchLabel: "Tìm nội dung trợ giúp",
+    categoryGroupLabel: "Danh mục trợ giúp",
+    botInputLabel: "Hỏi NexGridBot",
+    botSendLabel: "Gửi tin nhắn",
     catGettingStarted: "Bắt đầu",
     catEarnings: "Thu nhập",
     catDevices: "Thiết bị",
@@ -3131,6 +3152,9 @@ export const vi: Messages = {
     typeAi: "Nova",
     typeAdvisor: "Cố vấn",
     typeSupport: "Hỗ trợ",
+    // Tên nhóm cho thanh danh mục; mục Nova cần tên không trùng với tab Nova.
+    typeGroupLabel: "Danh mục hội thoại",
+    openAiSession: "Mở phiên cố vấn AI Nova",
     roleAi: "Cố vấn điện toán AI",
     roleAdvisor: "Cố vấn tăng trưởng",
     roleSupport: "Chăm sóc khách hàng",
@@ -3213,6 +3237,8 @@ export const vi: Messages = {
     feeLabel: "Phí mạng",
     feeFree: "Miễn phí",
     flip: "Đảo chiều",
+    payAmountLabel: "Số tiền trả ({sym})",
+    refreshRate: "Làm mới tỷ giá",
     quoteValid: "Báo giá còn hiệu lực · làm mới mỗi 15s",
     quoteRefreshing: "Đang làm mới tỷ giá…",
     confirm: "Xác nhận quy đổi",
@@ -3939,6 +3965,9 @@ export const vi: Messages = {
     calc: {
       label: "Máy tính lãi kép",
       principal: "Số tiền khóa",
+      amountLabel: "Số tiền khóa (USDT)",
+      termLabel: "Kỳ hạn khóa",
+      termOption: "Kỳ hạn {days} ngày",
       singlePayout: "Nhận 1 chu kỳ",
       singlePayoutDuration: "Nhận một lần · {days} ngày",
       compoundPayoutDuration: "Tái khóa {reinvestments} lần · {days} ngày",
@@ -5160,6 +5189,8 @@ export const vi: Messages = {
     pointPerDay: "+2 NEX mỗi ngày",
     bonusEvery7: "+5 thưởng mỗi 7 ngày",
     checkedInToday: "Đã điểm danh hôm nay · quay lại vào ngày mai",
+    // Hiển thị khi chưa xác nhận được trạng thái điểm danh hôm nay.
+    checkInUnconfirmed: "Chưa xác nhận trạng thái · đồng bộ lại",
     checkInCta: "Điểm danh · +2 NEX",
     balance: "Số dư",
     points: "NEX",

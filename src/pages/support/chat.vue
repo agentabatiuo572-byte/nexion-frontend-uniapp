@@ -72,6 +72,7 @@
       @typing="!isAi && convStore.setTyping($event)"
       :messages="threadMessages"
 	      :input-placeholder="inputPlaceholder"
+	      :input-label="inputLabel"
 	      :send-label="t.conversations.send"
       :quick-chips="quickChips"
       :empty-hint="emptyHint"
@@ -458,6 +459,16 @@ const inputPlaceholder = computed(() =>
     : isAi.value
       ? remoteApiEnabled ? t.value.nova.localInputPlaceholder : t.value.nova.inputPlaceholder
       : t.value.conversations.inputPlaceholder,
+);
+// 输入框的**名称**,与 inputPlaceholder(提示)分开。
+// 本仓 lib/a11y-field-label.ts 的契约写得很明白:placeholder 是提示不是名称 ——
+// 「拿 placeholder 冒充可访问名会把『提示』和『名称』混为一谈(placeholder 在输入后
+// 就消失了,不是稳定的名称)」。而 placeholder 这一侧是**随可用性变**的
+// (Nova 不可用时换成 localUnavailable),名称不能跟着一个会变的提示走。
+const inputLabel = computed(() =>
+  isAi.value
+    ? remoteApiEnabled ? t.value.nova.localInputPlaceholder : t.value.nova.inputPlaceholder
+    : t.value.conversations.inputPlaceholder,
 );
 const emptyHint = computed(() => {
   if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;

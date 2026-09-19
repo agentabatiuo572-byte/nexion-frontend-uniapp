@@ -38,10 +38,13 @@
             <text class="block" :style="streakLblStyle">{{ t.daily.activeStreak }}</text>
             <text class="block" :style="streakPointsStyle">{{ heroLineText }}</text>
             <!-- Sign-in button -->
-            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
+            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
               <template v-if="lastSignedToday">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><path d="M20 6 9 17l-5-5" /></svg>
                 <text>{{ t.daily.checkedInToday }}</text>
+              </template>
+              <template v-else-if="!checkInStateConfirmed">
+                <text>{{ t.daily.checkInUnconfirmed }}</text>
               </template>
               <template v-else>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
@@ -311,6 +314,18 @@ const remoteRefreshing = ref(false);
 const checkInSubmitting = ref(false);
 const saverSubmitting = ref(false);
 const remoteInitialLoading = ref(remoteApiEnabled);
+// 🔴 签到写闸(BUG 154)。`faucet.remoteReadState === 'ready'` 只说明**曾经**读到过账号状态:
+// 刷新失败时它按设计保持 ready(nex-faucet-remote-resilience.test.ts「keeps the last
+// confirmed daily state when a state refresh fails」——已确认的快照不许被一次失败清空)。
+// 而签到的前置事实是「今天还没签」,它**只有一次成功的读取能证明**;读取失败时
+// remoteCheckedInToday 停在 false,于是"未知"被当成"未签"——正是这个 bug。
+// 所以写闸必须同时确认**承载这份快照的这次读取真的跑成了**:
+//   · remoteRefreshError —— 本轮 refreshDaily 的读取失败(页面已挂错误条 + 重试);
+//   · remoteSessionReady  —— 冷会话/未恢复:refreshDaily 会提前 return,连错误条都不会置,
+//     这正是「重新同步后仍无法确认状态」那条路径,必须一起 fail-closed。
+// 冷会话围栏复用 lib/binary-session-ready,不另造第二套。
+const checkInStateConfirmed = computed(() => !remoteApiEnabled
+  || (remoteSessionReady.value && faucet.remoteReadState === 'ready' && !remoteRefreshError.value));
 let dailyRefreshRequest = 0;
 async function refreshDaily() {
   if (!remoteApiEnabled || !remoteSessionReady.value || !pageActive || remoteRefreshing.value) return;
@@ -482,6 +497,12 @@ function signInRef(ts: number): string {
 
 async function handleCheckIn() {
   if (!dailyFactsReady.value) return;
+  // 写闸:账号今日签到状态**本次已确认**才允许发写请求(见 checkInStateConfirmed)。
+  // 只靠 aria-disabled 不够——键盘合成 click、程序化调用都会绕过属性闸。
+  if (!checkInStateConfirmed.value) {
+    toast.error(t.value.authOtp.errorServiceUnavailable);
+    return;
+  }
   if (lastSignedToday.value || remoteRefreshing.value || checkInSubmitting.value) return;
   if (remoteApiEnabled) {
     checkInSubmitting.value = true;
@@ -668,16 +689,21 @@ const streakLblStyle: CSSProperties = {
   letterSpacing: "0.06em",
 };
 const streakPointsStyle: CSSProperties = { marginTop: "14px", fontSize: "13px", color: "rgba(255,255,255,0.92)" };
-const signInBtnStyle = computed<CSSProperties>(() => ({
-  marginTop: "18px",
-  height: "54px",
-  borderRadius: "14px",
-  background: lastSignedToday.value ? "rgba(255,255,255,0.42)" : "var(--v5-ink)",
-  color: lastSignedToday.value ? "rgba(255,255,255,0.65)" : "var(--v5-brand-2)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
-}));
+const signInBtnStyle = computed<CSSProperties>(() => {
+  // Both "already signed in" and "state not confirmed" are non-actionable, so they
+  // share the dimmed treatment; the label says which one it is.
+  const inert = lastSignedToday.value || !checkInStateConfirmed.value;
+  return {
+    marginTop: "18px",
+    height: "54px",
+    borderRadius: "14px",
+    background: inert ? "rgba(255,255,255,0.42)" : "var(--v5-ink)",
+    color: inert ? "rgba(255,255,255,0.65)" : "var(--v5-brand-2)",
+    fontFamily: "var(--font-v5)",
+    fontWeight: 600,
+    fontSize: "15px",
+  };
+});
 const nextClaimStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

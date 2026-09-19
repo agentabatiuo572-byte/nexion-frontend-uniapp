@@ -725,6 +725,8 @@ export const en = {
   earn: {
     title: "Earn",
     subtitle: "Your devices, your earnings, your tasks — live.",
+    summaryUnavailableTitle: "Earnings summary can't refresh",
+    summaryUnavailableBody: "The server earnings summary couldn't be read, so no figure is shown here. Device cards and history are unaffected.",
     myDevices: "My Devices",
     gpuUsage: "GPU Usage",
     gpuTemp: "Temp",
@@ -876,6 +878,7 @@ export const en = {
     hashCarrierH5Network: "Registered hashpower network",
     hashCarrierUpgradeHook: "Upgrade to the app for the online boost",
     rangeToday: "Today",
+    rangeGroupLabel: "Earnings time range",
     rangeWeek: "Week",
     rangeMonth: "Month",
     rangeAll: "All",
@@ -1079,6 +1082,7 @@ export const en = {
   search: {
     navTitle: "Search",
     placeholder: "Search devices, members, FAQ, pages…",
+    inputLabel: "Search devices, members, FAQ or pages",
     emptyTitle: "Search NexGrid",
     emptyBody: "Type to find routes, devices, products, network members, or FAQ entries.",
     noResults: "No results — try different keywords.",
@@ -1156,6 +1160,10 @@ export const en = {
     savedToast: "Goal saved · ${amount} in {days} days",
     minTargetWarn: "Minimum goal is $100",
     activeGoals: "Active goals",
+    targetPresetsLabel: "Quick target amounts",
+    targetPresetOption: "Target {amount} USDT",
+    deadlinePresetOption: "{days}-day term",
+    removeGoalLabel: "Delete goal ${amount}",
     deadlineRow: "{n} days remaining",
     achievedBadge: "Achieved",
     shopCta: "Shop recommended tier",
@@ -1436,6 +1444,9 @@ export const en = {
       closedToast: "Ticket closed · thanks for confirming",
     },
     note: "Tickets are private 1:1 with our support team. For general questions, the Telegram channel is faster.",
+    // The remote product exposes App channels only (live chat / tickets); this
+    // line must not point at an off-App channel the user cannot reach. #90
+    noteInternal: "Tickets are private 1:1 with our support team. For general questions, live chat is faster.",
     backToTickets: "Back to tickets",
   },
 
@@ -1481,6 +1492,7 @@ export const en = {
 
   events: {
     claimRewardCta: "Claim {reward}",
+    categoryGroupLabel: "Event categories",
     claimedReward: "Received {reward}",
     wheelPool: "Wheel prize pool",
     pageTitle: "Events",
@@ -1553,6 +1565,8 @@ export const en = {
       sell: "Sell NEX",
       chartTitle: "Price",
       historyUnavailable: "Not enough price history for {range}",
+      timeframeLabel: "Price timeframe",
+      timeframeOption: "{range} timeframe",
     },
     stats: {
       marketCap: "Market Cap",
@@ -3011,6 +3025,8 @@ export const en = {
       "Receipts are recorded on the platform ledger. Each tx_hash links to a network explorer for verification.",
     loadMore: "Load more",
     tabAll: "All",
+    kindGroupLabel: "Receipt type",
+    categoryGroupLabel: "Receipt category",
     catIG: "Image",
     catVG: "Video",
     catLL: "LLM",
@@ -3082,6 +3098,7 @@ export const en = {
     avatar: "Avatar",
     avatarHint: "Generated from your account · regenerate to reroll",
     regenerate: "Regenerate",
+    avatarRegenerate: "Change avatar",
     saveChanges: "Save Changes",
     savedToast: "Profile updated",
     noChangesToast: "No profile changes to save",
@@ -3191,6 +3208,10 @@ export const en = {
     title: "Help center",
     back: "Back",
     searchPlaceholder: "Search topics, questions or keywords…",
+    searchLabel: "Search help content",
+    categoryGroupLabel: "Help categories",
+    botInputLabel: "Ask NexGridBot",
+    botSendLabel: "Send message",
     catGettingStarted: "Getting started",
     catEarnings: "Earnings",
     catDevices: "Devices",
@@ -3249,6 +3270,10 @@ export const en = {
     typeAi: "Nova",
     typeAdvisor: "Advisor",
     typeSupport: "Support",
+    // Group name for the category rail; the Nova row needs a name that does not
+    // collide with the Nova category tab itself.
+    typeGroupLabel: "Conversation category",
+    openAiSession: "Open the Nova compute AI advisor session",
     // Role subtitles (list row + chat header)
     roleAi: "AI compute advisor",
     roleAdvisor: "Growth advisor",
@@ -3337,6 +3362,8 @@ export const en = {
     feeLabel: "Network fee",
     feeFree: "Free",
     flip: "Flip",
+    payAmountLabel: "You pay ({sym})",
+    refreshRate: "Refresh rate",
     quoteValid: "Quote valid · refreshes every 15s",
     quoteRefreshing: "Refreshing rate…",
     confirm: "Confirm Exchange",
@@ -4075,6 +4102,9 @@ export const en = {
     calc: {
       label: "Compound calculator",
       principal: "Stake amount",
+      amountLabel: "Stake amount (USDT)",
+      termLabel: "Stake term",
+      termOption: "{days}-day term",
       singlePayout: "1 cycle payout",
       singlePayoutDuration: "Single payout · {days} days",
       compoundPayoutDuration: "{reinvestments} re-stakes · {days} days",
@@ -5306,6 +5336,9 @@ export const en = {
     pointPerDay: "+2 NEX per day",
     bonusEvery7: "+5 bonus every 7 days",
     checkedInToday: "Signed in today · come back tomorrow",
+    // Shown on the button when today's check-in state was never confirmed: say why
+    // it cannot be pressed instead of offering an active check-in.
+    checkInUnconfirmed: "Check-in state unconfirmed · sync again",
     checkInCta: "Sign in · +2 NEX",
     balance: "Balance",
     points: "NEX",

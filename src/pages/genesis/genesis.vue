@@ -113,9 +113,11 @@
         </view>
 
         <!-- ════ Live market ════ -->
-        <view class="flex items-center justify-between active:opacity-80" :style="secHeaderStyle" role="button" tabindex="0" :aria-label="t.genesis.viewMarketplace" @click="goMarketplace">
+        <!-- 入口可用性同源于二级市场闸:市场未开放 / 熔断 / 配置未知时禁用入口,
+             而不是把用户送进一个只会说「暂未开放」的页面。 -->
+        <view class="flex items-center justify-between" :class="marketplaceEntryBlocked ? '' : 'active:opacity-80'" :style="secHeaderStyle" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry" @keydown.enter.prevent="openMarketplaceEntry" @keydown.space.prevent="openMarketplaceEntry">
           <text :style="secTitleStyle">{{ t.genesis.secLiveMarket }}</text>
-          <text :style="secLinkStyle" style="pointer-events: none">{{ t.genesis.viewMarketplace }}</text>
+          <text :style="secLinkStyle" style="pointer-events: none">{{ marketplaceEntryLabel }}</text>
         </view>
         <view class="grid grid-cols-2" style="gap: 10px">
           <NftCard v-for="n in liveMarket" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
@@ -259,7 +261,7 @@ onUnmounted(() => {
 });
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
-const { block, marketClosed, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
+const { block, marketClosed, secondaryBlock, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
   useGenesisSaleGate();
 
 const sheetOpen = ref(false);
@@ -434,6 +436,18 @@ function onEligSubscribe() {
 }
 function goHowItWorks() {
   navTo("/pages/genesis/how-it-works");
+}
+/**
+ * 二级市场入口与 marketClosed 同源:市场关闭 / 熔断 / 配置未知时不给入口,
+ * 免得落地页同时说「暂未开放」又给重试按钮,让用户分不清是没开放还是网络坏了。
+ * 售罄不在其中 —— 二级卖的是别人手里的存量,主售售罄恰恰是它该承接的场景。
+ */
+const marketplaceEntryBlocked = computed(() => secondaryBlock.value !== null);
+const marketplaceEntryLabel = computed(() =>
+  marketplaceEntryBlocked.value ? t.value.genesis.marketClosed.default : t.value.genesis.viewMarketplace);
+function openMarketplaceEntry() {
+  if (marketplaceEntryBlocked.value) return;
+  goMarketplace();
 }
 function goMarketplace() {
   navTo("/pages/genesis/marketplace");

@@ -29,28 +29,44 @@
         <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
         <view class="flex items-center" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
-          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" :disabled="savePending" @input="onTarget" />
+          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" :disabled="savePending" :aria-label="t.goals.targetLabel" @input="onTarget" />
         </view>
-        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px">
+        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px" role="radiogroup" :aria-label="t.goals.targetPresetsLabel">
           <view
-            v-for="p in PRESET_TARGETS"
+            v-for="(p, pi) in PRESET_TARGETS"
             :key="p"
             class="flex items-center justify-center active:opacity-70"
             :style="presetTargetStyle(p)"
+            role="radio"
+            :tabindex="target === p ? 0 : -1"
+            :aria-checked="target === p ? 'true' : 'false'"
+            :aria-label="fmt(t.goals.targetPresetOption, { amount: String(p) })"
             @click="selectTarget(p)"
+            @keydown.enter.prevent="selectTarget(p)"
+            @keydown.space.prevent="selectTarget(p)"
+            @keydown.left.prevent="moveTarget(pi, -1)"
+            @keydown.right.prevent="moveTarget(pi, 1)"
           >
             <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${p / 1000}K` : p }}</text>
           </view>
         </view>
 
         <text class="block" :style="[fieldLabelStyle, { marginTop: '18px' }]">{{ t.goals.deadlineLabel }}</text>
-        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px">
+        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px" role="radiogroup" :aria-label="t.goals.deadlineLabel">
           <view
-            v-for="d in PRESET_DEADLINES_DAYS"
+            v-for="(d, di) in PRESET_DEADLINES_DAYS"
             :key="d"
             class="flex items-center justify-center active:opacity-70"
             :style="presetDeadlineStyle(d)"
+            role="radio"
+            :tabindex="days === d ? 0 : -1"
+            :aria-checked="days === d ? 'true' : 'false'"
+            :aria-label="fmt(t.goals.deadlinePresetOption, { days: String(d) })"
             @click="selectDays(d)"
+            @keydown.enter.prevent="selectDays(d)"
+            @keydown.space.prevent="selectDays(d)"
+            @keydown.left.prevent="moveDays(di, -1)"
+            @keydown.right.prevent="moveDays(di, 1)"
           >
             <text :style="presetDeadlineLabelStyle(d)">{{ d }}d</text>
           </view>
@@ -65,7 +81,7 @@
       <view v-else-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
-        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals">
+        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
           <text :style="recCtaLabelStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -73,7 +89,7 @@
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" @click="goStore">
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <text :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -91,11 +107,11 @@
       <view v-if="remoteApiEnabled && goalsStore.status === 'loading' && goals.length === 0" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.loading }}</text></view>
       <view v-else-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length === 0" class="mx-4" :style="emptyStateStyle">
         <text>{{ t.goals.serverUnavailable }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
       </view>
       <view v-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length > 0" class="mx-4" :style="emptyStateStyle">
         <text>{{ t.goals.serverUnavailable }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
       </view>
       <view v-if="goals.length > 0">
         <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
@@ -103,7 +119,7 @@
           <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
             <view class="flex items-center justify-between">
               <text class="font-mono-tabular" :style="goalTargetStyle">${{ g.targetUSDT.toLocaleString() }}</text>
-              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" @click="remove(g.id)">
+              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: g.targetUSDT.toLocaleString() })" @click="remove(g.id)" @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
               </view>
             </view>
@@ -126,7 +142,7 @@
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
-import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onMounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -200,6 +216,18 @@ function selectTarget(value: number) {
 function selectDays(value: number) {
   if (!savePending.value) days.value = value;
 }
+/** roving tabindex 的标准行为:方向键移一格并选上,焦点跟到新选中项。 */
+function movePreset(list: number[], index: number, delta: number, apply: (value: number) => void): void {
+  const next = list[(index + delta + list.length) % list.length];
+  if (next === undefined) return;
+  apply(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
+}
+function moveTarget(index: number, delta: number): void { movePreset(PRESET_TARGETS, index, delta, selectTarget); }
+function moveDays(index: number, delta: number): void { movePreset(PRESET_DEADLINES_DAYS, index, delta, selectDays); }
 
 watch(() => goalsStore.accountEpoch, () => {
   saveEpoch += 1;

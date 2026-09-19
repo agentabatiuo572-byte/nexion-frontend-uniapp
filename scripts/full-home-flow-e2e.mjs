@@ -717,7 +717,7 @@ async function testHomeInteractions() {
     proof: `outline ${computeMarketFocus.outlineWidth} ${computeMarketFocus.outlineStyle} ${computeMarketFocus.outlineColor}`,
     result: "PASS",
   });
-  await clickRoute({ label: "算力市场：打开", locator: (home) => home.locator("[data-home-action='compute-market-open']"), route: "/pages/market/market" });
+  await clickRoute({ label: "算力市场：打开", locator: (home) => home.locator("[data-home-action='compute-market-open']"), route: "/pages/earn/earn" });
   await clickRoute({ label: "产品信任卡", locator: (home) => home.getByText("商品信任资料", { exact: true }).locator("xpath=ancestor::uni-view[@role='link'][1]"), route: "/pages/store/detail" });
   await clickRoute({ label: "信任与合规", locator: (home) => home.getByText("Trust 专项", { exact: true }).locator("xpath=ancestor::uni-view[@role='link'][1]"), route: "/pages/trust/trust" });
 

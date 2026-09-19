@@ -666,6 +666,8 @@ export const zh: Messages = {
   earn: {
     title: "赚取",
     subtitle: "你的设备、收益、任务,实时展示。",
+    summaryUnavailableTitle: "收益汇总暂时无法刷新",
+    summaryUnavailableBody: "未能读取服务端收益汇总,此处暂不显示数值。设备卡与历史明细不受影响。",
     myDevices: "我的设备",
     gpuUsage: "GPU 使用率",
     gpuTemp: "温度",
@@ -816,6 +818,7 @@ export const zh: Messages = {
     hashCarrierH5Network: "登记算力网络",
     hashCarrierUpgradeHook: "升级 App 拿在线加成",
     rangeToday: "今天",
+    rangeGroupLabel: "收益时间范围",
     rangeWeek: "本周",
     rangeMonth: "本月",
     rangeAll: "全部",
@@ -1017,6 +1020,7 @@ export const zh: Messages = {
   search: {
     navTitle: "搜索",
     placeholder: "搜索设备、成员、FAQ、页面...",
+    inputLabel: "搜索设备、成员、FAQ 或页面",
     emptyTitle: "搜索 NexGrid",
     emptyBody: "输入即可搜索路由、设备、商品、网络成员、FAQ 条目。",
     noResults: "未找到 — 试试其他关键词。",
@@ -1094,6 +1098,10 @@ export const zh: Messages = {
     savedToast: "目标已保存 · ${days} 天达成 ${amount}",
     minTargetWarn: "最低目标 $100",
     activeGoals: "进行中目标",
+    targetPresetsLabel: "快捷目标金额",
+    targetPresetOption: "目标金额 {amount} USDT",
+    deadlinePresetOption: "{days} 天期限",
+    removeGoalLabel: "删除目标 ${amount}",
     deadlineRow: "剩余 {n} 天",
     achievedBadge: "已达成",
     shopCta: "查看推荐设备",
@@ -1372,6 +1380,9 @@ export const zh: Messages = {
       closedToast: "工单已关闭 · 感谢确认",
     },
     note: "工单是与客服团队的私密 1:1 对话。一般性问题用 Telegram 频道更快。",
+    // 生产档客服枢纽只开放 App 内渠道(在线会话 / 工单),这句不得再引用站外频道 ——
+    // 用户在当前产品里找不到、也验证不了它。#90
+    noteInternal: "工单是与客服团队的私密 1:1 对话。一般性问题用在线会话更快。",
     backToTickets: "返回工单列表",
   },
 
@@ -1417,6 +1428,7 @@ export const zh: Messages = {
 
   events: {
     claimRewardCta: "领取 {reward}",
+    categoryGroupLabel: "活动分类",
     claimedReward: "已领取 {reward}",
     wheelPool: "转盘奖池",
     pageTitle: "活动中心",
@@ -1489,6 +1501,8 @@ export const zh: Messages = {
       sell: "卖出 NEX",
       chartTitle: "价格走势",
       historyUnavailable: "暂无足够的 {range} 价格记录",
+      timeframeLabel: "行情周期",
+      timeframeOption: "{range} 周期",
     },
     stats: {
       marketCap: "市值",
@@ -2922,6 +2936,8 @@ export const zh: Messages = {
     footerNote: "收据数据记录于平台账本,每条 tx_hash 可在区块链浏览器查验。",
     loadMore: "加载更多",
     tabAll: "全部",
+    kindGroupLabel: "收据类型",
+    categoryGroupLabel: "收据分类",
     catIG: "图像",
     catVG: "视频",
     catLL: "LLM",
@@ -2990,6 +3006,7 @@ export const zh: Messages = {
     avatar: "头像",
     avatarHint: "由账号信息生成 · 点击重新生成",
     regenerate: "重新生成",
+    avatarRegenerate: "更换头像",
     saveChanges: "保存修改",
     savedToast: "资料已更新",
     noChangesToast: "没有需要保存的资料变更",
@@ -3096,6 +3113,10 @@ export const zh: Messages = {
     title: "帮助中心",
     back: "返回",
     searchPlaceholder: "搜索话题、问题或关键字…",
+    searchLabel: "搜索帮助内容",
+    categoryGroupLabel: "帮助分类",
+    botInputLabel: "向 NexGridBot 提问",
+    botSendLabel: "发送消息",
     catGettingStarted: "新手入门",
     catEarnings: "收益相关",
     catDevices: "设备相关",
@@ -3149,6 +3170,9 @@ export const zh: Messages = {
     typeAi: "Nova",
     typeAdvisor: "顾问",
     typeSupport: "客服",
+    // 左侧分类栏的组名 + Nova 会话入口的可区分名称(与分类 tab 同名会让读屏撞名)
+    typeGroupLabel: "会话分类",
+    openAiSession: "打开 Nova 算力 AI 顾问会话",
     // 角色副标题(清单行 + 聊天页头)
     roleAi: "算力 AI 顾问",
     roleAdvisor: "专属增长顾问",
@@ -3237,6 +3261,8 @@ export const zh: Messages = {
     feeLabel: "网络手续费",
     feeFree: "免费",
     flip: "翻转",
+    payAmountLabel: "支付金额({sym})",
+    refreshRate: "刷新汇率",
     quoteValid: "报价有效 · 每 15 秒刷新",
     quoteRefreshing: "正在刷新汇率…",
     confirm: "确认兑换",
@@ -3950,6 +3976,9 @@ export const zh: Messages = {
     calc: {
       label: "复利计算器",
       principal: "锁仓金额",
+      amountLabel: "锁仓金额(USDT)",
+      termLabel: "锁仓期限",
+      termOption: "{days} 天期限",
       singlePayout: "单次结算",
       singlePayoutDuration: "单次结算 · {days} 天",
       compoundPayoutDuration: "续投 {reinvestments} 次 · {days} 天",
@@ -5153,6 +5182,8 @@ export const zh: Messages = {
     pointPerDay: "每日 +2 NEX",
     bonusEvery7: "每 7 天 +5 奖励",
     checkedInToday: "今日已签到 · 明日再来",
+    // 账号签到状态未确认时按钮上的文案:说清为什么按不动,而不是显示一个能点的签到。
+    checkInUnconfirmed: "签到状态未确认 · 请重新同步",
     checkInCta: "签到 · +2 NEX",
     balance: "余额",
     points: "NEX",

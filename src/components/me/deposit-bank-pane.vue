@@ -43,6 +43,7 @@
               :value="amount"
               placeholder="0.00"
               :disabled="!fxUsable || dailyCapacityExhausted"
+              :aria-label="t.bankPane.amountLabel"
               @input="onAmount"
             />
             <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>

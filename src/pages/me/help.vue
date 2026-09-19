@@ -23,6 +23,7 @@
           :placeholder="w.searchPlaceholder"
           :style="searchInputStyle"
           placeholder-class="ph"
+          :aria-label="w.searchLabel"
           @input="onSearch"
         />
       </view>
@@ -32,26 +33,30 @@
       </view>
 
       <!-- Category chips -->
+      <!-- 分类是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器当成
+           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个分类。改 radiogroup/radio。 -->
       <scroll-view scroll-x class="mx-4" style="margin-bottom: 12px; white-space: nowrap">
-        <view
-          class="active:opacity-70"
-          :style="chipStyle(cat === 'all')"
-          role="button" tabindex="0" :aria-pressed="cat === 'all'"
-          @click="selectCategory('all')"
-          @keydown.enter.prevent="selectCategory('all')" @keydown.space.prevent="selectCategory('all')"
-        >
-          <text>{{ t.receipt.tabAll }}</text>
-        </view>
-        <view
-          v-for="c in catOrder"
-          :key="c"
-          class="active:opacity-70"
-          :style="chipStyle(cat === c)"
-          role="button" tabindex="0" :aria-pressed="cat === c"
-          @click="selectCategory(c)"
-          @keydown.enter.prevent="selectCategory(c)" @keydown.space.prevent="selectCategory(c)"
-        >
-          <text>{{ categoryLabel(c) }}</text>
+        <view role="radiogroup" :aria-label="w.categoryGroupLabel" class="inline-flex">
+          <view
+            class="active:opacity-70"
+            :style="chipStyle(cat === 'all')"
+            role="radio" tabindex="0" :aria-checked="cat === 'all' ? 'true' : 'false'" :aria-label="t.receipt.tabAll"
+            @click="selectCategory('all')"
+            @keydown.enter.prevent="selectCategory('all')" @keydown.space.prevent="selectCategory('all')"
+          >
+            <text>{{ t.receipt.tabAll }}</text>
+          </view>
+          <view
+            v-for="c in catOrder"
+            :key="c"
+            class="active:opacity-70"
+            :style="chipStyle(cat === c)"
+            role="radio" tabindex="0" :aria-checked="cat === c ? 'true' : 'false'" :aria-label="categoryLabel(c)"
+            @click="selectCategory(c)"
+            @keydown.enter.prevent="selectCategory(c)" @keydown.space.prevent="selectCategory(c)"
+          >
+            <text>{{ categoryLabel(c) }}</text>
+          </view>
         </view>
       </scroll-view>
 
@@ -139,11 +144,12 @@
             :style="botInputStyle"
             placeholder-class="ph"
             confirm-type="send"
+            :aria-label="w.botInputLabel"
             @input="onBotInput"
             @confirm="sendToBot"
           />
           <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
-          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot" @keydown.enter.prevent="sendToBot" @keydown.space.prevent="sendToBot">
+          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-label="w.botSendLabel" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot" @keydown.enter.prevent="sendToBot" @keydown.space.prevent="sendToBot">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>

@@ -44,7 +44,10 @@
           <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="openTicket(tk.id)" />
         </view>
 
-        <text class="block text-center" :style="noteStyle">{{ t.tickets.note }}</text>
+        <!-- Remote mode exposes App-internal channels only (live chat / tickets),
+             so the footer must not point at an off-App Telegram channel the user
+             cannot find or verify from the product. #90 -->
+        <text class="block text-center" :style="noteStyle">{{ remoteApiEnabled ? t.tickets.noteInternal : t.tickets.note }}</text>
       </view>
 
       <!-- CREATE MODE -->
@@ -159,7 +162,7 @@ import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { supportApi } from "@/api/runtime";
+import { supportApi, remoteApiEnabled } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { navReplace } from "@/lib/route";
 import {

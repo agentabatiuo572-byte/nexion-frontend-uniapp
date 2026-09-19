@@ -53,7 +53,7 @@ describe("read-only audit remediation contracts", () => {
     for (const handler of ["handleCheckIn", "handleClaimMilestone", "handleUseSaver"]) {
       expect(source).toMatch(new RegExp(`async function ${handler}\\([^)]*\\) \\{\\s*if \\(!dailyFactsReady.value\\) return;`));
     }
-    expect(source).toContain('role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting ? \'true\' : \'false\'"');
+    expect(source).toContain('role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? \'true\' : \'false\'"');
     expect(source).toContain('@keydown.enter.prevent="handleCheckIn"');
     expect(source).toContain('@keydown.space.prevent="handleUseSaver"');
     expect(source).toContain('@keydown.enter.prevent="goWithdraw"');

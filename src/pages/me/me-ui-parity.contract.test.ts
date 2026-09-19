@@ -62,12 +62,17 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Goal reads retain the 5174 structure while current-scope recovery makes
   // loading/error explicit, preserves a confirmed snapshot, and exposes retry.
   // Saving remains idempotent; a completed or unavailable recommendation has no purchase CTA.
-  "goals.vue": "a3bdd127a981a67e381b587d4760f088c21a4c222e3460b9b36647868ecad512",
+  // #103: preset target/deadline pills are mutually exclusive choices, so they are
+  // radiogroups with aria-checked instead of unlabelled clickable views; the amount
+  // input and remove action carry accessible names. Styles are unchanged.
+  "goals.vue": "7e9d3a5b8d16b9345acaef9b7ecaba66f035131e17218e732c226100d1910f75",
   // R3 keyboard controls plus reviewed production FAQ empty-state authority:
   // unread, failed, or incomplete pagination cannot claim no matching content.
   // Exact FAQ deep links clear on category selection; withdrawn targets use the
   // generic no-match state without rendering their internal ID. Styles are unchanged.
-  "help.vue": "bfb23c862c905608072b5f6f5da68122d8364afa5faa463164333b21cf79d9e4",
+  // #104: FAQ search and Bot inputs carry accessible names and the send button is named.
+  // #94: category chips are a radiogroup with aria-checked, not toggle buttons.
+  "help.vue": "5068fc6daf0ee6c2d77b848a8a88c61d4927702f3bde80b6069130d099a4a877",
   // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
   "language.vue": "7e45ccd32787f167793f423b3fbb8439c7bdd2ec585fccd19d2789251c07dc93",
   "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
@@ -78,7 +83,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
   // Unknown canonical payout state retains a neutral management entry; only a
   // confirmed empty address book offers setup. Layout and styles are unchanged.
-  "profile.vue": "9b4c697705d19d9553d8a02a9affcb119e320ddb8763032194a7d019af02ee6b",
+  // #89: avatar, wallet row and save action expose names, link/button roles and
+  // Enter/Space activation. Layout and styles are unchanged.
+  "profile.vue": "1d41442da5a5583a4f34102537fd1cbf2b57787dc3b0f218b92925e96ea0b66d",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // an unavailable server percentile occupies the same label/value slot as a neutral unknown,
   // without inventing a rank or changing the surrounding 5174 layout.
@@ -88,7 +95,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // status and suppress positive amounts unless the receipt is CREDITED.
   // Compute and VietQR receipts render in separately selected, independently
   // recoverable lanes; a VietQR-only account must not be labelled as compute receipts.
-  "receipts.vue": "e5458482b51be00830c7879c29857274f7c7a5b1e4a01f4706299308d01fec9b",
+  // #94: compute/top-up type switch and category tabs are tablists with aria-selected,
+  // matching their mutually exclusive behaviour instead of toggle buttons.
+  "receipts.vue": "d517d95ad6fdae2f54fb9835e1590a4edb6fb5b892bfb354a35eb823b5335d89",
   // L2 keeps the 5174 voucher-ticket styles but distinguishes unknown, retryable
   // failure, and server-confirmed empty states.
   "rewards-list.vue": "e94eda52ff2176ff9fe6e46b5837433b062a7953934302da732281703042fbf5",
@@ -107,7 +116,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Production ticket detail can request the server-paginated earlier history.
   // Every mode change now routes through setMode so the address tracks the visible
   // form (back-to-list clears ?mode=create; a create deep link survives reload).
-  "support-tickets.vue": "32b01522dec69ebd35f9b9fd9da5ff9a89f09d9aa987169b7894ce9bdeb3c570",
+  "support-tickets.vue": "753f0dfbbb5007825350d8b447fda12c7f2610807e94a0b4890d83df45a8028c",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
@@ -117,18 +126,22 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-bills.vue": "c16daae93135450d6f3b383abdf3fcb58398dfac1c30c338a15eebb254cc3658",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
-  "wallet-cards-new.vue": "5aadc349a1d5a20213a77490ae7433766860b5e0e3751e6e5eef51e9bbe33f13",
+  // #88: cardholder input carries its visible label as an accessible name.
+  "wallet-cards-new.vue": "6af630a5acf97669826202e3842042a8b28af8813f0657da0a6085336f7a3fc2",
   "wallet-cards.vue": "b9800456add8dee31bbf2182901b4d6d30b717f3ad6b54fc55dc11abc8308671",
   "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
   // Server fee and six-decimal net proceeds are disclosed before confirmation;
   // an unknown remote snapshot is distinct from an empty transaction history.
   // A server-paused exchange shows an explicit status above the unchanged form.
-  "wallet-exchange.vue": "4519797f84ffd4c236aac22fe2ab663ac1d3a78a373a217a7d5c9dece5668b22",
+  // #88: pay-amount input and the icon-only flip/refresh/max actions carry accessible names.
+  "wallet-exchange.vue": "b7b60d345af7ae5dfa5071f90be54095677ea0f20451821d42b5c0994ecbd53c",
   // Same recent-activity rows; loading/error/retry now precede the true empty state.
   // Unknown market authority suppresses estimated valuation, and ledger activity
   // uses the controlled public presentation instead of internal bill vocabulary.
-  "wallet-nex.vue": "f6c9f05d530a6069210e11253b7929385b728c17b548619a4572ab0439e71e17",
+  // #87: view-market, quick cells, use tiles and view-all expose link roles,
+  // names and Enter activation (navigations, so Space stays with page scroll).
+  "wallet-nex.vue": "fc77db09f74971cf1184bf5ccf8e233d57d9deb3b5133d0a1e116383e5655fa8",
   "wallet-repurchase-how.vue": "6e12626d38a041f066c2dd37a8f3bf5497746c83b5962a11f9c578308662662a",
   // Input and principal display preserve the command's six-decimal precision.
   // R3: unresolved intents retain their amount and expose an explicit recovery CTA.
@@ -137,7 +150,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Readiness audit #59: neutral busy status replaces stale wallet/form output until
   // the current authoritative snapshot completes; no retry CTA during an active read.
   "wallet-repurchase.vue": "d20879fd3550c32bff34861b3fb196a205edeee4fd94cf1a330916ee43000e39",
-  "wallet-topup.vue": "3b2340e7c531a1153f39940da24b755f92fb733172e137627140ba6d1d31f76f",
+  // #88: channel tabs expose a group name and per-tab names alongside aria-selected.
+  "wallet-topup.vue": "d880238b395c4d38860ac03e4bbd3374639f81df2df6d0bb0a8c869ccc96d68f",
   // Deep-link tracking waits for an owned exact read and distinguishes loading,
   // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",

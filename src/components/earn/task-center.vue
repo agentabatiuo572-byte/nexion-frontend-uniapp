@@ -144,9 +144,19 @@ const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
 let receiptRequestEpoch = 0;
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
+/**
+ * The Home overview reports `activeJobs` as `null` when the period has no
+ * settled receipts — "no value" — while the fleet snapshot defines the same
+ * day's realized total as a genuine 0. When that snapshot proves today
+ * realized exactly 0 USDT and 0 NEX, the null job count is the confirmed 0
+ * rather than unknown, so the header agrees with the device cards. #128
+ */
 const activeJobsText = computed(() => {
-  const value = remoteApiEnabled ? app.homeTruth?.onGrid.activeJobs ?? null : app.global.activeJobs;
-  return value === null ? "—" : value.toLocaleString();
+  if (!remoteApiEnabled) return app.global.activeJobs.toLocaleString();
+  const value = app.homeTruth?.onGrid.activeJobs ?? null;
+  if (value !== null) return value.toLocaleString();
+  const fleet = app.remoteRealizedToday;
+  return fleet && fleet.usdt === 0 && fleet.nex === 0 ? "0" : "—";
 });
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);

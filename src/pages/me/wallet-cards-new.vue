@@ -55,7 +55,7 @@
             </view>
             <view>
               <text class="block" :style="labelStyle">{{ t.cards.formHolderLabel }}</text>
-              <input class="w-full" :style="[inputStyle, { textTransform: 'uppercase' }]" type="text" :value="holder" :placeholder="t.cards.formHolderPlaceholder" @input="onHolder" />
+              <input class="w-full" :style="[inputStyle, { textTransform: 'uppercase' }]" type="text" :value="holder" :placeholder="t.cards.formHolderPlaceholder" :aria-label="t.cards.formHolderLabel" @input="onHolder" />
             </view>
 
             <checkbox-group @change="onDefaultGroupChange">

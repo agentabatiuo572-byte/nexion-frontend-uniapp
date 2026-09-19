@@ -33,7 +33,7 @@
               <text :style="metaLabelStyle">{{ t.stakingV3.totalLocked }}</text>
               <view class="flex items-center" style="gap: 8px">
                 <text v-if="activePositions.length > 0" :style="earningChipStyle">{{ t.stakingV3.earningChip }}</text>
-                <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
+                <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" role="link" tabindex="0" :aria-label="t.stakingV3.howItWorksEntry" @click="goHowItWorks">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
                   <text style="margin: 0 6px">{{ t.stakingV3.howItWorksEntry }}</text>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -100,8 +100,9 @@
         </view>
         <view style="display: flex; flex-direction: column; gap: 10px">
           <!-- 《06》no-owned-asset:无持仓是转化型空态。不给 CTA —— 方案列表就在这块的正上方,
-               再放一个按钮等于让用户往回点,反而多余;文案直接指路。 -->
-          <EmptyState v-if="positions.length === 0" kind="no-owned-asset" :title="t.empty.stakingTitle" :desc="t.empty.stakingDesc" compact />
+               再放一个按钮等于让用户往回点,反而多余;文案直接指路。
+               一个可售方案都没有时不能再承诺「锁定 USDT,睡觉也在赚」:那笔收益此刻买不到。 -->
+          <EmptyState v-if="positions.length === 0" kind="no-owned-asset" :title="t.empty.stakingTitle" :desc="anyPlanSellable ? t.empty.stakingDesc : stakingConfigAvailable ? t.home.quickStakeStopped : t.staking.remoteUnavailableClosed" compact />
           <StakePositionRow
             v-for="p in positions"
             v-else
@@ -167,6 +168,8 @@ const stakingConfigAvailable = computed(() => staking.isMockMode || staking.remo
 function canOpenPool(term: StakingTerm) {
   return canOpenStakingPool(staking, term);
 }
+/** 当前是否有**可售**方案(与方案行的 disabled 同源)。空态文案与计算器都以它为准。 */
+const anyPlanSellable = computed(() => TERMS.some((term) => canOpenPool(term)));
 
 function poolForTerm(term: StakingTerm) {
   return resolveStakingPool(

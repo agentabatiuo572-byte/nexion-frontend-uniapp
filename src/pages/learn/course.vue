@@ -16,8 +16,14 @@
 
         <view v-for="(question, index) in course.questions" :key="question.questionId" style="margin-top: 16px">
           <text>{{ question.question }}</text>
-          <view v-for="(option, optionIndex) in question.options" :key="option" :class="interactionLocked ? '' : 'active:opacity-70'" style="margin-top: 8px" role="button" :tabindex="interactionLocked ? -1 : 0" :aria-label="option" :aria-pressed="answers[index] === optionIndex" :aria-disabled="interactionLocked" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))">
-            <text>{{ answers[index] === optionIndex ? "●" : "○" }} {{ option }}</text>
+          <!-- 每题只能选一个答案(选第二个会把第一个取消),是单选不是多选。
+               原先 role="button" + aria-pressed 被浏览器当成 toggle button,读屏按复选框朗读,
+               而且没有题目级分组名 —— 用户既以为能多选,也听不出这几个选项属于哪道题。
+               改用 radiogroup(组名 = 题干)+ radio + aria-checked。 -->
+          <view role="radiogroup" :aria-label="question.question">
+            <view v-for="(option, optionIndex) in question.options" :key="option" :class="interactionLocked ? '' : 'active:opacity-70'" style="margin-top: 8px" role="radio" :tabindex="!interactionLocked && (answers[index] === optionIndex || (answers[index] === undefined && optionIndex === 0)) ? 0 : -1" :aria-label="option" :aria-checked="answers[index] === optionIndex ? 'true' : 'false'" :aria-disabled="interactionLocked ? 'true' : 'false'" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.up.prevent="moveAnswer(index, optionIndex, -1)" @keydown.down.prevent="moveAnswer(index, optionIndex, 1)">
+              <text>{{ answers[index] === optionIndex ? "●" : "○" }} {{ option }}</text>
+            </view>
           </view>
         </view>
 
@@ -42,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -146,6 +152,17 @@ function attemptIdentity(expectedCourse: LearningCourse): LearningAttemptIdentit
 function selectAnswer(questionIndex: number, optionIndex: number) {
   if (loading.value || interactionLocked.value) return;
   answers.value[questionIndex] = optionIndex;
+}
+/** 上下方向键移一格并选上,焦点跟到新选中项(与 theme-row.vue 的左右键同形)。 */
+function moveAnswer(questionIndex: number, optionIndex: number, delta: number) {
+  const options = course.value?.questions[questionIndex]?.options ?? [];
+  if (options.length === 0) return;
+  const next = (optionIndex + delta + options.length) % options.length;
+  selectAnswer(questionIndex, next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelectorAll<HTMLElement>('[role="radio"][aria-checked="true"]')[questionIndex]?.focus();
+  });
 }
 function isCourseVersionConflict(cause: unknown): boolean {
   return cause instanceof ApiError && cause.message === "LEARNING_COURSE_VERSION_CONFLICT";

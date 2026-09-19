@@ -20,12 +20,16 @@ import type { Device, DeviceKind } from "@/store/types";
 import { fmt } from "@/i18n/format";
 
 /** A linked computer carries the user's own GPU model → its stored strings are
- *  proper nouns. Without a tier match it holds the generic English spec. */
-function isTieredPcGpu(d: Device): boolean {
+ *  proper nouns. Without a tier match it holds the generic English spec.
+ *  Takes the structural subset so callers holding a Device projection (e.g. the
+ *  store's upgrade comparison) resolve the same label without a cast. */
+type DeviceLabelSource = Pick<Device, "kind" | "name"> & Partial<Pick<Device, "gpuModel">>;
+
+function isTieredPcGpu(d: DeviceLabelSource): boolean {
   return d.kind === "pc-gpu" && !!d.gpuModel;
 }
 
-export function deviceName(t: Messages, d: Device): string {
+export function deviceName(t: Messages, d: DeviceLabelSource): string {
   if (d.kind === "phone") return t.earn.yourPhone;
   if (d.kind === "pc-gpu") {
     return isTieredPcGpu(d) ? t.device.nameSharedComputer : t.device.nameComputerGpu;

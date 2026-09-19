@@ -16,13 +16,14 @@
       <DepositBankPane v-if="remoteApiEnabled" />
 
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
-      <view v-else class="flex" :style="segWrapStyle">
+      <view v-else class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.wallet.chooseMethod">
         <view
           v-for="s in SEGMENTS"
           :key="s.id"
           :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
           role="tab" tabindex="0"
+          :aria-label="segLabel(s.id)"
           :aria-selected="seg === s.id"
           @click="seg = s.id"
         >

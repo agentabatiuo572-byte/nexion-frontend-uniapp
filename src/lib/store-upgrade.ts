@@ -1,5 +1,9 @@
-const HARDWARE = ["phone", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"];
-interface OwnedDevice { kind: string; name: string; activatedAt: number | null; baseRate: number; baseRateNEX: number }
+import type { DeviceKind } from "@/store/types";
+
+const HARDWARE: readonly DeviceKind[] = ["phone", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"];
+/** `kind` stays the stable DeviceKind (never a stored display string) so callers
+ *  can resolve the localized name at render time — see lib/device-copy.ts. */
+interface OwnedDevice { kind: DeviceKind; name: string; activatedAt: number | null; baseRate: number; baseRateNEX: number }
 interface OfferedProduct { id: string; name: string; dailyEarn: number; dailyEarnNEX: number }
 export function highestOwnedHardware(devices: readonly OwnedDevice[]): OwnedDevice | null {
   return devices.filter((d) => d.activatedAt !== null && HARDWARE.includes(d.kind))

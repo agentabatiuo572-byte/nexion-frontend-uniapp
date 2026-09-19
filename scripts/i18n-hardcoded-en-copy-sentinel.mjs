@@ -126,6 +126,10 @@ const NON_COPY_ATTRS = [
     // autocomplete 是浏览器填充策略,aria-required 是读屏必填状态;两者都不是翻译文案。
     names: ["type", "mode", "name", "id", "src", "href", "value", "min", "maxlength", "rows", "role", "tabindex", "inputmode", "canvas-id", "autocomplete", "aria-required",
       "aria-hidden", "aria-live", "aria-modal", "aria-expanded", "aria-selected", "aria-checked", "aria-disabled", "aria-describedby", "aria-controls", "aria-labelledby", "aria-atomic", "aria-haspopup", "aria-busy",
+      // aria-invalid 是 ARIA 规定的校验态枚举("true"/"false"/"grammar"/"spelling"),aria-orientation
+      // 是方向枚举("horizontal"/"vertical")。两者都是无障碍**状态**,取值来自规范而不是文案 ——
+      // 与上面同族的 aria-required / aria-disabled 同理。
+      "aria-invalid", "aria-orientation",
       "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {

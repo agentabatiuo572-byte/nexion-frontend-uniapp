@@ -73,8 +73,23 @@
               stroke-width="0.6"
             />
 
-            <!-- member nodes -->
-            <g v-for="p in plotted" :key="p.m.id" class="cursor-pointer" @click="selected = p.m">
+            <!-- member nodes — each is a real focusable button. The orb graphic stays
+                 the layout; role/tabindex/aria-label + explicit keydown make every node
+                 reachable and named. (SVGElement has no .click(), so the shared
+                 activation layer cannot synthesize activation here — globe.vue's
+                 established pattern: hand-written keydown with .prevent, which makes
+                 the platform layer yield via ev.defaultPrevented.) -->
+            <g
+              v-for="p in plotted"
+              :key="p.m.id"
+              class="nx-net-node cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-label="nodeLabel(p)"
+              @click="selected = p.m"
+              @keydown.enter.prevent="selected = p.m"
+              @keydown.space.prevent="selected = p.m"
+            >
               <circle v-if="pulseId === p.m.id" :cx="p.x" :cy="p.y" r="10">
                 <animate attributeName="r" values="4;18;4" dur="1s" repeatCount="1" />
                 <animate attributeName="opacity" values="0.6;0;0.6" dur="1s" repeatCount="1" />
@@ -139,7 +154,7 @@
                 </view>
               </view>
             </view>
-            <view class="grid place-items-center active:opacity-60" :style="sheetCloseStyle" @click="selected = null">
+            <view class="grid place-items-center active:opacity-60" :style="sheetCloseStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="selected = null" @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </view>
           </view>
@@ -179,7 +194,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
-import { rankTitle } from "@/lib/v-rank-copy";
+import { rankTitle, rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -270,6 +285,14 @@ function daysJoined(m: NetworkMember): number {
 function memberRankTitle(m: NetworkMember): string {
   return rankTitle(m.vRank, isZh.value, vRank.ladder);
 }
+// Orb nodes are the only way into a member's detail sheet; name each one with the
+// member, their rank and the relation (direct / extended) so a screen reader user
+// can pick a node without seeing the graphic. rankLabel always carries `V{n}` —
+// rankTitle alone renders empty when the ladder has not loaded (remote mode).
+function nodeLabel(p: Plotted): string {
+  const relation = p.kind === "direct" ? t.value.network.badgeDirect : t.value.network.badgeExtended;
+  return `${p.m.name} · ${rankLabel(p.m.vRank, isZh.value, vRank.ladder)} · ${relation}`;
+}
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";
 }
@@ -355,5 +378,15 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () 
 .nx-net-sheet {
   position: relative;
   z-index: 1;
+}
+/* Orb nodes are focusable buttons now. outline follows the node's bounding box,
+   so the focused member is visible without redrawing the graphic. */
+.nx-net-node {
+  outline: none;
+}
+.nx-net-node:focus,
+.nx-net-node:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 3px;
 }
 </style>
