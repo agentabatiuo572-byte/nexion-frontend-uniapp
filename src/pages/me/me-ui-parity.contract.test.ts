@@ -116,7 +116,11 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Production ticket detail can request the server-paginated earlier history.
   // Every mode change now routes through setMode so the address tracks the visible
   // form (back-to-list clears ?mode=create; a create deep link survives reload).
-  "support-tickets.vue": "753f0dfbbb5007825350d8b447fda12c7f2610807e94a0b4890d83df45a8028c",
+  // #162: the create form's category chips are a radiogroup with aria-checked and
+  // roving tabindex (they were unnamed toggle buttons with no selected state), and
+  // the subject/description fields carry accessible names plus required and
+  // length hints; the empty-submit error is associated to its field. Styles unchanged.
+  "support-tickets.vue": "f555c4c68a16d1f9001d87b594e9490e3bd0c2c52f9ee5143e53088358008100",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
@@ -149,7 +153,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Formal G7 now exposes historical orders, claim/early actions and server-configured copy.
   // Readiness audit #59: neutral busy status replaces stale wallet/form output until
   // the current authoritative snapshot completes; no retry CTA during an active read.
-  "wallet-repurchase.vue": "d20879fd3550c32bff34861b3fb196a205edeee4fd94cf1a330916ee43000e39",
+  // #165: the main CTA exposes aria-disabled, and an insufficient balance states its
+  // reason plus a top-up path instead of only greying out.
+  "wallet-repurchase.vue": "d904accf92c0fe8b14b1e9c5f40bccc29272e923722f08a436617a66606be4c0",
   // #88: channel tabs expose a group name and per-tab names alongside aria-selected.
   "wallet-topup.vue": "d880238b395c4d38860ac03e4bbd3374639f81df2df6d0bb0a8c869ccc96d68f",
   // Deep-link tracking waits for an owned exact read and distinguishes loading,

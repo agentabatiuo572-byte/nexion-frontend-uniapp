@@ -129,7 +129,9 @@ const NON_COPY_ATTRS = [
       // aria-invalid 是 ARIA 规定的校验态枚举("true"/"false"/"grammar"/"spelling"),aria-orientation
       // 是方向枚举("horizontal"/"vertical")。两者都是无障碍**状态**,取值来自规范而不是文案 ——
       // 与上面同族的 aria-required / aria-disabled 同理。
-      "aria-invalid", "aria-orientation",
+      // aria-errormessage 的值是**指向错误元素 id 的引用**(与 aria-describedby / aria-controls
+      // 同族),不是给人读的文案;文案本身仍在被引用的 <text> 里走 i18n。
+      "aria-invalid", "aria-orientation", "aria-errormessage",
       "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {
