@@ -47,7 +47,8 @@ function commands(bills: ReturnType<typeof useBills>, accepted: boolean) {
   }).outputText;
   const deps = {
     bills, remoteApiEnabled: true, pageActive: true, remoteSessionReady: ref(true),
-    dailyFactsReady: ref(true), lastSignedToday: ref(false), remoteRefreshing: ref(false), checkInSubmitting: ref(false),
+    dailyFactsReady: ref(true), checkInStateConfirmed: ref(true),
+    lastSignedToday: ref(false), remoteRefreshing: ref(false), checkInSubmitting: ref(false),
     faucet: { checkInRemote: vi.fn().mockResolvedValue({ ok: accepted, gained: 5, streak: 3 }),
       claimMilestoneRemote: vi.fn().mockResolvedValue(accepted) },
     toast: { success: vi.fn(), error: vi.fn() }, t: ref(en), dailyCheckInSuccessCopy, fmt,
@@ -170,5 +171,22 @@ describe("Daily wallet ledger authority", () => {
     expect(view.lifetimeSpent.value).toBe('—');
     expect(accepted.toast.success).toHaveBeenCalledOnce();
     expect(accepted.toast.error).not.toHaveBeenCalled();
+  });
+
+  // #154: "today's check-in state" is only ever proven by a successful read.
+  // A failed read leaves remoteCheckedInToday at false, so without this gate the
+  // page offers an enabled check-in whose precondition it cannot verify.
+  it("refuses the check-in write while today's account state is unconfirmed", async () => {
+    const bills = useBills(); bills.bindAccount('A');
+    const handler = commands(bills, true);
+    handler.checkInStateConfirmed.value = false;
+    await handler.handleCheckIn();
+    expect(handler.faucet.checkInRemote).not.toHaveBeenCalled();
+    expect(handler.toast.error).toHaveBeenCalledOnce();
+    expect(handler.toast.success).not.toHaveBeenCalled();
+    // The button reports the same gate to assistive tech and names why it is inert.
+    const button = (source.match(/<view\b[^>]*>/g) ?? []).find((tag) => tag.includes('@click="handleCheckIn"'));
+    expect(button).toContain("!checkInStateConfirmed ? 'true' : 'false'");
+    expect(source).toContain("t.daily.checkInUnconfirmed");
   });
 });

@@ -45,8 +45,13 @@
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">
         <!-- 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 已是 brand-soft,不撞色 -->
-        <view class="flex gap-0.5" style="background: var(--v5-surface); border-radius: 12px; padding: 3px">
-          <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" role="button" tabindex="0" :aria-label="rangeLabel(r)" :aria-pressed="range === r" @click="range = r">
+        <!-- 四个时间范围是**互斥单选**(点「本周」会把「今天」取消),不是可多选的开关。
+             原先写 role="button" + aria-pressed:浏览器把它当 toggle button,读屏按
+             「切换按钮/复选框」朗读,用户会以为能同时选中多个。改用 radiogroup/radio
+             + aria-checked,与真实交互一致;roving tabindex + 左右方向键照
+             theme-row.vue / wallet-withdraw.vue 的既有写法。 -->
+        <view class="flex gap-0.5" style="background: var(--v5-surface); border-radius: 12px; padding: 3px" role="radiogroup" :aria-label="t.earn.rangeGroupLabel">
+          <view v-for="(r, i) in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" role="radio" :tabindex="range === r ? 0 : -1" :aria-checked="range === r" :aria-label="rangeLabel(r)" @click="range = r" @keydown.enter.prevent="range = r" @keydown.space.prevent="range = r" @keydown.left.prevent="moveRange(i, -1)" @keydown.right.prevent="moveRange(i, 1)">
             <text :style="pillLabelStyle(r)">{{ rangeLabel(r) }}</text>
           </view>
         </view>
@@ -72,6 +77,21 @@
             </view>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">NEX</text></text>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
+            <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
+            <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="mt-2" role="status" aria-live="polite">
+              <text class="block" style="font-size: 12px; font-weight: 600; color: var(--v5-danger)">{{ t.earn.summaryUnavailableTitle }}</text>
+              <text class="block" style="font-size: 12px; margin-top: 2px; color: var(--v5-ink-3)">{{ t.earn.summaryUnavailableBody }}</text>
+              <view
+                class="inline-flex items-center active:opacity-70"
+                style="min-height: 44px; margin-top: 2px; color: var(--v5-brand); font-size: 12px; font-weight: 600"
+                role="button" tabindex="0"
+                @click="retrySummary"
+                @keydown.enter.prevent="retrySummary"
+                @keydown.space.prevent="retrySummary"
+              >
+                <text>{{ t.tradein.errPleaseRetry }}</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -191,7 +211,19 @@ watch([() => app.homeTruthStatus, () => app.remoteFleetStatus, () => app.homeTru
 });
 
 function retryFleet() { void app.refreshRemoteFleet().catch(() => undefined); }
+/** Retry the summary read itself (Home overview), not just the fleet. */
+function retrySummary() { void app.refreshHomeTruth().catch(() => undefined); }
 function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
+/** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
+function moveRange(index: number, delta: number): void {
+  const next = RANGES[(index + delta + RANGES.length) % RANGES.length];
+  if (!next) return;
+  range.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
+}
 
 // FEAT-DEV01: 任务池提示线展开态 + W-CAP1 弹层入口。
 const taskPoolOpen = ref(false);
@@ -225,17 +257,46 @@ const serverPeriod = computed(() => {
   if (!e) return null;
   return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;
 });
+/**
+ * The Home overview reports a period as `null` when it has no settled receipts
+ * — "no value" — while `/api/devices/earnings` defines the same day's realized
+ * total as a genuine 0. For Today, prefer that zero-safe figure so the summary
+ * agrees with the device cards ("$0.00 今日收益") instead of claiming unknown.
+ * Other ranges have no zero-safe source and stay unknown. #128
+ */
+const serverPeriodValue = computed(() => {
+  const period = serverPeriod.value;
+  if (!period || range.value !== "Today") return period;
+  const fleet = app.remoteRealizedToday;
+  return {
+    ...period,
+    usdt: period.usdt ?? fleet?.usdt ?? null,
+    nex: period.nex ?? fleet?.nex ?? null,
+  };
+});
 const mockTotal = computed(() => {
   const e = app.earnings;
   return range.value === "Today" ? e.today : range.value === "Week" ? e.thisWeek : range.value === "Month" ? e.thisMonth : e.total;
 });
-const total = computed(() => remoteApiEnabled ? serverPeriod.value?.usdt ?? null : mockTotal.value);
+const total = computed(() => remoteApiEnabled ? serverPeriodValue.value?.usdt ?? null : mockTotal.value);
 const totalKnown = computed(() => total.value !== null);
 const totalInt = computed(() => total.value === null ? "—" : Math.floor(total.value).toLocaleString());
 const totalCents = computed(() => total.value === null ? "" : String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
-const nexTotal = computed(() => remoteApiEnabled ? serverPeriod.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
+const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
 const nexFmt = computed(() => nexTotal.value === null ? "—" : nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
-const jobsCount = computed(() => remoteApiEnabled ? serverPeriod.value?.jobCount ?? null : (range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247));
+/**
+ * Same zero-safe witness for the settled-task count: a fleet snapshot whose
+ * whole day realized exactly 0 USDT and 0 NEX proves the day has no settled
+ * receipt, so the overview's null count is the confirmed 0 rather than unknown.
+ */
+const jobsCount = computed(() => {
+  if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
+  const period = serverPeriod.value;
+  if (!period) return null;
+  if (period.jobCount !== null) return period.jobCount;
+  const fleet = app.remoteRealizedToday;
+  return range.value === "Today" && fleet && fleet.usdt === 0 && fleet.nex === 0 ? 0 : null;
+});
 const jobsText = computed(() => jobsCount.value === null ? "—" : fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
 
 // drifting hero dots

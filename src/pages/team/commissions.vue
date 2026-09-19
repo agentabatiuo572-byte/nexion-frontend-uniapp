@@ -29,7 +29,7 @@
         <view :style="heroWrapStyle">
           <!-- rules-intro pill hugs the top-right; 4px above the grid so no empty gap. -->
           <view class="flex items-center justify-end" style="margin-bottom: 4px">
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="link" tabindex="0" @click="go('/pages/team/commissions-how')">
+            <view class="nx-commissions-focusable inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.commissions.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -64,8 +64,12 @@
           <view
             v-for="k in KIND_ORDER"
             :key="k"
-            class="text-left active:scale-[0.97]"
+            class="nx-commissions-focusable text-left active:scale-[0.97]"
             :style="kindCardStyle(k)"
+            role="button"
+            tabindex="0"
+            :aria-label="kindCardLabel(k)"
+            :aria-pressed="filter === k"
             @click="filter = k"
           >
             <text :style="{ color: KIND[k].color }">
@@ -81,16 +85,22 @@
 
         <!-- filter pills -->
         <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%">
-          <view class="inline-flex" style="gap: 6px">
-            <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" :style="pillStyle(filter === 'all', 'var(--v5-brand)')" @click="filter = 'all'">
+          <view class="inline-flex" style="gap: 6px" role="tablist" :aria-label="t.commissions.pageTitle">
+            <view class="nx-commissions-pill shrink-0 rounded-full grid place-items-center active:opacity-70" :style="pillStyle(filter === 'all', 'var(--v5-brand)')" role="tab" :tabindex="filter === 'all' ? 0 : -1" :aria-selected="filter === 'all' ? 'true' : 'false'" :aria-label="`${t.commissions.all} (${commission.events.length})`" @click="filter = 'all'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
               <text :style="pillTextStyle(filter === 'all', 'var(--v5-brand)')">{{ t.commissions.all }} ({{ commission.events.length }})</text>
             </view>
             <view
               v-for="k in KIND_ORDER"
               :key="k"
-              class="shrink-0 rounded-full grid place-items-center active:opacity-70"
+              class="nx-commissions-pill shrink-0 rounded-full grid place-items-center active:opacity-70"
               :style="pillStyle(filter === k, KIND[k].color)"
+              role="tab"
+              :tabindex="filter === k ? 0 : -1"
+              :aria-selected="filter === k ? 'true' : 'false'"
+              :aria-label="`${t.commissions.kind[k]} (${events.filter(e => e.kind === k).length})`"
               @click="filter = k"
+              @keydown.left.prevent="moveFilter(-1)"
+              @keydown.right.prevent="moveFilter(1)"
             >
               <text :style="pillTextStyle(filter === k, KIND[k].color)">{{ t.commissions.kind[k] }} ({{ events.filter(e => e.kind === k).length }})</text>
             </view>
@@ -148,7 +158,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -249,6 +259,24 @@ function commissionAmountStyle(e: CommissionEvent, asset: "usdt" | "nex"): CSSPr
 
 function go(url: string) {
   navTo(url);
+}
+
+// 6-kind summary cards double as filter controls: name them with the kind label
+// + current amount/count so a screen reader hears what the tile selects.
+function kindCardLabel(k: CommissionKind): string {
+  return `${t.value.commissions.kind[k]} · $${byKind.value[k].usdt.toFixed(0)} · ${byKind.value[k].count} ${t.value.commissions.events}`;
+}
+
+// Filter pills are one roving-tabindex tablist (same idiom as leaderboard/unilevel):
+// arrows move selection and the focus ring follows the newly selected tab.
+const FILTER_ORDER: Filter[] = ["all", ...KIND_ORDER];
+function moveFilter(delta: -1 | 1) {
+  const currentIndex = FILTER_ORDER.indexOf(filter.value);
+  filter.value = FILTER_ORDER[(currentIndex + delta + FILTER_ORDER.length) % FILTER_ORDER.length];
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>(".nx-commissions-pill[tabindex='0']")?.focus();
+  });
 }
 
 function activateLoadMore(event: KeyboardEvent) {
@@ -380,3 +408,15 @@ const extendedBadgeStyle: CSSProperties = {
 };
 const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 </script>
+
+<style scoped>
+/* Keyboard focus must be visible on the self-drawn tiles/pills — they are
+   focusable now (role+tabindex), and without this the focus ring is the
+   browser default outline clipped by the scroll-view on the pill row. */
+.nx-commissions-focusable:focus-visible,
+.nx-commissions-pill:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+</style>

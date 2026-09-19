@@ -79,9 +79,12 @@
 
         <!-- LISTINGS TAB -->
         <template v-if="tab === 'listings'">
-          <EmptyState v-if="genesis.remotePublicReadState === 'loading'" kind="empty-list"
+          <!-- 市场**被运营关闭**时不再渲染「市场数据暂不可用 + 重试」:那不是连接故障,
+               重试也修不好,而两个错误态并排会让用户分不清是未开放还是网络问题(#123)。
+               关闭原因由上方关闭说明条唯一承载。 -->
+          <EmptyState v-if="genesis.remotePublicReadState === 'loading' && secondaryBlock === null" kind="empty-list"
             :title="t.marketplace.marketLoading" :desc="t.marketplace.marketLoadingHint" />
-          <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable'" kind="empty-list"
+          <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable' && secondaryBlock === null" kind="empty-list"
             :title="t.marketplace.marketUnavailable" :desc="t.marketplace.marketUnavailableHint"
             :cta-label="t.marketplace.retry" emphasis @cta="retryMarketplaceFacts" />
           <template v-else-if="sortedListings.length > 0">
@@ -118,9 +121,10 @@
 
         <!-- ACTIVITY TAB(真实成交 + 虚拟成交混排,FEAT-GEN10)-->
         <template v-else-if="tab === 'activity'">
-          <EmptyState v-if="genesis.remotePublicReadState === 'loading'" kind="empty-list"
+          <!-- 同 LISTINGS:关闭态不叠加连接错误态(#123)。 -->
+          <EmptyState v-if="genesis.remotePublicReadState === 'loading' && secondaryBlock === null" kind="empty-list"
             :title="t.marketplace.marketLoading" :desc="t.marketplace.marketLoadingHint" />
-          <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable'" kind="empty-list"
+          <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable' && secondaryBlock === null" kind="empty-list"
             :title="t.marketplace.marketUnavailable" :desc="t.marketplace.marketUnavailableHint"
             :cta-label="t.marketplace.retry" emphasis @cta="retryMarketplaceFacts" />
           <view v-else-if="mergedActivity.length > 0" class="overflow-hidden" :style="listCardStyle">

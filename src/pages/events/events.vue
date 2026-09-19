@@ -36,8 +36,10 @@
         <!-- Tabs — shared SegmentedControl spec (segmented-control.tsx): p-1 / gap
              0.5 / rounded-2xl container, h-11 rounded-[10px] segments, brand fill
              + on-brand text on active (no shadow), label v5 12.5/500/-0.005em. -->
-        <view class="flex" :style="segWrapStyle">
-          <view v-for="id in TABS" :key="id" class="flex-1 relative grid place-items-center active:opacity-70" :style="pillStyle(id)" @click="tab = id">
+        <!-- 分类是互斥切换(选一个其余取消)。原先只有 @click:读屏不知道这是分类组,
+             也读不出当前选中项("全部"默认选中但没有任何状态)。改 tablist/tab + aria-selected。 -->
+        <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.events.categoryGroupLabel">
+          <view v-for="(id, i) in TABS" :key="id" class="flex-1 relative grid place-items-center active:opacity-70" :style="pillStyle(id)" role="tab" :tabindex="tab === id ? 0 : -1" :aria-label="t.events.tabs[id]" :aria-selected="tab === id ? 'true' : 'false'" @click="tab = id" @keydown.enter.prevent="tab = id" @keydown.space.prevent="tab = id" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
             <text :style="pillLabelStyle(id)">{{ t.events.tabs[id] }}</text>
           </view>
         </view>
@@ -75,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -374,6 +376,16 @@ function pillStyle(id: TabId): CSSProperties {
     borderRadius: "10px",
     background: on ? "var(--v5-brand)" : "transparent",
   };
+}
+/** roving tabindex 的标准行为:左右方向键移一格并选上,焦点跟到新选中项。 */
+function moveTab(index: number, delta: number): void {
+  const next = TABS[(index + delta + TABS.length) % TABS.length];
+  if (!next) return;
+  tab.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  });
 }
 function pillLabelStyle(id: TabId): CSSProperties {
   const on = tab.value === id;

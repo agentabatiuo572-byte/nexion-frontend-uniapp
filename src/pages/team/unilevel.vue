@@ -36,7 +36,7 @@
         <view v-if="!remoteApiEnabled || commission.configStatus === 'ready'" :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" :style="heroCapStyle">{{ t.unilevel.heroLabel }}</text>
-            <view class="nx-unilevel-how-link inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" role="button" tabindex="0" @click="go('/pages/team/unilevel-how')" @keydown.enter.prevent="go('/pages/team/unilevel-how')" @keydown.space.prevent="go('/pages/team/unilevel-how')">
+            <view class="nx-unilevel-how-link nx-unilevel-focus inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" role="button" tabindex="0" :aria-label="t.unilevel.howItWorksEntry" @click="go('/pages/team/unilevel-how')" @keydown.enter.prevent="go('/pages/team/unilevel-how')" @keydown.space.prevent="go('/pages/team/unilevel-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.unilevel.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -142,19 +142,21 @@
           </view>
         </view>
 
-        <!-- Filter pills — opens the member-list section, extra top break. -->
+        <!-- Filter pills — opens the member-list section, extra top break;
+             mutually exclusive: one tablist, roving tabindex, so the group has a
+             name and exactly one selected tab (BUG 95). -->
         <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%; margin-top: 6px">
-          <view class="inline-flex" style="gap: 6px">
-            <view class="nx-unilevel-filter-all shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'all')" @click="filter = 'all'">
+          <view class="inline-flex" style="gap: 6px" role="tablist" :aria-label="t.unilevel.pageTitle">
+            <view class="nx-unilevel-filter nx-unilevel-filter-all shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'all')" role="tab" :tabindex="filter === 'all' ? 0 : -1" :aria-selected="filter === 'all' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterAll} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length + extendedMembers.length : '—'}`" @click="filter = 'all'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
               <text :style="pillTextStyle(filter === 'all')">{{ t.unilevel.filterAll }}</text>
               <text class="font-mono-tabular" :style="pillCountStyle(filter === 'all')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length + extendedMembers.length : '—' }}</text>
             </view>
-            <view class="nx-unilevel-filter-direct shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'direct')" @click="filter = 'direct'">
+            <view class="nx-unilevel-filter nx-unilevel-filter-direct shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'direct')" role="tab" :tabindex="filter === 'direct' ? 0 : -1" :aria-selected="filter === 'direct' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterDirect} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length : '—'}`" @click="filter = 'direct'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
               <view v-if="filter !== 'direct'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-brand)' }" />
               <text :style="pillTextStyle(filter === 'direct')">{{ t.unilevel.filterDirect }}</text>
               <text class="font-mono-tabular" :style="pillCountStyle(filter === 'direct')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length : '—' }}</text>
             </view>
-            <view class="nx-unilevel-filter-extended shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'extended')" @click="filter = 'extended'">
+            <view class="nx-unilevel-filter nx-unilevel-filter-extended shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'extended')" role="tab" :tabindex="filter === 'extended' ? 0 : -1" :aria-selected="filter === 'extended' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterExtended} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? extendedMembers.length : '—'}`" @click="filter = 'extended'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
               <view v-if="filter !== 'extended'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-tech-cyan)' }" />
               <text :style="pillTextStyle(filter === 'extended')">{{ t.unilevel.filterExtended }}</text>
               <text class="font-mono-tabular" :style="pillCountStyle(filter === 'extended')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? extendedMembers.length : '—' }}</text>
@@ -232,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -489,6 +491,18 @@ function go(url: string) {
   navTo(url);
 }
 
+// Filter pills are one roving-tabindex tablist: arrows move the selection and the
+// focus ring follows it (same idiom as leaderboard.vue).
+const FILTER_ORDER: FilterId[] = ["all", "direct", "extended"];
+function moveFilter(delta: -1 | 1) {
+  const currentIndex = FILTER_ORDER.indexOf(filter.value);
+  filter.value = FILTER_ORDER[(currentIndex + delta + FILTER_ORDER.length) % FILTER_ORDER.length];
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>(".nx-unilevel-filter[tabindex='0']")?.focus();
+  });
+}
+
 // ─── styles ───
 // Pill chip on the title row: compact (34px) so it doesn't dominate the
 // section-title line; soft tint only, no border (chip whitelist).
@@ -628,3 +642,13 @@ function memberBadgeStyle(kind: "direct" | "extended"): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+/* The filter pills and the rules entry are keyboard-focusable now; the ring must be
+   visible inside the horizontal scroll-view (default outline gets clipped). */
+.nx-unilevel-filter:focus-visible,
+.nx-unilevel-focus:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+}
+</style>

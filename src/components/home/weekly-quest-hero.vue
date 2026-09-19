@@ -62,6 +62,14 @@ import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
+import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
+import {
+  questTargetBusiness,
+  unclaimableBusinessQuests,
+  questBusinessContractViolation,
+  type QuestTargetAvailability,
+} from "@/lib/quest-business-availability";
+import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
@@ -85,6 +93,20 @@ watch(
   ([snap, block]) => {
     const offenders = unclaimableGenesisQuests(snap?.quests ?? [], block);
     if (offenders.length > 0) console.error(genesisQuestContractViolation(offenders, block));
+  },
+  { immediate: true },
+);
+
+// 质押 / 兑换不可用时派了对应任务 —— 同一套纪律:只报警,不过滤(#127 / #155)。
+// 独立于上面那条 watch:那条的接线由 selfcheck-quest-genesis-tripwire 的数据流判据看着,
+// 把新判据塞进同一个回调会把它的变异锚点挪走(判据失锚 = 门空转),两件事本就互不相干。
+const targetAvailability = useQuestTargetAvailability();
+watch(
+  [() => wq.snapshot, genesisBlock, targetAvailability],
+  ([snap, block, availability]) => {
+    const resolved = { ...availability, genesisBlocked: genesisBlockIsKnownUnavailable(block) };
+    const offenders = unclaimableBusinessQuests(snap?.quests ?? [], resolved);
+    if (offenders.length > 0) console.error(questBusinessContractViolation(offenders, resolved));
   },
   { immediate: true },
 );
@@ -122,9 +144,30 @@ const periodText = computed(() => {
   return fmt(w.value.periodEndsIn, { time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}` });
 });
 
+/**
+ * 这条 Tier-1 任务指向的业务现在整体不可用吗(BUG 127 / 155)。
+ *
+ * 🔴 与上面的报警器**同一份读数**(useQuestTargetAvailability + 创世闸):
+ *   任务卡继续给「去完成」,就是把用户送进一个他立刻撞上的墙 —— 实测形态是
+ *   四个质押方案全部「暂停售卖」、兑换页明说「已暂停兑换」,卡片还在倒计时给按钮。
+ *   `genesisBlockIsKnownUnavailable` 排除 `configUnavailable`(那是「还不知道」,
+ *   不是「已经关了」),所以冷启动窗口不会把 CTA 误停一层。
+ */
+const questTargetClosed = computed(() => {
+  const q = quest.value;
+  if (!q || questTargetBusiness(q) === null) return false;
+  const availability: QuestTargetAvailability = {
+    // 「还不知道」不等于「已经关了」:configUnavailable 属前者,不能停 CTA。
+    genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value),
+    stakingClosed: targetAvailability.value.stakingClosed,
+    exchangeClosed: targetAvailability.value.exchangeClosed,
+  };
+  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], availability).length > 0;
+});
+
 function onCta() {
   const q = quest.value;
-  if (!q || wq.loading || periodExpired.value) return;
+  if (!q || wq.loading || periodExpired.value || questTargetClosed.value) return;
   navTo(q.actionRoute);
 }
 

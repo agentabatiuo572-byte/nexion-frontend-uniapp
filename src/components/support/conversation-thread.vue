@@ -109,7 +109,7 @@
         :value="draft"
         :maxlength="maxInputLength ?? 140"
         :placeholder="inputPlaceholder"
-        :aria-label="inputPlaceholder"
+        :aria-label="inputLabel"
         placeholder-class="nx-conv-input-ph"
         confirm-type="send"
         @input="onDraft"
@@ -130,6 +130,10 @@ import type { ThreadMsg, QuickChip } from "./thread-types";
 const props = defineProps<{
   messages: ThreadMsg[];
   inputPlaceholder: string;
+  /** 输入框的**名称**(稳定),与 inputPlaceholder(提示,随可用性变)分开。
+      见 lib/a11y-field-label.ts 的契约:placeholder 在输入后就消失,不是稳定的名称,
+      而这里的 placeholder 还会在 Nova 不可用时换成状态句 —— 名称不能跟着它走。 */
+  inputLabel: string;
   sendLabel: string;
   quickChips?: QuickChip[];
   emptyHint?: string;

@@ -16,18 +16,24 @@
       <SubPageHeader back="/pages/me/me" :title="remoteReceiptsMode ? remoteReceiptTitle : t.receipt.title" />
 
       <view v-if="remoteReceiptsMode" style="margin: 0 16px">
-        <view class="flex items-center" :style="remoteTabsRowStyle">
+        <!-- 推理收据／充值收据是互斥类型切换(选一个另一个必然取消),不是可多选的开关。
+             role="button" + aria-pressed 会让浏览器按「切换按钮/复选框」朗读 —— 用户以为能两个都选。
+             改成 tablist/tab + aria-selected,与页面本身的"类型切换"语义一致。 -->
+        <view class="flex items-center" :style="remoteTabsRowStyle" role="tablist" :aria-label="t.receipt.kindGroupLabel">
           <view
-            v-for="kind in REMOTE_RECEIPT_KINDS"
+            v-for="(kind, kindIndex) in REMOTE_RECEIPT_KINDS"
             :key="kind"
             class="flex-1 grid place-items-center active:opacity-70"
             :style="remoteTabStyle(kind)"
-            role="button"
-            tabindex="0"
-            :aria-pressed="remoteReceiptKind === kind"
+            role="tab"
+            :tabindex="remoteReceiptKind === kind ? 0 : -1"
+            :aria-label="remoteReceiptKindLabel(kind)"
+            :aria-selected="remoteReceiptKind === kind ? 'true' : 'false'"
             @click="selectRemoteReceiptKind(kind)"
             @keydown.enter.prevent="selectRemoteReceiptKind(kind)"
             @keydown.space.prevent="selectRemoteReceiptKind(kind)"
+            @keydown.left.prevent="moveRemoteReceiptKind(kindIndex, -1)"
+            @keydown.right.prevent="moveRemoteReceiptKind(kindIndex, 1)"
           >
             <text :style="remoteTabLabelStyle(kind)">{{ remoteReceiptKindLabel(kind) }}</text>
           </view>
@@ -109,19 +115,21 @@
       <!-- Tabs + clear-all -->
       <view v-if="!remoteReceiptsMode" class="flex items-center" :style="tabsRowStyle">
         <scroll-view scroll-x class="flex-1 min-w-0" :show-scrollbar="false" style="white-space: nowrap">
-          <view class="inline-flex" style="gap: 6px; padding: 0 1px 4px">
+          <view class="inline-flex" style="gap: 6px; padding: 0 1px 4px" role="tablist" :aria-label="t.receipt.categoryGroupLabel">
             <view
-              v-for="c in TAB_ORDER"
+              v-for="(c, cIndex) in TAB_ORDER"
               :key="c"
               class="inline-flex items-center shrink-0 active:opacity-70"
               :style="tabPillStyle(c)"
-              role="button"
-              tabindex="0"
+              role="tab"
+              :tabindex="tab === c ? 0 : -1"
               :aria-label="tabLabel(c)"
-              :aria-pressed="tab === c"
+              :aria-selected="tab === c ? 'true' : 'false'"
               @click="tab = c"
               @keydown.enter.prevent="tab = c"
               @keydown.space.prevent="tab = c"
+              @keydown.left.prevent="moveCategoryTab(cIndex, -1)"
+              @keydown.right.prevent="moveCategoryTab(cIndex, 1)"
             >
               <text :style="tabLabelStyle(c)">{{ tabLabel(c) }}</text>
               <text v-if="counts[c] > 0" class="font-mono-tabular tabular-nums" :style="tabCountStyle">{{ counts[c] }}</text>
@@ -185,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -409,6 +417,16 @@ function selectRemoteReceiptKind(kind: RemoteReceiptKind): void {
   remoteReceiptKind.value = kind;
   loadSelectedRemoteReceipts();
 }
+/** roving tabindex 的标准行为:左右方向键移一格并选上,焦点跟到新选中项。 */
+function moveRemoteReceiptKind(index: number, delta: number): void {
+  const next = REMOTE_RECEIPT_KINDS[(index + delta + REMOTE_RECEIPT_KINDS.length) % REMOTE_RECEIPT_KINDS.length];
+  if (!next) return;
+  selectRemoteReceiptKind(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  });
+}
 
 async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
   if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
@@ -516,6 +534,17 @@ const counts = computed<Record<Tab, number>>(() => {
   for (const r of receipts.value) c[r.category] += 1;
   return c;
 });
+
+/** roving tabindex 的标准行为:左右方向键移一格并选上,焦点跟到新选中项。 */
+function moveCategoryTab(index: number, delta: number): void {
+  const next = TAB_ORDER[(index + delta + TAB_ORDER.length) % TAB_ORDER.length];
+  if (!next) return;
+  tab.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  });
+}
 
 function tabLabel(c: Tab): string {
   const map: Record<Tab, string> = {

@@ -6,7 +6,7 @@
   $el-safe).
 -->
 <template>
-  <view v-if="configAvailable" class="relative overflow-hidden" :style="cardStyle">
+  <view v-if="configAvailable && hasSellablePlan" class="relative overflow-hidden" :style="cardStyle">
     <!-- aurora + grid -->
     <view aria-hidden class="gen-anim" :style="auroraStyle" />
     <view aria-hidden :style="gridStyle" />
@@ -24,12 +24,15 @@
       <!-- Input row -->
       <view class="flex items-baseline" style="gap: 8px">
         <text :style="dollarStyle">$</text>
-        <input class="flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="decimal" :value="amount" @input="onAmountInput" />
+        <input class="flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="decimal" :value="amount" :aria-label="w.amountLabel" @input="onAmountInput" />
       </view>
 
-      <!-- Term selector (inline segmented) -->
-      <view class="grid grid-cols-4" :style="segWrapStyle">
-        <view v-for="(tm, i) in terms" :key="tm" class="active:opacity-70 transition-opacity" :style="segPillStyle(i === termIdx)" role="button" tabindex="0" @click="termIdx = i">
+      <!-- Term selector (inline segmented) — 期限是互斥单选，默认 180d。
+           原先只有 role="button" + @click：读屏既不知道这是一组单选，也读不出当前选中项。
+           改 radiogroup/radio + aria-checked，并补键盘激活与左右方向键。
+           只列**当前可售**的档位：暂停售卖的档位不该被算出一个能赚的收益。 -->
+      <view class="grid" :style="segWrapStyle" role="radiogroup" :aria-label="w.termLabel">
+        <view v-for="tm in sellableTerms" :key="tm" class="nx-compound-term active:opacity-70 transition-opacity" :style="segPillStyle(tm === term)" role="radio" :tabindex="tm === term ? 0 : -1" :aria-checked="tm === term ? 'true' : 'false'" :aria-label="fmt(w.termOption, { days: String(tm) })" @click="selectTerm(tm)" @keydown.left.prevent="moveTerm(-1)" @keydown.right.prevent="moveTerm(1)">
           <text>{{ tm }}d</text>
         </view>
       </view>
@@ -72,17 +75,19 @@
     </view>
   </view>
   <view v-else class="relative overflow-hidden" :style="unavailableStyle">
-    <text>{{ t.staking.remoteUnavailableClosed }}</text>
+    <!-- 两种「不可计算」必须分开说:快照没到(重试可能好)vs 快照到了但全部停售(重试没用)。
+         合并成一句会让停售看起来像临时故障。 -->
+    <text>{{ configAvailable ? t.home.quickStakeStopped : t.staking.remoteUnavailableClosed }}</text>
   </view>
 </template>
 
 <script setup lang="ts">
 import { formatStakingPercentage } from "@/lib/staking-percentage";
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, nextTick, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
-import { resolveStakingPool } from "@/lib/staking-canonical";
+import { canOpenStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
 import { compoundDurationDays, reinvestmentCount } from "@/lib/compound-cycles";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
@@ -94,18 +99,36 @@ onMounted(() => {
 });
 
 const terms: StakingTerm[] = [30, 90, 180, 365];
+const DEFAULT_TERM: StakingTerm = 180;
 const amount = ref("1000");
-const termIdx = ref(2); // default 180d
 
-const term = computed(() => terms[termIdx.value]);
+const stakingState = computed(() => ({
+  isMockMode: staking.isMockMode,
+  remoteReady: staking.remoteReady,
+  pools: staking.pools,
+}));
+/**
+ * 当前**可售**的档位。远程档未就绪或全部停售时为空 —— 那时一个收益都不该算:
+ * 拿停售档位的 APY 算出「投 $1000 赚 $395」是在为买不到的产品报价。
+ */
+const sellableTerms = computed(() => terms.filter((tm) => canOpenStakingPool(stakingState.value, tm)));
+// 计算参数来自当前可售的服务端方案:默认 180d,它不可售时落到第一个可售档位。
+const term = ref<StakingTerm>(DEFAULT_TERM);
+watch(sellableTerms, (list) => {
+  const [first] = list;
+  if (first !== undefined && !list.includes(term.value)) term.value = first;
+}, { immediate: true });
+
 const amountNum = computed(() => parseFloat(amount.value) || 0);
 const pool = computed(() => resolveStakingPool(
-  { isMockMode: staking.isMockMode, remoteReady: staking.remoteReady, pools: staking.pools },
+  stakingState.value,
   term.value,
   { apy: STAKING_APY[term.value], penalty: STAKING_PENALTY[term.value], minAmountUsdt: STAKING_MIN[term.value] },
 ));
-const configAvailable = computed(() => pool.value !== null);
 const apy = computed(() => pool.value?.apy ?? 0);
+const configAvailable = computed(() => pool.value !== null);
+/** 至少要有一个可售档位才算得出收益;否则渲染暂停态,不报价。 */
+const hasSellablePlan = computed(() => sellableTerms.value.length > 0);
 const single = computed(() => amountNum.value * (1 + (apy.value * term.value) / 365));
 const singleProfit = computed(() => single.value - amountNum.value);
 const cycles = computed(() => Math.floor(365 / term.value));
@@ -139,6 +162,23 @@ const compoundLabel = computed(() => fmt(w.value.compoundPayoutDuration, {
 function onAmountInput(e: Event) {
   const raw = (e as unknown as { detail: { value: string } }).detail.value;
   amount.value = raw.replace(/[^0-9.]/g, "");
+}
+/** 只允许选到可售档位 —— 停售档位不出现在组里,这里再挡一次(handler 内守卫)。 */
+function selectTerm(next: StakingTerm): void {
+  if (!sellableTerms.value.includes(next)) return;
+  term.value = next;
+}
+/** 单选组的左右方向键:在可售档位间移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
+function moveTerm(delta: number): void {
+  const list = sellableTerms.value;
+  const at = list.indexOf(term.value);
+  const next = list[((((at < 0 ? 0 : at) + delta) % list.length) + list.length) % list.length];
+  if (next === undefined) return;
+  selectTerm(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('.nx-compound-term[aria-checked="true"]')?.focus();
+  });
 }
 
 const cardStyle: CSSProperties = {
@@ -198,13 +238,15 @@ const inputStyle: CSSProperties = {
   color: "var(--v5-ink)",
   background: "transparent",
 };
-const segWrapStyle: CSSProperties = {
+// 列数跟可售档位数走(原为固定 grid-cols-4 = repeat(4, minmax(0,1fr)))。
+const segWrapStyle = computed<CSSProperties>(() => ({
   marginTop: "12px",
   gap: "6px",
   padding: "4px",
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
-};
+  gridTemplateColumns: `repeat(${sellableTerms.value.length}, minmax(0, 1fr))`,
+}));
 function segPillStyle(active: boolean): CSSProperties {
   return {
     height: "34px",

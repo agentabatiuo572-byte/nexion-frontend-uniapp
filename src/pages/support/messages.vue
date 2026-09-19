@@ -14,17 +14,24 @@
       <SubPageHeader back="/pages/me/me" :title="t.conversations.title" />
 
       <view class="nx-conv-center">
-        <!-- Left type rail -->
-        <view class="nx-conv-rail">
+        <!-- Left type rail — one mutually exclusive choice, so it is a tablist:
+             the group carries a name and exactly one tab reports aria-selected.
+             Roving tabindex keeps it a single Tab stop; arrows move between tabs. -->
+        <view class="nx-conv-rail" role="tablist" aria-orientation="vertical" :aria-label="t.conversations.typeGroupLabel">
           <view
             v-for="ty in TYPES"
             :key="ty.key"
-            class="nx-conv-rail-item active:opacity-80"
+            class="nx-conv-rail-item nx-conv-rail-tab active:opacity-80"
             :style="railItemStyle(ty.key, ty.tint)"
-            role="button"
-            tabindex="0"
+            role="tab"
+            :tabindex="selectedType === ty.key ? 0 : -1"
+            :aria-selected="selectedType === ty.key ? 'true' : 'false'"
             :aria-label="typeLabel(ty.key)"
-            @click="selectedType = ty.key"
+            @click="selectType(ty.key)"
+            @keydown.left.prevent="moveType(-1)"
+            @keydown.right.prevent="moveType(1)"
+            @keydown.up.prevent="moveType(-1)"
+            @keydown.down.prevent="moveType(1)"
           >
             <view class="nx-conv-rail-ico" :style="{ color: selectedType === ty.key ? ty.tint : 'var(--v5-ink-3)' }">
               <view v-html="ty.icon" />
@@ -97,7 +104,7 @@
             class="nx-conv-row active:opacity-80"
             role="button"
             tabindex="0"
-            :aria-label="r.name"
+            :aria-label="r.isAi ? t.conversations.openAiSession : r.name"
             @click="openRow(r)"
             @keydown.enter.prevent="openRow(r)"
             @keydown.space.prevent="openRow(r)"
@@ -134,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -259,6 +266,22 @@ function typeLabel(key: ConversationType): string {
 function typeUnread(key: ConversationType): number {
   if (key === "ai") return nova.unread;
   return convStore.byType(key).reduce((sum, c) => sum + c.unread, 0);
+}
+
+// Rail tabs are one roving-tabindex group: arrows move the selection and carry the
+// focus ring with it (same idiom as team/leaderboard.vue and team/unilevel.vue).
+function selectType(key: ConversationType) {
+  selectedType.value = key;
+}
+function moveType(delta: -1 | 1) {
+  const keys = TYPES.value.map((row) => row.key);
+  const currentIndex = keys.indexOf(selectedType.value);
+  if (currentIndex < 0) return;
+  selectedType.value = keys[(currentIndex + delta + keys.length) % keys.length];
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>(".nx-conv-rail-tab[tabindex='0']")?.focus();
+  });
 }
 
 function cleanPreview(s: string): string {

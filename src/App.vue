@@ -55,6 +55,7 @@ import {
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
+import { installFieldNaming } from "@/lib/a11y-field-label";
 import { refreshEarnConfig } from "@/store/earn-config";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
@@ -1153,6 +1154,10 @@ onLaunch(() => {
   // ⚠️ 2026-08-12 这行被一次并发合并冲掉过一次(平台层文件还在、门也在,唯独没人调用它,
   //    等于功能是死的)。门的 D 判据专门守这一行,别再删。
   installKeyboardActivation();
+  // 输入控件的可访问名补齐层:uni 的 <input> 把 aria-label 落在 <uni-input> 宿主上,
+  // 真 textbox 拿不到名字(见 lib/a11y-field-label.ts 的实测记录)。与上一行同因同层,
+  // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
+  installFieldNaming();
   const auth = useAuth();
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {

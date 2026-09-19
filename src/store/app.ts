@@ -398,6 +398,14 @@ export const useApp = defineStore("app", () => {
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
+  /**
+   * The fleet's own "today" total, which the backend defines as zero-safe
+   * (COALESCE per device → the exact sum the device cards render). The Home
+   * overview collapses a zero-receipt window to `null` — "no value" — so the
+   * Earn hero has no way to say "confirmed $0.00" from that projection alone.
+   * Keeping this here lets the summary agree with the device cards below it.
+   */
+  const remoteRealizedToday = ref<{ usdt: number; nex: number } | null>(null);
   const remoteWithdrawalListStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteWithdrawalListHasSnapshot = ref(!remoteApiEnabled);
   let remoteWithdrawalListRefreshSequence = 0;
@@ -892,6 +900,7 @@ export const useApp = defineStore("app", () => {
           earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         };
         remoteFleetHasSnapshot.value = true;
+        remoteRealizedToday.value = { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex };
         remoteWalletReceiptHasSnapshot.value = false;
         remoteFleetStatus.value = "ready";
         return true;
@@ -927,6 +936,7 @@ export const useApp = defineStore("app", () => {
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
       remoteFleetHasSnapshot.value = false;
+      remoteRealizedToday.value = null;
       slotCap.value = MAX_DEVICES;
       remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
@@ -2337,7 +2347,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,

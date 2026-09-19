@@ -87,7 +87,10 @@ describe("accessibility remediation contracts", () => {
 
     const course = read("../pages/learn/course.vue");
     expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.courseUnavailable"');
-    expect(course).toContain(':aria-pressed="answers[index] === optionIndex"');
+    // Each question accepts exactly one answer, so the options are radios inside a
+    // named radiogroup — aria-pressed would read as a multi-select toggle.
+    expect(course).toContain('role="radiogroup" :aria-label="question.question"');
+    expect(course).toContain(':aria-checked="answers[index] === optionIndex ? \'true\' : \'false\'"');
 
     const developer = read("../pages/developer/developer.vue");
     expect(developer).toContain('role="tablist"');

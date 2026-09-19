@@ -57,6 +57,7 @@ const LEDGER = {
   "GET /api/config/staking/pools": "PRD §9.11c.1",
   "GET /api/config/task-capacity": "PRD §6.8 / §9.11c.1(PRD 原文标 TBD)",
   "GET /api/config/tradein": "PRD §7.5.1 / §9.11c.1",
+  "/api/config/exchange/caps": "PRD §9.4(Exchange 三阈值 USER_DAILY_CAP / PLATFORM_DAILY_CAP / KYC_LIFETIME;落地规格 §9.4 点名 `GET /api/config/exchange/caps`)",
   "GET /api/config/v-ranks": "PRD §9.11c.1",
   "GET /api/config/bank-accounts": "PRD §9.2.8",
   "GET /api/config/deposit-channels": "PRD §9.2.8",

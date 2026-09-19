@@ -39,7 +39,12 @@ async function show(
         deadlineLabel: "Deadline", recHeader: "Recommendation", loading: "Loading", serverUnavailable: "Read unavailable",
         noEligibleProduct: "No eligible product", recPath: "", recReasonServer: "", shopCta: "Shop", saveCta: "Save",
         activeGoals: "Active goals", deadlineRow: "{n} days", achievedBadge: "Achieved", minTargetWarn: "", savedToast: "",
+        targetPresetsLabel: "Quick target amounts", targetPresetOption: "Target {amount} USDT",
+        deadlinePresetOption: "{days}-day term", removeGoalLabel: "Delete goal ${amount}",
       }, ui: { retry: "Retry" } },
+      // The template formats its preset/remove accessible names through the shared helper.
+      fmt: (template: string, params: Record<string, string>) =>
+        template.replace(/\{(\w+)\}/g, (_m, key: string) => params[key] ?? ""),
       target: 1000, days: 90, savePending: false, PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30],
       goalsStore: { status, error: status === "error" ? "temporary" : "", goals, lifetimeEarningsUsdt: 25,
         recommendationStatus: recommendationState.status, recommendationError: recommendationState.error,

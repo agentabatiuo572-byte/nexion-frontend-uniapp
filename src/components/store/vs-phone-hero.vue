@@ -7,9 +7,11 @@
   <view class="relative overflow-hidden" :style="rootStyle">
     <view aria-hidden :style="auroraStyle" />
     <view class="relative grid gap-2.5 items-center" style="grid-template-columns: 1fr auto 1fr">
-      <!-- Your phone -->
+      <!-- Base device label resolves from DeviceKind at render time (lib/device-copy.ts):
+           the stored name is English ("Your phone") and would freeze that locale into
+           the card, while the same device reads 「你的手机」 on Home / Earn / inventory. -->
       <view>
-        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ comparison.base.name }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ baseName }}</text>
         <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.phone)" :style="phoneNumStyle">
           <text>{{ storefrontUsd(authority.phone) }}</text><text style="font-size: 13px; color: var(--v5-ink-4); font-weight: 500">{{ t.store.vsPerDay }}</text>
         </view>
@@ -36,6 +38,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import {
   storefrontNex,
   storefrontNexFull,
@@ -50,6 +53,10 @@ const authority = computed(() => ({
   phone: { usd: props.comparison.base.baseRate, nex: props.comparison.base.baseRateNEX },
   entry: { usd: props.comparison.target.dailyEarn, nex: props.comparison.target.dailyEarnNEX },
 }));
+/** The base slot is always the user's own hardware, so its label is descriptive
+ *  copy, not a SKU brand mark — resolve it from `kind` through the shared helper
+ *  the device cards use, instead of rendering the stored English name. */
+const baseName = computed(() => deviceName(t.value, props.comparison.base));
 const multiplierText = computed(() => `${props.comparison.multiplier}×`);
 const phoneNexText = computed(() => `+${storefrontNex(authority.value.phone)} NEX`);
 const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)} NEX`);

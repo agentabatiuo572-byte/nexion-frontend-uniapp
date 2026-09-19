@@ -23,6 +23,7 @@
             :placeholder="t.search.placeholder"
             :style="inputStyle"
             placeholder-class="nx-search-ph"
+            :aria-label="t.search.inputLabel"
           />
         </view>
       </view>

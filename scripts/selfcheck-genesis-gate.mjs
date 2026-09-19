@@ -229,7 +229,13 @@ function producedKinds(src) {
   //     「关闭态不派买创世」这条不变量**仍然没有任何执行方**,客户端只能看见并喊。
   //   机器门:`scripts/selfcheck-quest-genesis-tripwire.mjs`(报警判定 + 接线数据流 +
   //     「任务面新增跳创世入口必须问闸」的反向钉,13 条红测)。
-  const EXPECTED_GATE_CONSUMERS = 10;
+  //   ✅ 2026-09-20 10→11:weekly-quest-list.vue 接闸(BUG 127/155:二级市场
+  //     「逛创世二级市场」的 Tier2 任务行在关闭态仍可点进市场)。入口可用性本就
+  //     同源于二级闸(genesisSecondaryBlock,售罄档仍放行),列表行必须读同一个值,
+  //     否则同页 hero 说停、列表说走。#123 的入口禁用也是这条线。
+  //     🔴 与 hero 那条不同:这条是**真闸不是报警** —— 只在 PENDING 行上撤 CTA,
+  //     已挣到的 COMPLETED/CLAIMABLE 一律不碰(见 lib/quest-business-availability.ts)。
+  const EXPECTED_GATE_CONSUMERS = 11;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }

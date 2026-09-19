@@ -44,7 +44,7 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="flex items-center px-4 py-3" :class="isExpired(q) ? 'opacity-50' : 'active:opacity-80'" :role="isExpired(q) ? undefined : 'button'" :tabindex="isExpired(q) ? -1 : 0" :aria-disabled="isExpired(q)" :style="pendingRowStyle" @click="onRowCta(q)">
+        <view v-else class="flex items-center px-4 py-3" :class="rowInactive(q) ? 'opacity-50' : 'active:opacity-80'" :role="rowInactive(q) ? undefined : 'button'" :tabindex="rowInactive(q) ? -1 : 0" :aria-disabled="rowInactive(q)" :style="pendingRowStyle" @click="onRowCta(q)">
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
@@ -53,7 +53,9 @@
             <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
           </view>
           <view class="flex items-baseline" style="gap: 4px">
-            <text :style="pendingRewardStyle">+{{ rewardOf(q) }} NEX</text>
+            <!-- 目标业务停摆时不给可赚取数字:它与「不可完成」同屏是自相矛盾的。 -->
+            <text v-if="targetClosed(q)" :style="pendingPausedStyle">{{ t.questClaim.definitionInactive }}</text>
+            <text v-else :style="pendingRewardStyle">+{{ rewardOf(q) }} NEX</text>
           </view>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; flex-shrink: 0"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -77,6 +79,14 @@ import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { toast } from "@/store/ui";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
+import {
+  questTargetBusiness,
+  unclaimableBusinessQuests,
+  type QuestTargetAvailability,
+} from "@/lib/quest-business-availability";
+import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -139,8 +149,41 @@ function claimTextFor(q: CanonicalQuest): string {
   return fmt(w.value.claim, { n: rewardOf(q).toLocaleString() });
 }
 
+/**
+ * 这条任务的**目标业务现在整体不可用**吗(BUG 127 / 155)。
+ *
+ * 🔴 与 hero 用**同一份读数**:`useQuestTargetAvailability` + 创世闸(唯一派生)。
+ *   列表在这里独立判一次会与 hero 漂移 —— 同页两处对同一条任务给出两种结论,
+ *   正是本缺陷的形态。
+ * 🔴 `configUnavailable`(不知道)不算停:Cold start 配置还没到就撤掉 CTA,
+ *   用户看到的是任务莫名消失。
+ */
+const { block: genesisBlock, secondaryBlock: genesisSecondaryBlock } = useGenesisSaleGate();
+const targetAvailability = useQuestTargetAvailability();
+
+function targetClosed(q: CanonicalQuest): boolean {
+  const domain = questTargetBusiness(q);
+  if (domain === null) return false;
+  const closed: QuestTargetAvailability = {
+    genesisBlocked: domain === "genesis"
+      // 二级挂单承接的是他人存量,售罄档仍然可逛 —— 与闸完全同源。
+      ? (q.actionRoute.startsWith("/pages/genesis/marketplace")
+        ? genesisSecondaryBlock.value !== null
+        : genesisBlockIsKnownUnavailable(genesisBlock.value))
+      : false,
+    stakingClosed: targetAvailability.value.stakingClosed,
+    exchangeClosed: targetAvailability.value.exchangeClosed,
+  };
+  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], closed).length > 0;
+}
+
+/** 过期与「目标业务停摆」都是不可点:一处判据,渲染点只用它。 */
+function rowInactive(q: CanonicalQuest): boolean {
+  return isExpired(q) || targetClosed(q);
+}
+
 function onRowCta(q: CanonicalQuest) {
-  if (isExpired(q)) return;
+  if (rowInactive(q)) return;
   navTo(q.actionRoute);
 }
 
@@ -226,6 +269,12 @@ const periodStyle: CSSProperties = {
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  color: "var(--v5-ink-4)",
+};
+/** 「未开放」标记与奖励数字同槽位:同样是 12px 等宽,但不得像可赚取的金额一样抢眼。 */
+const pendingPausedStyle: CSSProperties = {
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   color: "var(--v5-ink-4)",
 };

@@ -46,6 +46,16 @@ describe("core financial and ambassador controls", () => {
         expect(tag).not.toContain('@keydown.space');
         continue;
       }
+      if (handler === "range = r" || handler === "tab = c") {
+        // These select one option and deselect the others. role="button"+aria-pressed
+        // reads as a multi-select toggle, so they are radios/tabs with the state in
+        // aria-checked/aria-selected instead. Either way the group is ONE Tab stop:
+        // the selected item is 0 and the rest are -1 (roving tabindex, contract §2.3).
+        expect(tag, handler).toMatch(/role="(radio|tab)"/);
+        expect(tag, handler).toMatch(/:(aria-checked|aria-selected)="/);
+        expect(tag, handler).toMatch(/:tabindex="[^"]*\? 0 : -1"/);
+        continue;
+      }
       expect(tag, handler).toContain('role="button"');
       expect(tag, handler).toContain('tabindex="0"');
     }

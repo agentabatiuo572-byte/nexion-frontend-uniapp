@@ -36,13 +36,19 @@
           </view>
 
           <!-- Timeframe — SegmentedControl (HIG 44pt, brand indicator) -->
-          <view class="grid" :style="segWrapStyle">
+          <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.marketPage.nexHero.timeframeLabel">
             <view
               v-for="f in TIMEFRAMES"
               :key="f"
-              class="grid place-items-center active:opacity-70"
+              class="grid place-items-center active:opacity-70 nx-timeframe-tab"
               :style="segItemStyle(f === tf)"
+              role="tab"
+              :tabindex="f === tf ? 0 : -1"
+              :aria-label="fmt(t.marketPage.nexHero.timeframeOption, { range: f })"
+              :aria-selected="f === tf ? 'true' : 'false'"
               @click="tf = f"
+              @keydown.left.prevent="cycleTimeframe(-1)"
+              @keydown.right.prevent="cycleTimeframe(1)"
             >
               <text :style="segLabelStyle(f === tf)">{{ f }}</text>
             </view>
@@ -53,16 +59,16 @@
             <NexChart :data="nexChartData" :up="nexUp" />
           </view>
           <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
-            <text class="active:opacity-70" :style="marketHoldBodyStyle" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
+            <text class="active:opacity-70" :style="marketHoldBodyStyle" role="button" tabindex="0" :aria-label="market.remoteError ? t.ui.retry : historyUnavailableText" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
           <view class="grid grid-cols-2" :style="ctaRowStyle">
-            <view class="rounded-full flex items-center justify-center nx-press" :style="buyBtnStyle" @click="goExchange('usdt2nex')">
+            <view class="rounded-full flex items-center justify-center nx-press" :style="buyBtnStyle" role="button" tabindex="0" :aria-label="t.marketPage.nexHero.buy" @click="goExchange('usdt2nex')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5l-5-5L2 17" /><path d="M16 7h6v6" /></svg>
               <text :style="buyTextStyle">{{ t.marketPage.nexHero.buy }}</text>
             </view>
-            <view class="rounded-xl flex items-center justify-center nx-press" :style="sellBtnStyle" @click="goExchange('nex2usdt')">
+            <view class="rounded-xl flex items-center justify-center nx-press" :style="sellBtnStyle" role="button" tabindex="0" :aria-label="t.marketPage.nexHero.sell" @click="goExchange('nex2usdt')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></svg>
               <text :style="sellTextStyle">{{ t.marketPage.nexHero.sell }}</text>
             </view>
@@ -94,7 +100,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, nextTick, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexChart from "@/components/market/nex-chart.vue";
@@ -132,6 +138,18 @@ const nexPriceText = computed(() => market.isMockMode || market.remoteReady ? fm
 onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
 
 const tf = ref<Timeframe>("24H");
+
+/** tablist 的左右方向键:选中相邻周期并把焦点带过去(roving tabindex 的标准行为)。 */
+function cycleTimeframe(delta: number): void {
+  const at = TIMEFRAMES.indexOf(tf.value);
+  const next = TIMEFRAMES[((at + delta) % TIMEFRAMES.length + TIMEFRAMES.length) % TIMEFRAMES.length];
+  if (next === undefined) return;
+  tf.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('.nx-timeframe-tab[tabindex="0"]')?.focus();
+  });
+}
 
 function retryMarkets() {
   void market.syncRemote();

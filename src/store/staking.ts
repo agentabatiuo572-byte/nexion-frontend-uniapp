@@ -28,6 +28,10 @@ const ONE_DAY = 86400 * 1000;
 
 export type StakingTerm = 30 | 90 | 180 | 365;
 
+/** The four sellable terms, in display order. Single source for every consumer
+ *  that needs to ask "is anything on sale" — pages had their own copies. */
+export const STAKING_TERMS: readonly StakingTerm[] = [30, 90, 180, 365];
+
 export const STAKING_APY: Record<StakingTerm, number> = {
   30: 0.12,
   90: 0.35,

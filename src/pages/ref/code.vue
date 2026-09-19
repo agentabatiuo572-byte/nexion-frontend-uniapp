@@ -128,13 +128,16 @@
       </view>
 
       <!-- Footer -->
+      <!-- Footer — all three legal destinations are real keyboard-activatable links.
+           role="link" takes Enter only (Space stays with page scrolling); the shared
+           activation layer supplies the key handling, so no keydown is hand-written. -->
       <view class="text-center" :style="footerStyle">
         <text>{{ t.ref.legalLine }} </text>
-        <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTerms">{{ t.ref.terms }}</text>
-        <text> · </text>
-        <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" @click="goPrivacy" @keydown.enter.prevent="goPrivacy">{{ t.ref.privacy }}</text>
-        <text> · </text>
-        <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTrust">{{ t.ref.trustCenter }}</text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.terms" @click="goTerms">{{ t.ref.terms }}</text>
+        <text aria-hidden="true"> · </text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.privacy" @click="goPrivacy">{{ t.ref.privacy }}</text>
+        <text aria-hidden="true"> · </text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.trustCenter" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
   </StandalonePageShell>
@@ -433,5 +436,12 @@ const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", padding: "15p
 }
 .nx-ref-footer-link:active {
   opacity: 0.6;
+}
+/* All three footer links are focusable now — the ring must be visible or keyboard
+   users cannot tell which legal document Enter will open. */
+.nx-ref-footer-link:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 </style>

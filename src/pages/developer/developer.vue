@@ -84,9 +84,18 @@
             <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
           </view>
           <view v-if="canSubmitAccessRequest" class="space-y-2">
-            <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph"
+              :aria-label="t.developer.formCompany" :aria-invalid="accessIssue === ISSUE_COMPANY ? 'true' : 'false'"
+              :aria-describedby="accessIssue === ISSUE_COMPANY ? 'dev-company-error' : undefined" />
+            <text v-if="accessIssue === ISSUE_COMPANY" id="dev-company-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.companyInvalid }}</text>
+            <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph"
+              :aria-label="t.developer.formEmail" :aria-invalid="accessIssue === ISSUE_EMAIL ? 'true' : 'false'"
+              :aria-describedby="accessIssue === ISSUE_EMAIL ? 'dev-email-error' : undefined" />
+            <text v-if="accessIssue === ISSUE_EMAIL" id="dev-email-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.emailInvalid }}</text>
+            <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph"
+              :aria-label="t.developer.formUseCase" :aria-invalid="accessIssue === ISSUE_USE_CASE ? 'true' : 'false'"
+              :aria-describedby="accessIssue === ISSUE_USE_CASE ? 'dev-usecase-error' : undefined" />
+            <text v-if="accessIssue === ISSUE_USE_CASE" id="dev-usecase-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.useCaseInvalid }}</text>
           </view>
           <view v-if="canSubmitAccessRequest" class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" role="button" tabindex="0" :aria-label="t.developer.formSubmit" :aria-busy="submitting ? 'true' : 'false'" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
@@ -210,7 +219,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-ap
 import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
-import { validateDeveloperAccess, validateDeveloperWebhook } from "./developer-form-validation";
+import { validateDeveloperAccess, validateDeveloperWebhook, type DeveloperFormIssue } from "./developer-form-validation";
 import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable, isDeveloperDocsNotReleased, type DeveloperAccessCopyKey } from "./developer-access-state";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
@@ -226,6 +235,17 @@ const tab = ref<Tab>("overview");
 const company = ref("");
 const email = ref("");
 const useCase = ref("");
+// 就地校验态:只存「哪一个字段不合法」,让每个字段各自挂 aria-invalid/aria-describedby。
+// 此前校验只在提交时弹 toast,读屏既定位不到出错字段,也读不到原因(BUG 105)。
+//
+// 三个 issue 码提成常量(而不是把 'companyInvalid' 直接写进模板三元):门的
+// aria-describedby 判据会把绑定表达式里的**所有**单引号字面量当成 id 引用,
+// 写进模板的 'companyInvalid' 会被判成悬空 id。常量比对后表达式里只剩一个
+// id 字面量,与 login.vue / register.vue 的既有写法同形。
+const ISSUE_COMPANY = "companyInvalid";
+const ISSUE_EMAIL = "emailInvalid";
+const ISSUE_USE_CASE = "useCaseInvalid";
+const accessIssue = ref<DeveloperFormIssue | null>(null);
 const submitting = ref(false);
 const latestRequest = ref<DeveloperAccessReceipt | null>(null);
 const latestLoadFailed = ref(false);
@@ -449,6 +469,7 @@ async function submitRequest() {
     return;
   }
   const issue = validateDeveloperAccess({ company: company.value, email: email.value, useCase: useCase.value });
+  accessIssue.value = issue;
   if (issue) return toast.warn(t.value.developer[issue]);
   if (remoteApiEnabled) {
     const accountKey = String(app.accountKey);
@@ -789,6 +810,11 @@ watch(() => String(app.accountKey), () => {
   void loadDocs();
 });
 watch(() => locale.code, () => { resetDocsScope(); void loadDocs(); });
+// 已报出的字段错误在用户改正后立刻消失 —— 否则 aria-invalid="true" 会一直挂在
+// 已经合法的字段上,读屏继续宣告一个不存在的错误。
+watch([company, email, useCase], () => {
+  if (accessIssue.value) accessIssue.value = validateDeveloperAccess({ company: company.value, email: email.value, useCase: useCase.value });
+});
 
 // ── styles ──
 const heroStyle: CSSProperties = {
@@ -910,6 +936,13 @@ const formTextareaStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink)",
   boxSizing: "border-box",
+};
+/** 字段级错误提示:与输入框同列,读屏经 aria-describedby 关联(BUG 105)。 */
+const fieldErrorStyle: CSSProperties = {
+  display: "block",
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "var(--v5-danger)",
 };
 const submitBtnStyle: CSSProperties = {
   height: "48px",
