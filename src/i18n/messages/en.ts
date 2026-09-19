@@ -838,7 +838,8 @@ export const en = {
     taskLockCtaUpgrade: "See higher tiers",
     taskLockCtaTradein: "Upgrade to higher compute",
     lockedTasksTitle: "Tasks you're locked out of",
-    lockedMissedDaily: "lost every day",
+    lockedMissedDaily: "est. daily potential",
+    lockedPotentialDisclaimer: "Estimated from these tasks' average duration, reward and queue saturation — not income you actually lost.",
     unlockNMoreTasks: "Unlock {n} more tasks →",
     // FEAT-DEV01: task-capacity readout + new-device subsidy + task-pool explainer sheet (W-CAP1)
     capacityChipLabel: "capacity",

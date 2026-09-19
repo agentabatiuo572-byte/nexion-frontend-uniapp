@@ -285,9 +285,10 @@
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">−${{ phoneLockedDaily }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">${{ phoneLockedDaily }}</text>
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
+      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
       <view class="space-y-1.5">
         <view v-for="(it, i) in phoneTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0">
@@ -322,9 +323,10 @@
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">−${{ hwLockedDaily }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">${{ hwLockedDaily }}</text>
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
+      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
       <view class="space-y-1.5">
         <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0">
