@@ -21,7 +21,7 @@ export function pendingProfileLocaleHydration(scope: LocaleProfileScope): Promis
 }
 
 function sameScope(left: LocaleProfileScope | null, right: LocaleProfileScope): boolean {
-  return left !== null && left.accountId === right.accountId && left.revision === right.revision;
+  return left !== null && left.accountId === right.accountId;
 }
 
 /**

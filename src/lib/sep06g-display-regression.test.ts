@@ -19,6 +19,16 @@ describe("audit display contracts", () => {
     expect(rankEntitlementLabel({ type: "VOUCHER", voucherId: "VC-1" }, labels)).toBe(labels.voucher);
     expect(rankEntitlementLabel({ type: "CUSTOM", customLabel: "Priority support" }, labels)).toBe("Priority support");
   });
+  it("withholds test-harness reward labels from the public rank page", () => {
+    const labels = { voucher: "Voucher details unavailable", sku: "Item details unavailable", custom: "Reward details unavailable" };
+    for (const customLabel of [
+      "F1ENGINE custom reward",
+      "F1ENGINE V2 custom",
+      "F-A1REVERIFY-20260721132132-custom-reward",
+    ]) {
+      expect(rankEntitlementLabel({ type: "CUSTOM", customLabel }, labels)).toBe(labels.custom);
+    }
+  });
   it("renders each endpoint method and path from the published document", () => {
     const source = sources["../pages/developer/developer.vue"];
     expect(source).toContain('v-for="(endpoint, index) in docs.endpoints"');

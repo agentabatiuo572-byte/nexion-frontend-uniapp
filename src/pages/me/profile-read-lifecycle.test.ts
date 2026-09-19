@@ -61,6 +61,7 @@ function mount() {
     "@/lib/remote-profile-quest": { claimSetupProfileQuest: () => { throw Error("No reward writes in read fixture"); } },
     "@/lib/profile-save-flow": { reconcileProfileEdit }, "@/lib/secure-command-id": { requireCryptoUuid: vi.fn() },
     "@/lib/profile-date": { formatJoinedDate: () => "" }, "@/lib/profile-vrank-display": { profileVRankProjection },
+    "@/lib/brand-copy": { nexGridBrandText: (value: string) => value },
     "@/api/order-api": runtimeRevision, "./p3-18-account-page-fence": { createP318AccountPageFence },
   };
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];

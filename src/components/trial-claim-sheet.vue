@@ -93,7 +93,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { useTrialConfig } from "@/store/trial-config";
+import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useFreeTrial, type TrialIneligibleReason } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -106,7 +106,10 @@ const freeTrial = useFreeTrial();
 const t = useT();
 
 const cfg = computed(() => trialConfig.config);
-const shadowTotal = computed(() => (cfg.value.shadowDailyUSD * cfg.value.trialDays).toFixed(0));
+// Same capped offset every other trial surface quotes (BUG 78): the raw
+// days × shadowDailyUSD accrual overstates what the user can actually offset.
+const trialOffset = computed(() => computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays));
+const shadowTotal = computed(() => trialOffset.value.offsetUSD.toFixed(0));
 const perDay = computed(() => fmt(t.value.trial.sheetPerDay, { amount: cfg.value.shadowDailyUSD.toFixed(2) }));
 const totalSuffix = computed(() => fmt(t.value.trial.sheetTotalSuffix, { days: String(cfg.value.trialDays) }));
 const prop1Sub = computed(() => fmt(t.value.trial.sheetProp1Sub, { days: String(cfg.value.trialDays) }));

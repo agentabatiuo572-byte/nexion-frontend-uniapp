@@ -46,8 +46,17 @@ const trialConfig = useTrialConfig();
 const isActive = computed(() => trial.status === "active" || trial.status === "grace");
 const visible = computed(() => !isActive.value && trial.showPromo());
 const canClaim = computed(() => trial.canStart());
-const claimLabel = computed(() => canClaim.value ? t.value.trial.entryClaimCta
-  : trial.authorityStatus === "error" ? t.value.trial.entryUnavailable : t.value.trial.entryChecking);
+// Action label follows the RETAINED offer state, not the in-flight read: a
+// background poll must not swap "马上领取" for "正在核实资格" and re-layout the
+// card (BUG 56). Clicking is still gated by canClaim.
+const claimLabel = computed(() => {
+  switch (trial.confirmedOfferState()) {
+    case "claimable": return t.value.trial.entryClaimCta;
+    case "error": return t.value.trial.entryUnavailable;
+    case "unavailable": return t.value.trial.entryUnavailable;
+    default: return t.value.trial.entryChecking;
+  }
+});
 
 const cfg = computed(() => trialConfig.config);
 const offerDesc = computed(() => fmt(t.value.trial.entryDescription, { days: cfg.value.trialDays }));

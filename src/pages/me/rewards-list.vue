@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect, type CSSProperties } from "vue";
+import { computed, ref, watch, watchEffect, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -145,7 +145,10 @@ import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { navTo } from "@/lib/route";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
-import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
+import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady } from "@/lib/binary-session-ready";
 
 // Mirrors L1's RewardsCat (pages/me/rewards.vue); unknown values fall back.
 type RewardsCat = "voucher" | "usdt" | "nex";
@@ -154,8 +157,20 @@ type RewardsCat = "voucher" | "usdt" | "nex";
 const PAGE_SIZE = 10;
 
 const t = useT();
+const app = useApp();
+const auth = useAuth();
 const voucher = useVoucher();
 const bills = useBills();
+// The voucher/reward reads are protected; on a cold H5 load they must wait for
+// the cookie restore to bind this account, otherwise AUTH_REQUIRED surfaces as
+// "暂时无法确认账号状态" even though the same account's summary read succeeded.
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 
 const cat = ref<RewardsCat>("voucher");
 onLoad((options) => {
@@ -199,6 +214,7 @@ const showManualLoadMore = computed(() => fundsServerEnabled && activePager.valu
 
 async function refreshRecords() {
   if (!fundsServerEnabled || cat.value === "voucher") return;
+  if (!remoteSessionReady.value) return;
   try { await activePager.value.refresh(); } catch { /* the pager retains rows and exposes the error */ }
 }
 async function loadMoreRecords() {
@@ -210,7 +226,14 @@ async function loadMoreRecords() {
 }
 onShow(() => {
   void refreshRecords();
-  if (cat.value === "voucher") void voucher.refreshRemote();
+  if (cat.value === "voucher") retryVouchers();
+});
+// onShow can run before the cookie restore binds the account; start the
+// deferred protected reads here so no page settles on an account-state error.
+watch(remoteSessionReady, (ready, wasReady) => {
+  if (!ready || wasReady) return;
+  void refreshRecords();
+  if (cat.value === "voucher") retryVouchers();
 });
 useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && cat.value !== "voucher" && !activePager.value.error,

@@ -367,6 +367,25 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       : status.value === "none" && (canStart() || eligibility().reason === "product-unavailable");
   }
 
+  /**
+   * Offer state for the promotional surfaces, retaining the LAST CONFIRMED
+   * answer while a background read is in flight. Both banners key their action
+   * label off this so a re-read cannot change the button width/structure
+   * (BUG 14 / 56: "正在核实资格" ↔ "马上领取" churn). It never authorizes a
+   * claim — canStart() stays fail-closed during every read.
+   */
+  function confirmedOfferState(): "claimable" | "unavailable" | "checking" | "error" {
+    if (authorityStatus.value === "error") return "error";
+    if (authorityStatus.value === "ready") return remoteCanStart.value ? "claimable" : "unavailable";
+    // loading / unknown: keep the last confirmed state when we have one, so the
+    // card neither unmounts nor rewrites its action mid-read. No confirmed
+    // snapshot (first read, or a rebind) → an honest checking placeholder.
+    if (confirmedPromoVisible.value || confirmedHeroVisible.value) {
+      return remoteEligibilityReason.value === "product-unavailable" ? "unavailable" : "claimable";
+    }
+    return "checking";
+  }
+
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
   // Idempotent: a second call while ineligible is a no-op (spec 异常3 — one
   // trial per account, concurrent taps produce exactly one).
@@ -575,7 +594,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
     authorityClaimNo, authorityVersion, authorityServerState,
-    eligibility, canStart, showPromo, showHeroPromo, start, convert, cancel, poll, bindAccount, snapshot,
+    eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
+    start, convert, cancel, poll, bindAccount, snapshot,
     refreshRemote, refreshEligibilityRemote,
   };
 });

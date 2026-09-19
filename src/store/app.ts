@@ -423,7 +423,9 @@ export const useApp = defineStore("app", () => {
   const remoteFleetRefreshCoordinator = createRemoteFleetRefreshCoordinator();
   let remoteFleetRefreshSequence = 0;
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
-  //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
+  //   在线数 = 舰队规模 × 在线率,**逐字展示公布值**。
+  //   BUG #59:此前的「呼吸带 ±onlineJitter」会让人工配置的公布规模在页面停留期间自行浮动,
+  //   对外读起来像实时接入统计。公布口径不是实时测量,不得人为抖动,故抖动带已删除。
   //   配置非法时回退编译期锚 —— 全局条不许因单个参数坏而冻结(异常3 的「单项坏不拖垮」);
   //   首页脉搏卡的「该格占位」判定读配置本体,不读这里的回退值,两层各管各的。
   const cfg = useConfig();
@@ -439,11 +441,6 @@ export const useApp = defineStore("app", () => {
     const h = publicStatsHealth(ps ?? null);
     if (!ps || !h.fleetOk || !h.rateOk) return 0;
     return Math.round(ps.fleetDevices * (ps.onlineRatePct / 100));
-  };
-  const pulseJitterBand = (): number => {
-    const ps = cfg.config.publicStats;
-    if (!ps || !publicStatsHealth(ps).jitterOk) return 0;
-    return ps.onlineJitter;
   };
   const global = ref<GlobalStats>(createInitialGlobal(pulseOnlineBaseline()));
   // 真后端模式下 config 是异步装载的；global 比它更早创建，不能永久保留启动时的 0。
@@ -1008,15 +1005,12 @@ export const useApp = defineStore("app", () => {
     // extrapolate (the old always-add tick implied +130k devices/day; see
     // docs/changes/2026-07-24-platform-stats-single-anchor.md). Bands clamp
     // the O(√t) drift of an unbounded symmetric walk over long dwells.
-    const devDrift = Math.random();
-    const nextDevices = global.value.activeDevices + (devDrift > 0.8 ? 1 : devDrift < 0.2 ? -1 : 0);
     const nextJobs = global.value.activeJobs + Math.floor(Math.random() * 5) - 2;
-    // 呼吸带跟配置走(运营改了舰队/在线率/抖幅,已开着的会话在带内自然漂过去)
-    const devBase = pulseOnlineBaseline();
-    const devBand = pulseJitterBand();
+    // BUG #59:公布的舰队规模是运营配置的对外口径,不是实时接入数 —— 逐字展示,
+    // 不做任何漂移(运营改了舰队/在线率,已开着的会话直接切到新基线)。
     global.value = {
       ...global.value,
-      activeDevices: Math.min(devBase + devBand, Math.max(devBase - devBand, nextDevices)),
+      activeDevices: pulseOnlineBaseline(),
       activeJobs: Math.min(ACTIVE_JOBS_SEED + 36, Math.max(ACTIVE_JOBS_SEED - 36, nextJobs)),
     };
     if (miningPaused.value) return;

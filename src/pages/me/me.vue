@@ -108,6 +108,7 @@ import ThemePickerSheet from "@/components/me/theme-picker-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navReset, navTo } from "@/lib/route";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -228,7 +229,7 @@ interface QuickSection {
 
 const usdtBalance = computed(() => app.user.usdtBalance);
 const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
-const profileName = computed(() => profile.displayName);
+const profileName = computed(() => nexGridBrandText(profile.displayName));
 const orderCount = computed(() => orders.orders.length);
 const localeUpper = computed(() => locale.code.toUpperCase());
 const activeCount = computed(() => app.activeSlotCount);

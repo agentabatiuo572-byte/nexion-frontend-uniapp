@@ -13,6 +13,7 @@ import { computed, ref, onMounted } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useProfile } from "@/store/profile";
 import { homeGreetingName } from "./home-greeting";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const t = useT();
 const profile = useProfile();
@@ -33,6 +34,7 @@ onMounted(() => {
 });
 
 // 登录响应 /api/app/profile 投影的是服务端完整昵称；首页不得擅自按空格截断。
-const nickname = computed(() => homeGreetingName(profile.displayName, "NexGrid"));
+// 存量账号的默认昵称在服务端仍是改名前的旧品牌,渲染层归一(见 lib/brand-copy.ts)。
+const nickname = computed(() => nexGridBrandText(homeGreetingName(profile.displayName, "NexGrid")));
 const greetingLine = computed(() => `${greeting.value}, ${nickname.value}`);
 </script>

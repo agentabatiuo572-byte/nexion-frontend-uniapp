@@ -73,8 +73,8 @@
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.longestStreak }}</text>
             <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
-              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ longestOrCurrent }}</text>
-              <text :style="heroUnitStyle">{{ t.proof.daysShort }}</text>
+              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ streakHeroValue }}</text>
+              <text v-if="longestOrCurrent !== null" :style="heroUnitStyle">{{ t.proof.daysShort }}</text>
             </view>
           </view>
           <view v-else style="margin-top: 16px">
@@ -211,6 +211,7 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
 import { buildShareLink } from "@/lib/share";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank } from "@/store/v-rank";
 import { rankTitle } from "@/lib/v-rank-copy";
@@ -304,7 +305,7 @@ const onlineDevices = computed(
   () => remoteApiEnabled ? remoteSnapshot.value?.onlineDevices ?? null
     : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
-const profileName = computed(() => profile.displayName);
+const profileName = computed(() => nexGridBrandText(profile.displayName));
 const myRank = computed(() => remoteApiEnabled && !vRank.remoteReady ? null : vRank.myRank);
 const totalMembers = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? null : network.totalMembers);
 const streakFacts = computed(() => proofStreakFacts(
@@ -316,6 +317,11 @@ const streakFacts = computed(() => proofStreakFacts(
 const streak = computed<number | null>(() => streakFacts.value.current);
 const longestStreak = computed<number | null>(() => streakFacts.value.longest);
 const longestOrCurrent = computed<number | null>(() => streakFacts.value.display);
+// A streak card is a public artifact: an unavailable server fact must read as
+// unavailable rather than rendering the unit alone ("d" with no number).
+const streakHeroValue = computed(() => longestOrCurrent.value === null
+  ? t.value.proof.valueUnavailable
+  : String(longestOrCurrent.value));
 
 const joined = computed(() => {
   const raw = remoteApiEnabled ? remoteSnapshot.value?.joinedAt : app.user.joinedAt;
@@ -335,7 +341,9 @@ const topPctText = computed(() => topPct.value === null ? "—" : `Top ${topPct.
 
 const shareText = computed(() => {
   if (variant.value === "streak")
-    return `🔥 ${longestOrCurrent.value ?? "—"}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
+    return longestOrCurrent.value === null
+      ? `🔥 My NexGrid streak is not available right now. Daily check-ins = passive NEX. Join me: ${referralLink.value}`
+      : `🔥 ${longestOrCurrent.value}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
     return `🌐 My NexGrid network has ${totalMembers.value ?? "—"} members. Explore NexGrid: ${referralLink.value}`;
   return `💸 Earned $${earningsTotalText.value} on NexGrid in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
@@ -475,7 +483,9 @@ function posterMetricLabel(): string {
 }
 
 function posterMetricValue(): string {
-  if (variant.value === "streak") return `${proofPosterText(longestOrCurrent.value)} ${t.value.proof.daysShort}`;
+  if (variant.value === "streak") return longestOrCurrent.value === null
+    ? t.value.proof.valueUnavailable
+    : `${proofPosterText(longestOrCurrent.value)} ${t.value.proof.daysShort}`;
   if (variant.value === "network") return proofPosterText(totalMembers.value);
   return `$${earningsTotalText.value}`;
 }

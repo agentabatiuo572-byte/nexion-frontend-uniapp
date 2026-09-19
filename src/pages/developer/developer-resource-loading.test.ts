@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/errors";
-import { isDeveloperApprovalRequired } from "./developer-access-state";
+import { isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable } from "./developer-access-state";
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
 function deferred<T>(): Deferred<T> {
@@ -36,10 +36,11 @@ function createHarness() {
   const resourcesReady = { value: false };
   const resourcesLoadFailed = { value: false };
   const resourcesApprovalRequired = { value: false };
+  const resourcesNotReleased = { value: false };
   const newWebhookSecret = { value: "one-time-fixture-secret" as string | null };
   const busy = new Set<string>();
   const makeLoadResources = new Function("deps", `
-    const { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, isDeveloperApprovalRequired, newWebhookSecret,
+    const { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, resourcesNotReleased, isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable, newWebhookSecret,
       developerResourcesApi, resourceFence, resourceFenceCurrent, resourceBusy,
       setResourceBusy, refreshRotationRecovery } = deps;
     const remoteApiEnabled = true;
@@ -49,8 +50,8 @@ function createHarness() {
     return loadResources;
   `) as (deps: Record<string, unknown>) => (fence?: { scope: string }) => Promise<void>;
   const loadResources = makeLoadResources({
-    apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, newWebhookSecret,
-    isDeveloperApprovalRequired,
+    apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, resourcesNotReleased, newWebhookSecret,
+    isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable,
     developerResourcesApi: {
       listKeys: () => { const read = deferred<unknown[]>(); keyReads.push(read); return read.promise; },
       listWebhooks: () => { const read = deferred<unknown[]>(); hookReads.push(read); return read.promise; },
@@ -62,7 +63,7 @@ function createHarness() {
     refreshRotationRecovery: () => undefined,
   });
   return {
-    loadResources, keyReads, hookReads, state: { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, newWebhookSecret },
+    loadResources, keyReads, hookReads, state: { apiKeys, webhooks, resourcesLoading, resourcesReady, resourcesLoadFailed, resourcesApprovalRequired, resourcesNotReleased, newWebhookSecret },
     changeScope: () => { currentScope = "scope-b"; },
   };
 }
@@ -98,6 +99,18 @@ describe("developer loadResources concurrent read authority", () => {
     expect(h.state.resourcesLoadFailed.value).toBe(true);
     expect(h.state.resourcesApprovalRequired.value).toBe(false);
     expect(h.state.newWebhookSecret.value).toBe("one-time-fixture-secret");
+  });
+
+  it("reports an undeployed capability as a product state instead of a load failure", async () => {
+    const h = createHarness(); const read = h.loadResources();
+    const notReleased = new ApiError({
+      kind: "http", status: 503, message: "DEVELOPER_ACCESS_SANDBOX_RUN_ID_REQUIRED",
+    });
+    h.keyReads[0].reject(notReleased); h.hookReads[0].reject(notReleased); await read;
+    expect(h.state.resourcesNotReleased.value).toBe(true);
+    expect(h.state.resourcesLoadFailed.value).toBe(false);
+    expect(h.state.resourcesApprovalRequired.value).toBe(false);
+    expect(h.state.resourcesReady.value).toBe(false);
   });
   it("does not let an old empty result overwrite mutation-triggered nonempty readback", async () => {
     const h = createHarness();

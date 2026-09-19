@@ -46,7 +46,7 @@
           </view>
           <view class="flex items-center justify-between" :style="heroFooterStyle">
             <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.leaderboard.pool.resetsIn }}</text>
-            <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-2)' }">{{ prize.resetsIn }}</text>
+            <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-2)' }">{{ resetsInText }}</text>
           </view>
         </view>
 
@@ -169,7 +169,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { LEADERBOARD, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
+import { LEADERBOARD, MY_RANK, PERIOD_PRIZE, type LeaderPeriod } from "@/mock/leaderboard";
 import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
 import { asApiError } from "@/api/errors";
@@ -199,9 +199,15 @@ watch(() => app.accountKey, () => {
 
 const rows = computed(() => remoteApiEnabled ? (remoteSnapshot.value?.period === period.value ? remoteSnapshot.value.rows : []) : LEADERBOARD[period.value]);
 const prize = computed(() => remoteApiEnabled ? { poolUSD: remoteSnapshot.value?.poolUsd ?? 0,
-  topN: remoteSnapshot.value?.topN ?? 0, resetsIn: "—", label: period.value }
+  topN: remoteSnapshot.value?.topN ?? 0, resetsIn: null as string | null, label: period.value }
   // Fixture rows can support layout preview, but client fixtures must never invent a cash pool.
-  : { poolUSD: 0, topN: 0, resetsIn: "—", label: period.value });
+  : { poolUSD: 0, topN: 0, resetsIn: PERIOD_PRIZE[period.value].resetsIn, label: period.value });
+// The server projection carries no countdown yet, so a period without one must
+// say so instead of rendering a bare placeholder that reads as a broken value.
+const resetsInText = computed(() => {
+  const value = prize.value.resetsIn;
+  return value && value !== "—" ? value : t.value.leaderboard.pool.resetsUnavailable;
+});
 const me = computed(() => remoteApiEnabled ? { rank: remoteSnapshot.value?.myRank ?? null,
   gapToNext: remoteSnapshot.value?.gapToNext ?? 0 } : MY_RANK[period.value]);
 const totalRows = computed(() => remoteApiEnabled ? remoteSnapshot.value?.totalRows ?? 0 : rows.value.length);

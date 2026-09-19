@@ -76,7 +76,8 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled, teamQuotaApi } from "@/api/runtime";
 import type { TeamQuotaSnapshot } from "@/api/team-quota-api";
-import { getProduct as getMockProduct, annualRoiPct as mockAnnualRoiPct } from "@/mock/products";
+import { getProduct as getMockProduct, annualRoiPct as mockAnnualRoiPct, type Product } from "@/mock/products";
+import { productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { specText } from "@/lib/product-copy";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
@@ -137,6 +138,9 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
 onShow(() => {
   quotaMounted = true;
   resetQuotaPageState();
+  // The tier cards render catalog-owned names/perks (BUG 34/33), so the
+  // catalog must be observed here too — a direct entry never visits the store.
+  void refreshProductCatalog();
   if (remoteApiEnabled) void refreshRemoteQuota();
 });
 onHide(() => {
@@ -188,10 +192,47 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
   };
 }
 
+// BUG 34/33: quota rows carry their own display_name/perk strings, which drift
+// from the live catalog the store renders ("NexGridBox Pro" vs the catalog's
+// "StellarBox Pro"; raw "80.000000 NEX/day"). The catalog is the single naming
+// and economics source — the server already refuses a quota snapshot whose
+// productNo is missing from it (AppTeamQuotaService → TEAM_QUOTA_CATALOG_NOT_READY)
+// — so the card renders catalog facts and only falls back to the server row
+// while the catalog read has not landed.
+function catalogProduct(productId: string): Product | undefined {
+  return productCatalogPresentation.value?.products.find((p) => p.id === productId);
+}
+function catalogProductName(productId: string, fallback: string): string {
+  return catalogProduct(productId)?.name ?? fallback;
+}
+function catalogProductPerks(productId: string, fallback: readonly string[]): string[] {
+  const p = catalogProduct(productId);
+  if (!p) return fallback.map(quotaPerkText);
+  // Same three lines the mock path builds, so both modes read identically.
+  return [
+    fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
+    `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
+    fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
+  ];
+}
+
+// The server row's perk strings are unlocalized and carry the raw column scale
+// ("80.000000 NEX/day"). Until the catalog read lands they are the only facts
+// available, so render them through the same localized, trailing-zero-free
+// line the catalog path uses (BUG 33) instead of printing the raw column.
+const QUOTA_PERK_GEN = /^(\d+(?:\.\d+)?)\s*NEX\s*\/\s*day$/i;
+function quotaPerkText(perk: string): string {
+  const match = QUOTA_PERK_GEN.exec(perk.trim());
+  if (!match) return perk;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return perk;
+  return fmt(t.value.quota.perkGen, { n: amount });
+}
+
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
     ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
-      productId: tier.productId, name: tier.name, price: tier.price,
+      productId: tier.productId, name: catalogProductName(tier.productId, tier.name), price: tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
       available: tier.available,
       unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",
@@ -201,7 +242,7 @@ const tiers = computed<QuotaTier[]>(() =>
           : t.value.quota.condActivatedDirect,
         current: condition.current, required: condition.required,
         kind: condition.kind === "teamVolume" ? "volume" : "invites",
-      })), perks: tier.perks, tint: index % 2 ? "var(--v5-warning)" : "var(--v5-brand)",
+      })), perks: catalogProductPerks(tier.productId, tier.perks), tint: index % 2 ? "var(--v5-warning)" : "var(--v5-brand)",
     }))
     : [buildTier("stellarbox-pro", "var(--v5-brand)"), buildTier("stellarrack-p1", "var(--v5-warning)")].filter(
       (x): x is QuotaTier => x !== null,

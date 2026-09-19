@@ -68,7 +68,7 @@
             <text style="font-size: 20px; font-weight: 500; color: var(--v5-quest-violet-ink)">$</text>
             <text style="font-size: 36px">{{ est }}</text>
           </view>
-          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); white-space: nowrap">{{ dailyEarnText }}</text>
+          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); white-space: nowrap">{{ creditBasisText }}</text>
         </view>
       </view>
 
@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialConfig } from "@/store/trial-config";
+import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -129,18 +129,36 @@ const visible = computed(() => trial.status === "none"
 
 const trialDays = computed(() => trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialCfg.config.shadowDailyUSD);
-const est = computed(() => Math.round(trialDays.value * dailyEarn.value));
+// The hero quotes the SAME creditable amount every other surface quotes: the
+// trial-earnings offset is capped (trialOffsetCapUSD), so the raw
+// days × shadowDailyUSD accrual is NOT what the user can offset. /me/trial and
+// checkout both go through computeTrialOffset; quoting the uncapped accrual
+// here overstated the benefit by the whole over-cap remainder (BUG 78).
+const trialOffset = computed(() => computeTrialOffset(trialCfg.config, trialDays.value * dailyEarn.value));
+const est = computed(() => Math.round(trialOffset.value.offsetUSD));
 const taglineText = computed(() => fmt(t.value.trial.heroTagline, { days: trialDays.value }));
 const earnLabelText = computed(() => fmt(t.value.trial.heroEarnLabel, { days: trialDays.value }));
 const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: trialCfg.config.seatsLeftToday }));
 const availabilityText = computed(() => productUnavailable.value
   ? t.value.trial.heroProductUnavailable
   : trialsLeftText.value);
-const claimCtaText = computed(() => trial.authorityStatus === "error" ? t.value.trial.entryUnavailable
-  : trial.authorityStatus === "loading" ? t.value.trial.entryChecking : productUnavailable.value
-  ? t.value.store.temporarilyOutOfStock
-  : t.value.trial.heroClaimCta);
+// CTA text follows the RETAINED offer state (BUG 14): an in-flight poll must
+// not swap the label and re-lay-out the ticket while the confirmed offer is
+// still the last thing the server told us. onClick stays gated by canClaim.
+const claimCtaText = computed(() => {
+  switch (trial.confirmedOfferState()) {
+    case "claimable": return t.value.trial.heroClaimCta;
+    case "error": return t.value.trial.entryUnavailable;
+    case "unavailable": return t.value.store.temporarilyOutOfStock;
+    default: return t.value.trial.entryChecking;
+  }
+});
 const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/d × ${trialDays.value}`);
+// State the basis when the cap bites: the daily rate line alone would read as if
+// the total were days × rate, which is exactly the overstatement BUG 78 reported.
+const creditBasisText = computed(() => trialOffset.value.offsetUSD < trialDays.value * dailyEarn.value
+  ? fmt(t.value.trial.heroCreditCapNote, { cap: trialCfg.config.trialOffsetCapUSD.toFixed(0) })
+  : dailyEarnText.value);
 
 const availabilityDotStyle = computed<CSSProperties>(() => ({
   width: "6px",

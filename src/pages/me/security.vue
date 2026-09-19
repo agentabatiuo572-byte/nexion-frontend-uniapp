@@ -47,9 +47,9 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="chevronStyle"><path d="m6 9 6 6 6-6" /></svg>
         </view>
         <view v-if="editingPwd" :style="pwdFormStyle">
-          <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onCurrent" />
-          <input class="w-full" :style="pwdInputStyle" password :value="next" :placeholder="t.security.newPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onNext" />
-          <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onConfirmPwd" />
+          <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onCurrent" />
+          <input class="w-full" :style="pwdInputStyle" password :value="next" :placeholder="t.security.newPassword" :aria-label="t.security.newPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onNext" />
+          <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :aria-label="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onConfirmPwd" />
           <text v-if="err" class="block" :style="errStyle">{{ err }}</text>
           <view class="flex" style="gap: 8px; margin-top: 4px">
             <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd" @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
@@ -68,12 +68,12 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text>
           </view>
           <text v-if="twoFactorEnabled === null" :style="unavailableValueStyle">—</text>
-          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" role="switch" tabindex="0" :aria-checked="twoFactorEnabled" @click="toggleTwoFactor(!twoFactorEnabled)" @keydown.enter.prevent="toggleTwoFactor(!twoFactorEnabled)" @keydown.space.prevent="toggleTwoFactor(!twoFactorEnabled)">
+          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" role="switch" tabindex="0" :aria-label="t.security.twoFactorSwitchLabel" :aria-checked="twoFactorEnabled" @click="toggleTwoFactor(!twoFactorEnabled)" @keydown.enter.prevent="toggleTwoFactor(!twoFactorEnabled)" @keydown.space.prevent="toggleTwoFactor(!twoFactorEnabled)">
             <view :style="toggleThumbStyle" />
           </view>
         </view>
         <view :style="pwdFormStyle">
-          <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
+          <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
             <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
             <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
@@ -132,7 +132,7 @@
           </view>
         </view>
         <view v-if="remoteApiEnabled && !deletionPending" :style="pwdFormStyle">
-          <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
+          <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </view>
         <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
           :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
@@ -160,6 +160,7 @@ import { useApp } from "@/store/app";
 import { useStaking } from "@/store/staking";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { accountApi, authApi, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
@@ -220,8 +221,8 @@ const modeLabel = computed(() => t.value.security.developmentModeLabel);
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,
-      deviceName: item.deviceName,
-      device: item.deviceName,
+      deviceName: nexGridBrandText(item.deviceName),
+      device: nexGridBrandText(item.deviceName),
       location: item.ipMasked,
       ip: item.ipMasked,
       lastActiveMs: Date.parse(item.lastActiveAt),

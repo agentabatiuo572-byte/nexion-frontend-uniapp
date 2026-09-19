@@ -93,6 +93,19 @@ describe("team network remote scope", () => {
     expect(remote.teamNetworkApi.snapshot).toHaveBeenCalledTimes(2);
     expect(store.members[0]?.id).toBe("a-new");
   });
+  it("keeps the confirmed projection mounted when the commerce runtime moves", async () => {
+    remote.teamNetworkApi.snapshot.mockResolvedValueOnce(snapshot("confirmed"));
+    const store = useNetwork();
+    await store.ensureCanonicalNetwork();
+    expect(store.hasRemoteSnapshot).toBe(true);
+    remote.teamNetworkApi.snapshot.mockReturnValueOnce(new Promise(() => {}));
+    advanceRuntimeRevision("TEAM-RUN-20260819");
+    expect(store.remoteStatus).toBe("loading");
+    expect(store.hasRemoteSnapshot).toBe(true);
+    expect(store.members.map(member => member.id)).toEqual(["confirmed"]);
+    expect(store.totalMembers).toBe(1);
+  });
+
   it("drops a response captured before the sandbox run changes", async () => {
     let resolve!: (value: ReturnType<typeof snapshot>) => void;
     remote.teamNetworkApi.snapshot

@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { remoteApiEnabled, vRankApi } from "@/api/runtime";
+import type { CanonicalVRankLadder, CanonicalVRankState } from "@/api/v-rank-api";
+import { asApiError } from "@/api/errors";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
@@ -271,6 +273,11 @@ export const useVRank = defineStore("vRank", () => {
   }
 
   let refreshGeneration = 0;
+  // H5 cold restore enters the page before the bearer is bound to this account.
+  // That local precondition must not surface as a server-unavailable error the
+  // user has to clear by hand: wait (bounded) for the session to match, then
+  // read, and retry once when the first attempt fails transiently.
+  const SESSION_BIND_RETRY_MILLISECONDS = 500;
   async function refreshCanonicalVRank(
     request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch),
     runScope: RuntimeRevisionScope = captureRuntimeRevision(),
@@ -284,9 +291,7 @@ export const useVRank = defineStore("vRank", () => {
       remoteReady.value = false;
       remoteError.value = null;
     }
-    try {
-      const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
-      if (!isCurrent()) return;
+    const apply = (remoteLadder: CanonicalVRankLadder, remoteCurrent: CanonicalVRankState) => {
       ladder.value = remoteLadder.ranks.map(canonicalRank);
       prizeName.value = remoteLadder.prizeName;
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
@@ -298,11 +303,31 @@ export const useVRank = defineStore("vRank", () => {
       ) as Partial<Record<VRank, number>>;
       remoteReady.value = true;
       remoteError.value = null;
-    } catch {
-      if (isCurrent()) {
-        clearRemoteFacts();
-        remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
+    };
+    try {
+      const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+      if (!isCurrent()) return;
+      apply(remoteLadder, remoteCurrent);
+    } catch (error) {
+      if (!isCurrent()) return;
+      // H5 cold restore enters this page before the bearer is bound to the
+      // account; the request layer reports that local precondition as an auth
+      // failure. One bounded retry keeps a recoverable first-request failure
+      // from being shown as a server error the user must clear by hand.
+      if (asApiError(error).kind === "auth") {
+        await new Promise<void>((resolve) => setTimeout(resolve, SESSION_BIND_RETRY_MILLISECONDS));
+        if (!isCurrent()) return;
+        try {
+          const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+          if (!isCurrent()) return;
+          apply(remoteLadder, remoteCurrent);
+          return;
+        } catch {
+          if (!isCurrent()) return;
+        }
       }
+      clearRemoteFacts();
+      remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
     }
   }
 

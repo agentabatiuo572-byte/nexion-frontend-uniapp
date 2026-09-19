@@ -98,4 +98,28 @@ describe("locale profile sync", () => {
     sync.discardInactive();
     expect(sync.pending()).toBeNull();
   });
+
+  // The locale write's own transport can refresh the bearer, advancing the vault
+  // revision while the account stays the same. Treating that revision as part of
+  // the identity made the in-flight job look inactive: the state stayed
+  // "syncing" forever and the page never left "syncing account language".
+  it("finishes a write whose bearer refresh advanced the revision on the same account", async () => {
+    let scope = { accountId: "user:42", revision: 3 };
+    const states: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const sync = createLocaleProfileSync({
+      currentScope: () => scope,
+      write: async () => { await gate; return "en"; },
+      onState: (state) => states.push(state),
+    });
+
+    sync.request("en");
+    scope = { accountId: "user:42", revision: 4 };
+    release();
+    await sync.flush();
+
+    expect(sync.pending()).toBeNull();
+    expect(states.at(-1)).toBe("idle");
+  });
 });

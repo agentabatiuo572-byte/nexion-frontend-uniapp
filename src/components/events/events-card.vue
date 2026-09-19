@@ -83,7 +83,7 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
-import { EVENT_KIND_LABEL, type NexEvent } from "@/mock/events";
+import type { NexEvent } from "@/mock/events";
 import {
   eventOpenTarget,
   shouldShowDecorativeAction,
@@ -113,7 +113,7 @@ const openTarget = computed(() => eventOpenTarget(props.ev));
 const showProgressAction = computed(() => shouldShowJoinedProgressAction(props.ev));
 const showDecorativeAction = computed(() => shouldShowDecorativeAction(props.ev));
 const claimLabel = computed(() => fmt(t.value.events.claimRewardCta, { reward: props.ev.reward }));
-const kindLabel = computed(() => EVENT_KIND_LABEL[props.ev.kind]);
+const kindLabel = computed(() => t.value.events.kind[props.ev.kind]);
 const progressPct = computed(() =>
   props.ev.progress ? Math.min(100, (props.ev.progress.current / props.ev.progress.total) * 100) : 0,
 );

@@ -338,7 +338,7 @@ const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
   if (remoteApiEnabled) return [{
     id: "nexgrid-wallet",
     label: t.value.wallet.title,
-    hint: t.value.wallet.usdtBalance,
+    hint: walletBalanceHint.value,
     iconPath: WALLET_PATH,
     iconPath2: WALLET_PATH2,
   }];
@@ -388,6 +388,19 @@ const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
 const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 const checkoutWalletRefreshing = ref(false);
 let checkoutWalletRefreshSequence = 0;
+// The wallet payment row must state the server-confirmed available USDT before
+// the user continues, with the same readability rule the wallet page uses
+// (a receipt-only balance stays readable). Server re-validates at submit.
+const checkoutWalletReadable = computed(() => !remoteApiEnabled
+  || app.remoteFleetHasSnapshot || app.remoteWalletReceiptHasSnapshot);
+const walletBalanceHint = computed(() => {
+  if (!remoteApiEnabled) return "";
+  if (!checkoutWalletReadable.value) {
+    return checkoutWalletRefreshing.value || app.remoteFleetStatus === "idle" || app.remoteFleetStatus === "loading"
+      ? t.value.help.loadingMore : t.value.wallet.fundsUnavailableTitle;
+  }
+  return `${t.value.wallet.usdtBalance} · $${app.user.usdtBalance.toFixed(2)}`;
+});
 
 function checkoutRouteIdentity() {
   const account = captureAccountScope();

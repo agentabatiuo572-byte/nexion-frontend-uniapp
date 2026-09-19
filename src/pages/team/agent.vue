@@ -237,10 +237,17 @@ const BUCKET_VISUALS: Record<AmbassadorPolicyBucket["id"], Pick<Bucket, "tint" |
 };
 const policy = ref<AmbassadorPolicy | null>(null);
 const pageReadState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
-const BUCKETS = computed<Bucket[]>(() => (policy.value?.buckets ?? []).map((bucket) => ({
-  id: bucket.id, title: bucket.title, range: bucket.range, rule: bucket.rule,
-  ...BUCKET_VISUALS[bucket.id],
-})));
+// Bucket ids are a closed server enum (venue/kol/print/dev) but the policy rows
+// carry only the operator's English title/rule. Resolve the visible name and
+// rule from the locale dictionary; the server copy stays the fallback for any
+// id a future release adds before its translation ships.
+const BUCKETS = computed<Bucket[]>(() => (policy.value?.buckets ?? []).map((bucket) => {
+  const copy = t.value.agent.buckets[bucket.id];
+  return {
+    id: bucket.id, title: copy?.title || bucket.title, range: bucket.range, rule: copy?.rule || bucket.rule,
+    ...BUCKET_VISUALS[bucket.id],
+  };
+}));
 
 interface ApprovedCase {
   name: string;

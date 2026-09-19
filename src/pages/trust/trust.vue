@@ -152,7 +152,9 @@ const narrativeHero = computed(() => localizedTrustFieldValue(narrativeSection.v
 const narrativeSubhero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "subhero", language.value) ?? "");
 const trustSnapshotLabel = computed(() => trustFieldValue(financialSection.value?.fields ?? [], "tvlOnChain") ?? "—");
 const activeDevicesText = computed(() => trustFieldValue(financialSection.value?.fields ?? [], "devicesOnlineValue") ?? "—");
-const financialFootnote = computed(() => localizedTrustFieldValue(financialSection.value?.fields ?? [], "footnote", language.value));
+const financialFootnote = computed(() => auditDocumentHref.value
+  ? localizedTrustFieldValue(financialSection.value?.fields ?? [], "footnote", language.value)
+  : null);
 const financialMetrics = computed(() => {
   const fields = financialSection.value?.fields ?? [];
   return ["tvlOnChain", "mrrValue", "activeAccountsValue", "devicesOnlineValue", "payoutsProcessedValue"].flatMap((key) => {
@@ -164,6 +166,13 @@ const financialMetrics = computed(() => {
 });
 const complianceRows = computed(() => trustNumberedRows(complianceSection.value?.fields ?? [], "badge", ["Label", "Body"] as const, language.value));
 const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, language.value));
+// BUG #59: the published footnote asserts the figures were reconciled against an
+// audited ledger. That claim is only publishable while an audit document is
+// actually reachable; with no reachable document the App must not repeat the
+// assurance while the audit row itself shows "link unavailable".
+const auditDocumentHref = computed(() => auditRows.value
+  .map((row) => row.Url.trim())
+  .find((value) => safeHref(value) !== null) ?? "");
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
 const listingRows = computed(() => trustNumberedRows(listingsSection.value?.fields ?? [], "listing", ["Exchange", "State", "Url"] as const, language.value));
 

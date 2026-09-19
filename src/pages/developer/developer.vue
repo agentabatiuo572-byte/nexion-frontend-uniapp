@@ -102,7 +102,8 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
-          <view v-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
+          <view v-if="remoteApiEnabled && docsNotReleased" class="rounded-xl" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
+          <view v-else-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
@@ -127,7 +128,10 @@
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
               <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
             </view>
-            <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+            <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
+            </view>
+            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
               <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
@@ -135,7 +139,7 @@
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
-            <view class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text></view>
+            <view v-if="!resourcesNotReleased" class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text></view>
             <view v-if="resourcesReady && !apiKeys.length" class="mt-3 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.keysEmpty }}</text></view>
           </view>
         </view>
@@ -150,7 +154,10 @@
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
               <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
             </view>
-            <view v-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+            <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
+              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
+            </view>
+            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
               <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
             </view>
@@ -204,7 +211,7 @@ import { apiClient, expectedApiEnvironment } from "@/api/runtime";
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperWebhook } from "./developer-form-validation";
-import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, type DeveloperAccessCopyKey } from "./developer-access-state";
+import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable, isDeveloperDocsNotReleased, type DeveloperAccessCopyKey } from "./developer-access-state";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -214,6 +221,7 @@ const locale = useLocaleStore();
 const docsApi = createDeveloperDocsApi(apiClient, expectedApiEnvironment);
 const docs = ref<DeveloperDocs | null>(null);
 const docsLoadFailed = ref(false);
+const docsNotReleased = ref(false);
 const tab = ref<Tab>("overview");
 const company = ref("");
 const email = ref("");
@@ -228,7 +236,8 @@ const resourcesLoading = ref(false);
 const resourcesReady = ref(false);
 const resourcesLoadFailed = ref(false);
 const resourcesApprovalRequired = ref(false);
-const canManageResources = computed(() => resourcesReady.value && !resourcesLoading.value && !resourcesApprovalRequired.value);
+const resourcesNotReleased = ref(false);
+const canManageResources = computed(() => resourcesReady.value && !resourcesLoading.value && !resourcesApprovalRequired.value && !resourcesNotReleased.value);
 const resourceBusyKeys = ref(new Set<string>());
 const resourceIntentKeys = new Map<string, string>();
 const webhookName = ref("");
@@ -394,6 +403,7 @@ function resetResourceScope(): void {
   resourcesReady.value = false;
   resourcesLoadFailed.value = false;
   resourcesApprovalRequired.value = false;
+  resourcesNotReleased.value = false;
   resourceBusyKeys.value = new Set();
   resourceIntentKeys.clear();
   rotationRecovery.value = {};
@@ -408,6 +418,7 @@ function resetDocsScope(): void {
   docsGeneration += 1;
   docs.value = null;
   docsLoadFailed.value = false;
+  docsNotReleased.value = false;
 }
 function refreshRotationRecovery(items: DeveloperWebhook[]): void {
   const scope = rotationJournal.captureScope();
@@ -514,15 +525,20 @@ async function loadResources(fence = resourceFence()) {
     refreshRotationRecovery(hooks);
     resourcesLoadFailed.value = false;
     resourcesApprovalRequired.value = false;
+    resourcesNotReleased.value = false;
     resourcesReady.value = true;
   } catch (cause) {
     if (current()) {
       resourcesApprovalRequired.value = isDeveloperApprovalRequired(cause);
-      resourcesLoadFailed.value = !resourcesApprovalRequired.value;
+      // A capability the server has not deployed (503 DEVELOPER_*) is a product
+      // state, not a failed load: it must not render as a retryable error next
+      // to the not-released copy.
+      resourcesNotReleased.value = isDeveloperCapabilityUnavailable(cause);
+      resourcesLoadFailed.value = !resourcesApprovalRequired.value && !resourcesNotReleased.value;
       apiKeys.value = [];
       webhooks.value = [];
       webhookDeliveries.value = {};
-      if (resourcesApprovalRequired.value) newWebhookSecret.value = null;
+      if (resourcesApprovalRequired.value || resourcesNotReleased.value) newWebhookSecret.value = null;
     }
   } finally {
     if (current()) {
@@ -535,14 +551,17 @@ async function loadDocs() {
   if (!remoteApiEnabled) return;
   const fence = docsFenceReader.capture();
   docsLoadFailed.value = false;
+  docsNotReleased.value = false;
   try {
     const value = await docsApi.published(fence.localeCode);
     if (!docsFenceCurrent(fence)) return;
     docs.value = value;
-  } catch {
+  } catch (cause) {
     if (!docsFenceCurrent(fence)) return;
     docs.value = null;
-    docsLoadFailed.value = true;
+    // "No documentation published yet" is a product state, not a failed load.
+    if (isDeveloperDocsNotReleased(cause)) docsNotReleased.value = true;
+    else docsLoadFailed.value = true;
   }
 }
 function retryLoadResources(): void { void loadResources(); }
