@@ -23,6 +23,7 @@
 
       <template v-if="state.phase !== 'saved'">
         <view class="binding-fields">
+          <text v-if="state.config?.bankSelection === 'ACCOUNT_ROUTED'" class="hint" role="status" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text>
           <text class="field-label">{{ c.accountLabel }} <text class="required">*</text></text>
           <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
           <text class="field-label">{{ c.holderLabel }} <text class="required">*</text></text>

@@ -25,6 +25,7 @@ export const zh: Messages = {
     accountLabel: "收款账号", accountPlaceholder: "请输入银行账户号码，不一定等于卡面卡号",
     holderLabel: "收款户名", holderPlaceholder: "请填写银行登记的完整户名", notApplicable: "不适用", required: "必填", continue: "确认绑定",
     defaultLabel: "设为默认提现账户", singleAccount: "当前支持一个提现账户，绑定后默认用于银行卡提现。",
+    accountRoutedNotice: "本服务按收款账号识别所属银行，无需也无法选择银行；银行名称在派发时由通道确认。请核对账号无误后再提交。",
     disclaimer: "请使用本人名下的银行账户。确认后保存资料；离开页面会清除未提交的内容。",
     loadError: "暂时无法读取账户配置或已绑定账户，请重试。", unsupported: "银行卡绑定服务正在更新，请稍后重新加载。",
     bindError: "账户未保存，请检查收款账号和户名，或联系客服。",

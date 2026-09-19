@@ -24,6 +24,7 @@ export const en = {
     accountLabel: "Receiving account number", accountPlaceholder: "Enter the bank account number, not necessarily the card number",
     holderLabel: "Account holder name", holderPlaceholder: "Full name as registered with the bank", notApplicable: "Not applicable", required: "Required", continue: "Confirm binding",
     defaultLabel: "Default withdrawal account", singleAccount: "One withdrawal account is supported at a time.",
+    accountRoutedNotice: "The bank is identified from the receiving account number, so there is no bank to choose. The bank name is confirmed by the payout channel. Check the account number before you submit.",
     disclaimer: "Use a bank account in your own name. Details are saved only after confirmation; drafts are cleared when you leave.",
     loadError: "Unable to load account configuration or your saved account. Please retry.", unsupported: "Bank account binding is being updated. Please reload shortly.",
     bindError: "Account not saved. Check the account number and holder name, or contact support.",
