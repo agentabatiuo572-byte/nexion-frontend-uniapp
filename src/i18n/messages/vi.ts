@@ -25,6 +25,7 @@ export const vi: Messages = {
     accountLabel: "Số tài khoản nhận tiền", accountPlaceholder: "Nhập số tài khoản ngân hàng, không nhất thiết là số trên thẻ",
     holderLabel: "Tên chủ tài khoản", holderPlaceholder: "Họ tên đầy đủ đã đăng ký tại ngân hàng", notApplicable: "Không áp dụng", required: "Bắt buộc", continue: "Xác nhận liên kết",
     defaultLabel: "Tài khoản rút tiền mặc định", singleAccount: "Hiện chỉ hỗ trợ một tài khoản rút tiền tại một thời điểm.",
+    accountRoutedNotice: "Hệ thống nhận diện ngân hàng theo số tài khoản nhận tiền nên không cần và không thể chọn ngân hàng; tên ngân hàng do kênh chi trả xác nhận. Vui lòng kiểm tra kỹ số tài khoản trước khi gửi.",
     disclaimer: "Vui lòng dùng tài khoản ngân hàng chính chủ. Thông tin chỉ được lưu sau khi xác nhận; bản nháp được xóa khi rời trang.",
     loadError: "Chưa thể tải cấu hình hoặc tài khoản đã liên kết. Vui lòng thử lại.", unsupported: "Dịch vụ liên kết tài khoản đang cập nhật. Vui lòng tải lại sau.",
     bindError: "Tài khoản chưa được lưu. Kiểm tra số tài khoản và tên chủ tài khoản hoặc liên hệ hỗ trợ.",
