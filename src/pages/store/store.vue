@@ -19,6 +19,18 @@
       <!-- Sprint 2 finale — phase + legacy-ownership trade-in window -->
       <TradeinWindowBanner />
 
+      <!-- Goal-recommendation context (BUG 71). Arriving from an earning goal
+           carries `focus`; the card locates the recommended SKU instead of
+           silently featuring the generic first product, and names the change
+           when the recommendation is no longer purchasable. -->
+      <view v-if="focusProductId" data-testid="store-goal-focus" class="rounded-2xl" :style="goalFocusCardStyle">
+        <text class="block" :style="goalFocusTitleStyle">{{ t.store.goalFocusTitle }}</text>
+        <text class="block mt-1" :style="goalFocusBodyStyle">{{ goalFocusBody }}</text>
+        <view v-if="!focusFeatured" class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="goalFocusRetryStyle" @click="retryCatalog">
+          <text>{{ t.store.catalogRetry }}</text>
+        </view>
+      </view>
+
       <!-- Server mode has no seeded purchase inventory. Keep the live catalog
            state visible so a malformed or empty response cannot hide every CTA. -->
       <view v-if="catalogStatus === 'loading' && !catalogHasProducts" data-testid="store-catalog-loading" :style="catalogStateStyle">
@@ -99,10 +111,11 @@ import ProductCard from "@/components/store/product-card.vue";
 import PurchaseTicker from "@/components/store/purchase-ticker.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
-import { onHide, onShow } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesis } from "@/store/genesis";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -110,6 +123,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
+import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -125,6 +139,15 @@ const ownedHardware = computed(() => highestOwnedHardware(ownedDevices.value));
 const genesisCfg = useGenesisConfig();
 const genesis = useGenesis();
 const earnConfig = useEarnConfig();
+// Goal-recommendation landing context (BUG 71). `focus` is the SKU the earning
+// goal recommended; `focusName` is its server display name, carried so the
+// change explanation can still name a recommendation that is no longer in the
+// purchasable catalog. Absent query → the store behaves exactly as before.
+// Declared before the lifecycle hooks below: onHide/onUnmounted clear this
+// arrival context, and a callback that runs before the declaration is
+// evaluated would read the binding in its temporal dead zone.
+const focusProductId = ref("");
+const focusProductName = ref("");
 let storePageVisible = false;
 let storeObservationEpoch = 0;
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -144,10 +167,17 @@ onShow(() => {
 onHide(() => {
   storePageVisible = false;
   storeObservationEpoch += 1;
+  // The goal-recommendation context belongs to the arrival from the earning
+  // goal, not to the tab. A tab switch or a detail push must not keep claiming
+  // "your goal sent you here" on the next look at an unrelated store visit.
+  focusProductId.value = "";
+  focusProductName.value = "";
 });
 onUnmounted(() => {
   storePageVisible = false;
   storeObservationEpoch += 1;
+  focusProductId.value = "";
+  focusProductName.value = "";
 });
 const phase = useProductPhase();
 
@@ -209,9 +239,41 @@ const lockedProducts = computed(() =>
 );
 
 const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices.value));
-// Feature a real upgrade when one is available; the full catalogue remains browsable.
+
+// Goal-recommendation landing context (BUG 71) is declared above, before the
+// lifecycle hooks that clear it.
+onLoad((options) => {
+  const query = (options || {}) as Record<string, string | undefined>;
+  focusProductId.value = (query.focus ?? "").trim();
+  focusProductName.value = (query.focusName ?? "").trim();
+});
+// Only a product that is actually purchasable may take over the recommendation
+// slot; a phase-locked or delisted SKU must not be presented as the live pick.
+const goalFocus = computed(() => resolveStoreGoalFocus(
+  focusProductId.value,
+  focusProductName.value,
+  displayProducts.value,
+  unlockedProducts.value,
+  catalogHasProducts.value,
+));
+const focusFeatured = computed(() => goalFocus.value.featured);
+const goalFocusBody = computed(() => {
+  const focus = goalFocus.value;
+  switch (focus.variant) {
+    case "located": return fmt(t.value.store.goalFocusLocated, { name: focus.name });
+    case "pending": return t.value.store.goalFocusCatalogPending;
+    case "not-purchasable": return fmt(t.value.store.goalFocusUnavailable, { name: focus.name });
+    case "replaced": return fmt(t.value.store.goalFocusReplaced, { name: focus.name });
+    default: return "";
+  }
+});
+
+// Feature a real upgrade when one is available; a goal-recommended SKU outranks
+// it; the full catalogue remains browsable.
 const featured = computed(
-  () => unlockedProducts.value.find((p) => p.id === upgrade.value?.target.id) ?? unlockedProducts.value[0],
+  () => focusFeatured.value
+    ?? unlockedProducts.value.find((p) => p.id === upgrade.value?.target.id)
+    ?? unlockedProducts.value[0],
 );
 const restProducts = computed(() =>
   unlockedProducts.value.filter((p) => p.id !== featured.value?.id),
@@ -263,5 +325,34 @@ const catalogRetryStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontSize: "13px",
   fontWeight: 600,
+};
+
+// Goal-recommendation context card — same filled/no-border L1 idiom as the
+// catalog state card above, tinted with the recommendation accent so it reads
+// as the reason this page opened, not as a second product card.
+const goalFocusCardStyle: CSSProperties = {
+  padding: "14px 16px",
+  borderRadius: "16px",
+  background: "color-mix(in srgb, var(--v5-brand-2) 10%, var(--v5-surface))",
+};
+const goalFocusTitleStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 600,
+  letterSpacing: "0.04em",
+  color: "var(--v5-brand-2-ink)",
+};
+const goalFocusBodyStyle: CSSProperties = {
+  fontSize: "13px",
+  lineHeight: "19px",
+  color: "var(--v5-ink)",
+};
+const goalFocusRetryStyle: CSSProperties = {
+  minHeight: "32px",
+  alignItems: "center",
+  padding: "0 12px",
+  borderRadius: "9999px",
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink)",
+  fontSize: "12px",
 };
 </script>

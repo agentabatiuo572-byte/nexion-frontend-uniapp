@@ -96,8 +96,10 @@ import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import { onHide, onShow } from "@dcloudio/uni-app";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady } from "@/lib/binary-session-ready";
 import {
   createRemoteOrdersRefresh,
   isInitialOrderReadLoading,
@@ -108,8 +110,19 @@ import {
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
 const orders = useOrders();
 const genesis = useGenesis();
+// Cold H5 loads restore the bearer through the refresh cookie. A protected
+// order read started before that returns AUTH_REQUIRED, which is what left the
+// commerce and genesis panels on "暂时无法确认账号状态" until a reload.
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 type CommerceOrderListItem = Order & { kind: "commerce"; meta?: string };
 type OrderListItem = CommerceOrderListItem | GenesisOrderListItem;
 const orderList = computed<OrderListItem[]>(() => [
@@ -145,7 +158,7 @@ const mainContentEmpty = computed(() =>
 let refreshEpoch = 0;
 let ordersPageActive = true;
 async function refreshOrders() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || !remoteSessionReady.value) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
   const currentRefresh = ++refreshEpoch;
   const current = () => ordersPageActive && currentRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
@@ -209,6 +222,11 @@ onUnmounted(() => {
 watch(() => app.accountBindingEpoch, () => {
   remoteOrdersResolved.value = false;
   if (ordersPageActive) void refreshOrders();
+});
+// onShow can land before the cookie restore binds the account. The deferred
+// read starts here instead, so the page never settles on an account-state error.
+watch(remoteSessionReady, (ready, wasReady) => {
+  if (ready && !wasReady && ordersPageActive) void refreshOrders();
 });
 
 // Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted

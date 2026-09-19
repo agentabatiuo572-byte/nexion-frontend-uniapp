@@ -132,8 +132,9 @@ import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import { dailyMilestoneRewardText } from "@/pages/daily/daily-reward-view";
+import { dailyMilestoneRewardText, dailyRewardLabels } from "@/pages/daily/daily-reward-view";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
@@ -264,13 +265,14 @@ onUnmounted(() => {
 const remoteGroups = computed(() => {
   const snapshot = remoteSnapshot.value;
   if (!snapshot) return [];
+  const rewardLabels = dailyRewardLabels(t.value.daily.milestones);
   const daily: RemoteMilestoneRow[] = snapshot.dailyMilestones.map((row) => ({
     key: `daily:${row.milestoneId}`,
     kind: "daily",
     id: row.milestoneId,
     label: `${w.value.dailyMilestone} ${row.milestoneDay}`,
     description: `${w.value.streakProgress}: ${snapshot.streak.currentStreak}/${row.milestoneDay}`,
-    reward: dailyMilestoneRewardText(row, t.value.daily.milestones.badgeLabel),
+    reward: dailyMilestoneRewardText(row, rewardLabels),
     status: row.status,
     iconId: "power_user",
   }));
@@ -290,7 +292,7 @@ const remoteGroups = computed(() => {
     id: row.achievementCode,
     label: row.name,
     description: row.description,
-    reward: row.rewardPoints > 0 ? `+${row.rewardPoints} PTS` : row.category,
+    reward: row.rewardPoints > 0 ? fmt(w.value.pointsReward, { n: row.rewardPoints }) : badgeCategoryLabel(row.category),
     status: row.status,
     iconId: row.iconKey || "power_user",
   }));
@@ -379,6 +381,20 @@ function catLabel(c: AchievementCategory): string {
       return w.value.catLoyalty;
     case "hardware":
       return w.value.catHardware;
+  }
+}
+// `nx_achievement.category` is operator-set and uppercased by the API parser.
+// A category with no shipped label must degrade to a neutral word, never print
+// the stored code.
+function badgeCategoryLabel(category: string): string {
+  switch (category.trim().toLowerCase()) {
+    case "streak": return w.value.catStreak;
+    case "firsts": return w.value.catFirsts;
+    case "earnings": return w.value.catEarnings;
+    case "social": return w.value.catSocial;
+    case "loyalty": return w.value.catLoyalty;
+    case "hardware": return w.value.catHardware;
+    default: return w.value.catOther;
   }
 }
 function label(a: AchievementDef): string {

@@ -227,7 +227,7 @@ import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-ap
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
-import { dailyBaseReward, dailyLuckyHint, dailyMilestoneRewardText, dailyUpcomingMilestone } from "./daily-reward-view";
+import { dailyBaseReward, dailyLuckyHint, dailyMilestoneRewardText, dailyRewardLabels, dailyUpcomingMilestone } from "./daily-reward-view";
 import { dailyCheckInSuccessCopy } from "./daily-success-copy";
 
 const ONE_DAY_MS = 86400 * 1000;
@@ -292,13 +292,14 @@ const checkInCtaText = computed(() => {
   return base === null ? t.value.daily.checkInAction : fmt(t.value.daily.checkInBase, { n: base });
 });
 const leaderRows = computed(() => remoteApiEnabled ? faucet.topStreakers : MOCK_TOP_STREAKERS);
+const milestoneRewardLabels = computed(() => dailyRewardLabels(t.value.daily.milestones));
 const milestones = computed<Milestone[]>(() => remoteApiEnabled
   ? faucet.remoteMilestones.map((m) => ({
       day: m.milestoneDay,
       rewardKey: "reward3",
       labelKey: "day3",
       labelText: fmt(t.value.daily.milestones.dayLabel, { n: m.milestoneDay }),
-      rewardText: dailyMilestoneRewardText(m, t.value.daily.milestones.badgeLabel),
+      rewardText: dailyMilestoneRewardText(m, milestoneRewardLabels.value),
       status: m.status,
       reward: { type: (m.rewardType.toLowerCase() === "usdt" ? "usdt" : m.rewardType.toLowerCase() === "spin" ? "spin" : m.rewardType.toLowerCase() === "badge" ? "badge" : "nex") as Milestone["reward"]["type"], amount: m.rewardAmount },
       tint: "var(--v5-nex)", iconPath: "m12 3v18M3 12h18",
@@ -555,7 +556,9 @@ async function handleClaimMilestone(m: Milestone) {
       toast.error(t.value.authOtp.errorServiceUnavailable);
       return;
     }
-    toast.success(m.rewardText ?? `${m.reward.type} ${m.reward.amount}`, fmt(t.value.daily.milestones.claimedDay, { n: m.day }));
+    toast.success(m.rewardText ?? dailyMilestoneRewardText(
+      { rewardType: m.reward.type, rewardAmount: m.reward.amount, badgeCode: null }, milestoneRewardLabels.value,
+    ), fmt(t.value.daily.milestones.claimedDay, { n: m.day }));
     void refreshLedger(true);
     return;
   }

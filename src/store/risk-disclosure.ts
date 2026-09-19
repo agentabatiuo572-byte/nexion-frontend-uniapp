@@ -13,10 +13,13 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const publicationUnavailable = ref(false);
+  /** Region routing is not provisioned (or is ambiguous) — retrying the same request cannot help. */
+  const jurisdictionUnmapped = ref(false);
   let requestGeneration = 0;
 
   function apply(snapshot: RiskDisclosureCurrent | null) {
     publicationUnavailable.value = false;
+    jurisdictionUnmapped.value = false;
     current.value = snapshot;
     accepted.value = snapshot?.acknowledged ?? false;
     acceptedAt.value = snapshot?.acknowledgedAt ? Date.parse(snapshot.acknowledgedAt) || null : null;
@@ -49,6 +52,9 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
         publicationUnavailable.value = cause instanceof ApiError && cause.kind === "http"
           && cause.status === 404 && cause.code === 404
           && cause.message === "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND";
+        jurisdictionUnmapped.value = cause instanceof ApiError && cause.kind === "http"
+          && (cause.message === "RISK_DISCLOSURE_JURISDICTION_NOT_CONFIGURED"
+              || cause.message === "RISK_DISCLOSURE_JURISDICTION_AMBIGUOUS");
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_UNAVAILABLE";
       }
     } finally {
@@ -75,6 +81,9 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
         publicationUnavailable.value = cause instanceof ApiError && cause.kind === "http"
           && cause.status === 404 && cause.code === 404
           && cause.message === "RISK_DISCLOSURE_PUBLISHED_VERSION_NOT_FOUND";
+        jurisdictionUnmapped.value = cause instanceof ApiError && cause.kind === "http"
+          && (cause.message === "RISK_DISCLOSURE_JURISDICTION_NOT_CONFIGURED"
+              || cause.message === "RISK_DISCLOSURE_JURISDICTION_AMBIGUOUS");
         error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_ACKNOWLEDGEMENT_FAILED";
       }
       return false;
@@ -101,5 +110,5 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
   }
   function bindAccount() { invalidateRequests(); apply(null); void refresh(); }
   function reset() { invalidateRequests(); apply(null); void refresh(); }
-  return { current, accepted, acceptedAt, loading, error, publicationUnavailable, refresh, accept, checkGate, reset, bindAccount };
+  return { current, accepted, acceptedAt, loading, error, publicationUnavailable, jurisdictionUnmapped, refresh, accept, checkGate, reset, bindAccount };
 });

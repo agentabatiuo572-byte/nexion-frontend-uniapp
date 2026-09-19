@@ -23,6 +23,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { learningApi } from "@/api/learning-runtime";
 import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
+import { courseDurationText } from "@/lib/course-duration";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
@@ -38,7 +39,7 @@ const errorText = computed(() => error.value ? t.value.learning[error.value] : "
 const featuredCourse = computed(() => overview.value?.courses.find((course) => course.featured));
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
 const progressLine = computed(() => fmt(t.value.learning.centerProgress, { done: overview.value?.completedCourses ?? 0, total: overview.value?.totalCourses ?? 0, nex: overview.value?.earnedNex ?? 0 }));
-function courseMeta(course: LearningCourse) { return fmt(t.value.learning.courseMeta, { duration: course.duration, nex: course.rewardNex }); }
+function courseMeta(course: LearningCourse) { return fmt(t.value.learning.courseMeta, { duration: courseDurationText(course.duration, t.value.learning.durationMinutes), nex: course.rewardNex }); }
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
 let accountEpoch = 0;
 let generation = 0;

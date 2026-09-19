@@ -223,14 +223,3 @@ export const EVENTS: NexEvent[] = [
     ctaLabel: "View results",
   },
 ];
-
-export const EVENT_KIND_LABEL: Record<EventKind, string> = {
-  discount: "Flash Sale",
-  referral: "Refer & Earn",
-  wheel: "Lucky Wheel",
-  regional: "Regional PK",
-  boost: "Bonus Boost",
-  seasonal: "Seasonal",
-  holding: "Holders Reward",
-  onboarding: "New Pilot",
-};

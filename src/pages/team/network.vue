@@ -21,19 +21,22 @@
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
           <view role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text></view>
         </view>
-        <!-- Top metrics — filled stat tiles, no border (single visual difference) -->
+        <!-- Top metrics — filled stat tiles, no border (single visual difference).
+             A background re-read keeps the last confirmed snapshot, so the tiles
+             only show the unavailable placeholder when nothing was ever read
+             (BUG 63: flipping every figure to "—" mid-refresh blanked the page). -->
         <view class="grid grid-cols-3" style="gap: 8px">
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.members }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : members.length }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ metricsUnavailable ? '—' : members.length }}</text>
           </view>
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.activeNow }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : activeCount }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ metricsUnavailable ? '—' : activeCount }}</text>
           </view>
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.direct }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : directCount }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ metricsUnavailable ? '—' : directCount }}</text>
           </view>
         </view>
 
@@ -204,6 +207,9 @@ const isZh = computed(() => useLocaleStore().code === "zh");
 
 const members = computed(() => network.members);
 const myRank = computed(() => vRank.myRank);
+// Unavailable only when this account has never produced a projection. A
+// background re-read keeps the confirmed snapshot on screen (BUG 63).
+const metricsUnavailable = computed(() => remoteApiEnabled && !network.hasRemoteSnapshot);
 const myRankText = computed(() => remoteApiEnabled && !vRank.remoteReady ? "—" : `V${myRank.value}`);
 const selected = ref<NetworkMember | null>(null);
 const pulseId = ref<string | null>(null);

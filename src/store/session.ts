@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { getDeviceIdentity, _devResetDeviceIdentity } from "@/lib/device-id";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { remoteApiEnabled } from "@/api/runtime";
 import { mockServerUuid } from "./mock-id";
@@ -180,8 +181,8 @@ export const useSession = defineStore("session", () => {
     void sessionRevision.value;
     return readAccountSessionRecords(accountKey.value).map((s) => ({
       id: s.sessionId,
-      deviceName: s.deviceName,
-      device: s.deviceName,
+      deviceName: nexGridBrandText(s.deviceName),
+      device: nexGridBrandText(s.deviceName),
       location: "",
       ip: "",
       lastActiveMs: s.lastSeenAt,

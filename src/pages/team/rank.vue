@@ -11,7 +11,7 @@
 <template>
   <AppChassis active="team">
     <view class="pb-6" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/team" :title="vState.prizeName || t.rank.pageTitle" />
+      <SubPageHeader back="/pages/team/team" :title="rankTitleText" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- My status — de-carded: sits directly on the page floor (card shell +
@@ -108,6 +108,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { isEntitlementVRankReward, rankEntitlementLabel } from "@/lib/rank-entitlement-label";
 import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -129,6 +130,9 @@ const { elRef: rankBarRef, inView: rankBarInView } = useScrollGrowProgress();
 
 const myRank = computed(() => vState.myRank);
 const rankDefs = computed(() => vState.ladder);
+// 标题优先用服务端 prizeName(运营可配);存量配置值仍是改名前的旧品牌,
+// 渲染层归一后再上屏,取不到才回退到三语 pageTitle(BUG 31)。
+const rankTitleText = computed(() => nexGridBrandText(vState.prizeName) || t.value.rank.pageTitle);
 const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
   v: vState.myRank, title: "", cnTitle: "", conditions: {}, directBonus: 0,

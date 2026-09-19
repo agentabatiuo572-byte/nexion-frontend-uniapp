@@ -180,7 +180,6 @@ import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { onlineDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
-import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
@@ -199,7 +198,6 @@ useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
 //   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
 //   rationale 见 docs/changes/2026-07-24-intro-stats-cumulative.md。
 const cfg = useConfig();
-const app = useApp();
 const fleetOk = () => {
   const ps = cfg.config.publicStats;
   return !!ps && publicStatsHealth(ps).fleetOk && publicStatsHealth(ps).rateOk;
@@ -257,18 +255,10 @@ onMounted(() => {
     // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
     // steps, so a reload can never show a smaller total than a longer session.
     paid.value = paidNow();
-    if (remoteApiEnabled) {
-      devices.value = fleetNow();
-      return;
-    }
-    const drift = Math.random();
-    // ±24 band, same rationale as the store tick (bounded symmetric wobble),
-    // 带心随配置派生的舰队数走(审计 P1 的「其它页面舰队数字」半场)。
-    const base = remoteApiEnabled ? app.homeTruth?.onboarding.activeDevices ?? null : fleetNow();
-    if (base === null) { devices.value = null; return; }
-    const current = devices.value ?? base;
-    if (drift > 0.75) devices.value = Math.min(base + 24, current + 1);
-    else if (drift < 0.25) devices.value = Math.max(base - 24, current - 1);
+    // BUG #59: the published fleet figure is an operator-owned aggregate, not a
+    // live measurement. It must not drift while the page is open — a wobbling
+    // number reads as a real-time feed. Display the configured value verbatim.
+    devices.value = fleetNow();
   }, 1800);
 });
 onUnmounted(() => {

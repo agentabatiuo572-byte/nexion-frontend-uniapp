@@ -82,7 +82,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // an unavailable server percentile occupies the same label/value slot as a neutral unknown,
   // without inventing a rank or changing the surrounding 5174 layout.
-  "proof.vue": "7de4caeb6ac8cfa9bfd48a0f216af7ac712f9966e0c727dbf259d26f362f29e9",
+  // #83: an absent streak fact reads as unavailable instead of rendering the unit alone.
+  "proof.vue": "a481a0ec1d957551aeb37c89d2d8e4c3af1d4098b1436c85b924bce8611b220c",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // Compute and VietQR receipts render in separately selected, independently
@@ -95,9 +96,12 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   // Published-document metadata/language fallback, plus reset of reading proof
   // whenever server jurisdiction/version/token identity changes.
-  "risk-disclosure.vue": "2bcf159899f17dedb684b06eda7ccd3363b3aa1b9131df1bbc60b50615b53edc",
+  // #60: an unprovisioned region mapping states the configuration fact and
+  // offers no retry CTA, since retrying cannot change the outcome.
+  "risk-disclosure.vue": "76b88fb99bd91ddd08241d5a8116cc8e68947de61de0dbac2347aec40628ffea",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.
-  "security.vue": "8eb2584d7f83472ec1eac4dd1d4de4f49ea226cabf5ccb9a185131af34ddd7f7",
+  // #80: password/2FA inputs carry an accessible name, not a placeholder alone.
+  "security.vue": "4879296a2fd5b596294b72a779d46e0b5e25902a51472e4d9d16acefa152ef23",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.

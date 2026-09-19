@@ -4,6 +4,7 @@ import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remot
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 export type NotifKind = "commission" | "team" | "staking" | "market" | "genesis" | "system";
 export type NotifPriority = "critical" | "high" | "normal" | "low";
@@ -23,7 +24,9 @@ export interface PushInput { id?: string; kind: NotifKind; priority?: NotifPrior
 const KEY = "nexgrid-notifications-accounts-v1";
 const knownKind = (value: string): NotifKind => ["commission", "team", "staking", "market", "genesis", "system"].includes(value) ? value as NotifKind : "system";
 function hydrate(accountKey: string): Notification[] {
-  return readAccountRow<{ items?: Notification[] }>(KEY, accountKey)?.items ?? [];
+  const rows = readAccountRow<{ items?: Notification[] }>(KEY, accountKey)?.items ?? [];
+  // 存量行可能是改名(2026-07-22)之前落盘的旧品牌标题,读侧一并归一。
+  return rows.map((row) => ({ ...row, title: nexGridBrandText(row.title), body: row.body ? nexGridBrandText(row.body) : row.body }));
 }
 let counter = 0;
 
@@ -51,8 +54,8 @@ export const useNotifications = defineStore("notifications", () => {
     const next = page.items.filter((item) => !seenIds.has(String(item.id))).map((item) => {
       seenIds.add(String(item.id));
       return {
-        id: String(item.id), kind: knownKind(item.kind), priority: item.priority, title: item.title,
-        body: item.body || undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
+        id: String(item.id), kind: knownKind(item.kind), priority: item.priority, title: nexGridBrandText(item.title),
+        body: item.body ? nexGridBrandText(item.body) : undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
         ts: item.createdAt, readAt: item.readAt,
       };
     });

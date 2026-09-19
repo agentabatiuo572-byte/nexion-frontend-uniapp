@@ -5,6 +5,7 @@ import source from "./achievements.vue?raw";
 import { readAchievementsForCurrentSession } from "./achievements-remote-read";
 import { zh } from "@/i18n/messages/zh";
 import { ApiError } from "@/api/errors";
+import { fmt } from "@/i18n/format";
 
 function deferred<T = unknown>() {
   let resolve!: (value: T) => void;
@@ -35,7 +36,8 @@ function mount() {
   const modules: Record<string, unknown> = {
     vue: { ...vue, onUnmounted: (fn: () => void) => hooks.unmount.push(fn) },
     "@dcloudio/uni-app": { onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
-    "@/pages/daily/daily-reward-view": { dailyMilestoneRewardText: () => "" },
+    "@/pages/daily/daily-reward-view": { dailyMilestoneRewardText: () => "", dailyRewardLabels: () => ({}) },
+    "@/i18n/format": { fmt },
     "@/i18n/use-t": { useT: () => vue.ref(zh) }, "@/store/ui": { toast }, "@/store/app": { useApp: () => app },
     "@/store/achievements": { useAchievements: () => ({ records: [] }) },
     "@/lib/money-receipt": { postMoneyBillsOnce: () => { throw Error("Real money action forbidden"); } },

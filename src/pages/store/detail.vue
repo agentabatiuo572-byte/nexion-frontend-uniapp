@@ -79,6 +79,11 @@
             <text v-if="eligibilityQualificationConditions(policy).length > 1" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityPolicyMode(policy) }}</text>
             <text v-for="condition in eligibilityQualificationConditions(policy)" :key="condition.kind" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(condition) }}</text>
             <text v-if="eligibilityMonthlyStockCondition(policy)" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(eligibilityMonthlyStockCondition(policy)!) }}</text>
+            <!-- BUG 29: a policy the server returned without any condition
+                 detail must never render as a bare title — state the missing
+                 facts and the server's final result explicitly. -->
+            <text v-if="!eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
+            <text class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
           </view>
         </view>
         <!-- === Section 1: Hero === -->
@@ -282,6 +287,7 @@ import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { estimatePaybackDays } from "@/lib/product-payback";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
+import { useEarnConfig } from "@/store/earn-config";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -461,8 +467,15 @@ const openFaq = ref(0);
 // 「你的手机」是平台手机档位配置里的典型档(Tier 3),对所有商品都是同一个数 —— 它从来
 // 不是商品属性(后端也没有这一列)。0 = 运营配置取不到,此时降级、不许拿旧值或猜测顶上,
 // 否则页面会用一个编出来的基准去宣称倍数。
+// 🔴 必须读与商城主列表**同一个响应式源**(earnConfig.phoneTiers)。原先这里读的是
+//    mock/phone-tiers 的可变兼容表,它没有任何响应式依赖:computed 只在首次求值时
+//    读一次 —— 那一刻 server 模式的表刚被 applyCanonicalPhoneTierYields([]) 清空,
+//    于是详情页永久停在「暂无数据」,而列表因为依赖 earnConfig.phoneTiers 的 ref
+//    已经拿到 $0.06/天(BUG 28)。
+const earnConfig = useEarnConfig();
 const phoneDailyEarnValue = computed(() =>
-  getPhoneTierYields().find((row) => row.tier === 3)?.baseRateUsdt ?? 0,
+  (remoteApiEnabled ? earnConfig.phoneTiers.value?.tiers : getPhoneTierYields())
+    ?.find((row) => row.tier === 3)?.baseRateUsdt ?? 0,
 );
 const speedup = computed(() =>
   product.value && !isShare.value
@@ -607,6 +620,12 @@ function eligibilityQualificationConditions(policy: PurchaseEligibilityPolicy): 
 }
 function eligibilityMonthlyStockCondition(policy: PurchaseEligibilityPolicy): PurchaseEligibilityCondition | undefined {
   return policy.conditions.find((condition) => condition.kind === "monthlyQuota");
+}
+function eligibilityPolicyHasFacts(policy: PurchaseEligibilityPolicy): boolean {
+  return policy.conditions.length > 0;
+}
+function eligibilityPolicyResultStyle(policy: PurchaseEligibilityPolicy): CSSProperties {
+  return { color: policy.eligible ? "var(--v5-success)" : "var(--v5-warning)" };
 }
 function eligibilityNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");

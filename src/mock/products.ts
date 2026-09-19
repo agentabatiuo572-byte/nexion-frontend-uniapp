@@ -3,6 +3,7 @@
 // + 2 pure helpers; copied faithfully so the store page renders the same 6 tiers).
 
 import type { PhaseId } from "@/store/product-phase";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 // AI workload throughput per device — replaces "MH/s" hash rate in the
 // hero spec card, drives the v3.1 "you can power LLM 70B inference" narrative.
@@ -303,7 +304,9 @@ export function clearProductCatalog(): void {
 
 /** Replace the legacy read surface with the already validated server catalog. */
 export function replaceProductCatalog(products: readonly Product[]): void {
-  PRODUCTS.splice(0, PRODUCTS.length, ...products.map((product) => ({ ...product })));
+  // 服务端目录的 SKU 显示名可能是改名前的存量值("NexionBox Pro v2");这里是**展示**目录,
+  // 归一后再进渲染面。协议侧不受影响:下单按 productNo(order-api 的 create 只发 productNo)。
+  PRODUCTS.splice(0, PRODUCTS.length, ...products.map((product) => ({ ...product, name: nexGridBrandText(product.name) })));
 }
 
 export function getProduct(id: string): Product | undefined {

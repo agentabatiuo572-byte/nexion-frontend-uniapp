@@ -39,11 +39,63 @@ export function dailyLuckyHint(rules: readonly DailyRule[], fallback: string): s
   return position >= 2 ? localized : fallback;
 }
 
+/**
+ * Server milestone rewards arrive as enum codes (`rewardType` = POINTS / SPIN /
+ * NEX / USDT / BADGE, `badgeCode` = STREAK_MASTER). Those codes are transport
+ * values, never user copy, so every branch resolves through the locale labels
+ * and an unknown code degrades to the generic unit instead of printing itself.
+ */
+export interface DailyRewardLabels {
+  points: string;
+  spin: string;
+  nex: string;
+  usdt: string;
+  unknown: string;
+  badge: string;
+  badges: Readonly<Record<string, string>>;
+}
+
+/** Builds the label table from the shared `daily.milestones` vocabulary. */
+export function dailyRewardLabels(m: {
+  badgeLabel: string;
+  rewardPoints: string;
+  rewardSpin: string;
+  rewardNex: string;
+  rewardUsdt: string;
+  rewardUnknown: string;
+  badgeStreakMaster: string;
+}): DailyRewardLabels {
+  return {
+    points: m.rewardPoints,
+    spin: m.rewardSpin,
+    nex: m.rewardNex,
+    usdt: m.rewardUsdt,
+    unknown: m.rewardUnknown,
+    badge: m.badgeLabel,
+    badges: { STREAK_MASTER: m.badgeStreakMaster },
+  };
+}
+
+/** Readable badge name for a shipped achievement code, `null` when unmapped. */
+export function dailyBadgeName(badgeCode: string | null | undefined, labels: DailyRewardLabels): string | null {
+  const code = badgeCode?.trim().toUpperCase();
+  return code ? labels.badges[code] ?? null : null;
+}
+
 export function dailyMilestoneRewardText(reward: {
   rewardType: string;
   rewardAmount: number;
   badgeCode: string | null;
-}, badgeLabel = "Badge"): string {
-  if (reward.rewardType.trim().toUpperCase() !== "BADGE") return `${reward.rewardType} ${reward.rewardAmount}`;
-  return reward.badgeCode?.trim() ? `${badgeLabel} · ${reward.badgeCode.trim()}` : badgeLabel;
+}, labels: DailyRewardLabels): string {
+  const type = reward.rewardType.trim().toUpperCase();
+  if (type === "BADGE") {
+    const name = dailyBadgeName(reward.badgeCode, labels);
+    return name ? `${labels.badge} · ${name}` : labels.badge;
+  }
+  const unit = type === "POINTS" ? labels.points
+    : type === "SPIN" ? labels.spin
+    : type === "NEX" ? labels.nex
+    : type === "USDT" ? labels.usdt
+    : labels.unknown;
+  return `${unit} ${reward.rewardAmount}`;
 }

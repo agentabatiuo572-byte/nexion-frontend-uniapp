@@ -27,8 +27,11 @@ test("remote storefront mirrors H1 product phase instead of deriving it from acc
 
 test("remote phase failure stays fail-closed and never falls back to a fresh account P1 claim", () => {
   assert.match(phaseStore, /status:\s*remoteApiEnabled \? "loading" : "ready"/);
-  assert.match(composable, /serverProductPhaseState\.status === "ready"/);
+  // In remote mode the only two paths are the last confirmed phase or the
+  // closed-side placeholder: a failed read must not re-derive from account age.
+  assert.match(composable, /if \(serverProductPhaseState\.phase\) return getPhaseParams\(serverProductPhaseState\.phase\)/);
   assert.match(composable, /return PHASES\[0\]/);
+  assert.doesNotMatch(composable, /if \(remoteApiEnabled\) return resolveActivePhase/);
 });
 
 test("account switching invalidates catalog snapshots and ignores stale responses", () => {

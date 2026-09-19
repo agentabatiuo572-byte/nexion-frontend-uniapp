@@ -2,7 +2,7 @@
   <view v-if="featuredCourse" role="link" tabindex="0" style="padding:16px;border-radius:16px;background:var(--v5-surface)" @click="open" @keydown.enter.prevent="open">
     <text class="block" style="font-size:12px;color:var(--v5-brand)">{{ t.learning.featuredLabel }}</text>
     <text class="block" style="margin-top:6px;font-size:15px;font-weight:600">{{ featuredCourse.title }}</text>
-    <text class="block" style="margin-top:4px;color:var(--v5-ink-3)">{{ featuredCourse.duration }} · {{ featuredCourse.rewardNex }} NEX</text>
+    <text class="block" style="margin-top:4px;color:var(--v5-ink-3)">{{ courseDurationText(featuredCourse.duration, t.learning.durationMinutes) }} · {{ featuredCourse.rewardNex }} NEX</text> <!-- i18n-raw-ok: courseDurationText 内部已用 {n} 完成替换 -->
   </view>
 </template>
 <script setup lang="ts">
@@ -16,6 +16,7 @@ import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
+import { courseDurationText } from "@/lib/course-duration";
 const t = useT();
 const app = useApp();
 const locale = useLocaleStore();

@@ -52,6 +52,8 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     invalidateDetailFacts: () => {}, stickyPageVisible: { value: true }, sticky: { hide: () => {} }, stickyOwner: "fixture",
     releaseActiveRefresh: () => {},
     listingPageScope: { visible: false, epoch: 0 },
+    // store.vue clears the goal-recommendation arrival context on hide/unmount.
+    focusProductId: { value: "" }, focusProductName: { value: "" },
   };
   const js = ts.transpileModule(`
     const { ${Object.keys(deps).join(",")} } = deps;

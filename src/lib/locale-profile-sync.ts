@@ -14,8 +14,14 @@ interface LocaleProfileSyncJob {
   scope: LocaleProfileScope;
 }
 
+/**
+ * The account id fences the subject; the vault revision is only a bearer
+ * epoch. A token refresh during the write advances that epoch without changing
+ * who the language belongs to, so requiring revision equality orphaned a write
+ * that actually landed and left the picker on "syncing" forever.
+ */
 function sameScope(left: LocaleProfileScope | null, right: LocaleProfileScope): boolean {
-  return left !== null && left.accountId === right.accountId && left.revision === right.revision;
+  return left !== null && left.accountId === right.accountId;
 }
 
 /**

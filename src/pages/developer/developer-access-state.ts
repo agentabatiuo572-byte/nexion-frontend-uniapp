@@ -7,6 +7,28 @@ export function isDeveloperApprovalRequired(error: unknown): boolean {
     && error.message === "DEVELOPER_ACCESS_APPROVAL_REQUIRED";
 }
 
+/**
+ * The server's published-docs endpoint answers 503 while no documentation is
+ * published. That is a product state (the portal is not released yet), not a
+ * network/service failure, and must not be rendered as a load error with a
+ * retry the user can never satisfy.
+ */
+export function isDeveloperDocsNotReleased(error: unknown): boolean {
+  return error instanceof ApiError && error.message === "DEVELOPER_DOCS_UNAVAILABLE";
+}
+
+/**
+ * Developer resources answer 503 while the capability itself is not deployable
+ * (no published docs, no acceptance run, unsupported profile). Those are
+ * product states, not transport failures: they must render a stable
+ * "not released yet" explanation instead of a retryable load error, and must
+ * never appear alongside the not-released copy as a conflicting second state.
+ */
+export function isDeveloperCapabilityUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.kind === "http" && error.status === 503
+    && /^DEVELOPER_/.test(error.message);
+}
+
 type DeveloperAccessStatusCopyKey =
   | "requestStatusPending"
   | "requestStatusApproved"

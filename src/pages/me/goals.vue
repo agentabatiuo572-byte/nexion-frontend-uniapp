@@ -287,8 +287,17 @@ async function remove(id: string) {
   }
 }
 
+// Carry the server's recommended SKU into the store so the landing page can
+// locate/highlight it instead of silently featuring the generic first product
+// (BUG 71). The name travels along so a recommendation that is no longer
+// purchasable can still be named in the change explanation.
 function goStore() {
-  navReset({ url: "/pages/store/store", fail: () => {} });
+  const productNo = goalsStore.recommendation?.productNo;
+  const name = recommendation.value.tier;
+  const query = productNo
+    ? `?focus=${encodeURIComponent(productNo)}${name ? `&focusName=${encodeURIComponent(name)}` : ""}`
+    : "";
+  navReset({ url: `/pages/store/store${query}`, fail: () => {} });
 }
 
 // ── styles ──

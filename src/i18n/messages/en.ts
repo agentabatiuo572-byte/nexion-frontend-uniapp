@@ -1254,6 +1254,7 @@ export const en = {
     reloadRegionCta: "Reload the disclosures for your region",
     publicationUnavailable: "Risk disclosure content for your region is temporarily unavailable. Please come back later. You cannot confirm until the content loads.",
     loadErrorRegion: "Risk disclosures for your region are unavailable; check your connection and retry. Nothing is confirmed until they load.",
+    jurisdictionUnmapped: "No risk-disclosure mapping is configured for your account region, so retrying cannot change the result. Contact support to verify the region mapping.",
     gateUnavailable: "We couldn't verify the disclosure gate. Nothing was submitted; please retry.",
   },
 
@@ -1485,6 +1486,16 @@ export const en = {
     pageTitle: "Events",
     subtitle: "Promotions · contests · seasonal drops",
     heroLabel: "FEATURED",
+    kind: {
+      discount: "Flash Sale",
+      referral: "Refer & Earn",
+      wheel: "Lucky Wheel",
+      regional: "Regional PK",
+      boost: "Bonus Boost",
+      seasonal: "Seasonal",
+      holding: "Holders Reward",
+      onboarding: "New Pilot",
+    },
     tabs: {
       all: "All",
       ongoing: "Ongoing",
@@ -1619,6 +1630,7 @@ export const en = {
     heroTagline: "Try free for {days} days, cancel anytime.",
     heroEarnLabel: "EST. {days}-DAY TRIAL CREDIT",
     heroTrialsLeft: "{n} trials left today",
+    heroCreditCapNote: "capped at ${cap}",
     heroClaimCta: "Claim trial",
     heroProductUnavailable: "Trial device temporarily out of stock",
     // /me TrialEntry — ticket form (lemon-themed, design IUVoAAI port)
@@ -1924,6 +1936,11 @@ export const en = {
     legacyBadge: "Classic",
     secRecommended: "Recommended for you",
     secRecommendedTag: "popular",
+    goalFocusTitle: "From your earning goal",
+    goalFocusLocated: "Your earning goal recommended {name}. It is highlighted below.",
+    goalFocusUnavailable: "Your earning goal recommended {name}, but it is not purchasable right now. The devices below are what you can buy today.",
+    goalFocusReplaced: "Your earning goal recommended {name}, which is no longer in the store catalogue. The devices below are what you can buy today.",
+    goalFocusCatalogPending: "Loading the devices your earning goal recommended…",
     secMoreTiers: "More tiers",
     catalogLoadingTitle: "Syncing the device catalog",
     catalogLoadingBody: "Products, quotes, and eligible trade-ins come only from the server.",
@@ -2282,6 +2299,9 @@ export const en = {
     purchaseEligibilityConditionMet: "Met",
     purchaseEligibilityConditionGap: "{gap} more needed",
     purchaseEligibilityQuotaDepleted: "Monthly available inventory is sold out",
+    purchaseEligibilityNoFacts: "The server returned no condition details for this requirement.",
+    purchaseEligibilityPolicyMet: "Result: met",
+    purchaseEligibilityPolicyUnmet: "Result: not met",
     trialProductUnavailable: "The trial device is temporarily out of stock. Please try again later.",
     productUnavailable: "This product is temporarily unavailable. Return to the store and try again.",
     cardLegacyBadge: "Classic",
@@ -3100,6 +3120,9 @@ export const en = {
     currentPassword: "Current password",
     newPassword: "New password",
     confirmPassword: "Confirm new password",
+    twoFactorCurrentPassword: "2FA current password",
+    deletionPassword: "Account deletion current password",
+    twoFactorSwitchLabel: "Enable two-factor authentication",
     passwordSaved: "Password updated",
     passwordRecovered: "Your previous password change was confirmed. No new change was made; use the password set previously.",
     passwordMismatch: "New passwords don't match",
@@ -3668,6 +3691,11 @@ export const en = {
     catSocial: "Social",
     catLoyalty: "Loyalty",
     catHardware: "Hardware",
+    // `nx_achievement.category` is free-form; only the shipped vocabulary is
+    // named, anything else degrades to a neutral label instead of the raw code.
+    catStreak: "Streak",
+    catOther: "Other",
+    pointsReward: "+{n} Points",
     a_first_contribution: "First Contribution",
     a_first_contribution_d: "Activate your phone compute (Step 3 toggle)",
     a_first_dollar: "First Dollar",
@@ -3841,6 +3869,7 @@ export const en = {
     topPctUnavailable: "Network ranking",
     longestStreak: "Longest streak",
     daysShort: "d",
+    valueUnavailable: "Unavailable",
     nexEarned: "NEX earned",
     teamReach: "Team reach",
     shareNative: "Quick share",
@@ -3977,6 +4006,7 @@ export const en = {
       label: "PRIZE POOL",
       payoutTo: "Pays to top {n}",
       resetsIn: "Resets in",
+      resetsUnavailable: "Not configured",
     },
     myRank: {
       label: "Your rank",
@@ -5306,6 +5336,16 @@ export const en = {
       dayLabel: "Day {n}",
       claimedDay: "Day {n} milestone claimed",
       badgeLabel: "Badge",
+      // Reward-kind units. Unknown server enum values must never reach the page
+      // as raw codes, so the presentation layer falls back to `rewardUnknown`.
+      rewardPoints: "Points",
+      rewardSpin: "Spin tickets",
+      rewardNex: "NEX",
+      rewardUsdt: "USDT",
+      rewardUnknown: "Reward",
+      // `nx_streak_milestone.badge_achievement_code` ships this one code; any
+      // other code degrades to the generic badgeLabel instead of the raw code.
+      badgeStreakMaster: "Streak Master",
       day3: "Day 3",
       day7: "Day 7",
       day14: "Day 14",
@@ -6205,6 +6245,9 @@ export const en = {
     centerLoading: "Loading the learning center…",
     centerProgress: "{done}/{total} completed · {nex} NEX earned",
     courseMeta: "{duration} · {nex} NEX reward",
+    // The server sends `duration` as "<n> min"; the page renders it through
+    // `courseDurationText` so the unit follows the interface language.
+    durationMinutes: "{n} min",
     centerOffline: "The learning center needs a trusted network connection; please connect and retry.",
     centerGeoUnresolved: "We can't confirm which rules apply in your region right now; course content will not fall back to a stale cache — check your connection and retry.",
     centerUnavailable: "The learning center is unavailable right now; please retry shortly.",

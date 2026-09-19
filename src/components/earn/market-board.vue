@@ -79,6 +79,7 @@ import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 interface WorkloadPrice {
   code: TaskCategory;
@@ -127,7 +128,7 @@ const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).map((row) => ({ rank: row.rank, name: row.name ?? undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function formatPrice(n: number): string {

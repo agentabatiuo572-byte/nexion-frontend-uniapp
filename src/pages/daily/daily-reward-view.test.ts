@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { dailyBaseReward, dailyLuckyHint, dailyMilestoneRewardText, dailyUpcomingMilestone } from "./daily-reward-view";
+import { dailyBadgeName, dailyBaseReward, dailyLuckyHint, dailyMilestoneRewardText, dailyRewardLabels, dailyUpcomingMilestone } from "./daily-reward-view";
+
+const labels = dailyRewardLabels({
+  badgeLabel: "Badge",
+  rewardPoints: "Points",
+  rewardSpin: "Spin tickets",
+  rewardNex: "NEX",
+  rewardUsdt: "USDT",
+  rewardUnknown: "Reward",
+  badgeStreakMaster: "Streak Master",
+});
 
 describe("daily reward presentation", () => {
   it("reads the configured base rather than assuming a final reward of two", () => {
@@ -35,7 +45,25 @@ describe("daily reward presentation", () => {
   });
 
   it("presents a badge identity instead of a zero quantity", () => {
-    expect(dailyMilestoneRewardText({ rewardType: "BADGE", rewardAmount: 0, badgeCode: "STREAK_100" }))
-      .toBe("Badge · STREAK_100");
+    expect(dailyMilestoneRewardText({ rewardType: "BADGE", rewardAmount: 0, badgeCode: "STREAK_MASTER" }, labels))
+      .toBe("Badge · Streak Master");
+  });
+
+  it("localizes reward-kind enums instead of printing the server code", () => {
+    expect(dailyMilestoneRewardText({ rewardType: "POINTS", rewardAmount: 50, badgeCode: null }, labels)).toBe("Points 50");
+    expect(dailyMilestoneRewardText({ rewardType: "SPIN", rewardAmount: 1, badgeCode: null }, labels)).toBe("Spin tickets 1");
+    expect(dailyMilestoneRewardText({ rewardType: "USDT", rewardAmount: 1, badgeCode: null }, labels)).toBe("USDT 1");
+  });
+
+  it("degrades an unrecognised reward kind to a generic unit rather than the raw code", () => {
+    const text = dailyMilestoneRewardText({ rewardType: "MYSTERY", rewardAmount: 3, badgeCode: null }, labels);
+    expect(text).toBe("Reward 3");
+    expect(text).not.toContain("MYSTERY");
+  });
+
+  it("degrades an unmapped badge code to the generic badge label", () => {
+    expect(dailyMilestoneRewardText({ rewardType: "BADGE", rewardAmount: 0, badgeCode: "STREAK_100" }, labels)).toBe("Badge");
+    expect(dailyBadgeName("STREAK_MASTER", labels)).toBe("Streak Master");
+    expect(dailyBadgeName(null, labels)).toBeNull();
   });
 });

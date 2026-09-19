@@ -30,7 +30,7 @@
         </view>
         <view v-else-if="loadError" :style="hintStyle">
           <text :style="hintTextStyle">{{ loadError }}</text>
-          <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ w.reloadRegionCta }}</text>
+          <text v-if="canRetryLoad" class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ w.reloadRegionCta }}</text>
         </view>
       </view>
 
@@ -141,7 +141,13 @@ const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
 const disclosure = computed(() => risk.current);
-const loadError = computed(() => risk.error ? (risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion) : "");
+// BUG #60: an unprovisioned/ambiguous region mapping is a configuration fact, not a
+// transient failure. Telling the user to retry (and offering the retry CTA) hides the
+// real, diagnosable cause behind a network-style message.
+const loadError = computed(() => !risk.error ? "" : risk.jurisdictionUnmapped
+  ? w.value.jurisdictionUnmapped
+  : risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion);
+const canRetryLoad = computed(() => !risk.jurisdictionUnmapped);
 const displayLanguage = computed(() => disclosure.value
   ? resolveRiskDisclosureDisplayLanguage(locale.code, disclosure.value.languageScope)
   : null);

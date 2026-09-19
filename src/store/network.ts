@@ -154,7 +154,9 @@ export const useNetwork = defineStore("network", () => {
 
   const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
     if (!remoteApiEnabled) return;
-    clearRemoteNetwork();
+    // The commerce runtime moved (catalogue/order revision). Re-read the
+    // projection, but keep the last confirmed snapshot mounted: clearing it
+    // blanked the whole influence-network page mid-refresh (BUG 63).
     void refreshCanonicalNetwork();
   });
   onScopeDispose(unsubscribeCommerceRun);

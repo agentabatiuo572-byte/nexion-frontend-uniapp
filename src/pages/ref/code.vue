@@ -104,6 +104,10 @@
           <Stat :label="t.ref.countries" :value="countryCountText" />
           <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
         </view>
+        <!-- BUG #59: these two figures are operator-published platform aggregates, not a
+             measured month-to-date feed. Without the scope label the card reads as a live
+             fact and the numbers carry no timestamp, basis, or source. -->
+        <text class="block" :style="proofScopeStyle">{{ t.home.networkPublishedScope }}</text>
       </view>
 
       <!-- Partner wall -->
@@ -170,6 +174,7 @@ const remotePreview = ref<PublicSponsorPreview | null>(null);
 const remotePreviewState = ref<ReferralPreviewState>("idle");
 const countryCount = ref<number | null>(null);
 const countryCountText = computed(() => remoteApiEnabled && countryCount.value !== null ? String(countryCount.value) : "—");
+const proofScopeStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-4)" };
 const paidOutText = computed(() => {
   const ps = cfg.config.publicStats;
   return !cfg.syncFailed && publicStatsHealth(ps).fleetOk

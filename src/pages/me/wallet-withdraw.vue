@@ -416,7 +416,9 @@ import {
 import { postReceiptForAccount } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
-import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
+import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { useAuth } from "@/store/auth";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
@@ -449,6 +451,7 @@ const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
 const payout = usePayoutAddress();
 const risk = useRiskDisclosure();
 const phase = useProductPhase();
@@ -611,7 +614,23 @@ const withdrawalFactsStatusText = computed(() => factsStatusText(withdrawalFacts
 const dailyFactsStatusText = computed(() => factsStatusText(dailyFactsState.value));
 const withdrawalActionStatusText = computed(() => withdrawalFactsFresh.value ? dailyFactsStatusText.value : withdrawalFactsStatusText.value);
 
+// Same cold-session fence the F3 pages use (binary / daily / unilevel): the
+// H5 vault binds only after its HttpOnly-cookie restore, and a protected read
+// issued before that returns AUTH_REQUIRED.
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
+
 async function retryWithdrawalFacts(): Promise<void> {
+  // A cold H5 load drops the access token and restores it through the refresh
+  // cookie; a protected read started before that restore returns AUTH_REQUIRED
+  // and left this page permanently on "钱包暂时无法刷新". Wait for the same
+  // account binding the other F3 pages wait for, then read.
+  if (remoteApiEnabled && !remoteSessionReady.value) return;
   const accountKey = app.accountKey;
   await Promise.allSettled([
     app.refreshRemoteFleet(),
@@ -641,6 +660,14 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   invalidateWithdrawalFacts();
   void retryWithdrawalFacts();
 });
+
+// The cold-load read is deferred until restore binds this account; without
+// this trigger the page would sit on "loading" with no second read.
+watch(remoteSessionReady, (ready, wasReady) => {
+  if (!ready || wasReady) return;
+  if (remoteApiEnabled) void payout.refreshRemote();
+  void retryWithdrawalFacts();
+}, { flush: "post" });
 
 const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision(() => {
   invalidateWithdrawalFacts();
@@ -870,7 +897,7 @@ function stopFreezeTimer() {
   freezeTimer = undefined;
 }
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote();
+  if (remoteApiEnabled && remoteSessionReady.value) void payout.refreshRemote();
   void retryWithdrawalFacts();
 });
 // 🔴 回前台 / 返回本页时重取策略。上一轮我把这条补给了追踪页,**加错页了**:
