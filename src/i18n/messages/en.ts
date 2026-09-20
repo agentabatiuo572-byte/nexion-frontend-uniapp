@@ -556,6 +556,9 @@ export const en = {
     //   别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。旧长式与其实测值
     //   (93.6/115.2/122.41/158.4/144.0 各 ✗)已随本次换串退役,不再是现网形态。
     networkMembersSub: "+{n}% /mo",
+    networkVerifiedMembers: "Measured by server · {at}",
+    networkVerifiedDevices: "Measured by server · {at}",
+    networkVerifiedScope: "Server-measured aggregate · captured {at} · see endpoint definition for basis",
     networkDevicesSub: "running jobs",
     networkRankUp24h: "+{n} in 24h",
     networkRankUnranked: "No rank",
@@ -3549,6 +3552,7 @@ export const en = {
     tabAll: "All",
     tabIn: "Credit",
     tabOut: "Debit",
+    tabGroupLabel: "Entry type",
     typeEarn: "Earnings",
     typeRefer: "Referral",
     typeBonus: "Bonus",
@@ -3868,6 +3872,8 @@ export const en = {
     regionProjectionErrorTitle: "Regional network unavailable",
     regionProjectionErrorDesc: "The server projection could not be loaded. Check the connection and retry.",
     regionLatencyUnavailable: "Avg latency {n}",
+    latencyTelemetryMissing: "Avg latency not collected",
+    latencyTelemetryMissingHint: "The server reports no latency telemetry, so no value is shown; online status follows heartbeats.",
     metricUnavailable: "--",
     projectionUpdatedAt: "Server updated {at}",
     uptimeLine: "uptime {v}",
@@ -4540,6 +4546,7 @@ export const en = {
       pool: "Pool",
       votes: "votes",
       unlimitedExtended: "Unlimited extended",
+      peerNotDispatched: "Peer {n}% · not yet available",
     },
     cond: {
       selfBuy: "Self-buy ≥ ${n}",
@@ -5235,6 +5242,7 @@ export const en = {
     projectionErrorDesc: "The authoritative server projection could not be loaded. A failed request is never shown as zero members or zero volume.",
     retry: "Retry",
     diagramYou: "YOU",
+    selfNodeLabel: "You · V{n} · yourself, open my rank",
   },
 
   tree: {
@@ -5850,6 +5858,7 @@ export const en = {
     refreshing: "Refreshing…",
     refreshStatus: "Refresh status",
     goComplete: "Complete now",
+    targetClosed: "This task's business is paused and cannot be completed",
     bonusCta: "Claim Weekly Champion bonus · +{n} NEX",
     bonusClaimed: "Weekly Champion · {n} NEX + badge claimed",
 

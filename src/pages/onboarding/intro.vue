@@ -202,14 +202,29 @@ const fleetOk = () => {
   const ps = cfg.config.publicStats;
   return !!ps && publicStatsHealth(ps).fleetOk && publicStatsHealth(ps).rateOk;
 };
-const fleetNow = () => (fleetOk() && !cfg.syncFailed ? onlineDevicesOf(cfg.config.publicStats) : null);
+// 🔴 对外「台设备在线」是可核验事实,不是公布口径的估算(zentao #59)。
+//   有服务端实测聚合时读真实在线设备数;没有(沙箱/旧后端)时退回公布口径,
+//   但该口径本身在页面底部已标注为「公开规模估算 · 非实时接入统计」,不会被读成实测。
+const fleetNow = () => {
+  if (cfg.syncFailed) return null;
+  const v = cfg.config.verifiedStats;
+  if (v) return v.onlineDevices.value;
+  return fleetOk() ? onlineDevicesOf(cfg.config.publicStats) : null;
+};
 // 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
 //   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
 //   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
 // No public payout projection exists. Private purchase totals are not payouts;
 // omit this unsupported metric rather than expose an account-dependent amount.
-const paidNow = () => remoteApiEnabled ? null : paidCumulativeNow();
+// 🔴 远程模式下的「累计已发放」只能是可核验的提现完成额(zentao #59):
+//   此前这里是 `null`(直接隐藏),服务端也没有对应聚合。现在读 verified 聚合;
+//   沙箱/旧后端没有该聚合 → 继续不显示,绝不用配置值编造一个财务事实。
+const paidNow = () => {
+  if (!remoteApiEnabled) return paidCumulativeNow();
+  const v = cfg.config.verifiedStats;
+  return v ? Math.round(v.completedPayoutUsdt.value) : null;
+};
 const paid = ref(paidNow());
 // Intro is public and is often shown before a user session exists. H9 public
 // stats are the server authority here; the authenticated home projection must

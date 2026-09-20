@@ -1,12 +1,13 @@
 <!-- ConversionBanner — homepage weekly task card. -->
 <template>
   <view
-    class="weekly-quest block active:scale-[0.98] active:opacity-90 transition-transform"
+    class="weekly-quest block transition-transform"
+    :class="cardInactive ? 'opacity-60' : 'active:scale-[0.98] active:opacity-90'"
     :style="rootStyle"
-    role="button"
-    :tabindex="props.active ? 0 : -1"
+    :role="cardInactive ? undefined : 'button'"
+    :tabindex="props.active && !cardInactive ? 0 : -1"
     :aria-hidden="!props.active"
-    :aria-disabled="weeklyState === 'loading' || weeklyState === 'empty' ? 'true' : 'false'"
+    :aria-disabled="cardInactive ? 'true' : 'false'"
     :aria-label="weeklyRetryAriaLabel"
     :data-copy-source="managedCopy.status[MANAGED_POSITION] ?? 'fallback'"
     :data-copy-key="managedCopy.deliveries[MANAGED_POSITION]?.copyKey ?? 'builtin'"
@@ -84,6 +85,14 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { presentHomeWeeklyCard, selectHomeWeeklySource } from "@/lib/home-task-carousel";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
+import {
+  questTargetBusiness,
+  unclaimableBusinessQuests,
+  type QuestTargetAvailability,
+} from "@/lib/quest-business-availability";
+import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 
 const MANAGED_POSITION = "home.conversion-banner";
 
@@ -101,6 +110,8 @@ onMounted(() => {
   });
 });
 
+const { block: genesisBlock } = useGenesisSaleGate();
+const targetAvailability = useQuestTargetAvailability();
 const weeklySource = computed(() => selectHomeWeeklySource(
   [...wq.tier1Quests, ...wq.tier2Quests],
   wq.snapshot?.promoBanner ?? null,
@@ -111,6 +122,28 @@ const weeklyCard = computed(() => presentHomeWeeklyCard(
   wq.multiplier,
   now.value * 1000,
 ));
+/**
+ * 这张卡指向的业务现在整体不可用吗(BUG 127 / 155)。
+ *
+ * 🔴 与 weekly-quest-hero / weekly-quest-list 用**同一份读数**:任务卡继续给「去完成」,
+ *   就是把用户送进一个他立刻撞上的墙 —— 实测形态是质押全部「暂停售卖」、兑换页明说
+ *   「已暂停兑换」,首页卡片仍在倒计时并跳转。hero/list 早就有这道闸,首页这张卡漏了。
+ *   `genesisBlockIsKnownUnavailable` 排除 `configUnavailable`(那是「还不知道」),所以
+ *   冷启动窗口不会把 CTA 误停一层。
+ */
+const questTargetClosed = computed(() => {
+  const source = weeklySource.value;
+  if (source?.kind !== "quest") return false;
+  const q = source.quest;
+  if (questTargetBusiness(q) === null) return false;
+  const availability: QuestTargetAvailability = {
+    genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value),
+    stakingClosed: targetAvailability.value.stakingClosed,
+    exchangeClosed: targetAvailability.value.exchangeClosed,
+  };
+  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], availability).length > 0;
+});
+
 const weeklyState = computed<"loading" | "error" | "empty" | "ready">(() => {
   if (wq.error) return "error";
   if (wq.loading || !wq.snapshot) return "loading";
@@ -159,10 +192,17 @@ const ctaText = computed(() => {
   if (weeklyState.value === "loading") return t.value.weeklyQuest.loading;
   if (weeklyState.value === "error") return weeklyRetryLabel.value;
   if (weeklyState.value === "empty") return t.value.weeklyQuest.noTaskAction;
+  // 目标业务停摆时明说原因:静默不改文案会让用户以为点了没反应。
+  if (questTargetClosed.value) return t.value.weeklyQuest.targetClosed;
   return weeklySource.value?.kind === "quest"
     ? t.value.weeklyQuest.goComplete
     : t.value.home.weeklyQuestGetNexGridBox;
 });
+
+/** 卡片整体不可交互 = 非当前卡 / 加载中 / 无任务 / 目标业务停摆。 */
+const cardInactive = computed(() => !props.active
+  || weeklyState.value === "loading" || weeklyState.value === "empty"
+  || questTargetClosed.value);
 
 const rootStyle: CSSProperties = {
   position: "relative",
@@ -193,12 +233,15 @@ const productStyle: CSSProperties = {
 
 function onCardAction() {
   if (weeklyState.value === "loading" || weeklyState.value === "empty") return;
+  if (questTargetClosed.value) return;
   if (weeklyState.value === "error") {
     if (weeklyLoginRequired.value) navTo("/pages/login/login");
     else void wq.refresh();
     return;
   }
 
+  // 业务已停用时不跳转:否则用户点进一个明说「已暂停」的页面,任务卡等于骗点击。
+  if (questTargetClosed.value) return;
   if (weeklyCard.value.actionRoute) navTo(weeklyCard.value.actionRoute);
 }
 </script>

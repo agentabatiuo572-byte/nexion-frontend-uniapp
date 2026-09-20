@@ -1,6 +1,8 @@
 import type {
   GpuTier,
   OnlineBonus,
+  PlatformVerifiedAggregate,
+  PlatformVerifiedStats,
   PublicStatsConfig,
   RewardsConfig,
   ShareChannelDef,
@@ -20,6 +22,11 @@ export interface PlatformComputeConfigSnapshot {
   };
   publicStats: PublicStatsConfig;
   publicStatsAuthority: PlatformPublicStatsAuthority;
+  /**
+   * 服务端可核验聚合。对外「在线设备 / 账号数」这类事实必须读它,不得再由
+   * 运营配置值派生(zentao #59)。沙箱为 null。
+   */
+  verifiedStats: PlatformVerifiedStats | null;
   onlineBonus: OnlineBonus;
   computeShare: {
     downloadUrl: string;
@@ -43,6 +50,7 @@ export interface PlatformPublicStatsAuthority {
   runId: string;
   version: number;
 }
+
 
 export interface PlatformConfigApi {
   platformConfig(): Promise<PlatformComputeConfigSnapshot>;
@@ -280,6 +288,32 @@ function parseGpuTiers(value: unknown): GpuTier[] {
   });
 }
 
+/**
+ * 解析服务端可核验聚合。整段缺席(null)是**合法**状态(沙箱 / 旧后端),不是协议错误 ——
+ * 消费方据此走「不可用」占位,而不是退回配置值。
+ */
+function parseVerifiedStats(value: unknown): PlatformVerifiedStats | null {
+  if (value === null || value === undefined) return null;
+  const row = record(value);
+  const aggregate = (key: string, integral = true): PlatformVerifiedAggregate => {
+    const item = record(row[key]);
+    const v = finiteNumber(item.value);
+    if (v < 0 || (integral && !Number.isInteger(v))) return invalid("H9_VERIFIED_AGGREGATE_INVALID");
+    return { value: v, definition: nonEmptyString(item.definition), kind: nonEmptyString(item.kind) };
+  };
+  const capturedAt = nonEmptyString(row.capturedAt);
+  if (Number.isNaN(Date.parse(capturedAt))) return invalid("H9_VERIFIED_AGGREGATE_INVALID");
+  return {
+    activeAccounts: aggregate("activeAccounts"),
+    registeredAccounts: aggregate("registeredAccounts"),
+    installedDevices: aggregate("installedDevices"),
+    onlineDevices: aggregate("onlineDevices"),
+    // 金额聚合不是整数,单独放行小数(USDT 精度)。
+    completedPayoutUsdt: aggregate("completedPayoutUsdt", false),
+    capturedAt,
+  };
+}
+
 function parsePublicStats(value: unknown): PublicStatsConfig {
   const projection = record(value);
   const version = finiteNumber(projection.version);
@@ -403,6 +437,8 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
     featureFlags: experience.featureFlags,
     publicStats: publicStatsProjection.config,
     publicStatsAuthority: publicStatsProjection.authority,
+    verifiedStats: parseVerifiedStats(root.publicStats && typeof root.publicStats === "object"
+      ? (root.publicStats as Record<string, unknown>).verified : null),
     onlineBonus: { h5BaseFactor, continuityFullHours },
     computeShare: {
       downloadUrl,

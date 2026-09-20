@@ -501,6 +501,9 @@ export const zh: Messages = {
     networkYourRank: "你的排名",
     // FEAT-HOME02 脉搏三格副文本 + 排名三态(上榜 / 未上榜 / 配置拉不到)
     networkMembersSub: "每月 +{n}%",
+    networkVerifiedMembers: "服务端实测 · {at}",
+    networkVerifiedDevices: "服务端实测 · {at}",
+    networkVerifiedScope: "服务端实测聚合 · 统计于 {at} · 口径见接口定义",
     networkDevicesSub: "正在跑任务",
     networkRankUp24h: "24h +{n} 名",
     networkRankUnranked: "未上榜",
@@ -3445,6 +3448,7 @@ export const zh: Messages = {
     tabAll: "全部",
     tabIn: "收入",
     tabOut: "支出",
+    tabGroupLabel: "流水类型",
     typeEarn: "收益",
     typeRefer: "推荐分成",
     typeBonus: "奖励",
@@ -3755,6 +3759,8 @@ export const zh: Messages = {
     regionProjectionErrorTitle: "区域网络读取失败",
     regionProjectionErrorDesc: "未能取得服务器区域投影，请检查网络后重试。",
     regionLatencyUnavailable: "平均延迟 {n}",
+    latencyTelemetryMissing: "平均延迟 未采集",
+    latencyTelemetryMissingHint: "服务端未上报延迟遥测,因此不显示数值;在线状态以心跳为准。",
     metricUnavailable: "--",
     projectionUpdatedAt: "服务器更新于 {at}",
     uptimeLine: "在线率 {v}",
@@ -4408,6 +4414,7 @@ export const zh: Messages = {
       pool: "领导池",
       votes: "票",
       unlimitedExtended: "无限扩展",
+      peerNotDispatched: "平级 {n}% · 暂未开放",
     },
     cond: {
       selfBuy: "自买 ≥ ${n}",
@@ -5083,6 +5090,7 @@ export const zh: Messages = {
     projectionErrorDesc: "未能取得服务器权威团队数据；当前不会把失败显示成零成员或零金额。",
     retry: "重试",
     diagramYou: "你",
+    selfNodeLabel: "你 · V{n} · 本人,打开我的等级",
   },
 
   tree: {
@@ -5685,6 +5693,7 @@ export const zh: Messages = {
     refreshing: "正在刷新…",
     refreshStatus: "刷新进度",
     goComplete: "去完成",
+    targetClosed: "该任务对应业务已暂停,暂不可完成",
     bonusCta: "领取 Weekly Champion 奖 · +{n} NEX",
     bonusClaimed: "Weekly Champion · {n} NEX + 勋章已到账",
 

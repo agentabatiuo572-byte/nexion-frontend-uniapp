@@ -16,17 +16,21 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.bills.title" />
 
-      <!-- Tabs -->
-      <view class="flex" :style="segWrapStyle">
+      <!-- 类型是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器当成
+           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个类型。改 radiogroup/radio。 -->
+      <view class="flex" :style="segWrapStyle" role="radiogroup" :aria-label="t.bills.tabGroupLabel">
         <view
           v-for="tb in TABS"
           :key="tb"
-          role="button"
+          role="radio"
           tabindex="0"
-          :aria-pressed="tab === tb"
+          :aria-checked="tab === tb ? 'true' : 'false'"
+          :aria-label="tabLabel(tb)"
           class="flex-1 grid place-items-center active:opacity-70"
           :style="pillStyle(tb)"
           @click="tab = tb"
+          @keydown.enter.prevent="tab = tb"
+          @keydown.space.prevent="tab = tb"
         >
           <text :style="pillLabelStyle(tb)">{{ tabLabel(tb) }}</text>
         </view>

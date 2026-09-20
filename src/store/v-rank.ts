@@ -228,6 +228,10 @@ export const useVRank = defineStore("vRank", () => {
   const teamVolumeUSD = ref(init.teamVolumeUSD);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  // 服务端能力位:某类收益今天是否真的会派发(与佣金指南同源)。等级阶梯里的
+  // peerBonus 是「配置比例」,不是「已生效权益」—— 渲染时必须靠这个位区分(#79)。
+  // 本地(mock)模式没有服务端能力位,按「会派发」处理,与 V_RANKS 的展示一致。
+  const capabilities = ref<{ peer: boolean; genesis: boolean }>({ peer: true, genesis: true });
   const prizeName = ref(remoteApiEnabled ? "" : "NexGrid V-Rank");
   const remoteReady = ref(!remoteApiEnabled);
   const remoteError = ref<string | null>(null);
@@ -240,6 +244,7 @@ export const useVRank = defineStore("vRank", () => {
     teamVolumeUSD.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
+    capabilities.value = { peer: false, genesis: false };
     prizeName.value = "";
     remoteReady.value = false;
   }
@@ -294,6 +299,7 @@ export const useVRank = defineStore("vRank", () => {
     const apply = (remoteLadder: CanonicalVRankLadder, remoteCurrent: CanonicalVRankState) => {
       ladder.value = remoteLadder.ranks.map(canonicalRank);
       prizeName.value = remoteLadder.prizeName;
+      capabilities.value = remoteLadder.capabilities;
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
       selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
       directRefs.value = remoteCurrent.progress.directRefs;
@@ -347,6 +353,7 @@ export const useVRank = defineStore("vRank", () => {
 
   return {
     myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, prizeName,
+    capabilities,
     remoteReady, remoteError,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank,
   };
