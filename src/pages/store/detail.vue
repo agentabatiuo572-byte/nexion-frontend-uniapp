@@ -83,7 +83,12 @@
                  detail must never render as a bare title — state the missing
                  facts and the server's final result explicitly. -->
             <text v-if="!eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
-            <text class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
+            <!-- BUG 29(续):没有条件事实的策略**不得**报「已满足」。后端在额度行缺失或未启用时
+                 会下发 eligible=true + 空条件(F4B_NOT_CONFIGURED / F4B_QUOTA_UNAVAILABLE),
+                 原样渲染等于平台对购买资格作了一个自己无法兑现的承诺 —— 用户看到「结果:已满足」
+                 却看不到任何额度。没有事实支撑时只说明「未配置,不作为购买依据」。 -->
+            <text v-if="eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
+            <text v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityUnconfigured }}</text>
           </view>
         </view>
         <!-- === Section 1: Hero === -->

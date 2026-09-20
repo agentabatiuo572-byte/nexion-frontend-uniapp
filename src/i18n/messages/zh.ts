@@ -2249,6 +2249,9 @@ export const zh: Messages = {
     purchaseEligibilityQuotaDepleted: "本月可售名额已用尽",
     purchaseEligibilityNoFacts: "服务端未返回该条件的明细。",
     purchaseEligibilityPolicyMet: "结果：已满足",
+    // zentao #29:服务端只回了「未配置」这类占位策略(没有任何条件事实)时,不得宣称「已满足」——
+    // 没有事实支撑的「已满足」等于对购买资格作了一个平台无法兑现的承诺。
+    purchaseEligibilityUnconfigured: "结果：该资格未配置，暂不作为购买依据",
     purchaseEligibilityPolicyUnmet: "结果：未满足",
     trialProductUnavailable: "试用设备暂时无可售库存，请稍后再试。",
     productUnavailable: "该商品暂时不可购买，请返回商城重试。",
