@@ -5959,6 +5959,7 @@ export const en = {
     kindGenesis: "Genesis",
     kindSystem: "System",
     filterAll: "All",
+    filterGroupLabel: "Notification category filter",
     actionReinvest: "Reinvest",
     actionTeam: "Team",
     actionStake: "Stake",

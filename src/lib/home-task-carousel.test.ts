@@ -154,6 +154,26 @@ describe("home task carousel", () => {
     expect(conversionBannerSource).not.toContain('navTo("/pages/missions/missions")');
   });
 
+  /**
+   * Tier-1 hero 的停用态必须与首页周任务卡(conversion-banner)同形(zentao #127/#155)。
+   *
+   * 原缺陷形态:目标业务(质押/兑换/Genesis)已停售,列表行与首页卡都改成了「未开放」,
+   * hero 却仍渲染「去完成」+ 琥珀色主操作 pill + role=button/tabindex=0,还挂着倒计时 ——
+   * 点下去被 onClick 挡住什么也不发生。只守 onClick 是不够的:用户看到的就是一个
+   * 可点的进行中任务。
+   */
+  it("hero withdraws the active CTA when the target business is paused", () => {
+    expect(weeklyQuestHeroSource).toContain("const questTargetClosed = computed(");
+    // 文案、可访问角色与焦点都必须随停用态一起收掉,不能只拦点击。
+    expect(weeklyQuestHeroSource).toContain("questTargetClosed ? w.targetClosed : ctaText");
+    expect(weeklyQuestHeroSource).toContain(":role=\"questTargetClosed ? undefined : 'button'\"");
+    expect(weeklyQuestHeroSource).toContain(":tabindex=\"questTargetClosed ? -1 : 0\"");
+    expect(weeklyQuestHeroSource).toContain(":aria-disabled=\"questTargetClosed ? 'true' : 'false'\"");
+    expect(weeklyQuestHeroSource).toContain(":style=\"questTargetClosed ? closedCtaStyle : ctaStyle\"");
+    // 停用态不得再用「可点的主操作」配色。
+    expect(weeklyQuestHeroSource).toContain("const closedCtaStyle: CSSProperties = {");
+  });
+
   it("keeps mock-only weekly values out of the formal UniApp component", () => {
     expect(conversionBannerSource).not.toContain("remoteApiEnabled");
     expect(conversionBannerSource).not.toContain("derivePromoUpgrade");

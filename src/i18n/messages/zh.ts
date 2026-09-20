@@ -5792,6 +5792,7 @@ export const zh: Messages = {
     kindGenesis: "Genesis",
     kindSystem: "系统",
     filterAll: "全部",
+    filterGroupLabel: "通知分类筛选",
     actionReinvest: "复投",
     actionTeam: "团队",
     actionStake: "锁仓",

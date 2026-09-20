@@ -40,23 +40,30 @@
       </view>
 
       <!-- Filter pills -->
+      <!-- 🔴 互斥分类必须暴露「唯一选中项」(zentao #94)。此前是 role=button +
+           aria-pressed:浏览器把带 aria-pressed 的按钮当 toggle button,读屏按复选框
+           朗读(「全部,已按下」),用户会以为能同时选多个分类。这里改用与 earn /
+           course 同款 radiogroup/radio + roving tabindex + 方向键。 -->
       <scroll-view scroll-x class="px-4" style="margin-bottom: 12px; white-space: nowrap">
-        <template v-for="id in filterIds" :key="id">
-          <view
-            v-if="id === 'all' || filter === id || countOf(id) > 0"
-            class="active:opacity-70"
-            :style="pillStyle(filter === id)"
-            role="button"
-            tabindex="0"
-            :aria-label="filterLabel(id)"
-            :aria-pressed="filter === id"
-            @click="filter = id"
-            @keydown.enter.stop.prevent="filter = id"
-            @keydown.space.stop.prevent="filter = id"
-          >
-            <text>{{ filterLabel(id) }} ({{ countOf(id) }})</text>
-          </view>
-        </template>
+        <view role="radiogroup" :aria-label="t.notifs.filterGroupLabel" class="flex items-center" style="gap: 6px">
+          <template v-for="id in visibleFilterIds" :key="id">
+            <view
+              class="active:opacity-70"
+              :style="pillStyle(filter === id)"
+              role="radio"
+              :aria-checked="filter === id ? 'true' : 'false'"
+              :tabindex="filter === id ? 0 : -1"
+              :aria-label="filterLabel(id)"
+              @click="filter = id"
+              @keydown.enter.stop.prevent="filter = id"
+              @keydown.space.stop.prevent="filter = id"
+              @keydown.left.stop.prevent="moveFilter(-1)"
+              @keydown.right.stop.prevent="moveFilter(1)"
+            >
+              <text>{{ filterLabel(id) }} ({{ countOf(id) }})</text>
+            </view>
+          </template>
+        </view>
       </scroll-view>
 
       <!-- Timeline -->
@@ -165,6 +172,25 @@ const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed 
 type Filter = "all" | NotifKind;
 const filter = ref<Filter>("all");
 const filterIds: Filter[] = ["all", "commission", "team", "staking", "market", "genesis", "system"];
+
+/**
+ * 只渲染有内容的分类(外加「全部」与当前选中项)。
+ *
+ * 提到 computed 里是因为**方向键必须在同一份可见清单上移动** —— 若键盘按
+ * filterIds 走而渲染按另一套判据走,焦点会落到一个根本没渲染的项上,roving
+ * tabindex 随之丢失,整组再也进不去。
+ */
+const visibleFilterIds = computed(() =>
+  filterIds.filter((id) => id === "all" || filter.value === id || countOf(id) > 0),
+);
+
+/** 互斥单选组的方向键移动(与 earn / course 同款语义:循环、立即选中)。 */
+function moveFilter(step: number) {
+  const ids = visibleFilterIds.value;
+  const at = ids.indexOf(filter.value);
+  if (at < 0 || ids.length === 0) return;
+  filter.value = ids[(at + step + ids.length) % ids.length];
+}
 
 const KIND_META: Record<NotifKind, { labelKey: string; tint: string; href: string }> = {
   commission: { labelKey: "kindMoney", tint: "var(--v5-success)", href: "/pages/me/wallet-repurchase" },
