@@ -131,7 +131,7 @@ import { useApp } from "@/store/app";
 import { useReferralReward } from "@/store/referral-reward";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
-import { buildShareLink, copyText, recordShareEvent } from "@/lib/share";
+import { buildShareLink, copyText } from "@/lib/share";
 import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 
@@ -202,7 +202,11 @@ async function copyCode() {
   // (名称来自 aria-label,文字变化被盖住)。可感知反馈走 toast —— 宿主 .nx-toast-host
   // 是 role=status + aria-live=polite,与 share-poster-sheet 的复制反馈同源。
   toast.success(t.value.team.inviteCodeCopied);
-  await recordShareEvent("code", "team_hero");
+  // 🔴 复制邀请码**不是分享**(zentao #199)。
+  //   此前这里上报 channel="code" 的分享事件,服务端据此消费 invite_friend 任务;
+  //   任务校验一旦失败,用户会在「邀请码已复制」之后又看到「分享已发出,但服务端暂时
+  //   无法验证任务,未发放奖励」—— 他并没有分享任何东西。复制与分享的埋点必须隔离:
+  //   只有真正把内容发到某个渠道(见 lib/share.ts 的 activateChannel)才算分享。
   setTimeout(() => (copiedCode.value = false), 1500);
 }
 async function copyLink() {
@@ -214,7 +218,7 @@ async function copyLink() {
   }
   copiedLink.value = true;
   toast.success(t.value.team.inviteLinkCopied);
-  await recordShareEvent("link", "team_hero");
+  // 同上:复制链接只是把文本放进剪贴板,不构成分享事件。
   setTimeout(() => (copiedLink.value = false), 1500);
 }
 function openPoster() {
