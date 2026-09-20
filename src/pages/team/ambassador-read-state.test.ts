@@ -40,13 +40,24 @@ describe('ambassador required read results', () => {
       expect(html.includes('Retry')).toBe(pageReadState === 'error');
     });
   }
-  for (const failing of ['latest', 'history', 'policy', 'rank'] as const) {
+  // 本页的必需读取是三条大使读取(policy / latest / history)。它们任一失败都必须给出可重试的失败态。
+  for (const failing of ['latest', 'history', 'policy'] as const) {
     it(`exposes a retryable failure when ${failing} is unavailable`, async () => {
       const state = scenario(failing);
       await tick();
       expect(state.value).toBe('error');
     });
   }
+  // 🔴 zentao #204:等级阶梯**不是**本页的必需读取。它挂在另一个端点、另一份契约上,失败时
+  // 只该降级「资格横幅」(unlocked 要求 rankReady,未知即渲染未知态),不能连预算规则、活动类型
+  // 和申请记录一起吃掉 —— 那会让用户看到「无法读取大使信息」,而大使数据其实全都读到了,
+  // 且重试永远复现(重试跑的是同一组读)。此前的实现把 remoteReady 与进了整页就绪判据,
+  // 本用例曾把这个缺陷钉成契约;现在钉住正确的边界。
+  it('keeps ambassador data readable when only the rank ladder is unavailable', async () => {
+    const state = scenario('rank');
+    await tick();
+    expect(state.value).toBe('ready');
+  });
   it('reveals business data only after all required reads succeed', async () => {
     const state = scenario();
     expect(state.value).toBe('loading');

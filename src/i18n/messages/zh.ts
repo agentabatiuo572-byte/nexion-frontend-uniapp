@@ -1947,7 +1947,6 @@ export const zh: Messages = {
     specPower: "功耗",
     specDatacenter: "数据中心",
     specUptime: "在线率 SLA",
-    specUptimeValue: "99.9%",
     specWarranty: "质保",
     specWarrantyMonths: "{n} 个月",
     specWarrantyYears: "{n} 年",
@@ -2270,7 +2269,7 @@ export const zh: Messages = {
     lockedInQueue: "人排队",
     comingSoonNote: "后续平台阶段",
     ordersChip: "订单",
-    pageFooter: "全程托管 · 零物流 · 99.9% 在线 SLA",
+    pageFooter: "全程托管 · 零物流",
   },
   team: {
     title: "我的团队",

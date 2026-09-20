@@ -1947,7 +1947,6 @@ export const vi: Messages = {
     specPower: "Công suất",
     specDatacenter: "Trung tâm dữ liệu",
     specUptime: "SLA thời gian hoạt động",
-    specUptimeValue: "99.9%",
     specWarranty: "Bảo hành",
     specWarrantyMonths: "{n} tháng",
     specWarrantyYears: "{n} năm",
@@ -2262,7 +2261,7 @@ export const vi: Messages = {
     lockedInQueue: "đang xếp hàng",
     comingSoonNote: "các giai đoạn nền tảng tiếp theo",
     ordersChip: "Đơn hàng",
-    pageFooter: "Vận hành trọn gói · không phí ship · SLA uptime 99.9%",
+    pageFooter: "Vận hành trọn gói · không phí ship",
   },
   team: {
     title: "Đội nhóm của tôi",

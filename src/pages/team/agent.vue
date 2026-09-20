@@ -418,6 +418,12 @@ function refreshAgentPage(): void {
   if (!remoteApiEnabled) return;
   const requestScope = captureAgentRequest();
   pageReadState.value = "loading";
+  // 🔴 本页的契约是三条大使读取(policy / latest / history),**不是**等级阶梯(zentao #204)。
+  // 此前就绪判据写成 `vrank.remoteReady && policy.value`,而等级读挂在另一个端点、另一份契约上:
+  // 那边一有风吹草动(响应缺字段、契约漂移、服务端尚未部署),整页就报「无法读取大使信息」——
+  // 预算规则、活动类型、申请记录全都读到了也照样不显示,而且重试永远复现,因为重试跑的是同一组读。
+  // 现在:三条大使读取成功即就绪;等级失败只降级「资格横幅」(unlocked 仍要求 rankReady,
+  // rankReady=false 时渲染未知态),不再吃掉整页。
   void Promise.all([
     refreshLatest(requestScope),
     refreshHistory(requestScope),
@@ -426,9 +432,12 @@ function refreshAgentPage(): void {
       policy.value = value;
       budgetText.value = String(value.defaultBudgetUsdt);
     }),
-    vrank.refreshCanonicalVRank(),
+    // 等级读单独吞掉自己的失败:它只喂资格横幅(rankReady/unlocked),失败由 store 记进
+    // remoteError、由横幅渲染未知态。挂在这里是为了让「等级不是本页的就绪前提」成为本页
+    // 自己的显式契约,而不是依赖 store 恰好不 rethrow 这个内部细节。
+    vrank.refreshCanonicalVRank().catch(() => undefined),
   ]).then(() => {
-    if (requestIsCurrent(requestScope)) pageReadState.value = vrank.remoteReady && policy.value ? "ready" : "error";
+    if (requestIsCurrent(requestScope)) pageReadState.value = policy.value ? "ready" : "error";
   }).catch(() => {
     if (requestIsCurrent(requestScope)) pageReadState.value = "error";
   });

@@ -40,6 +40,11 @@ const SLA_KEYS = [
   "riskDisclosure.s4Body",
   "riskDisclosure.s4BodyLargeAmount",
   "terms.s6Body",
+  // 🔴 2026-09-21(zentao #207):商城页脚对购买决策作出的量化服务承诺此前不在白名单内 ——
+  // 「全程托管 · 零物流 · 99.9% 在线 SLA」是写死文案,而服务端只有 nx_admin_device_sku.uptime
+  // 一列自由文本,没有口径/统计周期/例外/补偿条款,也没有适用 SKU 的已发布 SLA。门开着,缺陷就活到了验收。
+  // 详情页那处(store.specUptimeValue)已整体删除,故不进白名单 —— 本哨兵要求白名单 key 必须存在。
+  "store.pageFooter",
 ];
 
 for (const l of LOCALES) {

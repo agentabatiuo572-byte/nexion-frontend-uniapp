@@ -512,9 +512,10 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
     specRow(s.specVram, p.vram),
     specRow(s.specPower, p.power),
     specRow(s.specDatacenter, p.datacenter),
-    // 在线率是**平台**统一的托管承诺,对每件商品都一样,故走文案不走商品字段。
-    { k: s.specUptime, v: s.specUptimeValue },
-    // 无质保的条目(如 Cloud Share —— 用户不拥有硬件)整行不出现,而不是显示「暂无数据」。
+    // 在线率不是商品字段:服务端只有 nx_admin_device_sku.uptime 这一列自由文本,
+    // 没有口径/统计周期/例外/补偿条款,也没有适用 SKU 的已发布 SLA。没有权威条款时
+    // 不得对购买决策作出量化服务承诺(zentao #207),整行不出现 —— 与质保同一判据:
+    // 「没得说就不说」,而不是填一个占位符。
     specRow(s.specWarranty, p.warranty),
   ].filter((r): r is SpecRow => r !== null);
 });
