@@ -2015,7 +2015,6 @@ export const en = {
     specPower: "Power",
     specDatacenter: "Datacenter",
     specUptime: "Uptime SLA",
-    specUptimeValue: "99.9%",
     specWarranty: "Warranty",
     specWarrantyMonths: "{n} months",
     specWarrantyYears: "{n} years",
@@ -2343,7 +2342,7 @@ export const en = {
     lockedInQueue: "in queue",
     comingSoonNote: "next platform phases",
     ordersChip: "Orders",
-    pageFooter: "Fully managed · zero shipping · 99.9% uptime SLA",
+    pageFooter: "Fully managed · zero shipping",
   },
   team: {
     title: "My Team",

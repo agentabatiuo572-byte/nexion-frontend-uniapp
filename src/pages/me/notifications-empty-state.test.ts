@@ -31,7 +31,7 @@ function mountPage() {
     "@/store/ui": { confirm: async () => true, useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/store/app": { useApp: () => ({ accountKey: "fixture", accountBindingEpoch: 0 }) },
   };
-  const page = new Function("require", "exports", output + ";return { t, notifs, filter, filtered, countOf, filterLabel, emptyTitle, confirmClearRead };")(
+  const page = new Function("require", "exports", output + ";return { t, notifs, filter, filtered, countOf, filterLabel, emptyTitle, confirmClearRead, visibleFilterIds };")(
     (name: string) => {
       if (name.endsWith(".vue")) return {};
       if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
@@ -77,10 +77,10 @@ describe("notification empty-state context", () => {
     await page.confirmClearRead();
     expect(page.filtered.value).toHaveLength(0);
     expect(page.notifs.items).toHaveLength(1);
-    for (const template of [source, drawerSource]) {
-      const condition = template.match(/v-if="(id === 'all'[^\"]*)"/)![1];
-      expect(evaluateBinding(condition, { id: "team", filter: page.filter.value, countOf: page.countOf })).toBe(true);
-    }
+    // 断言行为而非模板文本:清空「team」最后一条已读后,该分类必须仍在可见清单里,
+    // 否则用户既看不到自己选中的分类,也无法切回去 —— 空态会伪装成「全站没有通知」。
+    // (此前用正则从模板里抠 v-if 表达式;改用页面真正渲染所依据的 computed。)
+    expect(page.visibleFilterIds.value).toContain("team");
   });
 
   it("renders the category empty title rather than implying all notifications are gone", async () => {

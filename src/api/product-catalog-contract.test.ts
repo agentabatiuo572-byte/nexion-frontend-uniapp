@@ -28,12 +28,18 @@ describe("product catalog strict specification contract", () => {
   // = 商城一件商品都没有**(P-110)。缺失必须降级,不能作废全量。
   const SPEC_FIELDS = ["gpu", "vram", "power", "datacenter", "warranty"] as const;
 
-  // 🔴 后端从来没有这四列(admin-ops 全仓零命中、数据字典无此列、前后台 PRD 均未承诺)。
-  // 它们已各归其位:在线率=平台统一承诺走 i18n 文案;手机日收益=平台手机档位配置;
-  // 质保是后端 nx_admin_device_sku.warranty 的现成 SKU 文案；其余三项仍不是商品字段。
+  // 🔴 这三项不是商品字段,不得投影进商品模型。
+  //
+  // 2026-09-21 更正(zentao #207):此前这里写着「后端从来没有这四列」,对 `uptime` 是**错的** ——
+  // nx_admin_device_sku.uptime 自迁移 20260817_p2_product_specifications.sql 起就存在,且由
+  // AppProductCatalogService.java:201 下发。错的是「投影进来」这一步的判据,不是事实本身:
+  // 那一列是 VARCHAR(64) 自由文本,只有一句展示串,没有口径/统计周期/例外/补偿条款,也没有
+  // 适用 SKU 的已发布 SLA。把它投影进来,商城就能对一个无法兑现说明的量化承诺负责(#207)。
+  // 因此本用例的断言不变(不投影),但理由改成「没有权威条款就不作量化承诺」;
+  // 手机日收益=平台手机档位配置;其余两项仍不是商品字段。
   const PHANTOM_FIELDS = ["uptime", "phoneDailyEarn", "phoneDailyEarnNEX"] as const;
 
-  it("does not resurrect specs the server never had", () => {
+  it("does not resurrect specs that cannot back a quantified claim", () => {
     const parsed = parseProductCatalogPayload({ source: "nx_product", ...proof, serverCanonical: true, revision: null, products: [product] });
     for (const f of PHANTOM_FIELDS) expect(parsed.products[0]).not.toHaveProperty(f);
     // 就算服务端硬塞,也不该被投影进商品模型

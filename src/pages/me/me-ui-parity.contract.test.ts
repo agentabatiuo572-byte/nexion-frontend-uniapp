@@ -81,7 +81,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "me.vue": "38690fef026420ad8ead1b9f0604dc13a804789e20422f07b88c8b0a470092b9",
   // Keep the selected zero-count category visible and show category-specific empty copy;
   // loading and request failures must not render a successful empty-feed message.
-  "notifications.vue": "7731130ef5eda24778d0c4604afa45d5a0df0ff89dde3ac26a7e51f6a06bd81e",
+  // #94/#210: the mutually exclusive category chips are a radiogroup (role=radio +
+  // aria-checked + roving tabindex + arrow keys), not aria-pressed toggle buttons.
+  "notifications.vue": "65da5d90ea7db6b540f068180fef697f12192bbfa19a3d7219f7f42cf5d5982a",
   // Translate the closed error category instead of showing protocol identifiers.
   "preferences.vue": "2113efe4331a844e135e9f403a6b0b683ef72a3283b34f0a571c58cb5fdd5cab",
   // Unknown canonical payout state retains a neutral management entry; only a

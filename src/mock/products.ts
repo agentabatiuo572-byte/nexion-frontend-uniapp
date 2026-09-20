@@ -117,7 +117,6 @@ export const PRODUCTS: Product[] = [
     stock: 47,
     features: [
       "Fully managed by NexGrid",
-      "99.9% uptime SLA",
       "Real-time remote monitoring",
       "Free shipping & installation",
     ],
@@ -153,7 +152,6 @@ export const PRODUCTS: Product[] = [
     features: [
       "8× RTX 4090 GPUs",
       "Priority task allocation",
-      "99.9% uptime SLA",
       "Hardware insurance included",
     ],
     ai: {
