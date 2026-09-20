@@ -30,15 +30,23 @@
           </view>
 
           <!-- primary h-md pill warning amber (quest accent) -->
+          <!-- 🔴 目标业务已暂停时,CTA 不能还是「去完成」(zentao #127/#155)。
+               此前只有 onClick 被 questTargetClosed 挡住,标签、琥珀色 pill 和
+               role=button/tabindex=0 全都照旧 —— 用户看到的仍是一个可点的进行中任务,
+               点下去却什么也不发生,而任务卡还挂着倒计时。conversion-banner(首页周任务卡)
+               早就这么做:停用态改文案、撤 role/tabindex 并置灰。这里对齐同一形态。 -->
           <view
             v-if="!completed"
-            class="inline-flex items-center shrink-0 active:opacity-85"
-            role="button" tabindex="0"
-            :style="ctaStyle"
+            class="inline-flex items-center shrink-0"
+            :class="questTargetClosed ? 'opacity-60' : 'active:opacity-85'"
+            :role="questTargetClosed ? undefined : 'button'"
+            :tabindex="questTargetClosed ? -1 : 0"
+            :aria-disabled="questTargetClosed ? 'true' : 'false'"
+            :style="questTargetClosed ? closedCtaStyle : ctaStyle"
             @click="onCta"
           >
-            <text>{{ ctaText }}</text>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+            <text>{{ questTargetClosed ? w.targetClosed : ctaText }}</text>
+            <svg v-if="!questTargetClosed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </view>
           <view
             v-else
@@ -285,6 +293,13 @@ const ctaStyle: CSSProperties = {
   fontSize: "13px",
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
+};
+/** 停用态:不再用「可点的主操作」配色 —— 灰底 + 次级墨色,与 conversion-banner 同形。 */
+const closedCtaStyle: CSSProperties = {
+  ...ctaStyle,
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink-4)",
+  border: "1px solid var(--v5-border)",
 };
 const claimStyle: CSSProperties = {
   gap: "6px",

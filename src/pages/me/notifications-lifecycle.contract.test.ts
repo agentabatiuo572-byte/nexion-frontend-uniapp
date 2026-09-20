@@ -23,12 +23,31 @@ describe("notification foreground and clear-read accessibility", () => {
   });
 
   it("keeps filters, retry, and pagination keyboard-operable", () => {
-    expect(source).toContain(':aria-pressed="filter === id"');
+    // 分类是**互斥**选择:必须暴露 radiogroup + 唯一 aria-checked + roving tabindex。
+    // 原断言钉的是 role=button + aria-pressed,而浏览器把 aria-pressed 按钮当 toggle
+    // button、读屏按复选框朗读 —— 用户以为能同时选多个分类(zentao #94)。判据改成
+    // 单选语义,键盘可操作性(Enter/Space/方向键)一并守住。
+    expect(source).toContain('role="radiogroup"');
+    expect(source).toContain(':aria-label="t.notifs.filterGroupLabel"');
+    expect(source).toContain('role="radio"');
+    expect(source).toContain(':aria-checked="filter === id ? \'true\' : \'false\'"');
+    expect(source).toContain(':tabindex="filter === id ? 0 : -1"');
+    expect(source).toContain("@keydown.left.stop.prevent=\"moveFilter(-1)\"");
+    expect(source).toContain("@keydown.right.stop.prevent=\"moveFilter(1)\"");
     expect(source).toContain('@keydown.enter.stop.prevent="filter = id"');
     expect(source).toContain('@keydown.space.stop.prevent="filter = id"');
+    expect(source).not.toContain(':aria-pressed="filter === id"');
     expect(source).toContain('@keydown.enter.stop.prevent="notifs.retryRemote()"');
     expect(source).toContain('@keydown.space.stop.prevent="notifs.retryRemote()"');
     expect(source).toContain('@keydown.enter.stop.prevent="notifs.loadMoreRemote()"');
     expect(source).toContain('@keydown.space.stop.prevent="notifs.loadMoreRemote()"');
+  });
+
+  it("moves the roving focus over the same list it renders", () => {
+    // 键盘按 filterIds 走、渲染按另一套判据走 → 焦点会落到没渲染的项上,roving
+    // tabindex 随之丢失,整组再也进不去。两边必须共用 visibleFilterIds。
+    expect(source).toContain("const visibleFilterIds = computed(");
+    expect(source).toContain("v-for=\"id in visibleFilterIds\"");
+    expect(source).toContain("const ids = visibleFilterIds.value;");
   });
 });

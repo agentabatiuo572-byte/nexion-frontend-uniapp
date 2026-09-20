@@ -5807,6 +5807,7 @@ export const vi: Messages = {
     kindGenesis: "Genesis",
     kindSystem: "Hệ thống",
     filterAll: "Tất cả",
+    filterGroupLabel: "Bộ lọc danh mục thông báo",
     actionReinvest: "Tái đầu tư",
     actionTeam: "Đội nhóm",
     actionStake: "Stake",
