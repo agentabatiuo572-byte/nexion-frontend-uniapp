@@ -3859,6 +3859,8 @@ export const vi: Messages = {
     next: "Tiếp theo:",
     need: "Cần:",
     prize: "Thưởng:",
+    // BUG 196: tiêu đề thẻ là cấp hiện tại, còn số này là thưởng của cấp kế tiếp.
+    prizeOnPromotion: "Khi lên V{v}:",
     upgradePath: "Lộ trình thăng cấp (mua thiết bị + mời)",
     sevenLayerNetwork: "Mạng lưới hoa hồng",
     todayMatch: "Đối khớp hôm nay",
@@ -5276,6 +5278,9 @@ export const vi: Messages = {
       threshold: "{n}d",
       daysToUnlock: "Còn {n} ngày nữa để mở",
       locked: "Đang khóa",
+      // BUG 195: nghiệp vụ mà hạng mục này trỏ tới đang tạm dừng.
+      suspended: "Tạm dừng",
+      suspendedDesc: "'{name}' trỏ tới nghiệp vụ đang tạm dừng, chưa thể kích hoạt; sẽ mở lại khi nghiệp vụ hoạt động",
       activate: "Kích hoạt",
       activated: "Đã kích hoạt",
       footer: "Điểm danh càng lâu, càng mở nhiều tăng lực. Đặc quyền đã kích hoạt giữ vĩnh viễn.",

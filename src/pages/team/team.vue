@@ -44,9 +44,12 @@
               <view :style="rankLevelWrapStyle">
                 <text class="font-display tabular-nums" :style="rankLevelTextStyle">{{ myRankDisplay }}</text>
               </view>
+              <!-- BUG 196: 这里渲染的是 rankInfo.next(即 ladder[myRank+1])的培育奖,而卡标题是**当前阶**。
+                   此前标签写「奖励:」,于是 V0 用户以为 V0 有 50 NEX —— 后台 V0 根本没配奖励。
+                   要么标清「升至 V{n} 可得」,要么当前阶无奖励时不渲染;取前者,信息不丢且不含糊。 -->
               <view v-if="rankInfo.next?.cultivationBonus" :style="rankDividerStyle" />
               <view v-if="rankInfo.next?.cultivationBonus" :style="rankPrizeWrapStyle">
-                <text class="font-mono-tabular" :style="rankPrizeLabelStyle">{{ t.teamV3.prize }}</text>
+                <text class="font-mono-tabular" :style="rankPrizeLabelStyle">{{ fmt(t.teamV3.prizeOnPromotion, { v: vrank.myRank + 1 }) }}</text>
                 <text class="font-display tabular-nums" :style="rankPrizeValueStyle">{{ rankInfo.next.cultivationBonus.toLocaleString() }} NEX</text>
               </view>
             </view>

@@ -3997,6 +3997,8 @@ export const en = {
     next: "Next:",
     need: "Need:",
     prize: "Reward:",
+    // BUG 196: the card title is the current rank while this figure is the next rank's bonus.
+    prizeOnPromotion: "On promotion to V{v}:",
     upgradePath: "Upgrade path (buy device + invite)",
     sevenLayerNetwork: "Royalty network",
     todayMatch: "Today match",
@@ -5428,6 +5430,9 @@ export const en = {
       threshold: "{n}d",
       daysToUnlock: "{n} more days to unlock",
       locked: "Locked",
+      // BUG 195: the target business is suspended, so this tier must not promise an activatable perk.
+      suspended: "Paused",
+      suspendedDesc: "'{name}' points to a business that is currently paused and cannot be activated; it returns once the business resumes",
       activate: "Activate",
       activated: "Activated",
       footer: "The longer you check in, the more boosts unlock. Activated perks stick permanently.",

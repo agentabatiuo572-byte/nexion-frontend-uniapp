@@ -41,10 +41,14 @@
               <text class="tabular-nums" :style="thresholdChipStyle(p)">{{ thresholdText(p.threshold) }}</text>
               <text :style="labelStyle(p)">{{ p.labelText ?? w[`${p.key}_label`] }}</text>
             </view>
-            <text class="block" :style="descStyle">{{ isUnlocked(p) ? (p.descText ?? w[`${p.key}_desc`]) : daysToUnlockText(p.threshold) }}</text>
+            <text class="block" :style="descStyle">{{ isBusinessSuspended(p) ? suspendedText(p) : isUnlocked(p) ? (p.descText ?? w[`${p.key}_desc`]) : daysToUnlockText(p.threshold) }}</text>
           </view>
           <!-- activated badge / activate CTA / locked label -->
           <text v-if="isClaimed(p.id)" :style="activatedBadgeStyle">{{ w.activated }}</text>
+          <!-- BUG 195:该档指向的业务当前整体停用(质押整池熔断/Genesis 未开放)时,
+               不能继续给「激活」入口 —— 用户投入 30/60 天后会撞上一个不可用的页面。
+               改为明确说明暂停,并保留档位可见(不隐藏已获得的权益说明)。 -->
+          <text v-else-if="isBusinessSuspended(p)" :style="lockedLabelStyle">{{ w.suspended }}</text>
           <view v-else-if="isUnlocked(p)" class="inline-flex items-center active:opacity-85" :style="activateBtnStyle(p)" @click="handleClaim(p)">
             <text>{{ w.activate }}</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="m9 18 6-6-6-6" /></svg>
@@ -82,6 +86,10 @@ import { useDailyPowerUp, type StreakPowerUpId } from "@/store/daily-powerup";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
 import { canonicalPowerUpTarget } from "@/lib/remote-powerup-target";
+import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
+import { questActionDomain } from "@/lib/quest-business-availability";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
 
 interface PowerUp {
   id: StreakPowerUpId;
@@ -92,6 +100,8 @@ interface PowerUp {
   labelText?: string;
   descText?: string;
   status?: "LOCKED" | "AVAILABLE" | "ACTIVATED";
+  /** 服务端下发的可用性;null = 不适用,undefined = 旧服务端未声明。 */
+  serverBusinessAvailable?: boolean | null;
 }
 
 const t = useT();
@@ -114,6 +124,8 @@ const powerUps = computed<PowerUp[]>(() => remoteApiEnabled
       tint: "var(--v5-success)", key: item.powerUpCode.toLowerCase() as PowerUp["key"], href: item.targetPath,
       labelText: item.name, descText: `${item.effectType}: ${item.effectValue}`,
       status: item.status,
+      // 服务端的可用性判定是权威:它读的是各域自己的读模型,比客户端本地推断更准。
+      serverBusinessAvailable: item.businessAvailable,
     }))
   : POWERUPS);
 
@@ -133,7 +145,33 @@ function isClaimed(id: StreakPowerUpId): boolean {
 const nextUnclaimedUnlocked = computed(() =>
   powerUps.value.find((p) => isUnlocked(p) && !isClaimed(p.id)),
 );
-const nextLocked = computed(() => powerUps.value.find((p) => !isUnlocked(p)));
+const nextLocked = computed(() => powerUps.value.find((p) => !isUnlocked(p) && !isBusinessSuspended(p)));
+
+// BUG 195:连签增益指向的业务整体停用时,不再承诺「激活后可用」。
+// 判据复用任务面那套**唯一读数入口**(与周任务报警器同源):质押走 useStaking 的远程
+// 方案快照,Genesis 走销售闸 —— 不在这里另写一份开关判断。
+// 🔴 与任务面同一原则:「还不知道」不算停用(false),不能把一次网络抖动说成业务关闭。
+const availability = useQuestTargetAvailability();
+const genesisGate = useGenesisSaleGate();
+// 主售与二级在闸上不是同一档:二级卖的是别人手里的存量,主售售罄不妨碍转让。
+// 所以两档各用各的判据,而不是共用「创世关了」这一个结论。
+const genesisPrimaryClosed = computed(() => genesisBlockIsKnownUnavailable(genesisGate.block.value));
+const genesisSecondaryClosed = computed(() => genesisBlockIsKnownUnavailable(genesisGate.secondaryBlock.value));
+function isBusinessSuspended(p: PowerUp): boolean {
+  // 服务端明确声明时以它为准 —— 那是各域读模型算出来的结论。
+  if (p.serverBusinessAvailable === true) return false;
+  if (p.serverBusinessAvailable === false) return true;
+  // 未声明(旧服务端)时才退回客户端判据,且同样遵守「不知道就别说」。
+  switch (questActionDomain(p.href)) {
+    case "staking": return availability.value.stakingClosed;
+    case "genesis-primary": return genesisPrimaryClosed.value;
+    case "genesis-secondary": return genesisSecondaryClosed.value;
+    default: return false;
+  }
+}
+function suspendedText(p: PowerUp): string {
+  return fmt(w.value.suspendedDesc, { name: p.labelText ?? w.value[`${p.key}_label`] });
+}
 const activatedCount = computed(() => powerUps.value.filter((p) => isClaimed(p.id)).length);
 
 const streakStatText = computed(() => fmt(w.value.streakStat, { n: streak.value }));

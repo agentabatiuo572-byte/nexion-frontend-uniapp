@@ -3872,6 +3872,8 @@ export const zh: Messages = {
     next: "下一阶:",
     need: "仍需:",
     prize: "奖励:",
+    // BUG 196:卡标题是当前阶,这里展示的却是下一阶的培育奖 —— 必须写明是晋升后可得。
+    prizeOnPromotion: "升至 V{v} 可得:",
     upgradePath: "升级路径(购买设备 + 邀请)",
     sevenLayerNetwork: "版税网络",
     todayMatch: "今日对碰",
@@ -5268,6 +5270,9 @@ export const zh: Messages = {
       threshold: "{n} 天",
       daysToUnlock: "再签 {n} 天解锁",
       locked: "锁定",
+      // BUG 195:该档指向的业务当前整体停用时,不能继续承诺可激活。
+      suspended: "业务暂停",
+      suspendedDesc: "「{name}」指向的业务当前已暂停，暂不可激活；恢复后可继续领取",
       activate: "激活",
       activated: "已激活",
       footer: "签到天数越多,可解锁的增益越多。已激活的永久生效。",

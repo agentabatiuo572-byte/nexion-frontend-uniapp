@@ -194,6 +194,8 @@ function producedKinds(src) {
     ["src/store/genesis.ts", "genesisPurchaseBlock"],
     // 观测消费者(非闸):周任务的报警器也必须从**本单源**取判定,不许自己读 config 再判一套。
     ["src/components/home/weekly-quest-hero.vue", "useGenesisSaleGate"],
+    // BUG 195:连签增益依赖创世的档位必须问闸,不许只看签到天数。
+    ["src/components/daily/streak-power-ups.vue", "useGenesisSaleGate"],
   ];
   for (const [f, sym] of CONSUMERS) {
     check(`⑤ ${f.split("/").pop()} 接线到单源`, strip(readFileSync(path.join(root, f), "utf8"), true).includes(sym), "没接线 = 它在自己判");
@@ -235,7 +237,13 @@ function producedKinds(src) {
   //     否则同页 hero 说停、列表说走。#123 的入口禁用也是这条线。
   //     🔴 与 hero 那条不同:这条是**真闸不是报警** —— 只在 PENDING 行上撤 CTA,
   //     已挣到的 COMPLETED/CLAIMABLE 一律不碰(见 lib/quest-business-availability.ts)。
-  const EXPECTED_GATE_CONSUMERS = 11;
+  //   ✅ 2026-09-20 11→12:streak-power-ups.vue 接闸(BUG 195:连签 60 天承诺解锁
+  //     「Genesis 资格入口」,而创世无 ACTIVE 系列/市场关闭时该入口不可用 ——
+  //     用户投入 60 天后撞墙)。**真闸不是报警**:停用档撤掉「激活」入口并说明原因,
+  //     已激活的档不动。主售与二级各读各的闸(genesisPrimaryClosed /
+  //     genesisSecondaryClosed),不共用一句「创世关了」——二级卖的是存量,主售售罄
+  //     不妨碍转让,合并判断会在售罄时误停二级。
+  const EXPECTED_GATE_CONSUMERS = 12;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }
