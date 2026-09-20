@@ -122,7 +122,7 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.weeklyPool }}</text>
-                <text class="block" :style="quickRowMetaStyle">{{ leadershipPoolLineA }}  /  {{ leadershipPoolLineB }}</text>
+                <text class="block" :style="quickRowMetaStyle">{{ leadershipPoolLineB ? `${leadershipPoolLineA}  /  ${leadershipPoolLineB}` : leadershipPoolLineA }}</text>
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
@@ -346,7 +346,7 @@ const leadershipPoolPrimary = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value.toFixed(1)}K`,
 );
 const leadershipPoolLineA = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHold : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const poolThisWeekText = computed(() => {
   const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
@@ -354,8 +354,11 @@ const poolThisWeekText = computed(() => {
     rate: (rate * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }),
   });
 });
+// 摘要行第二段只承载**真实数据**(占比 / 周池比例)。非就绪态一律留空 —— 状态说明已在
+// lineA,操作入口是整行点击进详情页;此前这里塞过 t.network.retry(「重新加载」),把一个
+// 动作标签放进了状态位,还留下一个悬空的「/」(zentao #206)。
 const leadershipPoolLineB = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "error" ? t.value.network.retry : "") : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : poolThisWeekText.value,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? "" : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : poolThisWeekText.value,
 );
 
 function go(url: string) {

@@ -4763,6 +4763,9 @@ export const vi: Messages = {
     loading: "Đang tải quỹ lãnh đạo từ máy chủ…",
     loadError: "Tạm thời chưa tải được quỹ lãnh đạo. Hãy kiểm tra mạng và thử lại.",
     settlementHold: "Quỹ lãnh đạo chưa mở kết toán. Vui lòng chờ nền tảng hoàn tất cấu hình quy tắc. Đây không phải lỗi kết nối.",
+    // Dòng tóm tắt gọn (trang đội nhóm) chỉ đủ chỗ cho một trạng thái ngắn;
+    // lý do đầy đủ nằm ở trang chi tiết (zentao #206).
+    settlementHoldShort: "Chưa mở",
     retry: "Tải lại",
     weekPool: "Quỹ tuần",
     weeklyDesc: "{rate} doanh số nền tảng mỗi tuần · kết toán sau {n}",
