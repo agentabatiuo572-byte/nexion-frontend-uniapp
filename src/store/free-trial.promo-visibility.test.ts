@@ -38,11 +38,20 @@ function refreshFromMe(trial: ReturnType<typeof useFreeTrial>): Promise<void> {
 function bannerActions(trial: ReturnType<typeof useFreeTrial>, show: () => void) {
   const script = (pages["../components/trial-promo-banner.vue"] as string).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)![1];
   const ast = ts.createSourceFile("banner.ts", script, ts.ScriptTarget.Latest, true);
+  const declarations = ast.statements.filter(ts.isVariableStatement)
+    .flatMap(s => [...s.declarationList.declarations]);
+  const read = (name: string) => ts.transpileModule(
+    "return " + declarations.find(d => d.name.getText(ast) === name)!.initializer!.getText(ast) + ";",
+    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
+  ).outputText;
   const actions = ast.statements.filter(s => ts.isFunctionDeclaration(s) && ["openClaim", "retryEligibility"].includes(s.name?.text ?? ""));
   const code = ts.transpileModule(actions.map(s => s.getText(ast)).join("\n") + ";return {openClaim,retryEligibility};", {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
-  return new Function("trial", "canClaim", "claimSheet", code)(trial, computed(() => trial.canStart()), { show });
+  // The component's OWN gate, not a test-local re-derivation of it: BUG 173 changed
+  // which snapshots may open the sheet, so the assertion has to follow the banner.
+  const canClaim = new Function("computed", "trial", read("canClaim"))(computed, trial);
+  return new Function("trial", "canClaim", "claimSheet", code)(trial, canClaim, { show });
 }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: unknown) => void;
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
@@ -88,14 +97,20 @@ describe("Earn hero display remains separate from claim authority", () => {
 });
 
 describe("Me trial promotion display vs claim authority", () => {
-  it("blocks the actual banner handler until current authority is ready", async () => {
+  it("opens the sheet from a confirmed claimable snapshot but never from an unconfirmed one", async () => {
     const trial = useFreeTrial(), show = vi.fn(), actions = bannerActions(trial, show);
+    // First frame: nothing confirmed yet — the entry stays closed.
     actions.openClaim(); expect(show).not.toHaveBeenCalled();
     remote.state.mockResolvedValueOnce(authority()); await trial.refreshRemote();
     actions.openClaim(); expect(show).toHaveBeenCalledOnce(); show.mockClear();
+    // BUG 173: a confirmed claimable snapshot keeps the entry usable while the
+    // background re-read is in flight (the card must not be briefly disabled).
+    // The claim command itself still re-reads authority and stays fail-closed.
     const read = deferred<TrialAuthorityState>(); remote.state.mockReturnValueOnce(read.promise);
-    const request = trial.refreshRemote(true); actions.openClaim(); expect(show).not.toHaveBeenCalled();
-    read.reject(Error("offline")); await request; actions.openClaim(); expect(show).not.toHaveBeenCalled();
+    const request = trial.refreshRemote(true); actions.openClaim(); expect(show).toHaveBeenCalledOnce();
+    // A failed re-read drops back to "error" — the entry closes again.
+    read.reject(Error("offline")); await request; show.mockClear();
+    actions.openClaim(); expect(show).not.toHaveBeenCalled();
     expect(remote.start).not.toHaveBeenCalled();
   });
   it("retries only a failed read, without opening a sheet or issuing a claim", async () => {
@@ -109,18 +124,19 @@ describe("Me trial promotion display vs claim authority", () => {
     read.resolve(authority()); await vi.waitFor(() => expect(trial.canStart()).toBe(true));
     expect(show).not.toHaveBeenCalled(); expect(remote.start).not.toHaveBeenCalled();
   });
-  it("keeps the confirmed card mounted across both sequential page refresh reads, but disables claims", async () => {
+  it("settles a confirmed card from the single state read, without a second eligibility round trip", async () => {
     const trial = useFreeTrial(), shown = rendered(trial);
-    const state = deferred<TrialAuthorityState>(), eligibility = deferred<TrialAuthorityState>();
+    const state = deferred<TrialAuthorityState>();
     remote.state.mockResolvedValueOnce(authority()).mockReturnValueOnce(state.promise);
-    remote.eligibility.mockReturnValueOnce(eligibility.promise);
     expect(shown.value).toBe(false);
     await trial.refreshRemote(); expect(shown.value).toBe(true);
     const refresh = refreshFromMe(trial);
     expect(trial.canStart()).toBe(false); expect(shown.value).toBe(true);
-    state.resolve(authority()); await vi.waitFor(() => expect(remote.eligibility).toHaveBeenCalledOnce());
-    expect(trial.canStart()).toBe(false); expect(shown.value).toBe(true);
-    eligibility.resolve(authority()); await refresh;
+    state.resolve(authority()); await refresh;
+    // BUG 173: GET /api/trial/state already carries canStart/eligibilityReason, so the
+    // page must not spend a second serial RTT (and a second disabled window) on
+    // /api/trial/eligibility. That read is now only a state-read recovery path.
+    expect(remote.eligibility).not.toHaveBeenCalled();
     expect(shown.value).toBe(true); expect(trial.canStart()).toBe(true);
     expect(remote.start).not.toHaveBeenCalled();
   });

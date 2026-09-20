@@ -1195,7 +1195,7 @@ export const zh: Messages = {
     checkboxLabel: "我已阅读并理解以上 7 个章节的风险披露。",
     checkboxRequired: "请先勾选上方的已阅读确认项。",
     acceptCta: "我已知悉 — 继续",
-    disclaimer: "确认操作会记录时间戳。可通过 Me → 风险提示书 重读。",
+    disclaimer: "确认操作会记录时间戳。可通过 {tab} → 风险提示书 重读。",
     acceptToast: "风险提示已确认 · 可进入 withdraw / staking / 锁仓功能。",
     sectionSelected: "已选中第 {n} 节",
     reloadRegionCta: "重新获取适用于当前地区的披露",
@@ -2315,10 +2315,14 @@ export const zh: Messages = {
     inviteShareText:
       "我在 NexGrid 上赚被动收益——让手机变成 AI 算力节点。用我的链接注册,我俩各拿 $200:{url}",
     inviteLinkCopied: "链接已复制 — 随处分享",
+    inviteCodeCopied: "邀请码已复制",
     inviteShareCode: "邀请码",
     inviteShareLink: "链接",
     inviteSharePoster: "海报",
     inviteShareQR: "二维码 + 图",
+    invitePosterAria: "生成邀请海报",
+    inviteCopyCodeAria: "复制邀请码",
+    inviteCopyLinkAria: "复制邀请链接",
     orShareVia: "或通过",
   },
   wallet: {
@@ -3134,6 +3138,9 @@ export const zh: Messages = {
     remoteSource: "来源：{source} · 语言：{language}",
     remoteFailed: "Nova 暂时无法从服务端回答。未执行任何账号操作。",
     remoteError: "服务端错误：{code} · 语言：{language}",
+    botTimeout: "NexGridBot 超时未应答,本次提问已取消。未执行任何账号操作。",
+    botTimeoutHint: "可以重试,或改用工单。",
+    botRetry: "重试",
     contactSupport: "联系客服",
     contactHint: "服务目标可在工单页查看，实际响应以处理情况为准",
     contactCta: "提交工单",
@@ -4212,7 +4219,7 @@ export const zh: Messages = {
       current: "当前档",
       seats: "{n} 席",
       left: "仅剩 {n} 席",
-      premium: "较白名单 +50%",
+      premium: "较白名单价高 50%",
     },
     value: {
       title: "权益",
@@ -4939,8 +4946,8 @@ export const zh: Messages = {
   },
 
   repurchase: {
-    ordersTitle: "我的回购订单",
-    ordersEmpty: "暂无回购订单",
+    ordersTitle: "我的复投订单",
+    ordersEmpty: "暂无复投订单",
     maturesAt: "到期时间",
     claimAction: "领取本金及利息",
     earlyAction: "提前退出",
@@ -4960,7 +4967,7 @@ export const zh: Messages = {
     recoveryHint: "上一笔请求的结果尚未确认。请按原金额重试，系统会沿用同一操作编号核对结果；确认前请勿另开一笔复投。",
     recoveryCta: "核对上一笔 ${amount} 请求",
     pageTitle: "复投增益",
-    hero: "加速提现",
+    hero: "复投增益",
     benefits: {
       apy: "35% APY · 90 天",
       cultivation: "培育奖 ×1.5",

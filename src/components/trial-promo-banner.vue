@@ -45,7 +45,11 @@ const trialConfig = useTrialConfig();
 
 const isActive = computed(() => trial.status === "active" || trial.status === "grace");
 const visible = computed(() => !isActive.value && trial.showPromo());
-const canClaim = computed(() => trial.canStart());
+// BUG 173: 已确认可领取的快照在后台重拉期间保持可点。放开的只是**入口**,
+// 不是权限 —— 真正下发领取命令的 start() 自己会先做一次权威资格读取并
+// fail-closed(读取失败/过期一律拒绝);读失败时 confirmedOfferState() 回落
+// 到 "error",入口重新关闭。首帧无任何快照时仍然不可点。
+const canClaim = computed(() => trial.canStart() || trial.confirmedOfferState() === "claimable");
 // Action label follows the RETAINED offer state, not the in-flight read: a
 // background poll must not swap "马上领取" for "正在核实资格" and re-layout the
 // card (BUG 56). Clicking is still gated by canClaim.

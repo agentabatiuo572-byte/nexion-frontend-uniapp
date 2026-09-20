@@ -84,6 +84,7 @@ const LEDGER = {
 
   // ── trial ─────────────────────────────────────────────────────────────
   "GET /api/trial/eligibility": "PRD §9.11a.2",
+  "/api/trial/eligibility": "PRD §9.11a.2(同一端点的无 method 引用形态)",
   "GET /api/trial/state": "HOLD: backend 当前仅公开 /api/trial/eligibility;保留为前端候选读取,未接线前不得当作服务端事实",
   "/api/trial/state": "HOLD: 同上;注释未带 method 的候选引用",
   "POST /api/trial/start": "PRD §9.11a.2",
@@ -321,6 +322,7 @@ const LEDGER = {
   "/api/exchange/recovery": "BACKEND: AppExchangeController GET recovery (6cdbf8fa);认证用户+原参数+Idempotency-Key只读原收据及当前订单，不重放兑换;见后端 docs/exchange-recovery.md",
   "/api/exchange/:param/cancel": "NOT-PRD: 🔴 死路径 —— wallet-exchange.vue 定义了 cancelRemoteOrder() 并在里面调本端点,但**没有任何东西调 cancelRemoteOrder**(模板无绑定、全文件仅定义处一处命中),用户点不到。与本轮开头删掉的卡时代早购镜像同型,只深一层。⚠️ 服务端仍可能把单据置为 CANCELLED(到期等),页面的 CANCELLED 展示是合法的——死的只是「客户端发起撤销」这条路。立卡见 docs/changes/2026-08-14-card-dead-exchange-cancel.md",
   "/api/genesis/account": "TBD-NAME: 创世账户读;PRD 未定义",
+  "GET /api/genesis/account": "TBD-NAME: 创世账户读(含持仓与订单投影);PRD 未定义",
   "/api/genesis/purchase": "TBD-NAME: 创世购买;PRD 未定义该路径(§10.1 有业务规则)",
   "/api/genesis/holdings/:param/listing": "TBD-NAME: 创世持仓挂单/撤单;概念见 PRD §10.2.4,路径未定义",
   "/api/genesis/holdings/:param/commands/:param": "BACKEND: AppGenesisController 已实现;认证用户按原幂等键只读查询挂单/撤单/买入状态,不执行历史命令",

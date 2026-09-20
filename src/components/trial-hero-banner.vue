@@ -121,7 +121,8 @@ watch(inView, (v) => {
 });
 
 const eligibility = computed(() => trial.eligibility());
-const canClaim = computed(() => trial.status === "none" && eligibility.value.ok);
+const canClaim = computed(() => trial.status === "none"
+  && (eligibility.value.ok || trial.confirmedOfferState() === "claimable"));
 const productUnavailable = computed(() => eligibility.value.reason === "product-unavailable");
 const visible = computed(() => trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0

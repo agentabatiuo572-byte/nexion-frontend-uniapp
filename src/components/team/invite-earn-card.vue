@@ -51,25 +51,30 @@
         </view>
       </view>
 
-      <!-- RIGHT — actions(码为空整列置灰,点击仍有 toast 反馈) -->
+      <!-- RIGHT — actions(码为空整列置灰,点击仍有 toast 反馈)
+           BUG 171:四个入口都是自绘控件,此前只有 @click —— 读屏树里只是 container,
+           Tab 跳不到、Enter/Space 无效。统一 role=button + tabindex=0 + 名称,
+           键盘激活由 lib/a11y-activate.ts 平台层按 role+tabindex 合成,故不手写 @keydown。
+           复制成功态走 toast(宿主 .nx-toast-host 是 role=status + aria-live=polite),
+           与 share-poster-sheet.vue 的既有写法同源 —— 只翻按钮文字读屏不保证播报。 -->
       <view class="flex flex-col shrink-0" :class="referralCode ? '' : 'opacity-50'" style="width: 158px; gap: 8px">
-        <view class="nx-team-share-poster rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(false)" @click="openPoster">
+        <view class="nx-team-share-poster rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(false)" role="button" tabindex="0" :aria-label="t.team.invitePosterAria" @click="openPoster">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01" /></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ t.team.inviteSharePoster }}</text>
           <text :style="shareValStyle(false)">{{ t.team.inviteShareQR }}</text>
         </view>
-        <view class="nx-team-copy-code rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedCode)" @click="copyCode">
+        <view class="nx-team-copy-code rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedCode)" role="button" tabindex="0" :aria-label="t.team.inviteCopyCodeAria" @click="copyCode">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="copiedCode ? 'var(--v5-brand)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><template v-if="copiedCode"><path d="M20 6 9 17l-5-5" /></template><template v-else><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></template></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ copiedCode ? t.team.copied : t.team.inviteShareCode }}</text>
           <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedCode)">{{ referralCode }}</text>
         </view>
-        <view class="nx-team-copy-link rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedLink)" @click="copyLink">
+        <view class="nx-team-copy-link rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedLink)" role="button" tabindex="0" :aria-label="t.team.inviteCopyLinkAria" @click="copyLink">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><template v-if="copiedLink"><path d="M20 6 9 17l-5-5" /></template><template v-else><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" /></template></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ copiedLink ? t.team.copied : t.team.inviteShareLink }}</text>
           <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedLink)">{{ linkLabel }}</text>
         </view>
 
-        <view class="nx-team-share-now rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" @click="openShare">
+        <view class="nx-team-share-now rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" role="button" tabindex="0" :aria-label="t.team.shareNow" @click="openShare">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
           <text :style="primaryCtaTextStyle">{{ rewardEnabled ? fmt(t.team.shareAndEarn, { n: `${nexReward.toLocaleString()} NEX` }) : t.team.shareNow }}</text>
         </view>
@@ -193,6 +198,10 @@ async function copyCode() {
     return;
   }
   copiedCode.value = true;
+  // BUG 171:按钮的 :aria-label 是静态名称,只把按钮文字换成「已复制!」读屏不播报
+  // (名称来自 aria-label,文字变化被盖住)。可感知反馈走 toast —— 宿主 .nx-toast-host
+  // 是 role=status + aria-live=polite,与 share-poster-sheet 的复制反馈同源。
+  toast.success(t.value.team.inviteCodeCopied);
   await recordShareEvent("code", "team_hero");
   setTimeout(() => (copiedCode.value = false), 1500);
 }
@@ -204,6 +213,7 @@ async function copyLink() {
     return;
   }
   copiedLink.value = true;
+  toast.success(t.value.team.inviteLinkCopied);
   await recordShareEvent("link", "team_hero");
   setTimeout(() => (copiedLink.value = false), 1500);
 }
@@ -323,3 +333,15 @@ const tickerWrapStyle: CSSProperties = {
 };
 const tickerAmtStyle: CSSProperties = { marginLeft: "auto", color: "var(--v5-brand)", fontWeight: 600 };
 </script>
+
+<style scoped>
+/* BUG 171:四个入口现在进得了 Tab 序(role+tabindex),没有外环键盘用户看不出焦点在哪。
+   药丸/圆角块自带 radius,默认 outline 贴圆角会被裁,按仓内既有写法补 :focus-visible。 */
+.nx-team-share-poster:focus-visible,
+.nx-team-copy-code:focus-visible,
+.nx-team-copy-link:focus-visible,
+.nx-team-share-now:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+}
+</style>

@@ -17,7 +17,10 @@
             {{ t.teamV3.lifetime }} ${{ totalUSDTLifetime.toFixed(2) }} · {{ contributors }} {{ t.teamV3.contributors }}
           </text>
         </view>
-        <view class="nx-team-commissions-link inline-flex items-center active:opacity-70" :style="detailsLinkStyle" @click="goCommissions">
+        <!-- BUG 172:入口此前只有 @click —— 读屏只把整张佣金摘要读成 container,
+             键盘既停不上也激活不了。跳转类 → role="link"(只吃 Enter,Space 留给滚动),
+             键盘激活由 lib/a11y-activate.ts 平台层合成;金额摘要保持只读文本不动。 -->
+        <view class="nx-team-commissions-link inline-flex items-center active:opacity-70" :style="detailsLinkStyle" role="link" tabindex="0" :aria-label="t.teamV3.viewDetails" @click="goCommissions">
           <text :style="{ fontSize: '13px', color: 'var(--v5-ink-2)' }">{{ t.teamV3.viewDetails }}</text>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
@@ -175,3 +178,13 @@ const metricValueStyle: CSSProperties = {
   lineHeight: 1.2,
 };
 </script>
+
+<style scoped>
+/* BUG 172:「查看明细」现在进得了 Tab 序(role+tabindex),没有外环键盘用户看不出
+   焦点落在哪 —— 44px 热区的默认 outline 会被相邻网格线压掉,按仓内写法补。 */
+.nx-team-commissions-link:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+</style>

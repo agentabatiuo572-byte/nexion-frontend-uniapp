@@ -442,7 +442,9 @@ export const useGenesis = defineStore("genesis", () => {
       clearPublic: clearRemotePublicFacts,
       clearAccount: clearRemoteAccountFacts,
       applyEligibilityError: (reason) => {
-        remoteAccountReadState.value = "unavailable";
+        // BUG 174: 资格不可用 ≠ 账号投影不可用。把前者写进
+        // remoteAccountReadState 会让持仓页/订单页把「Genesis 未开放」
+        // 误报成「账号数据读取失败」,并连带清空已经读到的订单。
         remoteEligibilityError.value = reason;
       },
       applyPublicError: (reason) => { remotePublicError.value = reason; },

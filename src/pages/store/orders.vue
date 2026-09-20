@@ -136,8 +136,16 @@ const commerceOrdersUnavailable = ref(false);
 const genesisOrdersUnavailable = ref(false);
 const unavailableOrderSources = computed(() => [
   ...(commerceOrdersUnavailable.value ? [{ label: t.value.headerTitles.storeOrders, message: t.value.authOtp.errorServiceUnavailable }] : []),
-  ...(genesisOrdersUnavailable.value ? [{ label: t.value.me.genesisNode, message: genesis.remoteEligibilityError === "GENESIS_SERIES_UNAVAILABLE"
-    ? t.value.genesis.marketClosed.seriesUnavailable : t.value.authOtp.errorServiceUnavailable }] : []),
+  // BUG 174: 这一条以前判的是 genesis.remoteEligibilityError —— 资格不可用
+  // (含「Genesis 未开放」)被升级成订单页顶层横幅「订单目录同步失败」,
+  // 而同刻主内容区又渲染「还没有订单」。资格是**能否参与**的判定,订单历史是
+  // **账号投影**;只有后者读失败才出这条横幅。真正的系列下线(账号投影与资格
+  // 一起报 GENESIS_SERIES_UNAVAILABLE)仍然说得出「未开放」这个准确原因。
+  ...(genesisOrdersUnavailable.value ? [{
+    label: t.value.me.genesisNode,
+    message: genesis.remoteEligibilityError === "GENESIS_SERIES_UNAVAILABLE"
+      ? t.value.genesis.marketClosed.seriesUnavailable : t.value.authOtp.errorServiceUnavailable,
+  }] : []),
 ]);
 const orderPanels = computed(() => orderListPanels({
   loading: isInitialOrderReadLoading({
@@ -177,7 +185,11 @@ async function refreshOrders() {
   const outcome = await createRemoteOrdersRefresh({
     commerce: () => orders.refreshRemote(),
     genesis: () => genesis.syncRemote(),
-    genesisAccountUnavailable: () => !!genesis.remoteEligibilityError,
+    // BUG 174: Genesis 订单行来自**账号投影** (GET /api/genesis/account),
+    // 不是资格判定。资格不可用(Genesis 未开放)时账号投影照常可读,
+    // 订单源必须判「已读」;只有账号投影真的读失败才算这一源不可用 ——
+    // 这样重试成功后错误能真正消失,而不是被资格状态永久钉住。
+    genesisAccountUnavailable: () => genesis.remoteAccountReadState !== "ready",
     isCurrent: current,
   })();
   if (outcome.availability === "stale") return;

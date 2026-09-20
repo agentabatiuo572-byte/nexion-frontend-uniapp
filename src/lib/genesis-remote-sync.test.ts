@@ -133,6 +133,37 @@ describe("Genesis remote fact orchestration", () => {
     expect(calls).toEqual(["public", "account", "eligibility"]);
   });
 
+  it("keeps a successful account projection (order history) when eligibility alone is unavailable", async () => {
+    // BUG 174: 资格与账号投影是两件独立的事。绑定同一可用性会让「Genesis 未开放 /
+    // 资格不可用」把已经读到的订单历史一起清空,订单页随即把资格故障升级成
+    // 「订单目录同步失败」并同时渲染「还没有订单」。
+    const applied: { account?: GenesisAccountState } = {};
+    const clearAccount = vi.fn();
+    const applyEligibilityError = vi.fn();
+    const api = {
+      state: vi.fn<() => Promise<GenesisPublicState>>().mockResolvedValue({} as GenesisPublicState),
+      account: vi.fn<() => Promise<GenesisAccountState>>().mockResolvedValue(account()),
+      eligibility: vi.fn<() => Promise<GenesisEligibility>>().mockRejectedValue(new ApiError({
+        kind: "business", message: "GENESIS_ELIGIBILITY_UNAVAILABLE", status: 409, code: 409,
+      })),
+    };
+
+    await expect(readGenesisRemoteFacts(api, {
+      hasAuthority: () => true,
+      isCurrent: () => true,
+      clear: vi.fn(),
+      clearAccount,
+      applyPublicState: vi.fn(),
+      applyAccount: (value) => { applied.account = value; },
+      applyEligibility: vi.fn(),
+      applyEligibilityError,
+    })).resolves.toBe(true);
+
+    expect(clearAccount).not.toHaveBeenCalled();
+    expect(applied.account?.eligibility.holderStatus).toBe("READY");
+    expect(applyEligibilityError).toHaveBeenCalledWith("GENESIS_ELIGIBILITY_UNAVAILABLE");
+  });
+
   it("keeps public supply facts when protected account projections are unavailable", async () => {
     const publicState = {} as GenesisPublicState;
     const clear = vi.fn();

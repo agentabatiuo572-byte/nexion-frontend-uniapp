@@ -88,9 +88,13 @@ export async function readGenesisRemoteFacts(
     return false;
   }
   const publicAvailable = publicResult.status === "fulfilled";
-  const accountAvailable = accountResult.status === "fulfilled"
-    && eligibilityResult.status === "fulfilled";
-  if (!publicAvailable && !accountAvailable) {
+  // BUG 174: 账号投影(含订单历史)与资格是**两件独立的事**。Genesis 未开放 /
+  // 资格不可用时,GET /api/genesis/account 仍然能如实返回该账号的持仓与订单
+  // (通常是空列表)。把两者绑成同一可用性,会让「没有资格」把已经读到的订单
+  // 一起清空,订单页于是把资格故障升级成「订单目录同步失败」。
+  const accountAvailable = accountResult.status === "fulfilled";
+  const eligibilityAvailable = eligibilityResult.status === "fulfilled";
+  if (!publicAvailable && !accountAvailable && !eligibilityAvailable) {
     scope.clear();
     scope.applyPublicError?.(publicReadError(publicResult.reason));
     scope.applyEligibilityError?.(eligibilityReadError(
@@ -107,21 +111,22 @@ export async function readGenesisRemoteFacts(
     scope.clearPublic?.();
     scope.applyPublicError?.(publicReadError(publicResult.reason));
   }
-  if (accountAvailable) {
-    scope.applyAccount(accountResult.value);
-    scope.applyEligibility(eligibilityResult.value);
-  } else {
-    const protectedReadError = eligibilityReadError(
-      accountResult.status === "rejected" ? accountResult.reason : null,
-      eligibilityResult.status === "rejected" ? eligibilityResult.reason : null,
-    );
+  if (accountAvailable) scope.applyAccount(accountResult.value);
+  else scope.clearAccount();
+  if (eligibilityAvailable) scope.applyEligibility(eligibilityResult.value);
+  else scope.applyEligibilityError?.(eligibilityReadError(
+    accountResult.status === "rejected" ? accountResult.reason : null,
+    eligibilityResult.status === "rejected" ? eligibilityResult.reason : null,
+  ));
+  if (!accountAvailable || !eligibilityAvailable) {
     console.warn("GENESIS_PROTECTED_READ_UNAVAILABLE", {
-      reason: protectedReadError,
-      accountAvailable: accountResult.status === "fulfilled",
-      eligibilityAvailable: eligibilityResult.status === "fulfilled",
+      reason: eligibilityReadError(
+        accountResult.status === "rejected" ? accountResult.reason : null,
+        eligibilityResult.status === "rejected" ? eligibilityResult.reason : null,
+      ),
+      accountAvailable,
+      eligibilityAvailable,
     });
-    scope.clearAccount();
-    scope.applyEligibilityError?.(protectedReadError);
   }
   return true;
 }
