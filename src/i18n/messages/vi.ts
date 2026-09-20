@@ -2241,6 +2241,8 @@ export const vi: Messages = {
     purchaseEligibilityQuotaDepleted: "Đã hết số lượng có thể bán trong tháng",
     purchaseEligibilityNoFacts: "Máy chủ không trả về chi tiết điều kiện này.",
     purchaseEligibilityPolicyMet: "Kết quả: đã đáp ứng",
+    // zentao #29: chính sách không có dữ kiện điều kiện thì không được báo là đã đáp ứng.
+    purchaseEligibilityUnconfigured: "Kết quả: chưa cấu hình; không dùng làm căn cứ mua",
     purchaseEligibilityPolicyUnmet: "Kết quả: chưa đáp ứng",
     trialProductUnavailable: "Thiết bị dùng thử tạm thời hết hàng. Vui lòng thử lại sau.",
     productUnavailable: "Sản phẩm này tạm thời chưa thể mua. Hãy quay lại cửa hàng và thử lại.",
