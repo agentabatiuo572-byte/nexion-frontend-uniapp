@@ -32,6 +32,13 @@ export interface CanonicalDailyPowerUp {
   effectType: string;
   effectValue: string;
   status: DailyPowerUpStatus;
+  /**
+   * 该权益指向的业务当前是否对客可用;null = 该档不依赖受管业务。
+   *
+   * 服务端在业务停用(质押整池熔断 / Genesis 未开放)时给 false,客户端据此不再
+   * 向用户承诺「激活后可用」。可选:旧服务端不返回该字段时为 null(= 不适用)。
+   */
+  businessAvailable: boolean | null;
 }
 
 export interface CanonicalTopStreaker {
@@ -234,6 +241,8 @@ function parsePowerUp(value: unknown): CanonicalDailyPowerUp {
   const effectType = text(row?.effectType);
   const effectValue = typeof row?.effectValue === "string" ? row.effectValue : null;
   const status = text(row?.status)?.toUpperCase() as DailyPowerUpStatus;
+  // 可选布尔:缺失/非布尔一律 null(= 该档不依赖受管业务),不把未知说成停用。
+  const businessAvailable = typeof row?.businessAvailable === "boolean" ? row.businessAvailable : null;
   if (!row || powerUpId === null || !powerUpCode || !name || unlockStreakDays === null
       || !targetPath || !effectType || effectValue === null
       || !["LOCKED", "AVAILABLE", "ACTIVATED"].includes(status)) {
@@ -245,6 +254,7 @@ function parsePowerUp(value: unknown): CanonicalDailyPowerUp {
     name,
     unlockStreakDays,
     targetPath,
+    businessAvailable,
     effectType,
     effectValue,
     status,
