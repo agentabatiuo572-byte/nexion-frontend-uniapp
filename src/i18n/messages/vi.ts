@@ -513,6 +513,9 @@ export const vi: Messages = {
     networkYourRank: "Hạng của bạn",
     // FEAT-HOME02 phụ đề 3 ô nhịp mạng + 3 trạng thái hạng
     networkMembersSub: "+{n}%/tháng",
+    networkVerifiedMembers: "Đo từ máy chủ · {at}",
+    networkVerifiedDevices: "Đo từ máy chủ · {at}",
+    networkVerifiedScope: "Tổng hợp đo từ máy chủ · ghi lúc {at} · xem định nghĩa API",
     networkDevicesSub: "chạy tác vụ",
     networkRankUp24h: "+{n} bậc/24h",
     // 🔴 值槽 90.3px@20px 装不下任何含 "hạng" 的越南语说法(实测:Chưa xếp hạng 139.1 /
@@ -3422,6 +3425,7 @@ export const vi: Messages = {
     tabAll: "Tất cả",
     tabIn: "Tiền vào",
     tabOut: "Tiền ra",
+    tabGroupLabel: "Loại giao dịch",
     typeEarn: "Thu nhập",
     typeRefer: "Giới thiệu",
     typeBonus: "Thưởng",
@@ -3738,6 +3742,8 @@ export const vi: Messages = {
     regionProjectionErrorTitle: "Không thể tải mạng theo khu vực",
     regionProjectionErrorDesc: "Không thể đọc dữ liệu máy chủ. Hãy kiểm tra kết nối và thử lại.",
     regionLatencyUnavailable: "Độ trễ TB {n}",
+    latencyTelemetryMissing: "Độ trễ TB chưa thu thập",
+    latencyTelemetryMissingHint: "Máy chủ không báo cáo dữ liệu độ trễ nên không hiển thị số; trạng thái trực tuyến theo nhịp tim.",
     metricUnavailable: "--",
     projectionUpdatedAt: "Máy chủ cập nhật lúc {at}",
     uptimeLine: "Thời gian hoạt động {v}",
@@ -4399,6 +4405,7 @@ export const vi: Messages = {
       pool: "Quỹ",
       votes: "phiếu",
       unlimitedExtended: "Mở rộng không giới hạn",
+      peerNotDispatched: "Cùng cấp {n}% · chưa mở",
     },
     cond: {
       selfBuy: "Tự mua ≥ ${n}",
@@ -5088,6 +5095,7 @@ export const vi: Messages = {
     projectionErrorDesc: "Không lấy được dữ liệu quyền lực từ máy chủ. Lỗi tải sẽ không được hiển thị giả thành 0 thành viên hoặc 0 doanh số.",
     retry: "Thử lại",
     diagramYou: "BẠN",
+    selfNodeLabel: "Bạn · V{n} · chính bạn, mở cấp bậc của tôi",
   },
 
   tree: {
@@ -5698,6 +5706,7 @@ export const vi: Messages = {
     refreshing: "Đang làm mới…",
     refreshStatus: "Làm mới tiến độ",
     goComplete: "Đi hoàn thành",
+    targetClosed: "Nghiệp vụ của nhiệm vụ này đang tạm dừng, chưa thể hoàn thành",
     bonusCta: "Nhận thưởng Weekly Champion · +{n} NEX",
     bonusClaimed: "Weekly Champion · đã nhận {n} NEX + huy hiệu",
 

@@ -221,29 +221,46 @@ const metrics = computed<Cell[]>(() => {
   //   在线率越域 / 增速为负 / 虚拟人口为负都算非法 → 对应格占位,禁拿回退锚冒充真数据。
   const h = health.value;
 
+  // 🔴 服务端可核验聚合优先(zentao #59)。`ps` 里的 fleetDevices / registeredUsersBase
+  //   是运营手填的**展示配置**,拿它们当「注册用户 / 在线设备」的事实陈述,就是把配置
+  //   当实测对外发布。`verified` 存在时这两格改读真实表聚合,并标注为服务端实测。
+  //   沙箱没有真实数据 → 保持原有的「平台公布口径」标注,不冒充实测。
+  const verified = cfg.config.verifiedStats;
+  const verifiedAt = verified ? verified.capturedAt.slice(0, 16).replace("T", " ") : "";
+
   // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
   const membersBad = failed || !h.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
   const members: Cell = membersBad
     ? placeholderCell(t.value.home.networkMembers)
-    : {
-        k: t.value.home.networkMembers,
-        v: compact(registered.value),
-        tone: "var(--v5-ink)",
-        sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
-        data: ramp(registered.value),
-        color: "var(--v5-brand)",
-      };
+    : verified
+      ? {
+          k: t.value.home.networkMembers,
+          v: compact(verified.registeredAccounts.value),
+          tone: "var(--v5-ink)",
+          sub: fmt(t.value.home.networkVerifiedMembers, { at: verifiedAt }),
+          data: ramp(verified.registeredAccounts.value),
+          color: "var(--v5-brand)",
+        }
+      : {
+          k: t.value.home.networkMembers,
+          v: compact(registered.value),
+          tone: "var(--v5-ink)",
+          sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
+          data: ramp(registered.value),
+          color: "var(--v5-brand)",
+        };
 
-  // 格 2 在线设备 —— 值来自 store 的呼吸态(基线与带宽都由配置驱动,见 app.ts)
-  const devicesBad = failed || !h.devicesOk;
+  // 格 2 在线设备 —— 有可核验聚合时读真实在线设备数;否则回退到公布口径(已标注非实时)
+  const devicesBad = failed || (!verified && !h.devicesOk);
+  const devicesValue = verified ? verified.onlineDevices.value : app.global.activeDevices;
   const devices: Cell = devicesBad
     ? placeholderCell(t.value.home.networkEstimatedDevices)
     : {
-        k: t.value.home.networkEstimatedDevices,
-        v: compact(app.global.activeDevices),
+        k: verified ? t.value.home.networkDevices : t.value.home.networkEstimatedDevices,
+        v: compact(devicesValue),
         tone: "var(--v5-ink)",
-        sub: t.value.home.networkPublished,
-        data: ramp(app.global.activeDevices),
+        sub: verified ? fmt(t.value.home.networkVerifiedDevices, { at: verifiedAt }) : t.value.home.networkPublished,
+        data: ramp(devicesValue),
         color: "var(--v5-tech-cyan-ink)",
       };
 

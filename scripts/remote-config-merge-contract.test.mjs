@@ -58,6 +58,16 @@ const SERVED_PLATFORM = {
         { tops: 2_400, cumPct: 100 },
       ],
     },
+    // 可核验聚合(zentao #59)。值同样**刻意偏离任何本地默认**(本地一律 null),
+    // 使「合并了」与「漏合并」可区分 —— 与上面 31337 / 0.45 同一个反空过理由。
+    verified: {
+      activeAccounts: { value: 18_402, definition: "nx_user.status=ACTIVE", kind: "COUNT" },
+      registeredAccounts: { value: 21_377, definition: "nx_user.is_deleted=0", kind: "COUNT" },
+      installedDevices: { value: 9_918, definition: "nx_user_device.is_deleted=0", kind: "COUNT" },
+      onlineDevices: { value: 7_731, definition: "OWNED+ACTIVATED 且 runtime ONLINE", kind: "COUNT" },
+      completedPayoutUsdt: { value: 1_234_567.89, definition: "nx_withdrawal_order COMPLETED 合计", kind: "SUM_USDT" },
+      capturedAt: "2026-08-11T00:00:00Z",
+    },
   },
   // 🔴 0.45 / 3 是**刻意偏离种子**(种子是 0.6 / 2)。首版 fixture 照抄了种子值,
   //   结果抽掉 `onlineBonus: remote.onlineBonus` 这行合并、本门照样全绿 —— 服务端值

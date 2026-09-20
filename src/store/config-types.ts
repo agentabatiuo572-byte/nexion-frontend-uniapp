@@ -243,9 +243,40 @@ export interface PublicStatsConfig {
   hashratePercentileTable: { tops: number; cumPct: number }[];
 }
 
+/**
+ * 服务端可核验事实聚合(zentao #59)。
+ *
+ * `publicStats` 里的 fleetDevices / registeredUsersBase 是**运营手填的展示配置**,
+ * 据此派生「已付 / 收入 / 在线」这类事实性指标,就是把配置当实测对外发布。
+ * 这里的每个数都来自真实表聚合,自带口径(definition)与统计时刻(capturedAt)。
+ *
+ * 🔴 沙箱环境没有真实数据,整段为 null —— 「不知道」不能变成 0,也不能退回配置值。
+ */
+export interface PlatformVerifiedAggregate {
+  value: number;
+  definition: string;
+  kind: string;
+}
+
+export interface PlatformVerifiedStats {
+  activeAccounts: PlatformVerifiedAggregate;
+  registeredAccounts: PlatformVerifiedAggregate;
+  installedDevices: PlatformVerifiedAggregate;
+  onlineDevices: PlatformVerifiedAggregate;
+  /** 累计已完成提现(USDT)。金额聚合,保留小数。 */
+  completedPayoutUsdt: PlatformVerifiedAggregate;
+  capturedAt: string;
+}
+
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
   publicStats: PublicStatsConfig;
+  /**
+   * 服务端可核验聚合(zentao #59)。与 `publicStats` 的区别是**数据性质**:
+   * `publicStats` 是运营手填的展示配置,`verifiedStats` 是真实表聚合。
+   * 对外「在线设备 / 账号数」这类事实表述必须读这里;沙箱为 null。
+   */
+  verifiedStats: PlatformVerifiedStats | null;
   onlineBonus: OnlineBonus;
   riskCluster: RiskClusterConfig;
   withdrawRules: WithdrawRulesConfig;
@@ -272,8 +303,10 @@ type RuntimeWithdrawRuleKey =
  * Runtime consumers always receive a complete `PlatformConfig`; the config
  * store supplies newly required fields outside the Mock dataset boundary.
  */
-export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "withdrawRules" | "otpGate"> & {
+export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "verifiedStats" | "withdrawRules" | "otpGate"> & {
   publicStats?: PublicStatsConfig;
+  /** 本地 mock 没有可核验聚合;compat 会补 null。 */
+  verifiedStats?: PlatformVerifiedStats | null;
   withdrawRules: Omit<WithdrawRulesConfig, RuntimeWithdrawRuleKey> &
     Partial<Pick<WithdrawRulesConfig, RuntimeWithdrawRuleKey>>;
   otpGate: Omit<OtpGateConfig, "captchaAlwaysScenes"> &

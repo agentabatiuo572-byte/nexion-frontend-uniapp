@@ -243,7 +243,13 @@ function producedKinds(src) {
   //     已激活的档不动。主售与二级各读各的闸(genesisPrimaryClosed /
   //     genesisSecondaryClosed),不共用一句「创世关了」——二级卖的是存量,主售售罄
   //     不妨碍转让,合并判断会在售罄时误停二级。
-  const EXPECTED_GATE_CONSUMERS = 12;
+  //   ✅ 2026-09-20 12→13:conversion-banner.vue(首页周任务卡)接闸(BUG 127/155)。
+  //     与 weekly-quest-hero/list 同一个缺陷面:hero 与列表早就在关闭态撤 CTA,而首页
+  //     这张卡仍直接 navTo(actionRoute) —— 同一屏三处对同一条任务给出两种结论,用户点进
+  //     一个明说「已暂停」的页面。**真闸不是报警**:目标业务整体不可用时撤掉 CTA、
+  //     去掉 button 角色并说明原因,已挣到的 CLAIMABLE 不在此组件内处理。
+  //     判据与 hero/list 同源(useQuestTargetAvailability + 创世闸),不新增第二份读数。
+  const EXPECTED_GATE_CONSUMERS = 13;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }

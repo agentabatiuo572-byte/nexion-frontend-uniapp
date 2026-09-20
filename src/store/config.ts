@@ -212,6 +212,7 @@ export const useConfig = defineStore("config", () => {
         //   本行由 scripts/remote-config-merge-contract.test.mjs 的覆盖等式钉着:
         //   解析器返回的每个属于 PlatformConfig 的字段都必须在这里落地,漏一个即红。
         publicStats: remote.publicStats,
+        verifiedStats: remote.verifiedStats,
         onlineBonus: remote.onlineBonus,
         rewards: remote.rewards,
         computeShare: remote.computeShare,

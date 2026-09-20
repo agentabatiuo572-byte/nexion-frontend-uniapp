@@ -2634,12 +2634,16 @@ platform_stats_anchor() {
   #   「配置派生 + publicStatsHealth 门控 + '—' 占位」,MONTHLY_NEW_JOINERS / FLEET_DEVICES
   #   两个消费对合法消亡(符号已从 import 整条移除,非死 import);消费对改钉 health 门控
   #   接线,坏配置回落到编译期像真数据的旧路径若复活,这两条计数会先红。
+  # (4-注3)2026-09-20 zentao #59:ref/code.vue 的两对消费(`publicStatsHealth` /
+  #   `monthlyPayoutUsdOf`)是**合法消亡**,不是被摘:该页的「已付 / 本月新增」原先由
+  #   运营配置的 fleetDevices × 公布档位、配置基数 × 配置增速派生 —— 那正是本缺陷要消除的
+  #   「把人工配置当实测财务事实发布」。现在这两格改读服务端可核验聚合 `verifiedStats`,
+  #   没有聚合时显示 '—'。判据随之下移而不是放宽:该页不得再出现配置派生财务量,
+  #   且必须消费 verifiedStats(见下方 4c)。
   for pair in \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
-    'src/pages/ref/code.vue|publicStatsHealth' \
     'src/store/app.ts|publicStatsHealth' \
-    'src/pages/onboarding/intro.vue|onlineDevicesOf' \
-    'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
+    'src/pages/onboarding/intro.vue|onlineDevicesOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
     # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
@@ -2686,8 +2690,21 @@ platform_stats_anchor() {
     fi
   fi
   # joiners/fleet 的健康门控接线(z1):坏配置必须落 '—' 占位,不许渲染像真数字。
-  if ! sed -E 's|(^\|[^:])//.*$|\1|' src/pages/ref/code.vue 2>/dev/null | grep -q 'membersOk'; then
-    bad "platform-anchor: code.vue joiners 未走 membersOk 健康门控"; fails=1
+  # (4c)2026-09-20 zentao #59 起,ref/code.vue 的对外财务事实改读服务端可核验聚合:
+  #   · 必须消费 verifiedStats(否则又回到配置派生);
+  #   · 不得再出现 monthlyPayoutUsdOf / registeredUsersBase×增速 这类配置派生财务量
+  #     (它们是把人工配置当实测发布,正是本缺陷);
+  #   · 没有聚合时必须落 '—' 占位。
+  #   判据比旧版更严:旧版只要求「走 membersOk 门控」,而配置值本身合规也能过门。
+  _codevue=$(sed -E 's|(^\|[^:])//.*$|\1|' src/pages/ref/code.vue 2>/dev/null)
+  if ! echo "$_codevue" | grep -q 'verifiedStats'; then
+    bad "platform-anchor: code.vue 未消费服务端可核验聚合 verifiedStats(对外财务事实不得由配置派生)"; fails=1
+  fi
+  if echo "$_codevue" | grep -qE 'monthlyPayoutUsdOf|registeredUsersMonthlyGrowthPct'; then
+    bad "platform-anchor: code.vue 又用配置派生对外财务量(已付/新增不得由公布口径推出)"; fails=1
+  fi
+  if ! echo "$_codevue" | grep -q '"—"'; then
+    bad "platform-anchor: code.vue 无可核验聚合时未落 '—' 占位"; fails=1
   fi
   # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
   for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do

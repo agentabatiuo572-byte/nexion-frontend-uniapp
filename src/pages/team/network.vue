@@ -104,8 +104,20 @@
               />
             </g>
 
-            <!-- center YOU node -->
-            <g>
+            <!-- center YOU node — also a real focusable control. The member orbs
+                 were named, but the root node stayed a bare graphic: with 0 members
+                 it is the only node on screen, so a keyboard/screen-reader user
+                 could not reach the page's declared core action at all (BUG 96).
+                 Same SVGElement constraint as the orbs: hand-written keydown. -->
+            <g
+              class="nx-net-node cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-label="selfNodeLabel"
+              @click="openSelf"
+              @keydown.enter.prevent="openSelf"
+              @keydown.space.prevent="openSelf"
+            >
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
               <SvgText x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">{{ t.network.diagramYou }}</SvgText>
               <SvgText x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="color-mix(in srgb, var(--v5-brand) 85%, transparent)" letter-spacing="1.5">{{ myRankText }}</SvgText>
@@ -199,6 +211,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { onShow } from "@dcloudio/uni-app";
+import { navTo } from "@/lib/route";
 
 const VIEW = 360;
 const CENTER = VIEW / 2;
@@ -289,6 +302,14 @@ function memberRankTitle(m: NetworkMember): string {
 // member, their rank and the relation (direct / extended) so a screen reader user
 // can pick a node without seeing the graphic. rankLabel always carries `V{n}` —
 // rankTitle alone renders empty when the ladder has not loaded (remote mode).
+// 中心「你」节点的可访问名称与激活行为。它不打开成员详情(自己没有 NetworkMember 行),
+// 而是进入「我的等级」——这是根节点在页面上唯一有意义的动作。名称始终带 V{n},等级未就绪时
+// 用 — 占位,绝不产出空名(空 aria-label 等于没有可访问名称)。
+const selfNodeLabel = computed(() => fmt(t.value.network.selfNodeLabel, { n: myRankText.value }));
+function openSelf() {
+  void navTo("/pages/team/rank");
+}
+
 function nodeLabel(p: Plotted): string {
   const relation = p.kind === "direct" ? t.value.network.badgeDirect : t.value.network.badgeExtended;
   return `${p.m.name} · ${rankLabel(p.m.vRank, isZh.value, vRank.ladder)} · ${relation}`;

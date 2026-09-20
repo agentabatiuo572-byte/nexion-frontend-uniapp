@@ -89,7 +89,10 @@
               <view class="flex" style="margin-top: 8px; gap: 6px; flex-wrap: wrap">
                 <text v-if="r.directBonus > 0.05" :style="chipStyle('default')">{{ t.rank.chips.direct }} {{ Math.round(r.directBonus * 100) }}%</text>
                 <text v-if="r.unilevelDepth > 1" :style="chipStyle('default')">{{ r.unilevelDepth >= 99 ? t.rank.chips.unlimitedExtended : t.teamV3.extendedRoyalty }}</text>
-                <text v-if="r.peerBonus > 0" :style="chipStyle('default')">{{ t.rank.chips.peer }} {{ Math.round(r.peerBonus * 100) }}%</text>
+                <!-- 平级奖励今天不派发(服务端能力位,与玩法说明同源)时,不能把配置比例
+                     写成已生效权益 —— 否则用户会以为升级即可获得 5% 平级收益(#79)。 -->
+                <text v-if="r.peerBonus > 0 && !vState.capabilities.peer" :style="chipStyle('muted')">{{ fmt(t.rank.chips.peerNotDispatched, { n: Math.round(r.peerBonus * 100) }) }}</text>
+                <text v-else-if="r.peerBonus > 0" :style="chipStyle('default')">{{ t.rank.chips.peer }} {{ Math.round(r.peerBonus * 100) }}%</text>
                 <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">{{ t.rank.chips.pool }} {{ r.leadershipVotes }} {{ t.rank.chips.votes }}</text>
                 <text v-if="r.cultivationBonus > 0" :style="chipStyle('lemon')">🎁 {{ r.cultivationBonus.toLocaleString() }} NEX</text>
                 <text v-for="reward in nonNexRewards(r)" :key="`${r.v}-${reward.type}-${reward.voucherId ?? reward.skuId ?? reward.customLabel ?? reward.amount}`" :style="chipStyle('lemon')">🎁 {{ rewardText(reward) }}</text>
@@ -118,6 +121,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useVRank, nextRankProgress, type VRank, type VRankDef, type VRankReward } from "@/store/v-rank";
 import { rankGapText, rankConditionsText, rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
@@ -277,9 +281,11 @@ const currentTagStyle: CSSProperties = {
 // SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[12px] leading-snug; was 1.45)
 const condStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 
-function chipStyle(kind: "default" | "purple" | "lemon"): CSSProperties {
+function chipStyle(kind: "default" | "purple" | "lemon" | "muted"): CSSProperties {
   const map = {
     default: { background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)", color: "var(--v5-ink-3)" },
+    // 未开放的权益用更弱的视觉:它仍是信息(该等级配置了比例),但不是可获得的承诺。
+    muted: { background: "color-mix(in srgb, var(--v5-surface-2) 40%, transparent)", color: "var(--v5-ink-4)", textDecoration: "line-through" },
     purple: { background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)", color: "var(--v5-brand-2)" },
     lemon: { background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)", color: "var(--v5-brand)" },
   } as const;

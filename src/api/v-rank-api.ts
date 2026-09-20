@@ -48,6 +48,14 @@ export type CanonicalVRankReward = MonetaryVRankReward | EntitlementVRankReward;
 export interface CanonicalVRankLadder {
   source: string;
   prizeName: string;
+  /**
+   * 服务端能力位:某类收益今天是否真的会派发。
+   *
+   * 🔴 等级阶梯里的 peerBonus 是「该等级配置的比例」,不是「现在会发」。没有这个
+   *   能力位,App 只能把配置比例当成已生效权益展示(V3–V12 逐级「平级 5%」),
+   *   与玩法说明的「未开放」自相矛盾(zentao #79)。
+   */
+  capabilities: { peer: boolean; genesis: boolean };
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string;
@@ -164,9 +172,15 @@ function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   const source = record(value);
   const proof = provenance(source, mode);
   if (!Array.isArray(source.ranks)) return invalid();
+  const capabilities = record(source.capabilities);
+  if (typeof capabilities.peer !== "boolean" || typeof capabilities.genesis !== "boolean") return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
   if (ranks.length !== 13 || ranks.some((rank, index) => rank.v !== index)) return invalid();
-  return { source: text(source.source), prizeName: text(source.prizeName), ...proof, ranks };
+  return {
+    source: text(source.source), prizeName: text(source.prizeName),
+    capabilities: { peer: capabilities.peer, genesis: capabilities.genesis },
+    ...proof, ranks,
+  };
 }
 
 function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {

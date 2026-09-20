@@ -107,7 +107,7 @@
         <!-- BUG #59: these two figures are operator-published platform aggregates, not a
              measured month-to-date feed. Without the scope label the card reads as a live
              fact and the numbers carry no timestamp, basis, or source. -->
-        <text class="block" :style="proofScopeStyle">{{ t.home.networkPublishedScope }}</text>
+        <text class="block" :style="proofScopeStyle">{{ verifiedScopeText }}</text>
       </view>
 
       <!-- Partner wall -->
@@ -160,7 +160,6 @@ import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
-import { monthlyPayoutUsdOf, publicStatsHealth } from "@/lib/platform-stats";
 import { visibleReferralGift } from "@/lib/referral-reward-gate";
 import {
   referralCtaMode,
@@ -178,17 +177,27 @@ const remotePreviewState = ref<ReferralPreviewState>("idle");
 const countryCount = ref<number | null>(null);
 const countryCountText = computed(() => remoteApiEnabled && countryCount.value !== null ? String(countryCount.value) : "—");
 const proofScopeStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-4)" };
+// 🔴 对外财务事实只能来自可核验聚合(zentao #59)。
+//   此前「已付」= 运营配置的设备数 × 公布档位 × 30,「本月新增」= 配置基数 × 配置增速 ——
+//   两者都是把人工配置当实测对外发布。现在:
+//     · 有 verified 聚合时,读真实提现完成额与真实注册账号数,并标注来源与统计时刻;
+//     · 没有(沙箱/旧后端)时显示「—」,不再用配置值编造一个看起来像事实的数字。
+const verified = computed(() => cfg.config.verifiedStats);
 const paidOutText = computed(() => {
-  const ps = cfg.config.publicStats;
-  return !cfg.syncFailed && publicStatsHealth(ps).fleetOk
-    ? `$${(monthlyPayoutUsdOf(ps) / 1_000_000).toFixed(1)}M`
-    : "—";
+  const v = verified.value;
+  if (cfg.syncFailed || !v) return "—";
+  return `$${(v.completedPayoutUsdt.value / 1_000_000).toFixed(2)}M`;
 });
 const joinersText = computed(() => {
-  const ps = cfg.config.publicStats;
-  return !cfg.syncFailed && publicStatsHealth(ps).membersOk
-    ? Math.round(ps.registeredUsersBase * ps.registeredUsersMonthlyGrowthPct / 100).toLocaleString("en-US")
-    : "—";
+  const v = verified.value;
+  if (cfg.syncFailed || !v) return "—";
+  return v.registeredAccounts.value.toLocaleString("en-US");
+});
+/** 可核验聚合的统计时刻与口径,附在卡片底部;没有聚合时不显示任何「已核对」表述。 */
+const verifiedScopeText = computed(() => {
+  const v = verified.value;
+  if (!v) return t.value.home.networkPublishedScope;
+  return fmt(t.value.home.networkVerifiedScope, { at: v.capturedAt.slice(0, 16).replace("T", " ") });
 });
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();

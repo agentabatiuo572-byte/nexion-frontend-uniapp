@@ -129,8 +129,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
   // Unknown server time keeps changes closed and exposes an accessible read-only refresh.
   "wallet-address-rebind.vue": "a24907e30eec77cda6495fff61782daacd487ef76f3e0bf273baac60bbc2bffd",
-  // Wallet filter pills expose keyboard button semantics and their selected state; styles are unchanged.
-  "wallet-bills.vue": "c16daae93135450d6f3b383abdf3fcb58398dfac1c30c338a15eebb254cc3658",
+  // 账单类型是互斥单选(选一个,其余取消)。此前用 role="button" + aria-pressed,浏览器
+  // 按 toggle button 暴露、读屏按复选框朗读 —— 用户会以为能同时选多个类型(zentao #94)。
+  // 改 radiogroup/radio + aria-checked,并补 Enter/Space;视觉样式与原型一致,未改动。
+  "wallet-bills.vue": "d227321b95688924a0aa6a0fa7387e4c240c431d5cbe4a7a9bd0838b5fbc1580",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
   // #88: cardholder input carries its visible label as an accessible name.
