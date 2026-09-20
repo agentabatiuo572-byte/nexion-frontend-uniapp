@@ -157,7 +157,10 @@ test("eligible first-time users retain a visible H2 claim entry which opens the 
   // opening the sheet still requires the current detailed eligibility result.
   // The store's product-unavailable offer discloses stock without permitting a claim.
   assert.match(hero, /const eligibility = computed\(\(\) => trial\.eligibility\(\)\);/);
-  assert.match(hero, /const canClaim = computed\(\(\) => trial\.status === "none" && eligibility\.value\.ok\);/);
+  // BUG 173:已确认可领取的快照在后台重拉期间保持可点 —— 此前只看 eligibility.value.ok,
+  // 于是每次刷新都会把已展示的卡片短暂禁用(报告里 7.0s 那一段)。
+  // 首帧(无确认快照)仍不可点,领取本身仍由 start() 走权威校验。
+  assert.match(hero, /const canClaim = computed\(\(\) => trial\.status === "none"\s+&& \(eligibility\.value\.ok \|\| trial\.confirmedOfferState\(\) === "claimable"\)\);/);
   assert.match(hero, /const visible = computed\(\(\) => trial\.status === "none"\s+&& trialCfg\.config\.seatsLeftToday > 0\s+&& trial\.showHeroPromo\(\)\);/);
   const trialStore = read("src/store/free-trial.ts");
   assert.match(trialStore, /confirmedHeroVisible\.value = next\.status === "none"\s+&& \(next\.canStart \|\| next\.eligibilityReason === "product-unavailable"\)/);

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialDeviceName } from "./trial-config";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
@@ -368,6 +368,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   /**
+   * 试用推广槽位的三态(BUG 173)。只有「显示/不显示」两态时,remoteApiEnabled 下
+   * 首帧恒等于「不显示」——卡片整块不渲染,等首次读取回来才凭空插入,把下面所有
+   * 模块整体推下去。页面必须能区分「还没问过服务器」(pending,渲染固定高度骨架)
+   * 与「服务器说没有」(hidden,真正不占位)。
+   * 已确认过的可领取快照在后台重拉期间保持 visible,不回退成 pending/hidden。
+   */
+  const promoSlot = computed<"pending" | "visible" | "hidden">(() => {
+    if (confirmedPromoVisible.value) return "visible";
+    if (!remoteApiEnabled) return canStart() ? "visible" : "hidden";
+    return authorityStatus.value === "loading" || authorityStatus.value === "unknown"
+      ? "pending" : "hidden";
+  });
+
+  /**
    * Offer state for the promotional surfaces, retaining the LAST CONFIRMED
    * answer while a background read is in flight. Both banners key their action
    * label off this so a re-read cannot change the button width/structure
@@ -595,6 +609,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
     authorityClaimNo, authorityVersion, authorityServerState,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
+    promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot,
     refreshRemote, refreshEligibilityRemote,
   };

@@ -31,7 +31,13 @@
 
       <WithdrawalLockedWarning v-if="showWithdrawalLocked" :balance="usdtBalance" />
 
-      <!-- Hero slot — zero-cost trial activation right after wallet -->
+      <!-- Hero slot — zero-cost trial activation right after wallet.
+           BUG 173: 三态占位 —— 首次读取期间渲染固定高度骨架,已确认后才一次性
+           呈现最终卡片,避免卡片延迟出现把下面的模块整体推下去。 -->
+      <view v-if="!trialIsActive && trial.promoSlot === 'pending'" aria-hidden="true" :style="trialSkeletonStyle" data-me-trial-state="pending">
+        <view :style="trialSkeletonTitleStyle" />
+        <view :style="trialSkeletonSubStyle" />
+      </view>
       <TrialEntry v-if="trialIsHero" />
 
       <view v-for="section in quickSections" :key="section.key">
@@ -253,11 +259,13 @@ const themeModeLabel = computed(() =>
 );
 
 // Trial routing — hero slot (eligible to start) vs active row (running).
+// BUG 173: 槽位是三态,不是两态 —— 首次读取期间用固定高度骨架占位,避免
+// 卡片在数据到达时凭空插入把下面的模块整体推下去。
 const trialStatus = computed(() => trial.status);
 const trialIsActive = computed(
   () => trialStatus.value === "active" || trialStatus.value === "grace",
 );
-const trialIsHero = computed(() => !trialIsActive.value && trial.showPromo());
+const trialIsHero = computed(() => !trialIsActive.value && trial.promoSlot === "visible");
 
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.
@@ -370,7 +378,11 @@ async function refreshRemoteSecurity() {
 }
 
 async function refreshRemoteTrial() {
-  await trial.refreshRemote(true);
+  // BUG 173: 原来是 state + eligibility 两次串行 RTT —— 卡片 4.2s 才出现、
+  // 7.0s 第二次置 loading 又把它禁掉,用户看到两段抖动。
+  // GET /api/trial/state 的权威答复里已经带 canStart/eligibilityReason,
+  // 一次读取就能定态;eligibility 读取只留作 state 读失败后的修复路径。
+  if (await trial.refreshRemote(true)) return;
   await trial.refreshEligibilityRemote();
 }
 
@@ -427,6 +439,28 @@ function toneColor(tone: QuickTone = "muted"): string {
       return "var(--v5-ink-2)";
   }
 }
+
+// BUG 173 骨架:高度对齐 TrialPromoBanner 的 18px+4px+18px 上下留白 + 两行文本,
+// 让 pending → visible 的替换不发生任何纵向位移。
+const trialSkeletonStyle: CSSProperties = {
+  padding: "18px 0",
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+};
+const trialSkeletonTitleStyle: CSSProperties = {
+  width: "58%",
+  height: "20px",
+  borderRadius: "6px",
+  background: "color-mix(in srgb, var(--v5-ink) 8%, transparent)",
+};
+const trialSkeletonSubStyle: CSSProperties = {
+  marginLeft: "14px",
+  width: "34%",
+  height: "18px",
+  borderRadius: "6px",
+  background: "color-mix(in srgb, var(--v5-ink) 6%, transparent)",
+};
 
 const quickGridCardStyle: CSSProperties = {
   padding: "18px 10px",

@@ -1257,7 +1257,7 @@ export const en = {
     checkboxLabel: "I have read and understood the risk disclosures in all 7 sections above.",
     checkboxRequired: "Please tick the acknowledgement above first.",
     acceptCta: "I acknowledge — continue",
-    disclaimer: "Acknowledgment is logged with timestamp. Re-reading is available anytime via Me → Risk disclosure.",
+    disclaimer: "Acknowledgment is logged with timestamp. Re-reading is available anytime via {tab} → Risk disclosure.",
     acceptToast: "Risk disclosure acknowledged · You can now access withdraw / staking / lock features.",
     sectionSelected: "Section {n} selected",
     reloadRegionCta: "Reload the disclosures for your region",
@@ -2388,10 +2388,14 @@ export const en = {
     inviteShareText:
       "I'm earning passive income on NexGrid — turn your phone into an AI cluster. Sign up with my link and we both get $200: {url}",
     inviteLinkCopied: "Link copied — share anywhere",
+    inviteCodeCopied: "Invitation code copied",
     inviteShareCode: "Code",
     inviteShareLink: "Link",
     inviteSharePoster: "Poster",
     inviteShareQR: "QR + image",
+    invitePosterAria: "Generate invite poster",
+    inviteCopyCodeAria: "Copy invitation code",
+    inviteCopyLinkAria: "Copy invite link",
     orShareVia: "or share via",
   },
   wallet: {
@@ -3230,6 +3234,9 @@ export const en = {
     remoteSource: "Source: {source} · language: {language}",
     remoteFailed: "Nova could not answer from the server. No account action was performed.",
     remoteError: "Server error: {code} · language: {language}",
+    botTimeout: "NexGridBot did not answer in time and this question was cancelled. No account action was performed.",
+    botTimeoutHint: "You can retry, or open a ticket instead.",
+    botRetry: "Retry",
     contactSupport: "Contact support",
     contactHint: "View service targets on the tickets page. Actual response times may vary.",
     contactCta: "Open ticket",
@@ -5090,8 +5097,8 @@ export const en = {
   },
 
   repurchase: {
-    ordersTitle: "My re-investments",
-    ordersEmpty: "No re-investments yet",
+    ordersTitle: "My re-investment orders",
+    ordersEmpty: "No re-investment orders yet",
     maturesAt: "Matures at",
     claimAction: "Claim principal and interest",
     earlyAction: "Withdraw early",
@@ -5111,7 +5118,7 @@ export const en = {
     recoveryHint: "The previous request is awaiting confirmation. Retry the original amount with the same operation ID to check its result; do not create another investment until it is resolved.",
     recoveryCta: "Check previous ${amount} request",
     pageTitle: "Re-invest Boost",
-    hero: "Faster withdrawals",
+    hero: "Re-invest Boost",
     benefits: {
       apy: "35% APY · 90 days",
       cultivation: "Cultivation ×1.5",

@@ -75,7 +75,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "help.vue": "5068fc6daf0ee6c2d77b848a8a88c61d4927702f3bde80b6069130d099a4a877",
   // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
   "language.vue": "7e45ccd32787f167793f423b3fbb8439c7bdd2ec585fccd19d2789251c07dc93",
-  "me.vue": "4c844c3c785073e568c38568d4bba897df86325bad2f677428b3588ba6d85aaf",
+  // BUG 173: the trial hero slot is three-state — a fixed-height skeleton holds the
+  // slot while the first authoritative trial read is in flight, so the card cannot
+  // appear late and push every module below it down.
+  "me.vue": "38690fef026420ad8ead1b9f0604dc13a804789e20422f07b88c8b0a470092b9",
   // Keep the selected zero-count category visible and show category-specific empty copy;
   // loading and request failures must not render a successful empty-feed message.
   "notifications.vue": "7731130ef5eda24778d0c4604afa45d5a0df0ff89dde3ac26a7e51f6a06bd81e",

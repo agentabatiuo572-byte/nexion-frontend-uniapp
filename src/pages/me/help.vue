@@ -153,6 +153,17 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>
+        <!-- BUG 175 降级入口:超时/失败后必须给用户出路 —— 重试同一提问,
+             或转人工工单。没有这一行,用户只能看着「正在思考…」干等。 -->
+        <view v-if="botFailure && !thinking" class="flex items-center" :style="botFallbackRowStyle" data-help-action="bot-fallback" role="status" aria-live="polite">
+          <text class="flex-1" :style="botFallbackHintStyle">{{ botFailure === 'timeout' ? w.botTimeoutHint : w.remoteFailed }}</text>
+          <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" :style="botFallbackBtnStyle" data-help-action="bot-retry" role="button" tabindex="0" :aria-label="w.botRetry" @click="retryBot" @keydown.enter.prevent="retryBot" @keydown.space.prevent="retryBot">
+            <text>{{ w.botRetry }}</text>
+          </view>
+          <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" :style="botFallbackTicketStyle" data-help-action="bot-ticket" role="button" tabindex="0" :aria-label="w.contactCta" @click="goTicketCreate" @keydown.enter.prevent="goTicketCreate" @keydown.space.prevent="goTicketCreate">
+            <text>{{ w.contactCta }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- Contact -->
@@ -186,6 +197,7 @@ import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { buildRemoteHelpRequest, novaHelpSource } from "@/lib/help-bot-remote";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { createLatestAbortableRequest } from "@/lib/nova-thinking";
 import { createHelpBotScope, type HelpBotRequest } from "@/lib/help-bot-scope";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { SupportFaq } from "@/domain/support";
@@ -358,6 +370,19 @@ resetBotTranscript();
 const botInput = ref("");
 const thinking = ref(false);
 const botScrollTop = ref(0);
+// BUG 175: 远端 chat 的传输兜底是 120s —— 那是**传输**时限,不是 UI 时限。
+// 把它当 UI 时限,用户会在「正在思考…」上无限等待,而输入框/发送按钮
+// (thinking 期间被禁用)也一起被钉死,无法重试、无法改问。
+const BOT_REPLY_TIMEOUT_MS = 25_000;
+const botRequestControl = createLatestAbortableRequest();
+// 失败后暴露降级入口(重试 / 提交工单);成功或新一轮提问时清掉。
+const botFailure = ref<"timeout" | "error" | null>(null);
+let botDeadline: ReturnType<typeof setTimeout> | null = null;
+
+function clearBotDeadline() {
+  if (botDeadline) clearTimeout(botDeadline);
+  botDeadline = null;
+}
 
 function syncBotAccountScope() {
   const current = helpScope.capture();
@@ -367,6 +392,8 @@ function syncBotAccountScope() {
   resetBotTranscript();
   botInput.value = "";
   thinking.value = false;
+  botFailure.value = null;
+  clearBotDeadline();
 }
 
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => {
@@ -392,48 +419,60 @@ async function sendToBot() {
   helpScope.add({ from: "user", text: q });
   bot.value = [...bot.value, { id: `u-${Date.now()}`, from: "user", text: q }];
   botInput.value = "";
+  botFailure.value = null;
   thinking.value = true;
   bumpScroll();
   if (remoteApiEnabled) {
     const language = locale.code === "zh" || locale.code === "vi" ? locale.code : "en";
     const request = helpScope.capture(language);
+    // BUG 175: 超时/失败必须**必然**结束 thinking,并给出明确原因 + 降级入口。
+    // 单靠 finally 不够:传输层忽略 signal 时 catch/finally 永远不会跑。
+    const control = botRequestControl.begin();
+    const appendBot = (text: string, meta?: string) => {
+      const message = { from: "bot" as const, text, ...(meta ? { meta } : {}) };
+      helpScope.add(message);
+      bot.value = [...bot.value, { id: `b-${Date.now()}`, ...message }];
+    };
+    const abandon = (failure: "timeout" | "error") => {
+      botRequestControl.cancel();
+      botFailure.value = failure;
+      appendBot(
+        failure === "timeout" ? w.value.botTimeout : w.value.remoteFailed,
+        failure === "timeout" ? w.value.botTimeoutHint : undefined,
+      );
+      thinking.value = false;
+      bumpScroll();
+    };
+    clearBotDeadline();
+    botDeadline = setTimeout(() => {
+      if (!helpScope.isCurrent(request) || !botRequestControl.isCurrent(control.epoch)) return;
+      abandon("timeout");
+    }, BOT_REPLY_TIMEOUT_MS);
     try {
       const result = await novaAiApi.chat(buildRemoteHelpRequest(
         q,
         request.language,
         request.conversationId,
         requireCryptoUuid(),
-      ));
+      ), control.signal);
       if (!helpScope.isCurrent(request)) {
         syncBotAccountScope();
         return;
       }
-      const responseMessage = {
-        from: "bot" as const,
-        text: result.reply,
-        meta: fmt(w.value.remoteSource, { source: novaHelpSource(result), language: request.language.toUpperCase() }),
-      };
-      helpScope.add(responseMessage);
-      bot.value = [...bot.value, {
-        id: `b-${Date.now()}`,
-        ...responseMessage,
-      }];
+      // 已被超时分支收尾(epoch 已失效):迟到/被取消的应答不得再追加。
+      if (!botRequestControl.isCurrent(control.epoch)) return;
+      clearBotDeadline();
+      appendBot(result.reply, fmt(w.value.remoteSource, { source: novaHelpSource(result), language: request.language.toUpperCase() }));
     } catch (error) {
       if (!helpScope.isCurrent(request)) {
         syncBotAccountScope();
         return;
       }
+      if (!botRequestControl.isCurrent(control.epoch)) return;
+      clearBotDeadline();
       const failure = asApiError(error);
-      const errorMessage = {
-        from: "bot" as const,
-        text: w.value.remoteFailed,
-        meta: fmt(w.value.remoteError, { code: failure.message, language: request.language.toUpperCase() }),
-      };
-      helpScope.add(errorMessage);
-      bot.value = [...bot.value, {
-        id: `b-${Date.now()}`,
-        ...errorMessage,
-      }];
+      botFailure.value = "error";
+      appendBot(w.value.remoteFailed, fmt(w.value.remoteError, { code: failure.message, language: request.language.toUpperCase() }));
     } finally {
       if (helpScope.isCurrent(request)) {
         thinking.value = false;
@@ -466,6 +505,14 @@ function goSupport() {
 }
 function goTicketCreate() {
   navTo("/pages/me/support-tickets?mode=create");
+}
+/** BUG 175 降级入口:失败后把上一条提问放回输入框并重新发送。 */
+function retryBot() {
+  if (thinking.value) return;
+  const lastUser = [...bot.value].reverse().find((m) => m.from === "user");
+  if (!lastUser) return;
+  botInput.value = lastUser.text;
+  void sendToBot();
 }
 
 const contactLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", minHeight: "44px", paddingLeft: "10px", paddingRight: "10px" };
@@ -560,6 +607,10 @@ const thinkingStyle: CSSProperties = { background: "var(--v5-surface-2)", border
 const thinkingTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const botInputRowStyle: CSSProperties = { gap: "8px", padding: "10px 12px", borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const botInputStyle: CSSProperties = { flex: "1", background: "transparent", fontSize: "13px", color: "var(--v5-ink)" };
+const botFallbackRowStyle: CSSProperties = { gap: "8px", padding: "8px 12px 12px", flexWrap: "wrap" };
+const botFallbackHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", lineHeight: 1.4, minWidth: "140px" };
+const botFallbackBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 12px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)", color: "var(--v5-brand)", fontSize: "12px", fontWeight: 600 };
+const botFallbackTicketStyle: CSSProperties = { minHeight: "32px", padding: "0 12px", borderRadius: "999px", border: "1px solid var(--v5-border)", color: "var(--v5-ink-2)", fontSize: "12px", fontWeight: 600 };
 function sendBtnStyle(active: boolean): CSSProperties {
   return { width: "32px", height: "32px", borderRadius: "8px", background: active ? "var(--v5-brand-2)" : "var(--v5-surface-2)" };
 }

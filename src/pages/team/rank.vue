@@ -22,7 +22,10 @@
           <view>
             <view class="flex items-center justify-between" style="gap: 8px">
               <text class="block" :style="heroCapStyle">{{ t.rank.currentRank }}</text>
-              <view class="inline-flex items-center shrink-0 active:scale-[0.98] transition-transform" :style="howEntryStyle" @click="go('/pages/team/rank-how')">
+              <!-- 规则介绍 pill — 跳转类入口,按契约 §2.1 用 role="link"(只吃 Enter,
+                   Space 留给页面滚动);键盘激活由 lib/a11y-activate.ts 平台层合成,
+                   故不手写 @keydown(BUG 170)。与 commissions.vue 同一药丸写法同源。 -->
+              <view class="nx-rank-how-link inline-flex items-center shrink-0 active:scale-[0.98] transition-transform" :style="howEntryStyle" role="link" tabindex="0" :aria-label="t.rank.howItWorksEntry" @click="go('/pages/team/rank-how')">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
                 <text>{{ t.rank.howItWorksEntry }}</text>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -292,3 +295,13 @@ function chipStyle(kind: "default" | "purple" | "lemon"): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+/* 规则介绍 pill 现在进得了 Tab 序(role+tabindex),没有这条外环键盘用户看不出
+   焦点停在哪 —— 药丸自带 border-radius:999px,默认 outline 贴圆角会被裁。 */
+.nx-rank-how-link:focus-visible {
+  outline: 2px solid var(--v5-brand-2);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+</style>
