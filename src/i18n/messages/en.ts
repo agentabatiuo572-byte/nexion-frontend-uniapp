@@ -4910,6 +4910,9 @@ export const en = {
     loading: "Loading the server leadership pool…",
     loadError: "The leadership pool is unavailable. Check your connection and retry.",
     settlementHold: "Leadership pool settlement is not open yet. The platform must finish configuring the rules. This is not a connection problem.",
+    // The compact summary row (team page "this week's leadership pool") fits only a short state;
+    // the full reason belongs on the detail page (zentao #206).
+    settlementHoldShort: "Not open yet",
     retry: "Reload",
     weekPool: "Week pool",
     weeklyDesc: "{rate} of weekly platform volume · settles in {n}",

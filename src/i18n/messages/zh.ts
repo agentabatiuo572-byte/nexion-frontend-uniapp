@@ -4764,6 +4764,8 @@ export const zh: Messages = {
     loading: "正在读取服务端领导池…",
     loadError: "暂时无法读取领导池，请检查网络后重试。",
     settlementHold: "领导池结算暂未开放，请等待平台完成规则配置。这不是网络故障。",
+    // 紧凑摘要行(团队页「本周领导池」)只放得下一句短状态;完整原因在点进详情页后给出(zentao #206)。
+    settlementHoldShort: "暂未开放",
     retry: "重新加载",
     weekPool: "周池",
     weeklyDesc: "平台周交易 {rate} · {n} 后结算",
