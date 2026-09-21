@@ -40,6 +40,35 @@ const current = {
 };
 
 describe("v-rank API authority provenance", () => {
+  it("keeps the server capability alongside the configured peer rate", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank",
+      capabilities: { peer: false, genesis: false },
+      ranks: ladder().map(item => item.v === 3 ? { ...item, peerBonus: .05 } : item),
+    });
+    const result = await createVRankApi({ request } as never, "prod").ladder();
+    expect(result.capabilities.peer).toBe(false);
+    expect(result.ranks[3].peerBonus).toBe(.05);
+  });
+
+  it("fails closed to no dispatch when an older server omits capabilities", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank", ranks: ladder(),
+    });
+    const result = await createVRankApi({ request } as never, "prod").ladder();
+    expect(result.capabilities).toEqual({ peer: false, genesis: false });
+    expect(result.ranks).toHaveLength(13);
+  });
+
+  it("rejects non-boolean capability values", async () => {
+    const request = vi.fn().mockResolvedValue({
+      source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank",
+      capabilities: { peer: "false", genesis: false }, ranks: ladder(),
+    });
+    await expect(createVRankApi({ request } as never, "prod").ladder())
+      .rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
+  });
+
   it("requires canonical production provenance in remote mode", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "nx_v_rank_config", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", prizeName: "NexGrid V-Rank", capabilities: { peer: false, genesis: false }, ranks: ladder(),

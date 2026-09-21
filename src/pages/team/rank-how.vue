@@ -131,10 +131,10 @@ const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
 const locale = useLocaleStore();
 const isZh = computed(() => locale.code === "zh");
-const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [] });
+const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
 const resource = createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => { state.value = value; } });
-const content = computed(() => buildRankHowContent(state.value.policy, state.value.ranks, locale.code, t.value.rank.cond));
+const content = computed(() => buildRankHowContent(state.value.policy, state.value.ranks, state.value.capabilities, locale.code, t.value.rank.cond));
 const s = (id: string, fallbackTitle?: string) => content.value.section(id, fallbackTitle);
 const sectionId = {
   overview: "overview", overviewDetail: "overview-detail", ladder: "ladder", promotion: "promotion",
