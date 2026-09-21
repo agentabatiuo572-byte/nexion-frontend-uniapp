@@ -57,4 +57,14 @@ describe("controlled wallet descriptions on every consumer", () => {
     expect(nexView("futureCode").view.value[0].label).toBe(en.bills.memo.other);
     expect(rewardsView("futureCode").view.value[0].memo).toBe(en.bills.memo.other);
   });
+  it("distinguishes same-day course rewards by their course reference", () => {
+    // zentao #219:三门课程同日各发 10 NEX,账本三笔完全同名。课程奖励现在有
+    // 自己的表现码,行上带 courseId@version,用户与客服才能逐笔对上课程。
+    const s = rewardsView("learningReward");
+    expect(s.view.value[0].memo).toBe(en.bills.memo.learningReward);
+    s.t.value = zh;
+    expect(s.view.value[0].memo).toBe(zh.bills.memo.learningReward);
+    expect(zh.bills.memo.learningReward).not.toBe(zh.bills.memo.bonus);
+    expect(en.bills.memo.learningReward).not.toBe(en.bills.memo.bonus);
+  });
 });

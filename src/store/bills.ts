@@ -246,6 +246,8 @@ export const useBills = defineStore("bills", () => {
     TRIAL_BONUS: { type: "bonus", memoKey: "trialBonus" },
     QUEST_REWARD: { type: "achievement", memoKey: "questReward" },
     PURCHASE_REWARD: { type: "bonus", memoKey: "purchaseReward" },
+    // 课程奖励(zentao #219):自己的码位,与其它 bonus 区分开。
+    LEARNING_REWARD: { type: "bonus", memoKey: "learningReward" },
     ORDER_PURCHASE: { type: "purchase", memoKey: "purchase", publicReference: "direct" },
     GENESIS_PURCHASE: { type: "purchase", memoKey: "purchase", publicReference: "direct" },
     WITHDRAWAL: { type: "withdraw", memoKey: "withdraw", publicReference: "direct" },
@@ -275,6 +277,7 @@ export const useBills = defineStore("bills", () => {
     trialBonus: "trialBonus",
     questReward: "questReward",
     purchaseReward: "purchaseReward",
+    learningReward: "learningReward",
     earn: "earn",
     refer: "refer",
     bonus: "bonus",

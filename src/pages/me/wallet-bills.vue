@@ -47,7 +47,9 @@
 
       <!-- Empty -->
       <view v-else-if="initialLoading" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
-      <EmptyState v-else-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
+      <!-- 空态按当前筛选说人话(zentao #220):「支出」筛到空时不能说「充值和到账」——
+           那是收入语义,会让用户以为筛选没生效。 -->
+      <EmptyState v-else-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="emptyDesc" />
 
       <!-- Grouped list -->
       <view v-else :style="listWrapStyle">
@@ -144,6 +146,11 @@ const allPager = billsStore.getLedger();
 const inPager = billsStore.getLedger({ direction: "IN" });
 const outPager = billsStore.getLedger({ direction: "OUT" });
 const activePager = computed(() => tab.value === "in" ? inPager : tab.value === "out" ? outPager : allPager);
+// 空态描述跟筛选走(zentao #220)。「支出」筛到空时不能复用收入口径的
+// 「每一笔充值和到账都会记在这里」—— 充值/到账是进账,与当前筛选自相矛盾。
+const emptyDesc = computed(() => tab.value === "out" ? t.value.empty.billsOutDesc
+  : tab.value === "in" ? t.value.empty.billsInDesc
+    : t.value.empty.billsDesc);
 const scrollAnchor = ref<unknown>(null);
 
 async function refreshLedger() {
