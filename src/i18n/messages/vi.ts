@@ -290,6 +290,7 @@ export const vi: Messages = {
     confirmRequired: "Vui lòng xác nhận Điều khoản dịch vụ hiện hành trước",
     gotIt: "Đã hiểu",
     languageRecovery: "Chọn ngôn ngữ để đọc điều khoản hiện hành.",
+    languageLabel: "Ngôn ngữ điều khoản",
   },
   authOtp: {
     errorOtpInvalidOrExpired: "Mã không hợp lệ hoặc đã hết hạn. Vui lòng lấy mã mới.",
@@ -529,6 +530,8 @@ export const vi: Messages = {
     networkRankTipUnranked: "Bạn chưa được xếp hạng. Thứ hạng dựa trên sức mạnh tính toán hiệu dụng của các thiết bị đang chạy và đáp ứng điều kiện. Chỉ kích hoạt thiết bị chưa đảm bảo có thứ hạng.",
     // 值槽 89.3px@20px 放不下 "Đang cập nhật"(实测 135.0px),换 "Đang tải" = 78.5px。
     networkStatUpdating: "Đang tải",
+    networkStatUnverified: "Không có số đo",
+    networkStatUnverifiedHint: "Nền tảng chưa công bố số liệu đo được",
     networkStatRetry: "Thử lại",
     networkStale: "Đã xác nhận",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
@@ -4867,6 +4870,7 @@ export const vi: Messages = {
   commissions: {
     recentEventsHint: "Danh sách hiển thị {n} sự kiện gần nhất. Tổng hợp bao gồm tất cả bản ghi.",
     pageTitle: "Hoa Hồng",
+    kindFilterLabel: "Lọc theo loại hoa hồng",
     directBadge: "Trực tiếp",
     extendedBadge: "Mở rộng",
     withdrawable: "Có thể rút",
@@ -5104,7 +5108,7 @@ export const vi: Messages = {
     projectionErrorDesc: "Không lấy được dữ liệu quyền lực từ máy chủ. Lỗi tải sẽ không được hiển thị giả thành 0 thành viên hoặc 0 doanh số.",
     retry: "Thử lại",
     diagramYou: "BẠN",
-    selfNodeLabel: "Bạn · V{n} · chính bạn, mở cấp bậc của tôi",
+    selfNodeLabel: "Bạn · {n} · chính bạn, mở cấp bậc của tôi",
   },
 
   tree: {
@@ -5143,7 +5147,7 @@ export const vi: Messages = {
     condTeamVol: "Doanh số tháng của đội",
     condRank: "Đạt V{v}",
     perkGen: "Sản sinh {n} NEX/ngày",
-    perkRoi: "Sản lượng ~{roi}%/năm",
+    perkRoi: "~{roi}%/năm (theo thu nhập USD/ngày ÷ giá)",
     buyCta: "Mua {name}",
     inviteToUnlock: "Mời để mở khóa",
     inviteFriendsTitle: "Mời thêm bạn bè",

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 
 const source = readFileSync(new URL('./network-pulse-card.vue', import.meta.url), 'utf8');
-const start = source.indexOf('function placeholderCell(');
+const start = source.indexOf('function unverifiedCell(');
 const end = source.indexOf('</script>', start);
 if (start < 0 || end < 0) throw new Error('Actual metrics implementation not found');
 const implementation = ts.transpileModule(source.slice(start, end), {
@@ -35,8 +35,10 @@ describe('actual homepage remote ranking is independent of H9 estimates', () => 
   it('keeps a successful real rank when public configuration fails', () => {
     const { metrics } = scenario({ failed: true, rankOk: true });
     expect(metrics[2].v).toBe('#7');
-    expect(metrics[0].v).toBe('networkStatUpdating');
-    expect(metrics[1].v).toBe('networkStatUpdating');
+    // #59:配置读失败且没有服务端可核验聚合时,两格不拿配置派生量充事实 ——
+    // 如实说「无实测口径」,而不是伪装成「更新中」再回落到配置值。
+    expect(metrics[0].v).toBe('networkStatUnverified');
+    expect(metrics[1].v).toBe('networkStatUnverified');
   });
   it('keeps an authoritative unranked state when public configuration fails', () => {
     expect(scenario({ failed: true, kind: 'unranked' }).metrics[2].v).toBe('networkRankUnranked');

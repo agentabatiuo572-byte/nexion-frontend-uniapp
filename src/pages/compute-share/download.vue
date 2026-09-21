@@ -45,16 +45,23 @@
         </view>
 
         <text class="block" :style="modelLabelStyle">{{ t.computeShare.modelLabel }}</text>
-        <view class="grid" style="grid-template-columns: 1fr 1fr; gap: 8px">
+        <!-- 显卡型号是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器
+             当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio + aria-checked
+             + roving tabindex + 左右方向键。 -->
+        <view class="grid" style="grid-template-columns: 1fr 1fr; gap: 8px" role="radiogroup" :aria-label="t.computeShare.modelLabel">
           <view
-            v-for="model in GPU_MODEL_PRESETS"
+            v-for="(model, mi) in GPU_MODEL_PRESETS"
             :key="model"
             :style="modelButtonStyle(model)"
-            role="button"
-            tabindex="0"
+            role="radio"
+            :tabindex="selectedModel === model ? 0 : -1"
             :aria-label="model"
-            :aria-pressed="selectedModel === model"
+            :aria-checked="selectedModel === model ? 'true' : 'false'"
             @click="selectedModel = model"
+            @keydown.enter.prevent="selectedModel = model"
+            @keydown.space.prevent="selectedModel = model"
+            @keydown.left.prevent="moveModel(mi, -1)"
+            @keydown.right.prevent="moveModel(mi, 1)"
           >
             <text>{{ model }}</text>
           </view>
@@ -98,7 +105,7 @@
 
 <script setup lang="ts">
 import { navReplace, navTo } from "@/lib/route";
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useApp } from "@/store/app";
@@ -135,6 +142,16 @@ const locale = useLocaleStore();
 const t = useT();
 
 const selectedModel = ref(GPU_MODEL_PRESETS[2]);
+/** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
+function moveModel(index: number, delta: number): void {
+  const next = GPU_MODEL_PRESETS[(index + delta + GPU_MODEL_PRESETS.length) % GPU_MODEL_PRESETS.length];
+  if (!next) return;
+  selectedModel.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
+}
 const enrollment = ref<ComputeShareEnrollment | null>(null);
 const connecting = ref(false);
 const gatePhase = ref<ComputeShareDownloadGatePhase>("pending");

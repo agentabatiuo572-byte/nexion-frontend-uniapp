@@ -25,19 +25,24 @@
         <!-- Variant tabs -->
         <view>
           <text class="block font-mono-tabular" :style="variantLabelStyle">{{ t.proof.variantLabel }}</text>
-          <view class="grid grid-cols-3" :style="variantTabsStyle">
+          <!-- 三种视图是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被
+               浏览器当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio +
+               aria-checked + roving tabindex + 左右方向键。 -->
+          <view class="grid grid-cols-3" :style="variantTabsStyle" role="radiogroup" :aria-label="t.proof.variantLabel">
             <view
-              v-for="v in VARIANTS"
+              v-for="(v, vi) in VARIANTS"
               :key="v"
               class="grid place-items-center active:scale-[0.97]"
               :style="variantPillStyle(v)"
-              role="button"
-              tabindex="0"
+              role="radio"
+              :tabindex="variant === v ? 0 : -1"
               :aria-label="t.proof.variants[v]"
-              :aria-pressed="variant === v"
+              :aria-checked="variant === v ? 'true' : 'false'"
               @click="variant = v"
               @keydown.enter.stop.prevent="variant = v"
               @keydown.space.stop.prevent="variant = v"
+              @keydown.left.prevent="moveVariant(vi, -1)"
+              @keydown.right.prevent="moveVariant(vi, 1)"
             >
               <text :style="variantPillTextStyle(v)" style="pointer-events: none">{{ t.proof.variants[v] }}</text>
             </view>
@@ -198,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onUnload } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
@@ -241,6 +246,16 @@ const network = useNetwork();
 const faucet = useNexFaucet();
 
 const variant = ref<Variant>("earnings");
+/** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
+function moveVariant(index: number, delta: number): void {
+  const next = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length];
+  if (!next) return;
+  variant.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
+}
 const exportingPoster = ref(false);
 const remoteSnapshot = ref<ProofSnapshot | null>(null);
 const remoteError = ref(false);

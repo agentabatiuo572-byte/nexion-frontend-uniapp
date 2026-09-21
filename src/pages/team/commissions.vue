@@ -59,18 +59,23 @@
           </view>
         </view>
 
-        <!-- 6-kind summary -->
-        <view class="grid grid-cols-3" style="gap: 8px">
+        <!-- 6-kind summary。这些卡片与下方 pill 行驱动**同一个** filter,是互斥单选组;
+             原先 role="button" + aria-pressed 被浏览器当 toggle button,读屏按复选框朗读
+             (zentao #94)。改 radiogroup/radio + aria-checked + roving tabindex,与下方
+             tablist 同为「选中即筛选」的语义,键盘行为一致。 -->
+        <view class="grid grid-cols-3" style="gap: 8px" role="radiogroup" :aria-label="t.commissions.kindFilterLabel">
           <view
             v-for="k in KIND_ORDER"
             :key="k"
             class="nx-commissions-focusable text-left active:scale-[0.97]"
             :style="kindCardStyle(k)"
-            role="button"
-            tabindex="0"
+            role="radio"
+            :tabindex="filter === k ? 0 : -1"
             :aria-label="kindCardLabel(k)"
-            :aria-pressed="filter === k"
+            :aria-checked="filter === k ? 'true' : 'false'"
             @click="filter = k"
+            @keydown.enter.prevent="filter = k"
+            @keydown.space.prevent="filter = k"
           >
             <text :style="{ color: KIND[k].color }">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>

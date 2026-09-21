@@ -57,7 +57,12 @@ describe("accessibility remediation contracts", () => {
 
   it("keeps language and destructive security controls keyboard-operable", () => {
     const language = read("../pages/me/language.vue");
-    expect(language).toContain(':aria-pressed="l.code === code"');
+    // 语言是互斥单选:aria-pressed 会被读成多选 toggle(zentao #94),改钉 radiogroup/radio。
+    expect(language).toContain('role="radiogroup" :aria-label="t.language.pageTitle"');
+    expect(language).toContain('role="radio"');
+    expect(language).toContain(':aria-checked="l.code === code ? \'true\' : \'false\'"');
+    // 注释里提到旧写法不算数:钉的是**属性**不再出现在模板上。
+    expect(language).not.toMatch(/:aria-pressed=/);
     expect(language).toContain('@keydown.space.prevent="pick(l.code)"');
     expect(language).toContain('@keydown.enter.prevent="retryCurrentProfileLocale"');
     expect(language).toContain('@keydown.space.prevent="goAccount"');
@@ -83,7 +88,9 @@ describe("accessibility remediation contracts", () => {
     const download = read("../pages/compute-share/download.vue");
     expect(download).toContain('role="button" tabindex="0" :aria-label="t.computeShare.downloadCta"');
     expect(download).toContain('role="button"');
-    expect(download).toContain(':aria-pressed="selectedModel === model"');
+    // 显卡型号是互斥单选:同上,改钉 radiogroup/radio。
+    expect(download).toContain('role="radiogroup" :aria-label="t.computeShare.modelLabel"');
+    expect(download).toContain(':aria-checked="selectedModel === model ? \'true\' : \'false\'"');
 
     const course = read("../pages/learn/course.vue");
     expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.courseUnavailable"');

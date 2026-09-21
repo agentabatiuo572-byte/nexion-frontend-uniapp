@@ -42,18 +42,22 @@
            they can read; the next server response alone decides whether exit opens. -->
       <view v-if="exitBlocked" class="tos-language" role="group" :aria-label="t.language.pageTitle">
         <text class="tos-language__hint">{{ t.terms.languageRecovery }}</text>
-        <view class="tos-language__choices">
+        <!-- 条款语言是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器
+             当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio + aria-checked。 -->
+        <view class="tos-language__choices" role="radiogroup" :aria-label="t.terms.languageLabel">
           <view
-            v-for="language in LOCALES"
+            v-for="(language, li) in LOCALES"
             :key="language.code"
             class="tos-language__choice active:opacity-70"
             :class="{ 'tos-language__choice--active': language.code === locale.code }"
-            role="button"
-            tabindex="0"
-            :aria-pressed="language.code === locale.code"
+            role="radio"
+            :tabindex="language.code === locale.code ? 0 : -1"
+            :aria-checked="language.code === locale.code ? 'true' : 'false'"
             @click="switchTermsLanguage(language.code)"
             @keydown.enter.prevent="switchTermsLanguage(language.code)"
             @keydown.space.prevent="switchTermsLanguage(language.code)"
+            @keydown.left.prevent="moveTermsLanguage(li, -1)"
+            @keydown.right.prevent="moveTermsLanguage(li, 1)"
           >
             <text>{{ language.nativeName }}</text>
           </view>
@@ -94,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBackPress, onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
@@ -271,6 +275,16 @@ function isCurrentRefreshContinuation(expected: LegalTermsSessionFence | null): 
 }
 function switchTermsLanguage(next: LocaleCode) {
   if (next !== locale.code) locale.setLocale(next);
+}
+/** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
+function moveTermsLanguage(index: number, delta: number): void {
+  const next = LOCALES[(index + delta + LOCALES.length) % LOCALES.length];
+  if (!next) return;
+  switchTermsLanguage(next.code);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
 }
 
 function repeatedKeyboardActivation(event?: Event): boolean {

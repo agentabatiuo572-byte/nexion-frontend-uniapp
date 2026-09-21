@@ -303,8 +303,9 @@ function memberRankTitle(m: NetworkMember): string {
 // can pick a node without seeing the graphic. rankLabel always carries `V{n}` —
 // rankTitle alone renders empty when the ladder has not loaded (remote mode).
 // 中心「你」节点的可访问名称与激活行为。它不打开成员详情(自己没有 NetworkMember 行),
-// 而是进入「我的等级」——这是根节点在页面上唯一有意义的动作。名称始终带 V{n},等级未就绪时
-// 用 — 占位,绝不产出空名(空 aria-label 等于没有可访问名称)。
+// 而是进入「我的等级」——这是根节点在页面上唯一有意义的动作。名称里的 {n} 是**完整的**
+// 等级文本(myRankText 已含 V 前缀);词典里不得再写 V{n},否则读屏会把 V0 念成 VV0
+// (zentao #222)。等级未就绪时用 — 占位,绝不产出空名(空 aria-label 等于没有可访问名称)。
 const selfNodeLabel = computed(() => fmt(t.value.network.selfNodeLabel, { n: myRankText.value }));
 function openSelf() {
   void navTo("/pages/team/rank");

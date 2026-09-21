@@ -278,6 +278,8 @@ export const zh: Messages = {
     confirmRequired: "请先确认当前服务条款",
     gotIt: "我已了解",
     languageRecovery: "请选择语言以阅读当前服务条款。",
+    // 语言选择是互斥单选组(zentao #94),组名给读屏一个范围。
+    languageLabel: "条款语言",
   },
   authOtp: {
     errorOtpInvalidOrExpired: "验证码无效或已过期，请重新获取",
@@ -514,6 +516,9 @@ export const zh: Messages = {
     networkRankTipUnranked: "当前未上榜。排名按符合条件的运行中设备有效算力计算；仅激活设备不一定获得名次。",
     // 值槽 89.3px@20px 放不下「数据更新中」(实测 98.6px),缩到「更新中」= 59.2px。
     networkStatUpdating: "更新中",
+    // 没有服务端可核验聚合时的如实说明(zentao #59):不拿运营配置值充事实。
+    networkStatUnverified: "无实测口径",
+    networkStatUnverifiedHint: "平台未提供可核验的实测统计",
     networkStatRetry: "重试",
     networkStale: "上次确认",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
@@ -4867,6 +4872,8 @@ export const zh: Messages = {
   commissions: {
     recentEventsHint: "明细展示最近 {n} 条记录，上方汇总包含全部记录。",
     pageTitle: "佣金明细",
+    // 六类卡片与下方 pill 行驱动同一个 filter,是互斥单选组(zentao #94)。
+    kindFilterLabel: "按佣金类型筛选",
     directBadge: "直推",
     extendedBadge: "扩展",
     withdrawable: "可提现",
@@ -5099,7 +5106,7 @@ export const zh: Messages = {
     projectionErrorDesc: "未能取得服务器权威团队数据；当前不会把失败显示成零成员或零金额。",
     retry: "重试",
     diagramYou: "你",
-    selfNodeLabel: "你 · V{n} · 本人,打开我的等级",
+    selfNodeLabel: "你 · {n} · 本人,打开我的等级",
   },
 
   tree: {
@@ -5137,7 +5144,9 @@ export const zh: Messages = {
     condTeamVol: "团队月业绩",
     condRank: "升至 V{v}",
     perkGen: "{n} NEX/天 产出",
-    perkRoi: "约 {roi}% 年化产出",
+    // 年化口径必须自带来源:ROI 由**美元日收益** ÷ 售价推导(dailyEarn,与商城一致),
+    // 而同行展示的是 NEX/天产出 —— 两种单位同屏却不标注,用户无法复核(zentao #221)。
+    perkRoi: "约 {roi}% 年化(按美元日收益/售价)",
     buyCta: "购买 {name}",
     inviteToUnlock: "邀请解锁",
     inviteFriendsTitle: "邀请更多朋友",
