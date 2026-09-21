@@ -41,7 +41,7 @@
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @confirm="onPhoneConfirm" />
+            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
           </view>
           <text id="login-phone-format" data-testid="auth-phone-hint" class="lg-phone-hint" :class="{ 'lg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <template v-if="mode === 'password'">
@@ -95,11 +95,14 @@
       </view>
 
       <!-- Primary CTA -->
-      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
+      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
         <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
         <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
       </view>
-      <text v-if="!canPrimary && !loading" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
+      <!-- 简报 #211:空白表单首次展示必须中性 —— 只在用户已与手机号字段交互或尝试提交后
+           才给出禁用原因。此前它从首帧起就存在(空表单天然 canPrimary=false),而 sr-only
+           的 clip 裁不住 uni-app 内部的 <span>,导致文本提取/自动化会读到用户从未触发的错误。 -->
+      <text v-if="!canPrimary && !loading && (phoneTouched || submitAttempted)" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
       <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
@@ -197,6 +200,19 @@ const code = ref<string[]>(["", "", "", "", "", ""]);
 const focusIdx = ref(0);
 const showPwd = ref(false);
 const error = ref<string | null>(null);
+/**
+ * 简报 #211:空白表单首次展示必须保持中性 —— 只有用户与手机号字段交互过(输入/失焦),
+ * 或尝试提交过,才给出「请输入有效的手机号」这类校验原因。
+ *
+ * 此前该原因只挂在 `!canPrimary` 上,而空表单天然不满足 canPrimary,于是它从首帧起
+ * 就存在于 DOM。它虽然带 .lg-sr-only,但 uni-app 会把内容包进内部 <span>,而
+ * clip: rect(0,0,0,0) 只裁剪定位元素自身、裁不住这个子盒 —— 实测该 span 的布局盒是
+ * 329×20 且被 document.body.innerText 计入,于是读屏之外,文本提取与自动化也会读到
+ * 一句用户从未触发过的错误。根因是「不该存在的内容被裁起来」,所以按验收要求直接
+ * 不渲染,而不是继续靠样式藏。
+ */
+const phoneTouched = ref(false);
+const submitAttempted = ref(false);
 const resendLeft = ref(0);
 const loading = ref(false);
 const returnParam = ref<string | null>(null);
@@ -346,6 +362,7 @@ function inputVal(e: Event): string {
 }
 function onPhone(e: Event) {
   invalidateOtpFlow();
+  phoneTouched.value = true;
   phone.value = sanitizePhoneInput(inputVal(e));
   error.value = null;
 }
@@ -826,6 +843,7 @@ async function finishReset() {
 }
 
 function onPrimary() {
+  submitAttempted.value = true;
   if (step.value === 1) { if (mode.value === "password") signInWithPassword(); else goSendCode(); }
   else if (step.value === 2) verifyCode();
   else finishReset();
