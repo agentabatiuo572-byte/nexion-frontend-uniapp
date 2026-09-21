@@ -966,6 +966,8 @@ export const vi: Messages = {
       system: "Hệ thống / tuân thủ / pháp lý",
     },
     notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong ngăn Nova và trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
+    // zentao #214: mục bắt buộc không thể tắt; nêu lý do dòng này bị khoá.
+    notifMandatoryHint: "Thông báo tuân thủ quan trọng — luôn bật, không thể tắt",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token

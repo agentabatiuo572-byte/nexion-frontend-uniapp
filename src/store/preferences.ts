@@ -17,6 +17,18 @@ export type NotifKind = "commission" | "team" | "staking" | "market" | "genesis"
 
 const ALL_NOTIF_KINDS: NotifKind[] = ["commission", "team", "staking", "market", "genesis", "system"];
 
+/**
+ * 简报 #214:关键合规通知不可禁用。
+ *
+ * `system` 这一类的界面标签就是「系统 / 合规 / 监管」,而页脚一直声明「关键合规通知不可禁用」——
+ * 但此前它和其它类一样能被关掉,声明与行为直接矛盾:用户以为合规通知仍然送达,实际已被静音。
+ * 约束落在数据层(而不是只把开关画灰):即便有人从别处调用 toggle,也关不掉它。
+ */
+const MANDATORY_NOTIF_KINDS: readonly NotifKind[] = ["system"];
+export function isMandatoryNotifKind(k: NotifKind): boolean {
+  return MANDATORY_NOTIF_KINDS.includes(k);
+}
+
 type NotifPrefs = Record<NotifKind, boolean>;
 
 const STORAGE_KEY = "nexgrid-preferences-v1";
@@ -98,6 +110,9 @@ export const usePreferences = defineStore("preferences", () => {
   function applyVisibleNotifPrefs() {
     const visible = { ...canonicalNotifPrefs };
     for (const [kind, pending] of pendingNotifMutations) visible[kind] = pending.value;
+    // 简报 #214:强制类必须呈现为开启 —— 无论服务端存量值还是本地缓存曾把它关掉。
+    // 放在这个唯一出口上,读路径(远端/本地/乐观更新)就都受同一条约束。
+    for (const kind of MANDATORY_NOTIF_KINDS) visible[kind] = true;
     notifPrefs.value = visible;
   }
 
@@ -118,6 +133,8 @@ export const usePreferences = defineStore("preferences", () => {
   }
 
   async function toggleNotifKind(k: NotifKind) {
+    // 简报 #214:强制类只能保持开启 —— 页脚声明「关键合规通知不可禁用」,这里让它成为事实。
+    if (isMandatoryNotifKind(k) && notifPrefs.value[k]) return;
     if (!remoteApiEnabled) {
       notifPrefs.value = { ...notifPrefs.value, [k]: !notifPrefs.value[k] };
       persist();
