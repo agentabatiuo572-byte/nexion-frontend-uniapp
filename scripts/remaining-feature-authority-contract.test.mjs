@@ -19,6 +19,11 @@ function passwordChangeFixture() {
   const deps = {
     current: { value: "OldPass1!" }, next: { value: "NewPass2!" }, confirmPwd: { value: "NewPass2!" },
     securityBusy: { value: false }, editingPwd: { value: true }, err: { value: "" },
+    // #216 起真实处理器还持有「错误归属字段」与「焦点目标」两个 ref,以及
+    // 字段码常量。夹具按真实签名补齐,否则注入的代码一执行就 ReferenceError。
+    pwdErrorField: { value: "" }, pwdFocusField: { value: "" },
+    PWD_FIELD_CURRENT: "current", PWD_FIELD_NEXT: "next", PWD_FIELD_CONFIRM: "confirm",
+    focusPwdField: mock.fn((field) => { deps.pwdFocusField.value = field; }),
     securityPageFence: { capture: () => ({}) }, captureAccountScope: () => ({}),
     auth: { accountId: "password-fixture" }, isCurrentSecurityRequest: () => currentScope,
     isPasswordOk: (value) => value === "NewPass2!", remoteApiEnabled: true,
@@ -78,6 +83,9 @@ test("password commands reject invalid forms before requests and do not send aft
   await page.submit();
   assert.equal(page.err.value, "mismatch");
   assert.equal(page.accountApi.passwordCommandReceipt.mock.callCount(), 0);
+  // #216:每条校验错误必须指名**哪一格**并聚焦过去,否则读屏只知道「提交失败」。
+  assert.equal(page.pwdErrorField.value, "confirm");
+  assert.equal(page.pwdFocusField.value, "confirm");
   page.confirmPwd.value = page.next.value;
   const pending = page.submit();
   page.leave();
@@ -87,6 +95,30 @@ test("password commands reject invalid forms before requests and do not send aft
   assert.equal(page.loadRemoteSecurity.mock.callCount(), 0);
   assert.equal(page.releaseAccountCommandKey.mock.callCount(), 0);
   assert.equal(page.toast.success.mock.callCount(), 0);
+});
+
+test("every password validation failure names and focuses its own field", async () => {
+  // #216:三格各自的错误要能分别定位 —— 这是「错误与输入框关联」的可执行判据,
+  // 模板侧的 aria-describedby/aria-invalid 由 a11y-activate 门守。
+  const blank = passwordChangeFixture();
+  blank.current.value = "";
+  await blank.submit();
+  assert.equal(blank.pwdErrorField.value, "current");
+  assert.equal(blank.pwdFocusField.value, "current");
+
+  const weak = passwordChangeFixture();
+  weak.next.value = "short";
+  await weak.submit();
+  assert.equal(weak.pwdErrorField.value, "next");
+  assert.equal(weak.pwdFocusField.value, "next");
+
+  // 服务端/传输层错误不属于任何单格:不得把服务端故障指到某一格上。
+  const remote = passwordChangeFixture();
+  remote.securityErrorMessage = () => "request failed";
+  const pending = remote.submit();
+  remote.resolveReceipt(null);
+  await pending;
+  assert.equal(remote.pwdErrorField.value, "");
 });
 
 test("remote security center consumes the authoritative account API", () => {

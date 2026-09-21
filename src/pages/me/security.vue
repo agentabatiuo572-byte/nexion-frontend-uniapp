@@ -47,10 +47,13 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="chevronStyle"><path d="m6 9 6 6 6-6" /></svg>
         </view>
         <view v-if="editingPwd" :style="pwdFormStyle">
-          <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onCurrent" />
-          <input class="w-full" :style="pwdInputStyle" password :value="next" :placeholder="t.security.newPassword" :aria-label="t.security.newPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onNext" />
-          <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :aria-label="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onConfirmPwd" />
-          <text v-if="err" class="block" :style="errStyle">{{ err }}</text>
+          <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
+          <input class="w-full" :style="pwdInputStyle" password :value="next" :placeholder="t.security.newPassword" :aria-label="t.security.newPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_NEXT" :aria-invalid="pwdErrorField === PWD_FIELD_NEXT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_NEXT ? 'security-pwd-error-next' : undefined" @input="onNext" />
+          <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :aria-label="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CONFIRM" :aria-invalid="pwdErrorField === PWD_FIELD_CONFIRM ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CONFIRM ? 'security-pwd-error-confirm' : undefined" @input="onConfirmPwd" />
+          <text v-if="err && pwdErrorField === PWD_FIELD_CURRENT" id="security-pwd-error-current" class="block" :style="errStyle" role="alert">{{ err }}</text>
+          <text v-else-if="err && pwdErrorField === PWD_FIELD_NEXT" id="security-pwd-error-next" class="block" :style="errStyle" role="alert">{{ err }}</text>
+          <text v-else-if="err && pwdErrorField === PWD_FIELD_CONFIRM" id="security-pwd-error-confirm" class="block" :style="errStyle" role="alert">{{ err }}</text>
+          <text v-else-if="err" class="block" :style="errStyle" role="alert">{{ err }}</text>
           <view class="flex" style="gap: 8px; margin-top: 4px">
             <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd" @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
               <text :style="pwdCancelLabelStyle">{{ t.ui.cancel }}</text>
@@ -237,6 +240,23 @@ const current = ref("");
 const next = ref("");
 const confirmPwd = ref("");
 const err = ref("");
+// 哪个字段是这条错误的归属(zentao #216)。错误文本经 aria-describedby 关联到该输入框,
+// 并给它挂 aria-invalid=true —— 否则读屏只知道「提交失败」,不知道改哪一格。
+// 服务端/传输层错误不属于任何单格,留空。
+//
+// 🔴 三个错误 id 与三个字段码都提成常量:门的 aria-describedby 判据会把绑定表达式里的
+// **所有**单引号字面量当成 id 引用,写进模板的 'current'/'next'/'confirm' 会被判成悬空 id;
+// 而 id 本身必须是模板里的**字面量** id="..."。两条合起来 = developer.vue(BUG 105)同形。
+const PWD_FIELD_CURRENT = "current";
+const PWD_FIELD_NEXT = "next";
+const PWD_FIELD_CONFIRM = "confirm";
+const pwdErrorField = ref<"" | "current" | "next" | "confirm">("");
+// 焦点移到首个错误字段(zentao #216)。uni-app 的 :focus 是「置真即聚焦」的边沿信号,
+// 字段被再次编辑时释放,否则焦点会一直钉在该格、用户无法手动移开。
+const pwdFocusField = ref<"" | "current" | "next" | "confirm">("");
+function focusPwdField(field: "current" | "next" | "confirm") {
+  pwdFocusField.value = field;
+}
 
 function securityErrorMessage(cause: unknown): string {
   const labels = t.value.security as typeof t.value.security & Record<
@@ -368,12 +388,18 @@ function detailVal(e: Event): string {
 }
 function onCurrent(e: Event) {
   current.value = detailVal(e);
+  if (pwdFocusField.value === PWD_FIELD_CURRENT) pwdFocusField.value = "";
+  if (pwdErrorField.value === PWD_FIELD_CURRENT) { err.value = ""; pwdErrorField.value = ""; }
 }
 function onNext(e: Event) {
   next.value = detailVal(e);
+  if (pwdFocusField.value === PWD_FIELD_NEXT) pwdFocusField.value = "";
+  if (pwdErrorField.value === PWD_FIELD_NEXT) { err.value = ""; pwdErrorField.value = ""; }
 }
 function onConfirmPwd(e: Event) {
   confirmPwd.value = detailVal(e);
+  if (pwdFocusField.value === PWD_FIELD_CONFIRM) pwdFocusField.value = "";
+  if (pwdErrorField.value === PWD_FIELD_CONFIRM) { err.value = ""; pwdErrorField.value = ""; }
 }
 function onTwoFactorPassword(e: Event) {
   twoFactorPassword.value = detailVal(e);
@@ -426,6 +452,7 @@ function relativeWhen(ms: number): string {
 function cancelPwd() {
   editingPwd.value = false;
   err.value = "";
+  pwdErrorField.value = "";
   current.value = "";
   next.value = "";
   confirmPwd.value = "";
@@ -438,16 +465,23 @@ async function submitPasswordChange() {
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   err.value = "";
+  pwdErrorField.value = "";
   if (!current.value) {
     err.value = t.value.login.errorInvalidPassword;
+    pwdErrorField.value = PWD_FIELD_CURRENT;
+    focusPwdField(PWD_FIELD_CURRENT);
     return;
   }
   if (!isPasswordOk(next.value)) {
     err.value = t.value.security.passwordShort;
+    pwdErrorField.value = PWD_FIELD_NEXT;
+    focusPwdField(PWD_FIELD_NEXT);
     return;
   }
   if (next.value !== confirmPwd.value) {
     err.value = t.value.security.passwordMismatch;
+    pwdErrorField.value = PWD_FIELD_CONFIRM;
+    focusPwdField(PWD_FIELD_CONFIRM);
     return;
   }
   const currentPassword = current.value;

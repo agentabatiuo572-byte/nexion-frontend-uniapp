@@ -115,7 +115,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "risk-disclosure.vue": "76b88fb99bd91ddd08241d5a8116cc8e68947de61de0dbac2347aec40628ffea",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.
   // #80: password/2FA inputs carry an accessible name, not a placeholder alone.
-  "security.vue": "4879296a2fd5b596294b72a779d46e0b5e25902a51472e4d9d16acefa152ef23",
+  // #216: the password-change validation error is associated to its own field
+  // (aria-describedby + aria-invalid, one literal id per field), announced via
+  // role=alert, and focus moves to the first invalid field; editing clears it.
+  "security.vue": "7c9f64519060bb36e27df8864ddde512356fbc9a122bce33ca15e89b6dd85ad4",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.
@@ -134,7 +137,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // 账单类型是互斥单选(选一个,其余取消)。此前用 role="button" + aria-pressed,浏览器
   // 按 toggle button 暴露、读屏按复选框朗读 —— 用户会以为能同时选多个类型(zentao #94)。
   // 改 radiogroup/radio + aria-checked,并补 Enter/Space;视觉样式与原型一致,未改动。
-  "wallet-bills.vue": "d227321b95688924a0aa6a0fa7387e4c240c431d5cbe4a7a9bd0838b5fbc1580",
+  // #220: the empty-state description follows the active filter, so the expense tab no
+  // longer reuses the income wording ("充值和到账").
+  "wallet-bills.vue": "e15315685c3dba9ccfcdf1097c75d6729eaabb6387e399af611500150b038812",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
   // #88: cardholder input carries its visible label as an accessible name.

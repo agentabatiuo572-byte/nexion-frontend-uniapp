@@ -3427,6 +3427,7 @@ export const zh: Messages = {
       trialBonus: "体验转换奖励",
       questReward: "任务奖励",
       purchaseReward: "购买奖励",
+      learningReward: "课程奖励",
       earn: "收益入账",
       refer: "推荐分成入账",
       bonus: "奖励入账",
@@ -5902,6 +5903,10 @@ export const zh: Messages = {
     ordersCta: "去逛逛",
     billsTitle: "还没有记录",
     billsDesc: "每一笔充值和到账都会记在这里",
+    // 支出/收入筛选各自的空态口径(zentao #220):支出侧只提购买、提现、兑换等真实支出类型,
+    // 不再借用「充值和到账」这类进账措辞。
+    billsInDesc: "每一笔充值、收益和奖励到账都会记在这里",
+    billsOutDesc: "购买、提现、兑换等支出都会记在这里",
     rewardsTitle: "还没有奖励",
     rewardsDesc: "代金券和礼包会收在这里",
     rewardsTokenDesc: "你获得的 {asset} 奖励记录会显示在这里。",

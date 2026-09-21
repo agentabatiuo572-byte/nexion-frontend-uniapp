@@ -101,7 +101,10 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
-              <text class="block truncate" :style="rowSubStyle">{{ b.memo }}</text>
+              <!-- 课程奖励带可区分的来源标识(zentao #219):同额同日多笔奖励靠
+                   courseId@version 逐笔追溯;其它奖励没有 ref 时只显示原 memo。 -->
+              <text v-if="b.ref" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
+              <text v-else class="block truncate" :style="rowSubStyle">{{ b.memo }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
               <text class="block tabular-nums" :style="rewardAmountStyle">+{{ b.amount.toLocaleString() }} {{ b.symbol }}</text>
