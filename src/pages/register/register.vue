@@ -52,7 +52,7 @@
               <text class="rg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @confirm="onCta" />
+            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @blur="phoneTouched = true" @confirm="onCta" />
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <!-- 包 zm T3:仅开发构建,Java dev 后端网络级失联时亮工程横幅(生产构建整段剔除)
@@ -126,14 +126,15 @@
         :aria-label="ctaLabel"
         :aria-disabled="!ctaEnabled || busy"
         :aria-busy="busy"
-        :aria-describedby="!ctaEnabled && !busy ? 'rg-cta-reason' : undefined"
+        :aria-describedby="!ctaEnabled && !busy && (phoneTouched || submitAttempted) ? 'rg-cta-reason' : undefined"
         @click="onCta"
         @keydown.enter.prevent="onCta"
         @keydown.space.prevent="onCta"
       >
         <text class="rg-cta__t" :class="ctaEnabled && !busy ? 'rg-cta__t--on' : ''">{{ ctaLabel }}</text>
       </view>
-      <text v-if="!ctaEnabled && !busy" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
+      <!-- 简报 #213:空白表单首次展示必须中性 —— 交互过或尝试提交后才给出禁用原因。 -->
+      <text v-if="!ctaEnabled && !busy && (phoneTouched || submitAttempted)" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
       <view v-if="step === 1 && !remoteApiEnabled" class="rg-oauth">
@@ -237,6 +238,15 @@ const confirmPwd = ref("");
 const showPwd = ref(false);
 const confirmPasswordFocused = ref(false);
 const error = ref<string | null>(null);
+/**
+ * 简报 #213(与 #211 同一类):空白表单首次展示必须中性。此前 CTA 的禁用原因只挂在
+ * `!ctaEnabled` 上,空表单天然满足,于是「请输入有效手机号后继续。」从首帧起就在 DOM 里;
+ * 它虽带 .rg-sr-only,但 uni-app 会把内容包进内部 <span>,clip: rect(0,0,0,0) 裁不住
+ * 那个子盒,文本提取与自动化因此能读到用户从未触发的校验错误。
+ * 现在只在用户与手机号字段交互过、或尝试提交过之后才渲染。
+ */
+const phoneTouched = ref(false);
+const submitAttempted = ref(false);
 const devBackendDown = ref(false);
 const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
@@ -408,6 +418,7 @@ function inputVal(e: Event): string {
 }
 function onPhone(e: Event) {
   invalidateOtpFlow();
+  phoneTouched.value = true;
   phone.value = sanitizePhoneInput(inputVal(e));
   error.value = null;
   registrationRisk.value = null;
@@ -438,6 +449,7 @@ function pickCountry(c: string) {
 }
 
 function onCta() {
+  submitAttempted.value = true;
   if (busy.value) return;
   if (!ctaEnabled.value) {
     error.value = ctaDisabledReason.value;
