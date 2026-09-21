@@ -200,6 +200,23 @@ function activate(action?: () => void) {
 }
 
 /** 配置失败的占位格(规格异常2:骨架→「数据更新中」+ 重试;禁回退写死数字)。 */
+/**
+ * 「没有可核验来源」态:数值位不给数字,说明为什么没有。
+ * 与 placeholderCell(读取失败/更新中)区分开 —— 这里不是暂时读不到,而是**平台没有
+ * 对外可核验的实测口径**,所以既不显示配置派生量,也不提供重试。
+ */
+function unverifiedCell(label: string): Cell {
+  return {
+    k: label,
+    v: t.value.home.networkStatUnverified,
+    vSize: "12.5px",
+    tone: "var(--v5-ink-3)",
+    sub: t.value.home.networkStatUnverifiedHint,
+    subTone: "var(--v5-ink-4)",
+    data: null,
+    color: "var(--v5-ink-4)",
+  };
+}
 function placeholderCell(label: string, retry?: () => void, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
@@ -228,41 +245,42 @@ const metrics = computed<Cell[]>(() => {
   const verified = cfg.config.verifiedStats;
   const verifiedAt = verified ? verified.capturedAt.slice(0, 16).replace("T", " ") : "";
 
+  // 🔴 没有服务端可核验聚合时,**不拿运营配置值充当对外事实**(zentao #59)。
+  //   后端 `GrowthPublicStatsService.verifiedAggregates` 明确写着「不知道不能变成 0,
+  //   也不能退回运营配置值」;沙箱/未接聚合时 verified 整体缺席,此时两格只能如实说
+  //   「无实测口径」,而不是把 registeredUsersBase×增长率、或 activeDevices 这类配置
+  //   派生量当作「注册用户 / 在线设备」发布出去 —— 那正是本单要消除的混淆。
+  const noVerifiedSource = !verified;
+
   // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
   const membersBad = failed || !h.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
-  const members: Cell = membersBad
-    ? placeholderCell(t.value.home.networkMembers)
-    : verified
-      ? {
+  const members: Cell = noVerifiedSource
+    ? unverifiedCell(t.value.home.networkMembers)
+    : membersBad
+      ? placeholderCell(t.value.home.networkMembers)
+      : {
           k: t.value.home.networkMembers,
           v: compact(verified.registeredAccounts.value),
           tone: "var(--v5-ink)",
           sub: fmt(t.value.home.networkVerifiedMembers, { at: verifiedAt }),
           data: ramp(verified.registeredAccounts.value),
           color: "var(--v5-brand)",
-        }
-      : {
-          k: t.value.home.networkMembers,
-          v: compact(registered.value),
-          tone: "var(--v5-ink)",
-          sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
-          data: ramp(registered.value),
-          color: "var(--v5-brand)",
         };
 
-  // 格 2 在线设备 —— 有可核验聚合时读真实在线设备数;否则回退到公布口径(已标注非实时)
-  const devicesBad = failed || (!verified && !h.devicesOk);
-  const devicesValue = verified ? verified.onlineDevices.value : app.global.activeDevices;
-  const devices: Cell = devicesBad
-    ? placeholderCell(t.value.home.networkEstimatedDevices)
-    : {
-        k: verified ? t.value.home.networkDevices : t.value.home.networkEstimatedDevices,
-        v: compact(devicesValue),
-        tone: "var(--v5-ink)",
-        sub: verified ? fmt(t.value.home.networkVerifiedDevices, { at: verifiedAt }) : t.value.home.networkPublished,
-        data: ramp(devicesValue),
-        color: "var(--v5-tech-cyan-ink)",
-      };
+  // 格 2 在线设备 —— 同上:只认服务端实测的在线设备数。
+  const devicesBad = failed || !h.devicesOk;
+  const devices: Cell = noVerifiedSource
+    ? unverifiedCell(t.value.home.networkEstimatedDevices)
+    : devicesBad
+      ? placeholderCell(t.value.home.networkEstimatedDevices)
+      : {
+          k: t.value.home.networkDevices,
+          v: compact(verified.onlineDevices.value),
+          tone: "var(--v5-ink)",
+          sub: fmt(t.value.home.networkVerifiedDevices, { at: verifiedAt }),
+          data: ramp(verified.onlineDevices.value),
+          color: "var(--v5-tech-cyan-ink)",
+        };
 
   // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2);rankOk 缺失同走占位
   const r = rank.value;

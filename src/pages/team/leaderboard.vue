@@ -277,6 +277,11 @@ async function loadRemote(page = 1, append = false) {
     }
   } finally {
     if (request === remoteRequest) remoteLoadingMore.value = false;
+    // 键盘切换周期后把焦点还给当前选中格(见 movePeriod 注释)。
+    if (pendingPeriodFocus && request === remoteRequest) {
+      pendingPeriodFocus = false;
+      void nextTick(focusActivePeriodTab);
+    }
   }
 }
 
@@ -322,13 +327,23 @@ function selectPeriod(next: LeaderPeriod) {
   period.value = next;
 }
 
+// 🔴 方向键切换必须让焦点**留在** tablist 上(zentao #215)。
+// 切周期会触发 loadRemote:它把 remoteState 置 loading、快照置 null,列表区随之
+// 重渲染,原来那一格从 DOM 里消失,焦点就掉回页面根节点 —— 后续 ArrowRight/Left
+// 全部失效。nextTick 只够应付同步重渲染,所以这里在**本轮读结束**后再补一次焦点
+// (成功/失败都补:失败态同样不该把键盘用户丢在页外)。
+let pendingPeriodFocus = false;
+function focusActivePeriodTab(): void {
+  if (typeof document === "undefined") return;
+  document.querySelector<HTMLElement>('.nx-leader-period-tab[tabindex="0"]')?.focus();
+}
 function movePeriod(delta: -1 | 1) {
   const currentIndex = PERIODS.indexOf(period.value);
-  period.value = PERIODS[(currentIndex + delta + PERIODS.length) % PERIODS.length];
-  void nextTick(() => {
-    if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('.nx-leader-period-tab[tabindex="0"]')?.focus();
-  });
+  const next = PERIODS[(currentIndex + delta + PERIODS.length) % PERIODS.length];
+  if (!next || next === period.value) return;
+  pendingPeriodFocus = true;
+  period.value = next;
+  void nextTick(focusActivePeriodTab);
 }
 
 // ─── styles ───

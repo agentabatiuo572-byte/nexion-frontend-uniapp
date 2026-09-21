@@ -53,8 +53,10 @@
             <!-- Title — punchy, restrained (high-end OG seat, not a bark) -->
             <text class="block" :style="titleStyle">{{ t.genesis.heroTitle }}</text>
 
-            <!-- Sub + disclaimer -->
-            <text class="block" :style="heroSubStyle">{{ t.genesis.heroSub }}</text>
+            <!-- Sub + disclaimer。🔴 heroSub 是**稀缺性/紧迫感**文案(「限量 1000 · 售完即止」),
+                 与同页其它紧迫感元素同源判定:市场关闭 / 熔断 / 配置未知时不得渲染 ——
+                 否则页面一边说「暂未开放」一边催「售完即止」(zentao #190)。 -->
+            <text v-if="showUrgency" class="block" :style="heroSubStyle">{{ t.genesis.heroSub }}</text>
             <text class="block" :style="heroDiscStyle">{{ t.genesis.heroDisc }}</text>
 
             <!-- Sales bar -->

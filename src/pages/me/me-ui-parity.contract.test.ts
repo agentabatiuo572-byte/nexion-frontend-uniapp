@@ -74,7 +74,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #94: category chips are a radiogroup with aria-checked, not toggle buttons.
   "help.vue": "5068fc6daf0ee6c2d77b848a8a88c61d4927702f3bde80b6069130d099a4a877",
   // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
-  "language.vue": "7e45ccd32787f167793f423b3fbb8439c7bdd2ec585fccd19d2789251c07dc93",
+  // #94: the language list is a mutually exclusive choice, so it is a named radiogroup
+  // with aria-checked and roving tabindex instead of toggle buttons.
+  "language.vue": "ca4e5280ab00b77a8b570ed380d2ba2d053873128d023b7155112bc881428120",
   // BUG 173: the trial hero slot is three-state — a fixed-height skeleton holds the
   // slot while the first authoritative trial read is in flight, so the card cannot
   // appear late and push every module below it down.
@@ -95,7 +97,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // an unavailable server percentile occupies the same label/value slot as a neutral unknown,
   // without inventing a rank or changing the surrounding 5174 layout.
   // #83: an absent streak fact reads as unavailable instead of rendering the unit alone.
-  "proof.vue": "a481a0ec1d957551aeb37c89d2d8e4c3af1d4098b1436c85b924bce8611b220c",
+  // #94: the three proof variants are a mutually exclusive choice, so they are a
+  // named radiogroup with aria-checked and roving tabindex instead of toggle buttons.
+  "proof.vue": "c7839154d46d332c138af9a7ed8c45dfe3703cda989e037bdcead580fd390692",
   // Formal receipts keep the 5174 row layout but render server settlement
   // status and suppress positive amounts unless the receipt is CREDITED.
   // Compute and VietQR receipts render in separately selected, independently

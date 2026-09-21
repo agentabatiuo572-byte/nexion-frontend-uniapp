@@ -7,7 +7,8 @@ const source = readFileSync(new URL("./terms.vue", import.meta.url), "utf8");
 describe("required terms language recovery", () => {
   it("keeps a blocked user able to choose a shipped language and re-read server terms", () => {
     expect(source).toContain('v-if="exitBlocked"');
-    expect(source).toContain('v-for="language in LOCALES"');
+    // #94:语言选择是互斥单选,遍历时带索引(方向键要用),改钉新的写法。
+    expect(source).toContain('v-for="(language, li) in LOCALES"');
     expect(source).toContain('locale.setLocale(next)');
     expect(source).toContain('watch(() => locale.code');
     expect(source).toContain('flush: "sync"');

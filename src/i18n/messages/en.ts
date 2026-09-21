@@ -289,6 +289,7 @@ export const en = {
     confirmRequired: "Confirm the current Terms of Service first",
     gotIt: "Got it",
     languageRecovery: "Choose a language to read the current terms.",
+    languageLabel: "Terms language",
   },
   authOtp: {
     errorOtpInvalidOrExpired: "Code invalid or expired — request a new one",
@@ -572,6 +573,8 @@ export const en = {
     networkRankTipRanked: "Your rank goes by the total hashpower of your active devices — more hashpower, higher rank.",
     networkRankTipUnranked: "You are not ranked yet. Rank is based on effective hashpower from eligible running devices. Activation alone does not guarantee a rank.",
     networkStatUpdating: "Updating",
+    networkStatUnverified: "No measured source",
+    networkStatUnverifiedHint: "No verifiable server measurement published",
     networkStatRetry: "Retry",
     networkStale: "Last confirmed",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
@@ -5014,6 +5017,7 @@ export const en = {
   commissions: {
     recentEventsHint: "The list shows the latest {n} events. Summary totals include all records.",
     pageTitle: "Commissions",
+    kindFilterLabel: "Filter by commission type",
     directBadge: "Direct",
     extendedBadge: "Extended",
     withdrawable: "Withdrawable",
@@ -5251,7 +5255,7 @@ export const en = {
     projectionErrorDesc: "The authoritative server projection could not be loaded. A failed request is never shown as zero members or zero volume.",
     retry: "Retry",
     diagramYou: "YOU",
-    selfNodeLabel: "You · V{n} · yourself, open my rank",
+    selfNodeLabel: "You · {n} · yourself, open my rank",
   },
 
   tree: {
@@ -5290,7 +5294,7 @@ export const en = {
     condTeamVol: "Team monthly volume",
     condRank: "Reach V{v}",
     perkGen: "{n} NEX/day generation",
-    perkRoi: "~{roi}% annualized output",
+    perkRoi: "~{roi}% annualized (USD daily yield / price)",
     buyCta: "Buy {name}",
     inviteToUnlock: "Invite to unlock",
     inviteFriendsTitle: "Invite more friends",

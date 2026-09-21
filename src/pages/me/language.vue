@@ -11,18 +11,23 @@
       <text class="block mx-4" :style="introStyle">{{ t.language.intro }}</text>
 
       <view class="mx-4">
-        <view :style="groupStyle">
+        <!-- 语言是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器
+             当 toggle button,读屏按复选框朗读,用户以为能同时选多个(zentao #94)。
+             改 radiogroup/radio + aria-checked + roving tabindex + 上下方向键。 -->
+        <view :style="groupStyle" role="radiogroup" :aria-label="t.language.pageTitle">
           <view
             v-for="(l, i) in LOCALES"
             :key="l.code"
             :class="['flex items-center active:opacity-80', `nx-language-row-${l.code}`]"
             :style="rowStyle(i !== 0, l.code === code)"
-            role="button"
-            tabindex="0"
-            :aria-pressed="l.code === code"
+            role="radio"
+            :tabindex="l.code === code ? 0 : -1"
+            :aria-checked="l.code === code ? 'true' : 'false'"
             @click="pick(l.code)"
             @keydown.enter.prevent="pick(l.code)"
             @keydown.space.prevent="pick(l.code)"
+            @keydown.up.prevent="moveLocale(i, -1)"
+            @keydown.down.prevent="moveLocale(i, 1)"
           >
             <text :style="flagStyle">{{ l.flag }}</text>
             <view class="min-w-0" style="flex: 1">
@@ -56,7 +61,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, type CSSProperties } from "vue";
+import { computed, nextTick, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -72,6 +77,16 @@ const localeCount = LOCALES.length;
 
 function pick(next: LocaleCode) {
   locale.setLocale(next);
+}
+/** 单选组的上下方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
+function moveLocale(index: number, delta: number): void {
+  const next = LOCALES[(index + delta + LOCALES.length) % LOCALES.length];
+  if (!next) return;
+  locale.setLocale(next.code);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('.nx-language-row-' + next.code)?.focus();
+  });
 }
 function goAccount() {
   navTo("/pages/me/me");
