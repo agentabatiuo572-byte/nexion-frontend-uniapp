@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildCommissionsHowContent, createCommissionsHowResource, COMMISSIONS_HOW_SLOTS, type CommissionsHowSnapshot } from "./commissions-how-content";
 
 const snapshot = (): CommissionsHowSnapshot => ({
-  document: { contentKey: "team-commissions-how", version: "p2", status: "PUBLISHED", source: "server", sourceEnvironment: "PRODUCTION", runId: "", locale: "zh", blocks: [
+  document: { contentKey: "team-commissions-how", version: "p2", versionSource: "ENTRY", status: "PUBLISHED", source: "server", sourceEnvironment: "PRODUCTION", runId: "", locale: "zh", blocks: [
     { id: "network", kind: "text", title: "网络", body: "{networkRates} {networkNex} {networkGate} {exitCap}" },
     { id: "binary", kind: "text", title: "双轨", body: "{binaryRules}" },
     { id: "cooling", kind: "text", title: "冷却", body: "{coolingDays}" },

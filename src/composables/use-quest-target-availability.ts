@@ -33,7 +33,7 @@ export function useQuestTargetAvailability() {
    * 质押四档全部「暂停售卖」时周任务卡照样渲染「去完成」。
    *
    * 「有没有档位可售」本来就只需要那份**公开只读**的方案目录
-   * (`/api/config/staking/pools`,与质押页方案行同源),不需要用户持仓。
+   * (`GET /api/config/staking/pools`,与质押页方案行同源),不需要用户持仓。
    * 与兑换那一路(caps)同形:进页面拉一次,失败算「不知道」(fail open)。
    */
   onMounted(() => {
