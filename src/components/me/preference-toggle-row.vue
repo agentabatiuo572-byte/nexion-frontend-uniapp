@@ -6,15 +6,17 @@
 -->
 <template>
   <view
-    class="flex items-start active:bg-[var(--v5-surface-2)] transition"
+    class="flex items-start transition"
+    :class="locked ? '' : 'active:bg-[var(--v5-surface-2)]'"
     :style="rowStyle"
     role="switch"
-    tabindex="0"
+    :tabindex="locked ? -1 : 0"
     :aria-label="label"
     :aria-checked="value ? 'true' : 'false'"
-    @click="emit('toggle')"
-    @keydown.enter.prevent="emit('toggle')"
-    @keydown.space.prevent="emit('toggle')"
+    :aria-disabled="locked ? 'true' : undefined"
+    @click="locked ? undefined : emit('toggle')"
+    @keydown.enter.prevent="locked ? undefined : emit('toggle')"
+    @keydown.space.prevent="locked ? undefined : emit('toggle')"
   >
     <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
       <slot name="icon" />
@@ -33,8 +35,8 @@
 import { computed, type CSSProperties } from "vue";
 
 const props = withDefaults(
-  defineProps<{ label: string; hint?: string; value: boolean; last?: boolean }>(),
-  { last: false },
+  defineProps<{ label: string; hint?: string; value: boolean; last?: boolean; locked?: boolean }>(),
+  { last: false, locked: false },
 );
 const emit = defineEmits<{ toggle: [] }>();
 
@@ -42,6 +44,8 @@ const rowStyle = computed<CSSProperties>(() => ({
   gap: "12px",
   padding: "12px 14px",
   borderBottom: props.last ? "none" : "1px solid var(--v5-border)",
+  // 锁定行整体降一档对比:它仍是信息(说明这类通知存在且强制开启),但明确不是可操作项。
+  opacity: props.locked ? 0.72 : 1,
 }));
 const iconBoxStyle: CSSProperties = {
   width: "28px",

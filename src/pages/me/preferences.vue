@@ -49,6 +49,8 @@
             :label="w.notifKinds[k]"
             :value="prefs.notifPrefs[k]"
             :last="i === notifKinds.length - 1"
+            :locked="isMandatoryNotifKind(k)"
+            :hint="isMandatoryNotifKind(k) ? w.notifMandatoryHint : undefined"
             @toggle="prefs.toggleNotifKind(k)"
           >
             <template #icon>
@@ -68,7 +70,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
-import { usePreferences, type NotifKind } from "@/store/preferences";
+import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
 
 const t = useT();
 const w = computed(() => t.value.preferences);

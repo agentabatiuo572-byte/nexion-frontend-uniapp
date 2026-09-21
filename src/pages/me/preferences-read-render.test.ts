@@ -5,6 +5,7 @@ import { parse } from "@vue/compiler-sfc";
 import * as Vue from "vue";
 import { renderToString } from "@vue/server-renderer";
 import { describe, expect, it } from "vitest";
+import { isMandatoryNotifKind } from "@/store/preferences";
 
 const template = parse(readFileSync(new URL("./preferences.vue", import.meta.url), "utf8")).descriptor.template!.content;
 const render = new Function("Vue", compile(template, { mode: "function", prefixIdentifiers: true }).code)(Vue);
@@ -16,7 +17,7 @@ async function show(ready: boolean, error: string | null) {
     prefs: { remoteReady: ready, error, soundEnabled: false, hapticsEnabled: true, notifPrefs: Object.fromEntries(kinds.map(k => [k, true])), refreshRemote() {}, toggleSound() {}, toggleHaptics() {}, toggleNotifKind() {} },
     t: { ui: { retry: "Retry" } }, preferenceError: "Read unavailable",
     w: { loading: "Loading settings", feedbackHeading: "Feedback", soundLabel: "Sound", soundHint: "", hapticsLabel: "Haptics", hapticsHint: "", notifHeading: "Notifications", notifKinds: Object.fromEntries(kinds.map(k => [k, k])), notifFooter: "" },
-    notifKinds: kinds, headingStyle: {}, cardStyle: {}, footerStyle: {}, dotStyle: () => ({}),
+    notifKinds: kinds, isMandatoryNotifKind, headingStyle: {}, cardStyle: {}, footerStyle: {}, dotStyle: () => ({}),
   }) });
   app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("ToggleRow", toggle);
   return renderToString(app);

@@ -948,6 +948,8 @@ export const zh: Messages = {
       system: "系统 / 合规 / 监管",
     },
     notifFooter: "禁用某类后,Nova 侧栏与通知中心不再推送对应条目。关键合规通知不可禁用。",
+    // 简报 #214:强制类开关不可操作,行内说明它为何锁定。
+    notifMandatoryHint: "关键合规通知,强制开启,不可禁用",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token

@@ -1010,6 +1010,8 @@ export const en = {
       system: "System / compliance / regulatory",
     },
     notifFooter: "Disabling a category suppresses the Nova drawer + notification center entries. Critical compliance notifications cannot be disabled.",
+    // zentao #214: mandatory categories cannot be switched off; say why the row is locked.
+    notifMandatoryHint: "Critical compliance notice — always on, cannot be disabled",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token(zh 的
