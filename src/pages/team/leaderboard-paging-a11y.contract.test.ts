@@ -24,4 +24,25 @@ describe("leaderboard paging and keyboard contract", () => {
     expect(source).toContain('@keydown.space.prevent="loadMore"');
     expect(source).toContain('@keydown.space.prevent="loadRemote()"');
   });
+
+  /**
+   * 简报 #215:报告称四个周期筛选「无 button/tab/radio 角色、无 tabindex、
+   * 当前选中项也无 aria-selected/aria-checked/aria-pressed」。
+   *
+   * 实现侧其实早已具备完整语义(role=tablist + tab + roving tabindex + aria-selected),
+   * 但本用例此前**只断言了角色与方向键,没有断言「唯一选中项」那一半** —— 也就是
+   * 报告真正指出的维度。补齐它:互斥筛选必须暴露唯一当前选中项,且 roving tabindex
+   * 只落在选中项上,否则键盘用户会停在一个不可达的 tab 上。
+   */
+  it("exposes exactly one selected period and roving tabindex on it", () => {
+    expect(source).toMatch(/role="tablist"[^>]*:aria-label=/);
+    expect(source).toContain(':aria-selected="p === period"');
+    expect(source).toContain(':tabindex="p === period ? 0 : -1"');
+    // 四个周期都渲染自同一份 PERIODS,不存在漏标语义的那一项。
+    expect(source).toMatch(/const PERIODS: LeaderPeriod\[\] = \["today", "week", "month", "all"\]/);
+    // 点击与键盘都必须走同一个选中函数(否则鼠标/键盘行为会分叉)。
+    expect(source).toContain('@click="selectPeriod(p)"');
+    expect(source).toContain('@keydown.enter.prevent="selectPeriod(p)"');
+    expect(source).toContain('@keydown.space.prevent="selectPeriod(p)"');
+  });
 });
