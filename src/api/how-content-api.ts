@@ -25,6 +25,12 @@ export interface HowContentBlock {
 export interface HowContentDocument {
   contentKey: HowContentKey;
   version: string;
+  /**
+   * 简报 #49:本页版本来自哪里。`ENTRY` = 本页自己的发布修订;`DOCUMENT_FALLBACK` =
+   * 该页尚未声明独立修订,退回整份文档的共用版本。页脚据此如实说明,避免让用户
+   * 把文档级版本误当成这一页的专属修订。
+   */
+  versionSource: "ENTRY" | "DOCUMENT_FALLBACK";
   locale: string;
   status: "PUBLISHED";
   blocks: HowContentBlock[];
@@ -63,10 +69,14 @@ function parse(value: unknown, expectedKey: string, mode: ApiEnvironment): HowCo
   const row = record(value);
   if (!HOW_CONTENT_KEYS.includes(expectedKey as HowContentKey) || row.contentKey !== expectedKey || row.status !== "PUBLISHED") return invalid();
   if (typeof row.version !== "string" || !row.version.trim() || typeof row.locale !== "string" || !row.locale.trim() || !Array.isArray(row.blocks) || row.blocks.length === 0 || row.blocks.length > 200) return invalid();
+  // 简报 #49:服务端在条目未声明自己修订时会退回文档级版本,并以 versionSource 如实标注。
+  // 缺省视为 ENTRY,兼容尚未部署该字段的后端(旧后端只发 version)。
+  const versionSource = row.versionSource === undefined ? "ENTRY" : row.versionSource;
+  if (versionSource !== "ENTRY" && versionSource !== "DOCUMENT_FALLBACK") return invalid();
   const blocks = row.blocks.map(parseBlock);
   if (new Set(blocks.map((block) => block.id)).size !== blocks.length) return invalid();
   if (!matchesRuntimeProvenance(row, mode, "server")) return invalid();
-  return { contentKey: expectedKey as HowContentKey, version: row.version.trim(), locale: row.locale.trim(), status: "PUBLISHED", blocks, source: "server", sourceEnvironment: row.sourceEnvironment as "PRODUCTION" | "SANDBOX", runId: row.runId as string };
+  return { contentKey: expectedKey as HowContentKey, version: row.version.trim(), versionSource, locale: row.locale.trim(), status: "PUBLISHED", blocks, source: "server", sourceEnvironment: row.sourceEnvironment as "PRODUCTION" | "SANDBOX", runId: row.runId as string };
 }
 
 export interface HowContentApi { published(contentKey: HowContentKey, locale: string): Promise<HowContentDocument> }
