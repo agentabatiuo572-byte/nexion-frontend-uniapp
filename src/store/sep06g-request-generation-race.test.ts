@@ -114,6 +114,7 @@ function ladder(title: string) {
   return {
     source: "server",
     prizeName: title,
+    capabilities: { peer: false, genesis: false },
     ranks: Array.from({ length: 13 }, (_, v) => ({
       v,
       title: `${title} V${v}`,
@@ -320,6 +321,7 @@ describe("Sep 06G same-account request generation fences", () => {
     expect(store.remoteReady).toBe(true);
     expect(store.remoteError).toBeNull();
     expect(store.prizeName).toBe("newer");
+    expect(store.capabilities).toEqual({ peer: false, genesis: false });
     expect(store.myRank).toBe(4);
   });
 

@@ -8,6 +8,12 @@ export interface VRankProvenance {
   runId: string;
 }
 
+/** 服务端能力位:某类收益今天是否真的会派发。与佣金指南同源,同一份事实。 */
+export interface CommissionCapabilities {
+  peer: boolean;
+  genesis: boolean;
+}
+
 export interface CanonicalVRankRow {
   v: number;
   title: string;
@@ -55,7 +61,7 @@ export interface CanonicalVRankLadder {
    *   能力位,App 只能把配置比例当成已生效权益展示(V3–V12 逐级「平级 5%」),
    *   与玩法说明的「未开放」自相矛盾(zentao #79)。
    */
-  capabilities: { peer: boolean; genesis: boolean };
+  capabilities: CommissionCapabilities;
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string;
@@ -172,14 +178,20 @@ function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   const source = record(value);
   const proof = provenance(source, mode);
   if (!Array.isArray(source.ranks)) return invalid();
-  const capabilities = record(source.capabilities);
-  if (typeof capabilities.peer !== "boolean" || typeof capabilities.genesis !== "boolean") return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
   if (ranks.length !== 13 || ranks.some((rank, index) => rank.v !== index)) return invalid();
+  // 旧后端(尚未下发能力位)不能让整个阶梯判非法 —— 那会把等级页变成「数据不可用」,
+  // 连配置比例都读不到。缺字段一律**失败关闭**为「不派发」:宁可少承诺,不能把配置
+  // 比例写成已生效权益(#79)。字段在但类型不对属于协议违规,仍判非法。
+  let capabilities: CommissionCapabilities = { peer: false, genesis: false };
+  if (source.capabilities !== undefined && source.capabilities !== null) {
+    const raw = record(source.capabilities);
+    if (typeof raw.peer !== "boolean" || typeof raw.genesis !== "boolean") return invalid();
+    capabilities = { peer: raw.peer, genesis: raw.genesis };
+  }
   return {
     source: text(source.source), prizeName: text(source.prizeName),
-    capabilities: { peer: capabilities.peer, genesis: capabilities.genesis },
-    ...proof, ranks,
+    capabilities, ...proof, ranks,
   };
 }
 

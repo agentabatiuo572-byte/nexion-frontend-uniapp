@@ -38,7 +38,7 @@ describe("V-rank remote consumer authority", () => {
     const text = source("../pages/team/rank-how.vue");
     expect(text).toContain("ladder: vRankApi.ladder");
     expect(text).toContain("createRankHowResource");
-    expect(text).toContain("buildRankHowContent(state.value.policy, state.value.ranks");
+    expect(text).toContain("buildRankHowContent(state.value.policy, state.value.ranks, state.value.capabilities");
     expect(text).not.toContain("useVRank");
   });
 });
