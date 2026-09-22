@@ -24,3 +24,20 @@ export function referralShareText(
   const template = enabled ? enabledTemplate : disabledTemplate;
   return template.split("{link}").join(link);
 }
+
+/**
+ * 注册页副标题该说哪一档 —— 与金额同源,判据是**闸门**,不是金额。
+ *
+ * 🔴 zentao #227:闸门关闭时 `visibleReferralGift` 会把金额归零,但文案若只按
+ *   「金额是否 > 0」分档,就会落进「新人奖励已备好,连接设备即刻到账」那一支 ——
+ *   在奖励停用期间照样承诺一份不会到账的奖励。所以:
+ *     gated   → 闸门关闭,一句奖励承诺都不能有
+ *     amount  → 闸门开启且有金额,可报出金额
+ *     prepared→ 闸门开启但金额未配置,可以说「已备好」但报不出数字
+ */
+export type NewcomerSubtitleKind = "gated" | "amount" | "prepared";
+
+export function newcomerSubtitleKind(rewardsEnabled: boolean, usdtAmount: number): NewcomerSubtitleKind {
+  if (!rewardsEnabled) return "gated";
+  return usdtAmount > 0 ? "amount" : "prepared";
+}

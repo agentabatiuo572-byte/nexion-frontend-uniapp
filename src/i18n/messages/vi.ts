@@ -399,6 +399,7 @@ export const vi: Messages = {
     title: "Tạo tài khoản",
     subtitleHighlight: "Thưởng chào mừng ${usd}",
     subtitleRest: " vào tài khoản ngay khi thiết bị của bạn kết nối.",
+    subtitleRewardDisabled: "Kết nối thiết bị để bắt đầu sử dụng.",
     subtitleNoBonus: "Thưởng chào mừng đã sẵn sàng — vào tài khoản ngay khi thiết bị kết nối.",
     phoneLenHint: "Số điện thoại mã vùng này gồm {range} chữ số",
     phonePlaceholder: "Số điện thoại",

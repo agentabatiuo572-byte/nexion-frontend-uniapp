@@ -404,6 +404,7 @@ export const en = {
     title: "Create account",
     subtitleHighlight: "${usd} Welcome Bonus",
     subtitleRest: " credited the moment your device connects.",
+    subtitleRewardDisabled: "Connect a device to get started.",
     subtitleNoBonus: "Your welcome bonus is ready — credited the moment your device connects.",
     phoneLenHint: "Phone numbers for this code are {range} digits",
     phonePlaceholder: "Mobile number",

@@ -388,6 +388,7 @@ export const zh: Messages = {
     title: "创建账号",
     subtitleHighlight: "{usd} 美元新人奖励",
     subtitleRest: ",连接设备即刻到账。",
+    subtitleRewardDisabled: "连接设备后即可开始使用。",
     subtitleNoBonus: "新人奖励已备好,连接设备即刻到账。",
     phoneLenHint: "该区号手机号为 {range} 位",
     phonePlaceholder: "手机号码",
