@@ -4675,6 +4675,7 @@ export const en = {
 
   unilevel: {
     canonicalPolicy: "{days}-day cooling period · promotional multiplier ×{multiplier}",
+    canonicalPolicyUnavailable: "Cooling-period configuration unavailable",
     periods: { today: "Today", week: "This week", month: "This month", all: "All time" },
     pausedLayersTitle: "Some royalty layers are paused",
     pausedLayersDesc: "Settlement and new accrual are paused for {layers}. Amounts already recorded remain unchanged.",

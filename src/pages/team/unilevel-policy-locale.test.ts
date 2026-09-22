@@ -30,4 +30,9 @@ describe("Unilevel localized canonical policy",()=>{
     const view=build(computed,fmt,ref(zh),{config:null},ref(null));
     expect(view.canonicalPolicyText.value).toBe("");expect(view.canonicalPeriodText.value).toBe("");
   });
+  it("does not render a fabricated 30-day policy when cooling is unpublished",()=>{
+    const view=build(computed,fmt,ref(zh),{config:{coolingDays:null,promoMultiplier:1}},ref({period:"month"}));
+    expect(view.canonicalPolicyText.value).toBe("冷静期配置不可用");
+    expect(view.canonicalPolicyText.value).not.toContain("30");
+  });
 });

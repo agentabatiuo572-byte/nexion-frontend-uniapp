@@ -4534,6 +4534,7 @@ export const vi: Messages = {
 
   unilevel: {
     canonicalPolicy: "Thời gian chờ {days} ngày · hệ số khuyến mãi ×{multiplier}",
+    canonicalPolicyUnavailable: "Chưa có cấu hình thời gian chờ",
     periods: { today: "Hôm nay", week: "Tuần này", month: "Tháng này", all: "Toàn bộ thời gian" },
     pausedLayersTitle: "Một số tầng hoa hồng đang tạm dừng",
     pausedLayersDesc: "Tạm dừng quyết toán và ghi nhận mới ở {layers}. Các khoản đã ghi nhận không thay đổi.",

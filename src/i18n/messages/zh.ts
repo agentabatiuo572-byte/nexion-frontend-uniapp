@@ -4541,6 +4541,7 @@ export const zh: Messages = {
 
   unilevel: {
     canonicalPolicy: "冷静期 {days} 天 · 活动倍率 ×{multiplier}",
+    canonicalPolicyUnavailable: "冷静期配置不可用",
     periods: { today: "今日", week: "本周", month: "本月", all: "全部时间" },
     pausedLayersTitle: "部分版税层级已暂停",
     pausedLayersDesc: "{layers} 暂停结算与新增计提，已记录的金额不受影响。",
