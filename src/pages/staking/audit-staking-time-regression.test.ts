@@ -182,4 +182,28 @@ describe("staking time regression", () => {
     resolveSnapshot(storeSnapshot(2));
     await flush();
   });
+
+  /**
+   * zentao #228:安全设置页把「当前设备登录时间」直接喂给 `Date.parse`,而后端字段是
+   * Java `LocalDateTime` 序列化出的**无时区**串、按业务时区 Asia/Shanghai 写入。
+   * 本机在 +09:00 时 `Date.parse` 会把它当成东京本地时间 —— 刚注册账号的当前设备
+   * 于是显示「59 分钟前」,差的正是那 1 小时。安全页必须与提现/兑换等面一样走
+   * `parseServerTimestamp`。
+   */
+  it("reads a freshly issued session timestamp as just now rather than an hour ago", () => {
+    // 后端此刻会写下的值:上海墙钟、无时区后缀。
+    const shanghaiWallClockNow = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19);
+
+    // 正确路径:默认 +08:00 → 差值≈0 → 页面显示「刚刚」。
+    expect(Date.now() - (parseServerTimestamp(shanghaiWallClockNow) as number)).toBeLessThan(5 * 60 * 1000);
+    // 旧写法:当成本机时区 → 差值≈1 小时 → 页面显示「59 分钟前」。
+    expect(Date.now() - Date.parse(shanghaiWallClockNow)).toBeGreaterThan(55 * 60 * 1000);
+  });
+
+  it("routes the security page's session timestamps through the business-zone parser", async () => {
+    const securitySource = (await import("../../pages/me/security.vue?raw")).default as string;
+    expect(securitySource).toContain("parseServerTimestamp(item.lastActiveAt)");
+    // 直接 Date.parse 服务端时间戳就是本单的成因,不允许回来。
+    expect(securitySource).not.toContain("lastActiveMs: Date.parse(");
+  });
 });

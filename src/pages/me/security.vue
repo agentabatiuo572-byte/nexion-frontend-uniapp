@@ -153,6 +153,7 @@ import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import { parseServerTimestamp } from "@/api/server-time";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
@@ -228,7 +229,11 @@ const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
       device: nexGridBrandText(item.deviceName),
       location: item.ipMasked,
       ip: item.ipMasked,
-      lastActiveMs: Date.parse(item.lastActiveAt),
+      // 🔴 zentao #228:`lastActiveAt` 是 Java `LocalDateTime` 序列化出来的**无时区**串,
+      //   后端按业务时区 Asia/Shanghai 写入。直接 `Date.parse` 会把它当成**本机时区**
+      //   (此处 +09:00),于是刚注册账号的当前设备显示成「59 分钟前」—— 差的就是那 1 小时。
+      //   统一走 `parseServerTimestamp`(无时区默认 +08:00),与提现/兑换等面同源。
+      lastActiveMs: parseServerTimestamp(item.lastActiveAt) ?? Date.now(),
       current: item.current,
       entrySurface: "h5",
     }))
