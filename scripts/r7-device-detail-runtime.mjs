@@ -341,16 +341,10 @@ try {
   await detail.locator(".nx-device-quick-menu").waitFor({ state: "detached" });
   assert(await cardHeader.evaluate((element) => element === document.activeElement), "device quick menu did not restore header focus");
 
-  const helpButton = detail.locator(".nx-device-help");
-  await helpButton.focus();
-  await helpButton.press("Enter");
-  assert((await helpButton.getAttribute("aria-expanded")) === "true", "device help did not open from keyboard");
-  const networkSwitch = detail.locator(".nx-device-network-toggle");
-  const networkBefore = await networkSwitch.getAttribute("aria-checked");
-  await networkSwitch.focus();
-  await networkSwitch.press("Space");
-  assert((await networkSwitch.getAttribute("aria-checked")) !== networkBefore, "device network switch ignored keyboard activation");
-  await networkSwitch.press("Space");
+  assert(await detail.locator(".nx-device-help, .nx-device-charger-toggle, .nx-device-network-toggle").count() === 0,
+    "remote device detail exposed mock heartbeat controls");
+  assert(!(await detail.locator(".nx-device-card").innerText()).includes("ping 失败"),
+    "remote device detail claimed an unobserved network failure");
 
   const homeForHardware = await goto("#/pages/index/index", ".nx-device-slot");
   await homeForHardware.locator(".nx-device-slot").nth(1).click();

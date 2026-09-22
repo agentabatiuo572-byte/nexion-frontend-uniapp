@@ -258,7 +258,7 @@
     </view>
 
     <!-- Phone: background mode toggles -->
-    <view v-if="device.kind === 'phone'" style="padding: 0 20px 12px">
+    <view v-if="device.kind === 'phone' && !remoteApiEnabled" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
         <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
         <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp" @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
@@ -473,6 +473,11 @@ const statusLabel = computed(() => {
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (idleGated.value) return t.value.earn.idle;
+  if (props.device.capacitySource === "server" && props.device.kind === "phone") {
+    if (props.device.runtimeStatus === "ONLINE") return t.value.earn.online;
+    if (props.device.runtimeStatus === "OFFLINE") return t.value.earn.offline;
+    return t.value.earn.runtimeUnknown;
+  }
   if (props.device.kind !== "phone" && props.device.capacitySource === "server"
       && (props.device.runtimeStatus == null || props.device.runtimeStatus === "UNKNOWN")) {
     return t.value.earn.runtimeUnknown;
@@ -485,6 +490,9 @@ const statusLabel = computed(() => {
 const statusColor = computed(() => {
   if (props.device.pendingDeactivate) return "var(--v5-warning)";
   if (reconnecting.value) return "var(--v5-warning)";
+  if (props.device.capacitySource === "server" && props.device.kind === "phone") {
+    return props.device.runtimeStatus === "ONLINE" ? "var(--v5-brand)" : "var(--v5-ink-3)";
+  }
   if (idleGated.value || !deviceOnline.value) return "var(--v5-ink-3)";
   return "var(--v5-brand)";
 });
