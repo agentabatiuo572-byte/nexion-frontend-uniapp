@@ -15,12 +15,9 @@ describe("NEX page published-content contract", () => {
     expect(source).not.toContain(':sub="w.heroSub"');
   });
 
-  it("renders the active-AI-client field as a published statistic rather than a market value", () => {
-    expect(source).toContain('narrative.value.activeAiClients');
-    expect(source).toContain('fmt(w.publishedDataVersion, { version: narrative.version })');
-    expect(source).toContain('w.activeAiClientsLabel');
-    expect(source).toContain('w.activeAiClientsNotice');
-    expect(source).not.toContain('market.activeAiClients');
+  it("does not render an editor-supplied AI-client number as a fact", () => {
+    expect(source).not.toContain('narrative.value.activeAiClients');
+    expect(source).not.toContain('w.activeAiClientsLabel');
   });
 
   it("refreshes the published projection and records a view only after usable content resolves", () => {

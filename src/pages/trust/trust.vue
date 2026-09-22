@@ -15,9 +15,9 @@
               <text v-if="narrativeSubhero" class="block" :style="heroBodyStyle">{{ narrativeSubhero }}</text>
             </view>
           </view>
-          <view class="grid grid-cols-2 text-center" :style="heroStatsStyle">
-            <Stat :label="tr.tvlOnChain" :value="trustSnapshotLabel" tint="var(--v5-brand)" />
+          <view v-if="verified" class="grid text-center" :style="heroStatsStyle">
             <Stat :label="tr.activeNodes" :value="activeDevicesText" />
+            <text class="block" :style="footnoteStyle">{{ financialFootnote }}</text>
           </view>
         </view>
 
@@ -29,35 +29,22 @@
 
         <template v-else>
           <template v-if="financialSection && financialMetrics.length">
-            <SectionHeader :label="sectionLabel(sectionKey.financials)" :suffix="financialSection.version" />
+            <SectionHeader :label="sectionLabel(sectionKey.financials)" />
             <view class="grid grid-cols-2" :style="gridCardStyle">
-              <view v-for="metric in financialMetricsVisible" :key="metric.key" :style="metricStyle">
+              <view v-for="metric in financialMetrics" :key="metric.key" :style="metricStyle">
                 <text class="block" :style="labelStyle">{{ metric.label }}</text>
                 <view class="flex items-baseline" style="gap: 6px; margin-top: 4px">
                   <text :style="metricValueStyle">{{ metric.value }}</text>
                   <text v-if="metric.delta" :style="deltaStyle">{{ metric.delta }}</text>
                 </view>
               </view>
-              <text v-if="financialFootnote" class="block" :style="footnoteStyle">{{ financialFootnote }}</text>
-              <!-- 无可达审计文件时如实说明这些数字的来源:平台公布口径,不是实测/已审计事实。 -->
-              <text v-else-if="financialUnverified" class="block" :style="footnoteStyle" role="note">{{ tr.financialsUnverifiedNote }}</text>
             </view>
           </template>
 
-          <template v-if="complianceSection && complianceRows.length">
-            <SectionHeader :label="sectionLabel(sectionKey.complianceBadges)" :suffix="complianceSection.version" />
-            <view class="grid grid-cols-2" style="gap: 8px">
-              <view v-for="row in complianceRows" :key="row.Label" :style="tileStyle">
-                <text class="block" :style="titleStyle">{{ row.Label }}</text>
-                <text class="block" :style="bodyStyle">{{ row.Body }}</text>
-              </view>
-            </view>
-          </template>
-
-          <template v-if="auditSection && auditRows.length">
+          <template v-if="auditSection && verifiedAuditRows.length">
             <SectionHeader :label="sectionLabel(sectionKey.auditsReserves)" :suffix="auditSection.version" />
             <view :style="listCardStyle">
-              <view v-for="(row, index) in auditRows" :key="row.Primary" :class="safeHref(row.Url) ? 'active:opacity-75' : ''" :style="listRowStyle(index === auditRows.length - 1)"
+              <view v-for="(row, index) in verifiedAuditRows" :key="row.Primary" class="active:opacity-75" :style="listRowStyle(index === verifiedAuditRows.length - 1)"
                 role="link" :tabindex="safeHref(row.Url) ? 0 : -1" :aria-disabled="safeHref(row.Url) ? 'false' : 'true'"
                 @click="openHref(row.Url)" @keydown.enter.prevent="openHref(row.Url)">
                 <view class="min-w-0" style="flex: 1">
@@ -70,10 +57,10 @@
             </view>
           </template>
 
-          <template v-if="leadershipSection && leadershipRows.length">
+          <template v-if="leadershipSection && verifiedLeadershipRows.length">
             <SectionHeader :label="sectionLabel(sectionKey.leadership)" :suffix="leadershipSection.version" />
             <view :style="listCardStyle">
-              <view v-for="(row, index) in leadershipRows" :key="row.Name" :style="listRowStyle(index === leadershipRows.length - 1)" @click="openHref(row.Url)">
+              <view v-for="(row, index) in verifiedLeadershipRows" :key="row.Name" :style="listRowStyle(index === verifiedLeadershipRows.length - 1)" @click="openHref(row.Url)">
                 <view class="grid place-items-center" :style="avatarStyle"><text :style="avatarTextStyle">{{ initials(row.Name) }}</text></view>
                 <view class="min-w-0" style="flex: 1">
                   <text class="block" :style="titleStyle">{{ row.Name }}</text>
@@ -108,16 +95,19 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import SectionHeader from "@/components/trust/trust-section-header.vue";
 import Stat from "@/components/trust/trust-stat.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
+import { useConfig } from "@/store/config";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
-import { localizedTrustFieldValue, trustFieldValue, trustNumberedRows } from "@/lib/trust-fields";
+import { localizedTrustFieldValue, trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
+const cfg = useConfig();
 const tr = computed(() => t.value.trust);
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
@@ -146,46 +136,29 @@ const sectionKey = {
 const financialSection = computed(() => section(sectionKey.financials));
 const leadershipSection = computed(() => section(sectionKey.leadership));
 const narrativeSection = computed(() => section(sectionKey.nexNarrative));
-const complianceSection = computed(() => section(sectionKey.complianceBadges));
 const auditSection = computed(() => section(sectionKey.auditsReserves));
 const listingsSection = computed(() => section(sectionKey.listings));
 
 const narrativeHero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "hero", language.value) ?? "");
 const narrativeSubhero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "subhero", language.value) ?? "");
-const trustSnapshotLabel = computed(() => trustFieldValue(financialSection.value?.fields ?? [], "tvlOnChain") ?? "—");
-const activeDevicesText = computed(() => trustFieldValue(financialSection.value?.fields ?? [], "devicesOnlineValue") ?? "—");
-const financialFootnote = computed(() => auditDocumentHref.value
-  ? localizedTrustFieldValue(financialSection.value?.fields ?? [], "footnote", language.value)
+const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
+const activeDevicesText = computed(() => verified.value?.onlineDevices.value.toLocaleString("en-US") ?? "—");
+const financialFootnote = computed(() => verified.value
+  ? fmt(tr.value.verifiedAggregateNote, { at: verified.value.capturedAt.slice(0, 16).replace("T", " ") })
   : null);
 const financialMetrics = computed(() => {
-  const fields = financialSection.value?.fields ?? [];
-  return ["tvlOnChain", "mrrValue", "activeAccountsValue", "devicesOnlineValue", "payoutsProcessedValue"].flatMap((key) => {
-    const field = fields.find((item) => item.key === key);
-    if (!field?.value.trim()) return [];
-    const label = key === "tvlOnChain" ? tr.value.tvlOnChain : key === "devicesOnlineValue" ? tr.value.activeNodes : field.label;
-    return [{ key, label, value: field.value, delta: key.endsWith("Value") ? trustFieldValue(fields, key.replace(/Value$/, "Delta")) : null }];
-  });
+  const v = verified.value;
+  if (!v) return [];
+  return [
+    { key: "activeAccountsValue", label: tr.value.activeAccounts, value: v.activeAccounts.value.toLocaleString("en-US"), delta: null },
+    { key: "devicesOnlineValue", label: tr.value.activeNodes, value: v.onlineDevices.value.toLocaleString("en-US"), delta: null },
+    { key: "payoutsProcessedValue", label: tr.value.completedPayouts, value: `$${v.completedPayoutUsdt.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, delta: null },
+  ];
 });
-// 🔴 zentao #59:这些数字是运营可编辑的**公布口径**(后端 OpsTrustDisclosureService 里的
-//   trustField 种子值,如 TVL $128.4M),不是任何实测聚合。在没有可核验的审计文件之前,
-//   把它们的环比增量当成「增长」展示,等于把人工配置的虚拟增长率发布成事实。
-//   所以:没有可达审计文件时,只保留数值本身,并显式标注来源为平台公布口径 ——
-//   与首页「网络脉搏」同一处理原则(配置值不得冒充实测)。
-const financialUnverified = computed(() => auditDocumentHref.value === "");
-const financialMetricsVisible = computed(() => financialMetrics.value.map((metric) => ({
-  ...metric,
-  delta: financialUnverified.value ? null : metric.delta,
-})));
-const complianceRows = computed(() => trustNumberedRows(complianceSection.value?.fields ?? [], "badge", ["Label", "Body"] as const, language.value));
 const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, language.value));
-// BUG #59: the published footnote asserts the figures were reconciled against an
-// audited ledger. That claim is only publishable while an audit document is
-// actually reachable; with no reachable document the App must not repeat the
-// assurance while the audit row itself shows "link unavailable".
-const auditDocumentHref = computed(() => auditRows.value
-  .map((row) => row.Url.trim())
-  .find((value) => safeHref(value) !== null) ?? "");
+const verifiedAuditRows = computed(() => auditRows.value.filter((row) => safeHref(row.Url)));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
+const verifiedLeadershipRows = computed(() => leadershipRows.value.filter((row) => safeHref(row.Url)));
 const listingRows = computed(() => trustNumberedRows(listingsSection.value?.fields ?? [], "listing", ["Exchange", "State", "Url"] as const, language.value));
 
 let trustPageVisible = false;

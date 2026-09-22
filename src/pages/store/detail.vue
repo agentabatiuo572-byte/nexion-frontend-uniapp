@@ -228,18 +228,13 @@
           <view style="padding: 22px 16px 4px"><SectionHeader :title="productTrustTitle" /></view>
           <view class="mx-4 rounded-2xl" :style="trustCardStyle" data-testid="product-trust-material">
             <text v-if="trustStatus === 'loading' || trustStatus === 'idle'" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
-            <template v-else-if="trustStatus === 'ready' && (productComplianceRows.length || productAuditRows.length)">
-              <view v-for="row in productComplianceRows" :key="row.Label" :style="trustDisclosureRowStyle">
-                <text class="block" :style="trustDisclosureTitleStyle">{{ row.Label }}</text>
-                <text class="block" :style="trustBodyStyle">{{ row.Body }}</text>
-              </view>
-              <view v-for="row in productAuditRows" :key="row.Primary" :class="safeTrustUrl(row.Url) ? 'active:opacity-70' : ''" :style="trustDisclosureRowStyle"
-                role="link" :tabindex="safeTrustUrl(row.Url) ? 0 : -1" :aria-disabled="!safeTrustUrl(row.Url)" :aria-label="row.Primary"
+            <template v-else-if="trustStatus === 'ready' && productAuditRows.length">
+              <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle"
+                role="link" tabindex="0" :aria-label="row.Primary"
                 @click="openTrustUrl(row.Url)" @keydown.enter.prevent="openTrustUrl(row.Url)">
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
-                <text v-if="safeTrustUrl(row.Url)" class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
-                <text v-else class="block" :style="trustBodyStyle">{{ t.trust.linkUnavailable }}</text>
+                <text class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
               </view>
             </template>
             <template v-else>
@@ -544,14 +539,13 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
 // their registered names in every locale.
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
 const compliance = ["SOC 2 Type II", "ISO 27001", "CE / FCC"];
-const productComplianceSection = computed(() => trustSections.value.find((section) => section.sectionKey === "complianceBadges"));
 const productAuditSection = computed(() => trustSections.value.find((section) => section.sectionKey === "auditsReserves"));
-const productTrustTitle = computed(() => t.value.store.detTrustedBy);
-const productComplianceRows = computed(() => trustNumberedRows(productComplianceSection.value?.fields ?? [], "badge", ["Label", "Body"] as const, trustLanguage.value));
-const productAuditRows = computed(() => trustNumberedRows(productAuditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, trustLanguage.value));
+const productTrustTitle = computed(() => t.value.store.detEvidenceDocuments);
+const productAuditRows = computed(() => trustNumberedRows(productAuditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, trustLanguage.value)
+  .filter((row) => safeTrustUrl(row.Url)));
 
 async function refreshTrustMaterial() {
-  if (await refreshTrust(true)) recordPublishedTrustViews(["complianceBadges", "auditsReserves"], trustLanguage.value);
+  if (await refreshTrust(true)) recordPublishedTrustViews(["auditsReserves"], trustLanguage.value);
 }
 
 function safeTrustUrl(raw: string): string | null {

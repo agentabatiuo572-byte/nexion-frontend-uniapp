@@ -444,6 +444,7 @@ export const useApp = defineStore("app", () => {
   //   裸消费它 —— 同一行页脚里 200 万在线 × 按 2.8 万舰队算的 $/sec。根修这一个生产点,
   //   消费者自动收敛;域判定与卡片占位共用同一个函数,两层永不打架)。
   const pulseOnlineBaseline = (): number => {
+    if (remoteApiEnabled) return cfg.config.verifiedStats?.onlineDevices.value ?? 0;
     const ps = cfg.config.publicStats;
     // R3 P2:jitter 只属呼吸带(band 自己会回退 24),越域不该把合法舰队基线拖回种子
     const h = publicStatsHealth(ps ?? null);
@@ -457,8 +458,7 @@ export const useApp = defineStore("app", () => {
     watch(
       () => [
         cfg.syncFailed,
-        cfg.config.publicStats.fleetDevices,
-        cfg.config.publicStats.onlineRatePct,
+        cfg.config.verifiedStats?.onlineDevices.value,
       ],
       () => {
         const activeDevices = cfg.syncFailed ? 0 : pulseOnlineBaseline();

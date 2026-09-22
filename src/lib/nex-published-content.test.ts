@@ -13,29 +13,24 @@ describe("published NEX narrative", () => {
       { key: "hero.en", label: "Headline", value: "Server English headline" },
       { key: "subhero.zh", label: "副标题", value: "服务端中文副标题" },
     ])], "ready", "zh")).toEqual({
-      state: "ready", version: "v7", hero: "服务端中文标题", subhero: "服务端中文副标题", activeAiClients: null,
+      state: "ready", version: "v7", hero: "服务端中文标题", subhero: "服务端中文副标题",
     });
   });
 
-  it("reads a valid published active-AI-client count without changing the published hero", () => {
+  it("does not publish an editor-supplied AI-client count", () => {
     expect(resolvePublishedNexNarrative([section([
       { key: "hero.en", label: "Headline", value: "Published headline" },
       { key: "activeAiClients", label: "Active AI clients", value: "18,420" },
     ], "v1")], "ready", "en")).toEqual({
-      state: "ready", version: "v1", hero: "Published headline", subhero: null, activeAiClients: 18420,
+      state: "ready", version: "v1", hero: "Published headline", subhero: null,
     });
   });
 
-  it("keeps a missing or malformed published count unavailable and follows the published version", () => {
+  it("follows the published narrative version without displaying numeric claims", () => {
     const fields: PublishedTrustSection["fields"] = [{ key: "hero.en", label: "Headline", value: "Published headline" }];
     expect(resolvePublishedNexNarrative([section(fields, "v2")], "ready", "en")).toMatchObject({
-      state: "ready", version: "v2", hero: "Published headline", activeAiClients: null,
+      state: "ready", version: "v2", hero: "Published headline", subhero: null,
     });
-    for (const value of ["", "-1", "1.5", "18,42", "9007199254740992", "1e4"]) {
-      expect(resolvePublishedNexNarrative([section([...fields, {
-        key: "activeAiClients", label: "Active AI clients", value,
-      }], "v3")], "ready", "en")).toMatchObject({ state: "ready", version: "v3", activeAiClients: null });
-    }
   });
 
   it("does not borrow another locale or local copy when this locale has no published hero", () => {
