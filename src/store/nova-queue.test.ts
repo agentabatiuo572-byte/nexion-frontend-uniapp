@@ -48,6 +48,22 @@ describe("Nova serial pending turns", () => {
     expect(nova.messages).toHaveLength(3);
   });
 
+  it("tracks an ambiguously timed-out turn with the same id instead of exposing a retry", () => {
+    const nova = setup();
+    add(nova, "a"); add(nova, "b");
+    expect(nova.claimRemote()).toMatchObject({ turnId: "a", tracking: false });
+
+    expect(nova.trackRemote("a")).toBe(true);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
+    expect(nova.retryRemote("a")).toBe(false);
+    expect(nova.claimRemote()).toMatchObject({ turnId: "a", tracking: true });
+
+    nova.completeRemote("a", "one authoritative answer");
+    nova.completeRemote("a", "duplicate answer");
+    expect(nova.messages.map(message => message.text)).toEqual(["a", "one authoritative answer", "b"]);
+    expect(nova.claimRemote()).toMatchObject({ turnId: "b", tracking: false });
+  });
+
   it("reserves an editing turn until saved and allows cancelling only unsent turns", () => {
     const nova = setup();
     add(nova, "a"); add(nova, "b"); nova.claimRemote();
@@ -63,17 +79,17 @@ describe("Nova serial pending turns", () => {
     expect(nova.messages.some(m => m.text === "c")).toBe(false);
   });
 
-  it("preserves interrupted requests on navigation and does not hydrate over pending questions", () => {
+  it("keeps interrupted requests under server authority and does not hydrate over pending questions", () => {
     const nova = setup();
     const conversationId = nova.conversationId;
     add(nova, "a"); add(nova, "b"); nova.claimRemote();
     nova.interruptRemote();
     nova.hydrateRemote("a", "other-conversation", []);
     expect(nova.conversationId).toBe(conversationId);
-    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "failed", failure: "interrupted" });
-    expect(nova.claimRemote()).toBeUndefined();
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
     nova.completeRemote("a", "late answer");
     expect(nova.messages.map(m => m.text)).toEqual(["a", "b"]);
+    expect(nova.claimRemote()).toMatchObject({ turnId: "a", tracking: true });
   });
 
   it("clears pending turns on account change, reset and explicit new conversation", () => {

@@ -392,17 +392,49 @@ describe("real Nova page queue worker", () => {
     page.cleanup();
   });
 
-  it("retains interrupted work, aborts the old call, and rejects a late answer after retry", async () => {
+  it("tracks a timed-out request with one turn id until the server can replay it", async () => {
+    const { page, hooks, api, nova } = mount();
+    await hooks.onShow();
+    api.chat
+      .mockRejectedValueOnce(new ApiError({ kind: "http", message: "NOVA_AI_TIMEOUT", status: 504 }))
+      .mockRejectedValueOnce(new ApiError({ kind: "http", message: "NOVA_AI_TURN_IN_PROGRESS", status: 429 }))
+      .mockResolvedValueOnce({ reply: "authoritative answer" })
+      .mockResolvedValueOnce({ reply: "answer:two" });
+
+    await page.onSend("one"); await page.onSend("two");
+    await vi.advanceTimersByTimeAsync(0);
+    const turnId = nova.pendingRemote[0].turnId;
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
+    expect(page.threadMessages.value[0].queue).toMatchObject({ state: "tracking", label: zh.nova.queue.tracking });
+    expect(api.chat).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(api.chat).toHaveBeenCalledTimes(2);
+    expect(api.chat.mock.calls[1][0].turnId).toBe(turnId);
+    expect(nova.pendingRemote[0].delivery).toBe("tracking");
+    expect(api.chat.mock.calls.some(([request]) => request.message === "two")).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(api.chat).toHaveBeenCalledTimes(3);
+    expect(api.chat.mock.calls[2][0].turnId).toBe(turnId);
+    await vi.advanceTimersByTimeAsync(1800);
+    expect(api.chat.mock.calls[3][0].message).toBe("two");
+    await vi.advanceTimersByTimeAsync(1800);
+    expect(nova.messages.map(message => message.text)).toEqual(["one", "authoritative answer", "two", "answer:two"]);
+    page.cleanup();
+  });
+
+  it("retains interrupted work, resumes tracking, and rejects the cancelled call's late answer", async () => {
     const { page, hooks, api, nova } = mount();
     await hooks.onShow();
     const old = deferred(); api.chat.mockReturnValueOnce(old.promise).mockResolvedValue({ reply: "retried" });
     await page.onSend("one"); await page.onSend("two");
     hooks.onHide();
     expect(api.chat.mock.calls[0][1].aborted).toBe(true);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
     await hooks.onShow();
     expect(nova.pendingRemote).toHaveLength(2);
-    page.onQueueAction(nova.pendingRemote[0].turnId, "retry");
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
     old.resolve({ reply: "stale" });
     await vi.advanceTimersByTimeAsync(3600);
     expect(nova.messages.some(m => m.text === "stale")).toBe(false);
