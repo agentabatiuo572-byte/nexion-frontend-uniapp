@@ -188,6 +188,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
       `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
       fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
     ],
+    roiBasis: { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) },
     tint,
   };
 }
@@ -214,6 +215,15 @@ function catalogProductPerks(productId: string, fallback: readonly string[]): st
     `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
     fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
   ];
+}
+/**
+ * 年化 ROI 的推导输入,与上面那条 perk 文案**同源同算**(都走 annualRoiPct),
+ * 所以页面上的比例与列出的算式不可能各说各话。
+ */
+function catalogProductRoiBasis(productId: string): { dailyEarn: number; price: number; roi: number } | undefined {
+  const p = catalogProduct(productId);
+  if (!p) return undefined;
+  return { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) };
 }
 
 // The server row's perk strings are unlocalized and carry the raw column scale
@@ -242,7 +252,8 @@ const tiers = computed<QuotaTier[]>(() =>
           : t.value.quota.condActivatedDirect,
         current: condition.current, required: condition.required,
         kind: condition.kind === "teamVolume" ? "volume" : "invites",
-      })), perks: catalogProductPerks(tier.productId, tier.perks), tint: index % 2 ? "var(--v5-warning)" : "var(--v5-brand)",
+      })), perks: catalogProductPerks(tier.productId, tier.perks),
+      roiBasis: catalogProductRoiBasis(tier.productId), tint: index % 2 ? "var(--v5-warning)" : "var(--v5-brand)",
     }))
     : [buildTier("stellarbox-pro", "var(--v5-brand)"), buildTier("stellarrack-p1", "var(--v5-warning)")].filter(
       (x): x is QuotaTier => x !== null,

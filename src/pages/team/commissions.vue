@@ -65,17 +65,18 @@
              tablist 同为「选中即筛选」的语义,键盘行为一致。 -->
         <view class="grid grid-cols-3" style="gap: 8px" role="radiogroup" :aria-label="t.commissions.kindFilterLabel">
           <view
-            v-for="k in KIND_ORDER"
+            v-for="(k, i) in KIND_ORDER"
             :key="k"
             class="nx-commissions-focusable text-left active:scale-[0.97]"
             :style="kindCardStyle(k)"
             role="radio"
-            :tabindex="filter === k ? 0 : -1"
+            :tabindex="filter === k || (filter === 'all' && i === 0) ? 0 : -1"
             :aria-label="kindCardLabel(k)"
             :aria-checked="filter === k ? 'true' : 'false'"
             @click="filter = k"
             @keydown.enter.prevent="filter = k"
             @keydown.space.prevent="filter = k"
+            @keydown.left.prevent="moveKindCard(i, -1)" @keydown.right.prevent="moveKindCard(i, 1)"
           >
             <text :style="{ color: KIND[k].color }">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>
@@ -281,6 +282,26 @@ function moveFilter(delta: -1 | 1) {
   void nextTick(() => {
     if (typeof document === "undefined") return;
     document.querySelector<HTMLElement>(".nx-commissions-pill[tabindex='0']")?.focus();
+  });
+}
+
+/**
+ * 六张 kind 卡的左右方向键。
+ *
+ * 卡片与下方 pill 行驱动**同一个** filter,但它们是两个独立的单选组:卡组只有 6 个成员
+ * (没有「全部」),所以方向键必须在**卡组内部**环转,不能复用 moveFilter —— 那会把选中项
+ * 移到「全部」,而卡组里没有对应成员,焦点随即无处可去。
+ *
+ * 焦点目标按 tabindex 而不是 aria-checked 取:filter 为「全部」时卡组无成员被选中,
+ * 此时可 Tab 进入的是第一张卡(tabindex=0),按 aria-checked 会取到 null 而丢失焦点。
+ */
+function moveKindCard(index: number, delta: -1 | 1) {
+  const next = KIND_ORDER[(index + delta + KIND_ORDER.length) % KIND_ORDER.length];
+  if (!next || next === filter.value) return;
+  filter.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus();
   });
 }
 

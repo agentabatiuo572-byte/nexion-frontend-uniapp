@@ -72,7 +72,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // generic no-match state without rendering their internal ID. Styles are unchanged.
   // #104: FAQ search and Bot inputs carry accessible names and the send button is named.
   // #94: category chips are a radiogroup with aria-checked, not toggle buttons.
-  "help.vue": "5068fc6daf0ee6c2d77b848a8a88c61d4927702f3bde80b6069130d099a4a877",
+  // #94: 分类 chips 补齐 roving tabindex + 左右方向键(此前六个成员全是 tabindex="0")。
+  "help.vue": "429d108c535dbeb4b20c02b8e6c99dd4f29c7f368c07533899e7cde65a7633d5",
   // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
   // #94: the language list is a mutually exclusive choice, so it is a named radiogroup
   // with aria-checked and roving tabindex instead of toggle buttons.
@@ -143,7 +144,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // 改 radiogroup/radio + aria-checked,并补 Enter/Space;视觉样式与原型一致,未改动。
   // #220: the empty-state description follows the active filter, so the expense tab no
   // longer reuses the income wording ("充值和到账").
-  "wallet-bills.vue": "e15315685c3dba9ccfcdf1097c75d6729eaabb6387e399af611500150b038812",
+  // #94: 类型单选组补齐 roving tabindex + 左右方向键(同上)。
+  "wallet-bills.vue": "1c64d9843a12c3f9e7ed49da8cb6250f217e559e7919af03ec5d13840418add4",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
   // #88: cardholder input carries its visible label as an accessible name.
@@ -173,7 +175,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // reason plus a top-up path instead of only greying out.
   "wallet-repurchase.vue": "d904accf92c0fe8b14b1e9c5f40bccc29272e923722f08a436617a66606be4c0",
   // #88: channel tabs expose a group name and per-tab names alongside aria-selected.
-  "wallet-topup.vue": "d880238b395c4d38860ac03e4bbd3374639f81df2df6d0bb0a8c869ccc96d68f",
+  // #94: 通道 tablist 补齐 roving tabindex(选中项 0、其余 -1)与左右方向键 ——
+  //      只加 role=tab 而每个成员都 tabindex="0" 不是 roving,组内方向键也无效。
+  "wallet-topup.vue": "f393081b511e49364411d1c2a160a4085f9b5c5dd239650d62c6532c8d0b7d6d",
   // Deep-link tracking waits for an owned exact read and distinguishes loading,
   // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",

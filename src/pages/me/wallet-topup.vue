@@ -18,14 +18,17 @@
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
       <view v-else class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.wallet.chooseMethod">
         <view
-          v-for="s in SEGMENTS"
+          v-for="(s, i) in SEGMENTS"
           :key="s.id"
           :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
-          role="tab" tabindex="0"
+          role="tab" :tabindex="seg === s.id ? 0 : -1"
           :aria-label="segLabel(s.id)"
           :aria-selected="seg === s.id"
           @click="seg = s.id"
+          @keydown.enter.prevent="seg = s.id"
+          @keydown.space.prevent="seg = s.id"
+          @keydown.left.prevent="moveSeg(i, -1)" @keydown.right.prevent="moveSeg(i, 1)"
         >
           <text :style="segLabelStyle(s.id)">{{ segLabel(s.id) }}</text>
         </view>
@@ -46,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, type CSSProperties } from "vue";
+import { ref, nextTick, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
@@ -65,6 +68,23 @@ function segLabel(id: Seg): string {
   if (id === "crypto") return tc.segUsdt;
   if (id === "bank") return t.value.bankPane.segBank;
   return tc.segCard;
+}
+/**
+ * 通道 tablist 的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。
+ *
+ * 这里比别处多一道必要判断:通道切换会**卸载/挂载不同的 pane 组件**(USDT/银行/银行卡
+ * 三段是 v-if/v-else-if/v-else),所以方向键移过去之后原焦点节点可能已被移除。
+ * 若不在下一帧重新聚焦新选中的 tab,焦点会掉到 body,键盘用户被踢回页面开头 ——
+ * 这恰恰是「方向键动了但焦点没动」那类复验失败的成因,必须在 nextTick 之后聚焦。
+ */
+function moveSeg(index: number, delta: number): void {
+  const next = SEGMENTS[(index + delta + SEGMENTS.length) % SEGMENTS.length];
+  if (!next || next.id === seg.value) return;
+  seg.value = next.id;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  });
 }
 
 const t = useT();

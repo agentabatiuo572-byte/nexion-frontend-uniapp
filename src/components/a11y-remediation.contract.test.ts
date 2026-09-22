@@ -101,7 +101,11 @@ describe("accessibility remediation contracts", () => {
 
     const developer = read("../pages/developer/developer.vue");
     expect(developer).toContain('role="tablist"');
-    expect(developer).toContain('role="tab" tabindex="0"');
+    // 🔴 这里原先钉的是字面量 `role="tab" tabindex="0"` —— 那是 #94 的**半截修复**:
+    // 每个成员都能 Tab 进入、组内方向键无效,不满足 tablist 的键盘契约。判据改成
+    // roving tabindex(绑定到选中态)+ 左右方向键,与 earn.vue / marketplace.vue 同源。
+    expect(developer).toContain('role="tab" :tabindex="tab === o.value ? 0 : -1"');
+    expect(developer).toContain('@keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)"');
     expect(developer).toContain(':aria-selected="tab === o.value ? \'true\' : \'false\'"');
     expect(developer).toContain('role="button" tabindex="0" :aria-label="t.developer.formSubmit"');
 

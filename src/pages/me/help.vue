@@ -34,26 +34,31 @@
 
       <!-- Category chips -->
       <!-- 分类是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器当成
-           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个分类。改 radiogroup/radio。 -->
+           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个分类。改 radiogroup/radio。
+           🔴 roving tabindex + 方向键:只给 role=radio 不给 roving tabindex 是**半截修复** ——
+           六个成员全部 tabindex="0",Tab 要停六次,且组内方向键无效,不是单选组的键盘契约
+           (zentao #94 复验正是卡在这里)。照 earn.vue / marketplace.vue 的既有写法补齐。 -->
       <scroll-view scroll-x class="mx-4" style="margin-bottom: 12px; white-space: nowrap">
         <view role="radiogroup" :aria-label="w.categoryGroupLabel" class="inline-flex">
           <view
             class="active:opacity-70"
             :style="chipStyle(cat === 'all')"
-            role="radio" tabindex="0" :aria-checked="cat === 'all' ? 'true' : 'false'" :aria-label="t.receipt.tabAll"
+            role="radio" :tabindex="cat === 'all' ? 0 : -1" :aria-checked="cat === 'all' ? 'true' : 'false'" :aria-label="t.receipt.tabAll"
             @click="selectCategory('all')"
             @keydown.enter.prevent="selectCategory('all')" @keydown.space.prevent="selectCategory('all')"
+            @keydown.left.prevent="moveCategory(0, -1)" @keydown.right.prevent="moveCategory(0, 1)"
           >
             <text>{{ t.receipt.tabAll }}</text>
           </view>
           <view
-            v-for="c in catOrder"
+            v-for="(c, i) in catOrder"
             :key="c"
             class="active:opacity-70"
             :style="chipStyle(cat === c)"
-            role="radio" tabindex="0" :aria-checked="cat === c ? 'true' : 'false'" :aria-label="categoryLabel(c)"
+            role="radio" :tabindex="cat === c ? 0 : -1" :aria-checked="cat === c ? 'true' : 'false'" :aria-label="categoryLabel(c)"
             @click="selectCategory(c)"
             @keydown.enter.prevent="selectCategory(c)" @keydown.space.prevent="selectCategory(c)"
+            @keydown.left.prevent="moveCategory(i + 1, -1)" @keydown.right.prevent="moveCategory(i + 1, 1)"
           >
             <text>{{ categoryLabel(c) }}</text>
           </view>
@@ -186,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -316,6 +321,20 @@ function selectCategory(value: FaqCategory | "all") {
   if (requestedFaqId.value) query.value = "";
   requestedFaqId.value = "";
   cat.value = value;
+}
+/**
+ * 分类单选组的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。
+ * 索引 0 是「全部」,其余按 catOrder 顺延 —— 与模板里的渲染顺序严格同序。
+ */
+const CATEGORY_ORDER: Array<FaqCategory | "all"> = ["all", ...catOrder];
+function moveCategory(index: number, delta: number): void {
+  const next = CATEGORY_ORDER[(index + delta + CATEGORY_ORDER.length) % CATEGORY_ORDER.length];
+  if (!next || next === cat.value) return;
+  selectCategory(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
 }
 function toggleFaq(id: string) {
   openId.value = openId.value === id ? null : id;

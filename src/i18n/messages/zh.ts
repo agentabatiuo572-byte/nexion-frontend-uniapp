@@ -5146,7 +5146,11 @@ export const zh: Messages = {
     perkGen: "{n} NEX/天 产出",
     // 年化口径必须自带来源:ROI 由**美元日收益** ÷ 售价推导(dailyEarn,与商城一致),
     // 而同行展示的是 NEX/天产出 —— 两种单位同屏却不标注,用户无法复核(zentao #221)。
+    // 只写「按美元日收益/售价」仍然不够:那两个数页面上一分都没露,用户复核不了,
+    // 所以下面这一行把**参与计算的每个数**都摆出来(美元日收益 / 售价 / 公式)。
     perkRoi: "约 {roi}% 年化(按美元日收益/售价)",
+    perkRoiBasis: "年化口径:${dailyEarn}/天 × 365 ÷ ${price} = {roi}%",
+    perkRoiNotGuaranteed: "按当前目录价与日收益推算,不构成收益承诺;实际产出随网络与运行状况变化。",
     buyCta: "购买 {name}",
     inviteToUnlock: "邀请解锁",
     inviteFriendsTitle: "邀请更多朋友",
