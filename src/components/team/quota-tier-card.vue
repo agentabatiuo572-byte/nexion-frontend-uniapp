@@ -66,6 +66,17 @@
       </view>
     </view>
 
+    <!-- 年化口径的推导来源(zentao #221)。只给「按美元日收益/售价」这个说法不够:
+         两个输入数必须同屏可复核,否则用户无法验证比例,只能当成无出处的数字。 -->
+    <view v-if="tier.roiBasis" :style="roiBasisWrapStyle">
+      <text class="block font-mono-tabular" :style="roiBasisStyle">{{ fmt(t.quota.perkRoiBasis, {
+        dailyEarn: tier.roiBasis.dailyEarn.toFixed(2),
+        price: tier.roiBasis.price.toLocaleString(),
+        roi: tier.roiBasis.roi,
+      }) }}</text>
+      <text class="block" :style="roiNoteStyle">{{ t.quota.perkRoiNotGuaranteed }}</text>
+    </view>
+
     <!-- CTA -->
     <view style="margin-top: 12px">
       <view v-if="unlocked && stockLeft > 0 && tier.available !== false" class="flex items-center justify-center active:opacity-90" :style="buyCtaStyle" role="button" tabindex="0" :aria-label="fmt(t.quota.buyCta, { name: tier.name })" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
@@ -107,6 +118,12 @@ export interface QuotaTier {
   conditions: QuotaCondition[];
   perks: string[];
   tint: string;
+  /**
+   * 年化 ROI 的**推导输入**。zentao #221:此前只写「约 N% 年化(按美元日收益/售价)」,
+   * 而参与计算的两个数(美元日收益、售价)页面上一分都没露 —— 用户复核不了比例来源。
+   * 目录读到时由页面填上;缺失(旧服务端/目录未落地)则整行不渲染,而不是显示占位 0。
+   */
+  roiBasis?: { dailyEarn: number; price: number; roi: number };
 }
 
 const props = defineProps<{ tier: QuotaTier }>();
@@ -170,6 +187,17 @@ const perksWrapStyle: CSSProperties = {
   flexDirection: "column",
   gap: "6px",
 };
+
+const roiBasisWrapStyle: CSSProperties = {
+  marginTop: "10px",
+  paddingTop: "10px",
+  borderTop: "1px solid var(--v5-border)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+};
+const roiBasisStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)" };
+const roiNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 
 const buyCtaStyle = computed<CSSProperties>(() => ({
   width: "100%",

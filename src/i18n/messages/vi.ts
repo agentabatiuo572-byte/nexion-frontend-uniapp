@@ -5148,6 +5148,8 @@ export const vi: Messages = {
     condRank: "Đạt V{v}",
     perkGen: "Sản sinh {n} NEX/ngày",
     perkRoi: "~{roi}%/năm (theo thu nhập USD/ngày ÷ giá)",
+    perkRoiBasis: "Cơ sở tính/năm: ${dailyEarn}/ngày × 365 ÷ ${price} = {roi}%",
+    perkRoiNotGuaranteed: "Suy ra từ giá niêm yết và thu nhập/ngày hiện tại; không phải cam kết lợi nhuận. Sản lượng thực tế thay đổi theo mạng và điều kiện vận hành.",
     buyCta: "Mua {name}",
     inviteToUnlock: "Mời để mở khóa",
     inviteFriendsTitle: "Mời thêm bạn bè",

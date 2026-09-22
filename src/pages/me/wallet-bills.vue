@@ -17,13 +17,15 @@
       <SubPageHeader back="/pages/me/wallet" :title="t.bills.title" />
 
       <!-- 类型是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器当成
-           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个类型。改 radiogroup/radio。 -->
+           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个类型。改 radiogroup/radio。
+           🔴 补 roving tabindex + 左右方向键:只加 role=radio 而每个成员都 tabindex="0",
+           键盘上仍是三个独立 Tab 停靠点、组内方向键无效,不满足单选组契约(zentao #94)。 -->
       <view class="flex" :style="segWrapStyle" role="radiogroup" :aria-label="t.bills.tabGroupLabel">
         <view
-          v-for="tb in TABS"
+          v-for="(tb, i) in TABS"
           :key="tb"
           role="radio"
-          tabindex="0"
+          :tabindex="tab === tb ? 0 : -1"
           :aria-checked="tab === tb ? 'true' : 'false'"
           :aria-label="tabLabel(tb)"
           class="flex-1 grid place-items-center active:opacity-70"
@@ -31,6 +33,7 @@
           @click="tab = tb"
           @keydown.enter.prevent="tab = tb"
           @keydown.space.prevent="tab = tb"
+          @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)"
         >
           <text :style="pillLabelStyle(tb)">{{ tabLabel(tb) }}</text>
         </view>
@@ -119,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -374,6 +377,16 @@ function tabLabel(tb: Tab): string {
   if (tb === "all") return t.value.bills.tabAll;
   if (tb === "in") return t.value.bills.tabIn;
   return t.value.bills.tabOut;
+}
+/** 类型单选组的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
+function moveTab(index: number, delta: number): void {
+  const next = TABS[(index + delta + TABS.length) % TABS.length];
+  if (!next || next === tab.value) return;
+  tab.value = next;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+  });
 }
 
 // Empty state (de-card white-list): dashed outline, no fill.

@@ -33,7 +33,7 @@
       <!-- Tabs — SegmentedControl (HIG 44pt, accent = tech-cyan) -->
       <view class="mx-4 mt-3">
         <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.developer.headline">
-          <view v-for="o in tabOptions" :key="o.value" class="grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" tabindex="0" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value">
+          <view v-for="(o, i) in tabOptions" :key="o.value" class="grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" :tabindex="tab === o.value ? 0 : -1" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value" @keydown.enter.prevent="tab = o.value" @keydown.space.prevent="tab = o.value" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
             <text :style="pillLabelStyle(o.value)">{{ o.label }}</text>
           </view>
         </view>
@@ -197,7 +197,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -292,6 +292,17 @@ const tabOptions = computed(() => [
   { value: "keys" as Tab, label: t.value.developer.keysTab },
   { value: "webhooks" as Tab, label: t.value.developer.webhooksTab },
 ]);
+/** tablist 的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
+function moveTab(index: number, delta: number): void {
+  const options = tabOptions.value;
+  const next = options[(index + delta + options.length) % options.length];
+  if (!next || next.value === tab.value) return;
+  tab.value = next.value;
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  });
+}
 
 const PARTNERS = [
   { id: "aws", label: "AWS" },

@@ -5295,6 +5295,8 @@ export const en = {
     condRank: "Reach V{v}",
     perkGen: "{n} NEX/day generation",
     perkRoi: "~{roi}% annualized (USD daily yield / price)",
+    perkRoiBasis: "Annualized basis: ${dailyEarn}/day × 365 ÷ ${price} = {roi}%",
+    perkRoiNotGuaranteed: "Derived from the current catalogue price and daily yield; not a guarantee of return. Actual output varies with network and operating conditions.",
     buyCta: "Buy {name}",
     inviteToUnlock: "Invite to unlock",
     inviteFriendsTitle: "Invite more friends",
