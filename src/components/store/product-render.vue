@@ -8,7 +8,7 @@
   P-013). The tilt uses the existing `v5-product-tilt` keyframe in tokens.css.
 
   The store LIST card has its own inline render (id-keyed photo, no brand
-  overlay); this tier-keyed variant with the NEXGRID label is detail-only.
+  overlay); this product-keyed variant with the NEXGRID label is detail-only.
 -->
 <template>
   <view class="relative w-full overflow-hidden" :style="rootStyle">
@@ -30,7 +30,7 @@
     </template>
 
     <!-- Cloud Share — abstract distributed cloud -->
-    <template v-else>
+    <template v-else-if="props.tier === 'Share'">
       <view aria-hidden class="absolute inset-0 dot-grid" style="opacity: 0.25" />
       <view aria-hidden :style="cloudGlowStyle" />
       <svg viewBox="0 0 800 360" class="relative w-full h-full" preserveAspectRatio="xMidYMid meet">
@@ -75,27 +75,28 @@
         </g>
       </svg>
     </template>
+
+    <!-- Hardware without an approved product image uses a neutral placeholder. -->
+    <view v-else class="absolute inset-0 grid place-items-center" style="color: var(--v5-ink-3)">
+      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
 import SvgText from "@/components/svg-text";
+import { productImageMeta } from "@/lib/product-image";
 
-const props = defineProps<{ tier: "Entry" | "Pro" | "Flagship" | "Share"; imageUrl?: string; videoUrl?: string }>();
-
-const PHOTO_MAP: Record<string, { src: string; tierCode: string } | null> = {
-  Entry: { src: "/static/img/products/nexgridbox-s1-v4.png", tierCode: "S1" },
-  Pro: { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro" },
-  Flagship: { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" },
-  Share: null,
-};
+const props = defineProps<{ productId: string; tier: "Entry" | "Pro" | "Flagship" | "Share"; imageUrl?: string; videoUrl?: string }>();
 
 const failedImageUrl = ref("");
 watch(() => props.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
 const photo = computed(() => {
+  const fallback = productImageMeta(props.productId);
   const imageUrl = failedImageUrl.value === props.imageUrl ? undefined : props.imageUrl;
-  return imageUrl ? { src: imageUrl, tierCode: PHOTO_MAP[props.tier]?.tierCode ?? props.tier } : PHOTO_MAP[props.tier] ?? null;
+  if (imageUrl) return { src: imageUrl, tierCode: fallback?.tierCode ?? props.tier };
+  return fallback?.src ? { src: fallback.src, tierCode: fallback.tierCode } : null;
 });
 function fallbackProductImage() {
   failedImageUrl.value = props.imageUrl ?? "";

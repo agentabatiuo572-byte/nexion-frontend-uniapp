@@ -96,7 +96,7 @@
           <view aria-hidden :style="auroraStyle" />
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
+            <ProductRender :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <!-- Folded-corner ribbon -->
             <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
               <text>{{ copy.badge }}</text>

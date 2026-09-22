@@ -15,6 +15,11 @@ const productRender = (import.meta.glob("../../components/store/product-render.v
   import: "default",
   eager: true,
 })["../../components/store/product-render.vue"] ?? "") as string;
+const productImage = (import.meta.glob("../../lib/product-image.ts", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+})["../../lib/product-image.ts"] ?? "") as string;
 const socialProof = (import.meta.glob("../../components/store/live-social-proof.vue", {
   query: "?raw",
   import: "default",
@@ -24,10 +29,19 @@ const socialProof = (import.meta.glob("../../components/store/live-social-proof.
 describe("store product truth rendering", () => {
   it("uses the catalog product image in both card and detail views with a local fallback", () => {
     expect(productCard).toContain("props.product.imageUrl");
-    expect(productCard).toContain("PRODUCT_PHOTO[props.product.id]");
+    expect(productCard).toContain("productImageMeta(props.product.id)");
+    expect(detail).toContain(':product-id="product.id"');
+    expect(productRender).toContain("productId: string");
     expect(productRender).toContain("imageUrl?: string");
     expect(productRender).toContain("props.imageUrl");
-    expect(productRender).toContain("PHOTO_MAP[props.tier]");
+    expect(productRender).toContain("productImageMeta(props.productId)");
+  });
+
+  it("never assigns the Rack P1 image to Rack P2 when no approved P2 image exists", () => {
+    expect(productImage).toContain('"stellarrack-p1": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" }');
+    expect(productImage).toContain('"stellarrack-p2": { tierCode: "Rack P2" }');
+    expect(productImage).not.toMatch(/"stellarrack-p2"\s*:\s*\{[^}]*nexgridrack-p1-v2\.png/);
+    expect(productRender).toContain("Hardware without an approved product image uses a neutral placeholder.");
   });
 
   it("keeps video playback on the detail page and falls back without autoplay", () => {

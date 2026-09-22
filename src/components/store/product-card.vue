@@ -139,6 +139,7 @@ import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
+import { productImageMeta } from "@/lib/product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import { productCatalogState } from "@/store/product-catalog";
@@ -148,14 +149,6 @@ const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>
 });
 const t = useT();
 const copy = computed(() => productCopy(t.value, props.product));
-
-const PRODUCT_PHOTO: Record<string, { src: string; tierCode: string }> = {
-  "stellarbox-s1": { src: "/static/img/products/nexgridbox-s1-v4.png", tierCode: "S1" },
-  "stellarbox-pro": { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro" },
-  "stellarbox-pro-v2": { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro v2" },
-  "stellarrack-p1": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" },
-  "stellarrack-p2": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P2" },
-};
 
 const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
@@ -167,9 +160,10 @@ watch(() => props.product.imageUrl, () => { failedImageUrl.value = ""; }, { imme
 // Product videos stay detail-only: listing cards use a static product poster
 // so browsing never triggers downloads or playback before the user chooses it.
 const photo = computed(() => {
+  const fallback = productImageMeta(props.product.id);
   const imageUrl = failedImageUrl.value === props.product.imageUrl ? undefined : props.product.imageUrl;
-  if (imageUrl) return { src: imageUrl, tierCode: PRODUCT_PHOTO[props.product.id]?.tierCode ?? props.product.tier };
-  return isShare.value ? null : PRODUCT_PHOTO[props.product.id] ?? null;
+  if (imageUrl) return { src: imageUrl, tierCode: fallback?.tierCode ?? props.product.tier };
+  return isShare.value || !fallback?.src ? null : { src: fallback.src, tierCode: fallback.tierCode };
 });
 function fallbackProductImage() {
   failedImageUrl.value = props.product.imageUrl ?? "";
