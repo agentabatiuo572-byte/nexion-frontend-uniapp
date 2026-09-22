@@ -33,7 +33,7 @@
       <!-- Tabs — SegmentedControl (HIG 44pt, accent = tech-cyan) -->
       <view class="mx-4 mt-3">
         <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.developer.headline">
-          <view v-for="(o, i) in tabOptions" :key="o.value" class="grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" :tabindex="tab === o.value ? 0 : -1" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value" @keydown.enter.prevent="tab = o.value" @keydown.space.prevent="tab = o.value" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
+          <view v-for="(o, i) in tabOptions" :key="o.value" class="nx-dev-tab grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" :tabindex="tab === o.value ? 0 : -1" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value" @keydown.enter.prevent="tab = o.value" @keydown.space.prevent="tab = o.value" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
             <text :style="pillLabelStyle(o.value)">{{ o.label }}</text>
           </view>
         </view>
@@ -183,9 +183,9 @@
             </view>
             <view v-if="resourcesReady && !webhooks.length" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
             <template v-if="canManageResources">
-            <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :aria-label="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :aria-label="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :aria-label="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-webhook')" role="button" tabindex="0" @click="createWebhook"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text></view>
             </template>
             <view v-if="newWebhookSecret && canManageResources" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
@@ -300,7 +300,7 @@ function moveTab(index: number, delta: number): void {
   tab.value = next.value;
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    document.querySelector<HTMLElement>('.nx-dev-tab[tabindex="0"]')?.focus();
   });
 }
 

@@ -69,6 +69,7 @@
           maxlength="6"
           :value="otpCode"
           :placeholder="t.addrRebind.otpPlaceholder"
+          :aria-label="t.addrRebind.otpPlaceholder"
           @input="onOtpInput"
         />
         <view v-if="otpError"><text class="block" :style="errorTextStyle">{{ otpError }}</text></view>
@@ -107,6 +108,7 @@
           type="text"
           :value="newAddress"
           :placeholder="addressPlaceholder"
+          :aria-label="t.addrRebind.newAddressLabel"
           @input="onAddressInput"
         />
         <view v-if="addrError"><text class="block" :style="errorTextStyle">{{ addrError }}</text></view>

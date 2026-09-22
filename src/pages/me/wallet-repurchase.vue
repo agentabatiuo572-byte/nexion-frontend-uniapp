@@ -65,6 +65,7 @@
             <text class="shrink-0" :style="dollarStyle">$</text>
             <input
               :value="formatCommandAmount(amount)"
+              :aria-label="w.amountLabel"
               type="digit"
               :disabled="confirming || repurchase.submitting || recovering"
               :style="amountInputStyle"

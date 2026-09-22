@@ -142,7 +142,7 @@
         </view>
 
         <view v-if="canReply(detailTicket)" :style="replyCardStyle">
-          <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
+          <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" :aria-label="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
           <view class="grid grid-cols-2" style="gap: 8px; margin-top: 8px">
             <view v-if="canClose(detailTicket)" class="flex items-center justify-center active:scale-[0.98]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
               <text>{{ t.tickets.detail.closeBtn }}</text>

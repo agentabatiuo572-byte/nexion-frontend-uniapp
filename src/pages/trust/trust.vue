@@ -31,7 +31,7 @@
           <template v-if="financialSection && financialMetrics.length">
             <SectionHeader :label="sectionLabel(sectionKey.financials)" :suffix="financialSection.version" />
             <view class="grid grid-cols-2" :style="gridCardStyle">
-              <view v-for="metric in financialMetrics" :key="metric.key" :style="metricStyle">
+              <view v-for="metric in financialMetricsVisible" :key="metric.key" :style="metricStyle">
                 <text class="block" :style="labelStyle">{{ metric.label }}</text>
                 <view class="flex items-baseline" style="gap: 6px; margin-top: 4px">
                   <text :style="metricValueStyle">{{ metric.value }}</text>
@@ -39,6 +39,8 @@
                 </view>
               </view>
               <text v-if="financialFootnote" class="block" :style="footnoteStyle">{{ financialFootnote }}</text>
+              <!-- 无可达审计文件时如实说明这些数字的来源:平台公布口径,不是实测/已审计事实。 -->
+              <text v-else-if="financialUnverified" class="block" :style="footnoteStyle" role="note">{{ tr.financialsUnverifiedNote }}</text>
             </view>
           </template>
 
@@ -164,6 +166,16 @@ const financialMetrics = computed(() => {
     return [{ key, label, value: field.value, delta: key.endsWith("Value") ? trustFieldValue(fields, key.replace(/Value$/, "Delta")) : null }];
   });
 });
+// 🔴 zentao #59:这些数字是运营可编辑的**公布口径**(后端 OpsTrustDisclosureService 里的
+//   trustField 种子值,如 TVL $128.4M),不是任何实测聚合。在没有可核验的审计文件之前,
+//   把它们的环比增量当成「增长」展示,等于把人工配置的虚拟增长率发布成事实。
+//   所以:没有可达审计文件时,只保留数值本身,并显式标注来源为平台公布口径 ——
+//   与首页「网络脉搏」同一处理原则(配置值不得冒充实测)。
+const financialUnverified = computed(() => auditDocumentHref.value === "");
+const financialMetricsVisible = computed(() => financialMetrics.value.map((metric) => ({
+  ...metric,
+  delta: financialUnverified.value ? null : metric.delta,
+})));
 const complianceRows = computed(() => trustNumberedRows(complianceSection.value?.fields ?? [], "badge", ["Label", "Body"] as const, language.value));
 const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, language.value));
 // BUG #59: the published footnote asserts the figures were reconciled against an

@@ -65,7 +65,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #103: preset target/deadline pills are mutually exclusive choices, so they are
   // radiogroups with aria-checked instead of unlabelled clickable views; the amount
   // input and remove action carry accessible names. Styles are unchanged.
-  "goals.vue": "7e9d3a5b8d16b9345acaef9b7ecaba66f035131e17218e732c226100d1910f75",
+  "goals.vue": "265bbf2b295d52dbb62e3bbce42ab6425d192a2f5061bba621ce3ba4c2b02c10",
   // R3 keyboard controls plus reviewed production FAQ empty-state authority:
   // unread, failed, or incomplete pagination cannot claim no matching content.
   // Exact FAQ deep links clear on category selection; withdrawn targets use the
@@ -73,7 +73,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #104: FAQ search and Bot inputs carry accessible names and the send button is named.
   // #94: category chips are a radiogroup with aria-checked, not toggle buttons.
   // #94: 分类 chips 补齐 roving tabindex + 左右方向键(此前六个成员全是 tabindex="0")。
-  "help.vue": "429d108c535dbeb4b20c02b8e6c99dd4f29c7f368c07533899e7cde65a7633d5",
+  "help.vue": "d180b1016227da9570f320c1912cc1db9fdebc4b394b173be63e4ab3e0136c35",
   // Formal picker presents only shipped interface languages; priority/RTL roadmap UI is excluded.
   // #94: the language list is a mutually exclusive choice, so it is a named radiogroup
   // with aria-checked and roving tabindex instead of toggle buttons.
@@ -123,7 +123,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #216: the password-change validation error is associated to its own field
   // (aria-describedby + aria-invalid, one literal id per field), announced via
   // role=alert, and focus moves to the first invalid field; editing clears it.
-  "security.vue": "7c9f64519060bb36e27df8864ddde512356fbc9a122bce33ca15e89b6dd85ad4",
+  "security.vue": "b0412facb6c2625f0148375533c2bcd8d9de2556ea8814fd3461449e3a73dd62",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.
@@ -133,19 +133,19 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // roving tabindex (they were unnamed toggle buttons with no selected state), and
   // the subject/description fields carry accessible names plus required and
   // length hints; the empty-submit error is associated to its field. Styles unchanged.
-  "support-tickets.vue": "f555c4c68a16d1f9001d87b594e9490e3bd0c2c52f9ee5143e53088358008100",
+  "support-tickets.vue": "0aec7c6ce7090a8b35877f5b25ac05f051049c775e1774724433ef2008268241",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
   // Unknown server time keeps changes closed and exposes an accessible read-only refresh.
-  "wallet-address-rebind.vue": "a24907e30eec77cda6495fff61782daacd487ef76f3e0bf273baac60bbc2bffd",
+  "wallet-address-rebind.vue": "af2acd0ccced08df5e0671e5e870bd2efd80e4daa79c4bc2af8ab16ecc3ef8d8",
   // 账单类型是互斥单选(选一个,其余取消)。此前用 role="button" + aria-pressed,浏览器
   // 按 toggle button 暴露、读屏按复选框朗读 —— 用户会以为能同时选多个类型(zentao #94)。
   // 改 radiogroup/radio + aria-checked,并补 Enter/Space;视觉样式与原型一致,未改动。
   // #220: the empty-state description follows the active filter, so the expense tab no
   // longer reuses the income wording ("充值和到账").
   // #94: 类型单选组补齐 roving tabindex + 左右方向键(同上)。
-  "wallet-bills.vue": "1c64d9843a12c3f9e7ed49da8cb6250f217e559e7919af03ec5d13840418add4",
+  "wallet-bills.vue": "4fe232cb79b7e25673bc2b8bb786e7d69257d0151e146158323cbf7a25faf353",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
   // #88: cardholder input carries its visible label as an accessible name.
@@ -173,11 +173,11 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // the current authoritative snapshot completes; no retry CTA during an active read.
   // #165: the main CTA exposes aria-disabled, and an insufficient balance states its
   // reason plus a top-up path instead of only greying out.
-  "wallet-repurchase.vue": "d904accf92c0fe8b14b1e9c5f40bccc29272e923722f08a436617a66606be4c0",
+  "wallet-repurchase.vue": "a74d55193c065bdb2a714d1043313d1ab453f85b0c9c55c427603710ee2628ed",
   // #88: channel tabs expose a group name and per-tab names alongside aria-selected.
   // #94: 通道 tablist 补齐 roving tabindex(选中项 0、其余 -1)与左右方向键 ——
   //      只加 role=tab 而每个成员都 tabindex="0" 不是 roving,组内方向键也无效。
-  "wallet-topup.vue": "f393081b511e49364411d1c2a160a4085f9b5c5dd239650d62c6532c8d0b7d6d",
+  "wallet-topup.vue": "124e03f7fb3a1debb1ed8a658e3c612d4c84f9ac486189c190a3484acd507b9b",
   // Deep-link tracking waits for an owned exact read and distinguishes loading,
   // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",

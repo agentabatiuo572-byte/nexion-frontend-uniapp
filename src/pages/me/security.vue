@@ -78,7 +78,7 @@
         <view :style="pwdFormStyle">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
-            <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
+            <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
             <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
               <text :style="pwdSaveLabelStyle">{{ t.addrRebind.otpConfirmCta }}</text>
             </view>
