@@ -5972,6 +5972,7 @@ export const zh: Messages = {
     confirmDelayed: "网络拥堵,确认时间延长",
     channelPaused: "暂停服务,请选择其他网络",
     allNetworksPaused: "充值通道暂时不可用,稍后恢复;需要帮助可联系客服",
+    copyAddress: "复制地址",
     addrCopied: "地址已复制",
     topupNotCreditedYet: "入账确认中,资金不会丢失;稍后刷新查看",
     depositOpFailedNote: "操作没有完成,你的资金未受影响;请稍后重试。",
