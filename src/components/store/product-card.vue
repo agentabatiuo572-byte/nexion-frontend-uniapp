@@ -87,8 +87,11 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
               <text>{{ gateLabel }}</text>
             </view>
+            <!-- 🔴 remote 模式没有可展开内容,别用「展开箭头」暗示它会展开(zentao #239):
+                 那里点它是**去详情页**看条件,所以画一个前进箭头。 -->
             <view v-if="!gate.soldOut" class="grid place-items-center" :style="gateToggleStyle">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+              <svg v-if="remoteApiEnabled" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </view>
           </view>
           <view v-if="!remoteApiEnabled && !gate.soldOut && gateDetailsOpen" class="mt-1.5 flex flex-wrap" style="gap: 6px">
@@ -270,13 +273,24 @@ function onBuy() {
   }
   goCheckout();
 }
+/**
+ * 点「解锁后购买」这一块。
+ *
+ * 🔴 zentao #239:remote 模式下**本卡没有可展开的内容** —— 展开区那两处渲染都带
+ * `!remoteApiEnabled` 前置条件,于是点了只翻转一个不可见的开关、箭头转一下,
+ * 用户拿不到任何实质反馈。而未满足的条件其实**已经在商品详情页渲染**
+ * (detail.vue 用服务端 policies),本卡点击本身也是去详情页。
+ * 所以 remote 模式直接把这一下交给详情页;local 模式才在原地展开。
+ */
 function toggleGateDetails() {
   if (stockUnavailable.value) return;
   const now = Date.now();
   if (now - lastGateToggleAt < 120) return;
   lastGateToggleAt = now;
-  if (remoteApiEnabled && eligibility.value.status === "error") {
-    void retryEligibility();
+  if (remoteApiEnabled) {
+    // 资格读取失败时先重试(原行为保留),否则去详情页看具体条件。
+    if (eligibility.value.status === "error") { void retryEligibility(); return; }
+    goDetail();
     return;
   }
   if (!gate.value.soldOut) gateDetailsOpen.value = !gateDetailsOpen.value;

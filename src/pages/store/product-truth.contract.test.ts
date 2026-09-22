@@ -51,3 +51,27 @@ describe("store product truth rendering", () => {
     expect(detail).not.toContain("f.location, f.withdraw");
   });
 });
+
+/**
+ * zentao #239:商品卡上的「解锁后购买」看起来是可展开的按钮,点了却没有任何实质反馈。
+ *
+ * 成因:展开区那两处渲染都带 `!remoteApiEnabled` 前置条件,而 remote 模式恰恰是线上模式 ——
+ * 于是点一下只翻转一个不可见的开关、箭头转一下。未满足的条件其实**已经在商品详情页渲染**
+ * (detail.vue 用服务端 policies),而卡片本身点击也去详情页。
+ *
+ * 判据:remote 模式下这一下必须**去详情页**(有真实去处),local 模式才原地展开;
+ * 并且箭头形状要如实 —— remote 给前进箭头,不再用「展开箭头」暗示会展开。
+ */
+describe("locked card gate affordance tells the truth", () => {
+  it("routes a locked card to the product page in remote mode instead of expanding nothing", () => {
+    // remote 分支必须先于 local 的展开翻转,且确实走 goDetail。
+    expect(productCard).toMatch(/if \(remoteApiEnabled\) \{[\s\S]{0,220}?goDetail\(\);/);
+    // 展开区在 remote 下不渲染,所以那条翻转语句不能是 remote 的唯一效果。
+    expect(productCard).toMatch(/if \(!gate\.value\.soldOut\) gateDetailsOpen\.value = !gateDetailsOpen\.value;/);
+  });
+
+  it("uses a forward chevron in remote mode rather than an expand chevron", () => {
+    expect(productCard).toMatch(/v-if="remoteApiEnabled" width="13" height="13"[^>]*><path d="m9 18 6-6-6-6"/);
+    expect(productCard).toMatch(/v-else width="13" height="13"[^>]*><path d="m6 9 6 6 6-6"/);
+  });
+});
