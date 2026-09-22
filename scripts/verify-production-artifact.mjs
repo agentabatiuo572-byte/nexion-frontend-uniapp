@@ -31,6 +31,8 @@ for (const artifact of files) {
     assert.doesNotMatch(source, pattern,
       `${path.relative(root, artifact)} leaked development-only runtime configuration`);
   }
+  assert.doesNotMatch(source, /目标已保存\s*·\s*\$\{days\}/,
+    `${path.relative(root, artifact)} renders the goal deadline as a currency amount`);
 }
 
 console.log(`Production artifact boundary: PASS (${files.length} files scanned)`);
