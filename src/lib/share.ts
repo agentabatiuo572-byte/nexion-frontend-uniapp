@@ -121,6 +121,22 @@ export function copyText(data: string): Promise<boolean> {
 // web 直开 intent(拦截失败降级复制,异常3);scheme 复制引导(异常4);
 // copy 复制链接(失败禁误报,FEAT-SHARE1 异常3);system 走 navigator.share。
 // poster 型由组件层自行处理(切面板),这里 no-op。
+/**
+ * 哪些渠道意图**本身**算一次分享。
+ *
+ * 🔴 zentao #199:判据必须有单一宿主 —— 上一轮只在 `invite-earn-card.vue` 里按这条原则
+ * 修掉了「复制链接」,而 `activateChannel` 的 `copy` 分支仍记事件,于是同一个缺陷从
+ * 「立即分享」面板那条路径又漏了出来。
+ *
+ * · `copy`   —— 否。只是把文本放进剪贴板,用户没有把内容发到任何渠道。
+ * · `poster` —— 否。海报产物留在本地,没有发出去。
+ * · `scheme` —— 是。那里的复制是 **intent 被拦后的降级替代**,用户本意确实是分享。
+ * · `web` / `system` —— 是。真的打开了目标渠道 / 走完了系统分享面板。
+ */
+export function shareIntentRecordsEvent(intentType: ShareChannelDef["intentType"]): boolean {
+  return intentType === "web" || intentType === "scheme" || intentType === "system";
+}
+
 export async function activateChannel(def: ShareChannelDef, surface: ShareSurface, label: string): Promise<void> {
   const t = useT();
   const link = buildShareLink();
@@ -186,10 +202,16 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       break;
     }
     case "copy": {
+      // 🔴 zentao #199:「复制链接」**不是分享事件**。它只是把文本放进剪贴板,用户并没有
+      //   把内容发到任何渠道。此前这里也调了 recordShareEvent,于是点一次复制就会打
+      //   `POST /api/share/event`,任务校验不通过时后端回 422,用户先看到「链接已复制」、
+      //   紧接着又看到「分享已发出,但服务端暂时无法验证任务,未发放奖励」——
+      //   一次纯本地操作被说成了一次失败的分享。
+      //   注意与上面 `scheme` 分支的区别:那里复制是 **intent 被拦后的降级替代**,
+      //   用户本意确实是分享,所以仍计一次;这里是用户主动选择的独立意图,不计。
       const ok = await copyText(link);
       if (ok) {
         toast.success(t.value.team.inviteLinkCopied);
-        await recordShareEvent(def.key, surface);
       } else {
         toast.info(t.value.share.copyFailed);
       }
