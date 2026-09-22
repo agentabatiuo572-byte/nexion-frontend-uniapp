@@ -2840,6 +2840,7 @@ export const zh: Messages = {
       waiting: "等待回答，前面还有 {n} 条问题",
       ready: "等待发送，请稍候…",
       processing: "正在回答这条问题…",
+      tracking: "服务器仍在处理这条问题，Nova 会自动获取回答，请稍候…",
       editing: "正在修改，保存后继续排队",
       paused: "队列已暂停，请先重试前面未完成的问题",
       full: "已有 3 条问题等待回答，请等一条完成后再发送。输入内容已保留。",

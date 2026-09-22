@@ -508,7 +508,8 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       receipt: receiptFor(m.status, i === lastUser),
       queue: m.delivery ? {
         turnId: m.turnId!, state: m.delivery,
-        label: m.delivery === "failed" ? t.value.nova.queue[m.failure ?? "failed"]
+        label: m.serverPending ? t.value.nova.queue.tracking
+          : m.delivery === "failed" ? t.value.nova.queue[m.failure ?? "failed"]
           : m.delivery === "processing" ? t.value.nova.queue.processing
           : m.delivery === "editing" ? t.value.nova.queue.editing
           : nova.pendingRemote[0]?.delivery === "failed" ? t.value.nova.queue.paused
@@ -776,6 +777,7 @@ function acquireSendSlot(): boolean {
 // Reply choreography (ms after send): agent reads → types → answers.
 const AI_TYPING_ON_MS = 300;
 const AI_REPLY_MS = 1100;
+const NOVA_SERVER_TRACK_RETRY_MS = 3000;
 
 async function onSend(text: string, restore?: () => void) {
   if (isAi.value && remoteApiEnabled) {
@@ -901,18 +903,21 @@ async function onSend(text: string, restore?: () => void) {
 async function drainNovaQueue() {
   if (!novaPageVisible || !isAi.value || !remoteApiEnabled || novaProviderHold.value
       || novaStatusLoading.value || novaHistoryLoading.value || novaAiRequestInFlight.value) return;
-  if (nova.pendingRemote[0]?.delivery !== "queued" || novaDispatchTimer !== undefined) return;
+  const headDelivery = nova.pendingRemote[0]?.delivery;
+  if (!headDelivery || !["queued", "tracking"].includes(headDelivery) || novaDispatchTimer !== undefined) return;
   if (novaDispatchAccount !== app.accountKey) {
     novaDispatchAccount = app.accountKey;
     novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
   }
-  const verdict = novaDispatchLimiter.tryAcquire();
-  if (!verdict.ok) {
-    novaDispatchTimer = setTimeout(() => {
-      novaDispatchTimer = undefined;
-      void drainNovaQueue();
-    }, verdict.retryInSec * 1000);
-    return;
+  if (headDelivery === "queued") {
+    const verdict = novaDispatchLimiter.tryAcquire();
+    if (!verdict.ok) {
+      novaDispatchTimer = setTimeout(() => {
+        novaDispatchTimer = undefined;
+        void drainNovaQueue();
+      }, verdict.retryInSec * 1000);
+      return;
+    }
   }
   const item = nova.claimRemote();
   if (!item) return;
@@ -935,9 +940,18 @@ async function drainNovaQueue() {
     handoffRecommended.value = !!result.handoffReason;
   } catch (error) {
     if (current()) {
-      nova.failRemote(item.turnId, novaFailure(error));
-      handoffNeedsFreshQuestion.value = true;
-      handoffRecommended.value = true;
+      const failure = novaFailure(error);
+      if (failure === "timeout" || failure === "network" || (item.tracking && failure === "busy")) {
+        nova.trackRemote(item.turnId);
+        novaDispatchTimer = setTimeout(() => {
+          novaDispatchTimer = undefined;
+          void drainNovaQueue();
+        }, NOVA_SERVER_TRACK_RETRY_MS);
+      } else {
+        nova.failRemote(item.turnId, failure);
+        handoffNeedsFreshQuestion.value = true;
+        handoffRecommended.value = true;
+      }
     }
   } finally {
     if (novaRequestControl.isCurrent(request.epoch)) {

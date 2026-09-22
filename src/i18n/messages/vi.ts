@@ -2817,6 +2817,7 @@ export const vi: Messages = {
       waiting: "Đang chờ trả lời · còn {n} câu hỏi phía trước",
       ready: "Đang chờ gửi, vui lòng đợi…",
       processing: "Đang trả lời câu hỏi này…",
+      tracking: "Máy chủ vẫn đang xử lý câu hỏi này. Nova sẽ tự động lấy câu trả lời…",
       editing: "Đang chỉnh sửa · lưu để tiếp tục xếp hàng",
       paused: "Hàng đợi đã tạm dừng. Hãy thử lại câu hỏi chưa hoàn tất trước.",
       full: "Đã có 3 câu hỏi đang chờ. Vui lòng đợi một câu hoàn tất. Nội dung nhập được giữ lại.",

@@ -2912,6 +2912,7 @@ export const en = {
       waiting: "Waiting for an answer · {n} question(s) ahead",
       ready: "Waiting to send. Please wait…",
       processing: "Answering this question…",
+      tracking: "The server is still processing this question. Nova will retrieve the answer automatically…",
       editing: "Editing · save to continue in the queue",
       paused: "Queue paused. Retry the unfinished question first.",
       full: "3 questions are already waiting. Please wait for one to finish. Your draft is retained.",

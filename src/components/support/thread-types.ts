@@ -17,7 +17,7 @@ export interface ThreadMsg {
   ctaHref?: string;
   queue?: {
     turnId: string;
-    state: "queued" | "processing" | "editing" | "failed";
+    state: "queued" | "processing" | "tracking" | "editing" | "failed";
     label: string;
     editable: boolean;
   };

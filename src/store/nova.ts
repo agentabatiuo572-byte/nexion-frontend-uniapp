@@ -44,9 +44,11 @@ export interface NovaMessage {
   ctaHref?: string;
   turnId?: string;
   language?: "en" | "zh" | "vi";
-  delivery?: "queued" | "processing" | "editing" | "failed";
+  delivery?: "queued" | "processing" | "tracking" | "editing" | "failed";
   failure?: NovaFailure;
   attempted?: boolean;
+  /** The server may still own this turn after a client timeout or transport abort. */
+  serverPending?: boolean;
 }
 
 export interface NovaRemoteHistory {
@@ -187,12 +189,13 @@ export const useNova = defineStore("nova", () => {
 
   function claimRemote() {
     const head = pendingRemote.value[0];
-    if (!head || head.delivery !== "queued") return;
+    if (!head || !["queued", "tracking"].includes(head.delivery!)) return;
+    const tracking = head.serverPending === true;
     head.delivery = "processing";
     head.attempted = true;
     head.status = "read";
     head.failure = undefined;
-    return { turnId: head.turnId!, text: head.text, language: head.language! };
+    return { turnId: head.turnId!, text: head.text, language: head.language!, tracking };
   }
 
   function completeRemote(turnId: string, reply: string) {
@@ -200,6 +203,7 @@ export const useNova = defineStore("nova", () => {
     if (index < 0) return;
     messages.value[index].delivery = undefined;
     messages.value[index].failure = undefined;
+    messages.value[index].serverPending = undefined;
     messages.value.splice(index + 1, 0, { id: `${turnId}:nova`, sender: "nova",
       kind: "nova-reply", text: reply, ts: Date.now() });
   }
@@ -209,6 +213,16 @@ export const useNova = defineStore("nova", () => {
     if (head?.turnId !== turnId || head.delivery !== "processing") return;
     head.delivery = "failed";
     head.failure = failure;
+    head.serverPending = undefined;
+  }
+
+  function trackRemote(turnId: string): boolean {
+    const head = pendingRemote.value[0];
+    if (head?.turnId !== turnId || head.delivery !== "processing") return false;
+    head.delivery = "tracking";
+    head.failure = undefined;
+    head.serverPending = true;
+    return true;
   }
 
   function retryRemote(turnId: string): boolean {
@@ -216,6 +230,7 @@ export const useNova = defineStore("nova", () => {
     if (head?.turnId !== turnId || head.delivery !== "failed") return false;
     head.delivery = "queued";
     head.failure = undefined;
+    head.serverPending = undefined;
     return true;
   }
 
@@ -250,7 +265,7 @@ export const useNova = defineStore("nova", () => {
 
   function interruptRemote() {
     for (const item of pendingRemote.value) {
-      if (item.delivery === "processing") failRemote(item.turnId!, "interrupted");
+      if (item.delivery === "processing") trackRemote(item.turnId!);
       if (item.delivery === "editing") item.delivery = "queued";
     }
   }
@@ -337,6 +352,6 @@ export const useNova = defineStore("nova", () => {
     open, close, push, sendUser, markUserRead, setTyping, reset, startNewConversation,
     bindRemoteAccount, hydrateRemote, ensureRemoteHistory, loadEarlierRemote,
     pendingRemote, historyLoaded, historyTruncated, historyNextCursor, enqueueRemote, claimRemote, completeRemote, failRemote,
-    retryRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
+    retryRemote, trackRemote, editRemote, saveRemoteEdit, cancelRemoteEdit, cancelRemote, interruptRemote,
   };
 });
