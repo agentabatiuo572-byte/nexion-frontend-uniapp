@@ -35,10 +35,10 @@
           <view
             v-for="(p, pi) in PRESET_TARGETS"
             :key="p"
-            class="flex items-center justify-center active:opacity-70"
+            class="nx-goal-target-preset flex items-center justify-center active:opacity-70"
             :style="presetTargetStyle(p)"
             role="radio"
-            :tabindex="target === p ? 0 : -1"
+            :tabindex="target === p || (pi === 0 && !PRESET_TARGETS.includes(target)) ? 0 : -1"
             :aria-checked="target === p ? 'true' : 'false'"
             :aria-label="fmt(t.goals.targetPresetOption, { amount: String(p) })"
             @click="selectTarget(p)"
@@ -56,10 +56,10 @@
           <view
             v-for="(d, di) in PRESET_DEADLINES_DAYS"
             :key="d"
-            class="flex items-center justify-center active:opacity-70"
+            class="nx-goal-deadline-preset flex items-center justify-center active:opacity-70"
             :style="presetDeadlineStyle(d)"
             role="radio"
-            :tabindex="days === d ? 0 : -1"
+            :tabindex="days === d || (di === 0 && !PRESET_DEADLINES_DAYS.includes(days)) ? 0 : -1"
             :aria-checked="days === d ? 'true' : 'false'"
             :aria-label="fmt(t.goals.deadlinePresetOption, { days: String(d) })"
             @click="selectDays(d)"
@@ -216,18 +216,27 @@ function selectTarget(value: number) {
 function selectDays(value: number) {
   if (!savePending.value) days.value = value;
 }
-/** roving tabindex 的标准行为:方向键移一格并选上,焦点跟到新选中项。 */
-function movePreset(list: number[], index: number, delta: number, apply: (value: number) => void): void {
+/**
+ * roving tabindex 的标准行为:方向键移一格并选上,焦点跟到新选中项。
+ *
+ * 🔴 两个必须点(否则方向键要么跳组、要么把焦点丢掉):
+ *  ① 聚焦选择器必须**限定在本组内** —— 本页有两组档位(目标 / 期限),全局
+ *     `[role="radio"]` 会命中另一组,方向键一按焦点就跳到隔壁。
+ *  ② 锚点按 `tabindex="0"` 取,不按 `aria-checked="true"` —— 用户手输的自定义值
+ *     (如 $1500)不在档位里时**没有任何一格是 checked**,按 aria-checked 取到 null,
+ *     焦点直接掉回 body,键盘用户被踢出表单(zentao #223)。
+ */
+function movePreset(selector: string, list: number[], index: number, delta: number, apply: (value: number) => void): void {
   const next = list[(index + delta + list.length) % list.length];
   if (next === undefined) return;
   apply(next);
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+    document.querySelector<HTMLElement>(`${selector}[tabindex="0"]`)?.focus();
   });
 }
-function moveTarget(index: number, delta: number): void { movePreset(PRESET_TARGETS, index, delta, selectTarget); }
-function moveDays(index: number, delta: number): void { movePreset(PRESET_DEADLINES_DAYS, index, delta, selectDays); }
+function moveTarget(index: number, delta: number): void { movePreset(".nx-goal-target-preset", PRESET_TARGETS, index, delta, selectTarget); }
+function moveDays(index: number, delta: number): void { movePreset(".nx-goal-deadline-preset", PRESET_DEADLINES_DAYS, index, delta, selectDays); }
 
 watch(() => goalsStore.accountEpoch, () => {
   saveEpoch += 1;

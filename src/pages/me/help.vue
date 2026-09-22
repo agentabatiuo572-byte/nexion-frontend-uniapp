@@ -41,7 +41,7 @@
       <scroll-view scroll-x class="mx-4" style="margin-bottom: 12px; white-space: nowrap">
         <view role="radiogroup" :aria-label="w.categoryGroupLabel" class="inline-flex">
           <view
-            class="active:opacity-70"
+            class="nx-help-cat-chip active:opacity-70"
             :style="chipStyle(cat === 'all')"
             role="radio" :tabindex="cat === 'all' ? 0 : -1" :aria-checked="cat === 'all' ? 'true' : 'false'" :aria-label="t.receipt.tabAll"
             @click="selectCategory('all')"
@@ -53,7 +53,7 @@
           <view
             v-for="(c, i) in catOrder"
             :key="c"
-            class="active:opacity-70"
+            class="nx-help-cat-chip active:opacity-70"
             :style="chipStyle(cat === c)"
             role="radio" :tabindex="cat === c ? 0 : -1" :aria-checked="cat === c ? 'true' : 'false'" :aria-label="categoryLabel(c)"
             @click="selectCategory(c)"
@@ -333,7 +333,7 @@ function moveCategory(index: number, delta: number): void {
   selectCategory(next);
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+    document.querySelector<HTMLElement>('.nx-help-cat-chip[tabindex="0"]')?.focus();
   });
 }
 function toggleFaq(id: string) {

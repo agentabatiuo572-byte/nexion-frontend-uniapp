@@ -28,7 +28,7 @@
           :tabindex="tab === tb ? 0 : -1"
           :aria-checked="tab === tb ? 'true' : 'false'"
           :aria-label="tabLabel(tb)"
-          class="flex-1 grid place-items-center active:opacity-70"
+          class="nx-bills-type-radio flex-1 grid place-items-center active:opacity-70"
           :style="pillStyle(tb)"
           @click="tab = tb"
           @keydown.enter.prevent="tab = tb"
@@ -385,7 +385,7 @@ function moveTab(index: number, delta: number): void {
   tab.value = next;
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+    document.querySelector<HTMLElement>('.nx-bills-type-radio[tabindex="0"]')?.focus();
   });
 }
 

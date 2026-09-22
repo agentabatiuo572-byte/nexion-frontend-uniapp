@@ -41,12 +41,12 @@
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
+            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :aria-label="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
           </view>
           <text id="login-phone-format" data-testid="auth-phone-hint" class="lg-phone-hint" :class="{ 'lg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
-              <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
+              <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
               <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
                 <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -61,7 +61,7 @@
         <!-- Step 2: OTP -->
         <view v-else-if="step === 2" class="lg-col">
           <view class="lg-otp">
-            <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
+            <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :aria-label="fmt(t.login.otpDigitLabel, { n: i + 1 })" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
           </view>
           <view v-if="developmentOtpEnabled" class="lg-development-otp" data-testid="development-otp-code" role="status">
             <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
@@ -76,14 +76,14 @@
         <!-- Step 3: new password (reset) -->
         <view v-else class="lg-col">
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
-            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
+            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :aria-label="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
             <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
           </view>
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': confirmPwd && newPassword !== confirmPwd }">
-            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" :focus="confirmPasswordFocused" confirm-type="done" @input="onConfirm" @blur="confirmPasswordFocused = false" @confirm="onPrimary" />
+            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.confirmPasswordPlaceholder" :aria-label="t.login.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" :focus="confirmPasswordFocused" confirm-type="done" @input="onConfirm" @blur="confirmPasswordFocused = false" @confirm="onPrimary" />
           </view>
         </view>
       </view>

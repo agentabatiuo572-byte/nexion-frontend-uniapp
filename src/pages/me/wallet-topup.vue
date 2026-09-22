@@ -20,7 +20,7 @@
         <view
           v-for="(s, i) in SEGMENTS"
           :key="s.id"
-          :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
+          :class="['nx-topup-seg flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
           role="tab" :tabindex="seg === s.id ? 0 : -1"
           :aria-label="segLabel(s.id)"
@@ -83,7 +83,7 @@ function moveSeg(index: number, delta: number): void {
   seg.value = next.id;
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    document.querySelector<HTMLElement>('.nx-topup-seg[tabindex="0"]')?.focus();
   });
 }
 

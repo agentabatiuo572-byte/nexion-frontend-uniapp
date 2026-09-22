@@ -101,6 +101,7 @@
               </view>
               <input
                 v-model="date"
+                :aria-label="t.agent.fieldEventDate"
                 type="text"
                 :disabled="!unlocked"
                 placeholder="YYYY-MM-DD"
@@ -115,6 +116,7 @@
               </view>
               <input
                 v-model="city"
+                :aria-label="t.agent.fieldCity"
                 type="text"
                 :disabled="!unlocked"
                 :placeholder="t.agent.cityPlaceholder"
@@ -131,6 +133,7 @@
                 <text class="font-display" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', marginRight: '4px' }">$</text>
                 <input
                   v-model="budgetText"
+                  :aria-label="t.agent.fieldBudget"
                   type="text"
                   inputmode="decimal"
                   :disabled="!unlocked"
