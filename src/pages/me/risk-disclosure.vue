@@ -63,13 +63,13 @@
       <view ref="sentinelRef" class="mx-4" style="height: 1px; margin-top: 12px" />
 
       <!-- Scroll hint -->
-      <view v-if="!scrolledToBottom && !accepted" class="mx-4 flex items-center" :style="hintStyle">
+      <view v-if="disclosure?.acknowledgmentToken && !scrolledToBottom && !accepted" class="mx-4 flex items-center" :style="hintStyle">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
         <text :style="hintTextStyle">{{ w.scrollHint }}</text>
       </view>
 
       <!-- Acknowledge -->
-      <view class="mx-4" :style="ackCardStyle">
+      <view v-if="disclosure?.acknowledgmentToken || accepted" class="mx-4" :style="ackCardStyle">
         <!-- 反馈走 scale:同 P-058,inline style 里已有 opacity(未读完时 0.55),写 opacity 反馈会被压掉 -->
         <view
           class="flex items-start active:scale-[0.98] transition-transform"
@@ -163,8 +163,11 @@ const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishe
 const documentIdentity = computed(() => riskDisclosureDocumentIdentity(disclosure.value));
 
 const returnTo = ref("/pages/me/me");
+const publicCountry = ref<string | null>(null);
 onLoad((options) => {
   returnTo.value = safeReturnTo(options?.return, "/pages/me/me");
+  publicCountry.value = typeof options?.country === "string" && /^[A-Z]{2}$/.test(options.country)
+    ? options.country : null;
 });
 
 const scrolledToBottom = ref(false);
@@ -351,7 +354,7 @@ async function reload() {
   stopBottomObserver();
   scrollEventIdentity.value = null;
   setReadingState();
-  await risk.refresh();
+  await risk.refresh(publicCountry.value);
   if (disposed || !pageActive || generation !== pageGeneration) return;
   const identity = documentIdentity.value;
   readingIdentity.value = identity;

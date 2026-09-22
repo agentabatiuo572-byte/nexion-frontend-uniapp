@@ -86,7 +86,7 @@ const rd = stripComments(read("src/pages/me/risk-disclosure.vue"));
 // 换钉远端渲染源三合取,逐项独立断言(各自可红):
 check("🔴 披露正文渲染源 = 远端 chapters(disclosure.value?.chapters 真进渲染管线)",
   rd.includes("disclosure.value?.chapters"));
-check("🔴 进页真的拉远端披露(risk.refresh())", rd.includes("risk.refresh()"));
+check("🔴 进页真的拉远端披露(risk.refresh())", rd.includes("risk.refresh(publicCountry.value)"));
 check("🔴 拉取失败有失败态出口(loadError 提示 + 重试)", rd.includes("loadError"));
 
 // z1 判决(2026-08-10):terms §06 的插值机制(normalizeSlaHours + payoutSlaHours +

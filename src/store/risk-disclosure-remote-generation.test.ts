@@ -5,8 +5,10 @@ import type { RiskDisclosureCurrent } from "@/api/risk-disclosure-api";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
+  sessionVault: { read: vi.fn(() => ({ accessToken: "test" }) as { accessToken: string } | null) },
   riskDisclosureApi: {
     current: vi.fn(),
+    publicCurrent: vi.fn(),
     acknowledge: vi.fn(),
     checkGate: vi.fn(),
   },
@@ -62,9 +64,33 @@ describe("risk disclosure remote request generation", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     remote.riskDisclosureApi.current.mockReset();
+    remote.riskDisclosureApi.publicCurrent.mockReset();
+    remote.sessionVault.read.mockReturnValue({ accessToken: "test" });
     remote.riskDisclosureApi.acknowledge.mockReset();
     remote.riskDisclosureApi.checkGate.mockReset();
     remoteAccountScope.bind(`risk-disclosure-test-${Date.now()}-${Math.random()}`);
+  });
+
+  it("loads anonymous published copy without offering an acknowledgement", async () => {
+    remote.sessionVault.read.mockReturnValue(null);
+    remote.riskDisclosureApi.publicCurrent.mockResolvedValue({
+      ...disclosure("public", false), acknowledgmentToken: null, acknowledgmentTokenExpiresAt: null,
+    });
+    const store = useRiskDisclosure();
+    await store.refresh("VN");
+    expect(store.current?.version).toBe("public");
+    expect(remote.riskDisclosureApi.publicCurrent).toHaveBeenCalledWith("VN");
+    expect(remote.riskDisclosureApi.current).not.toHaveBeenCalled();
+    expect(await store.accept()).toBe(false);
+    expect(remote.riskDisclosureApi.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("does not guess a jurisdiction for an anonymous direct link", async () => {
+    remote.sessionVault.read.mockReturnValue(null);
+    const store = useRiskDisclosure();
+    await store.refresh();
+    expect(store.error).toBe("RISK_DISCLOSURE_COUNTRY_REQUIRED");
+    expect(remote.riskDisclosureApi.publicCurrent).not.toHaveBeenCalled();
   });
 
   it("classifies only the exact missing published version and never acknowledges it", async () => {

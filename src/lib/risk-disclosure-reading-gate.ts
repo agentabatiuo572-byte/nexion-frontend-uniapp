@@ -53,6 +53,7 @@ export function canAcknowledgeRiskDisclosure(input: {
 }): boolean {
   return Boolean(
     input.disclosure
+      && input.disclosure.acknowledgmentToken
       && input.documentIdentity
       && input.readingIdentity === input.documentIdentity
       && input.reading.scrolledToBottom

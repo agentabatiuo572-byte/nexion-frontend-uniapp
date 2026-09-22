@@ -86,4 +86,17 @@ describe("risk disclosure reading gate", () => {
       loading: false,
     })).toBe(true);
   });
+
+  it("does not enable acknowledgement for an anonymous copy without a read token", () => {
+    const publicCopy = disclosure("v1", null);
+    const identity = riskDisclosureDocumentIdentity(publicCopy);
+    expect(canAcknowledgeRiskDisclosure({
+      disclosure: publicCopy,
+      documentIdentity: identity,
+      readingIdentity: identity,
+      reading: { scrolledToBottom: true, checked: true, selectedBlock: 7 },
+      accepted: false,
+      loading: false,
+    })).toBe(false);
+  });
 });

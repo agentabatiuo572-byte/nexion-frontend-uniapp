@@ -324,7 +324,7 @@ function goBack(event?: Event) {
 }
 function goRisk(event?: Event) {
   if (repeatedKeyboardActivation(event)) return;
-  navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(returnTo.value)}`);
+  navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(buildLegalTermsRoute(returnTo.value))}&country=VN`);
 }
 async function confirmTerms(event?: Event) {
   if (repeatedKeyboardActivation(event) || confirming.value) return;
