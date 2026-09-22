@@ -536,7 +536,7 @@ async function toggleTwoFactor(value: boolean) {
     return;
   }
   if (!twoFactorPassword.value) {
-    err.value = t.value.login.errorInvalidPassword;
+    toast.error(t.value.login.errorInvalidPassword);
     return;
   }
   if (value === twoFactorEnabled.value) return;

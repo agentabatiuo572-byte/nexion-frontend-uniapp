@@ -129,6 +129,8 @@ test("remote security center consumes the authoritative account API", () => {
   assert.match(page, /accountApi\.revokeSession\(/);
   assert.match(page, /accountApi\.revokeOtherSessions\(\)/);
   assert.match(page, /accountApi\.requestAccountDeletion\(/);
+  assert.match(page, /if \(!twoFactorPassword\.value\) \{\s*toast\.error\(t\.value\.login\.errorInvalidPassword\);\s*return;\s*\}/,
+    "the 2FA toggle must visibly report a missing current password");
   const passwordChange = page.match(/async function submitPasswordChange\(\) \{([\s\S]*?)^\}/m)?.[1];
   assert.ok(passwordChange, "password command boundary must exist");
   const branches = passwordChange.match(/if \(remoteApiEnabled\) \{([\s\S]*?)\n\s*\} else \{([\s\S]*?)\n\s*\}/);
