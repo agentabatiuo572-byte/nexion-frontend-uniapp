@@ -5978,6 +5978,7 @@ export const vi: Messages = {
     confirmDelayed: "Mạng tắc nghẽn, xác nhận lâu hơn bình thường",
     channelPaused: "Tạm dừng dịch vụ, vui lòng chọn mạng khác",
     allNetworksPaused: "Kênh nạp tạm thời không khả dụng — sẽ sớm mở lại. Cần giúp cứ liên hệ hỗ trợ.",
+    copyAddress: "Sao chép địa chỉ",
     addrCopied: "Đã sao chép địa chỉ",
     topupNotCreditedYet: "Đang xác nhận khoản nạp — tiền không bị mất. Làm mới lại sau nhé.",
     depositOpFailedNote: "Thao tác chưa hoàn tất — tiền của bạn không bị ảnh hưởng. Thử lại sau nhé.",

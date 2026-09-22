@@ -70,6 +70,42 @@ const reply = ""; const onReply = () => {};
 </script>
 `, /\[|src\//);
 
+// ── N3:纯图标的 role="button" 没有名字(zentao #88 的图标按钮一半) ──────────────
+expectRed("N3 纯图标按钮缺少可访问名", `<template>
+  <view>
+    <view role="button" tabindex="0" @click="copy">
+      <svg width="16" height="16" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" /></svg>
+    </view>
+  </view>
+</template>
+<script setup lang="ts">
+const copy = () => {};
+</script>
+`, /N3|纯图标/);
+
+// ── N3 的反面:带可见文字的按钮不该被误判(首版非贪婪正则会在这里假红) ─────────
+{
+  writeFileSync(PROBE, `<template>
+  <view>
+    <view role="button" tabindex="0" @click="go">
+      <view class="icon" aria-hidden="true"><svg width="16" height="16"><path d="M0 0h16v16H0z" /></svg></view>
+      <text class="title">{{ label }}</text>
+    </view>
+  </view>
+</template>
+<script setup lang="ts">
+const go = () => {}; const label = "继续";
+</script>
+`, "utf8");
+  const { code, out } = runGate();
+  cleanup();
+  if (code !== 0) {
+    console.error(`✖ 带可见文字的按钮被误判成纯图标(假红):\n${out}`);
+    process.exit(1);
+  }
+  console.log("✓ 带可见文字的按钮正确豁免");
+}
+
 // ── 注释里的 <input> 不算控件(首版实测的假红面) ─────────────────────────────
 {
   writeFileSync(PROBE, `<template>

@@ -6132,6 +6132,7 @@ export const en = {
     confirmDelayed: "Network congested — confirmation is taking longer",
     channelPaused: "Paused — please choose another network",
     allNetworksPaused: "Top-up channels are briefly unavailable — back soon. Contact support if you need help.",
+    copyAddress: "Copy address",
     addrCopied: "Address copied",
     topupNotCreditedYet: "Confirming your deposit — funds aren't lost. Refresh shortly.",
     depositOpFailedNote: "That didn't go through — your funds are untouched. Try again shortly.",

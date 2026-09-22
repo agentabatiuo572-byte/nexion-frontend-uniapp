@@ -34,6 +34,8 @@ const LAYER = join(SRC, "lib", "a11y-field-label.ts");
 
 /** 控件数下界:低于它就说明解析器漏扫。2026-09 实测 52 个。 */
 const FIELD_FLOOR = 40;
+/** role=button 数下界(同理由:低于它就说明解析器漏扫)。2026-09 实测 525 个。 */
+const BUTTON_FLOOR = 400;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -43,6 +45,18 @@ function walk(dir, out = []) {
     else if (name.endsWith(".vue")) out.push(p);
   }
   return out;
+}
+
+/** 找配对的 </tag>(只数同名开闭标签,模板内足够且不误跨组件)。 */
+function matchClose(src, openEnd, tag) {
+  const re = new RegExp(`<${tag}\\b|</${tag}\\s*>`, "g");
+  re.lastIndex = openEnd;
+  let depth = 1, m;
+  while ((m = re.exec(src))) {
+    if (m[0].startsWith("</")) { if (--depth === 0) return m.index; }
+    else depth++;
+  }
+  return src.length;
 }
 
 /** 注释里的示例代码不是控件:剥掉 HTML 注释、块注释与整行 // 注释(保留行数)。 */
@@ -55,6 +69,7 @@ function stripComments(text) {
 
 const findings = [];
 let fields = 0;
+let buttons = 0;
 const files = walk(SRC);
 
 for (const file of files) {
@@ -68,6 +83,20 @@ for (const file of files) {
     const line = src.slice(0, m.index).split("\n").length;
     const flat = tag.replace(/\s+/g, " ").slice(0, 120);
     findings.push({ file: rel, line, tag: flat });
+  }
+
+  // N3:纯图标的 role="button" 也要有名字。正文里没有可见文字时,读屏只会念「按钮」——
+  // 充值地址旁的「复制」按钮就是这样(zentao #88)。
+  // 🔴 必须按**配对闭合**取正文:非贪婪正则会在第一个内层 </view> 处截断,把带文字的
+  //    按钮误判成纯图标(首版实测:525 个按钮里误报 8 个,深度感知后只剩 1 个真缺陷)。
+  for (const m of src.matchAll(/<view\b[^>]*\brole="button"[^>]*>/g)) {
+    buttons++;
+    const openEnd = src.indexOf(">", m.index);
+    const body = src.slice(openEnd, matchClose(src, openEnd, "view"));
+    if (/\baria-label(ledby)?\s*=/.test(m[0])) continue;
+    if (/<text\b[^>]*>\s*[^<\s{]/.test(body) || /\{\{/.test(body)) continue;
+    const line = src.slice(0, m.index).split("\n").length;
+    findings.push({ file: rel, line, tag: "role=\"button\" 纯图标按钮缺少可访问名(正文无可见文字)" });
   }
 }
 
@@ -84,6 +113,10 @@ if (!existsSync(LAYER)) {
   }
 }
 
+if (buttons < BUTTON_FLOOR) {
+  console.error(`✖ 只解析出 ${buttons} 个 role="button",低于下界 ${BUTTON_FLOOR} —— 解析器疑似漏扫,判据不可信`);
+  process.exit(2);
+}
 if (fields < FIELD_FLOOR) {
   console.error(`✖ 只解析出 ${fields} 个输入控件,低于下界 ${FIELD_FLOOR} —— 解析器疑似漏扫,判据不可信`);
   process.exit(2);
@@ -100,4 +133,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.log(`✓ 输入控件可访问名:${fields} 个控件 / ${files.length} 文件,名字齐备且补齐层已挂载`);
+console.log(`✓ 可访问名:${fields} 个输入控件 + ${buttons} 个 role="button"(纯图标者已核)/ ${files.length} 文件,名字齐备且补齐层已挂载`);
