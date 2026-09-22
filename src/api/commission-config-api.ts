@@ -20,7 +20,7 @@ export interface CanonicalCommissionConfig {
   };
   influenceClampMin: number;
   influenceClampMax: number;
-  coolingDays: number;
+  coolingDays: number | null;
   promoMultiplier: number;
 }
 
@@ -172,7 +172,7 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
     partnerThresholds: parsePartnerThresholds(source.partnerTiersJson),
     influenceClampMin,
     influenceClampMax,
-    coolingDays: number(source.coolingDays, 0, 90),
+    coolingDays: source.coolingDays === null ? null : number(source.coolingDays, 0, 90),
     promoMultiplier: number(source.promoMultiplier, 1, 3),
   };
 }

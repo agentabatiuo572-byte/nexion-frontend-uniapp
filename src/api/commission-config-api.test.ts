@@ -81,6 +81,14 @@ describe("commission config provenance and protocol", () => {
     await expect(createCommissionConfigApi({ request: vi.fn().mockResolvedValue(payload({ coolingDays: "not-a-number" })) } as unknown as ApiClient, "prod").rates()).rejects.toMatchObject({ kind: "protocol" });
   });
 
+  it("preserves an explicitly missing cooling policy instead of inventing 30 days", async () => {
+    const api = createCommissionConfigApi({
+      request: vi.fn().mockResolvedValue(payload({ coolingDays: null })),
+    } as unknown as ApiClient, "prod");
+
+    await expect(api.rates()).resolves.toMatchObject({ coolingDays: null });
+  });
+
   it("preserves every canonical binary settlement state without failing the full projection", async () => {
     const statuses = ["COOLING", "UNLOCKED", "PAID", "SETTLED", "FROZEN", "REVERSED", "REJECTED"];
     const recentMatches = statuses.map((status, index) => ({

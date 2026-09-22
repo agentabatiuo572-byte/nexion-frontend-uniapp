@@ -429,7 +429,9 @@ const remoteExtended = computed(() => remoteSnapshot.value?.split.extended ?? { 
 const remoteTotalUSDT = computed(() => remoteDirect.value.amountUSDT + remoteExtended.value.amountUSDT);
 const remoteTotalNEX = computed(() => remoteDirect.value.amountNEX + remoteExtended.value.amountNEX);
 const canonicalPolicyText = computed(() => commission.config
-  ? fmt(t.value.unilevel.canonicalPolicy, { days: commission.config.coolingDays, multiplier: commission.config.promoMultiplier })
+  ? commission.config.coolingDays === null
+    ? t.value.unilevel.canonicalPolicyUnavailable
+    : fmt(t.value.unilevel.canonicalPolicy, { days: commission.config.coolingDays, multiplier: commission.config.promoMultiplier })
   : "");
 const canonicalPeriodText = computed(() => remoteSnapshot.value
   ? t.value.unilevel.periods[remoteSnapshot.value.period] : "");
