@@ -13,6 +13,12 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.quota.pageTitle" />
 
+      <!-- 🔴 zentao #246:请求聚焦的商品不在配额档位里时**明说** ——
+           静默展示无关档位,正是「查看解锁条件跳到另一商品的配额页」的成因。 -->
+      <view v-if="!focusedTierPresent" class="px-4" style="padding-top: 14px">
+        <text class="block" :style="focusedMissingStyle" role="note">{{ t.quota.focusedTierMissing }}</text>
+      </view>
+
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
         <!-- Hero — de-carded: invites count sits directly on the page floor.
              The bordered card + page-floor radial glow were deleted outright
@@ -68,7 +74,7 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, ref, watch, type CSSProperties } from "vue";
-import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
@@ -135,6 +141,11 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   resetQuotaPageState();
   if (quotaMounted && remoteApiEnabled) void refreshRemoteQuota();
 });
+onLoad((options) => {
+  const requested = typeof options?.product === "string" ? options.product.trim() : "";
+  focusedProductId.value = requested.slice(0, 64);
+});
+
 onShow(() => {
   quotaMounted = true;
   resetQuotaPageState();
@@ -164,6 +175,15 @@ const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.valu
 // with live progress from network/v-rank). No hardcoded device economics here —
 // the page mirrors §4 PurchaseGate + the store catalog (fixes stale $899/$3,499/
 // "800-1,100 NEX/day" that drifted out of sync with the recalibrated catalog).
+/**
+ * 🔴 zentao #246:从商品详情页点「查看解锁条件」时带过来的商品 id。
+ *
+ * 此前详情页硬编码跳到 `/pages/team/quota`,而配额页只列**它自己的**档位 ——
+ * 用户在看 Pro v2,跳过来看到的却是另一件商品的配额,即「查看解锁条件」指向了别人的条件。
+ * 现在带上 id 并据此定位;若该商品根本不在配额档位里,页面**明说**,而不是静默展示无关档位。
+ */
+const focusedProductId = ref("");
+
 function buildTier(productId: string, tint: string): QuotaTier | null {
   const p = getMockProduct(productId);
   const g = p?.purchaseGate;
@@ -239,6 +259,10 @@ function quotaPerkText(perk: string): string {
   return fmt(t.value.quota.perkGen, { n: amount });
 }
 
+/** 请求聚焦的商品是否确实在配额档位里(空 id = 未指定,不提示)。 */
+const focusedTierPresent = computed(() =>
+  !focusedProductId.value || tiers.value.some((tier) => tier.productId === focusedProductId.value));
+
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
     ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
@@ -267,6 +291,12 @@ function go(url: string) {
 // ─── styles ───
 // De-carded hero: no surface/border/glow — content sits directly on the page
 // floor (leaderboard prize-hero idiom, 2px optical inset).
+const focusedMissingStyle: CSSProperties = {
+  fontSize: "12px",
+  lineHeight: 1.5,
+  color: "var(--v5-ink-3)",
+};
+
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 const heroIconStyle: CSSProperties = { width: "48px", height: "48px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
 const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand-2)", letterSpacing: "0.06em" };
