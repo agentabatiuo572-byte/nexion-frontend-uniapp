@@ -1111,7 +1111,9 @@ export const zh: Messages = {
     recPro: "Pro 是 S1 两倍上限;一台 Pro + 偶尔复投即可达成。",
     recRack: "Rack 级别算力按期清账,可考虑 Trade-in 分期。",
     saveCta: "保存目标",
-    savedToast: "目标已保存 · ${days} 天达成 ${amount}",
+    // 🔴 天数不带货币符号:此前写成 `${days}`,把 `${amount}` 的 `$` 复制到了天数上,
+    //    于是「90 天」显示成「$90 天」(zentao #247)。$ 只属于金额。
+    savedToast: "目标已保存 · {days} 天达成 ${amount}",
     minTargetWarn: "最低目标 $100",
     activeGoals: "进行中目标",
     targetPresetsLabel: "快捷目标金额",
