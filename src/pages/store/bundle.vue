@@ -192,6 +192,8 @@ import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
+// 🔴 zentao #244:线上模式必须问**服务端**资格,本地门仅 mock 用 —— 与 detail.vue 同一口径。
+import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { isProductAvailable } from "@/store/product-availability";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
@@ -592,12 +594,26 @@ async function onCheckout() {
     activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
     teamVolumeUSD: vRank.teamVolumeUSD,
   };
-  const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
-  if (blocked) {
-    const g = evaluatePurchaseGate(blocked, gateCtx);
-    toast.warn(g.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
-    navTo("/pages/team/quota");
-    return;
+  // 🔴 zentao #244:线上模式此前只跑**本地** `evaluatePurchaseGate`(V-Rank / 团队业绩取自本地
+  //   快照),而线上权威门是服务端的账号维度资格判定 —— 于是服务端判不合格的商品仍能进套餐、
+  //   并启用结算按钮。现按 detail.vue 的既有口径分流:remote 逐 SKU 问服务端,
+  //   **任一不达标即整单拒**;本地门只在 mock 模式生效。
+  if (remoteApiEnabled) {
+    const decisions = await Promise.all(list.map((p) => purchaseEligibilityStore.ensure(p.id)));
+    const firstBlocked = decisions.findIndex((eligible) => !eligible);
+    if (firstBlocked >= 0) {
+      toast.warn(t.value.store.gateBlockedToast);
+      navTo(`/pages/team/quota?product=${encodeURIComponent(list[firstBlocked].id)}`);
+      return;
+    }
+  } else {
+    const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
+    if (blocked) {
+      const g = evaluatePurchaseGate(blocked, gateCtx);
+      toast.warn(g.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
+      navTo("/pages/team/quota");
+      return;
+    }
   }
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;
