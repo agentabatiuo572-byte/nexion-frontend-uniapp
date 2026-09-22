@@ -2642,13 +2642,16 @@ platform_stats_anchor() {
   #   且必须消费 verifiedStats(见下方 4c)。
   for pair in \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
-    'src/store/app.ts|publicStatsHealth' \
-    'src/pages/onboarding/intro.vue|onlineDevicesOf'; do
+    'src/store/app.ts|publicStatsHealth'; do
     f="${pair%%|*}"; sym="${pair##*|}"
     # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
+  if ! grep -Fq 'cfg.config.verifiedStats?.onlineDevices.value' src/pages/onboarding/intro.vue \
+    || grep -Fq 'onlineDevicesOf(cfg.config.publicStats)' src/pages/onboarding/intro.vue; then
+    bad "platform-anchor: 引导页在线设备必须读服务端 verifiedStats,不能由 H9 配置派生"; fails=1
+  fi
   # 正式 App 的 On Grid 数字来自 Java Home canonical projection，不再从编译期平台锚派生。
   # 同时钉字段消费与刷新入口，避免换成另一本地常量后假绿。
   if ! grep -q 'app\.homeTruth?.onGrid\.perSecUsdt' src/components/home/on-grid-section.vue 2>/dev/null \
@@ -2776,7 +2779,10 @@ home_task_carousel_contract() {
   grep -q 'home-task-carousel__meta' "$page" && miss="${miss}page-number-overlay "
   grep -q 'taskSlide + 1' "$page" && miss="${miss}visible-page-number "
   grep -q '<TrustChipWall' "$page" || miss="${miss}server-trust-entry-missing "
-  grep -q 'usePublishedTrust' src/components/home/trust-chip-wall.vue || miss="${miss}server-trust-entry-not-authoritative "
+  grep -q 'navTo("/pages/trust/trust")' src/components/home/trust-chip-wall.vue \
+    && grep -q 'trustSnapshotUnavailable' src/components/home/trust-chip-wall.vue \
+    && ! grep -q 'summary\.chips\|reserveProof' src/components/home/trust-chip-wall.vue \
+    || miss="${miss}server-trust-entry-not-authoritative "
   grep -q 'event: "update:expanded"' "$newcomer" || miss="${miss}controlled-newcomer-expand "
   grep -q 'expanded: false' "$newcomer" || miss="${miss}newcomer-default-collapse "
   grep -q 'height: "var(--home-task-card-height, 184px)"' "$weekly" || miss="${miss}weekly-equal-height "

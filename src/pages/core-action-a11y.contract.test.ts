@@ -38,10 +38,11 @@ describe("core financial and ambassador controls", () => {
       const tag = click >= 0 ? value.slice(value.lastIndexOf("<", click), value.indexOf(">", click) + 1) : "";
       if (path === "./store/detail.vue" && handler === "openTrustUrl(row.Url)") {
         // A report navigates like a link: Enter activates, Space scrolls.
-        // Missing/unsafe destinations must leave the keyboard tab order.
+        // Missing/unsafe destinations are removed before rendering; linked
+        // reports remain in the keyboard tab order and Enter opens them.
         expect(tag).toContain('role="link"');
-        expect(tag).toContain(':tabindex="safeTrustUrl(row.Url) ? 0 : -1"');
-        expect(tag).toContain(':aria-disabled="!safeTrustUrl(row.Url)"');
+        expect(value).toContain(".filter((row) => safeTrustUrl(row.Url))");
+        expect(tag).toContain('tabindex="0"');
         expect(tag).toContain('@keydown.enter.prevent="openTrustUrl(row.Url)"');
         expect(tag).not.toContain('@keydown.space');
         continue;

@@ -169,6 +169,7 @@ export const useConfig = defineStore("config", () => {
     config.value = {
       ...config.value,
       publicStats: { ...unavailableServerConfig.publicStats },
+      verifiedStats: null,
       rewards: {
         enabled: false,
         effectiveAt: null,

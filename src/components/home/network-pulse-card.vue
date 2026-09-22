@@ -13,7 +13,7 @@
       <view class="px-3.5 py-2.5 flex justify-between items-center font-mono-tabular" style="border-bottom: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <view class="inline-flex items-center gap-1.5">
           <PulseDot color="var(--v5-tech-cyan)" />
-          <text>{{ t.home.networkPublishedScope }}</text>
+          <text>{{ cfg.config.verifiedStats && !cfg.syncFailed ? fmt(t.home.networkVerifiedScope, { at: cfg.config.verifiedStats.capturedAt.slice(0, 16).replace('T', ' ') }) : t.home.networkStatUnverifiedHint }}</text>
         </view>
         <!-- 条头右侧刻意留空:实时支付流数字已删(FEAT-HOME02 定案,与「今日支付」同一笔钱两种表达)。 -->
       </view>
@@ -80,7 +80,7 @@ import { useRankSnapshot } from "@/store/rank-snapshot";
 import { useNetworkRank } from "@/store/network-rank";
 import { remoteApiEnabled } from "@/api/runtime";
 import { computeRank } from "@/lib/network-rank";
-import { derivedRegisteredUsers, publicStatsHealth, compactNumber as compact } from "@/lib/platform-stats";
+import { publicStatsHealth, compactNumber as compact } from "@/lib/platform-stats";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 import PulseDot from "./pulse-dot.vue";
@@ -152,8 +152,6 @@ const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i *
 
 // 健康度共享一份(三格 + 排名入参守卫同源)
 const health = computed(() => publicStatsHealth(cfg.config.publicStats));
-// ── 格 1:注册用户(公布基数按月增速从锚点推算，仅作展示)──
-const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats, nowTs.value));
 // ── 格 3:名次(每次渲染由当下算力 + 当下配置现算,禁缓存名次)──
 //   🔴 入参守卫(R2 P2):分母吃服务端真实账号数，营销公布基数不参与资格排名。
 //   是它自己的输入坏了,同判 unavailable;ps 整段缺席(机器门最小桩)同理,不裸解引。
@@ -253,7 +251,7 @@ const metrics = computed<Cell[]>(() => {
   const noVerifiedSource = !verified;
 
   // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
-  const membersBad = failed || !h.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
+  const membersBad = failed;
   const members: Cell = noVerifiedSource
     ? unverifiedCell(t.value.home.networkMembers)
     : membersBad
@@ -268,7 +266,7 @@ const metrics = computed<Cell[]>(() => {
         };
 
   // 格 2 在线设备 —— 同上:只认服务端实测的在线设备数。
-  const devicesBad = failed || !h.devicesOk;
+  const devicesBad = failed;
   const devices: Cell = noVerifiedSource
     ? unverifiedCell(t.value.home.networkEstimatedDevices)
     : devicesBad

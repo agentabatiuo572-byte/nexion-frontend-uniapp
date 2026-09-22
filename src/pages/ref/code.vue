@@ -97,11 +97,10 @@
       <view :style="proofCardStyle">
         <view class="flex items-center" :style="proofHeadStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ t.ref.thisMonth }}</text>
+          <text>{{ t.ref.platformTotals }}</text>
         </view>
-        <view class="grid grid-cols-3 text-center" style="gap: 8px">
+        <view class="grid grid-cols-2 text-center" style="gap: 8px">
           <Stat :label="t.ref.newJoiners" :value="joinersText" tint="var(--v5-brand)" />
-          <Stat :label="t.ref.countries" :value="countryCountText" />
           <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
         </view>
         <!-- BUG #59: these two figures are operator-published platform aggregates, not a
@@ -154,7 +153,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
-import { apiClient, networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
+import { apiClient, remoteApiEnabled } from "@/api/runtime";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
@@ -174,19 +173,20 @@ const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 const remotePreview = ref<PublicSponsorPreview | null>(null);
 const remotePreviewState = ref<ReferralPreviewState>("idle");
-const countryCount = ref<number | null>(null);
-const countryCountText = computed(() => remoteApiEnabled && countryCount.value !== null ? String(countryCount.value) : "—");
 const proofScopeStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-4)" };
 // 🔴 对外财务事实只能来自可核验聚合(zentao #59)。
 //   此前「已付」= 运营配置的设备数 × 公布档位 × 30,「本月新增」= 配置基数 × 配置增速 ——
 //   两者都是把人工配置当实测对外发布。现在:
 //     · 有 verified 聚合时,读真实提现完成额与真实注册账号数,并标注来源与统计时刻;
 //     · 没有(沙箱/旧后端)时显示「—」,不再用配置值编造一个看起来像事实的数字。
-const verified = computed(() => cfg.config.verifiedStats);
+const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
 const paidOutText = computed(() => {
   const v = verified.value;
   if (cfg.syncFailed || !v) return "—";
-  return `$${(v.completedPayoutUsdt.value / 1_000_000).toFixed(2)}M`;
+  const amount = v.completedPayoutUsdt.value;
+  return amount >= 1_000_000
+    ? `$${(amount / 1_000_000).toFixed(2)}M`
+    : `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 });
 const joinersText = computed(() => {
   const v = verified.value;
@@ -196,8 +196,8 @@ const joinersText = computed(() => {
 /** 可核验聚合的统计时刻与口径,附在卡片底部;没有聚合时不显示任何「已核对」表述。 */
 const verifiedScopeText = computed(() => {
   const v = verified.value;
-  if (!v) return t.value.home.networkPublishedScope;
-  return fmt(t.value.home.networkVerifiedScope, { at: v.capturedAt.slice(0, 16).replace("T", " ") });
+  if (!v) return t.value.ref.unavailableScope;
+  return fmt(t.value.ref.verifiedScope, { at: v.capturedAt.slice(0, 16).replace("T", " ") });
 });
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
@@ -231,14 +231,6 @@ onLoad(async (options) => {
     code.value = "";
     remotePreview.value = null;
     remotePreviewState.value = "idle";
-    countryCount.value = null;
-    void networkRegionsApi.list()
-      .then((value) => {
-        if (isCurrentReferralLoad(loadVersion)) countryCount.value = value.countryCount;
-      })
-      .catch(() => {
-        if (isCurrentReferralLoad(loadVersion)) countryCount.value = null;
-      });
     const rawCode = String(options?.code ?? "").trim();
     const norm = normalizeRegistrationSponsorCode(rawCode, true);
     if (!norm) {

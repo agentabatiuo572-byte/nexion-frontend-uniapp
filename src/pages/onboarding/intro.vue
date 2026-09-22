@@ -105,15 +105,16 @@
         <view class="intro-stats anim-stats">
           <view class="stat-item">
             <view class="stat-dot" />
-            <text class="stat-num">{{ fmtNum(devices) }}</text>
+            <text class="stat-num">{{ fmtNum(visibleDevices) }}</text>
             <text class="stat-label">{{ t.intro.statsDevices }}</text>
           </view>
-          <view v-if="paid !== null" class="stat-sep" />
-          <view v-if="paid !== null" class="stat-item">
-            <text class="stat-num stat-num--brand">{{ paid === null ? t.intro.publicStatsUnavailable : `$${fmtNum(paid)}` }}</text>
+          <view v-if="visiblePaid !== null" class="stat-sep" />
+          <view v-if="visiblePaid !== null" class="stat-item">
+            <text class="stat-num stat-num--brand">{{ visiblePaid === null ? t.intro.publicStatsUnavailable : `$${fmtNum(visiblePaid)}` }}</text>
             <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
           </view>
         </view>
+        <text v-if="verifiedScope" class="stat-label">{{ verifiedScope }}</text>
       </view>
 
       <view class="intro-cta anim-cta">
@@ -175,10 +176,11 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { onlineDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
+import { paidCumulativeNow } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 import { remoteApiEnabled } from "@/api/runtime";
 
@@ -193,23 +195,9 @@ function pick(code: LocaleCode) {
   langOpen.value = false;
 }
 useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
-// 🔴 累计支付与舰队数走**配置派生**(2026-08-06 审计 P1:规格 ③「其它页面舰队数字
-//   继续从它派生」)。配置坏回种子锚(本页不在异常3 占位管辖面)。
-//   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
-//   rationale 见 docs/changes/2026-07-24-intro-stats-cumulative.md。
 const cfg = useConfig();
-const fleetOk = () => {
-  const ps = cfg.config.publicStats;
-  return !!ps && publicStatsHealth(ps).fleetOk && publicStatsHealth(ps).rateOk;
-};
-// 🔴 对外「台设备在线」是可核验事实,不是公布口径的估算(zentao #59)。
-//   有服务端实测聚合时读真实在线设备数;没有(沙箱/旧后端)时退回公布口径,
-//   但该口径本身在页面底部已标注为「公开规模估算 · 非实时接入统计」,不会被读成实测。
 const fleetNow = () => {
-  if (cfg.syncFailed) return null;
-  const v = cfg.config.verifiedStats;
-  if (v) return v.onlineDevices.value;
-  return fleetOk() ? onlineDevicesOf(cfg.config.publicStats) : null;
+  return cfg.syncFailed ? null : cfg.config.verifiedStats?.onlineDevices.value ?? null;
 };
 // 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
@@ -222,14 +210,19 @@ const fleetNow = () => {
 //   沙箱/旧后端没有该聚合 → 继续不显示,绝不用配置值编造一个财务事实。
 const paidNow = () => {
   if (!remoteApiEnabled) return paidCumulativeNow();
-  const v = cfg.config.verifiedStats;
+  const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
   return v ? Math.round(v.completedPayoutUsdt.value) : null;
 };
 const paid = ref(paidNow());
-// Intro is public and is often shown before a user session exists. H9 public
-// stats are the server authority here; the authenticated home projection must
-// not turn an already-loaded public fleet count into a dash.
+const visiblePaid = computed(() => remoteApiEnabled ? paidNow() : paid.value);
+const verifiedScope = computed(() => {
+  const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
+  return v ? fmt(t.value.intro.verifiedScope, { at: v.capturedAt.slice(0, 16).replace("T", " ") }) : "";
+});
+// Intro is public and often shown before a user session exists. Its public
+// device count comes from the verified server aggregate.
 const devices = ref(fleetNow());
+const visibleDevices = computed(() => remoteApiEnabled ? fleetNow() : devices.value);
 
 function fmtNum(n: number | null): string {
   return n === null ? "—" : n.toLocaleString("en-US");

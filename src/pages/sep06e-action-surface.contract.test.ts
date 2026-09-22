@@ -39,11 +39,11 @@ describe("September 6 action surfaces", () => {
     expect(source).toContain("navTo(`/pages/me/wallet-exchange?direction=${direction}`)");
   });
 
-  it("keeps onboarding's public online number rate-derived without falling back to account data", () => {
+  it("keeps onboarding's public online number backed by verified device data", () => {
     const source = read("./onboarding/intro.vue");
 
-    expect(source).toContain("onlineDevicesOf(cfg.config.publicStats)");
-    expect(source).toMatch(/publicStatsHealth\(ps\)\.fleetOk\s*&&\s*publicStatsHealth\(ps\)\.rateOk/);
+    expect(source).toContain("cfg.config.verifiedStats?.onlineDevices.value");
+    expect(source).not.toContain("onlineDevicesOf(cfg.config.publicStats)");
     expect(source).toContain("const devices = ref(fleetNow())");
     expect(source).toContain("devices.value = fleetNow()");
     expect(source).not.toContain("devices.value = app.homeTruth?.onboarding.activeDevices");

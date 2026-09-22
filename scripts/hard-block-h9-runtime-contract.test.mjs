@@ -25,17 +25,17 @@ test("H9 rank denominator uses the real server user count, not the marketing dis
   assert.doesNotMatch(card, /realPopulation: registered\.value/);
 });
 
-test("H9-dependent trust and globe surfaces render unavailable copy instead of a fake zero", () => {
+test("Trust uses measured online devices while globe retains its independent remote projection", () => {
   assert.doesNotMatch(trust, /:value="global\.activeDevices\.toLocaleString\(\)"/);
-  assert.match(trust, /const activeDevicesText = computed/);
-  assert.match(trust, /trustFieldValue\(financialSection\.value\?\.fields \?\? \[\], "devicesOnlineValue"\) \?\? "—"/);
+  assert.match(trust, /verified\.value\?\.onlineDevices\.value/);
+  assert.doesNotMatch(trust, /trustFieldValue\([^\n]*"devicesOnlineValue"/);
   assert.match(globe, /cfg\.syncFailed \|\| !health\.devicesOk/);
   assert.match(globe, /t\.value\.home\.networkStatUpdating/);
 });
 
-test("remote H9 config rebases the long-lived global snapshot after async load", () => {
+test("remote verified aggregate rebases the long-lived global snapshot after async load", () => {
   assert.match(appStore, /import \{[^}]*\bwatch\b[^}]*\} from "vue"/);
-  assert.match(appStore, /watch\(\s*\(\) => \[\s*cfg\.syncFailed,[\s\S]*?cfg\.config\.publicStats\.onlineRatePct/);
+  assert.match(appStore, /watch\(\s*\(\) => \[\s*cfg\.syncFailed,[\s\S]*?cfg\.config\.verifiedStats\?\.onlineDevices\.value/);
   assert.match(appStore, /const activeDevices = cfg\.syncFailed\s*\?\s*0\s*:\s*pulseOnlineBaseline\(\)/);
   assert.match(appStore, /global\.value = \{ \.\.\.global\.value, activeDevices \}/);
 });

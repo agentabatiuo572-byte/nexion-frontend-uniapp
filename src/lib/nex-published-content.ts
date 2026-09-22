@@ -7,13 +7,7 @@ export type PublishedNexNarrative =
   | { state: "loading" }
   | { state: "error" }
   | { state: "unpublished" }
-  | { state: "ready"; version: string; hero: string; subhero: string | null; activeAiClients: number | null };
-
-function publishedNonNegativeCount(value: string | null): number | null {
-  if (!value || !/^(?:0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)$/.test(value)) return null;
-  const count = Number(value.replaceAll(",", ""));
-  return Number.isSafeInteger(count) && count >= 0 ? count : null;
-}
+  | { state: "ready"; version: string; hero: string; subhero: string | null };
 
 /**
  * The NEX explainer can only present the published I4 narrative for the active
@@ -35,6 +29,5 @@ export function resolvePublishedNexNarrative(
     version: section.version,
     hero,
     subhero: localizedTrustFieldValue(section.fields, "subhero", locale),
-    activeAiClients: publishedNonNegativeCount(localizedTrustFieldValue(section.fields, "activeAiClients", locale)),
   };
 }

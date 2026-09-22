@@ -13,7 +13,10 @@ describe("audited navigation semantics", () => {
     expect(read("team/commissions.vue")).toMatch(/role="link" tabindex="0"[^>]*@click="go\('\/pages\/team\/commissions-how'\)"/);
   });
   it("never presents private purchase totals as a public payout statistic", () => {
-    expect(read("onboarding/intro.vue")).not.toContain("app.homeTruth?.onboarding.cumulativePaidUsdt");
-    expect(read("onboarding/intro.vue")).toContain('v-if="paid !== null"');
+    const source = read("onboarding/intro.vue");
+    expect(source).not.toContain("app.homeTruth?.onboarding.cumulativePaidUsdt");
+    expect(source).toMatch(/const paidNow = \(\) => \{[\s\S]*?const v = cfg\.syncFailed \? null : cfg\.config\.verifiedStats;[\s\S]*?return v \? Math\.round\(v\.completedPayoutUsdt\.value\) : null;/);
+    expect(source).toContain('v-if="visiblePaid !== null"');
+    expect(source).toContain("const visiblePaid = computed(() => remoteApiEnabled ? paidNow() : paid.value)");
   });
 });

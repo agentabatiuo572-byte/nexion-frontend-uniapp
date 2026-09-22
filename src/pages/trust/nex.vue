@@ -23,11 +23,6 @@
 
       <template v-else>
       <HowHero :label="`${w.heroLabel} · ${narrative.version}`" :title="narrative.hero" :sub="narrative.subhero ?? ''" accent="nex" />
-      <view class="mx-4" :style="publishedStatStyle">
-        <text class="block" :style="publishedStatLabelStyle">{{ fmt(w.publishedDataVersion, { version: narrative.version }) }} / {{ w.activeAiClientsLabel }}</text>
-        <text class="block font-mono-tabular" :style="publishedStatValueStyle">{{ activeAiClientsText }}</text>
-        <text class="block" :style="publishedStatNoticeStyle">{{ w.activeAiClientsNotice }}</text>
-      </view>
 
       <HowSection :title="w.s1Title" accent="nex">
         <template #icon>
@@ -145,12 +140,6 @@ const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
 const { sections, status, refresh } = usePublishedTrust();
 const narrative = computed(() => resolvePublishedNexNarrative(sections.value, status.value, language.value));
-const activeAiClientsText = computed(() => {
-  const activeAiClients = narrative.value.state === "ready" ? narrative.value.activeAiClients : null;
-  return activeAiClients === null
-    ? "—"
-    : activeAiClients.toLocaleString({ zh: "zh-CN", vi: "vi-VN", en: "en-US" }[language.value]);
-});
 
 let narrativePageVisible = false;
 let narrativeVisibleEpoch = 0;
@@ -220,10 +209,6 @@ function goBack() {
 const stateCardStyle: CSSProperties = { marginTop: "16px", padding: "16px", borderRadius: "16px", background: "var(--v5-surface)" };
 const stateTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
 const retryStyle: CSSProperties = { marginTop: "8px", minHeight: "44px", display: "inline-flex", alignItems: "center", fontSize: "13px", color: "var(--v5-brand)" };
-const publishedStatStyle: CSSProperties = { marginTop: "12px", padding: "14px 16px", borderRadius: "12px", background: "var(--v5-surface)" };
-const publishedStatLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.08em", color: "var(--v5-ink-3)" };
-const publishedStatValueStyle: CSSProperties = { marginTop: "6px", fontSize: "26px", fontWeight: 600, color: "var(--v5-nex)" };
-const publishedStatNoticeStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const tableStyle: CSSProperties = {

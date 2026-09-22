@@ -34,11 +34,8 @@ test("remote trust and storefront surfaces do not expose static endorsements", (
   const detail = read("src/pages/store/detail.vue");
   assert.equal(fs.existsSync(retiredTrustFixture), false);
   assert.match(trust, /usePublishedTrust/);
-  assert.match(homeTrust, /summary\.chips/);
-  assert.match(homeTrust, /summary\.reserveProof/);
-  assert.match(homeTrust, /summary\.value\.chips\.length === 7/);
-  assert.match(homeTrust, /v-for="\(chip, index\) in summary\.chips"/);
-  assert.match(homeTrust, /:key="`trust-chip-\$\{index\}`"/);
+  assert.match(homeTrust, /trustSnapshotUnavailable/);
+  assert.doesNotMatch(homeTrust, /summary\.chips|summary\.reserveProof|trust-chip-/);
   assert.doesNotMatch(homeTrust, /MOCK_CHIPS/);
   assert.doesNotMatch(homeTrust, /summary\?\.hero/);
   assert.doesNotMatch(homeTrust, /trustSnapshotTvl/);
