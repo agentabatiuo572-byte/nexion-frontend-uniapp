@@ -114,10 +114,11 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // L1's #80 source-only count gate does not alter this template pair.
   "rewards.vue": "9334402601bb42d5429ed5fd665da0e2fd093d4d1e1a659ad8339b2a0420dd3b",
   // Published-document metadata/language fallback, plus reset of reading proof
-  // whenever server jurisdiction/version/token identity changes.
+  // whenever server jurisdiction/version/token identity changes. #226 keeps
+  // anonymous legal text readable without rendering an acknowledgment control.
   // #60: an unprovisioned region mapping states the configuration fact and
   // offers no retry CTA, since retrying cannot change the outcome.
-  "risk-disclosure.vue": "76b88fb99bd91ddd08241d5a8116cc8e68947de61de0dbac2347aec40628ffea",
+  "risk-disclosure.vue": "b9465bdf68bd257c65a1efb47cd8498fb62374c0e96196256695758c1bb83e26",
   // Formal single-device signout names that device; server cursor exposes remaining sessions.
   // #80: password/2FA inputs carry an accessible name, not a placeholder alone.
   // #216: the password-change validation error is associated to its own field

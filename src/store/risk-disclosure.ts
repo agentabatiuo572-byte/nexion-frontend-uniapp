@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { remoteApiEnabled, riskDisclosureApi } from "@/api/runtime";
+import { remoteApiEnabled, riskDisclosureApi, sessionVault } from "@/api/runtime";
 import type { RiskDisclosureCurrent } from "@/api/risk-disclosure-api";
 import { ApiError } from "@/api/errors";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
@@ -31,8 +31,9 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
     return requestGeneration === generation && remoteAccountScope.isCurrent(request);
   }
   function invalidateRequests() { requestGeneration += 1; }
-  async function refresh() {
+  async function refresh(publicCountry?: string | null) {
     const { request, generation } = beginRequest();
+    const authenticated = !!sessionVault.read();
     apply(null);
     error.value = null;
     if (!remoteApiEnabled) {
@@ -42,9 +43,15 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
       }
       return;
     }
+    if (!authenticated && !publicCountry) {
+      if (requestIsCurrent(request, generation)) error.value = "RISK_DISCLOSURE_COUNTRY_REQUIRED";
+      return;
+    }
     loading.value = true;
     try {
-      const snapshot = await riskDisclosureApi.current();
+      const snapshot = await (authenticated
+        ? riskDisclosureApi.current()
+        : riskDisclosureApi.publicCurrent(publicCountry!));
       if (requestIsCurrent(request, generation)) apply(snapshot);
     } catch (cause) {
       if (requestIsCurrent(request, generation)) {
@@ -62,7 +69,7 @@ export const useRiskDisclosure = defineStore("riskDisclosure", () => {
     }
   }
   async function accept() {
-    if (!current.value || accepted.value) return false;
+    if (!sessionVault.read() || !current.value?.acknowledgmentToken || accepted.value) return false;
     const { request, generation } = beginRequest();
     const disclosure = current.value;
     loading.value = true;

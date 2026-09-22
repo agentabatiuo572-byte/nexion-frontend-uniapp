@@ -289,6 +289,7 @@ const LEDGER = {
   "/api/notifications": "PRD §11.2.4(分页拉取,支持按优先级过滤)",
   "/api/notifications/:param/read": "PRD §11.2.4(原文写作 /api/notifications/:id/read)",
   "/api/legal/risk-disclosure/current": "PRD §9.11d.1(按 jurisdiction 返 {version, body})",
+  "/api/legal/risk-disclosure/public/current": "TBD: 2026-09-23 禅道 #226 匿名只读披露;后端公开接口按 country 取已发布正文,确认仍需登录",
   "/api/legal/privacy-policy/current": "BACKEND: PublishedPrivacyPolicyController 已实现;PC 发布后 App 按法域/语言读取",
   "/api/legal/terms/current": "后台法律条款 CMS 规格 NEXION-LEGAL-TERMS-CMS-v1;服务端发布版本只读",
   "/api/legal/terms/acknowledgment": "后台法律条款 CMS 规格 NEXION-LEGAL-TERMS-CMS-v1;版本化幂等确认",

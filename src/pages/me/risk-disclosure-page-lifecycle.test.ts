@@ -39,6 +39,7 @@ function actualPage() {
     onUnmounted: (cb: () => void) => unmounted.push(cb),
     onHide: (cb: () => void) => hidden.push(cb), onShow: (cb: () => unknown) => shown.push(cb),
     risk, disclosure, documentIdentity,
+    publicCountry: ref("VN"),
     accepted: computed(() => risk.accepted), IntersectionObserver: Observer, Element, HTMLElement: Element,
     SCROLL_THRESHOLD_PX: 24, ...reading, displayLanguage: ref({ language: "en" }),
     riskDisclosureChapterCopy: () => ({ title: "", body: "" }), fmt: () => "", w: ref({}), toast, navBack,
