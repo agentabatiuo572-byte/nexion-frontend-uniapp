@@ -6178,6 +6178,7 @@ export const vi: Messages = {
     centerUnavailable: "Trung tâm hướng dẫn tạm thời không khả dụng; vui lòng thử lại sau.",
     courseLoading: "Đang tải bài học…",
     courseVersionMeta: "Phiên bản {version} · Thưởng {nex} NEX",
+    courseIdMissing: "Liên kết bài học này không đầy đủ (thiếu ID bài học); vui lòng quay lại trung tâm hướng dẫn và mở lại bài học.",
     courseOffline: "Bài học cần được tải qua mạng tin cậy; vui lòng quay lại trung tâm hướng dẫn rồi thử lại.",
     courseUnavailable: "Bài học tạm thời không khả dụng; vui lòng thử lại.",
     courseStartConfirming: "Nội dung bài học đã tải và bản ghi bắt đầu đang được xác nhận. Tạm thời không thể trả lời hoặc nhận thưởng.",

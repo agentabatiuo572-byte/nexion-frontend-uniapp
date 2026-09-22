@@ -6171,6 +6171,7 @@ export const zh: Messages = {
     centerUnavailable: "教程中心暂不可用;请稍后重试。",
     courseLoading: "正在加载课程…",
     courseVersionMeta: "版本 {version} · 奖励 {nex} NEX",
+    courseIdMissing: "这条课程链接不完整(缺少课程 ID),请返回教程中心重新进入。",
     courseOffline: "课程需要在受信任网络中获取;请返回教程中心后重试。",
     courseUnavailable: "课程暂不可用;请重试。",
     courseStartConfirming: "课程内容已加载，正在确认开始记录；答题和奖励暂不可用。",
