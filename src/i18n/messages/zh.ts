@@ -5135,6 +5135,7 @@ export const zh: Messages = {
 
   quota: {
     stockUnavailable: "本期全站可售库存暂已用尽，请稍后查看",
+    focusedTierMissing: "这件商品没有配额档位,因此解锁条件不在这里;请返回商品页查看它的资格要求。",
     pageTitle: "硬件配额",
     yourInvites: "你的邀请",
     totalSuffix: "/ 总 {n}",

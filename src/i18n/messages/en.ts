@@ -5282,6 +5282,7 @@ export const en = {
 
   quota: {
     stockUnavailable: "Platform-wide stock is currently unavailable for this period. Please check later.",
+    focusedTierMissing: "This product has no quota tier, so its unlock conditions are not listed here; go back to the product page to see its eligibility requirements.",
     pageTitle: "Hardware Quota",
     yourInvites: "Your invites",
     totalSuffix: "/ {n} total",

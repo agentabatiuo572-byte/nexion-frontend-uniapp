@@ -703,7 +703,9 @@ watch(
     if (remoteApiEnabled && !eligibility.value.eligible) {
       const quotaDepleted = purchaseEligibilityMessage.value === "quotaDepleted";
       sticky.show({
-        href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : "/pages/team/quota",
+        // 🔴 zentao #246:必须带上**当前商品**的 id。配额页只列它自己的档位,
+        //   不传 id 时它会展示另一件商品的配额,用户点「查看解锁条件」却看到别人的条件。
+        href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : `/pages/team/quota?product=${encodeURIComponent(product.value.id)}`,
         amount: `$${priceText.value}`,
         amountSubtext: quotaDepleted
           ? t.value.store.purchaseEligibilityQuotaDepleted
@@ -719,7 +721,7 @@ watch(
     // Purchase gate blocks → CTA routes to /team/quota with locked label, not checkout.
     if (purchaseGate.value.blocked) {
       sticky.show({
-        href: "/pages/team/quota",
+        href: `/pages/team/quota?product=${encodeURIComponent(product.value.id)}`,
         amount: `$${priceText.value}`,
         amountSubtext: purchaseGate.value.soldOut
           ? t.value.store.gateSoldOut

@@ -5135,6 +5135,7 @@ export const vi: Messages = {
 
   quota: {
     stockUnavailable: "Tồn kho toàn nền tảng cho kỳ này hiện đã hết. Vui lòng kiểm tra sau.",
+    focusedTierMissing: "Sản phẩm này không có bậc hạn mức nên điều kiện mở khóa không nằm ở đây; hãy quay lại trang sản phẩm để xem điều kiện.",
     pageTitle: "Hạn Mức Phần Cứng",
     yourInvites: "Lượt mời của bạn",
     totalSuffix: "/ tổng {n}",
