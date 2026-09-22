@@ -258,20 +258,24 @@ const serverPeriod = computed(() => {
   return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;
 });
 /**
- * The Home overview reports a period as `null` when it has no settled receipts
- * — "no value" — while `/api/devices/earnings` defines the same day's realized
- * total as a genuine 0. For Today, prefer that zero-safe figure so the summary
- * agrees with the device cards ("$0.00 今日收益") instead of claiming unknown.
- * Other ranges have no zero-safe source and stay unknown. #128
+ * A successful Home overview encodes an empty settled-receipt period as three
+ * nulls. That is a confirmed zero for every range; a failed/absent overview has
+ * no period and stays unknown with the existing retry state. For a partial
+ * Today projection, the device snapshot remains the zero-safe fallback. #249
  */
 const serverPeriodValue = computed(() => {
   const period = serverPeriod.value;
-  if (!period || range.value !== "Today") return period;
+  if (!period) return null;
+  if (period.usdt === null && period.nex === null && period.jobCount === null) {
+    return { usdt: 0, nex: 0, jobCount: 0 };
+  }
+  if (range.value !== "Today") return period;
   const fleet = app.remoteRealizedToday;
   return {
     ...period,
     usdt: period.usdt ?? fleet?.usdt ?? null,
     nex: period.nex ?? fleet?.nex ?? null,
+    jobCount: period.jobCount ?? (fleet && fleet.usdt === 0 && fleet.nex === 0 ? 0 : null),
   };
 });
 const mockTotal = computed(() => {
@@ -284,18 +288,9 @@ const totalInt = computed(() => total.value === null ? "—" : Math.floor(total.
 const totalCents = computed(() => total.value === null ? "" : String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
 const nexFmt = computed(() => nexTotal.value === null ? "—" : nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
-/**
- * Same zero-safe witness for the settled-task count: a fleet snapshot whose
- * whole day realized exactly 0 USDT and 0 NEX proves the day has no settled
- * receipt, so the overview's null count is the confirmed 0 rather than unknown.
- */
 const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
-  const period = serverPeriod.value;
-  if (!period) return null;
-  if (period.jobCount !== null) return period.jobCount;
-  const fleet = app.remoteRealizedToday;
-  return range.value === "Today" && fleet && fleet.usdt === 0 && fleet.nex === 0 ? 0 : null;
+  return serverPeriodValue.value?.jobCount ?? null;
 });
 const jobsText = computed(() => jobsCount.value === null ? "—" : fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
 

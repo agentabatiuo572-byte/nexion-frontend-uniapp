@@ -1,7 +1,5 @@
-// #128 regression: evaluate earn.vue's real hero computeds against the server
-// shapes that matter — an overview period of null beside a fleet snapshot whose
-// realized today total is exactly 0 (a confirmed empty day) versus no confirmed
-// snapshot at all (genuinely unknown).
+// #128/#249 regression: evaluate earn.vue's real hero computeds against the
+// successful-empty overview shape versus an absent failed-read snapshot.
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
 import ts from "typescript";
@@ -15,7 +13,7 @@ const code = ts.transpileModule(source.slice(start, end), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
 }).outputText;
 
-function hero(range: "Today" | "Week", homeTruth: unknown, realized: { usdt: number; nex: number } | null) {
+function hero(range: "Today" | "Week" | "Month" | "All", homeTruth: unknown, realized: { usdt: number; nex: number } | null) {
   const app = reactive({ homeTruth, remoteRealizedToday: realized });
   const t = ref({ earn: { jobsCount: "{n} tasks" } });
   const fmt = (template: string, params: Record<string, string>) =>
@@ -29,7 +27,7 @@ function hero(range: "Today" | "Week", homeTruth: unknown, realized: { usdt: num
 const emptyPeriod = { usdt: null, nex: null, jobCount: null };
 const emptyTruth = { earnings: { today: emptyPeriod, week: emptyPeriod, month: emptyPeriod, all: emptyPeriod } };
 
-describe("BUG 128 earn hero: confirmed zero vs unknown", () => {
+describe("BUG 249 earn hero: confirmed empty periods vs failed read", () => {
   it("renders the fleet's zero-safe realized total when the overview reports no value", () => {
     const view = hero("Today", emptyTruth, { usdt: 0, nex: 0 });
     expect(view.total.value).toBe(0);
@@ -40,8 +38,18 @@ describe("BUG 128 earn hero: confirmed zero vs unknown", () => {
     expect(view.jobsText.value).toBe("0 tasks");
   });
 
-  it("keeps the value unknown when no zero-safe fleet snapshot was confirmed", () => {
-    const view = hero("Today", emptyTruth, null);
+  it("renders successful empty Week, Month, and All periods as zero", () => {
+    for (const range of ["Week", "Month", "All"] as const) {
+      const view = hero(range, emptyTruth, null);
+      expect(view.total.value).toBe(0);
+      expect(view.nexTotal.value).toBe(0);
+      expect(view.jobsCount.value).toBe(0);
+      expect(view.jobsText.value).toBe("0 tasks");
+    }
+  });
+
+  it("keeps values unknown when the overview request has no confirmed snapshot", () => {
+    const view = hero("Week", null, null);
     expect(view.total.value).toBeNull();
     expect(view.totalKnown.value).toBe(false);
     expect(view.totalInt.value).toBe("—");
@@ -56,9 +64,10 @@ describe("BUG 128 earn hero: confirmed zero vs unknown", () => {
     expect(view.jobsCount.value).toBe(4);
   });
 
-  it("does not borrow today's zero-safe witness for the Week range", () => {
-    const view = hero("Week", emptyTruth, { usdt: 0, nex: 0 });
+  it("does not borrow today's device snapshot for a partially unavailable Week range", () => {
+    const partialTruth = { earnings: { ...emptyTruth.earnings, week: { usdt: null, nex: null, jobCount: 2 } } };
+    const view = hero("Week", partialTruth, { usdt: 0, nex: 0 });
     expect(view.total.value).toBeNull();
-    expect(view.jobsCount.value).toBeNull();
+    expect(view.jobsCount.value).toBe(2);
   });
 });
