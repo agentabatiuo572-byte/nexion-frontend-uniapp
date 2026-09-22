@@ -88,6 +88,12 @@ findLabel(cardAst);
 const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "t", `return (${labelBody})();`);
 const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online" }, myDevices: { inventoryPendingDeactivateChip: "pending" } } };
 describe("actual device card runtime label", () => {
+  it("does not expose mock heartbeat controls in the remote phone card", () => {
+    expect(cardContent).toContain("v-if=\"device.kind === 'phone' && !remoteApiEnabled\"");
+  });
+  it.each([["ONLINE", "online"], ["OFFLINE", "offline"], ["UNKNOWN", "unknown"]])("renders server phone %s as %s", (runtimeStatus, expected) => {
+    expect(labelFactory({ device: { kind: "phone", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe(expected);
+  });
   it.each([undefined, "UNKNOWN"])("renders unknown rather than offline for %s", runtimeStatus => {
     expect(labelFactory({ device: { kind: "cloud-share", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe("unknown");
   });
