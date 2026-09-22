@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
+import { fmt } from "@/i18n/format";
+import { zh } from "@/i18n/messages/zh";
 
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
 
@@ -42,11 +44,7 @@ describe("earning-goal save account fence", () => {
  * 判据是**行为**而非文本:用真实 fmt 渲染一遍,断言天数前没有 $、金额前有 $。
  */
 describe("goal save toast placeholder contract", () => {
-  it("never puts a currency sign in front of the day count", async () => {
-    const { fmt } = await import("@/i18n/format");
-    const { zh } = (await import("@/i18n/messages/zh")) as unknown as {
-      zh: { goals: { savedToast: string } };
-    };
+  it("never puts a currency sign in front of the day count", () => {
     const rendered = fmt(zh.goals.savedToast, { amount: "1000", days: "90" });
 
     expect(rendered).toContain("90 天");
