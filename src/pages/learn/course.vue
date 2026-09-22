@@ -74,7 +74,7 @@ import { createLearningCourseStartLoadCoalescer, loadPublishedCourseWithStart } 
 import { learningAttemptRecoveryAction, learningResultDetails, matchingCourseResult, matchingReceiptResult, validAnswersForCourse } from "./learning-result-details";
 
 // 存 key 不存译文：译好的串快照进 ref 后不再跟随语言（见 courses.vue 同处注释）。
-type CourseError = "" | "courseOffline" | "courseUnavailable" | "courseUpdated" | "submitUnconfirmed";
+type CourseError = "" | "courseOffline" | "courseIdMissing" | "courseUnavailable" | "courseUpdated" | "submitUnconfirmed";
 type CourseStartState = "idle" | "pending" | "confirmed" | "unconfirmed";
 
 const t = useT();
@@ -218,10 +218,19 @@ async function performLoad() {
   pendingAttempt.value = null;
   pendingReceiptStatus.value = null;
   startState.value = "idle";
-  if (!remoteApiEnabled || !requestedCourseId) {
+  // 🔴 zentao #240:缺课程 ID 与「没有网络」是两件事,此前共用一条分支 ——
+  //   深链没带 courseId(或参数丢失)时报的是「课程需要在受信任网络中获取」,
+  //   把用户引向检查网络这个错误方向,而真正该做的是从教程中心重新进入。
+  if (!remoteApiEnabled) {
     if (!current(scope)) return;
     loading.value = false;
     error.value = "courseOffline";
+    return;
+  }
+  if (!requestedCourseId) {
+    if (!current(scope)) return;
+    loading.value = false;
+    error.value = "courseIdMissing";
     return;
   }
   try {

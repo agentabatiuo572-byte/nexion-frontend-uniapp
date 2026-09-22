@@ -6335,6 +6335,7 @@ export const en = {
     centerUnavailable: "The learning center is unavailable right now; please retry shortly.",
     courseLoading: "Loading the course…",
     courseVersionMeta: "Version {version} · {nex} NEX reward",
+    courseIdMissing: "This course link is incomplete (no course ID); please go back to the learning center and open the course again.",
     courseOffline: "Courses load over a trusted network; please go back to the learning center and retry.",
     courseUnavailable: "This course is unavailable right now; please retry.",
     courseStartConfirming: "Course content is loaded and its start record is being confirmed. Answers and rewards are unavailable for now.",
