@@ -111,6 +111,13 @@ async function routeAfter(authenticated, target) {
   // The initial route is the document entry point. Do not boot home first and
   // race its startup navigation against the route whose guard outcome we read.
   await page.goto(`${BASE}/?nx_device=off#${target}`, { waitUntil: "load", timeout: 30000 });
+  // A cold dev-server transform can finish after the load event. Start the
+  // guard tick only once the direct UniApp document has rendered readable text.
+  await page.waitForFunction(
+    () => (document.body?.innerText || "").trim().length > 0,
+    undefined,
+    { timeout: 10_000 },
+  );
   await wait(1800); // onShow guard + one 1s tick
   const witness = await page.evaluate(() => ({
     actualRoute: (location.hash || "").replace(/^#/, ""),

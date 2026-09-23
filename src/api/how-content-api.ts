@@ -70,8 +70,14 @@ function parse(value: unknown, expectedKey: string, mode: ApiEnvironment): HowCo
   if (!HOW_CONTENT_KEYS.includes(expectedKey as HowContentKey) || row.contentKey !== expectedKey || row.status !== "PUBLISHED") return invalid();
   if (typeof row.version !== "string" || !row.version.trim() || typeof row.locale !== "string" || !row.locale.trim() || !Array.isArray(row.blocks) || row.blocks.length === 0 || row.blocks.length > 200) return invalid();
   // 简报 #49:服务端在条目未声明自己修订时会退回文档级版本,并以 versionSource 如实标注。
-  // 缺省视为 ENTRY,兼容尚未部署该字段的后端(旧后端只发 version)。
-  const versionSource = row.versionSource === undefined ? "ENTRY" : row.versionSource;
+  // 旧后端只发 version:仅那一版佣金文档在其他说明页可确定是文档回退。
+  // 新后端明确给出 ENTRY 时始终尊重服务端来源,不从修订文本反推。
+  const legacyDocumentFallback = row.versionSource === undefined
+    && expectedKey !== "team-commissions-how"
+    && row.version.trim() === "2026.08.31-commissions-guide";
+  const versionSource = row.versionSource === undefined
+    ? (legacyDocumentFallback ? "DOCUMENT_FALLBACK" : "ENTRY")
+    : row.versionSource;
   if (versionSource !== "ENTRY" && versionSource !== "DOCUMENT_FALLBACK") return invalid();
   const blocks = row.blocks.map(parseBlock);
   if (new Set(blocks.map((block) => block.id)).size !== blocks.length) return invalid();

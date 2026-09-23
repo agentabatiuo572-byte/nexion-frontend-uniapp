@@ -125,8 +125,7 @@ export const en = {
     unavailableTitle: "Content is temporarily unavailable",
     unavailableBody: "The published explanation could not be loaded. Please retry.",
     versionMeta: "Version {version} · Language {locale}",
-    // zentao #49: this page has not declared its own published revision; it falls back to the shared document version.
-    versionMetaDocumentFallback: "Version {version} · Language {locale} · this page has no revision of its own yet; the document version is shown",
+    versionMetaDocumentFallback: "No page-specific revision has been published yet · Language {locale}",
   },
   tabs: {
     home: "Home",

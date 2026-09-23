@@ -13,12 +13,12 @@ const render = new Function("Vue", compile(template, { mode: "function", prefixI
 const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("section", slots.default?.()) });
 const hero = Vue.defineComponent({ props: ["title", "sub"], setup: props => () => Vue.h("header", [String(props.title), String(props.sub)]) });
 
-async function show(blocks: Array<Record<string, unknown>>) {
+async function show(blocks: Array<Record<string, unknown>>, document: Record<string, unknown> = {}) {
   const app = Vue.createSSRApp({ render, setup: () => ({
     loading: false, error: false, back: "/pages/me/wallet", bodyStyle: {},
-    content: { contentKey: "wallet-exchange-how", version: "fixture-v1", locale: "zh", blocks },
-    t: { howPublished: { versionMeta: "fixture-version" } },
-    heroLabel: () => "Guide", fmt: (value: string) => value,
+    content: { contentKey: "wallet-exchange-how", version: "fixture-v1", versionSource: "ENTRY", locale: "zh", blocks, ...document },
+    t: { howPublished: { versionMeta: "Version {version}", versionMetaDocumentFallback: "No page-specific revision" } },
+    heroLabel: () => "Guide", fmt: (value: string, params: Record<string, string>) => value.replace(/\{(\w+)\}/g, (_, key) => params[key] ?? ""),
     renderBody: (block: Record<string, unknown>) => block.kind === "ruleRef" ? "resolved-rule-reference" : block.body,
   }) });
   app.component("HowHero", hero);
@@ -46,5 +46,22 @@ describe("published first-block rendering", () => {
     const html = await show([{ id: "rule", kind: "ruleRef", title: "Current rule", body: "Rule {value}" }]);
     expect(html).toContain("resolved-rule-reference");
     expect(html).not.toContain("{value}");
+  });
+});
+
+describe("published revision label", () => {
+  const blocks = [{ id: "intro", kind: "text", title: "Guide", body: "Published content" }];
+  it("respects an explicitly declared entry revision even if its text resembles the document revision", async () => {
+    const html = await show(blocks, { contentKey: "genesis-how", version: "2026.08.31-commissions-guide", versionSource: "ENTRY" });
+    expect(html).toContain("Version 2026.08.31-commissions-guide");
+  });
+  it("hides the raw document version on a declared fallback", async () => {
+    const html = await show(blocks, { version: "shared-document-v1", versionSource: "DOCUMENT_FALLBACK" });
+    expect(html).toContain("No page-specific revision");
+    expect(html).not.toContain("shared-document-v1");
+  });
+  it("shows a page-specific revision", async () => {
+    const html = await show(blocks, { contentKey: "genesis-how", version: "genesis-v2" });
+    expect(html).toContain("Version genesis-v2");
   });
 });

@@ -128,12 +128,10 @@ function syncAll(root: ParentNode): void {
  */
 function syncNode(node: Node): void {
   if (!(node instanceof Element)) return;
-  if (node.matches(HOSTS)) { syncHost(node); return; }
-  if (node.matches(INNER)) {
-    const host = node.closest(HOSTS);
-    if (host) syncHost(host);
-    return;
-  }
+  // uni can insert its wrapper after the host; that wrapper is neither a host
+  // nor an input, but its ancestor still needs to name the new inner control.
+  const host = node.closest(HOSTS);
+  if (host) syncHost(host);
   syncAll(node);
 }
 

@@ -218,7 +218,9 @@ export const useBills = defineStore("bills", () => {
     const projectedMemoKey = presentationCode(row.presentationCode);
     // Older projections identify every withdrawal leg as generic `withdraw`.
     // A known legacy component is more specific; new component codes still win.
-    const memoKey = projectedMemoKey === "withdraw" && legacy?.memoKey !== undefined && legacy.memoKey !== "withdraw"
+    const memoKey = projectedMemoKey === "bonus" && row.bizType === "LEARNING_REWARD"
+      ? "learningReward"
+      : projectedMemoKey === "withdraw" && legacy?.memoKey !== undefined && legacy.memoKey !== "withdraw"
       ? legacy.memoKey
       : projectedMemoKey ?? legacy?.memoKey ?? categoryMemoKey(type);
     return {
@@ -307,6 +309,10 @@ export const useBills = defineStore("bills", () => {
     return LEGACY_PRESENTATIONS[bizType.trim().toUpperCase()];
   }
   function legacyPublicReference(bizType: string, bizNo: string, kind: LegacyPublicReference | undefined): string | undefined {
+    if (bizType === "LEARNING_REWARD") {
+      const match = /^LEARN:[1-9][0-9]*:([a-z0-9][a-z0-9-]{2,80}):([A-Za-z0-9][A-Za-z0-9._-]{0,31})$/.exec(bizNo);
+      return match ? `${match[1]}@${match[2]}` : undefined;
+    }
     if (kind === "direct") return bizNo;
     if (kind !== "withdrawalComponent") return undefined;
     const value = bizType.trim().toUpperCase();

@@ -126,8 +126,7 @@ export const zh: Messages = {
     unavailableTitle: "说明暂时无法加载",
     unavailableBody: "未能获取已发布的说明，请重试。",
     versionMeta: "版本 {version} · 语言 {locale}",
-    // 简报 #49:该页尚未声明独立发布修订,退回整份文档的共用版本时如实说明。
-    versionMetaDocumentFallback: "版本 {version} · 语言 {locale} · 本页暂未单独声明发布修订,此处显示整份文档的版本",
+    versionMetaDocumentFallback: "本页尚无独立发布修订号 · 语言 {locale}",
   },
   tabs: {
     home: "首页",
