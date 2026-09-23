@@ -155,6 +155,7 @@ import { useGoals, type Goal } from "@/store/goals";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const PRESET_TARGETS = [500, 1000, 5000, 10000];
 const PRESET_DEADLINES_DAYS = [30, 90, 180, 365];
@@ -179,7 +180,7 @@ let restoringEditor = false;
 const recommendation = computed(() => {
   if (remoteApiEnabled && goalsStore.recommendation?.purchaseRequired) {
     return {
-      tier: goalsStore.recommendation.productName ?? "",
+      tier: nexGridBrandText(goalsStore.recommendation.productName ?? ""),
       reason: fmt(t.value.goals.recReasonServer, { daily: formatGoalDailyRate(goalsStore.recommendation.dailyEarn ?? 0) }),
     };
   }
