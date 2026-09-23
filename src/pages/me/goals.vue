@@ -99,7 +99,7 @@
 
       <!-- Save -->
       <view style="padding: 0 16px; margin-top: 12px">
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, editorBlocked ? saveBtnPendingStyle : {}]" role="button" :tabindex="editorBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="editorBlocked" @click="onSave" @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, saveBlocked ? saveBtnPendingStyle : {}]" role="button" :tabindex="saveBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="saveBlocked" @click="onSave" @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
           <text :style="saveLabelStyle" style="pointer-events: none">{{ t.goals.saveCta }}</text>
         </view>
@@ -170,7 +170,10 @@ const goals = computed(() => goalsStore.goals);
 const target = ref(1000);
 const days = ref(90);
 const savePending = ref(false);
+const restoredGoal = ref<{ targetUSDT: number; days: number } | null>(null);
 const editorBlocked = computed(() => savePending.value || (remoteApiEnabled && goalsStore.status !== "ready"));
+const saveBlocked = computed(() => editorBlocked.value || (remoteApiEnabled && restoredGoal.value !== null
+    && target.value === restoredGoal.value.targetUSDT && days.value === restoredGoal.value.days));
 type GoalSaveIntent = { targetUSDT: number; days: number; deadlineMs: number; idempotencyKey: string };
 const retryableSaveIntents = new Map<string, GoalSaveIntent>();
 let saveEpoch = 0;
@@ -198,7 +201,7 @@ const heroSubLine = computed(() =>
 const recPathLine = computed(() =>
   fmt(t.value.goals.recPath, {
     target: target.value.toLocaleString(),
-    days: days.value,
+    days: goalsStore.recommendation?.days ?? days.value,
     tier: recommendation.value.tier,
     perDay: formatGoalDailyRate(goalsStore.recommendation?.requiredDaily ?? target.value / days.value),
   }),
@@ -249,6 +252,7 @@ watch(() => goalsStore.accountEpoch, () => {
   restoringEditor = true;
   target.value = 1000;
   days.value = 90;
+  restoredGoal.value = null;
   restoringEditor = false;
   saveEpoch += 1;
   savePending.value = false;
@@ -258,7 +262,9 @@ watch(() => goalsStore.accountEpoch, () => {
 function restoreEditorFromGoal(goal: Goal | undefined): void {
   restoringEditor = true;
   target.value = goal?.targetUSDT ?? 1000;
-  days.value = goal ? Math.max(1, Math.ceil((goal.deadlineMs - Date.now()) / ONE_DAY_MS)) : 90;
+  // The selected term is fixed at creation; remaining days are shown only in the goal row.
+  days.value = goal ? Math.max(1, Math.round((goal.deadlineMs - goal.createdAt) / ONE_DAY_MS)) : 90;
+  restoredGoal.value = goal ? { targetUSDT: target.value, days: days.value } : null;
   restoringEditor = false;
 }
 
@@ -273,7 +279,7 @@ async function refreshRemoteGoals(force = false): Promise<void> {
   const latestActive = goalsStore.goals.filter((goal) => !goal.achieved)
     .sort((left, right) => right.createdAt - left.createdAt)[0];
   restoreEditorFromGoal(latestActive);
-  await goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+  await goalsStore.refreshRecommendation(target.value, latestActive?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
 }
 
 function retryGoals() {
@@ -307,7 +313,7 @@ function goalPct(targetUSDT: number): number {
 }
 
 async function onSave() {
-  if (editorBlocked.value) return;
+  if (saveBlocked.value) return;
   if (target.value < 100) {
     toast.warn(t.value.goals.minTargetWarn);
     return;
@@ -331,7 +337,7 @@ async function onSave() {
     if (!isCurrentSave() || outcome === "stale") return;
     retryableSaveIntents.delete(intentKey);
     restoreEditorFromGoal(goalsStore.goals.at(-1));
-    void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+    void goalsStore.refreshRecommendation(target.value, goalsStore.goals.at(-1)?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
     toast.success(fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }));
   } catch (error) {
     if (!isCurrentSave()) return;
