@@ -64,10 +64,12 @@ describe("remoteEventView", () => {
     expect(view.useHref).toBeUndefined();
   });
 
-  it("does not present a wheel as a zero-value generic reward", () => {
-    expect(remoteEventView(canonicalEvent({ kind: "wheel", rewardAmount: 0, rewardName: "Wheel pool award" }), labels).reward)
-      .toBe("Wheel prize pool");
-  });
+  it.each(["转盘奖池奖励", "Wheel pool award", "Phần thưởng từ vòng quay"])(
+    "shows the localized canonical wheel reward %s without a zero amount", (rewardName) => {
+      expect(remoteEventView(canonicalEvent({ kind: "wheel", rewardAmount: 0, rewardName }), labels).reward)
+        .toBe(rewardName);
+    },
+  );
 
   it("does not render a dead decorative CTA when neither an href nor an in-app action exists", () => {
     const view = remoteEventView(canonicalEvent({ kind: "holding", href: "" }), labels);
