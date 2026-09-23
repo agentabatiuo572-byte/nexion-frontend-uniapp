@@ -1,8 +1,8 @@
-import type { BankBeneficiary, BankConfig, BankOrder } from "@/api/bank-withdrawal-api";
+import { hasVerifiedBankIdentity, type BankBeneficiary, type BankConfig, type BankOrder } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
 
 export function bankBeneficiaryReady(beneficiary: BankBeneficiary | null | undefined): boolean {
-  return !!beneficiary && beneficiary.canWithdraw === true;
+  return !!beneficiary && beneficiary.canWithdraw === true && hasVerifiedBankIdentity(beneficiary);
 }
 
 export function bankCanQuote(config: BankConfig | null): boolean {
@@ -29,8 +29,9 @@ export function bankAmountError(value: string, config: BankConfig | null): BankA
   return null;
 }
 
-export type BankAccountNotice = "ready" | "unavailable";
+export type BankAccountNotice = "ready" | "unavailable" | "unverified";
 export function bankAccountNotice(beneficiary: BankBeneficiary): BankAccountNotice {
+  if (!hasVerifiedBankIdentity(beneficiary)) return "unverified";
   return bankBeneficiaryReady(beneficiary) ? "ready" : "unavailable";
 }
 

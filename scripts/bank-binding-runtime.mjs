@@ -67,7 +67,7 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     await page.getByTestId("bank-bind-saved").waitFor();
     assert.equal(await page.getByTestId("bank-binding-verify").count(),0);
     assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /24 (hours|小时|giờ)/);
-    assert.match(await page.getByTestId("bank-binding-status").innerText(), /saved|已绑定|Đã liên kết/);
+    assert.match(await page.getByTestId("bank-binding-status").innerText(), /route is unverified|路由尚未核实|Tuyến ngân hàng nhận chưa được xác minh/i);
     await page.waitForFunction(()=>document.activeElement?.getAttribute('data-testid')==='bank-bind-done');
     const calls=await page.evaluate(()=>window.__bindingFixture.binds);
     assert.equal(calls.length,2); assert.deepEqual(calls[0],calls[1]);

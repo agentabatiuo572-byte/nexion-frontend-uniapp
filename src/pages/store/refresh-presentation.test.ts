@@ -14,18 +14,18 @@ function actual(script: string, names: string[], args: Record<string, unknown>) 
 }
 
 describe("actual page presentation remains separate from authority", () => {
-  it("only maps the already classified Genesis series error, never commerce or unrelated errors", () => {
+  it("shows order read errors without importing Genesis opening status", () => {
     const genesis = reactive({ remoteEligibilityError: "GENESIS_SERIES_UNAVAILABLE" });
     const commerceOrdersUnavailable = ref(true), genesisOrdersUnavailable = ref(true);
-    const t = ref({ headerTitles: { storeOrders: "Orders" }, me: { genesisNode: "Genesis" }, authOtp: { errorServiceUnavailable: "Retry" }, genesis: { marketClosed: { seriesUnavailable: "Not open" } } });
+    const t = ref({ headerTitles: { storeOrders: "Orders" }, me: { genesisNode: "Genesis" }, orders: { refreshFailed: "Order read failed" } });
     const { unavailableOrderSources } = actual(ordersPage, ["unavailableOrderSources"], { computed, t, genesis, commerceOrdersUnavailable, genesisOrdersUnavailable });
-    expect(unavailableOrderSources.value).toEqual([{ label: "Orders", message: "Retry" }, { label: "Genesis", message: "Not open" }]);
+    expect(unavailableOrderSources.value).toEqual([{ label: "Orders", message: "Order read failed" }, { label: "Genesis", message: "Order read failed" }]);
     for (const error of ["offline", "GENESIS_STATE_UNAVAILABLE", "genesis_series_unavailable", ""]) {
       genesis.remoteEligibilityError = error;
-      expect(unavailableOrderSources.value[1].message).toBe("Retry");
+      expect(unavailableOrderSources.value[1].message).toBe("Order read failed");
     }
     genesisOrdersUnavailable.value = false;
-    expect(unavailableOrderSources.value).toEqual([{ label: "Orders", message: "Retry" }]);
+    expect(unavailableOrderSources.value).toEqual([{ label: "Orders", message: "Order read failed" }]);
   });
 
   it("cannot buy from retained cards while catalog loads or fails, nor with unavailable eligibility", () => {

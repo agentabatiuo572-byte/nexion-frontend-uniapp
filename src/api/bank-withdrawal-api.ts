@@ -4,7 +4,7 @@ import { parseServerTimestamp } from "./server-time";
 
 export interface BankBeneficiary {
   bankCode: string; bankName: string; maskedAccount: string; effectiveAt: string; nextChangeAt: string;
-  beneficiaryNo?: string; canWithdraw?: boolean;
+  beneficiaryNo?: string; canWithdraw?: boolean; bankRoutingVerified?: boolean;
 }
 export interface BankIntent {
   state: "NOT_SUBMITTED" | "COMMITTED"; quoteNo: string; withdrawalNo: string | null;
@@ -36,6 +36,7 @@ export interface BankWithdrawalCapacity {
 export interface BankQuote {
   quoteNo: string; amountUsdt: number; feeUsdt: number; netUsdt: number; rateVnd: number;
   amountVnd: number; bankCode: string; bankName: string; maskedAccount: string; expiresAt: string;
+  bankRoutingVerified?: boolean;
 }
 export interface BankSettlementEvidence {
   status: "unconfirmed" | "paid" | "refunded" | "review_required"; evidenceRef: string | null;
@@ -50,6 +51,10 @@ function record(value: unknown): Record<string, unknown> {
 }
 function text(value: unknown): string { if (typeof value !== "string" || !value.trim()) throw invalid(); return value; }
 function bankCode(value: unknown): string { if (typeof value !== "string" || !/^(?:[A-Za-z0-9]{2,16})?$/.test(value)) throw invalid(); return value; }
+export function hasVerifiedBankIdentity(bank: { bankCode: string; bankName: string; bankRoutingVerified?: boolean }): boolean {
+  return bank.bankRoutingVerified === true && !!bank.bankCode.trim() && bank.bankCode.trim().toUpperCase() !== "BANKQR"
+    && !!bank.bankName.trim() && bank.bankName.trim().toUpperCase() !== "BANKQR";
+}
 function number(value: unknown): number {
   if ((typeof value !== "number" && typeof value !== "string") || String(value).trim() === "") throw invalid();
   const n = Number(value); if (!Number.isFinite(n) || n < 0) throw invalid(); return n;
@@ -77,9 +82,11 @@ function option<T extends string>(value: unknown, allowed: readonly T[], fallbac
 function beneficiary(value: unknown): BankBeneficiary {
   const r = record(value);
   if (typeof r.maskedAccount !== "string" || !/^[*•]{2,}[0-9]{4}$/.test(r.maskedAccount)) throw invalid();
-  return { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), maskedAccount: text(r.maskedAccount),
+  const identity = { bankCode: bankCode(r.bankCode), bankName: text(r.bankName), bankRoutingVerified: r.bankRoutingVerified === true };
+  return { ...identity, maskedAccount: text(r.maskedAccount),
     effectiveAt: date(r.effectiveAt), nextChangeAt: date(r.nextChangeAt),
-    beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined, canWithdraw: r.canWithdraw === true };
+    beneficiaryNo: optionalText(r.beneficiaryNo) ?? undefined,
+    canWithdraw: r.canWithdraw === true && hasVerifiedBankIdentity(identity) };
 }
 function policy(value: unknown): BankWithdrawalPolicy {
   const r = record(value);
@@ -127,7 +134,8 @@ export function parseBankQuote(value: unknown): BankQuote {
   const r = record(value);
   const q: BankQuote = { quoteNo: text(r.quoteNo), amountUsdt: usdt(r.amountUsdt), feeUsdt: usdt(r.feeUsdt),
     netUsdt: usdt(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: bankCode(r.bankCode),
-    bankName: text(r.bankName), maskedAccount: text(r.maskedAccount), expiresAt: date(r.expiresAt) };
+    bankName: text(r.bankName), maskedAccount: text(r.maskedAccount), expiresAt: date(r.expiresAt),
+    bankRoutingVerified: r.bankRoutingVerified === true };
   if (!/^BQ-[a-f0-9]{32}$/.test(q.quoteNo) || q.amountUsdt <= 0 || q.netUsdt <= 0 || q.rateVnd <= 0
       || !Number.isSafeInteger(q.amountVnd) || q.amountVnd <= 0
       || Math.round(q.amountUsdt * 1e6) !== Math.round(q.feeUsdt * 1e6) + Math.round(q.netUsdt * 1e6)) throw invalid();
@@ -157,6 +165,7 @@ export function createBankWithdrawalApi(client: ApiClient) {
     async config(): Promise<BankConfig> {
       const r = record(await client.request({ path: `${base}/config`, authenticated: true }));
       if (typeof r.enabled !== "boolean" || !Array.isArray(r.banks)) throw invalid();
+      if (r.bankSelection !== undefined && r.bankSelection !== "ACCOUNT_ROUTED") throw invalid();
       return { enabled: r.enabled, banks: r.banks.map(v => { const b = record(v); return { code: text(b.code), name: text(b.name) }; }),
         bankCodeRequired: r.bankCodeRequired !== false, bindingOtpRequired: r.bindingOtpRequired !== false,
         payType: typeof r.payType === "string" ? r.payType : undefined,

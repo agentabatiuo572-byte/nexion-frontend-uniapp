@@ -135,16 +135,12 @@ const remoteOrdersResolved = ref(false);
 const commerceOrdersUnavailable = ref(false);
 const genesisOrdersUnavailable = ref(false);
 const unavailableOrderSources = computed(() => [
-  ...(commerceOrdersUnavailable.value ? [{ label: t.value.headerTitles.storeOrders, message: t.value.authOtp.errorServiceUnavailable }] : []),
-  // BUG 174: 这一条以前判的是 genesis.remoteEligibilityError —— 资格不可用
-  // (含「Genesis 未开放」)被升级成订单页顶层横幅「订单目录同步失败」,
-  // 而同刻主内容区又渲染「还没有订单」。资格是**能否参与**的判定,订单历史是
-  // **账号投影**;只有后者读失败才出这条横幅。真正的系列下线(账号投影与资格
-  // 一起报 GENESIS_SERIES_UNAVAILABLE)仍然说得出「未开放」这个准确原因。
+  ...(commerceOrdersUnavailable.value ? [{ label: t.value.headerTitles.storeOrders, message: t.value.orders.refreshFailed }] : []),
+  // Order history and Genesis eligibility are separate reads. An order-source
+  // failure must not display the series opening status on the orders page.
   ...(genesisOrdersUnavailable.value ? [{
     label: t.value.me.genesisNode,
-    message: genesis.remoteEligibilityError === "GENESIS_SERIES_UNAVAILABLE"
-      ? t.value.genesis.marketClosed.seriesUnavailable : t.value.authOtp.errorServiceUnavailable,
+    message: t.value.orders.refreshFailed,
   }] : []),
 ]);
 const orderPanels = computed(() => orderListPanels({

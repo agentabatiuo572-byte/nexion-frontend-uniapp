@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createBankWithdrawalApi, parseBankQuote, parseBankRecovery } from "./bank-withdrawal-api";
+import { createBankWithdrawalApi, hasVerifiedBankIdentity, parseBankQuote, parseBankRecovery } from "./bank-withdrawal-api";
 import { createWithdrawalApi, toCanonicalWithdrawal } from "./withdrawal-api";
 
 const quote = {
@@ -10,7 +10,7 @@ const quote = {
 const receipt = { state: "COMMITTED", withdrawalNo: "WD-TEST", withdrawal: { withdrawalNo: "WD-TEST", chain: "BANK-VND", status: "SENT" }, providerState: "PENDING", bank: quote };
 describe("bank withdrawal server contract", () => {
   test("binding rejects a receipt for another bank/account and never accepts an unmasked recipient", async () => {
-    const saved = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z" };
+    const saved = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true };
     const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A" };
     const request = vi.fn().mockResolvedValue({ beneficiary: saved });
     const api = createBankWithdrawalApi({ request } as never);
@@ -29,14 +29,33 @@ describe("bank withdrawal server contract", () => {
       request.mockResolvedValue(invalid); await expect(api.sendOtp()).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");
     }
   });
-  test("empty BANKQR codes are valid but missing or malformed bank codes are not", async () => {
+  test("placeholder BANKQR quotes remain readable for recovery, but not a verified bank identity", async () => {
     expect(parseBankQuote({ ...quote, bankCode: "", bankName: "BANKQR" }).bankCode).toBe("");
+    expect(hasVerifiedBankIdentity({ bankCode: "", bankName: "BANKQR", bankRoutingVerified: true })).toBe(false);
+    expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "BANKQR", bankRoutingVerified: true })).toBe(false);
+    expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "Vietcombank" })).toBe(false);
+    expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "Vietcombank", bankRoutingVerified: true })).toBe(true);
     for (const bankCode of [null, undefined, " ", 0]) expect(() => parseBankQuote({ ...quote, bankCode })).toThrow();
     const request = vi.fn().mockResolvedValue({ enabled: false, banks: [], beneficiary: null });
     const api = createBankWithdrawalApi({ request } as never);
     expect(await api.config()).toMatchObject({ bankCodeRequired: true, bindingOtpRequired: true });
     request.mockResolvedValue({ enabled: false, banks: [], beneficiary: null, bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
     expect(await api.config()).toMatchObject({ bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
+    request.mockResolvedValue({ enabled: true, banks: [], beneficiary: { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789",
+      effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true }, unresolvedIntent: null });
+    expect(await api.config()).toMatchObject({ beneficiary: { canWithdraw: false }, unresolvedIntent: null });
+  });
+  test("rejects a contradictory bank routing contract instead of treating it as an older server", async () => {
+    const response = { enabled: true, banks: [], beneficiary: null, bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" };
+    const request = vi.fn().mockResolvedValue(response);
+    const api = createBankWithdrawalApi({ request } as never);
+    await expect(api.config()).resolves.toMatchObject({ bankSelection: undefined });
+    request.mockResolvedValue({ ...response, bankSelection: "ACCOUNT_ROUTED" });
+    await expect(api.config()).resolves.toMatchObject({ bankSelection: "ACCOUNT_ROUTED" });
+    for (const bankSelection of ["USER_SELECTED", "", null]) {
+      request.mockResolvedValue({ ...response, bankSelection });
+      await expect(api.config()).rejects.toThrow("BANK_WITHDRAWAL_RESPONSE_INVALID");
+    }
   });
   test("keeps VND integer amount separate from the USDT balance debit", () => {
     expect(parseBankQuote(quote)).toMatchObject({ amountUsdt: 100, feeUsdt: 1, netUsdt: 99, amountVnd: 2475000 });

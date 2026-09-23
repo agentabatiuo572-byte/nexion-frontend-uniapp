@@ -39,6 +39,7 @@
           <text class="account-number">{{ recipient.maskedAccount }}</text>
           <text class="bank-name">{{ displayBank(recipient.bankName) }}</text>
         </view>
+        <view v-if="(config.beneficiary && !hasVerifiedBankIdentity(config.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
 
         <template v-if="quote">
           <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ money(quote.amountVnd) }}</text><text class="currency">VND</text></view>
@@ -99,7 +100,7 @@ import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { apiClient } from "@/api/runtime";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
-import { createBankWithdrawalApi, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
+import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "@/lib/bank-withdrawal-state";
@@ -131,7 +132,8 @@ const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? N
 const displayBank = (name: string) => name === "BANKQR" ? useTranslations.value.bankBinding.type : name;
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
-  && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE" && bankBeneficiaryReady(config.value.beneficiary));
+  && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"
+  && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
 const accountStatus = computed(() => config.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(config.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");

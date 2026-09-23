@@ -41,14 +41,15 @@
               <text class="tabular-nums" :style="thresholdChipStyle(p)">{{ thresholdText(p.threshold) }}</text>
               <text :style="labelStyle(p)">{{ p.labelText ?? w[`${p.key}_label`] }}</text>
             </view>
-            <text class="block" :style="descStyle">{{ isBusinessSuspended(p) ? suspendedText(p) : isUnlocked(p) ? (p.descText ?? w[`${p.key}_desc`]) : daysToUnlockText(p.threshold) }}</text>
+            <text class="block" :style="descStyle">{{ isClaimed(p.id) ? (p.descText ?? w[`${p.key}_desc`]) : isBusinessSuspended(p) ? w.suspendedDesc : isBusinessPending(p) ? w.pendingDesc : isUnlocked(p) ? (p.descText ?? w[`${p.key}_desc`]) : daysToUnlockText(p.threshold) }}</text>
+            <text v-if="isClaimed(p.id) && !isBusinessReady(p)" class="block" :style="descStyle">{{ isBusinessSuspended(p) ? w.suspendedDesc : w.pendingDesc }}</text>
           </view>
           <!-- activated badge / activate CTA / locked label -->
           <text v-if="isClaimed(p.id)" :style="activatedBadgeStyle">{{ w.activated }}</text>
           <!-- BUG 195:该档指向的业务当前整体停用(质押整池熔断/Genesis 未开放)时,
                不能继续给「激活」入口 —— 用户投入 30/60 天后会撞上一个不可用的页面。
                改为明确说明暂停,并保留档位可见(不隐藏已获得的权益说明)。 -->
-          <text v-else-if="isBusinessSuspended(p)" :style="lockedLabelStyle">{{ w.suspended }}</text>
+          <text v-else-if="!isBusinessReady(p)" :style="lockedLabelStyle">{{ isBusinessSuspended(p) ? w.suspended : w.pending }}</text>
           <view v-else-if="isUnlocked(p)" class="inline-flex items-center active:opacity-85" :style="activateBtnStyle(p)" @click="handleClaim(p)">
             <text>{{ w.activate }}</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="m9 18 6-6-6-6" /></svg>
@@ -67,10 +68,11 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
       <text style="color: var(--v5-ink-2)">{{ footerNextText }}</text>
     </view>
-    <view v-else class="mx-2 flex items-center" :style="footerAllStyle">
+    <view v-else-if="powerUps.length > 0 && powerUps.every((p) => isClaimed(p.id))" class="mx-2 flex items-center" :style="footerAllStyle">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
       <text style="color: var(--v5-success); font-weight: 600">{{ footerAllText }}</text>
     </view>
+    <text v-else-if="powerUps.length > 0" class="block px-4" :style="footerNoteStyle">{{ w.footerWait }}</text>
 
     <text class="block px-4" :style="footerNoteStyle">{{ w.footer }}</text>
   </view>
@@ -143,9 +145,9 @@ function isClaimed(id: StreakPowerUpId): boolean {
 }
 
 const nextUnclaimedUnlocked = computed(() =>
-  powerUps.value.find((p) => isUnlocked(p) && !isClaimed(p.id)),
+  powerUps.value.find((p) => isBusinessReady(p) && isUnlocked(p) && !isClaimed(p.id)),
 );
-const nextLocked = computed(() => powerUps.value.find((p) => !isUnlocked(p) && !isBusinessSuspended(p)));
+const nextLocked = computed(() => powerUps.value.find((p) => !isUnlocked(p) && isBusinessReady(p)));
 
 // BUG 195:连签增益指向的业务整体停用时,不再承诺「激活后可用」。
 // 判据复用任务面那套**唯一读数入口**(与周任务报警器同源):质押走 useStaking 的远程
@@ -158,9 +160,8 @@ const genesisGate = useGenesisSaleGate();
 const genesisPrimaryClosed = computed(() => genesisBlockIsKnownUnavailable(genesisGate.block.value));
 const genesisSecondaryClosed = computed(() => genesisBlockIsKnownUnavailable(genesisGate.secondaryBlock.value));
 function isBusinessSuspended(p: PowerUp): boolean {
-  // 服务端明确声明时以它为准 —— 那是各域读模型算出来的结论。
-  if (p.serverBusinessAvailable === true) return false;
-  if (p.serverBusinessAvailable === false) return true;
+  // 服务端三态字段优先：null 是未知，只有旧服务端未返回字段时才回退本地判据。
+  if (p.serverBusinessAvailable !== undefined) return p.serverBusinessAvailable === false;
   // 未声明(旧服务端)时才退回客户端判据,且同样遵守「不知道就别说」。
   switch (questActionDomain(p.href)) {
     case "staking": return availability.value.stakingClosed;
@@ -169,8 +170,14 @@ function isBusinessSuspended(p: PowerUp): boolean {
     default: return false;
   }
 }
-function suspendedText(p: PowerUp): string {
-  return fmt(w.value.suspendedDesc, { name: p.labelText ?? w.value[`${p.key}_label`] });
+function isManagedBusiness(p: PowerUp): boolean {
+  return remoteApiEnabled && (p.href === "/wallet/staking" || p.href === "/market/genesis");
+}
+function isBusinessPending(p: PowerUp): boolean {
+  return isManagedBusiness(p) && p.serverBusinessAvailable == null;
+}
+function isBusinessReady(p: PowerUp): boolean {
+  return !isBusinessSuspended(p) && !isBusinessPending(p);
 }
 const activatedCount = computed(() => powerUps.value.filter((p) => isClaimed(p.id)).length);
 
@@ -195,6 +202,7 @@ const footerNextText = computed(() =>
 const footerAllText = computed(() => fmt(w.value.footerAll, { n: activatedCount.value }));
 
 async function handleClaim(p: PowerUp) {
+  if (!isBusinessReady(p)) return;
   if (remoteApiEnabled) {
     if (await powerUp.claimRemote(p.id)) {
       toast.success(fmt(w.value.toastTitle, { name: p.labelText ?? w.value[`${p.key}_label`] }), p.descText ?? w.value.toastBody);
