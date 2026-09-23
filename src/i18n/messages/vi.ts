@@ -3198,7 +3198,7 @@ export const vi: Messages = {
     loadError: "Chưa thể làm mới tin nhắn",
     loadErrorDesc: "Hãy kiểm tra kết nối rồi thử lại. Lỗi tải không được xem là hộp thư trống.",
     staleSnapshot: "Đang hiển thị tin nhắn đã xác nhận gần nhất. Hãy làm mới để xem cập nhật.",
-    realtimeFallback: "Cập nhật trực tiếp tạm thời không khả dụng. Đang kiểm tra tin nhắn mới định kỳ; bạn cũng có thể làm mới.",
+    realtimeFallback: "Cập nhật trực tiếp tạm thời không khả dụng. Chọn Thử lại để làm mới cuộc trò chuyện; tin nhắn mới có thể hiển thị chậm.",
     retry: "Thử lại",
     startConversation: "Bắt đầu trò chuyện",
     contactAdvisor: "Liên hệ cố vấn",
