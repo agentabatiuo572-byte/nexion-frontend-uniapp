@@ -64,24 +64,24 @@
     </view>
 
     <!-- Upgrade comparison -->
-    <view v-if="detected" class="est-compare anim-up-delay">
+    <view v-if="detected && (s1 || pro)" class="est-compare anim-up-delay">
       <text class="est-compare__h">{{ t.onboarding.unlockMore }}</text>
-      <view class="cmp">
+      <view v-if="s1" class="cmp">
         <view class="cmp__icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
         </view>
         <view class="cmp__body">
-          <text class="cmp__label">{{ t.onboarding.withS1 }}</text>
+          <text class="cmp__label">{{ s1?.label ?? t.onboarding.withS1 }}</text>
           <text class="cmp__sub">{{ multS1Label }} {{ t.onboarding.yourCurrentRate }}</text>
         </view>
         <text class="cmp__val">{{ s1Label }}{{ t.onboarding.perDay }}</text>
       </view>
-      <view class="cmp">
+      <view v-if="pro" class="cmp">
         <view class="cmp__icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
         </view>
         <view class="cmp__body">
-          <text class="cmp__label">{{ t.onboarding.withPro }}</text>
+          <text class="cmp__label">{{ pro?.label ?? t.onboarding.withPro }}</text>
           <text class="cmp__sub">{{ proMonthlyLabel }}{{ t.onboarding.perMonth }}</text>
         </view>
         <text class="cmp__val">{{ proLabel }}{{ t.onboarding.perDay }}</text>

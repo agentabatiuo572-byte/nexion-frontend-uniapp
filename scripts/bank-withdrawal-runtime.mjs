@@ -10,6 +10,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     const quote = { quoteNo: `BQ-${"a".repeat(32)}`, amountUsdt: 100, feeUsdt: 1, netUsdt: 99, rateVnd: 25000,
       amountVnd: 2475000, bankCode: "VCB", bankName: "Vietcombank", maskedAccount: "******6789", expiresAt: new Date(Date.now()+300000).toISOString() };
     const fixture = { status: "SENT", providerState: "PENDING", submits: 0, abandons: 0, quotes: 0, verifies: 0, enabled: true,
+      bankRoutingVerified: false,
       intent: null, settlementEvidence: null, canWithdraw: true, quote,
       policy: {version:1,minAmountUsd:20,maxAmountUsd:5000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:25},
       capacity: {maxWithdrawableUsdt:100,dailyRemainingCount:2,dailyLimitCount:2,dailyCountResetAt:"2026-10-01T00:00:00Z",withdrawalEnabled:true},
@@ -18,7 +19,7 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     window.__bankRestore = rt.apiClient.request;
     const receipt = () => ({ state: "COMMITTED", withdrawalNo: "WD-BANKTEST123", providerState: fixture.providerState,
       withdrawal: { withdrawalNo: "WD-BANKTEST123", chain: "BANK-VND", status: fixture.status }, bank: quote, settlementEvidence: fixture.settlementEvidence });
-    const beneficiary = () => ({ bankCode:"VCB",bankName:"Vietcombank",maskedAccount:"******6789",effectiveAt:"2026-09-01T00:00:00Z",nextChangeAt:"2026-09-08T00:00:00Z",
+    const beneficiary = () => ({ bankCode:"VCB",bankName:"Vietcombank",bankRoutingVerified:fixture.bankRoutingVerified,maskedAccount:"******6789",effectiveAt:"2026-09-01T00:00:00Z",nextChangeAt:"2026-09-08T00:00:00Z",
       canWithdraw:fixture.canWithdraw });
     rt.apiClient.request = async request => {
       if (request.path === "/api/app/profile/language") return {language:request.body.language};
@@ -31,14 +32,14 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
       }
       if (request.path === "/api/withdrawals/bank/config") {
         if (fixture.configUnavailable) throw new ApiError({kind:"network",message:"FIXTURE_CONFIG_UNAVAILABLE",retryable:true});
-        return { enabled: fixture.enabled, banks: [{code:"VCB",name:"Vietcombank"}], beneficiary: fixture.unbound ? null : beneficiary(), unresolvedIntent: fixture.intent, policy:fixture.policy, capacity:fixture.capacity };
+        return { enabled: fixture.enabled, bankSelection:"ACCOUNT_ROUTED", banks: fixture.bankRoutingVerified ? [{code:"VCB",name:"Vietcombank"}] : [], beneficiary: fixture.unbound ? null : beneficiary(), unresolvedIntent: fixture.intent, policy:fixture.policy, capacity:fixture.capacity };
       }
       if (request.path === "/api/withdrawals/bank/beneficiary/verify") { fixture.verifies++; return { beneficiary:beneficiary() }; }
       if (request.path === "/api/withdrawals/bank/quotes") {
         if (request.body.amountUsdt === "5") throw new ApiError({kind:"business",message:"BANK_AMOUNT_OUT_OF_RANGE"});
         assertAmount(request.body.amountUsdt); fixture.quotes++;
         fixture.intent={state:"NOT_SUBMITTED",quoteNo:quote.quoteNo,withdrawalNo:null,intents:[{state:"NOT_SUBMITTED",quoteNo:quote.quoteNo,withdrawalNo:null,expiresAt:quote.expiresAt,providerState:null}]};
-        return quote;
+        return {...quote,bankRoutingVerified:fixture.bankRoutingVerified};
       }
       if (request.path === "/api/withdrawals/bank/orders") {
         fixture.submits++;
@@ -76,6 +77,11 @@ export async function verifyBankWithdrawalPage(page, gotoProtected) {
     await page.evaluate(() => { Object.assign(window.__bankFixture,{enabled:true,configUnavailable:false}); });
     await page.getByTestId("bank-refresh").click();
     await page.getByTestId("bank-refresh").waitFor({state:"hidden"});
+    await gotoProtected("/pages/me/wallet-withdraw-bank");
+    assert.equal(await page.getByTestId("bank-continue").getAttribute("aria-disabled"),"true","current account-routed backend has no verified bank identity");
+    assert.equal(await page.getByTestId("bank-max").count(),0);
+    assert.match(await page.locator(".bank-withdraw").innerText(),/路由尚未核实|routing is unverified|định tuyến ngân hàng/i);
+    await page.evaluate(() => { window.__bankFixture.bankRoutingVerified=true; window.__bankFixture.quote.bankRoutingVerified=true; });
     assert.equal((await gotoProtected("/pages/me/wallet-withdraw-method")).landed,true);
     await page.waitForFunction(() => document.querySelector('[data-testid="withdraw-method-bank"]')?.getAttribute("aria-disabled")==="false");
     await page.screenshot({path:".verify-cache/bank-withdrawal/method.png",fullPage:true});

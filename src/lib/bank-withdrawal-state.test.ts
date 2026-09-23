@@ -4,8 +4,8 @@ import { createBankWithdrawalApi, parseBankRecovery, parseBankUnresolvedIntent, 
 
 const now = Date.parse("2026-09-16T00:00:00Z");
 const beneficiary: BankBeneficiary = {
-  bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-15T00:00:00Z", nextChangeAt: "2026-09-21T00:00:00Z",
-  canWithdraw: true,
+  bankCode: "VCB", bankName: "Vietcombank", maskedAccount: "****6789", effectiveAt: "2026-09-15T00:00:00Z", nextChangeAt: "2026-09-21T00:00:00Z",
+  canWithdraw: true, bankRoutingVerified: true,
 };
 const config: BankConfig = { enabled: true, banks: [], beneficiary, unresolvedIntent: null };
 const quote = { quoteNo: `BQ-${"a".repeat(32)}`, amountUsdt: 100, feeUsdt: 1, netUsdt: 99, rateVnd: 25000,
@@ -64,6 +64,12 @@ describe("bank account authority and settlement evidence", () => {
     expect(bankCanQuote({ ...config, enabled: false })).toBe(false);
     expect(bankCanQuote({ ...config, beneficiary: null })).toBe(false);
     expect(bankCanQuote({ ...config, unresolvedIntent: undefined })).toBe(false);
+    expect(bankBeneficiaryReady({ ...beneficiary, bankCode: "", bankName: "BANKQR" })).toBe(false);
+    expect(bankAccountNotice({ ...beneficiary, bankCode: "", bankName: "BANKQR" })).toBe("unverified");
+    expect(bankAccountNotice({ ...beneficiary, bankRoutingVerified: undefined })).toBe("unverified");
+    expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankCode: "", bankName: "BANKQR" } })).toBe(false);
+    expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankRoutingVerified: false } })).toBe(false);
+    expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankRoutingVerified: undefined } })).toBe(false);
   });
   it("restores server account intents across devices and rejects ambiguous or malformed pointers", async () => {
     const intent = { state: "NOT_SUBMITTED", quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null };

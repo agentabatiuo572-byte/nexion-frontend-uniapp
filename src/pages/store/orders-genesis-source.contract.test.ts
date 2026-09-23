@@ -23,9 +23,9 @@ describe("orders page Genesis source verdict", () => {
       .replace(/\/\/[^\n]*/g, "");
     expect(banner).toContain("commerceOrdersUnavailable.value");
     expect(banner).toContain("genesisOrdersUnavailable.value");
-    // 资格错误只能用来**选择**准确措辞(真·系列下线),不能决定是否出横幅。
-    expect(banner.match(/remoteEligibilityError/g)).toHaveLength(1);
-    expect(banner).toMatch(/genesisOrdersUnavailable\.value \? \[\{[\s\S]{0,200}remoteEligibilityError/);
+    expect(banner).toContain("t.value.orders.refreshFailed");
+    expect(banner).not.toContain("remoteEligibilityError");
+    expect(banner).not.toContain("seriesUnavailable");
   });
 
   it("re-arms the per-source verdict on an explicit resync", () => {

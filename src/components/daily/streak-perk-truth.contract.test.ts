@@ -34,21 +34,33 @@ describe("连签增益只在目标业务可用时承诺可激活(BUG 195)", () =
   it("服务端声明的可用性优先于客户端推断", () => {
     // 服务端读的是各域自己的读模型,比客户端本地推断更权威;旧服务端不返回时才回退。
     expect(api).toContain("businessAvailable: boolean | null");
-    expect(streak).toContain("p.serverBusinessAvailable === false");
+    expect(streak).toContain("p.serverBusinessAvailable !== undefined");
+    expect(streak).toContain("return p.serverBusinessAvailable === false;");
   });
 
   it("停用时不再渲染可点的激活入口", () => {
-    // 模板里必须先判停用再判解锁,否则停用档仍会落到「激活」分支上。
-    const suspended = streak.indexOf('isBusinessSuspended(p)" :style="lockedLabelStyle"');
+    // 服务端未确认可用时,不展示原权益承诺或激活入口。
+    const suspended = streak.indexOf('!isBusinessReady(p)" :style="lockedLabelStyle"');
     const activatable = streak.indexOf('isUnlocked(p)" class="inline-flex items-center active:opacity-85"');
     expect(suspended).toBeGreaterThan(-1);
     expect(activatable).toBeGreaterThan(-1);
     expect(suspended).toBeLessThan(activatable);
+    expect(streak).toContain("if (!isBusinessReady(p)) return;");
+    expect(streak).toContain("p.labelText ?? w[`${p.key}_label`]");
+    expect(streak).toContain("isClaimed(p.id) ? (p.descText");
+    expect(streak).toContain('isClaimed(p.id) && !isBusinessReady(p)');
+    expect(streak).toContain("isBusinessReady(p) && isUnlocked(p)");
   });
 
   it("未知一律不算停用(读不到开关不能诬告业务已关闭)", () => {
-    // 与任务面同一原则:失败/未就绪返回 false,由判据自己保证。
-    expect(streak).toContain("if (p.serverBusinessAvailable === true) return false;");
+    const body = streak.match(/function isBusinessSuspended\(p: PowerUp\): boolean \{([\s\S]*?)\n\}/)?.[1];
+    expect(body).toBeTruthy();
+    const suspended = new Function("p", "questActionDomain", "availability", "genesisPrimaryClosed", "genesisSecondaryClosed", body!);
+    const args = [() => "staking", { value: { stakingClosed: true } }, { value: false }, { value: false }];
+    expect(suspended({ href: "/wallet/staking", serverBusinessAvailable: null }, ...args)).toBe(false);
+    expect(suspended({ href: "/wallet/staking", serverBusinessAvailable: true }, ...args)).toBe(false);
+    expect(suspended({ href: "/wallet/staking", serverBusinessAvailable: false }, ...args)).toBe(true);
+    expect(suspended({ href: "/wallet/staking" }, ...args)).toBe(true);
   });
 });
 
