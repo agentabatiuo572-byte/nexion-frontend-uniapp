@@ -19,11 +19,11 @@
       </view>
       <text v-if="state.busy && !state.config" class="hint" role="status">{{ t.bankWithdrawal.loading }}</text>
       <view v-if="state.error" class="error-note" role="alert"><text>{{ errorMessage }}</text></view>
-      <view v-if="state.error === 'load' || state.error === 'unsupported'" class="text-action" role="button" tabindex="0" :aria-disabled="state.busy" @click="form.load" @keydown.enter.prevent="form.load" @keydown.space.prevent="form.load"><text>{{ c.retry }}</text></view>
+      <view v-if="state.error === 'load' || state.error === 'unsupported' || state.error === 'routingUnverified'" class="text-action" role="button" tabindex="0" :aria-disabled="state.busy" @click="form.load" @keydown.enter.prevent="form.load" @keydown.space.prevent="form.load"><text>{{ c.retry }}</text></view>
 
       <template v-if="state.phase !== 'saved'">
         <view class="binding-fields">
-          <text v-if="state.config?.bankSelection === 'ACCOUNT_ROUTED'" class="hint" role="status" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text>
+          <text v-if="state.config && directBankBindingAvailable(state.config)" class="hint" role="status" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text>
           <text class="field-label">{{ c.accountLabel }} <text class="required">*</text></text>
           <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
           <text class="field-label">{{ c.holderLabel }} <text class="required">*</text></text>
@@ -50,7 +50,7 @@
         <text class="saved-note" role="status" data-testid="bank-bind-saved">{{ t.bankWithdrawal.bound }}</text>
         <view class="submit ready" role="button" tabindex="0" data-testid="bank-bind-done" @click="done" @keydown.enter.prevent="done" @keydown.space.prevent="done"><text>{{ c.done }}</text></view>
       </template>
-      <text class="disclaimer">{{ t.bankWithdrawal.bindingNotice }}</text>
+      <text v-if="state.config && directBankBindingAvailable(state.config)" class="disclaimer">{{ t.bankWithdrawal.bindingNotice }}</text>
     </view>
 
   </view>
@@ -66,7 +66,7 @@ import { apiClient } from "@/api/runtime";
 import { createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { parseServerTimestamp } from "@/api/server-time";
-import { createBankBindingForm } from "@/lib/bank-binding-form";
+import { createBankBindingForm, directBankBindingAvailable } from "@/lib/bank-binding-form";
 import { bankAccountNotice } from "@/lib/bank-withdrawal-state";
 import { navReplace } from "@/lib/route";
 
@@ -75,12 +75,12 @@ const t = useT(), c = computed(() => t.value.bankBinding), app = useApp();
 const form = createBankBindingForm(createBankWithdrawalApi(apiClient), () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`);
 const state = form.state, now = ref(Date.now());
 const accountStatus = computed(() => state.config?.beneficiary ? t.value.bankWithdrawal.accountStatus[bankAccountNotice(state.config.beneficiary)] : "");
-const fieldsDisabled = computed(() => state.busy || state.phase !== "details");
+const fieldsDisabled = computed(() => state.busy || state.phase !== "details" || !directBankBindingAvailable(state.config));
 const canSubmit = computed(() => { void now.value; return !state.busy && (state.phase === "uncertain" || form.canContinue()); });
 const canSendOtp = computed(() => { void now.value; return form.canSendOtp(); });
 const resendSeconds = computed(() => Math.max(0, Math.ceil((state.resendAt - now.value) / 1000)));
 function sendOtp() { if (canSendOtp.value) void form.sendOtp(); }
-const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
+const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, routingUnverified: c.value.routingUnverified, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
 const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString(dateLocale(), { timeZone: "Asia/Ho_Chi_Minh", timeZoneName: "short" });
 function submitBinding() { if (canSubmit.value) void form.submit(); }
 watch(() => state.phase, async phase => {
