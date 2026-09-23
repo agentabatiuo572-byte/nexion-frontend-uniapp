@@ -10,8 +10,8 @@
  * 真浏览器里的效果(AX 树里 textbox 真的拿到名字)由运行期探针证明,见
  * 文件头记录的实测数据。
  */
-import { describe, expect, it } from "vitest";
-import { MIRRORED_FIELD_ATTRIBUTES, mirrorFieldAttributes } from "./a11y-field-label";
+import { describe, expect, it, vi } from "vitest";
+import { installFieldNaming, MIRRORED_FIELD_ATTRIBUTES, mirrorFieldAttributes, uninstallFieldNaming } from "./a11y-field-label";
 
 /** 最小属性包:只实现本层用到的四个方法。 */
 function bag(initial: Record<string, string> = {}) {
@@ -91,5 +91,33 @@ describe("uni 输入控件的可访问名镜像", () => {
     expect(inner.attrs).toEqual({});
     expect(MIRRORED_FIELD_ATTRIBUTES).not.toContain("aria-hidden");
     expect(MIRRORED_FIELD_ATTRIBUTES).not.toContain("aria-live");
+  });
+
+  it("宿主先出现、随后插入内部包装节点时仍给真输入框命名", () => {
+    const host = bag({ "aria-label": "手机号码" });
+    const inner = bag();
+    let onMutations: (records: Array<{ type: string; target: unknown; addedNodes: unknown[] }>) => void = () => {};
+    class FakeElement {
+      closest() { return host; }
+      querySelectorAll() { return []; }
+      matches() { return false; }
+    }
+    vi.stubGlobal("Element", FakeElement);
+    vi.stubGlobal("document", { documentElement: new FakeElement(), querySelectorAll: () => [] });
+    vi.stubGlobal("MutationObserver", class {
+      constructor(callback: typeof onMutations) { onMutations = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const wrapper = new FakeElement();
+    Object.assign(host, { querySelector: () => inner });
+    try {
+      installFieldNaming();
+      onMutations([{ type: "childList", target: host, addedNodes: [wrapper] }]);
+      expect(inner.attrs["aria-label"]).toBe("手机号码");
+    } finally {
+      uninstallFieldNaming();
+      vi.unstubAllGlobals();
+    }
   });
 });

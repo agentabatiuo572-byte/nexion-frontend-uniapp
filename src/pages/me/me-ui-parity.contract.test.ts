@@ -142,7 +142,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",
   // Unknown server time keeps changes closed and exposes an accessible read-only refresh.
-  "wallet-address-rebind.vue": "af2acd0ccced08df5e0671e5e870bd2efd80e4daa79c4bc2af8ab16ecc3ef8d8",
+  "wallet-address-rebind.vue": "23fa722a584818ccc66a67e2fee49abe970b981f82a61fc7c8f293fae870ebd9",
   // 账单类型是互斥单选(选一个,其余取消)。此前用 role="button" + aria-pressed,浏览器
   // 按 toggle button 暴露、读屏按复选框朗读 —— 用户会以为能同时选多个类型(zentao #94)。
   // 改 radiogroup/radio + aria-checked,并补 Enter/Space;视觉样式与原型一致,未改动。

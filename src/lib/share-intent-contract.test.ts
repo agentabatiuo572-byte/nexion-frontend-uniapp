@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shareIntentRecordsEvent } from "@/lib/share";
+import { recordShareEvent, shareIntentRecordsEvent } from "@/lib/share";
 // 用 `?raw` 取源码而不是 `node:fs`:本仓的 type-check 面不含 node 类型
 // (首版用 `node:fs` 直接让 type-check 齿轮红,报 TS2307)。`?raw` 是既有约定
 // (staking.vue?raw 等),既拿到文本又不引入 node 依赖。
@@ -21,13 +21,18 @@ describe("share intent records an event", () => {
     expect(shareIntentRecordsEvent("poster")).toBe(false);
   });
 
-  it("counts intents that actually reach a channel", () => {
+  it("counts only intents that actually reach a channel", () => {
     // web/system:真的打开了目标渠道 / 走完了系统分享面板。
     expect(shareIntentRecordsEvent("web")).toBe(true);
     expect(shareIntentRecordsEvent("system")).toBe(true);
-    // scheme:复制是 intent 被拦后的**降级替代**,用户本意确实是分享 —— 与 copy 不同。
-    expect(shareIntentRecordsEvent("scheme")).toBe(true);
+    expect(shareIntentRecordsEvent("scheme")).toBe(false);
   });
+});
+
+it("rejects clipboard and local poster event channels at the recording boundary", async () => {
+  for (const channel of ["copy", "code", "link", "poster"]) {
+    expect(await recordShareEvent(channel, "share_sheet")).toBe(false);
+  }
 });
 
 describe("share.ts copy branch", () => {
@@ -40,8 +45,9 @@ describe("share.ts copy branch", () => {
   it("keeps recordShareEvent out of the copy branch", () => {
     const copyBranch = source.slice(source.indexOf('case "copy": {'), source.indexOf('case "system": {'));
     expect(copyBranch).not.toContain("recordShareEvent");
-    // 反面:scheme 分支必须保留它,否则降级分享会被漏计。
     const schemeBranch = source.slice(source.indexOf('case "scheme": {'), source.indexOf('case "copy": {'));
-    expect(schemeBranch).toContain("recordShareEvent");
+    expect(schemeBranch).not.toContain("recordShareEvent");
+    const webFallback = source.slice(source.indexOf('const ok = await copyText(text);'), source.indexOf('case "scheme": {'));
+    expect(webFallback).not.toContain("recordShareEvent");
   });
 });

@@ -30,8 +30,8 @@
         <HowCalloutBox v-else class="mx-4" :title="block.title" :body="renderBody(block)" tone="purple" />
       </template>
       <view class="mx-4" style="margin-top: 24px; padding: 10px 12px; border-radius: 10px; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 12px;">
-        <!-- 简报 #49:退回文档级版本时如实说明,不让人误以为这是本页的专属修订。 -->
-        <text>{{ fmt(content.versionSource === "DOCUMENT_FALLBACK" ? t.howPublished.versionMetaDocumentFallback : t.howPublished.versionMeta, { version: content.version, locale: content.locale }) }}</text>
+        <text v-if="content.versionSource !== 'DOCUMENT_FALLBACK'">{{ fmt(t.howPublished.versionMeta, { version: content.version, locale: content.locale }) }}</text>
+        <text v-else>{{ fmt(t.howPublished.versionMetaDocumentFallback, { locale: content.locale }) }}</text>
       </view>
     </view>
   </view>

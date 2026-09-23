@@ -16,15 +16,19 @@
       <!-- ── 网络切换(与提现页同语汇)── -->
       <view class="mx-4" style="padding: 0 2px">
         <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
-        <view class="flex" style="gap: 8px; margin-top: 8px">
+        <view class="flex" style="gap: 8px; margin-top: 8px" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
           <view
             v-for="nw in NETWORKS"
             :key="nw.id"
-            :class="['flex-1 flex flex-col items-center justify-center active:opacity-85', `nx-rebind-net-${nw.label.toLowerCase()}`]"
+            :class="['flex-1 flex flex-col items-center justify-center active:opacity-85 nx-rebind-network-radio', `nx-rebind-net-${nw.label.toLowerCase()}`]"
             :style="netChipStyle(nw.id)"
-            role="button" tabindex="0"
-            :aria-selected="network === nw.id"
+            role="radio" :tabindex="network === nw.id ? 0 : -1"
+            :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
+            @keydown.enter.prevent="switchNetwork(nw.id)"
+            @keydown.space.prevent="switchNetwork(nw.id)"
+            @keydown.left.prevent="moveNetwork(-1)"
+            @keydown.right.prevent="moveNetwork(1)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
             <text v-if="nw.id === 'usdt-trc20'" :style="netChipTagStyle">{{ t.topupChrome.netRecommended }}</text>
@@ -109,9 +113,12 @@
           :value="newAddress"
           :placeholder="addressPlaceholder"
           :aria-label="t.addrRebind.newAddressLabel"
+          aria-required="true"
+          :aria-invalid="addrError ? 'true' : 'false'"
+          :aria-describedby="addrError ? 'rebind-address-error' : undefined"
           @input="onAddressInput"
         />
-        <view v-if="addrError"><text class="block" :style="errorTextStyle">{{ addrError }}</text></view>
+        <view v-if="addrError"><text id="rebind-address-error" class="block" :style="errorTextStyle">{{ addrError }}</text></view>
 
         <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次。 -->
         <view v-if="mode === 'change'" class="flex" :style="warnlineStyle">
@@ -233,7 +240,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { asApiError } from "@/api/errors";
@@ -307,6 +314,15 @@ function switchNetwork(id: ChainDepositChannel) {
   newAddress.value = "";
   addrError.value = "";
   historyOpen.value = false;
+}
+function moveNetwork(delta: number) {
+  const index = NETWORKS.findIndex((item) => item.id === network.value);
+  const next = NETWORKS[(index + delta + NETWORKS.length) % NETWORKS.length];
+  if (!next) return;
+  switchNetwork(next.id);
+  void nextTick(() => {
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".nx-rebind-network-radio[tabindex=\"0\"]")?.focus();
+  });
 }
 
 // ── 表单 ──

@@ -70,6 +70,18 @@ describe("how content version provenance", () => {
     expect(value.versionSource).toBe("ENTRY");
   });
 
+  it("recognizes the exact legacy shared document version only when provenance is absent", async () => {
+    const legacy = { ...base("genesis-how"), version: "2026.08.31-commissions-guide" } as Record<string, unknown>;
+    delete legacy.versionSource;
+    const request = vi.fn().mockResolvedValue(legacy);
+    const value = await createHowContentApi({ request } as never, "prod").published("genesis-how", "en");
+    expect(value.versionSource).toBe("DOCUMENT_FALLBACK");
+
+    const explicit = { ...legacy, versionSource: "ENTRY" };
+    const explicitValue = await createHowContentApi({ request: vi.fn().mockResolvedValue(explicit) } as never, "prod").published("genesis-how", "en");
+    expect(explicitValue.versionSource).toBe("ENTRY");
+  });
+
   it("fails closed on an unknown versionSource rather than guessing", async () => {
     const request = vi.fn().mockResolvedValue({ ...base("genesis-how"), versionSource: "SOMETHING_ELSE" });
     await expect(createHowContentApi({ request } as never, "prod").published("genesis-how", "en"))

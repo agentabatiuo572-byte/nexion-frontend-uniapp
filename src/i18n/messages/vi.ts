@@ -126,8 +126,7 @@ export const vi: Messages = {
     unavailableTitle: "Nội dung tạm thời không khả dụng",
     unavailableBody: "Không thể tải hướng dẫn đã xuất bản. Vui lòng thử lại.",
     versionMeta: "Phiên bản {version} · Ngôn ngữ {locale}",
-    // zentao #49: trang này chưa có bản sửa đổi riêng; hiển thị phiên bản của toàn tài liệu.
-    versionMetaDocumentFallback: "Phiên bản {version} · Ngôn ngữ {locale} · trang này chưa có bản sửa đổi riêng; đang hiển thị phiên bản của tài liệu",
+    versionMetaDocumentFallback: "Trang này chưa có bản sửa đổi riêng được công bố · Ngôn ngữ {locale}",
   },
   tabs: {
     home: "Trang chủ",

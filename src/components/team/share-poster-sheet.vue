@@ -113,7 +113,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
 import { toast } from "@/store/ui";
-import { activateChannel, buildShareLink, copyText, currentShareReferralCode, recordShareEvent } from "@/lib/share";
+import { activateChannel, buildShareLink, copyText, currentShareReferralCode } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
@@ -527,7 +527,6 @@ function saveImage() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 4000);
       toast.success(t.value.share.saved);
-      await recordShareEvent("poster", "poster_sheet");
     } catch {
       // 异常2:下载受限 → 长按引导
       toast.info(t.value.share.saveLongPress);
@@ -537,9 +536,8 @@ function saveImage() {
   // #ifndef H5
   uni.saveImageToPhotosAlbum({
     filePath: imgSrc.value,
-    success: async () => {
+    success: () => {
       toast.success(t.value.share.saved);
-      await recordShareEvent("poster", "poster_sheet");
     },
     fail: () => toast.info(t.value.share.saveLongPress),
   });
@@ -551,7 +549,6 @@ async function copyLinkAction() {
   const ok = await copyText(buildShareLink());
   if (ok) {
     toast.success(t.value.team.inviteLinkCopied);
-    await recordShareEvent("copy", "poster_sheet");
   } else {
     toast.info(t.value.share.copyFailed);
   }

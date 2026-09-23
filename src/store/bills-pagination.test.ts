@@ -84,6 +84,26 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
       { type: "purchase", memo: "", memoKey: "purchase", ref: "ORD-42" },
     ]);
   });
+  it("keeps three equal course rewards traceable with an older generic server projection", async () => {
+    const courses = ["account-security", "orders-and-bills", "tasks-and-learning"];
+    remote.walletBillsApi.list.mockResolvedValue({
+      ...page([], null), total: 3,
+      bills: courses.map((course, index) => ({ ...row(`course-${index}`), bizNo: `LEARN:7:${course}:v1`,
+        bizType: "LEARNING_REWARD", amount: 10, category: "bonus", presentationCode: "bonus",
+        remark: `internal user 7 ${course}` })),
+    });
+    const pager = useBills().getLedger(); await pager.refresh();
+    expect(pager.rows.map(b => [b.memoKey, b.ref, b.amount])).toEqual(courses.map(course => ["learningReward", `${course}@v1`, 10]));
+    expect(pager.rows.every(b => b.memo === "" && !b.ref?.includes("7"))).toBe(true);
+  });
+  it("does not invent a course source from a malformed ledger number", async () => {
+    remote.walletBillsApi.list.mockResolvedValue({ ...page([], null), total: 2, bills: [
+      { ...row("wrong-prefix"), bizNo: "PRIVATE:7:account-security:v1", bizType: "LEARNING_REWARD" },
+      { ...row("wrong-course"), bizNo: "LEARN:7:UPPER CASE:v1", bizType: "LEARNING_REWARD" },
+    ] });
+    const pager = useBills().getLedger(); await pager.refresh();
+    expect(pager.rows.map(b => b.ref)).toEqual([undefined, undefined]);
+  });
   it("normalizes every current withdrawal accounting leg to its withdrawal tracking number", async () => {
     const withdrawalNo = "WD-0123456789ABCDEF0123456789ABCDEF";
     const components = [

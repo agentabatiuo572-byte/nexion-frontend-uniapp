@@ -130,11 +130,11 @@ export function copyText(data: string): Promise<boolean> {
  *
  * · `copy`   —— 否。只是把文本放进剪贴板,用户没有把内容发到任何渠道。
  * · `poster` —— 否。海报产物留在本地,没有发出去。
- * · `scheme` —— 是。那里的复制是 **intent 被拦后的降级替代**,用户本意确实是分享。
+ * · `scheme` —— 否。当前实现只复制文本,尚无渠道确认。
  * · `web` / `system` —— 是。真的打开了目标渠道 / 走完了系统分享面板。
  */
 export function shareIntentRecordsEvent(intentType: ShareChannelDef["intentType"]): boolean {
-  return intentType === "web" || intentType === "scheme" || intentType === "system";
+  return intentType === "web" || intentType === "system";
 }
 
 export async function activateChannel(def: ShareChannelDef, surface: ShareSurface, label: string): Promise<void> {
@@ -183,7 +183,6 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
         const ok = await copyText(text);
         if (ok) {
           toast.info(fmt(t.value.share.openFailedCopied, { channel: label }));
-          await recordShareEvent(def.key, surface);
         } else {
           toast.info(t.value.share.copyFailed);
         }
@@ -191,11 +190,10 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       break;
     }
     case "scheme": {
-      // 异常4:复制成功才算一次分享;失败禁误报(FEAT-SHARE1 异常3)。
+      // 当前 scheme 渠道只提供复制引导,并未确认内容已发送。
       const ok = await copyText(text);
       if (ok) {
         toast.info(fmt(t.value.share.schemeCopied, { channel: label }));
-        await recordShareEvent(def.key, surface);
       } else {
         toast.info(t.value.share.copyFailed);
       }
@@ -207,8 +205,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       //   `POST /api/share/event`,任务校验不通过时后端回 422,用户先看到「链接已复制」、
       //   紧接着又看到「分享已发出,但服务端暂时无法验证任务,未发放奖励」——
       //   一次纯本地操作被说成了一次失败的分享。
-      //   注意与上面 `scheme` 分支的区别:那里复制是 **intent 被拦后的降级替代**,
-      //   用户本意确实是分享,所以仍计一次;这里是用户主动选择的独立意图,不计。
+      //   scheme 和 web 拦截后的复制降级同样不能证明内容已发送。
       const ok = await copyText(link);
       if (ok) {
         toast.success(t.value.team.inviteLinkCopied);
@@ -248,6 +245,9 @@ function readEvents(): ShareEventRecord[] {
 // invite_friend——quest store 只记完成,入账 + 账单 + toast 在这里组合
 // (对齐 quest.ts 头注的调用层组合约定)。
 export async function recordShareEvent(channel: string, surface: ShareSurface): Promise<boolean> {
+  // Clipboard and local poster actions never complete a share, even if a
+  // configured channel routes through another intent branch.
+  if (channel === "copy" || channel === "code" || channel === "link" || channel === "poster") return false;
   if (remoteApiEnabled) {
     if (!SHARE_EVENT_CHANNELS.has(channel as ShareEventChannel)) return false;
     const accountScope = captureAccountScope();
