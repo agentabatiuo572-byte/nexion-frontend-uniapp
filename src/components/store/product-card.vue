@@ -119,7 +119,7 @@
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="stockUnavailable ? -1 : 0" :aria-disabled="stockUnavailable || catalogUnavailable ? 'true' : 'false'" @click.stop="onBuy" @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy" @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -215,6 +215,8 @@ const gate = computed(() => stockUnavailable.value
 const gateDetailsOpen = ref(false);
 let lastGateToggleAt = 0;
 const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
+const buyUnavailable = computed(() => stockUnavailable.value || catalogUnavailable.value
+  || (remoteApiEnabled && (gate.value.soldOut || eligibility.value.status === "loading" || eligibility.value.status === "idle")));
 const gateLabel = computed(() => {
   if (stockUnavailable.value) return t.value.store.temporarilyOutOfStock;
   if (!remoteApiEnabled) return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.gateLockedEyebrow;
@@ -255,10 +257,11 @@ const buyLabel = computed(() =>
       : t.value.store.cardBuyNow,
 );
 function onBuy() {
-  if (stockUnavailable.value || catalogUnavailable.value) return;
+  if (buyUnavailable.value) return;
   if (remoteApiEnabled) {
     if (eligibility.value.status === "error") void retryEligibility();
     else if (eligibility.value.status === "ready" && eligibility.value.eligible) goCheckout();
+    else if (eligibility.value.status === "ready") goDetail();
     return;
   }
   if (gate.value.blocked) {

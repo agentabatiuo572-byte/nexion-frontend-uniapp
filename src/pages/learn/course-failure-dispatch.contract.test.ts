@@ -28,8 +28,12 @@ describe("learning course failure dispatch", () => {
     // 两个条件必须各自成分支:合并写法正是本单的成因。
     expect(courseSource).not.toMatch(/!remoteApiEnabled\s*\|\|\s*!requestedCourseId/);
     expect(courseSource).toMatch(/if \(!remoteApiEnabled\) \{/);
-    expect(courseSource).toMatch(/if \(!requestedCourseId\) \{/);
+    expect(courseSource).toMatch(/if \(!requestedCourseId\.trim\(\)\) \{/);
     expect(courseSource).toMatch(/error\.value = "courseIdMissing"/);
+    expect(courseSource.indexOf("if (!requestedCourseId.trim())")).toBeLessThan(courseSource.indexOf("if (!remoteApiEnabled)"));
+    expect(courseSource).toMatch(/cause instanceof ApiError && cause\.kind === "network" \? "courseOffline"/);
+    expect(courseSource).toMatch(/error === 'courseIdMissing'.*backToCourses/);
+    expect(courseSource).toMatch(/navReplace\("\/pages\/learn\/courses"\)/);
   });
 
   it("gives the missing-id case its own wording in every locale", () => {

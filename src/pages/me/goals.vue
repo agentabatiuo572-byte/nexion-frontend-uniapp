@@ -304,7 +304,7 @@ async function onSave() {
   try {
     const outcome = await goalsStore.setGoal(intent);
     if (!isCurrentSave() || outcome === "stale") return;
-    toast.success(fmt(t.value.goals.savedToast, { amount: target.value, days: days.value }));
+    toast.success(fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }));
     retryableSaveIntents.delete(intentKey);
     target.value = 1000;
     days.value = 90;

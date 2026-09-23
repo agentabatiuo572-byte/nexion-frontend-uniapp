@@ -151,11 +151,11 @@
             confirm-type="send"
             :aria-label="w.botInputLabel"
             @input="onBotInput"
-            @confirm="sendToBot"
+            @confirm="sendToBot()"
           />
           <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
-          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-label="w.botSendLabel" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot" @keydown.enter.prevent="sendToBot" @keydown.space.prevent="sendToBot">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
+          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() && !pendingBotRequest }" role="button" tabindex="0" :aria-label="w.botSendLabel" :aria-disabled="botInput.trim() && !pendingBotRequest ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim() && !pendingBotRequest)" @click="sendToBot()" @keydown.enter.prevent="sendToBot()" @keydown.space.prevent="sendToBot()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() && !pendingBotRequest ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>
         <!-- BUG 175 降级入口:超时/失败后必须给用户出路 —— 重试同一提问,
@@ -396,6 +396,8 @@ const BOT_REPLY_TIMEOUT_MS = 25_000;
 const botRequestControl = createLatestAbortableRequest();
 // 失败后暴露降级入口(重试 / 提交工单);成功或新一轮提问时清掉。
 const botFailure = ref<"timeout" | "error" | null>(null);
+// A local deadline cannot cancel the model task. Keep its exact identity for replay.
+const pendingBotRequest = ref<{ scope: HelpBotRequest; payload: ReturnType<typeof buildRemoteHelpRequest> } | null>(null);
 let botDeadline: ReturnType<typeof setTimeout> | null = null;
 
 function clearBotDeadline() {
@@ -412,6 +414,8 @@ function syncBotAccountScope() {
   botInput.value = "";
   thinking.value = false;
   botFailure.value = null;
+  pendingBotRequest.value = null;
+  botRequestControl.cancel();
   clearBotDeadline();
 }
 
@@ -430,20 +434,25 @@ function bumpScroll() {
 function onBotInput(e: Event) {
   botInput.value = detailVal(e);
 }
-async function sendToBot() {
+async function sendToBot(retryPending = false) {
   syncBotAccountScope();
-  const q = botInput.value.trim();
+  if (remoteApiEnabled && (thinking.value || (pendingBotRequest.value && !retryPending))) return;
+  const pending = retryPending ? pendingBotRequest.value : null;
+  const q = pending?.payload.message ?? botInput.value.trim();
   if (!q) return;
-  if (remoteApiEnabled && thinking.value) return;
-  helpScope.add({ from: "user", text: q });
-  bot.value = [...bot.value, { id: `u-${Date.now()}`, from: "user", text: q }];
-  botInput.value = "";
+  if (!pending) {
+    helpScope.add({ from: "user", text: q });
+    bot.value = [...bot.value, { id: `u-${Date.now()}`, from: "user", text: q }];
+    botInput.value = "";
+  }
   botFailure.value = null;
   thinking.value = true;
   bumpScroll();
   if (remoteApiEnabled) {
     const language = locale.code === "zh" || locale.code === "vi" ? locale.code : "en";
-    const request = helpScope.capture(language);
+    const request = pending?.scope ?? helpScope.capture(language);
+    const payload = pending?.payload ?? buildRemoteHelpRequest(q, request.language, request.conversationId, requireCryptoUuid());
+    pendingBotRequest.value = { scope: request, payload };
     // BUG 175: 超时/失败必须**必然**结束 thinking,并给出明确原因 + 降级入口。
     // 单靠 finally 不够:传输层忽略 signal 时 catch/finally 永远不会跑。
     const control = botRequestControl.begin();
@@ -468,12 +477,20 @@ async function sendToBot() {
       abandon("timeout");
     }, BOT_REPLY_TIMEOUT_MS);
     try {
-      const result = await novaAiApi.chat(buildRemoteHelpRequest(
-        q,
-        request.language,
-        request.conversationId,
-        requireCryptoUuid(),
-      ), control.signal);
+      let result: Awaited<ReturnType<typeof novaAiApi.chat>>;
+      while (true) {
+        try {
+          result = await novaAiApi.chat(payload, control.signal);
+          break;
+        } catch (error) {
+          const failure = asApiError(error);
+          if (failure.status !== 429 || failure.message !== "NOVA_AI_TURN_IN_PROGRESS") throw error;
+          // The original turn still owns the server slot. Poll the same turn;
+          // its committed answer is replayed once the worker finishes.
+          await new Promise<void>((resolve) => setTimeout(resolve, 3_000));
+          if (!helpScope.isCurrent(request) || !botRequestControl.isCurrent(control.epoch)) return;
+        }
+      }
       if (!helpScope.isCurrent(request)) {
         syncBotAccountScope();
         return;
@@ -481,6 +498,7 @@ async function sendToBot() {
       // 已被超时分支收尾(epoch 已失效):迟到/被取消的应答不得再追加。
       if (!botRequestControl.isCurrent(control.epoch)) return;
       clearBotDeadline();
+      pendingBotRequest.value = null;
       appendBot(result.reply, fmt(w.value.remoteSource, { source: novaHelpSource(result), language: request.language.toUpperCase() }));
     } catch (error) {
       if (!helpScope.isCurrent(request)) {
@@ -490,10 +508,11 @@ async function sendToBot() {
       if (!botRequestControl.isCurrent(control.epoch)) return;
       clearBotDeadline();
       const failure = asApiError(error);
+      if (failure.kind !== "network" && ![408, 429, 500, 502, 503, 504].includes(failure.status ?? 0)) pendingBotRequest.value = null;
       botFailure.value = "error";
       appendBot(w.value.remoteFailed, fmt(w.value.remoteError, { code: failure.message, language: request.language.toUpperCase() }));
     } finally {
-      if (helpScope.isCurrent(request)) {
+      if (helpScope.isCurrent(request) && botRequestControl.isCurrent(control.epoch)) {
         thinking.value = false;
         bumpScroll();
       }
@@ -525,9 +544,13 @@ function goSupport() {
 function goTicketCreate() {
   navTo("/pages/me/support-tickets?mode=create");
 }
-/** BUG 175 降级入口:失败后把上一条提问放回输入框并重新发送。 */
+/** Retry the same server turn while its outcome is unknown. */
 function retryBot() {
   if (thinking.value) return;
+  if (pendingBotRequest.value) {
+    void sendToBot(true);
+    return;
+  }
   const lastUser = [...bot.value].reverse().find((m) => m.from === "user");
   if (!lastUser) return;
   botInput.value = lastUser.text;

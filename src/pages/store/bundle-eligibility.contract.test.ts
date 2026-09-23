@@ -14,31 +14,28 @@ const source = (import.meta.glob("./bundle.vue", {
 })["./bundle.vue"] ?? "") as string;
 
 describe("bundle purchase gate consults the server in remote mode", () => {
-  it("asks the server for every SKU and refuses the whole bundle if any is ineligible", () => {
+  it("checks a suggestion before adding it to the cart", () => {
     expect(source).toContain("purchaseEligibilityStore");
-    // 逐 SKU 询问,且**任一**不达标即整单拒(不是只看第一件)。
-    expect(source).toMatch(/Promise\.all\(list\.map\(\(p\) => purchaseEligibilityStore\.ensure\(p\.id\)\)\)/);
-    expect(source).toMatch(/const firstBlocked = decisions\.findIndex\(\(eligible\) => !eligible\)/);
-    expect(source).toMatch(/if \(firstBlocked >= 0\) \{/);
+    const add = source.slice(source.indexOf("async function onAddSuggestion"), source.indexOf("interface PendingBundleCommands"));
+    expect(add).toMatch(/await purchaseEligibilityStore\.ensure\(p\.id, true\)/);
+    expect(add).toMatch(/if \(!isCurrentAccountScope\(scope\)\) return/);
+    expect(add.indexOf("if (!eligible)"), "reject before cart.add").toBeLessThan(add.indexOf("cart.add(p.id)"));
   });
 
-  it("keeps the local gate for mock mode only", () => {
-    // 以本单的注释标记为界切出这段门控,再断言本地门落在 remote 分支**之后**的 else 里。
-    // 用**最后**一处标记:同一个单号在导入处也出现,indexOf 会抓到导入区(首版实测)。
-    const marker = source.lastIndexOf("zentao #244");
-    expect(marker, "缺少 #244 的分流注释").toBeGreaterThan(-1);
-    const region = source.slice(marker, marker + 1200);
-
-    const remoteBranch = region.indexOf("if (remoteApiEnabled) {");
-    const elseBranch = region.indexOf("} else {");
-    const localGate = region.indexOf("evaluatePurchaseGate(p, gateCtx).blocked");
-    expect(remoteBranch, "remote 分支").toBeGreaterThan(-1);
-    expect(elseBranch, "else 分支").toBeGreaterThan(remoteBranch);
-    expect(localGate, "本地门").toBeGreaterThan(elseBranch);
+  it("disables checkout while any cart SKU lacks a ready, eligible server decision", () => {
+    const disabled = source.slice(source.indexOf("const checkoutUnavailable"), source.indexOf("const ctaText"));
+    expect(disabled).toContain('entry.status !== "ready" || !entry.eligible');
+    expect(source).toContain('tabindex="0"');
   });
 
-  it("routes the blocked bundle to that product's own conditions", () => {
-    // 与 #246 一致:带上具体商品 id,不落在无关商品的配额页。
-    expect(source).toMatch(/team\/quota\?product=\$\{encodeURIComponent\(list\[firstBlocked\]\.id\)\}/);
+  it("rechecks every SKU before remote order creation, then keeps the local gate in mock only", () => {
+    const checkout = source.slice(source.indexOf("async function onCheckout"));
+    const remote = checkout.slice(checkout.indexOf("if (remoteApiEnabled) {"), checkout.indexOf("  // 购买资格门"));
+    expect(remote).toMatch(/Promise\.all\(list\.map\(\(p\) => purchaseEligibilityStore\.ensure\(p\.id, true\)\)\)/);
+    expect(remote).toMatch(/const firstBlocked = decisions\.findIndex\(\(eligible\) => !eligible\)/);
+    expect(remote.indexOf("if (firstBlocked >= 0)"), "reject before order create").toBeLessThan(remote.indexOf("bundleOrderApi.create("));
+    expect(remote).not.toContain("evaluatePurchaseGate");
+    expect(checkout.indexOf("evaluatePurchaseGate(p, gateCtx).blocked"), "mock gate follows remote return")
+      .toBeGreaterThan(checkout.indexOf("    return;\n  }\n  // 购买资格门"));
   });
 });

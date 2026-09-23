@@ -66,14 +66,16 @@
       </view>
     </view>
 
-    <!-- 年化口径的推导来源(zentao #221)。只给「按美元日收益/售价」这个说法不够:
-         两个输入数必须同屏可复核,否则用户无法验证比例,只能当成无出处的数字。 -->
+    <!-- Percentage and its inputs share this guard, so a missing catalog cannot
+         leave an unexplained annualized claim beside the NEX/day figure. -->
     <view v-if="tier.roiBasis" :style="roiBasisWrapStyle">
+      <text class="block font-mono-tabular" :style="roiBasisStyle">{{ fmt(t.quota.perkRoi, { roi: tier.roiBasis.roi }) }}</text>
       <text class="block font-mono-tabular" :style="roiBasisStyle">{{ fmt(t.quota.perkRoiBasis, {
         dailyEarn: tier.roiBasis.dailyEarn.toFixed(2),
         price: tier.roiBasis.price.toLocaleString(),
         roi: tier.roiBasis.roi,
       }) }}</text>
+      <text class="block" :style="roiNoteStyle">{{ fmt(t.quota.perkRoiRevision, { revision: tier.roiBasis.revision || t.quota.perkRoiRevisionUnknown }) }}</text>
       <text class="block" :style="roiNoteStyle">{{ t.quota.perkRoiNotGuaranteed }}</text>
     </view>
 
@@ -123,7 +125,7 @@ export interface QuotaTier {
    * 而参与计算的两个数(美元日收益、售价)页面上一分都没露 —— 用户复核不了比例来源。
    * 目录读到时由页面填上;缺失(旧服务端/目录未落地)则整行不渲染,而不是显示占位 0。
    */
-  roiBasis?: { dailyEarn: number; price: number; roi: number };
+  roiBasis?: { dailyEarn: number; price: number; roi: number; revision?: string | null };
 }
 
 const props = defineProps<{ tier: QuotaTier }>();

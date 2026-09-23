@@ -61,6 +61,12 @@ const FILE_EXEMPTIONS = [
 
 const VALUE_EXEMPTIONS = [
   {
+    id: "quota-annualized-source-token",
+    why: "服务端配额权益里的年化是待过滤的数据标识，不是客户端展示文案；只授权此识别表达式中的该词",
+    files: ["src/lib/quota-perk.ts"],
+    strip: (line) => line.replace(/^(\s*return\s+\/\(\?:)年化(?=\|annual\|)/, "$1"),
+  },
+  {
     id: "support-unassigned-token",
     why: "后端备勤池代理名仅用于未分配状态比较，显示文案仍由三语词典提供；限定文件、变量及严格相等比较位置",
     files: ["src/pages/support/chat.vue"],

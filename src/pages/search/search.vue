@@ -124,7 +124,7 @@ import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 import { remoteApiEnabled, supportApi } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
 import { readPublishedFaqPages } from "@/lib/published-faq-pages";
-import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
 import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-source-state";
@@ -207,7 +207,8 @@ const devices = computed(() => !remoteApiEnabled
   ? app.visibleDevices
   : []);
 const members = computed(() => !remoteApiEnabled || network.remoteStatus === "ready" ? network.members : []);
-const searchableProducts = computed(() => !remoteApiEnabled || productCatalogState.status === "ready" ? PRODUCTS : []);
+const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
+  : productCatalogState.status === "ready" ? productCatalogPresentation.value?.products ?? [] : []);
 
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
 // only the key→href binding stays here.
@@ -278,9 +279,9 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const p of searchableProducts.value) {
-    // Match on the copy the user can actually see, so a Vietnamese query hits a
-    // Vietnamese tagline. `name` is a brand mark — untranslated on both sides.
-    const tagline = productCopy(t.value, p).tagline;
+    // Match the copy shown by the store: server prose in remote mode, localized
+    // fixture prose in mock mode. The brand name remains untranslated.
+    const tagline = remoteApiEnabled ? p.tagline : productCopy(t.value, p).tagline;
     if (p.name.toLowerCase().includes(query) || tagline.toLowerCase().includes(query)) {
       out.push({
         group: "product",

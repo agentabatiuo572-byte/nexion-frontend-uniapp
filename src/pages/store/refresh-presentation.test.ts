@@ -31,19 +31,27 @@ describe("actual page presentation remains separate from authority", () => {
   it("cannot buy from retained cards while catalog loads or fails, nor with unavailable eligibility", () => {
     const state = reactive({ status: "ready" });
     const eligibility = ref({ status: "ready", eligible: true });
-    const goCheckout = vi.fn(), retryEligibility = vi.fn();
-    const { onBuy } = actual(card, ["catalogUnavailable", "onBuy"], {
-      computed, remoteApiEnabled: true, productCatalogState: state, eligibility, stockUnavailable: ref(false), goCheckout, retryEligibility,
+    const stockUnavailable = ref(false), gate = ref({ soldOut: false });
+    const goCheckout = vi.fn(), goDetail = vi.fn(), retryEligibility = vi.fn();
+    const { buyUnavailable, onBuy } = actual(card, ["catalogUnavailable", "buyUnavailable", "onBuy"], {
+      computed, remoteApiEnabled: true, productCatalogState: state, eligibility, stockUnavailable, gate, goCheckout, goDetail, retryEligibility,
     });
-    for (const status of ["loading", "error"]) { state.status = status; onBuy(); }
+    for (const status of ["loading", "error"]) { state.status = status; expect(buyUnavailable.value).toBe(true); onBuy(); }
     expect(goCheckout).not.toHaveBeenCalled();
     state.status = "ready";
-    for (const status of ["idle", "loading", "error"]) { eligibility.value.status = status; onBuy(); }
+    for (const status of ["idle", "loading"]) { eligibility.value.status = status; expect(buyUnavailable.value).toBe(true); onBuy(); }
+    eligibility.value.status = "error"; expect(buyUnavailable.value).toBe(false); onBuy();
     expect(goCheckout).not.toHaveBeenCalled();
     expect(retryEligibility).toHaveBeenCalledOnce();
     eligibility.value = { status: "ready", eligible: false }; onBuy();
     expect(goCheckout).not.toHaveBeenCalled();
+    expect(goDetail).toHaveBeenCalledOnce();
+    gate.value.soldOut = true; expect(buyUnavailable.value).toBe(true); onBuy();
+    expect(goDetail).toHaveBeenCalledOnce();
+    gate.value.soldOut = false;
     eligibility.value.eligible = true; onBuy();
+    expect(goCheckout).toHaveBeenCalledOnce();
+    stockUnavailable.value = true; expect(buyUnavailable.value).toBe(true); onBuy();
     expect(goCheckout).toHaveBeenCalledOnce();
   });
 });

@@ -94,6 +94,8 @@
             <text class="block" :style="itemMetaStyle">
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
             </text>
+            <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
+            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
           <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: p.name })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -249,6 +251,8 @@ onShow(() => {
   void refreshServerProductPhase(true);
   void refreshBundlePolicy();
   void refreshBundleWallet();
+  if (remoteApiEnabled) void Promise.all(products.value.map((p) =>
+    purchaseEligibilityStore.ensure(p.id, purchaseEligibilityStore.state(p.id).status === "ready")));
   restoreReceiptRecovery();
 });
 
@@ -268,6 +272,9 @@ const products = computed<Product[]>(() =>
       .filter((p) => isProductAvailable(p, phase.value))
     : [],
 );
+watch([() => products.value.map((p) => p.id).join("|"), () => app.accountKey], () => {
+  if (remoteApiEnabled) void Promise.all(products.value.map((p) => purchaseEligibilityStore.ensure(p.id)));
+}, { immediate: true });
 const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
 const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
 const bundleQuote = computed(() => quoteBundleAmountUsdt(
@@ -349,11 +356,22 @@ async function refreshBundleWallet(): Promise<void> {
   }
 }
 
-const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || products.value.length < 2);
+const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || products.value.length < 2
+  || (remoteApiEnabled && products.value.some((p) => {
+    const entry = purchaseEligibilityStore.state(p.id);
+    return entry.status !== "ready" || !entry.eligible;
+  })));
 const ctaText = computed(() => (
-  submitting.value || walletRefreshing.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
+  submitting.value || walletRefreshing.value ? "…" : checkoutUnavailable.value ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
-const checkoutHint = computed(() => products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
+const checkoutHint = computed(() => {
+  if (products.value.length < 2) return t.value.bundle.checkoutUnavailableHint;
+  if (!remoteApiEnabled) return "";
+  const entries = products.value.map((p) => purchaseEligibilityStore.state(p.id));
+  if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
+  if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
+  return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
+});
 const BUNDLE_RECEIPT_RECOVERY_KEY = "nexgrid-bundle-receipt-recovery-v1";
 type BundleReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderIds: string[] };
 const receiptWriteFailure = ref<BundleReceiptRecovery | null>(null);
@@ -397,7 +415,18 @@ function remove(id: string) {
 function clear() {
   cart.clear();
 }
-function onAddSuggestion(p: Product) {
+async function onAddSuggestion(p: Product) {
+  if (remoteApiEnabled) {
+    const scope = captureAccountScope();
+    const eligible = await purchaseEligibilityStore.ensure(p.id, true);
+    if (!isCurrentAccountScope(scope)) return;
+    if (!eligible) {
+      toast.warn(purchaseEligibilityStore.state(p.id).status === "error"
+        ? t.value.store.purchaseEligibilityError : t.value.store.gateBlockedToast);
+      return;
+    }
+  }
+  if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
   cart.add(p.id);
   toast.success(fmt(t.value.bundle.addedToBundle, { name: p.name }));
 }
@@ -477,6 +506,14 @@ async function onCheckout() {
     }
     submitting.value = true;
     try {
+      const decisions = await Promise.all(list.map((p) => purchaseEligibilityStore.ensure(p.id, true)));
+      if (!scopeIsCurrent()) return;
+      const firstBlocked = decisions.findIndex((eligible) => !eligible);
+      if (firstBlocked >= 0) {
+        toast.warn(purchaseEligibilityStore.state(list[firstBlocked].id).status === "error"
+          ? t.value.store.purchaseEligibilityError : t.value.store.gateBlockedToast);
+        return;
+      }
       const latestPolicy = await bundleDiscountApi.current();
       if (!scopeIsCurrent()) return;
       if (!policy.value || latestPolicy.policyVersion !== policy.value.policyVersion) {
@@ -594,26 +631,12 @@ async function onCheckout() {
     activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
     teamVolumeUSD: vRank.teamVolumeUSD,
   };
-  // 🔴 zentao #244:线上模式此前只跑**本地** `evaluatePurchaseGate`(V-Rank / 团队业绩取自本地
-  //   快照),而线上权威门是服务端的账号维度资格判定 —— 于是服务端判不合格的商品仍能进套餐、
-  //   并启用结算按钮。现按 detail.vue 的既有口径分流:remote 逐 SKU 问服务端,
-  //   **任一不达标即整单拒**;本地门只在 mock 模式生效。
-  if (remoteApiEnabled) {
-    const decisions = await Promise.all(list.map((p) => purchaseEligibilityStore.ensure(p.id)));
-    const firstBlocked = decisions.findIndex((eligible) => !eligible);
-    if (firstBlocked >= 0) {
-      toast.warn(t.value.store.gateBlockedToast);
-      navTo(`/pages/team/quota?product=${encodeURIComponent(list[firstBlocked].id)}`);
-      return;
-    }
-  } else {
-    const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
-    if (blocked) {
-      const g = evaluatePurchaseGate(blocked, gateCtx);
-      toast.warn(g.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
-      navTo("/pages/team/quota");
-      return;
-    }
+  const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
+  if (blocked) {
+    const g = evaluatePurchaseGate(blocked, gateCtx);
+    toast.warn(g.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
+    navTo("/pages/team/quota");
+    return;
   }
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;

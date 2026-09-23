@@ -28,24 +28,43 @@ function setup(remoteApiEnabled = true, refreshCatalog?: ReturnType<typeof vi.fn
     refreshCanonicalNetwork: vi.fn(async () => undefined),
   });
   const productCatalogState = reactive({ status: 'ready' });
+  const productCatalogPresentation = ref<{ products: { id: string; name: string; tagline: string; price: number }[] } | null>({
+    products: [{ id: 'server-sku', name: 'Server SKU', tagline: 'Server specification', price: 321 }],
+  });
+  const PRODUCTS = [{ id: 'mock-sku', name: 'Mock SKU', tagline: 'Mock specification', price: 123 }];
   const refreshProductCatalog = refreshCatalog ?? vi.fn(async () => true);
   const staking = { syncRemote: vi.fn(async () => undefined) };
   const locale = reactive({ code: 'zh' });
   const factory = new Function(
-    'computed', 'app', 'network', 'remoteApiEnabled', 'productCatalogState',
+    'computed', 'app', 'network', 'remoteApiEnabled', 'productCatalogState', 'productCatalogPresentation', 'PRODUCTS',
     'refreshProductCatalog', 'staking', 'locale', 'createPageVisibilityRefresh', 'bindPageVisibilityRefresh',
     'watch', 'onMounted', 'onShow', 'onHide', 'ref', 'supportApi', 'readPublishedFaqPages',
     `${executableSourceBlock}\nreturn { refreshSearchSources, refreshPublishedFaqs, publishedFaqs, publishedFaqStatus, devices, members, searchableProducts };`,
   );
   const value = factory(
-    computed, app, network, remoteApiEnabled, productCatalogState,
+    computed, app, network, remoteApiEnabled, productCatalogState, productCatalogPresentation, PRODUCTS,
     refreshProductCatalog, staking, locale, () => ({ dispose: () => undefined }), () => () => undefined,
     () => undefined, () => undefined, () => undefined, () => undefined, ref, {}, faqReader,
   );
-  return { ...value, app, network, refreshProductCatalog, staking, locale, faqReader };
+  return { ...value, app, network, productCatalogState, productCatalogPresentation, refreshProductCatalog, staking, locale, faqReader };
 }
 
 describe('search remote source wiring', () => {
+  it('searches only the current server catalogue in remote mode and no mock product while loading or failed', () => {
+    const remote = setup(true);
+    expect(remote.searchableProducts.value.map((p: { id: string }) => p.id)).toEqual(['server-sku']);
+    remote.productCatalogState.status = 'loading';
+    expect(remote.searchableProducts.value).toEqual([]);
+    remote.productCatalogState.status = 'error';
+    expect(remote.searchableProducts.value).toEqual([]);
+    remote.productCatalogState.status = 'ready';
+    remote.productCatalogPresentation.value = null;
+    expect(remote.searchableProducts.value).toEqual([]);
+
+    const local = setup(false);
+    expect(local.searchableProducts.value.map((p: { id: string }) => p.id)).toEqual(['mock-sku']);
+  });
+
   it('starts FAQ reads independently of a pending catalogue and rejects an old language response', async () => {
     let finishFaq!: (value: { id: string }[]) => void;
     const faqReader = vi.fn(() => new Promise<{ id: string }[]>(resolve => { finishFaq = resolve; }));

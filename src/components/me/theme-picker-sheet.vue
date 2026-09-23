@@ -23,27 +23,34 @@
         </view>
 
         <!-- Options -->
-        <view
-          v-for="opt in options"
-          :key="opt.mode"
-          class="flex items-center active:opacity-80"
-          :style="optionStyle(opt.mode)"
-          :data-me-action="`theme:${opt.mode}`"
-          role="button"
-          tabindex="0"
-          :aria-label="opt.label"
-          @click="choose(opt.mode)"
-          @keydown.enter.prevent="choose(opt.mode)"
-          @keydown.space.prevent="choose(opt.mode)"
-        >
-          <view class="grid place-items-center shrink-0" :style="iconChipStyle(opt.mode)">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isActive(opt.mode) ? 'var(--v5-brand)' : 'var(--v5-ink-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path v-for="d in opt.paths" :key="d" :d="d" />
-            </svg>
+        <view role="radiogroup" :aria-label="t.me.themePickerTitle">
+          <view
+            v-for="(opt, i) in options"
+            :key="opt.mode"
+            class="flex items-center active:opacity-80"
+            :style="optionStyle(opt.mode)"
+            :data-me-action="`theme:${opt.mode}`"
+            role="radio"
+            :tabindex="isActive(opt.mode) ? 0 : -1"
+            :aria-checked="isActive(opt.mode) ? 'true' : 'false'"
+            :aria-label="opt.label"
+            @click="choose(opt.mode)"
+            @keydown.enter.prevent="choose(opt.mode)"
+            @keydown.space.prevent="choose(opt.mode)"
+            @keydown.left.prevent="moveTheme(i, -1)"
+            @keydown.right.prevent="moveTheme(i, 1)"
+            @keydown.up.prevent="moveTheme(i, -1)"
+            @keydown.down.prevent="moveTheme(i, 1)"
+          >
+            <view class="grid place-items-center shrink-0" :style="iconChipStyle(opt.mode)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isActive(opt.mode) ? 'var(--v5-brand)' : 'var(--v5-ink-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path v-for="d in opt.paths" :key="d" :d="d" />
+              </svg>
+            </view>
+            <text class="flex-1" :style="labelStyle(opt.mode)">{{ opt.label }}</text>
+            <!-- Check on the active mode -->
+            <svg v-if="isActive(opt.mode)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           </view>
-          <text class="flex-1" :style="labelStyle(opt.mode)">{{ opt.label }}</text>
-          <!-- Check on the active mode -->
-          <svg v-if="isActive(opt.mode)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
         </view>
       </view>
     </view>
@@ -51,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, nextTick, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useTheme, type ThemeMode } from "@/store/theme";
@@ -80,6 +87,16 @@ function isActive(m: ThemeMode): boolean {
 function choose(next: ThemeMode) {
   theme.setMode(next);
   emit("close");
+}
+
+function moveTheme(index: number, step: number) {
+  const next = options.value[(index + step + options.value.length) % options.value.length];
+  if (!next) return;
+  theme.setMode(next.mode);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>(`.nx-theme-picker-root [role="radio"][aria-checked="true"]`)?.focus();
+  });
 }
 
 // ── styles ──

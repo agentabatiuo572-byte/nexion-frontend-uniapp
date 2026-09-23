@@ -43,6 +43,49 @@ function passwordChangeFixture() {
   return { ...deps, submit, resolveReceipt: (receipt) => resolveReceipt(receipt), leave: () => { currentScope = false; } };
 }
 
+function twoFactorFixture() {
+  const script = read("src/pages/me/security.vue").match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script, "security page script must exist");
+  const parsed = ts.createSourceFile("security.ts", script, ts.ScriptTarget.Latest, true);
+  const handlers = ["toggleTwoFactor", "onTwoFactorPassword"].map((name) => {
+    const node = parsed.statements.find((part) => ts.isFunctionDeclaration(part) && part.name?.text === name);
+    assert.ok(node, `${name} must exist`);
+    return ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  }).join("\n");
+  const deps = {
+    securityBusy: { value: false }, securityPageFence: { capture: () => ({}) },
+    captureAccountScope: () => ({}), auth: { accountId: "two-factor-fixture" },
+    isCurrentSecurityRequest: () => true, remoteApiEnabled: true,
+    remoteSecurity: { value: { twoFactorEnabled: false } }, err: { value: "" },
+    twoFactorPassword: { value: "" }, twoFactorPasswordError: { value: "" },
+    twoFactorPasswordFocus: { value: false }, twoFactorEnabled: { value: false },
+    twoFactorTarget: { value: null }, twoFactorChallengeNo: { value: "" },
+    twoFactorPhoneMasked: { value: "" }, twoFactorCode: { value: "" },
+    detailVal: (event) => event.detail.value,
+    toast: { error: mock.fn(), success: mock.fn() },
+    t: { value: { login: { errorInvalidPassword: "enter password" }, security: {
+      twoFactorPasswordRequired: "enter current password", opFailed: "failed",
+    }, addrRebind: { otpSendCta: "sent" } } },
+    accountApi: { sendTwoFactorChallenge: mock.fn(async () => ({ challengeNo: "SEC2FA-fixture", phoneMasked: "***" })) },
+    securityErrorMessage: () => "failed", security: { setTwoFactor: mock.fn() },
+    uiConfirm: mock.fn(async () => true), securityConfirmOwner: "fixture",
+  };
+  const actions = new Function(...Object.keys(deps), `${handlers}; return { toggleTwoFactor, onTwoFactorPassword };`)(...Object.values(deps));
+  return { ...deps, ...actions };
+}
+
+test("empty 2FA password focuses its field and cannot send a challenge", async () => {
+  const page = twoFactorFixture();
+  await page.toggleTwoFactor(true);
+  assert.equal(page.twoFactorPasswordError.value, "enter current password");
+  assert.equal(page.twoFactorPasswordFocus.value, true);
+  assert.equal(page.toast.error.mock.callCount(), 1);
+  assert.equal(page.accountApi.sendTwoFactorChallenge.mock.callCount(), 0);
+  page.onTwoFactorPassword({ detail: { value: "a-password" } });
+  assert.equal(page.twoFactorPasswordError.value, "");
+  assert.equal(page.twoFactorPasswordFocus.value, false);
+});
+
 test("password change sends only the values validated before awaiting a prior receipt", async () => {
   const page = passwordChangeFixture();
   const pending = page.submit();
@@ -129,8 +172,10 @@ test("remote security center consumes the authoritative account API", () => {
   assert.match(page, /accountApi\.revokeSession\(/);
   assert.match(page, /accountApi\.revokeOtherSessions\(\)/);
   assert.match(page, /accountApi\.requestAccountDeletion\(/);
-  assert.match(page, /if \(!twoFactorPassword\.value\) \{\s*toast\.error\(t\.value\.login\.errorInvalidPassword\);\s*return;\s*\}/,
-    "the 2FA toggle must visibly report a missing current password");
+  assert.match(page, /if \(!twoFactorPassword\.value\) \{\s*twoFactorPasswordError\.value = t\.value\.security\.twoFactorPasswordRequired;\s*twoFactorPasswordFocus\.value = true;\s*toast\.error\(t\.value\.login\.errorInvalidPassword\);\s*return;\s*\}/,
+    "the 2FA toggle must report a missing current password and focus its input");
+  assert.match(page, /:aria-describedby="twoFactorPasswordError \? 'security-2fa-password-error' : undefined"/,
+    "the 2FA password input must be linked to its inline error");
   const passwordChange = page.match(/async function submitPasswordChange\(\) \{([\s\S]*?)^\}/m)?.[1];
   assert.ok(passwordChange, "password command boundary must exist");
   const branches = passwordChange.match(/if \(remoteApiEnabled\) \{([\s\S]*?)\n\s*\} else \{([\s\S]*?)\n\s*\}/);

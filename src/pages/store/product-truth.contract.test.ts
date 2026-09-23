@@ -77,6 +77,12 @@ describe("store product truth rendering", () => {
  * 并且箭头形状要如实 —— remote 给前进箭头,不再用「展开箭头」暗示会展开。
  */
 describe("locked card gate affordance tells the truth", () => {
+  it("makes the actual footer CTA lead to eligibility details or retry instead of silently returning", () => {
+    expect(productCard).toMatch(/<view[^>]*:aria-disabled="buyUnavailable \? 'true' : 'false'"[^>]*@click\.stop="onBuy"/);
+    expect(productCard).toMatch(/const buyUnavailable = computed\([\s\S]{0,240}?eligibility\.value\.status === "loading"/);
+    expect(productCard).toMatch(/if \(remoteApiEnabled\) \{\s*if \(eligibility\.value\.status === "error"\) void retryEligibility\(\);\s*else if \(eligibility\.value\.status === "ready" && eligibility\.value\.eligible\) goCheckout\(\);\s*else if \(eligibility\.value\.status === "ready"\) goDetail\(\);/);
+  });
+
   it("routes a locked card to the product page in remote mode instead of expanding nothing", () => {
     // remote 分支必须先于 local 的展开翻转,且确实走 goDetail。
     expect(productCard).toMatch(/if \(remoteApiEnabled\) \{[\s\S]{0,220}?goDetail\(\);/);

@@ -30,7 +30,7 @@ vi.mock("@/i18n/use-t", () => ({
   getT: () => ({ ui: { navigationFailed: "Navigation failed" } }),
 }));
 
-import { navBack, navTo, navReset, navReplace, toUniRoute } from "./route";
+import { navBack, navTo, navReset, navReplace, takeNavigationQuery, toUniRoute } from "./route";
 
 type NavigationOptions = {
   url: string;
@@ -97,6 +97,25 @@ describe("route navigation failure handling", () => {
   it("recognizes physical tabBar routes during migrated navigation", () => {
     expect(toUniRoute("/pages/team/team")).toEqual({ url: "/pages/team/team", tab: true });
     expect(toUniRoute("/pages/me/wallet")).toEqual({ url: "/pages/me/wallet", tab: false });
+  });
+
+  it("preserves a quota product for one H5 navigation when the destination loses its query", async () => {
+    vi.stubGlobal("uni", {
+      navigateTo: vi.fn((options: NavigationOptions) => options.success?.()),
+      redirectTo: vi.fn((options: NavigationOptions) => options.success?.()),
+      reLaunch: vi.fn((options: NavigationOptions) => options.success?.()),
+    });
+
+    await expect(navTo("/pages/team/quota?product=stellarrack-p2")).resolves.toBe(true);
+    expect(uni.navigateTo).toHaveBeenCalledWith(expect.objectContaining({
+      url: "/pages/team/quota?product=stellarrack-p2",
+    }));
+    expect(takeNavigationQuery("/pages/team/quota")).toBe("?product=stellarrack-p2");
+    expect(takeNavigationQuery("/pages/team/quota")).toBe("");
+
+    await navTo("/pages/team/quota?product=another-sku");
+    await navTo("/pages/team/team");
+    expect(takeNavigationQuery("/pages/team/quota")).toBe("");
   });
 
   it("continues navigation when transient stores are not initialized yet", () => {

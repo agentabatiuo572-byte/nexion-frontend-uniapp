@@ -31,8 +31,8 @@
 
         <text class="block" :style="slaNoticeStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
 
-        <view class="grid grid-cols-4" :style="tabsStyle">
-          <view v-for="id in tabs" :key="id" class="active:opacity-70 transition-opacity" :style="tabStyle(tab === id)" role="button" tabindex="0" :aria-label="tabLabel(id)" @click="selectTab(id)">
+        <view class="grid grid-cols-4" :style="tabsStyle" role="tablist" :aria-label="t.tickets.pageTitle">
+          <view v-for="(id, i) in tabs" :key="id" class="nx-ticket-status-tab active:opacity-70 transition-opacity" :style="tabStyle(tab === id)" role="tab" :tabindex="tab === id ? 0 : -1" :aria-selected="tab === id ? 'true' : 'false'" :aria-label="tabLabel(id)" @click="selectTab(id)" @keydown.enter.prevent="selectTab(id)" @keydown.space.prevent="selectTab(id)" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
             <text>{{ tabLabel(id) }}</text>
           </view>
         </view>
@@ -453,6 +453,16 @@ function selectTab(id: Tab) {
   }
   tab.value = id;
   filterFeedback.value = "";
+}
+
+function moveTab(index: number, step: number) {
+  const next = tabs[(index + step + tabs.length) % tabs.length];
+  if (!next) return;
+  selectTab(next);
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    document.querySelector<HTMLElement>('.nx-ticket-status-tab[aria-selected="true"]')?.focus();
+  });
 }
 function canClose(tk: Ticket): boolean {
   return tk.status !== "closed" && tk.status !== "resolved";

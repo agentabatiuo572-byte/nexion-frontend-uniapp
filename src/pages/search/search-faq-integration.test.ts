@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import page from "./search.vue?raw";
 import { resolveSearchResultState } from "@/lib/search-source-state";
@@ -11,22 +11,51 @@ const source = ts.transpileModule(page.slice(start, end), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
 }).outputText;
 
-function setup(query: string) {
+function setup(query: string, remoteApiEnabled = true) {
   const publishedFaqs = ref([{ id: "faq/a?b", question: "页面数据没有更新怎么办？", answer: "请刷新页面后重试。" }]);
   const publishedFaqStatus = ref("ready");
+  const products = ref<{ id: string; name: string; tagline: string; price: number }[]>([]);
+  const messages = ref({
+    search: { routes: {}, faqEntries: {}, askNova: "问问 Nova", askNovaWithQuery: "解答{query}" },
+    store: { mockTagline: "Mock H100 tagline" },
+  });
+  const productCopy = vi.fn((copy: typeof messages.value) => ({ tagline: copy.store.mockTagline }));
   const names = ["computed", "q", "t", "ROUTES", "FAQ", "staking", "searchStakingRateSummary",
     "remoteApiEnabled", "searchableProducts", "productCopy", "devices", "deviceName", "deviceGpuLabel",
     "members", "publishedFaqs", "publishedFaqStatus", "resolveSearchResultState", "productCatalogState", "network", "app"];
   const result = new Function(...names, `${source}; return {results, searchResultState};`)(
-    computed, ref(query), ref({ search: { routes: {}, faqEntries: {}, askNova: "问问 Nova", askNovaWithQuery: "解答{query}" } }),
-    [], [], {}, () => "", true, ref([]), () => "", ref([]), () => "", () => "", ref([]),
+    computed, ref(query), messages,
+    [], [], {}, () => "", remoteApiEnabled, products, productCopy, ref([]), () => "", () => "", ref([]),
     publishedFaqs, publishedFaqStatus, resolveSearchResultState, { status: "ready" }, { remoteStatus: "ready" },
     { remoteFleetStatus: "ready", remoteFleetHasSnapshot: true },
   );
-  return { ...result, publishedFaqs, publishedFaqStatus };
+  return { ...result, publishedFaqs, publishedFaqStatus, products, messages, productCopy };
 }
 
 describe("global search uses the published Help Center FAQ corpus", () => {
+  it("uses server price and prose for every remote SKU, including matching, without reading mock translations", () => {
+    const state = setup("RTX 4090");
+    state.products.value = [
+      { id: "stellarrack-p2", name: "StellarRack P2", tagline: "8× RTX 4090 managed rack", price: 7499 },
+      { id: "another-sku", name: "Another SKU", tagline: "RTX 4090 server copy", price: 899 },
+    ];
+    expect(state.results.value.filter((hit: { group: string }) => hit.group === "product")).toEqual([
+      { group: "product", label: "StellarRack P2", sublabel: "$7499 · 8× RTX 4090 managed rack", href: "/pages/store/detail?id=stellarrack-p2" },
+      { group: "product", label: "Another SKU", sublabel: "$899 · RTX 4090 server copy", href: "/pages/store/detail?id=another-sku" },
+    ]);
+    expect(state.productCopy).not.toHaveBeenCalled();
+    state.products.value = [];
+    expect(state.results.value.filter((hit: { group: string }) => hit.group === "product")).toEqual([]);
+  });
+
+  it("keeps mock-mode product copy responsive to the active language", () => {
+    const state = setup("Mock SKU", false);
+    state.products.value = [{ id: "mock-sku", name: "Mock SKU", tagline: "English fixture", price: 123 }];
+    expect(state.results.value.find((hit: { group: string }) => hit.group === "product")?.sublabel).toBe("$123 · Mock H100 tagline");
+    state.messages.value.store.mockTagline = "Bản dịch Việt";
+    expect(state.results.value.find((hit: { group: string }) => hit.group === "product")?.sublabel).toBe("$123 · Bản dịch Việt");
+  });
+
   it("finds a published question missing from the static guide catalog and binds its exact id", () => {
     const state = setup("页面数据没有更新");
     expect(state.results.value).toContainEqual({ group: "faq", label: "页面数据没有更新怎么办？",

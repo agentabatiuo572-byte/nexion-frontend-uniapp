@@ -170,6 +170,16 @@ type NavigationAttempt = (
   fail: (result: unknown) => void,
 ) => void;
 
+// Uni H5 can drop a navigateTo query from the visible hash route. Keep only
+// this navigation's query until the destination page consumes it.
+let pendingNavigationQuery: { path: string; query: string } | null = null;
+
+export function takeNavigationQuery(path: string): string {
+  const query = pendingNavigationQuery?.path === path ? pendingNavigationQuery.query : "";
+  pendingNavigationQuery = null;
+  return query;
+}
+
 function runNavigationChain(attempts: NavigationAttempt[]): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;
@@ -215,16 +225,22 @@ export function navTo(href: string): Promise<boolean> {
     return Promise.resolve(false);
   }
   const { url, tab } = toUniRoute(href);
-  if (tab) {
-    return runNavigationChain([
+  const question = url.indexOf("?");
+  pendingNavigationQuery = question < 0 ? null : { path: url.slice(0, question), query: url.slice(question) };
+  const queryForThisNavigation = pendingNavigationQuery;
+  const result = tab
+    ? runNavigationChain([
       (success, fail) => uni.reLaunch({ url, success, fail }),
       (success, fail) => uni.redirectTo({ url, success, fail }),
       (success, fail) => uni.navigateTo({ url, success, fail }),
-    ]);
-  }
-  return runNavigationChain([
+    ])
+    : runNavigationChain([
     (success, fail) => uni.navigateTo({ url, success, fail }),
     (success, fail) => uni.redirectTo({ url, success, fail }),
     (success, fail) => uni.reLaunch({ url, success, fail }),
   ]);
+  return result.then((ok) => {
+    if (!ok && pendingNavigationQuery === queryForThisNavigation) pendingNavigationQuery = null;
+    return ok;
+  });
 }
