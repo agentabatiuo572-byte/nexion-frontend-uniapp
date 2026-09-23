@@ -67,7 +67,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // input and remove action carry accessible names. Styles are unchanged.
   // #223: editing waits for the server goal, then restores its target and deadline;
   // preset and save controls expose their loading state without changing layout.
-  "goals.vue": "53447ff6cb818ae3c39f8d2be9d6e83c5385e9f6373f9d37dd28b099ceb8a32c",
+  // An unchanged restored goal also disables Save; the original term remains selectable.
+  "goals.vue": "ee21b8c3da303530aba70fa1c9da0350245ab624b2b7bf2826d3533bb31b6bc4",
   // R3 keyboard controls plus reviewed production FAQ empty-state authority:
   // unread, failed, or incomplete pagination cannot claim no matching content.
   // Exact FAQ deep links clear on category selection; withdrawn targets use the
