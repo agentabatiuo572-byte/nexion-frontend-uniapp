@@ -243,6 +243,9 @@ const consoleErrorsFor = (page) => {
   if (!errorsOf.has(page)) {
     const arr = []; errorsOf.set(page, arr);
     page.setDefaultTimeout(20000);
+    // Cold Vite transforms can delay navigation without changing the empty
+    // state assertion. Keep element/action waits bounded separately above.
+    page.setDefaultNavigationTimeout(60000);
     page.on("console", (m) => {
       if (m.type() === "error" && !/favicon/i.test(m.text()) && !isThirdPartyResourceError(m.text(), m.location?.().url, BASE)) arr.push(m.text().slice(0, 90));
     });

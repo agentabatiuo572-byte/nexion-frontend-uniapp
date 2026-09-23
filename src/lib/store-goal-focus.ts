@@ -1,4 +1,5 @@
 import type { Product } from "@/mock/products";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 /**
  * Landing context for a store visit that started at an earning goal (BUG 71).
@@ -39,8 +40,19 @@ export function resolveStoreGoalFocus(
   if (!id) return { variant: "none", featured: null, name: "" };
   const featured = purchasable.find((product) => product.id === id) ?? null;
   if (featured) return { variant: "located", featured, name: featured.name };
-  if (!catalogHasProducts) return { variant: "pending", featured: null, name: focusName.trim() || id };
+  // UniApp may pass an already encoded query value through onLoad. Decode the
+  // display hint only; the SKU remains the lookup key.
+  let hint = focusName.trim();
+  for (let pass = 0; pass < 2; pass += 1) {
+    try {
+      const decoded = decodeURIComponent(hint);
+      if (decoded === hint) break;
+      hint = decoded;
+    } catch { break; }
+  }
+  hint = nexGridBrandText(hint) || id;
+  if (!catalogHasProducts) return { variant: "pending", featured: null, name: hint };
   const known = products.find((product) => product.id === id) ?? null;
   if (known) return { variant: "not-purchasable", featured: null, name: known.name };
-  return { variant: "replaced", featured: null, name: focusName.trim() || id };
+  return { variant: "replaced", featured: null, name: hint };
 }

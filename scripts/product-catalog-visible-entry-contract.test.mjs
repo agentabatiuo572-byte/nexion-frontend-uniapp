@@ -24,7 +24,8 @@ test("remote catalog replacement invalidates Store computed listings", () => {
   assert.match(page, /displayProducts\.value\.filter/);
   assert.match(page, /remoteApiEnabled \? productCatalogPresentation\.value : null/);
   const store = read("src/store/product-catalog.ts");
-  assert.match(store, /presentation\.value = snapshot/);
+  assert.match(store, /presentation\.value = \{/);
+  assert.match(store, /name: nexGridBrandText\(product\.name\)/);
   assert.match(store, /presentation\.value = null/);
   const card = read("src/components/store/product-card.vue");
   assert.match(card, /const buyUnavailable = computed\(\(\) => stockUnavailable\.value \|\| catalogUnavailable\.value/);

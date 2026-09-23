@@ -3,6 +3,7 @@ import type { ProductCatalogSnapshot } from "@/api/product-catalog-api";
 import { productCatalogApi, remoteApiEnabled } from "@/api/runtime";
 import { advanceRuntimeRevision } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 // "mock" 变体已删:它曾是 mock 模式的初值,而全仓消费方只认 "ready" —— 留着这个变体
 // 等于给「下次有人再把 mock 设成它」留了门。删掉后 tsc 会证明没有第二处在用。
@@ -81,7 +82,10 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
     .then((snapshot) => {
       if (requestEpoch !== catalogEpoch) return false;
       replaceProductCatalog(snapshot.products);
-      presentation.value = snapshot;
+      presentation.value = {
+        ...snapshot,
+        products: snapshot.products.map((product) => ({ ...product, name: nexGridBrandText(product.name) })),
+      };
       productCatalogState.status = "ready";
       productCatalogState.source = snapshot.source;
       productCatalogState.sourceEnvironment = snapshot.sourceEnvironment;

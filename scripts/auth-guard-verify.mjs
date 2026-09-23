@@ -110,13 +110,15 @@ async function routeAfter(authenticated, target) {
   await installServerSessionBoundary(page, authenticated);
   // The initial route is the document entry point. Do not boot home first and
   // race its startup navigation against the route whose guard outcome we read.
-  await page.goto(`${BASE}/?nx_device=off#${target}`, { waitUntil: "load", timeout: 30000 });
-  // A cold dev-server transform can finish after the load event. Start the
+  // Subresources can hold the load event after the document is ready. The
+  // guard assertion below needs rendered UniApp text, not every asset loaded.
+  await page.goto(`${BASE}/?nx_device=off#${target}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  // A cold dev-server transform can finish after DOMContentLoaded. Start the
   // guard tick only once the direct UniApp document has rendered readable text.
   await page.waitForFunction(
     () => (document.body?.innerText || "").trim().length > 0,
     undefined,
-    { timeout: 10_000 },
+    { timeout: 30_000 },
   );
   await wait(1800); // onShow guard + one 1s tick
   const witness = await page.evaluate(() => ({
@@ -147,8 +149,8 @@ async function sameDocumentRoute(target, authenticated = true, initialRoute = ""
   // same-document transition under test.
   const staticStart = authenticated && !!initialRoute && startRoute.startsWith("/pages/entry-surfaces/");
   const initialDocumentRoute = staticStart ? "/pages/me/me" : startRoute;
-  await page.goto(`${BASE}/?nx_device=off#${initialDocumentRoute}`, { waitUntil: "load", timeout: 30000 });
-  await waitForUniAppPage(page, initialDocumentRoute.replace(/^\//, ""));
+  await page.goto(`${BASE}/?nx_device=off#${initialDocumentRoute}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await waitForUniAppPage(page, initialDocumentRoute.replace(/^\//, ""), { timeout: 30_000 });
   if (staticStart) {
     // `Guard Witness` exists only in the mocked /auth/users/refresh response;
     // this proves the server restoration completed, unlike the raw persisted

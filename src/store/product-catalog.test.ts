@@ -30,7 +30,7 @@ describe("product catalog refresh", () => {
   });
 
   it("keeps only a presentation snapshot during refresh/error, accepts real deletions, and clears on rebind", async () => {
-    const snapshot = { products: [{ id: "confirmed" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "one" };
+    const snapshot = { products: [{ id: "confirmed", name: "NexGridBox S1" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "one" };
     mocks.catalog.mockResolvedValueOnce(snapshot);
     const catalog = await import("./product-catalog");
     expect(catalog.productCatalogPresentation.value).toBeNull();
@@ -56,6 +56,21 @@ describe("product catalog refresh", () => {
     expect(catalog.productCatalogPresentation.value).toBeNull();
   });
 
+  it("presents a retired server product name under the current brand without changing its SKU", async () => {
+    const legacyName = "Nexi" + "onBox Pro v2";
+    const snapshot = { products: [{ id: "stellarbox-pro-v2", name: legacyName }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "brand" };
+    mocks.catalog.mockResolvedValueOnce(snapshot);
+    const catalog = await import("./product-catalog");
+
+    await catalog.refreshProductCatalog(true);
+
+    expect(catalog.productCatalogPresentation.value?.products[0]).toMatchObject({
+      id: "stellarbox-pro-v2", name: "NexGridBox Pro v2",
+    });
+    expect(mocks.replace).toHaveBeenCalledWith(snapshot.products);
+    expect(snapshot.products[0].name).toBe(legacyName);
+  });
+
   it("lets a forced refresh supersede an older request and ignores its late response", async () => {
     const first = deferred<any>();
     const second = deferred<any>();
@@ -68,9 +83,9 @@ describe("product catalog refresh", () => {
     expect(secondRequest).not.toBe(firstRequest);
     expect(mocks.catalog).toHaveBeenCalledTimes(2);
 
-    second.resolve({ products: [{ id: "new" }], source: "new", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "new" });
+    second.resolve({ products: [{ id: "new", name: "New" }], source: "new", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "new" });
     await secondRequest;
-    first.resolve({ products: [{ id: "old" }], source: "old", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "old" });
+    first.resolve({ products: [{ id: "old", name: "Old" }], source: "old", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "old" });
     await firstRequest;
 
     expect(catalog.productCatalogState.revision).toBe("new");
@@ -88,11 +103,11 @@ describe("product catalog refresh", () => {
     expect(catalog.productCatalogState.status).toBe("loading");
     const currentRequest = catalog.refreshProductCatalog(true);
 
-    beforeRebind.resolve({ products: [{ id: "old" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "old" });
+    beforeRebind.resolve({ products: [{ id: "old", name: "Old" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "old" });
     await oldRequest;
     expect(mocks.replace).not.toHaveBeenCalled();
 
-    afterRebind.resolve({ products: [{ id: "current" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "current" });
+    afterRebind.resolve({ products: [{ id: "current", name: "Current" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "current" });
     await currentRequest;
     expect(catalog.productCatalogState.status).toBe("ready");
     expect(catalog.productCatalogState.revision).toBe("current");
