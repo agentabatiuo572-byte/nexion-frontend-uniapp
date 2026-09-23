@@ -49,4 +49,9 @@ describe("Trust report link availability uses the actual page handler", () => {
     view.openHref("https://example.com/report.pdf");
     expect(view.error).toHaveBeenCalledWith(view.copy.openFailed);
   });
+  it("does not render published listing claims without a verified source contract", () => {
+    const template = page.slice(0, page.indexOf("<script setup"));
+    expect(template).not.toMatch(/listingRows|listingsSection|row\.Exchange|row\.State/);
+    expect(script).not.toMatch(/listingRows|listingsSection/);
+  });
 });
