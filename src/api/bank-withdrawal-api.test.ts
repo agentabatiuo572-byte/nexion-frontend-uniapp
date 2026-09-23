@@ -40,7 +40,9 @@ describe("bank withdrawal server contract", () => {
     const api = createBankWithdrawalApi({ request } as never);
     expect(await api.config()).toMatchObject({ bankCodeRequired: true, bindingOtpRequired: true });
     request.mockResolvedValue({ enabled: false, banks: [], beneficiary: null, bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
-    expect(await api.config()).toMatchObject({ bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" });
+    expect(await api.config()).toMatchObject({ bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", bankRoutingVerified: false });
+    request.mockResolvedValue({ enabled: false, banks: [], beneficiary: null, bankRoutingVerified: true });
+    expect(await api.config()).toMatchObject({ bankRoutingVerified: true });
     request.mockResolvedValue({ enabled: true, banks: [], beneficiary: { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789",
       effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true }, unresolvedIntent: null });
     expect(await api.config()).toMatchObject({ beneficiary: { canWithdraw: false }, unresolvedIntent: null });

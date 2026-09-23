@@ -26,7 +26,7 @@ export const en = {
     defaultLabel: "Default withdrawal account", singleAccount: "One withdrawal account is supported at a time.",
     accountRoutedNotice: "The bank is identified from the receiving account number, so there is no bank to choose. The bank name is confirmed by the payout channel. Check the account number before you submit.",
     disclaimer: "Use a bank account in your own name. Details are saved only after confirmation; drafts are cleared when you leave.",
-    loadError: "Unable to load account configuration or your saved account. Please retry.", unsupported: "Bank account binding is being updated. Please reload shortly.",
+    loadError: "Unable to load account configuration or your saved account. Please retry.", unsupported: "This binding method is currently unavailable. Please try again later.", routingUnverified: "The receiving bank cannot be verified yet, so a bank withdrawal account cannot be bound. Please try again later.",
     bindError: "Account not saved. Check the account number and holder name, or contact support.",
     unknown: "The binding result is not confirmed. Do not start a new binding; retry this request to check its result.",
     locked: "Account change is temporarily locked", retry: "Retry loading", retryOriginal: "Check original binding", close: "Close", done: "Done", manage: "Manage my bank account",

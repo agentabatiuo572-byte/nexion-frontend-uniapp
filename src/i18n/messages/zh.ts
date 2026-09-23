@@ -27,7 +27,7 @@ export const zh: Messages = {
     defaultLabel: "设为默认提现账户", singleAccount: "当前支持一个提现账户，绑定后默认用于银行卡提现。",
     accountRoutedNotice: "本服务按收款账号识别所属银行，无需也无法选择银行；银行名称在派发时由通道确认。请核对账号无误后再提交。",
     disclaimer: "请使用本人名下的银行账户。确认后保存资料；离开页面会清除未提交的内容。",
-    loadError: "暂时无法读取账户配置或已绑定账户，请重试。", unsupported: "银行卡绑定服务正在更新，请稍后重新加载。",
+    loadError: "暂时无法读取账户配置或已绑定账户，请重试。", unsupported: "当前绑定方式暂不可用，请稍后重试。", routingUnverified: "当前无法验证收款银行，暂不能绑定可提现银行账户。请稍后重试。",
     bindError: "账户未保存，请检查收款账号和户名，或联系客服。",
     unknown: "绑定结果尚未确认，请勿重新绑卡。请核对原绑定请求的结果。",
     locked: "暂不可变更账户", retry: "重新加载", retryOriginal: "核对原绑定结果", close: "关闭", done: "完成", manage: "管理我的银行卡",

@@ -27,7 +27,7 @@ export const vi: Messages = {
     defaultLabel: "Tài khoản rút tiền mặc định", singleAccount: "Hiện chỉ hỗ trợ một tài khoản rút tiền tại một thời điểm.",
     accountRoutedNotice: "Hệ thống nhận diện ngân hàng theo số tài khoản nhận tiền nên không cần và không thể chọn ngân hàng; tên ngân hàng do kênh chi trả xác nhận. Vui lòng kiểm tra kỹ số tài khoản trước khi gửi.",
     disclaimer: "Vui lòng dùng tài khoản ngân hàng chính chủ. Thông tin chỉ được lưu sau khi xác nhận; bản nháp được xóa khi rời trang.",
-    loadError: "Chưa thể tải cấu hình hoặc tài khoản đã liên kết. Vui lòng thử lại.", unsupported: "Dịch vụ liên kết tài khoản đang cập nhật. Vui lòng tải lại sau.",
+    loadError: "Chưa thể tải cấu hình hoặc tài khoản đã liên kết. Vui lòng thử lại.", unsupported: "Phương thức liên kết này hiện chưa khả dụng. Vui lòng thử lại sau.", routingUnverified: "Chưa thể xác minh ngân hàng nhận tiền, vì vậy chưa thể liên kết tài khoản rút tiền qua ngân hàng. Vui lòng thử lại sau.",
     bindError: "Tài khoản chưa được lưu. Kiểm tra số tài khoản và tên chủ tài khoản hoặc liên hệ hỗ trợ.",
     unknown: "Chưa xác nhận kết quả liên kết. Không tạo yêu cầu mới; hãy kiểm tra lại yêu cầu ban đầu.",
     locked: "Tạm thời chưa thể đổi tài khoản", retry: "Tải lại", retryOriginal: "Kiểm tra yêu cầu ban đầu", close: "Đóng", done: "Hoàn tất", manage: "Quản lý tài khoản ngân hàng",

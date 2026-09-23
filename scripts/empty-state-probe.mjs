@@ -18,7 +18,7 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
-  if (url.pathname === "/api/withdrawals/bank/config") return { enabled: false, banks: [], beneficiary: null };
+  if (url.pathname === "/api/withdrawals/bank/config") return { enabled: false, banks: [], beneficiary: null, bankRoutingVerified: false };
   // An empty commission history is a successful canonical read. The page
   // also needs valid policy and member projections before showing its empty state.
   if (url.pathname === "/api/config/commission/rates") return {
@@ -279,7 +279,8 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       const form = page.getByTestId("bank-account-binding");
       const fields = form.locator("input"), account = form.locator('[data-testid="bank-account"] input'), holder = form.locator('[data-testid="bank-holder"] input');
       if (await fields.count() !== 2 || await account.count() !== 1 || await holder.count() !== 1) throw new Error("Bank binding must contain only account and holder inputs");
-      for (const field of [account, holder]) if (!await field.isEditable()) throw new Error("Bank account/holder input is not editable");
+      for (const field of [account, holder]) if (await field.isEditable()) throw new Error("Unverified bank routing must disable account/holder input");
+      if (!await form.locator(".error-note").isVisible()) throw new Error("Unverified bank routing notice is missing");
       if (await form.locator('[data-testid="bank-expiry"], [data-testid="bank-cvv"]').count()) throw new Error("Bank binding must not display expiry or CVV placeholders");
       const backButtons = page.getByRole("button", { name: "Back", exact: true });
       if (await backButtons.count() !== 1) throw new Error("Original header exit missing or duplicated");
@@ -298,11 +299,6 @@ const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
       if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Empty form can submit");
       const submitBounds = await submit.boundingBox();
       if (!submitBounds || submitBounds.height < 44 || await submit.getAttribute("tabindex") !== "0") throw new Error("Submit touch/keyboard target regressed");
-      // Fixture-only values; all API/auth routes are intercepted by the isolated
-      // formal session above. No real account or card is used by this probe.
-      // uni-input paints its placeholder in a sibling view rather than a native attribute.
-      await account.fill("00123456789");
-      await holder.fill("TEST USER");
       if (await submit.getAttribute("aria-disabled") !== "true") throw new Error("Missing direct-binding capability must prevent submission");
       await submit.press("Enter");
       if (await page.locator('[data-testid="bank-otp"], [data-testid="bank-select"]').count()) throw new Error("BANKQR must not show bank selection or OTP");

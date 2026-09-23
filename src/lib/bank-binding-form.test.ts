@@ -3,7 +3,7 @@ import { createBankBindingForm, directBankBindingAvailable, validBankRecipient }
 import { ApiError } from "@/api/errors";
 
 const beneficiary = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2099-09-17T00:00:00Z", nextChangeAt: "2099-09-23T00:00:00Z" };
-const config = { enabled: false, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", beneficiary: null };
+const config = { enabled: false, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", bankSelection: "ACCOUNT_ROUTED" as const, bankRoutingVerified: true, beneficiary: null };
 function fixture() {
   const api = { config: vi.fn().mockResolvedValue(config), bind: vi.fn().mockResolvedValue(beneficiary), sendOtp: vi.fn().mockResolvedValue({ challengeNo: "PAYOUT-BANK-"+"a".repeat(32), expiresInSeconds: 300, retryAfterSeconds: 60 }) };
   let current = "user-a:1";
@@ -19,12 +19,15 @@ describe("bank binding form", () => {
       { account: "1234x5678", holder: "NGUYEN VAN A" }, { account: "001234", holder: "A" }])
       expect(validBankRecipient(draft)).toBe(false);
   });
-  it("requires the server to confirm BANKQR plus no-bank/no-OTP capability", async () => {
+  it("requires explicit verified account routing before any binding or OTP", async () => {
     const { form, api, fill } = fixture(); fill();
     for (const c of [{ ...config, bankCodeRequired: undefined }, { ...config, bindingOtpRequired: true },
-      { ...config, payType: "BANK" }, { ...config, bankCodeRequired: true }]) {
+      { ...config, payType: "BANK" }, { ...config, bankCodeRequired: true },
+      { ...config, bankRoutingVerified: false }, { ...config, bankRoutingVerified: undefined },
+      { ...config, bankSelection: undefined }, { ...config, banks: [{ code: "VCB", name: "Vietcombank" }] }]) {
       api.config.mockResolvedValue(c); await form.load();
-      expect(form.canContinue()).toBe(false); await form.submit();
+      expect(form.state.error).toBe(c.bankRoutingVerified === true ? "unsupported" : "routingUnverified");
+      expect(form.canContinue()).toBe(false); expect(form.canSendOtp()).toBe(false); await form.submit();
     }
     expect(api.bind).not.toHaveBeenCalled();
   });
@@ -115,24 +118,15 @@ describe("bank binding form", () => {
   });
 });
 
-/**
- * zentao #143:绑定出来的提现账户**没有银行标识**。
- *
- * `bankCodeRequired === false` 只在服务端**声明由收款账号路由**(`ACCOUNT_ROUTED`,
- * 银行在打款时按账号识别)时才成立。此前客户端不看 `bankSelection`,于是两个字段
- * **显式矛盾**时也会放行空 `bankCode`。
- *
- * 判据刻意只拒绝显式矛盾:该字段在旧服务端上**缺席是正常状态**(契约注释写明),
- * 要求它必须存在会破坏兼容。
- */
-describe("direct bank binding requires an account-routed contract", () => {
+describe("direct bank binding requires verified account routing", () => {
   const base = { enabled: true, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", beneficiary: null };
 
-  it("refuses when the server says bank codes are optional but does not route by account", () => {
-    expect(directBankBindingAvailable({ ...base, bankSelection: undefined })).toBe(true);
-    expect(directBankBindingAvailable({ ...base, bankSelection: "ACCOUNT_ROUTED" })).toBe(true);
-    // 显式矛盾:既不要求银行代码,又没说由账号路由 —— 放行就会绑出无银行标识的账户。
-    expect(directBankBindingAvailable({ ...base, bankSelection: "USER_SELECTED" as never })).toBe(false);
+  it("refuses the current unverified contract and permits only explicit verified routing", () => {
+    expect(directBankBindingAvailable({ ...base, bankSelection: "ACCOUNT_ROUTED", bankRoutingVerified: false })).toBe(false);
+    expect(directBankBindingAvailable({ ...base, bankRoutingVerified: true })).toBe(false);
+    expect(directBankBindingAvailable({ ...base, bankSelection: "ACCOUNT_ROUTED", bankRoutingVerified: true })).toBe(true);
+    expect(directBankBindingAvailable({ ...base, bankSelection: "ACCOUNT_ROUTED", bankRoutingVerified: true,
+      banks: [{ code: "VCB", name: "Vietcombank" }] })).toBe(false);
   });
 
   it("still refuses when the server does require a bank code", () => {

@@ -12,33 +12,10 @@ export function validBankRecipient(draft: Recipient): boolean {
   return /^[0-9]{6,32}$/.test(draft.account.trim()) && name.length >= 2 && name.length <= 100
     && /^[\p{L}\p{M} .'-]+$/u.test(name);
 }
-/**
- * Whether "submit the account only, pick no bank" binding is allowed.
- *
- * zentao #143: this used to look at `bankCodeRequired === false` alone and never
- * at `bankSelection`, yet "bank code optional" is only sound when the server also
- * declares that it routes by receiving account (ACCOUNT_ROUTED -- the bank is
- * identified at payout). When the two fields contradict each other, the client
- * would submit an empty bankCode and bind an account with no bank identity.
- *
- * The predicate deliberately rejects only an **explicit contradiction**: the
- * contract documents bankSelection as absent on older servers, so demanding it
- * would break compatibility (and would reject channels that legitimately express
- * the same thing through bankCodeRequired alone). Absent = unknown = keep the
- * existing behaviour; present and not ACCOUNT_ROUTED = contradiction = fail closed.
- *
- * NOTE: this file keeps its comments in English on purpose (see the CJK sentinel in
- * scripts/verify.sh). The shared comment stripper does not understand regex
- * literals, and the character class on the `validBankRecipient` line above contains
- * a quote character, which makes the stripper treat the remainder of the file as a
- * string and stop stripping block comments -- so a Chinese comment here is judged as
- * code. English sidesteps that entirely; do not "localise" these comments.
- */
+/** Account-only binding needs explicit server proof that bank routing is verified. */
 export function directBankBindingAvailable(config: BankConfig | null): boolean {
-  const contradictsAccountRouting = config?.bankSelection !== undefined
-    && config.bankSelection !== "ACCOUNT_ROUTED";
-  return config?.payType === "BANKQR" && config.bankCodeRequired === false
-    && !contradictsAccountRouting
+  return config?.bankRoutingVerified === true && config.bankSelection === "ACCOUNT_ROUTED"
+    && config.banks.length === 0 && config.payType === "BANKQR" && config.bankCodeRequired === false
     && config.bindingOtpRequired === !!config.beneficiary;
 }
 function sameBeneficiary(a: BankBeneficiary | null, b: BankBeneficiary): boolean {
@@ -73,7 +50,7 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
     try {
       const config = await api.config(); if (!current()) return;
       state.config = config; clearOtp();
-      if (!directBankBindingAvailable(config)) state.error = "unsupported";
+      if (!directBankBindingAvailable(config)) state.error = config.bankRoutingVerified === true ? "unsupported" : "routingUnverified";
     } catch { if (current()) { state.config = null; state.error = "load"; } }
     finally { if (current()) state.busy = false; }
   }

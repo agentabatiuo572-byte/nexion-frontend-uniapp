@@ -7,12 +7,13 @@ export async function verifyBankBindingPage(page, gotoProtected) {
   await page.evaluate(async () => {
     const rt = await import("/src/api/runtime.ts");
     const { ApiError } = await import("/src/api/errors.ts");
-    const fixture = { beneficiary: null, binds: [], otps: 0, loseResponse: false, loadFails: false, supported: true };
+    const fixture = { beneficiary: null, binds: [], otps: 0, loseResponse: false, loadFails: false, supported: true, routingVerified: true };
     window.__bindingFixture = fixture; window.__bindingRestore = rt.apiClient.request;
     rt.apiClient.request = async request => {
       if (request.path === "/api/withdrawals/bank/config") {
         if (fixture.loadFails) throw new ApiError({kind:"network",message:"FIXTURE_OFFLINE"});
-        return {enabled:false,banks:[],bankCodeRequired:!fixture.supported,bindingOtpRequired:fixture.supported ? !!fixture.beneficiary : true,payType:"BANKQR",beneficiary:fixture.beneficiary};
+        return {enabled:false,banks:[],bankCodeRequired:!fixture.supported,bindingOtpRequired:fixture.supported ? !!fixture.beneficiary : true,payType:"BANKQR",
+          bankSelection:"ACCOUNT_ROUTED",bankRoutingVerified:fixture.routingVerified,beneficiary:fixture.beneficiary};
       }
       if (request.path === "/api/withdrawals/bank/beneficiary/otp") {
         fixture.otps++; if (!fixture.beneficiary) throw new Error("FIRST_BINDING_MUST_NOT_SEND_SMS");
@@ -99,14 +100,15 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     const replacementCalls=await page.evaluate(()=>window.__bindingFixture.binds.slice(2));
     assert.deepEqual(replacementCalls[0],replacementCalls[1]);
     assert.equal(await page.evaluate(()=>window.__bindingFixture.binds[2].body.code),"123456");
-    // An old server must not allow incompatible direct binding. Empty bank choices alone do not block BANKQR.
-    await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.beneficiary=null;window.__bindingFixture.supported=false;});
+    // An unverified bank route cannot accept recipient details or create a binding.
+    await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.beneficiary=null;window.__bindingFixture.routingVerified=false;});
     await gotoProtected("/pages/me/wallet-cards-new"); await page.locator(".error-note").waitFor();
-    await account.fill("00123456789"); await holder.fill("NGUYEN VAN A");
+    assert.match(await page.locator(".error-note").innerText(),/cannot be verified|无法验证|Chưa thể xác minh/i);
+    assert.equal(await account.isEditable(),false); assert.equal(await holder.isEditable(),false);
     assert.equal(await submit.getAttribute("aria-disabled"),"true");
-    await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.supported=true;window.__bindingFixture.loadFails=true;});
+    await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.routingVerified=true;window.__bindingFixture.loadFails=true;});
     await gotoProtected("/pages/me/wallet-cards-new"); await page.locator(".error-note").waitFor();
-    await account.fill("00123456789"); await holder.fill("NGUYEN VAN A");
+    assert.equal(await account.isEditable(),false); assert.equal(await holder.isEditable(),false);
     assert.equal(await submit.getAttribute("aria-disabled"),"true");
     await gotoProtected("/pages/me/wallet"); await gotoProtected("/pages/me/wallet-cards-new");
     assert.equal(await account.inputValue(),""); assert.equal(await holder.inputValue(),"");

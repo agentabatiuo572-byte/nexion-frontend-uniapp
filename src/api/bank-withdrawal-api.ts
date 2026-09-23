@@ -17,6 +17,7 @@ export interface BankUnresolvedIntent {
 export interface BankConfig {
   enabled: boolean; banks: { code: string; name: string }[]; beneficiary: BankBeneficiary | null;
   bankCodeRequired?: boolean; bindingOtpRequired?: boolean; payType?: string;
+  bankRoutingVerified?: boolean;
   // The provider routes by receiving account number, so the user cannot choose a bank.
   // ACCOUNT_ROUTED means "submit the account only; the bank is identified at payout".
   bankSelection?: "ACCOUNT_ROUTED"; bankSelectionNotice?: string; bankNameSource?: string;
@@ -169,6 +170,7 @@ export function createBankWithdrawalApi(client: ApiClient) {
       return { enabled: r.enabled, banks: r.banks.map(v => { const b = record(v); return { code: text(b.code), name: text(b.name) }; }),
         bankCodeRequired: r.bankCodeRequired !== false, bindingOtpRequired: r.bindingOtpRequired !== false,
         payType: typeof r.payType === "string" ? r.payType : undefined,
+        bankRoutingVerified: r.bankRoutingVerified === true,
         // Absent on older servers: undefined keeps the page from claiming a routing contract
         // the backend has not confirmed.
         bankSelection: r.bankSelection === "ACCOUNT_ROUTED" ? "ACCOUNT_ROUTED" : undefined,
