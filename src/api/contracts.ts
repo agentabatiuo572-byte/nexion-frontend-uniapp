@@ -73,6 +73,7 @@ export interface AuthSessionResponse {
   challengeNo?: string | null;
   deliveryHint?: string | null;
   refreshToken: string | null;
+  sessionSyncKey?: string | null;
   registrationReceipt?: RegistrationReceipt | null;
 }
 

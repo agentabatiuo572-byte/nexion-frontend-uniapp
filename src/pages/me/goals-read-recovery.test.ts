@@ -45,7 +45,8 @@ async function show(
       // The template formats its preset/remove accessible names through the shared helper.
       fmt: (template: string, params: Record<string, string>) =>
         template.replace(/\{(\w+)\}/g, (_m, key: string) => params[key] ?? ""),
-      target: 1000, days: 90, savePending: false, PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30],
+      target: 1000, days: 90, savePending: false, editorBlocked: status !== "ready",
+      PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30],
       goalsStore: { status, error: status === "error" ? "temporary" : "", goals, lifetimeEarningsUsdt: 25,
         recommendationStatus: recommendationState.status, recommendationError: recommendationState.error,
         recommendation: recommendationState.recommendation },
@@ -64,6 +65,13 @@ async function show(
 }
 
 describe("earning-goal read recovery", () => {
+  it("locks the default editor until the server goal has loaded", async () => {
+    const html = await show("loading", []);
+    expect(html).toMatch(/<input[^>]*disabled/);
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).not.toMatch(/<text[^>]*>Recommendation<\/text>/);
+  });
+
   it("keeps a confirmed snapshot and exposes a retry after a later list failure", async () => {
     const html = await show("error", [goal()]);
     expect(html).toContain("$500");
@@ -96,8 +104,8 @@ describe("earning-goal read recovery", () => {
     expect(html).not.toContain("Shop");
   });
 
-  it("executes mounted, shown, same-account-rebind, and explicit retry paths from the actual SFC script", async () => {
-    const start = source.indexOf("function refreshRemoteGoals");
+  it("restores the newest saved goal before recommending, including refresh and account rebind", async () => {
+    const start = source.indexOf("function restoreEditorFromGoal");
     const end = source.indexOf("function deadlineLine");
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
@@ -107,18 +115,37 @@ describe("earning-goal read recovery", () => {
     const app = Vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1 });
     const target = Vue.ref(1000);
     const days = Vue.ref(90);
-    const goalsStore = { ensure: vi.fn().mockResolvedValue(undefined), refresh: vi.fn().mockResolvedValue(undefined), refreshRecommendation: vi.fn().mockResolvedValue(undefined) };
-    const execute = new Function("remoteApiEnabled", "goalsStore", "target", "days", "ONE_DAY_MS", "onMounted", "onShow", "watch", "app", `${ts.transpileModule(implementation, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText}; return { refreshRemoteGoals, retryGoals };`);
+    const savePending = Vue.ref(false);
+    const older = { ...goal("older"), targetUSDT: 1000, createdAt: Date.now() - 2 * 86_400_000 };
+    const stored = { ...goal("newer"), deadlineMs: Date.now() + 30 * 86_400_000,
+      createdAt: Date.now() - 86_400_000 };
+    const goalsStore = {
+      accountEpoch: 1, status: "ready", goals: [stored, older],
+      ensure: vi.fn().mockResolvedValue(undefined), refresh: vi.fn().mockResolvedValue(undefined),
+      refreshRecommendation: vi.fn().mockResolvedValue(undefined),
+    };
+    const execute = new Function("remoteApiEnabled", "goalsStore", "target", "days", "savePending", "ONE_DAY_MS", "onMounted", "onShow", "watch", "app", `let editorReadEpoch = 0; let restoringEditor = false; ${ts.transpileModule(implementation, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText}; return { refreshRemoteGoals, retryGoals };`);
     const scope = Vue.effectScope();
-    const page = scope.run(() => execute(true, goalsStore, target, days, 86_400_000, (hook: () => void) => mount.push(hook), (hook: () => void) => showHooks.push(hook), Vue.watch, app));
-    mount.forEach((hook) => hook()); showHooks.forEach((hook) => hook());
+    const page = scope.run(() => execute(true, goalsStore, target, days, savePending, 86_400_000, (hook: () => void) => mount.push(hook), (hook: () => void) => showHooks.push(hook), Vue.watch, app));
+    expect(mount).toHaveLength(1);
+    expect(showHooks).toHaveLength(1);
+    await page.refreshRemoteGoals();
+    expect(target.value).toBe(500);
+    expect(days.value).toBe(30);
+    expect(goalsStore.refreshRecommendation).toHaveBeenCalledExactlyOnceWith(500, expect.any(Number));
+
+    target.value = 1000;
+    expect(goalsStore.refreshRecommendation).toHaveBeenLastCalledWith(1000, expect.any(Number));
     app.accountBindingEpoch += 1;
     await Vue.nextTick();
-    page.retryGoals();
-
-    expect(goalsStore.ensure).toHaveBeenCalledTimes(3);
-    expect(goalsStore.refreshRecommendation).toHaveBeenCalledTimes(4);
+    await page.refreshRemoteGoals(true);
+    expect(target.value).toBe(500);
+    expect(days.value).toBe(30);
     expect(goalsStore.refresh).toHaveBeenCalledTimes(1);
+    goalsStore.goals = [];
+    await page.refreshRemoteGoals(true);
+    expect(target.value).toBe(1000);
+    expect(days.value).toBe(90);
     scope.stop();
   });
 });

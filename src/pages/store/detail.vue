@@ -297,7 +297,7 @@ import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-o
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import type { PurchaseEligibilityCondition, PurchaseEligibilityPolicy } from "@/api/purchase-eligibility-api";
-import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
@@ -697,9 +697,8 @@ watch(
     if (remoteApiEnabled && !eligibility.value.eligible) {
       const quotaDepleted = purchaseEligibilityMessage.value === "quotaDepleted";
       sticky.show({
-        // 🔴 zentao #246:必须带上**当前商品**的 id。配额页只列它自己的档位,
-        //   不传 id 时它会展示另一件商品的配额,用户点「查看解锁条件」却看到别人的条件。
-        href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : `/pages/team/quota?product=${encodeURIComponent(product.value.id)}`,
+        // A rank-only product has no quota tier; take the user to rank progression.
+        href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : purchaseEligibilityUnlockHref(eligibility.value.snapshot!, product.value.id),
         amount: `$${priceText.value}`,
         amountSubtext: quotaDepleted
           ? t.value.store.purchaseEligibilityQuotaDepleted

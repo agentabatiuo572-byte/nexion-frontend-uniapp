@@ -20,6 +20,8 @@ test("a refreshed H5 account restores its HttpOnly-cookie session before the rou
   assert.match(app, /type ServerSessionRestoreState = "idle" \| "restoring" \| "ready" \| "failed"/);
   assert.match(app, /serverSessionRestoreState === "restoring"/);
   assert.match(app, /await authApi\.restore\(\)/);
+  assert.match(app, /COOKIE_LOCK_UNAVAILABLE[\s\S]*?clearInvalidRemoteSessionState\(useAuth\(\)\)[\s\S]*?secure-browser-unsupported/,
+    "a browser without the required cookie lock must clear the old account projection before showing login");
   assert.match(app, /completeSignIn\(\{[\s\S]*?serverProfile: restored\.user[\s\S]*?serverSessionRevision: sessionVault\.revision\(\)/);
   assert.match(app, /beginServerSessionRestore\(\)/);
   assert.doesNotMatch(app, /runtime vault is deliberately in-memory, so refresh\/restart means a[\s\S]*?clean sign-in/);

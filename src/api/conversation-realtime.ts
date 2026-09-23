@@ -82,7 +82,7 @@ export class ConversationRealtime {
           }
         }catch{this.disconnect(true);}
       };
-    }catch(e){if(current()){const code=(e as {status?:number;code?:number}).status??(e as {code?:number}).code;this.disconnect(true,code===401||code===403||code===428);}}
+    }catch(e){if(current()){const code=(e as {status?:number;code?:number}).status??(e as {code?:number}).code;this.disconnect(true,code===401||code===403);}}
   }
   private async sync(epoch:number){
     if(this.syncing||!this.authenticated)return;

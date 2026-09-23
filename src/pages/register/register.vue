@@ -37,7 +37,7 @@
       </view>
       <text class="rg-subtitle">
         <!-- 奖励金额护栏(包 zm T1):配置未到位/被中毒清零时金额句整体让位,$0 永不上转化首屏 -->
-        <template v-if="step === 1"><template v-if="newcomerSubtitle === 'amount'"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { usd: giftUsdt }) }}</text>{{ t.register.subtitleRest }}</template><template v-else-if="newcomerSubtitle === 'prepared'">{{ t.register.subtitleNoBonus }}</template><template v-else>{{ t.register.subtitleRewardDisabled }}</template></template>
+        <template v-if="step === 1"><template v-if="newcomerSubtitle === 'amount'"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { reward: giftLabel }) }}</text>{{ t.register.subtitleRest }}</template><template v-else>{{ t.register.subtitleRewardDisabled }}</template></template>
         <template v-else-if="step === 2">{{ t.register.codeSentTo }} <text class="rg-subtitle__ph">{{ country }} {{ phone }}</text></template>
         <template v-else>{{ t.register.setPasswordHint }}</template>
       </text>
@@ -211,18 +211,19 @@ const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 // 礼包金额单源派生自 platform config(禁本地常量镜像)。
 const remotePreview = ref<PublicSponsorPreview | null>(null);
 const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
-// 🔴 zentao #227:H8 奖励闸门关闭时,金额会被 visibleReferralGift 归零,但**文案不能**
-//   跟着只走「金额为 0」这一条分支 —— 那条分支写的是「新人奖励已备好,连接设备即刻到账」,
-//   于是在闸门停用期间页面照样承诺一份不会到账的奖励。闸门本身就是文案的判据。
+// H8 闸门或邀请预览未确认金额时，注册页不承诺新人奖励。
 const rewardGateEnabled = computed(() => cfg.config.rewards.enabled);
-/** 副标题分档由 lib/referral-reward-gate.ts 单一宿主决定(闸门优先于金额)。 */
-const newcomerSubtitle = computed(() => newcomerSubtitleKind(rewardGateEnabled.value, giftUsdt.value));
+const newcomerSubtitle = computed(() => newcomerSubtitleKind(rewardGateEnabled.value, giftUsdt.value, giftNex.value));
 const giftUsdt = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.usdtAmount ?? 0
   : localGift.value.usdtAmount);
 const giftNex = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.nexAmount ?? 0
   : localGift.value.nexAmount);
+const giftLabel = computed(() => [
+  giftUsdt.value > 0 ? `${giftUsdt.value} USDT` : "",
+  giftNex.value > 0 ? `${giftNex.value} NEX` : "",
+].filter(Boolean).join(" + "));
 
 type Step = 1 | 2 | 3;
 
@@ -740,6 +741,7 @@ async function finish() {
       code: codeStr.value,
       password: password.value,
       sponsorCode: currentSponsorCode(),
+      language: useLocaleStore().code,
     }, () => isCurrentRemoteRegistrationAttempt(registrationAttempt));
     if (registration.kind === "stale" || !isCurrentRemoteRegistrationAttempt(registrationAttempt)) return;
     if (registration.kind === "registration_error") {

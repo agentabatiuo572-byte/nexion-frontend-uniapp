@@ -114,7 +114,8 @@
             :style="suggestionRowStyle(i === suggestions.length - 1)"
             role="button"
             tabindex="0"
-            :aria-label="fmt(t.uiChrome.addItem, { name: p.name })"
+            :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
+              ? `${p.name} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: p.name })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
@@ -123,9 +124,12 @@
               <text class="block" :style="itemMetaStyle">
                 <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
               </text>
+              <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
+              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+              <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
             </view>
           </view>
         </view>
@@ -251,8 +255,6 @@ onShow(() => {
   void refreshServerProductPhase(true);
   void refreshBundlePolicy();
   void refreshBundleWallet();
-  if (remoteApiEnabled) void Promise.all(products.value.map((p) =>
-    purchaseEligibilityStore.ensure(p.id, purchaseEligibilityStore.state(p.id).status === "ready")));
   restoreReceiptRecovery();
 });
 
@@ -272,9 +274,6 @@ const products = computed<Product[]>(() =>
       .filter((p) => isProductAvailable(p, phase.value))
     : [],
 );
-watch([() => products.value.map((p) => p.id).join("|"), () => app.accountKey], () => {
-  if (remoteApiEnabled) void Promise.all(products.value.map((p) => purchaseEligibilityStore.ensure(p.id)));
-}, { immediate: true });
 const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
 const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
 const bundleQuote = computed(() => quoteBundleAmountUsdt(
@@ -296,6 +295,11 @@ const suggestions = computed(() =>
     ).slice(0, 3)
     : [],
 );
+watch([() => products.value.map((p) => p.id).join("|"),
+  () => suggestions.value.map((p) => p.id).join("|"), () => app.accountKey], () => {
+  if (remoteApiEnabled) void Promise.all([...products.value, ...suggestions.value]
+    .map((p) => purchaseEligibilityStore.ensure(p.id, true)));
+}, { immediate: true });
 
 function retryCatalog() {
   void refreshProductCatalog(true);
@@ -417,12 +421,16 @@ function clear() {
 }
 async function onAddSuggestion(p: Product) {
   if (remoteApiEnabled) {
+    if (purchaseEligibilityStore.state(p.id).status === "ready" && !purchaseEligibilityStore.state(p.id).eligible) {
+      navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
+      return;
+    }
     const scope = captureAccountScope();
     const eligible = await purchaseEligibilityStore.ensure(p.id, true);
     if (!isCurrentAccountScope(scope)) return;
     if (!eligible) {
-      toast.warn(purchaseEligibilityStore.state(p.id).status === "error"
-        ? t.value.store.purchaseEligibilityError : t.value.store.gateBlockedToast);
+      if (purchaseEligibilityStore.state(p.id).status === "error") toast.warn(t.value.store.purchaseEligibilityError);
+      else navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
       return;
     }
   }

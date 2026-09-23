@@ -46,6 +46,12 @@ describe("conversation-center refresh failure contract", () => {
     expect(source.indexOf("convStore.categoryAvailabilityStatus === 'loading'")).toBeLessThan(source.indexOf('v-if="canStartConversation"'));
   });
 
+  it("shows a retryable polling notice when the human realtime channel fails", () => {
+    expect(source).toContain("selectedType !== 'ai' && convStore.realtimeFallback");
+    expect(source).toContain("t.conversations.realtimeFallback");
+    expect(source).toContain('role="status" aria-live="polite"');
+  });
+
   it("gives a failed prior AI selection the same retry state as a human category", () => {
     expect(source).not.toContain("selectedType !== 'ai' && (convStore.error || convStore.categoryAvailabilityStatus === 'failed')");
     expect(source).toContain("convStore.error || convStore.categoryAvailabilityStatus === 'failed'");

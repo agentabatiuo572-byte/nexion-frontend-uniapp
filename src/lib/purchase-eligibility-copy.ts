@@ -6,6 +6,16 @@ import {
 export type PurchaseEligibilityRequestStatus = "idle" | "loading" | "ready" | "error";
 export type PurchaseEligibilityMessage = "eligible" | "ineligible" | "quotaDepleted" | "error";
 
+/** Send a rank-only denial to the rank progression page, not an unrelated quota tier. */
+export function purchaseEligibilityUnlockHref(snapshot: PurchaseEligibilitySnapshot, productNo: string): string {
+  const hasUnmetQuotaConditions = snapshot.policies.some((policy) =>
+    policy.policy === "F4B" && policy.conditions.some((condition) => !condition.met));
+  const needsRank = snapshot.policies.some((policy) =>
+    policy.policy === "E1" && policy.conditions.some((condition) => condition.kind === "rank" && !condition.met));
+  if (needsRank && !hasUnmetQuotaConditions) return "/pages/team/rank";
+  return `/pages/team/quota?product=${encodeURIComponent(productNo)}`;
+}
+
 /**
  * Resolve checkout copy from the server response only. A response that is
  * unknown, internally inconsistent, or absent is an error: local rank/team

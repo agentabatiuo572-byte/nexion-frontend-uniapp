@@ -46,6 +46,57 @@ function deferred<T>() {
 }
 
 describe("auth refresh adversarial regressions", () => {
+  it("clears the old account when another tab replaces the shared cookie with a different account", async () => {
+    const vault = createSessionVault();
+    vault.save(snapshot(userA, "expired-a", "cookie"));
+    const onUnauthorized = vi.fn();
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "TOKEN_EXPIRED", data: null }, headers: {} })
+      .mockResolvedValueOnce({ status: 200, data: { code: 0, message: "success", data: sessionResponse(userB, "access-b", "cookie") }, headers: {} });
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:8110", transport: { request }, vault,
+      onUnauthorized, refreshCredentialMode: "cookie" });
+
+    await expect(api.request({ path: "/api/app/home/overview" })).rejects.toThrow("SESSION_EXPIRED");
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(vault.read()).toBeNull();
+  });
+
+  it("clears protected state when the retried resource rejects the rotated bearer", async () => {
+    const vault = createSessionVault();
+    vault.save(snapshot(userA, "old-access"));
+    const onUnauthorized = vi.fn();
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "TOKEN_EXPIRED", data: null }, headers: {} })
+      .mockResolvedValueOnce({ status: 200, data: { code: 0, message: "success", data: sessionResponse(userA, "new-access") }, headers: {} })
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "TOKEN_REVOKED", data: null }, headers: {} });
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:8110", transport: { request }, vault, onUnauthorized });
+
+    await expect(api.request({ path: "/api/app/home/overview" })).rejects.toThrow("TOKEN_REVOKED");
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(vault.read()).toBeNull();
+  });
+
+  it("does not clear a newer login when a retried old resource rejects late", async () => {
+    const vault = createSessionVault();
+    vault.save(snapshot(userA, "old-access"));
+    const onUnauthorized = vi.fn();
+    const retry = deferred<{ status: number; data: unknown; headers: Record<string, string> }>();
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 401, data: { code: 401, message: "TOKEN_EXPIRED", data: null }, headers: {} })
+      .mockResolvedValueOnce({ status: 200, data: { code: 0, message: "success", data: sessionResponse(userA, "new-access") }, headers: {} })
+      .mockImplementationOnce(() => retry.promise);
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:8110", transport: { request }, vault, onUnauthorized });
+    const pending = api.request({ path: "/api/app/home/overview" });
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(3));
+    vault.save(snapshot(userB, "later-login"));
+    retry.resolve({ status: 401, data: { code: 401, message: "TOKEN_REVOKED", data: null }, headers: {} });
+
+    await expect(pending).rejects.toThrow("TOKEN_REVOKED");
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(vault.read()).toMatchObject({ accessToken: "later-login", user: userB });
+  });
+
   it("treats USER_REFRESH_NOT_ALLOWED as terminal and consumes the rejected session", async () => {
     const vault = createSessionVault();
     vault.save(snapshot(userA, "expired-access"));
@@ -156,6 +207,23 @@ describe("auth refresh adversarial regressions", () => {
     await expect(restore).resolves.toMatchObject({ accessToken: "rotated-access", user: userA });
     await expect(clientRefresh).resolves.toMatchObject({ accessToken: "rotated-access", user: userA });
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits the later cookie rotation after a same-account peer refresh", async () => {
+    const vault = createSessionVault();
+    vault.save(snapshot(userA, "old-access", "cookie"));
+    const response = deferred<{ status: number; data: unknown; headers: Record<string, string> }>();
+    const request = vi.fn(() => response.promise);
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:8110", transport: { request }, vault,
+      refreshCredentialMode: "cookie",
+    });
+    const pending = api.refreshSession();
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    vault.refreshIfUnchanged(snapshot(userA, "peer-access", "cookie"), vault.revision());
+    response.resolve({ status: 200, data: { code: 0, message: "success", data: sessionResponse(userA, "latest-access", "cookie") }, headers: {} });
+    await expect(pending).resolves.toMatchObject({ accessToken: "latest-access" });
+    expect(vault.read()?.accessToken).toBe("latest-access");
   });
 
   it("does not let an older cookie restore overwrite a newer vault revision", async () => {

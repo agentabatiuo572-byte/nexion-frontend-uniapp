@@ -151,6 +151,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       const send = () => options.transport.request(request);
       response = refreshCredentialMode === "cookie" && request.method === "POST"
         && request.url.startsWith(`${baseUrl}/auth/users/`)
+        && request.url !== `${baseUrl}/auth/users/refresh`
+        // Logout revokes the whole refresh chain even if another tab rotates
+        // concurrently. It must remain available if Web Locks is disabled.
+        && request.url !== `${baseUrl}/auth/users/logout`
         ? await withSessionCookieLock(send)
         : await send();
     } catch (error) {
@@ -232,7 +236,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
       }
       if (current && data.user.userId !== current.user.userId) {
-        throw new ApiError({ kind: "protocol", message: "REFRESH_USER_MISMATCH" });
+        return expireSession(revision);
       }
       const next: SessionSnapshot = {
         accessToken: data.accessToken,
@@ -240,8 +244,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         tokenType: data.tokenType,
         user: data.user,
         refreshCredentialMode,
+        sessionSyncKey: typeof data.sessionSyncKey === "string" ? data.sessionSyncKey : undefined,
       };
-      if (!options.vault.refreshIfUnchanged(next, revision)) {
+      const commitRevision = options.vault.revision();
+      if (commitRevision !== revision && !options.vault.isRefreshContinuation(revision)) {
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
+      }
+      if (!options.vault.refreshIfUnchanged(next, commitRevision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
       }
       return next;
@@ -261,7 +270,15 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
   function refreshSession(): Promise<SessionSnapshot> {
     if (!refreshInFlight) {
-      refreshInFlight = refreshNow().finally(() => {
+      const revision = options.vault.revision();
+      const refresh = refreshCredentialMode === "cookie"
+        ? withSessionCookieLock(refreshNow) : refreshNow();
+      refreshInFlight = refresh.catch(async (error: unknown) => {
+        const apiError = asApiError(error);
+        if (apiError.message === "COOKIE_LOCK_UNAVAILABLE" && options.vault.read()
+            && options.vault.clearIfUnchanged(revision)) await options.onUnauthorized?.();
+        throw apiError;
+      }).finally(() => {
         refreshInFlight = null;
       });
     }
@@ -319,16 +336,25 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
       }
-      return execute<T>(
-        {
-          ...httpRequest,
-          headers: {
-            ...httpRequest.headers,
-            Authorization: `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`,
+      const retryRevision = options.vault.revision();
+      try {
+        return await execute<T>(
+          {
+            ...httpRequest,
+            headers: {
+              ...httpRequest.headers,
+              Authorization: `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`,
+            },
           },
-        },
-        apiRequest.acceptedResponses,
-      );
+          apiRequest.acceptedResponses,
+        );
+      } catch (retryError) {
+        const rejected = asApiError(retryError);
+        if (rejected.kind === "auth" && options.vault.revision() === retryRevision) {
+          return terminateSession(retryRevision, rejected.message, rejected.status ?? 401, rejected.code ?? 401);
+        }
+        throw rejected;
+      }
     }
   }
 
@@ -375,8 +401,17 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
       }
+      const retryRevision = options.vault.revision();
       uploadRequest.headers.Authorization = `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`;
-      return executeUpload();
+      try {
+        return await executeUpload();
+      } catch (retryError) {
+        const rejected = asApiError(retryError);
+        if (rejected.kind === "auth" && options.vault.revision() === retryRevision) {
+          return terminateSession(retryRevision, rejected.message, rejected.status ?? 401, rejected.code ?? 401);
+        }
+        throw rejected;
+      }
     }
   }
 

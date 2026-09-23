@@ -16,7 +16,7 @@ const handlers = ts.transpileModule(functions.map((node) => node.getText(parsed)
   compilerOptions: { target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
-function fixture(failure: unknown, messages = en) {
+function fixture(failure: unknown, messages = en, language: "en" | "vi" | "zh" = "en") {
   vi.useFakeTimers();
   const code = ref(["1", "2", "3", "4", "5", "6"]);
   const otpRequestId = ref<string | null>("old-challenge");
@@ -29,7 +29,7 @@ function fixture(failure: unknown, messages = en) {
     focusIdx: ref(5), resendLeft: ref(12), pwdOk: ref(true), pwdMatch: ref(true), remoteApiEnabled: true,
     fullPhone: ref("+8619900009112"), country: ref("+86"), phoneClean: ref("19900009112"), password: ref("fixture-only"),
     currentSponsorCode: () => null, geoText: () => null, t: ref(messages),
-    completeSignIn: vi.fn().mockReturnValue({ ok: true }), useLocaleStore: () => ({ code: "en" }),
+    completeSignIn: vi.fn().mockReturnValue({ ok: true }), useLocaleStore: () => ({ code: language }),
     registrationCompletionDestination: () => "/pages/register/success", stageRemoteRegistrationReceipt: vi.fn(),
     launchRegistrationSuccess: vi.fn(), toast: { success: vi.fn() }, clearInterval,
   };
@@ -108,6 +108,11 @@ describe("Registration verifies with the server before password setup", () => {
 });
 
 describe("Registration rejection recovery", () => {
+  it.each(["en", "vi", "zh"] as const)("sends the selected %s language with registration", async (language) => {
+    const page = fixture(new Error("offline"), en, language);
+    await page.finish();
+    expect(page.authApi.register).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ language }));
+  });
   it.each([en, zh, vietnamese])("returns an invalid or expired OTP to a translated fresh-code step", async (messages) => {
     const page = fixture(new ApiError({ kind: "http", status: 422, message: "USER_REGISTRATION_OTP_INVALID" }), messages);
     await page.finish();

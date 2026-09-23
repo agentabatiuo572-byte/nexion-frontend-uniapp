@@ -46,6 +46,7 @@ export interface RegistrationRequest extends RegistrationOtpRequest {
   code: string;
   password: string;
   sponsorCode: string | null;
+  language?: string;
 }
 
 export type OAuthProvider = "GOOGLE" | "APPLE" | "PASSKEY" | "TELEGRAM";
@@ -178,6 +179,7 @@ function sessionFromResponse(data: AuthSessionResponse, refreshCredentialMode: R
     tokenType: data.tokenType,
     user: data.user,
     refreshCredentialMode,
+    sessionSyncKey: typeof data.sessionSyncKey === "string" ? data.sessionSyncKey : undefined,
   };
 }
 
@@ -243,6 +245,7 @@ function oauthExchangeFromResponse(
     tokenType: data.tokenType,
     user: data.user,
     refreshCredentialMode,
+    sessionSyncKey: typeof data.sessionSyncKey === "string" ? data.sessionSyncKey : undefined,
   };
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });

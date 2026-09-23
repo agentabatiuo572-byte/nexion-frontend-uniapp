@@ -4,6 +4,7 @@ import source from "./App.vue?raw";
 import { createApiClient } from "./api/api-client";
 import { createAuthApi } from "./api/auth-api";
 import { createSessionVault } from "./api/session-vault";
+import { ApiError } from "./api/errors";
 import { createRemoteAccountEpoch } from "./lib/remote-account-epoch";
 import { isPublicAuthRoute } from "./lib/auth-route-visibility";
 
@@ -51,7 +52,7 @@ function harness(request = vi.fn(), route = "pages/earn/earn") {
     hasServerAuthenticatedAccountTrace: () => auth.isAuthenticated && auth.accountId.startsWith("user:"),
     readCurrentRoute: () => route, isAuthWhitelisted: isPublicAuthRoute,
     setRemoteUnauthorizedHandler: (fn: () => void) => { onUnauthorized = fn; },
-    toast, useT: () => ({ value: { session: { restoreRetryNotice: "Session restore unavailable; retrying" } } }),
+    toast, ApiError, useT: () => ({ value: { session: { restoreRetryNotice: "Session restore unavailable; retrying" } } }),
   };
   const compiled = new Function("deps", `
     const { ${Object.keys(deps).join(",")} } = deps;
@@ -60,6 +61,7 @@ function harness(request = vi.fn(), route = "pages/earn/earn") {
     const SERVER_SESSION_RESTORE_RETRY_MS = 15000;
     let serverSessionRestoreState = 'idle', serverSessionRestoreInFlight = null;
     let serverSessionRestoreRetryAt = 0, serverSessionRestoreNoticeShown = false;
+    let secureBrowserUnsupported = false;
     let pendingServerSessionRecovery = false, serverAuthenticatedAccountTraceAtBoot = false, serverSessionProbeAt = 0;
     ${appEntryPoints()}
     return { restore: beginServerSessionRestore, guard: checkAuthGuard, cleanup: clearInvalidRemoteSessionState,
@@ -107,6 +109,17 @@ describe("App cookie restoration and expired account isolation", () => {
     expect(h.nav).not.toHaveBeenCalled();
     expect(h.storesEpoch.isCurrent(old)).toBe(true);
     expect(h.toast.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears authority and keeps routing to login when cookie locking is unavailable", async () => {
+    const request = vi.fn().mockRejectedValue(new ApiError({ kind: "configuration", message: "COOKIE_LOCK_UNAVAILABLE" }));
+    const h = harness(request);
+    await expect(h.restore()).resolves.toBe(false);
+    expect(h.auth.isAuthenticated).toBe(false);
+    expect(h.nav).toHaveBeenCalledWith({ url: "/pages/login/login?notice=secure-browser-unsupported" });
+    h.nav.mockClear();
+    expect(h.guard()).toBe(true);
+    expect(h.nav).toHaveBeenCalledWith({ url: "/pages/login/login?notice=secure-browser-unsupported" });
   });
 
   it("backs off retry attempts and resumes from a successful server response", async () => {

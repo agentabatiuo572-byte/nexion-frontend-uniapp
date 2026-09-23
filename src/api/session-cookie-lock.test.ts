@@ -13,8 +13,15 @@ describe("session cookie rotation lock", () => {
     const request = vi.fn().mockRejectedValue(new Error("lock unavailable"));
     vi.stubGlobal("navigator", { locks: { request } });
     const work = vi.fn();
-    await expect(withSessionCookieLock(work)).rejects.toThrow("lock unavailable");
+    await expect(withSessionCookieLock(work)).rejects.toMatchObject({
+      kind: "configuration", message: "COOKIE_LOCK_UNAVAILABLE",
+    });
     expect(work).not.toHaveBeenCalled();
+  });
+  it("preserves an error raised by work after acquiring the lock", async () => {
+    vi.stubGlobal("navigator", { locks: { request: (_name: string, work: () => Promise<unknown>) => work() } });
+    await expect(withSessionCookieLock(async () => { throw new Error("server failed"); }))
+      .rejects.toThrow("server failed");
   });
   it("serializes same-context fallback work and recovers after a rejected mutation", async () => {
     vi.stubGlobal("navigator", undefined);
@@ -29,5 +36,13 @@ describe("session cookie rotation lock", () => {
     await rejected;
     await expect(next).resolves.toBe(2);
     expect(calls).toEqual(["first", "next"]);
+  });
+  it("never sends a browser cookie mutation without a cross-tab lock", async () => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("indexedDB", undefined);
+    const work = vi.fn(async () => "unsafe");
+    await expect(withSessionCookieLock(work)).rejects.toThrow("COOKIE_LOCK_UNAVAILABLE");
+    expect(work).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
+import { specRow } from '@/lib/product-copy';
 import searchPage from './search.vue?raw';
 
 const pageSource = searchPage;
@@ -35,21 +36,30 @@ function setup(remoteApiEnabled = true, refreshCatalog?: ReturnType<typeof vi.fn
   const refreshProductCatalog = refreshCatalog ?? vi.fn(async () => true);
   const staking = { syncRemote: vi.fn(async () => undefined) };
   const locale = reactive({ code: 'zh' });
+  const t = ref({ store: { specGpu: 'GPU', specVram: 'VRAM' } });
+  const productCopy = vi.fn(() => ({ tagline: 'Localized fixture tagline' }));
   const factory = new Function(
     'computed', 'app', 'network', 'remoteApiEnabled', 'productCatalogState', 'productCatalogPresentation', 'PRODUCTS',
     'refreshProductCatalog', 'staking', 'locale', 'createPageVisibilityRefresh', 'bindPageVisibilityRefresh',
-    'watch', 'onMounted', 'onShow', 'onHide', 'ref', 'supportApi', 'readPublishedFaqPages',
-    `${executableSourceBlock}\nreturn { refreshSearchSources, refreshPublishedFaqs, publishedFaqs, publishedFaqStatus, devices, members, searchableProducts };`,
+    'watch', 'onMounted', 'onShow', 'onHide', 'ref', 'supportApi', 'readPublishedFaqPages', 't', 'productCopy', 'specRow',
+    `${executableSourceBlock}\nreturn { refreshSearchSources, refreshPublishedFaqs, publishedFaqs, publishedFaqStatus, devices, members, searchableProducts, productSearchDetail };`,
   );
   const value = factory(
     computed, app, network, remoteApiEnabled, productCatalogState, productCatalogPresentation, PRODUCTS,
     refreshProductCatalog, staking, locale, () => ({ dispose: () => undefined }), () => () => undefined,
-    () => undefined, () => undefined, () => undefined, () => undefined, ref, {}, faqReader,
+    () => undefined, () => undefined, () => undefined, () => undefined, ref, {}, faqReader, t, productCopy, specRow,
   );
   return { ...value, app, network, productCatalogState, productCatalogPresentation, refreshProductCatalog, staking, locale, faqReader };
 }
 
 describe('search remote source wiring', () => {
+  it('shows server SKU specs instead of a conflicting marketing tagline', () => {
+    const sku = { id: 'p2', name: 'StellarRack P2', price: 7499, tagline: 'H100 rack', gpu: '8× RTX 4090', vram: '192GB' };
+    expect(setup(true).productSearchDetail(sku)).toBe('8× RTX 4090 · 192GB');
+    expect(setup(true).productSearchDetail({ ...sku, gpu: 'unavailable', vram: '' })).toBe('');
+    expect(setup(false).productSearchDetail(sku)).toBe('Localized fixture tagline');
+  });
+
   it('searches only the current server catalogue in remote mode and no mock product while loading or failed', () => {
     const remote = setup(true);
     expect(remote.searchableProducts.value.map((p: { id: string }) => p.id)).toEqual(['server-sku']);

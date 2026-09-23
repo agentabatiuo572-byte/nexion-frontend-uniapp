@@ -210,10 +210,10 @@ export const useNova = defineStore("nova", () => {
 
   function failRemote(turnId: string, failure: NovaFailure) {
     const head = pendingRemote.value[0];
-    if (head?.turnId !== turnId || head.delivery !== "processing") return;
+    if (head?.turnId !== turnId || !["processing", "tracking"].includes(head.delivery!)) return;
     head.delivery = "failed";
     head.failure = failure;
-    head.serverPending = undefined;
+    head.serverPending = failure === "timeout" ? true : undefined;
   }
 
   function trackRemote(turnId: string): boolean {
@@ -230,7 +230,6 @@ export const useNova = defineStore("nova", () => {
     if (head?.turnId !== turnId || head.delivery !== "failed") return false;
     head.delivery = "queued";
     head.failure = undefined;
-    head.serverPending = undefined;
     return true;
   }
 

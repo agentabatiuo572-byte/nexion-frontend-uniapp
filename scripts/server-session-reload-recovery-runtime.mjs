@@ -3,9 +3,14 @@ import { chromium } from "playwright";
 
 const base = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://127.0.0.1:5173";
 const browser = await chromium.launch();
+const rejectMissingCookie = (route) => route.fulfill({
+  status: 401, contentType: "application/json",
+  body: JSON.stringify({ code: 401, message: "AUTH_REQUIRED", data: null }),
+});
 
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  await context.route("**/auth/users/refresh", rejectMissingCookie);
   await context.addInitScript(() => {
     localStorage.clear();
     localStorage.setItem("nexgrid-auth-v1", JSON.stringify({
@@ -48,6 +53,7 @@ try {
   await context.close();
 
   const freshContext = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  await freshContext.route("**/auth/users/refresh", rejectMissingCookie);
   await freshContext.addInitScript(() => {
     localStorage.clear();
     localStorage.setItem("nexgrid-locale-v1", JSON.stringify({

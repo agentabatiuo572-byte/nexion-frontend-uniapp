@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { resolvePurchaseEligibilityMessage } from "./purchase-eligibility-copy";
+import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "./purchase-eligibility-copy";
 
 const base = {
   productNo: "stellarbox-pro-v2",
@@ -26,4 +26,20 @@ test("unknown, malformed, or failed remote decisions map to error and never loca
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: false, decisionCode: "CLIENT_GUESSED" })).toBe("error");
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: true, decisionCode: "PURCHASE_GATE_NOT_MET" })).toBe("error");
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: true, decisionCode: "ELIGIBLE" })).toBe("eligible");
+});
+
+test("rank-only product opens rank progression instead of another product quota", () => {
+  const rank = { kind: "rank" as const, current: 0, required: 2, gap: 2, met: false };
+  const snapshot = { ...base, eligible: false, decisionCode: "PURCHASE_GATE_NOT_MET", policies: [
+    { ...base.policies[0], eligible: false, decisionCode: "PURCHASE_GATE_NOT_MET", conditions: [rank] },
+    base.policies[1],
+  ] };
+  expect(purchaseEligibilityUnlockHref(snapshot, "stellarbox-pro-v2")).toBe("/pages/team/rank");
+  const quotaCondition = { kind: "activeDirect" as const, current: 0, required: 5, gap: 5, met: false };
+  expect(purchaseEligibilityUnlockHref({ ...snapshot, policies: [snapshot.policies[0],
+    { ...base.policies[1], conditions: [{ ...quotaCondition, current: 5, gap: 0, met: true }] }] }, "stellarbox-pro-v2"))
+    .toBe("/pages/team/rank");
+  expect(purchaseEligibilityUnlockHref({ ...snapshot, policies: [snapshot.policies[0],
+    { ...base.policies[1], conditions: [quotaCondition] }] }, "stellarbox-pro-v2"))
+    .toBe("/pages/team/quota?product=stellarbox-pro-v2");
 });

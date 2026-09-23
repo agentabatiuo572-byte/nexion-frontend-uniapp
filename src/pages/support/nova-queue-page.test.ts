@@ -424,6 +424,86 @@ describe("real Nova page queue worker", () => {
     page.cleanup();
   });
 
+  it("ends each silent attempt within 75 seconds and lets the same turn recover", async () => {
+    const { page, hooks, api, nova } = mount();
+    await hooks.onShow();
+    const first = deferred();
+    const second = deferred();
+    api.chat.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+      .mockResolvedValueOnce({ reply: "recovered" });
+    await page.onSend("one");
+    const turnId = nova.pendingRemote[0].turnId;
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "failed", failure: "timeout", serverPending: true });
+    expect(nova.typing).toBe(false);
+    expect(api.chat.mock.calls[0][1].aborted).toBe(true);
+    page.onQueueAction(turnId, "retry");
+    page.onQueueAction(turnId, "retry");
+    expect(api.chat).toHaveBeenCalledTimes(2);
+    expect(api.chat.mock.calls[1][0].turnId).toBe(turnId);
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "failed", failure: "timeout", serverPending: true });
+    expect(nova.typing).toBe(false);
+    expect(api.chat.mock.calls[1][1].aborted).toBe(true);
+    first.resolve({ reply: "late one" }); second.resolve({ reply: "late two" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(nova.messages.some(message => message.sender === "nova")).toBe(false);
+    page.onQueueAction(turnId, "retry");
+    await vi.advanceTimersByTimeAsync(1800);
+    expect(nova.messages.map(message => message.text)).toEqual(["one", "recovered"]);
+    page.cleanup();
+  });
+
+  it("tracks a busy server after the first silent timeout, then replays the same turn", async () => {
+    const { page, hooks, api, nova } = mount();
+    await hooks.onShow();
+    const first = deferred();
+    api.chat.mockReturnValueOnce(first.promise)
+      .mockRejectedValueOnce(new ApiError({ kind: "http", message: "NOVA_AI_TURN_IN_PROGRESS", status: 429 }))
+      .mockResolvedValueOnce({ reply: "server replay" });
+    await page.onSend("one");
+    const turnId = nova.pendingRemote[0].turnId;
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "failed", failure: "timeout", serverPending: true });
+    page.onQueueAction(turnId, "retry");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
+    expect(api.chat.mock.calls[1][0].turnId).toBe(turnId);
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(1800);
+    first.resolve({ reply: "stale" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.chat.mock.calls[2][0].turnId).toBe(turnId);
+    expect(nova.messages.map(message => message.text)).toEqual(["one", "server replay"]);
+    page.cleanup();
+  });
+
+  it.each([
+    ["timeout", new ApiError({ kind: "http", message: "NOVA_AI_TIMEOUT", status: 504 })],
+    ["network", new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE" })],
+    ["server busy", new ApiError({ kind: "http", message: "NOVA_AI_TURN_IN_PROGRESS", status: 429 })],
+  ])("bounds repeated %s while preserving the same turn for manual retry", async (_kind, repeatedError) => {
+    const { page, hooks, api, nova } = mount();
+    await hooks.onShow();
+    api.chat.mockRejectedValueOnce(new ApiError({ kind: "http", message: "NOVA_AI_TIMEOUT", status: 504 }))
+      .mockRejectedValue(repeatedError);
+    await page.onSend("one");
+    const turnId = nova.pendingRemote[0].turnId;
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(nova.pendingRemote[0]).toMatchObject({ delivery: "failed", failure: "timeout", serverPending: true });
+    expect(nova.typing).toBe(false);
+    expect(page.threadMessages.value[0].queue).toMatchObject({ state: "failed", label: zh.nova.queue.timeout });
+    expect(api.chat.mock.calls.every(([request]) => request.turnId === turnId)).toBe(true);
+    const calls = api.chat.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(api.chat).toHaveBeenCalledTimes(calls);
+    api.chat.mockResolvedValue({ reply: "replayed answer" });
+    page.onQueueAction(turnId, "retry");
+    await vi.advanceTimersByTimeAsync(1800);
+    expect(nova.messages.map(message => message.text)).toEqual(["one", "replayed answer"]);
+    page.cleanup();
+  });
+
   it("retains interrupted work, resumes tracking, and rejects the cancelled call's late answer", async () => {
     const { page, hooks, api, nova } = mount();
     await hooks.onShow();
@@ -432,6 +512,8 @@ describe("real Nova page queue worker", () => {
     hooks.onHide();
     expect(api.chat.mock.calls[0][1].aborted).toBe(true);
     expect(nova.pendingRemote[0]).toMatchObject({ delivery: "tracking", serverPending: true });
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(api.chat).toHaveBeenCalledTimes(1);
     await hooks.onShow();
     expect(nova.pendingRemote).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(0);

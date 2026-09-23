@@ -70,6 +70,7 @@ export const useConversations = defineStore("conversations", () => {
   const typingIds = ref<Record<string, boolean>>({});
   const onlineIds = ref<Record<string, boolean>>({});
   const realtimeReady = ref(false);
+  const realtimeFallback = ref(false);
   let realtime: ConversationRealtime | null = null;
   let watchedId: string | null = null;
   let typingExpiry: ReturnType<typeof setTimeout> | undefined;
@@ -81,12 +82,12 @@ export const useConversations = defineStore("conversations", () => {
       url: `${apiRuntimeConfig.baseUrl.replace(/^http/, "ws").replace(/\/$/, "")}/ws/conversations`,
       ticket: () => apiClient.request({ method: "POST", path: "/api/app/support/realtime-ticket" }), socket: createUniRealtimeSocket,
       reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
-      state: ready => { if (current()) realtimeReady.value = ready; },
+      state: (ready) => { if (current()) { realtimeReady.value = ready; realtimeFallback.value = !ready; } },
       presence: value => { if (!current()) return; clearTimeout(typingExpiry); if (!value) { typingIds.value={}; onlineIds.value={}; return; } onlineIds.value[value.conversationNo]=value.online; typingIds.value[value.conversationNo]=value.typing; typingExpiry=setTimeout(()=>{if(current())typingIds.value[value.conversationNo]=false;},value.expiresIn??5000); },
     });
     realtime=instance; setAppConversationRealtime(instance); instance.watch(watchedId); instance.start();
   }
-  function stopRealtime() { const instance=realtime; realtime=null; setAppConversationRealtime(null); clearTimeout(typingExpiry); realtimeReady.value=false; typingIds.value={}; onlineIds.value={}; instance?.stop(); }
+  function stopRealtime() { const instance=realtime; realtime=null; setAppConversationRealtime(null); clearTimeout(typingExpiry); realtimeReady.value=false; realtimeFallback.value=false; typingIds.value={}; onlineIds.value={}; instance?.stop(); }
   function watchRealtime(id: string | null) { watchedId=id; realtime?.watch(id); if (!id) { typingIds.value={}; onlineIds.value={}; } }
   function setTyping(active: boolean) { realtime?.typing(active); }
 
@@ -463,5 +464,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
+  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
 });
