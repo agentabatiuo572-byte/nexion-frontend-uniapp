@@ -404,6 +404,14 @@ function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
 watch(() => app.accountKey, () => {
   restoreReceiptRecovery();
   void refreshBundleWallet();
+  // A direct H5 reload reaches onLoad/onShow before cookie session restore.
+  // The account rebind clears the pre-auth failure back to "loading"; retry
+  // these reads once the restored account owns a bearer session.
+  if (remoteApiEnabled && app.accountKey !== "default") {
+    void refreshProductCatalog(true);
+    void refreshServerProductPhase(true);
+    void refreshBundlePolicy();
+  }
 });
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
