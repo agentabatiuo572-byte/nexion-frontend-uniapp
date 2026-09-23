@@ -20,20 +20,12 @@ describe("orders cursor pagination UI", () => {
     expect(page("order-detail.vue")).toContain("orders.ensureRemoteOrder(id.value)");
   });
 
-  // One unavailable order source is supplemental state. The page used to render
-  // only loading/empty/list/unavailable, so a partial read with no rows (genesis
-  // down, commerce empty) left the main content area blank behind the outage
-  // banner — the store CTA disappeared entirely.
-  it("renders main content for every non-loading presentation the panel can report", () => {
+  it("shows an outage without claiming that a partial read found no orders", () => {
     const source = page("orders.vue");
-    for (const state of ["empty", "partial"]) {
-      const panels = orderListPanels({ loading: false, availability: state === "partial" ? "partial" : "ready", orderCount: 0 });
-      expect(panels.mainPresentation).toBe(state);
-    }
-    // The partial read must reach the same main-content branch as an empty read,
-    // so the store CTA is present rather than replaced by the outage banner.
-    expect(source).toMatch(/mainContentEmpty[\s\S]{0,120}mainPresentation === "empty"/);
-    expect(source).toMatch(/mainContentEmpty[\s\S]{0,160}mainPresentation === "partial"/);
-    expect(source).toMatch(/v-if="mainContentEmpty"[\s\S]{0,300}t\.empty\.ordersCta/);
+    expect(orderListPanels({ loading: false, availability: "partial", orderCount: 0 }))
+      .toEqual({ mainPresentation: "partial", showSourceOutage: true });
+    expect(source).toContain('v-if="orderPanels.showSourceOutage"');
+    expect(source).toContain('v-if="orderPanels.mainPresentation === \'empty\'"');
+    expect(source).not.toContain('v-if="mainContentEmpty"');
   });
 });
