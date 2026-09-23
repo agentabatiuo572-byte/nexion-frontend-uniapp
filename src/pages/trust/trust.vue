@@ -71,15 +71,6 @@
             </view>
           </template>
 
-          <template v-if="listingsSection && listingRows.length">
-            <SectionHeader :label="sectionLabel(sectionKey.listings)" :suffix="listingsSection.version" />
-            <view :style="listCardStyle">
-              <view v-for="(row, index) in listingRows" :key="row.Exchange" class="flex items-center justify-between active:opacity-75" :style="listRowStyle(index === listingRows.length - 1)" @click="openHref(row.Url)">
-                <text :style="titleStyle">{{ row.Exchange }}</text>
-                <text :style="stateStyle">{{ row.State }}</text>
-              </view>
-            </view>
-          </template>
         </template>
       </view>
     </CardStagger>
@@ -137,7 +128,6 @@ const financialSection = computed(() => section(sectionKey.financials));
 const leadershipSection = computed(() => section(sectionKey.leadership));
 const narrativeSection = computed(() => section(sectionKey.nexNarrative));
 const auditSection = computed(() => section(sectionKey.auditsReserves));
-const listingsSection = computed(() => section(sectionKey.listings));
 
 const narrativeHero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "hero", language.value) ?? "");
 const narrativeSubhero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "subhero", language.value) ?? "");
@@ -159,7 +149,6 @@ const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ??
 const verifiedAuditRows = computed(() => auditRows.value.filter((row) => safeHref(row.Url)));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
 const verifiedLeadershipRows = computed(() => leadershipRows.value.filter((row) => safeHref(row.Url)));
-const listingRows = computed(() => trustNumberedRows(listingsSection.value?.fields ?? [], "listing", ["Exchange", "State", "Url"] as const, language.value));
 
 let trustPageVisible = false;
 let trustVisibleEpoch = 0;
@@ -199,6 +188,7 @@ function safeHref(raw: string): string | null {
     return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.toString() : null;
   } catch { return null; }
 }
+
 
 function openHref(raw: string) {
   const href = safeHref(raw);
@@ -252,6 +242,5 @@ const roleStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "v
 const linkStyle: CSSProperties = { fontSize: "15px", color: "var(--v5-brand)" };
 const avatarStyle: CSSProperties = { width: "38px", height: "38px", borderRadius: "999px", background: "var(--v5-brand-soft)" };
 const avatarTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
-const stateStyle: CSSProperties = { padding: "3px 8px", borderRadius: "999px", fontSize: "12px", color: "var(--v5-success)", background: "var(--v5-success-soft)" };
 const retryStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
 </script>
