@@ -1926,6 +1926,7 @@ export const en = {
     expiredBadge: "Expired",
     useCta: "Use",
     typeBonus: "Bonus",
+    courseDetail: "View course details",
     typeRefer: "Referral",
     typeAchievement: "Achievement",
     validUntil: "Valid until {date}",

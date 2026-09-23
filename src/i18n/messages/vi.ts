@@ -1860,6 +1860,7 @@ export const vi: Messages = {
     expiredBadge: "Đã hết hạn",
     useCta: "Dùng",
     typeBonus: "Thưởng",
+    courseDetail: "Xem chi tiết khóa học",
     typeRefer: "Giới thiệu",
     typeAchievement: "Thành tựu",
     validUntil: "Có hiệu lực đến {date}",

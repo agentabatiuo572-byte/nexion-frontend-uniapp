@@ -105,6 +105,7 @@
                    courseId@version 逐笔追溯;其它奖励没有 ref 时只显示原 memo。 -->
               <text v-if="b.ref" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
               <text v-else class="block truncate" :style="rowSubStyle">{{ b.memo }}</text>
+              <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: 4px" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)" @keydown.enter.prevent="onKeyboardActivate($event, () => openCourseReward(b))">{{ t.rewards.courseDetail }} ›</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
               <text class="block tabular-nums" :style="rewardAmountStyle">+{{ b.amount.toLocaleString() }} {{ b.symbol }}</text>
@@ -142,7 +143,8 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useVoucher } from "@/store/voucher";
-import { useBills, isRewardBill, type BillType } from "@/store/bills";
+import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
+import { courseRewardId } from "./course-reward-link";
 import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { navTo } from "@/lib/route";
@@ -287,6 +289,11 @@ function rewardTypeLabel(type: BillType): string {
   if (type === "refer") return t.value.rewards.typeRefer;
   if (type === "achievement") return t.value.rewards.typeAchievement;
   return t.value.rewards.typeBonus;
+}
+function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
+function openCourseReward(bill: Bill) {
+  const id = courseRewardId(bill);
+  if (id) navTo(`/pages/learn/course?id=${encodeURIComponent(id)}`);
 }
 function onUse(v: VoucherDef) {
   if (isSingleSkuVoucher(v)) {
