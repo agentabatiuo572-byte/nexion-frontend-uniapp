@@ -29,7 +29,7 @@
         <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
         <view class="flex items-center" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
-          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" :disabled="savePending" :aria-label="t.goals.targetLabel" @input="onTarget" />
+          <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" :disabled="editorBlocked" :aria-label="t.goals.targetLabel" @input="onTarget" />
         </view>
         <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px" role="radiogroup" :aria-label="t.goals.targetPresetsLabel">
           <view
@@ -38,6 +38,7 @@
             class="nx-goal-target-preset flex items-center justify-center active:opacity-70"
             :style="presetTargetStyle(p)"
             role="radio"
+            :aria-disabled="editorBlocked"
             :tabindex="target === p || (pi === 0 && !PRESET_TARGETS.includes(target)) ? 0 : -1"
             :aria-checked="target === p ? 'true' : 'false'"
             :aria-label="fmt(t.goals.targetPresetOption, { amount: String(p) })"
@@ -59,6 +60,7 @@
             class="nx-goal-deadline-preset flex items-center justify-center active:opacity-70"
             :style="presetDeadlineStyle(d)"
             role="radio"
+            :aria-disabled="editorBlocked"
             :tabindex="days === d || (di === 0 && !PRESET_DEADLINES_DAYS.includes(days)) ? 0 : -1"
             :aria-checked="days === d ? 'true' : 'false'"
             :aria-label="fmt(t.goals.deadlinePresetOption, { days: String(d) })"
@@ -97,7 +99,7 @@
 
       <!-- Save -->
       <view style="padding: 0 16px; margin-top: 12px">
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, savePending ? saveBtnPendingStyle : {}]" role="button" tabindex="0" :aria-label="t.goals.saveCta" :aria-disabled="savePending" @click="onSave">
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, editorBlocked ? saveBtnPendingStyle : {}]" role="button" :tabindex="editorBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="editorBlocked" @click="onSave" @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
           <text :style="saveLabelStyle" style="pointer-events: none">{{ t.goals.saveCta }}</text>
         </view>
@@ -149,7 +151,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useGoals } from "@/store/goals";
+import { useGoals, type Goal } from "@/store/goals";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -167,9 +169,12 @@ const goals = computed(() => goalsStore.goals);
 const target = ref(1000);
 const days = ref(90);
 const savePending = ref(false);
+const editorBlocked = computed(() => savePending.value || (remoteApiEnabled && goalsStore.status !== "ready"));
 type GoalSaveIntent = { targetUSDT: number; days: number; deadlineMs: number; idempotencyKey: string };
 const retryableSaveIntents = new Map<string, GoalSaveIntent>();
 let saveEpoch = 0;
+let editorReadEpoch = 0;
+let restoringEditor = false;
 
 const recommendation = computed(() => {
   if (remoteApiEnabled && goalsStore.recommendation?.purchaseRequired) {
@@ -207,14 +212,14 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onTarget(e: Event) {
-  if (savePending.value) return;
+  if (editorBlocked.value) return;
   target.value = Math.max(0, parseFloat(detailVal(e)) || 0);
 }
 function selectTarget(value: number) {
-  if (!savePending.value) target.value = value;
+  if (!editorBlocked.value) target.value = value;
 }
 function selectDays(value: number) {
-  if (!savePending.value) days.value = value;
+  if (!editorBlocked.value) days.value = value;
 }
 /**
  * roving tabindex 的标准行为:方向键移一格并选上,焦点跟到新选中项。
@@ -239,16 +244,35 @@ function moveTarget(index: number, delta: number): void { movePreset(".nx-goal-t
 function moveDays(index: number, delta: number): void { movePreset(".nx-goal-deadline-preset", PRESET_DEADLINES_DAYS, index, delta, selectDays); }
 
 watch(() => goalsStore.accountEpoch, () => {
+  editorReadEpoch += 1;
+  restoringEditor = true;
+  target.value = 1000;
+  days.value = 90;
+  restoringEditor = false;
   saveEpoch += 1;
   savePending.value = false;
   retryableSaveIntents.clear();
 }, { flush: "sync" });
 
-function refreshRemoteGoals(force = false): Promise<void> {
-  if (!remoteApiEnabled) return Promise.resolve();
+function restoreEditorFromGoal(goal: Goal | undefined): void {
+  restoringEditor = true;
+  target.value = goal?.targetUSDT ?? 1000;
+  days.value = goal ? Math.max(1, Math.ceil((goal.deadlineMs - Date.now()) / ONE_DAY_MS)) : 90;
+  restoringEditor = false;
+}
+
+async function refreshRemoteGoals(force = false): Promise<void> {
+  if (!remoteApiEnabled) return;
+  const expectedReadEpoch = ++editorReadEpoch;
+  const expectedAccountEpoch = goalsStore.accountEpoch;
   const list = force ? goalsStore.refresh() : goalsStore.ensure();
-  const recommendation = goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
-  return Promise.all([list, recommendation]).then(() => undefined);
+  await list;
+  if (expectedReadEpoch !== editorReadEpoch || expectedAccountEpoch !== goalsStore.accountEpoch
+      || goalsStore.status !== "ready" || savePending.value) return;
+  const latestActive = goalsStore.goals.filter((goal) => !goal.achieved)
+    .sort((left, right) => right.createdAt - left.createdAt)[0];
+  restoreEditorFromGoal(latestActive);
+  await goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
 }
 
 function retryGoals() {
@@ -264,10 +288,10 @@ onShow(() => {
 });
 
 watch([target, days], () => {
-  if (remoteApiEnabled && target.value >= 100 && days.value > 0) {
+  if (!restoringEditor && remoteApiEnabled && goalsStore.status === "ready" && target.value >= 100 && days.value > 0) {
     void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
   }
-});
+}, { flush: "sync" });
 
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   void refreshRemoteGoals();
@@ -282,7 +306,7 @@ function goalPct(targetUSDT: number): number {
 }
 
 async function onSave() {
-  if (savePending.value) return;
+  if (editorBlocked.value) return;
   if (target.value < 100) {
     toast.warn(t.value.goals.minTargetWarn);
     return;
@@ -304,10 +328,10 @@ async function onSave() {
   try {
     const outcome = await goalsStore.setGoal(intent);
     if (!isCurrentSave() || outcome === "stale") return;
-    toast.success(fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }));
     retryableSaveIntents.delete(intentKey);
-    target.value = 1000;
-    days.value = 90;
+    restoreEditorFromGoal(goalsStore.goals.at(-1));
+    void goalsStore.refreshRecommendation(target.value, Date.now() + days.value * ONE_DAY_MS);
+    toast.success(fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }));
   } catch (error) {
     if (!isCurrentSave()) return;
     toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);

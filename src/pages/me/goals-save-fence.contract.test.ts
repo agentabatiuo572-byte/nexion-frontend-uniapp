@@ -13,7 +13,8 @@ describe("earning-goal save account fence", () => {
   });
 
   it("disables editable goal controls while a save is pending", () => {
-    expect(source).toMatch(/:disabled="savePending"/);
+    expect(source).toMatch(/:disabled="editorBlocked"/);
+    expect(source).toMatch(/editorBlocked = computed\(\(\) => savePending\.value/);
     expect(source).toMatch(/selectTarget\(p\)/);
     expect(source).toMatch(/selectDays\(d\)/);
   });

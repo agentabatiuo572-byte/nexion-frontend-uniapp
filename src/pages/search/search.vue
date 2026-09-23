@@ -119,7 +119,8 @@ import { useNetwork } from "@/store/network";
 import { useLocaleStore } from "@/store/locale";
 import { useStaking } from "@/store/staking";
 import { PRODUCTS } from "@/mock/products";
-import { productCopy } from "@/lib/product-copy";
+import type { Product } from "@/mock/products";
+import { productCopy, specRow } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 import { remoteApiEnabled, supportApi } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
@@ -210,6 +211,12 @@ const members = computed(() => !remoteApiEnabled || network.remoteStatus === "re
 const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
   : productCatalogState.status === "ready" ? productCatalogPresentation.value?.products ?? [] : []);
 
+function productSearchDetail(p: Product): string {
+  if (!remoteApiEnabled) return productCopy(t.value, p).tagline;
+  return [specRow(t.value.store.specGpu, p.gpu)?.v, specRow(t.value.store.specVram, p.vram)?.v]
+    .filter(Boolean).join(" · ");
+}
+
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
 // only the key→href binding stays here.
 type RouteKey = keyof typeof t.value.search.routes;
@@ -279,14 +286,13 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const p of searchableProducts.value) {
-    // Match the copy shown by the store: server prose in remote mode, localized
-    // fixture prose in mock mode. The brand name remains untranslated.
-    const tagline = remoteApiEnabled ? p.tagline : productCopy(t.value, p).tagline;
-    if (p.name.toLowerCase().includes(query) || tagline.toLowerCase().includes(query)) {
+    // Match the displayed SKU specs, never an unrelated marketing tagline.
+    const detail = productSearchDetail(p);
+    if (p.name.toLowerCase().includes(query) || detail.toLowerCase().includes(query)) {
       out.push({
         group: "product",
         label: p.name,
-        sublabel: `$${p.price} · ${tagline}`,
+        sublabel: `$${p.price}${detail ? ` · ${detail}` : ""}`,
         href: `/pages/store/detail?id=${p.id}`,
       });
     }

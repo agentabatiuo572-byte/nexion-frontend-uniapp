@@ -1,8 +1,42 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "./api-client";
 import { createSessionVault } from "./session-vault";
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("API client session lifecycle", () => {
+  it("clears an existing account when the browser cannot lock a cookie refresh", async () => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", {});
+    const vault = createSessionVault();
+    vault.save({ accessToken: "expired", refreshToken: "", tokenType: "Bearer",
+      refreshCredentialMode: "cookie",
+      user: { userId: 7, countryCode: "+86", phone: "13800000007", nickname: "Fixture", onboardingComplete: true } });
+    const onUnauthorized = vi.fn();
+    const request = vi.fn();
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:8110", vault,
+      transport: { request }, onUnauthorized, refreshCredentialMode: "cookie" });
+
+    await expect(api.refreshSession()).rejects.toThrow("COOKIE_LOCK_UNAVAILABLE");
+    expect(request).not.toHaveBeenCalled();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(vault.read()).toBeNull();
+  });
+
+  it("still sends chain-revoking logout when browser Web Locks is unavailable", async () => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", {});
+    const request = vi.fn().mockResolvedValue({
+      status: 200, data: { code: 0, message: "success", data: { revoked: true } }, headers: {},
+    });
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:8110", vault: createSessionVault(),
+      transport: { request }, refreshCredentialMode: "cookie",
+    });
+    await expect(api.request({ path: "/auth/users/logout", method: "POST", authenticated: false }))
+      .resolves.toEqual({ revoked: true });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
   it("fails a protected prefetch locally when no session exists without evicting a later login", async () => {
     const request = vi.fn();
     const onUnauthorized = vi.fn();

@@ -172,6 +172,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, nova.conversationId], () =
 let novaPageVisible = false;
 let novaHistoryEpoch = 0;
 let novaDispatchTimer: ReturnType<typeof setTimeout> | undefined;
+let novaReplyDeadline: { turnId: string; expiresAt: number } | undefined;
 const dialogOwner = `nova-chat-${Date.now()}`;
 const novaThinkingStage = ref<NovaThinkingStage>("understanding");
 let novaStatusEpoch = 0;
@@ -508,8 +509,8 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       receipt: receiptFor(m.status, i === lastUser),
       queue: m.delivery ? {
         turnId: m.turnId!, state: m.delivery,
-        label: m.serverPending ? t.value.nova.queue.tracking
-          : m.delivery === "failed" ? t.value.nova.queue[m.failure ?? "failed"]
+        label: m.delivery === "failed" ? t.value.nova.queue[m.failure ?? "failed"]
+          : m.serverPending && ["processing", "tracking"].includes(m.delivery) ? t.value.nova.queue.tracking
           : m.delivery === "processing" ? t.value.nova.queue.processing
           : m.delivery === "editing" ? t.value.nova.queue.editing
           : nova.pendingRemote[0]?.delivery === "failed" ? t.value.nova.queue.paused
@@ -719,6 +720,7 @@ function finishNovaThinking(epoch: number) {
 function cancelNovaThinking() {
   if (novaDispatchTimer !== undefined) clearTimeout(novaDispatchTimer);
   novaDispatchTimer = undefined;
+  novaReplyDeadline = undefined;
   novaRequestControl.cancel();
   clearNovaThinkingTimers();
   if (pendingNovaThinkingWait) {
@@ -778,6 +780,19 @@ function acquireSendSlot(): boolean {
 const AI_TYPING_ON_MS = 300;
 const AI_REPLY_MS = 1100;
 const NOVA_SERVER_TRACK_RETRY_MS = 3000;
+const NOVA_REPLY_DEADLINE_MS = 75_000;
+
+async function waitForNovaReply<T>(reply: Promise<T>, abort: () => void, remainingMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      reply,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => { abort(); reject(new Error("request:fail timeout")); }, remainingMs);
+      }),
+    ]);
+  } finally { if (timer !== undefined) clearTimeout(timer); }
+}
 
 async function onSend(text: string, restore?: () => void) {
   if (isAi.value && remoteApiEnabled) {
@@ -905,6 +920,15 @@ async function drainNovaQueue() {
       || novaStatusLoading.value || novaHistoryLoading.value || novaAiRequestInFlight.value) return;
   const headDelivery = nova.pendingRemote[0]?.delivery;
   if (!headDelivery || !["queued", "tracking"].includes(headDelivery) || novaDispatchTimer !== undefined) return;
+  const headTurnId = nova.pendingRemote[0].turnId!;
+  if (headDelivery === "tracking" && novaReplyDeadline?.turnId === headTurnId
+      && Date.now() >= novaReplyDeadline.expiresAt) {
+    nova.failRemote(headTurnId, "timeout");
+    novaReplyDeadline = undefined;
+    handoffNeedsFreshQuestion.value = true;
+    handoffRecommended.value = true;
+    return;
+  }
   if (novaDispatchAccount !== app.accountKey) {
     novaDispatchAccount = app.accountKey;
     novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
@@ -921,6 +945,9 @@ async function drainNovaQueue() {
   }
   const item = nova.claimRemote();
   if (!item) return;
+  if (!novaReplyDeadline || novaReplyDeadline.turnId !== item.turnId || headDelivery === "queued") {
+    novaReplyDeadline = { turnId: item.turnId, expiresAt: Date.now() + NOVA_REPLY_DEADLINE_MS };
+  }
   const accountKey = app.accountKey;
   const conversationId = nova.conversationId;
   const requestStartedAt = novaThinkingNow();
@@ -929,26 +956,30 @@ async function drainNovaQueue() {
   const current = () => novaPageVisible && novaRequestControl.isCurrent(request.epoch)
     && accountKey === app.accountKey && conversationId === nova.conversationId;
   try {
-    const result = await novaAiApi.chat({ message: item.text, language: item.language,
-      conversationId, turnId: item.turnId }, request.signal);
+    const result = await waitForNovaReply(novaAiApi.chat({ message: item.text, language: item.language,
+      conversationId, turnId: item.turnId }, request.signal), request.abort,
+      Math.max(0, novaReplyDeadline.expiresAt - Date.now()));
     if (!current()) return;
     const completed = await waitForNovaThinkingDelay(
       remainingNovaThinkingMs(requestStartedAt, novaThinkingNow()), request.epoch);
     if (!completed || !current()) return;
     nova.completeRemote(item.turnId, result.reply);
+    novaReplyDeadline = undefined;
     handoffNeedsFreshQuestion.value = false;
     handoffRecommended.value = !!result.handoffReason;
   } catch (error) {
     if (current()) {
       const failure = novaFailure(error);
-      if (failure === "timeout" || failure === "network" || (item.tracking && failure === "busy")) {
+      if (Date.now() < novaReplyDeadline!.expiresAt
+          && (failure === "timeout" || failure === "network" || (item.tracking && failure === "busy"))) {
         nova.trackRemote(item.turnId);
         novaDispatchTimer = setTimeout(() => {
           novaDispatchTimer = undefined;
           void drainNovaQueue();
-        }, NOVA_SERVER_TRACK_RETRY_MS);
+        }, Math.min(NOVA_SERVER_TRACK_RETRY_MS, novaReplyDeadline!.expiresAt - Date.now()));
       } else {
-        nova.failRemote(item.turnId, failure);
+        nova.failRemote(item.turnId, Date.now() >= novaReplyDeadline!.expiresAt ? "timeout" : failure);
+        novaReplyDeadline = undefined;
         handoffNeedsFreshQuestion.value = true;
         handoffRecommended.value = true;
       }

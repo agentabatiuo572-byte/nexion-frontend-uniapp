@@ -31,13 +31,12 @@ export function referralShareText(
  * 🔴 zentao #227:闸门关闭时 `visibleReferralGift` 会把金额归零,但文案若只按
  *   「金额是否 > 0」分档,就会落进「新人奖励已备好,连接设备即刻到账」那一支 ——
  *   在奖励停用期间照样承诺一份不会到账的奖励。所以:
- *     gated   → 闸门关闭,一句奖励承诺都不能有
- *     amount  → 闸门开启且有金额,可报出金额
- *     prepared→ 闸门开启但金额未配置,可以说「已备好」但报不出数字
+ *     gated  → 闸门关闭或邀请预览没有可核实金额，不承诺奖励
+ *     amount → 闸门开启且邀请预览有金额，可报出金额和结算条件
  */
-export type NewcomerSubtitleKind = "gated" | "amount" | "prepared";
+export type NewcomerSubtitleKind = "gated" | "amount";
 
-export function newcomerSubtitleKind(rewardsEnabled: boolean, usdtAmount: number): NewcomerSubtitleKind {
+export function newcomerSubtitleKind(rewardsEnabled: boolean, usdtAmount: number, nexAmount: number): NewcomerSubtitleKind {
   if (!rewardsEnabled) return "gated";
-  return usdtAmount > 0 ? "amount" : "prepared";
+  return usdtAmount > 0 || nexAmount > 0 ? "amount" : "gated";
 }

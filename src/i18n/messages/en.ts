@@ -403,10 +403,9 @@ export const en = {
   },
   register: {
     title: "Create account",
-    subtitleHighlight: "${usd} Welcome Bonus",
-    subtitleRest: " credited the moment your device connects.",
+    subtitleHighlight: "Invitation welcome reward: {reward}",
+    subtitleRest: ". A valid invite and reward eligibility are required; credit follows settlement records.",
     subtitleRewardDisabled: "Connect a device to get started.",
-    subtitleNoBonus: "Your welcome bonus is ready — credited the moment your device connects.",
     phoneLenHint: "Phone numbers for this code are {range} digits",
     phonePlaceholder: "Mobile number",
     passwordPlaceholder: "Create password (8–64 chars)",
@@ -2744,6 +2743,7 @@ export const en = {
   },
   session: {
     restoreRetryNotice: "Unable to restore your session right now. Retrying automatically.",
+    secureBrowserUnsupported: "This browser cannot securely sign in or restore your session. Please update your browser and try again.",
     kickedTitle: "Session ended",
     kickedBodyKicked: "This sign-in has ended. Sign in again to view your task and settlement records.",
     kickedBodySessionEnded: "This sign-in has ended. Sign in again to view your task and settlement records.",
@@ -3319,6 +3319,7 @@ export const en = {
     loadError: "Messages couldn't be refreshed",
     loadErrorDesc: "Check your connection and try again. No empty inbox is assumed.",
     staleSnapshot: "Showing the last confirmed messages. Refresh to check for updates.",
+    realtimeFallback: "Live updates are unavailable. Checking for new messages periodically; you can also refresh.",
     retry: "Retry",
     startConversation: "Start conversation",
     contactAdvisor: "Contact advisor",

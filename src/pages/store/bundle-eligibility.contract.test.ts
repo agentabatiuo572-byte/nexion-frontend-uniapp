@@ -14,6 +14,16 @@ const source = (import.meta.glob("./bundle.vue", {
 })["./bundle.vue"] ?? "") as string;
 
 describe("bundle purchase gate consults the server in remote mode", () => {
+  it("shows recommendation eligibility and guides a blocked SKU to its server-backed detail", () => {
+    const suggestions = source.slice(source.indexOf("<!-- Suggestions -->"), source.indexOf("<!-- Total summary -->"));
+    expect(suggestions).toContain("purchaseEligibilityStore.state(p.id).status !== 'ready'");
+    expect(suggestions).toContain("t.store.gateBlockedToast");
+    expect(suggestions).toContain("v-if=\"remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible\"");
+    expect(source).toMatch(/suggestions\.value\.map\(\(p\) => p\.id\)[\s\S]*?purchaseEligibilityStore\.ensure\(p\.id, true\)/);
+    const add = source.slice(source.indexOf("async function onAddSuggestion"), source.indexOf("interface PendingBundleCommands"));
+    expect(add).toMatch(/!purchaseEligibilityStore\.state\(p\.id\)\.eligible[\s\S]*?navTo\(`\/pages\/store\/detail\?id=/);
+  });
+
   it("checks a suggestion before adding it to the cart", () => {
     expect(source).toContain("purchaseEligibilityStore");
     const add = source.slice(source.indexOf("async function onAddSuggestion"), source.indexOf("interface PendingBundleCommands"));

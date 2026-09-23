@@ -7,6 +7,7 @@ export const NOVA_THINKING_COMPOSING_MS = 1_200;
 export interface AbortableNovaRequest {
   epoch: number;
   signal: AbortSignal;
+  abort(): void;
 }
 
 export interface LatestAbortableRequestControl {
@@ -23,7 +24,8 @@ export function createLatestAbortableRequest(): LatestAbortableRequestControl {
     begin() {
       activeController?.abort();
       activeController = new AbortController();
-      return { epoch: ++epoch, signal: activeController.signal };
+      const controller = activeController;
+      return { epoch: ++epoch, signal: controller.signal, abort: () => controller.abort() };
     },
     cancel() {
       epoch += 1;

@@ -65,7 +65,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #103: preset target/deadline pills are mutually exclusive choices, so they are
   // radiogroups with aria-checked instead of unlabelled clickable views; the amount
   // input and remove action carry accessible names. Styles are unchanged.
-  "goals.vue": "265bbf2b295d52dbb62e3bbce42ab6425d192a2f5061bba621ce3ba4c2b02c10",
+  // #223: editing waits for the server goal, then restores its target and deadline;
+  // preset and save controls expose their loading state without changing layout.
+  "goals.vue": "53447ff6cb818ae3c39f8d2be9d6e83c5385e9f6373f9d37dd28b099ceb8a32c",
   // R3 keyboard controls plus reviewed production FAQ empty-state authority:
   // unread, failed, or incomplete pagination cannot claim no matching content.
   // Exact FAQ deep links clear on category selection; withdrawn targets use the

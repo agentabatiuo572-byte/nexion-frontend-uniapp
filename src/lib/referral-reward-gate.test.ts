@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformConfig } from "@/store/config-types";
 import { newcomerSubtitleKind, referralShareText, visibleReferralGift } from "@/lib/referral-reward-gate";
+import { en } from "@/i18n/messages/en";
+import { vi } from "@/i18n/messages/vi";
+import { zh } from "@/i18n/messages/zh";
 
 function rewards(enabled: boolean): PlatformConfig["rewards"] {
   return {
@@ -31,22 +34,26 @@ describe("visibleReferralGift", () => {
 });
 
 describe("newcomerSubtitleKind", () => {
-  /**
-   * zentao #227:闸门关闭时金额会被归零,而「金额为 0」那一支的文案仍是
-   * 「新人奖励已备好,连接设备即刻到账」—— 只看金额就会在奖励停用期间
-   * 照样承诺一份不会到账的奖励。分档必须**先看闸门**。
-   */
-  it("never promises a newcomer reward while the reward gate is disabled", () => {
-    expect(newcomerSubtitleKind(false, 5)).toBe("gated");
-    // 关键用例:闸门关 + 金额已被归零,不能落进「已备好」那一支。
-    expect(newcomerSubtitleKind(false, 0)).toBe("gated");
+  it("never promises a reward while the H8 gate is disabled", () => {
+    expect(newcomerSubtitleKind(false, 5, 20)).toBe("gated");
+    expect(newcomerSubtitleKind(false, 0, 0)).toBe("gated");
   });
 
-  it("reports the amount only when the gate is on and an amount is configured", () => {
-    expect(newcomerSubtitleKind(true, 5)).toBe("amount");
+  it("does not promise a reward without a confirmed invitation amount", () => {
+    expect(newcomerSubtitleKind(true, 0, 0)).toBe("gated");
   });
 
-  it("falls back to the no-amount wording when the gate is on but nothing is configured", () => {
-    expect(newcomerSubtitleKind(true, 0)).toBe("prepared");
+  it("shows only positive H8 reward amounts, including NEX-only rewards", () => {
+    expect(newcomerSubtitleKind(true, 5, 20)).toBe("amount");
+    expect(newcomerSubtitleKind(true, 0, 20)).toBe("amount");
+    expect(newcomerSubtitleKind(true, 5, 0)).toBe("amount");
+  });
+
+  it("describes review and settlement without instant-credit claims in all languages", () => {
+    for (const dict of [zh, en, vi]) {
+      expect(dict.register.subtitleHighlight).toContain("{reward}");
+      expect(dict.register.subtitleRest).not.toMatch(/即刻到账|moment your device connects|ngay khi thiết bị kết nối/i);
+      expect(dict.register.subtitleRest).toMatch(/结算|settlement|quyết toán/i);
+    }
   });
 });

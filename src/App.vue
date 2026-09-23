@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
+import { ApiError } from "@/api/errors";
 import { watch } from "vue";
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
@@ -85,6 +86,7 @@ let serverSessionRestoreInFlight: Promise<boolean> | null = null;
 const SERVER_SESSION_RESTORE_RETRY_MS = 15_000;
 let serverSessionRestoreRetryAt = 0;
 let serverSessionRestoreNoticeShown = false;
+let secureBrowserUnsupported = false;
 const SERVER_SESSION_PROBE_MIN_MS = 60_000;
 let serverSessionProbeAt = 0;
 let serverSessionProbeInFlight: Promise<boolean> | null = null;
@@ -602,7 +604,14 @@ function beginServerSessionRestore(): Promise<boolean> {
     serverSessionRestoreNoticeShown = false;
     serverSessionProbeAt = Date.now();
     return true;
-  })().catch(() => {
+  })().catch((error: unknown) => {
+    if (error instanceof ApiError && error.message === "COOKIE_LOCK_UNAVAILABLE") {
+      secureBrowserUnsupported = true;
+      serverSessionRestoreState = "failed";
+      clearInvalidRemoteSessionState(useAuth());
+      navReset({ url: "/pages/login/login?notice=secure-browser-unsupported" });
+      return false;
+    }
     if (canRefreshRemoteAccount(useAuth())) {
       serverSessionRestoreState = "ready";
       serverSessionRestoreRetryAt = 0;
@@ -635,6 +644,11 @@ function checkAuthGuard(): boolean {
   //    只修 ① 的状态在实景里与不修同果 —— verify 绿 ≠ 渲染 OK 的活例。
   const route = readCurrentRoute();
   if (!route) return false; // no route yet
+  if (secureBrowserUnsupported) {
+    if (route.startsWith("pages/login/")) return false;
+    navReset({ url: "/pages/login/login?notice=secure-browser-unsupported" });
+    return true;
+  }
   if (remoteApiEnabled && serverSessionRestoreState === "idle") {
     void beginServerSessionRestore();
     return false;

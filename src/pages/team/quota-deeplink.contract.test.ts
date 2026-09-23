@@ -20,15 +20,16 @@ const quotaSource = readFileSync(new URL("./quota.vue", import.meta.url), "utf8"
 
 describe("quota deep link carries the product being viewed", () => {
   it("sends the current product id from the product page", () => {
-    // 两处跳转(配额耗尽 / 资格未达成)都必须带 id。
+    // Local purchase gates still carry the viewed product id.
     const hrefs = detailSource.match(/href: [^\n]*team\/quota[^\n]*/g) ?? [];
-    expect(hrefs.length).toBeGreaterThanOrEqual(2);
+    expect(hrefs.length).toBeGreaterThanOrEqual(1);
     for (const href of hrefs) {
       expect(href, href).toContain("team/quota?product=");
       expect(href, href).toContain("encodeURIComponent(product.value.id)");
     }
     // 硬编码的裸跳转不许回来 —— 那正是本单的成因。
     expect(detailSource).not.toMatch(/href: "\/pages\/team\/quota"/);
+    expect(detailSource).toContain("purchaseEligibilityUnlockHref(eligibility.value.snapshot!, product.value.id)");
   });
 
   it("reads the parameter and admits when the product has no quota tier", () => {

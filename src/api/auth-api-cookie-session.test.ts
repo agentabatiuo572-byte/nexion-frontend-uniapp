@@ -4,7 +4,8 @@ import { createAuthApi } from "./auth-api";
 import { createSessionVault } from "./session-vault";
 
 const user = { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "NexGrid 3775", onboardingComplete: true };
-const cookieSession = { accessToken: "access", refreshToken: null, tokenType: "Bearer", user };
+const cookieSession = { accessToken: "access", refreshToken: null, tokenType: "Bearer", user,
+  sessionSyncKey: "a".repeat(64) };
 
 describe("H5 HttpOnly refresh-cookie session", () => {
   it("accepts a login response without exposing the refresh credential to JavaScript", async () => {
@@ -19,6 +20,7 @@ describe("H5 HttpOnly refresh-cookie session", () => {
       headers: { "X-Nexion-Refresh-Mode": "cookie" },
     }));
     expect(vault.read()).toMatchObject({ refreshCredentialMode: "cookie", refreshToken: "", user });
+    expect(vault.read()?.sessionSyncKey).toBe(cookieSession.sessionSyncKey);
   });
 
   it("restores an empty in-memory vault from the HttpOnly cookie", async () => {
@@ -45,6 +47,7 @@ describe("H5 HttpOnly refresh-cookie session", () => {
     }));
     expect(request.mock.calls[0]?.[0]).not.toHaveProperty("body");
     expect(vault.read()?.accessToken).toBe("access");
+    expect(vault.read()?.sessionSyncKey).toBe(cookieSession.sessionSyncKey);
   });
 
   it("preserves an incomplete-onboarding server session during cookie restore", async () => {

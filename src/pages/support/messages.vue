@@ -52,6 +52,12 @@
             <text>{{ t.help.loadingMore }}</text>
           </view>
           <template v-else>
+          <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.realtimeFallback" class="nx-conv-refresh-warning" role="status" aria-live="polite">
+            <text class="nx-conv-refresh-warning__text">{{ t.conversations.realtimeFallback }}</text>
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations" @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
+              <text>{{ t.conversations.retry }}</text>
+            </view>
+          </view>
           <!-- A new turn opens a composer first. The authenticated user's text is the
                first durable timeline entry; this surface never invents an opening. -->
           <view

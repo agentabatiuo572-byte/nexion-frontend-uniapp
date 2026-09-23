@@ -387,10 +387,9 @@ export const zh: Messages = {
   },
   register: {
     title: "创建账号",
-    subtitleHighlight: "{usd} 美元新人奖励",
-    subtitleRest: ",连接设备即刻到账。",
+    subtitleHighlight: "邀请新人礼：{reward}",
+    subtitleRest: "。须有有效邀请并满足奖励条件；实际到账以结算记录为准。",
     subtitleRewardDisabled: "连接设备后即可开始使用。",
-    subtitleNoBonus: "新人奖励已备好,连接设备即刻到账。",
     phoneLenHint: "该区号手机号为 {range} 位",
     phonePlaceholder: "手机号码",
     passwordPlaceholder: "设置密码(8–64 位)",
@@ -2674,6 +2673,7 @@ export const zh: Messages = {
   },
   session: {
     restoreRetryNotice: "暂时无法恢复登录，正在自动重试。",
+    secureBrowserUnsupported: "此浏览器不支持安全登录或会话恢复。请更新浏览器后重试。",
     kickedTitle: "登录已结束",
     kickedBodyKicked: "当前登录已结束。请重新登录后查看任务和结算记录。",
     kickedBodySessionEnded: "当前登录已结束。请重新登录后查看任务和结算记录。",
@@ -3223,6 +3223,7 @@ export const zh: Messages = {
     loadError: "会话暂时无法刷新",
     loadErrorDesc: "请检查网络后重试。当前不会把读取失败当成空会话。",
     staleSnapshot: "当前展示上一次确认的会话，刷新后可查看最新状态。",
+    realtimeFallback: "实时连接暂不可用，正在定时检查新消息；也可手动刷新。",
     retry: "重试",
     startConversation: "发起会话",
     contactAdvisor: "联系顾问",

@@ -8,6 +8,16 @@ class Socket implements RealtimeSocket {
 }
 afterEach(()=>vi.useRealTimers());
 describe('conversation realtime recovery',()=>{
+  it('keeps polling and retries the ticket after a temporary 428',async()=>{
+    vi.useFakeTimers();
+    const reconcile=vi.fn().mockResolvedValue(undefined);
+    const ticket=vi.fn().mockRejectedValueOnce({status:428}).mockResolvedValue({ticket:'ready'});
+    const client=new ConversationRealtime({ticket,socket:()=>new Socket(),url:'ws://local',reconcile});
+    client.start();await vi.advanceTimersByTimeAsync(5000);
+    expect(reconcile).toHaveBeenCalled();
+    expect(ticket).toHaveBeenCalledTimes(2);
+    client.stop();
+  });
   it('resumes fallback after hide/show while the new ticket is still pending',async()=>{
     vi.useFakeTimers();
     const reconcile=vi.fn().mockResolvedValue(undefined);

@@ -36,8 +36,11 @@ test("server mode starts unauthenticated and only retains a non-secret recovery 
   assert.match(auth, /import \{ remoteApiEnabled \} from "@\/api\/runtime"/);
   assert.match(auth, /function hydrate\(\): Persisted \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?isAuthenticated: false[\s\S]*?accountId: "default"/);
   assert.match(auth, /hasPersistedServerAuthenticatedAccountTrace[\s\S]*?startsWith\("user:"\)/);
-  assert.match(vault, /createRuntimeSessionVault\(\): SessionVault \{[\s\S]*?return createSessionVault\(\);/);
-  assert.doesNotMatch(vault, /accessToken:\s*snapshot\.accessToken/,
+  const runtimeVault = fnBlock(vault, "createRuntimeSessionVault");
+  assert.match(runtimeVault, /const vault = createSessionVault\(\);/);
+  assert.doesNotMatch(runtimeVault, /(?:window\.)?localStorage\.(?:setItem|getItem)|uni\.setStorageSync|storage\.set\(/,
+    "cross-tab access-token continuity must remain in memory");
+  assert.doesNotMatch(fnBlock(vault, "persistAndCommit"), /accessToken:\s*snapshot\.accessToken/,
     "the H5 persistence format must never contain a Bearer token");
 });
 

@@ -53,6 +53,12 @@ describe("conversation realtime lifecycle", () => {
     store.startRealtime();
     const fresh = harness.instances[1];
     fresh.options.state(true);
+    expect(store.realtimeFallback).toBe(false);
+    fresh.options.state(false, false);
+    expect(store.realtimeFallback).toBe(true);
+    fresh.options.state(false, true);
+    expect(store.realtimeFallback).toBe(true);
+    fresh.options.state(true);
     fresh.options.presence({ conversationNo: "CV-1", online: true, typing: true, expiresIn: 1000 });
     old.options.state(false);
     old.options.presence({ conversationNo: "CV-1", online: false, typing: false, expiresIn: 1000 });
@@ -60,6 +66,7 @@ describe("conversation realtime lifecycle", () => {
 
     expect(old.stop).toHaveBeenCalledOnce();
     expect(store.realtimeReady).toBe(true);
+    expect(store.realtimeFallback).toBe(false);
     expect(store.onlineIds["CV-1"]).toBe(true);
     expect(store.typingIds["CV-1"]).toBe(true);
     expect(runtime.supportApi.conversations).not.toHaveBeenCalled();

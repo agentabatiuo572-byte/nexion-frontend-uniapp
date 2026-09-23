@@ -398,10 +398,9 @@ export const vi: Messages = {
   },
   register: {
     title: "Tạo tài khoản",
-    subtitleHighlight: "Thưởng chào mừng ${usd}",
-    subtitleRest: " vào tài khoản ngay khi thiết bị của bạn kết nối.",
+    subtitleHighlight: "Thưởng chào mừng qua lời mời: {reward}",
+    subtitleRest: ". Cần lời mời hợp lệ và đủ điều kiện nhận thưởng; chỉ xác nhận đã nhận thưởng theo kết quả quyết toán.",
     subtitleRewardDisabled: "Kết nối thiết bị để bắt đầu sử dụng.",
-    subtitleNoBonus: "Thưởng chào mừng đã sẵn sàng — vào tài khoản ngay khi thiết bị kết nối.",
     phoneLenHint: "Số điện thoại mã vùng này gồm {range} chữ số",
     phonePlaceholder: "Số điện thoại",
     passwordPlaceholder: "Tạo mật khẩu (8–64 ký tự)",
@@ -2651,6 +2650,7 @@ export const vi: Messages = {
   },
   session: {
     restoreRetryNotice: "Tạm thời chưa thể khôi phục phiên đăng nhập. Đang tự động thử lại.",
+    secureBrowserUnsupported: "Trình duyệt này không hỗ trợ đăng nhập hoặc khôi phục phiên an toàn. Vui lòng cập nhật trình duyệt rồi thử lại.",
     kickedTitle: "Phiên đã kết thúc",
     kickedBodyKicked: "Phiên đăng nhập này đã kết thúc. Hãy đăng nhập lại để xem các bản ghi tác vụ và quyết toán.",
     kickedBodySessionEnded: "Phiên đăng nhập này đã kết thúc. Hãy đăng nhập lại để xem các bản ghi tác vụ và quyết toán.",
@@ -3198,6 +3198,7 @@ export const vi: Messages = {
     loadError: "Chưa thể làm mới tin nhắn",
     loadErrorDesc: "Hãy kiểm tra kết nối rồi thử lại. Lỗi tải không được xem là hộp thư trống.",
     staleSnapshot: "Đang hiển thị tin nhắn đã xác nhận gần nhất. Hãy làm mới để xem cập nhật.",
+    realtimeFallback: "Cập nhật trực tiếp tạm thời không khả dụng. Đang kiểm tra tin nhắn mới định kỳ; bạn cũng có thể làm mới.",
     retry: "Thử lại",
     startConversation: "Bắt đầu trò chuyện",
     contactAdvisor: "Liên hệ cố vấn",
