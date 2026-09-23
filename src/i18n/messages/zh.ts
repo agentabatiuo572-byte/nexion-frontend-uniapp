@@ -3223,7 +3223,7 @@ export const zh: Messages = {
     loadError: "会话暂时无法刷新",
     loadErrorDesc: "请检查网络后重试。当前不会把读取失败当成空会话。",
     staleSnapshot: "当前展示上一次确认的会话，刷新后可查看最新状态。",
-    realtimeFallback: "实时连接暂不可用，正在定时检查新消息；也可手动刷新。",
+    realtimeFallback: "实时连接暂不可用。点击“重试”可手动刷新会话；新消息可能延迟显示。",
     retry: "重试",
     startConversation: "发起会话",
     contactAdvisor: "联系顾问",

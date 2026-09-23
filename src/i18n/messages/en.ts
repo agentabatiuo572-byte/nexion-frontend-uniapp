@@ -3319,7 +3319,7 @@ export const en = {
     loadError: "Messages couldn't be refreshed",
     loadErrorDesc: "Check your connection and try again. No empty inbox is assumed.",
     staleSnapshot: "Showing the last confirmed messages. Refresh to check for updates.",
-    realtimeFallback: "Live updates are unavailable. Checking for new messages periodically; you can also refresh.",
+    realtimeFallback: "Live updates are unavailable. Use Retry to refresh conversations; new messages may be delayed.",
     retry: "Retry",
     startConversation: "Start conversation",
     contactAdvisor: "Contact advisor",
