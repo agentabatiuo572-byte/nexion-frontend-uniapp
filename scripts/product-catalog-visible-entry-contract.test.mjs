@@ -27,7 +27,8 @@ test("remote catalog replacement invalidates Store computed listings", () => {
   assert.match(store, /presentation\.value = snapshot/);
   assert.match(store, /presentation\.value = null/);
   const card = read("src/components/store/product-card.vue");
-  assert.match(card, /if \(stockUnavailable\.value \|\| catalogUnavailable\.value\) return/);
+  assert.match(card, /const buyUnavailable = computed\(\(\) => stockUnavailable\.value \|\| catalogUnavailable\.value/);
+  assert.match(card, /function onBuy\(\) \{\s*if \(buyUnavailable\.value\) return/);
 });
 
 test("app launch does not consume the authenticated catalog before a user session exists", () => {

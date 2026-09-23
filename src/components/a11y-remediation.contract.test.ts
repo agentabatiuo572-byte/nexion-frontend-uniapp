@@ -93,7 +93,8 @@ describe("accessibility remediation contracts", () => {
     expect(download).toContain(':aria-checked="selectedModel === model ? \'true\' : \'false\'"');
 
     const course = read("../pages/learn/course.vue");
-    expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.courseUnavailable"');
+    expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses" @keydown.enter.prevent="onKeyboardActivate($event, backToCourses)" @keydown.space.prevent="onKeyboardActivate($event, backToCourses)"');
+    expect(course).toContain('role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)"');
     // Each question accepts exactly one answer, so the options are radios inside a
     // named radiogroup — aria-pressed would read as a multi-select toggle.
     expect(course).toContain('role="radiogroup" :aria-label="question.question"');

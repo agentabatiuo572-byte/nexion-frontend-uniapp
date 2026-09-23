@@ -5,7 +5,8 @@
       <view v-if="loading"><text>{{ t.learning.courseLoading }}</text></view>
       <view v-else-if="error" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
-        <text class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.courseUnavailable" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
+        <text v-if="error === 'courseIdMissing'" class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses" @keydown.enter.prevent="onKeyboardActivate($event, backToCourses)" @keydown.space.prevent="onKeyboardActivate($event, backToCourses)">{{ t.learning.centerTitle }}</text>
+        <text v-else class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
       </view>
       <view v-else-if="course">
         <text class="block" style="font-size: 20px; font-weight: 600">{{ course.title }}</text>
@@ -20,7 +21,7 @@
                原先 role="button" + aria-pressed 被浏览器当成 toggle button,读屏按复选框朗读,
                而且没有题目级分组名 —— 用户既以为能多选,也听不出这几个选项属于哪道题。
                改用 radiogroup(组名 = 题干)+ radio + aria-checked。 -->
-          <view role="radiogroup" :aria-label="question.question">
+          <view role="radiogroup" :aria-label="question.question" :data-course-question-index="index">
             <view v-for="(option, optionIndex) in question.options" :key="option" :class="interactionLocked ? '' : 'active:opacity-70'" style="margin-top: 8px" role="radio" :tabindex="!interactionLocked && (answers[index] === optionIndex || (answers[index] === undefined && optionIndex === 0)) ? 0 : -1" :aria-label="option" :aria-checked="answers[index] === optionIndex ? 'true' : 'false'" :aria-disabled="interactionLocked ? 'true' : 'false'" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.up.prevent="moveAnswer(index, optionIndex, -1)" @keydown.down.prevent="moveAnswer(index, optionIndex, 1)">
               <text>{{ answers[index] === optionIndex ? "●" : "○" }} {{ option }}</text>
             </view>
@@ -64,6 +65,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
 import type { LearningCourse, LearningQuizReceiptStatus, LearningResult } from "@/api/learning-api";
 import { ApiError } from "@/api/errors";
+import { navReplace } from "@/lib/route";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -144,6 +146,7 @@ const fenceReader = createLearningPageFenceReader(
 function fence(): LearningPageFence { return fenceReader.capture(); }
 function current(scope: LearningPageFence): boolean { return fenceReader.isCurrent(scope); }
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
+function backToCourses() { void navReplace("/pages/learn/courses"); }
 function attemptIdentity(expectedCourse: LearningCourse): LearningAttemptIdentity | null {
   const accountKey = String(app.accountKey).trim();
   if (!accountKey) return null;
@@ -161,7 +164,7 @@ function moveAnswer(questionIndex: number, optionIndex: number, delta: number) {
   selectAnswer(questionIndex, next);
   void nextTick(() => {
     if (typeof document === "undefined") return;
-    document.querySelectorAll<HTMLElement>('[role="radio"][aria-checked="true"]')[questionIndex]?.focus();
+    document.querySelector<HTMLElement>(`[data-course-question-index="${questionIndex}"] [role="radio"][aria-checked="true"]`)?.focus();
   });
 }
 function isCourseVersionConflict(cause: unknown): boolean {
@@ -221,16 +224,16 @@ async function performLoad() {
   // 🔴 zentao #240:缺课程 ID 与「没有网络」是两件事,此前共用一条分支 ——
   //   深链没带 courseId(或参数丢失)时报的是「课程需要在受信任网络中获取」,
   //   把用户引向检查网络这个错误方向,而真正该做的是从教程中心重新进入。
+  if (!requestedCourseId.trim()) {
+    if (!current(scope)) return;
+    loading.value = false;
+    error.value = "courseIdMissing";
+    return;
+  }
   if (!remoteApiEnabled) {
     if (!current(scope)) return;
     loading.value = false;
     error.value = "courseOffline";
-    return;
-  }
-  if (!requestedCourseId) {
-    if (!current(scope)) return;
-    loading.value = false;
-    error.value = "courseIdMissing";
     return;
   }
   try {
@@ -255,8 +258,8 @@ async function performLoad() {
     }
     startState.value = loaded.start;
     if (startConfirmed.value) await recoverPendingReceipt(scope, loaded.course);
-  } catch {
-    if (current(scope)) error.value = "courseUnavailable";
+  } catch (cause) {
+    if (current(scope)) error.value = cause instanceof ApiError && cause.kind === "network" ? "courseOffline" : "courseUnavailable";
   } finally {
     if (current(scope)) loading.value = false;
   }

@@ -124,17 +124,18 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #216: the password-change validation error is associated to its own field
   // (aria-describedby + aria-invalid, one literal id per field), announced via
   // role=alert, and focus moves to the first invalid field; editing clears it.
-  "security.vue": "b0412facb6c2625f0148375533c2bcd8d9de2556ea8814fd3461449e3a73dd62",
+  "security.vue": "e90d8d133dbb7c1bccb2b91bb7b4d30f04f65723ef37b82dd91f7973df89c60e",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.
   // Every mode change now routes through setMode so the address tracks the visible
   // form (back-to-list clears ?mode=create; a create deep link survives reload).
+  // #94: the list status tabs expose their selected state and arrow-key navigation.
   // #162: the create form's category chips are a radiogroup with aria-checked and
   // roving tabindex (they were unnamed toggle buttons with no selected state), and
   // the subject/description fields carry accessible names plus required and
   // length hints; the empty-submit error is associated to its field. Styles unchanged.
-  "support-tickets.vue": "0aec7c6ce7090a8b35877f5b25ac05f051049c775e1774724433ef2008268241",
+  "support-tickets.vue": "0496f1d848ab357d929f7c72f9b89e65478dbb19728a07da5d6cdecb1fc715da",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",

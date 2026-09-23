@@ -18,23 +18,29 @@ function sendToBotSource(): string {
   const from = source.indexOf("async function sendToBot");
   const to = source.indexOf("\nfunction goSupport", from);
   if (from < 0 || to < 0) throw new Error("HELP_SEND_TO_BOT_NOT_FOUND");
-  return ts.transpileModule(source.slice(from, to), {
+  const retryFrom = source.indexOf("function retryBot()");
+  const retryTo = source.indexOf("\nconst contactLinkStyle", retryFrom);
+  if (retryFrom < 0 || retryTo < 0) throw new Error("HELP_RETRY_BOT_NOT_FOUND");
+  return ts.transpileModule(`${source.slice(from, to)}\n${source.slice(retryFrom, retryTo)}`, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
 }
 
 interface Harness {
   sendToBot: () => Promise<void>;
+  retryBot: () => void;
   botInput: { value: string };
   thinking: { value: boolean };
   botFailure: { value: "timeout" | "error" | null };
   transcript: Array<{ from: string; text: string; meta?: string }>;
+  pendingBotRequest: { value: { payload: { turnId: string } } | null };
 }
 
-function harness(chat: () => Promise<unknown>): Harness {
+function harness(chat: (request?: { turnId: string }) => Promise<unknown>): Harness {
   const botInput = ref("怎么提现?");
   const thinking = ref(false);
   const botFailure = ref<"timeout" | "error" | null>(null);
+  const pendingBotRequest = ref(null);
   const transcript: Harness["transcript"] = [];
   const body = `
     let botDeadline = null;
@@ -51,20 +57,20 @@ function harness(chat: () => Promise<unknown>): Harness {
     const bumpScroll = () => undefined;
     const fmt = (template, params) => template.replace(/\\{(\\w+)\\}/g, (_, key) => params[key] ?? "{" + key + "}");
     const novaHelpSource = () => "faq";
-    const asApiError = (error) => ({ message: String(error?.message ?? error) });
+    const asApiError = (error) => ({ message: String(error?.message ?? error), status: error?.status, kind: error?.kind });
     ${sendToBotSource()}
-    return { sendToBot };
+    return { sendToBot, retryBot };
   `;
   const build = new Function(
     "ref", "computed", "botInput", "thinking", "botFailure", "transcript", "remoteApiEnabled",
-    "locale", "novaAiApi", "buildRemoteHelpRequest", "requireCryptoUuid", "botRequestControl", "BOT_REPLY_TIMEOUT_MS",
+    "locale", "novaAiApi", "buildRemoteHelpRequest", "requireCryptoUuid", "botRequestControl", "BOT_REPLY_TIMEOUT_MS", "pendingBotRequest",
     body,
   )(
     ref, computed, botInput, thinking, botFailure, transcript, true,
-    { code: "zh" }, { chat }, (q: string, language: string, conversationId: string, turnId: string) => ({ q, language, conversationId, turnId }),
-    () => "turn-id", createLatestAbortableRequest(), 25_000,
+    { code: "zh" }, { chat }, (message: string, language: string, conversationId: string, turnId: string) => ({ message, language, conversationId, turnId }),
+    () => "turn-id", createLatestAbortableRequest(), 25_000, pendingBotRequest,
   );
-  return { sendToBot: build.sendToBot, botInput, thinking, botFailure, transcript };
+  return { sendToBot: build.sendToBot, retryBot: build.retryBot, botInput, thinking, botFailure, transcript, pendingBotRequest };
 }
 
 beforeEach(() => { vi.useFakeTimers(); });
@@ -110,5 +116,38 @@ describe("NexGridBot remote reply deadline", () => {
     expect(h.thinking.value).toBe(false);
     expect(h.botFailure.value).toBe("error");
     expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "服务端失败", meta: "错误:NOVA_AI_UNAVAILABLE" });
+  });
+
+  it("retries the original turn after local timeout and follows its in-progress result", async () => {
+    const requests: string[] = [];
+    let calls = 0;
+    let resolveFirst!: (value: unknown) => void;
+    const h = harness(async (request) => {
+      requests.push(request!.turnId);
+      calls += 1;
+      if (calls === 1) return new Promise((resolve) => { resolveFirst = resolve; });
+      if (calls === 2) throw Object.assign(new Error("NOVA_AI_TURN_IN_PROGRESS"), { status: 429 });
+      return { reply: "同一条回答", source: "faq", language: "zh" };
+    });
+    void h.sendToBot();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(h.pendingBotRequest.value?.payload.turnId).toBe("turn-id");
+    expect(h.thinking.value).toBe(false);
+    h.botInput.value = "另一条问题";
+    await h.sendToBot();
+    expect(requests).toEqual(["turn-id"]);
+    expect(h.botInput.value).toBe("另一条问题");
+    h.retryBot();
+    expect(h.thinking.value).toBe(true);
+    resolveFirst({ reply: "迟到的旧应答", source: "faq", language: "zh" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(h.thinking.value).toBe(true);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(requests).toEqual(["turn-id", "turn-id", "turn-id"]);
+    expect(h.transcript.filter((message) => message.from === "user")).toHaveLength(1);
+    expect(h.transcript.at(-1)?.text).toBe("同一条回答");
+    expect(h.transcript.some((message) => message.text === "迟到的旧应答")).toBe(false);
+    expect(h.pendingBotRequest.value).toBeNull();
   });
 });

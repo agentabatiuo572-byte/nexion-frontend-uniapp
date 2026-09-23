@@ -44,12 +44,11 @@ describe("earning-goal save account fence", () => {
  * 判据是**行为**而非文本:用真实 fmt 渲染一遍,断言天数前没有 $、金额前有 $。
  */
 describe("goal save toast placeholder contract", () => {
-  it("never puts a currency sign in front of the day count", () => {
-    const rendered = fmt(zh.goals.savedToast, { amount: "1000", days: "90" });
-
-    expect(rendered).toContain("90 天");
-    expect(rendered).not.toContain("$90");
-    // 金额仍必须带 $ —— 修的是位置,不是把货币符号一起删掉。
-    expect(rendered).toContain("$1000");
+  it("keeps days unitless and groups default and custom amounts", () => {
+    expect(source).toMatch(/savedToast, \{ amount: target\.value\.toLocaleString\("en-US"\), days: days\.value \}/);
+    expect(fmt(zh.goals.savedToast, { amount: (1000).toLocaleString("en-US"), days: 90 }))
+      .toBe("目标已保存 · 90 天达成 $1,000");
+    expect(fmt(zh.goals.savedToast, { amount: (1234.56).toLocaleString("en-US"), days: 180 }))
+      .toBe("目标已保存 · 180 天达成 $1,234.56");
   });
 });

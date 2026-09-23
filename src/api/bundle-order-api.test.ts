@@ -28,6 +28,10 @@ function onCheckoutHarness(receipt: { productNos: string[]; amountUsdt: number }
     total: { value: 285 }, normalizeBundleExpectedAmountUsdt, toast: { warn: vi.fn(), success: vi.fn(), error: vi.fn() },
     t: { value: en }, bundleDiscountApi: { current: vi.fn().mockResolvedValue({ policyVersion: 3 }) },
     policy: { value: { policyVersion: 3 } }, policyStatus: { value: "ready" },
+    purchaseEligibilityStore: {
+      ensure: vi.fn().mockResolvedValue(true),
+      state: vi.fn(() => ({ status: "ready" })),
+    },
     acquireBundleCommand: vi.fn(() => ({ key: "bundle-key", expectedAmountUsdt: 285, productNos: ["sku-a", "sku-b"] })),
     offerBundleWalletTopup: vi.fn(), bundleOrderApi: { create: vi.fn().mockResolvedValue(created) }, matchesBundleQuote,
     ApiError, orderApi: { pay: vi.fn().mockResolvedValue({ orderNo: "BND-1", paymentMethod: "OTHER" }) },
@@ -158,6 +162,16 @@ describe("bundle order API", () => {
     expect(policyRead).toBeGreaterThan(-1);
     expect(fence).toBeGreaterThan(policyRead);
     expect(fence).toBeLessThan(create);
+  });
+
+  it("refuses an ineligible SKU before creating a remote bundle order", async () => {
+    const h = onCheckoutHarness({ productNos: ["sku-a", "sku-b"], amountUsdt: 285 });
+    h.purchaseEligibilityStore.ensure.mockImplementation(async (id: string) => id !== "sku-b");
+    await h.onCheckout();
+    expect(h.purchaseEligibilityStore.ensure).toHaveBeenCalledWith("sku-a", true);
+    expect(h.purchaseEligibilityStore.ensure).toHaveBeenCalledWith("sku-b", true);
+    expect(h.bundleOrderApi.create).not.toHaveBeenCalled();
+    expect(h.orderApi.pay).not.toHaveBeenCalled();
   });
 
   it("rejects a server receipt whose product set or amount differs from the confirmed quote", () => {

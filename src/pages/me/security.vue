@@ -76,7 +76,8 @@
           </view>
         </view>
         <view :style="pwdFormStyle">
-          <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
+          <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
+          <text v-if="twoFactorPasswordError" id="security-2fa-password-error" class="block" :style="errStyle" role="alert">{{ twoFactorPasswordError }}</text>
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
             <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
             <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
@@ -210,6 +211,8 @@ const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUES
   || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED");
 const securityBusy = ref(false);
 const twoFactorPassword = ref("");
+const twoFactorPasswordError = ref("");
+const twoFactorPasswordFocus = ref(false);
 const twoFactorCode = ref("");
 const twoFactorChallengeNo = ref("");
 const twoFactorPhoneMasked = ref("");
@@ -300,6 +303,8 @@ function clearSecurityAccountState() {
   next.value = "";
   confirmPwd.value = "";
   twoFactorPassword.value = "";
+  twoFactorPasswordError.value = "";
+  twoFactorPasswordFocus.value = false;
   twoFactorCode.value = "";
   twoFactorChallengeNo.value = "";
   twoFactorPhoneMasked.value = "";
@@ -408,6 +413,8 @@ function onConfirmPwd(e: Event) {
 }
 function onTwoFactorPassword(e: Event) {
   twoFactorPassword.value = detailVal(e);
+  twoFactorPasswordError.value = "";
+  twoFactorPasswordFocus.value = false;
 }
 function onTwoFactorCode(e: Event) {
   twoFactorCode.value = detailVal(e).replace(/\D/g, "").slice(0, 6);
@@ -536,6 +543,8 @@ async function toggleTwoFactor(value: boolean) {
     return;
   }
   if (!twoFactorPassword.value) {
+    twoFactorPasswordError.value = t.value.security.twoFactorPasswordRequired;
+    twoFactorPasswordFocus.value = true;
     toast.error(t.value.login.errorInvalidPassword);
     return;
   }

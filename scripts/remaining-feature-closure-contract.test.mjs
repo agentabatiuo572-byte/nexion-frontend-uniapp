@@ -23,7 +23,7 @@ test("bundle editor uses the real remote order lifecycle with stable command rec
   assert.match(page, /acquireBundleCommand\(list, accountKey, quotedTotal\)/);
   assert.match(page, /bundleOrderApi\.create\(\s*command\.productNos, latestPolicy\.policyVersion, command\.expectedAmountUsdt, command\.key\)/);
   assert.match(page, /if \(!canonicalOrderCommitted && !idempotencyPayloadMismatch\s*&& \(policyStale \|\| quoteStale \|\| !isAmbiguousOutcome\(error\)\)\)/);
-  assert.match(page, /const checkoutUnavailable = computed\(\(\) => submitting\.value \|\| walletRefreshing\.value \|\| products\.value\.length < 2\)/);
+  assert.match(page, /const checkoutUnavailable = computed\(\(\) => submitting\.value \|\| walletRefreshing\.value \|\| products\.value\.length < 2[\s\S]*entry\.status !== "ready" \|\| !entry\.eligible/);
   assert.match(api, /\/api\/orders\/bundle/);
   assert.match(api, /idSource !== "server"/);
 });

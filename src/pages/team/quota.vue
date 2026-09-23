@@ -11,15 +11,19 @@
 <template>
   <AppChassis active="team">
     <view class="pb-6" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/team" :title="t.quota.pageTitle" />
+      <SubPageHeader :back="focusedProductId ? `/pages/store/detail?id=${encodeURIComponent(focusedProductId)}` : '/pages/team/team'" :title="t.quota.pageTitle" />
 
       <!-- 🔴 zentao #246:请求聚焦的商品不在配额档位里时**明说** ——
            静默展示无关档位,正是「查看解锁条件跳到另一商品的配额页」的成因。 -->
       <view v-if="!focusedTierPresent" class="px-4" style="padding-top: 14px">
+        <text class="block" :style="heroCapStyle">{{ focusedProductName }}</text>
         <text class="block" :style="focusedMissingStyle" role="note">{{ t.quota.focusedTierMissing }}</text>
+        <view class="inline-flex items-center justify-center active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="go(focusedProductHref)" @keydown.enter.prevent="go(focusedProductHref)" @keydown.space.prevent="go(focusedProductHref)">
+          <text>{{ t.store.gateLockedCta }}</text>
+        </view>
       </view>
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
+      <view v-else class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
         <!-- Hero — de-carded: invites count sits directly on the page floor.
              The bordered card + page-floor radial glow were deleted outright
              (owner call 2026-07-08: floor auras are removed, not re-tuned). -->
@@ -51,7 +55,7 @@
         </view>
 
         <!-- Tier cards -->
-        <QuotaTierCard v-for="tier in tiers" :key="tier.productId" :tier="tier" @navigate="go" />
+        <QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" @navigate="go" />
 
         <!-- Invite CTA -->
         <view class="rounded-2xl active:scale-[0.98] transition-transform" :style="inviteCtaStyle" @click="go('/pages/team/team')">
@@ -72,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -83,13 +87,14 @@ import { fmt } from "@/i18n/format";
 import { remoteApiEnabled, teamQuotaApi } from "@/api/runtime";
 import type { TeamQuotaSnapshot } from "@/api/team-quota-api";
 import { getProduct as getMockProduct, annualRoiPct as mockAnnualRoiPct, type Product } from "@/mock/products";
-import { productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { specText } from "@/lib/product-copy";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
 import { isCurrentTeamP31718Request, type TeamP31718Request } from "@/lib/team-p3-17-18-request-scope";
+import { isAnnualizedQuotaPerk } from "@/lib/quota-perk";
 
 const t = useT();
 const network = useNetwork();
@@ -142,7 +147,8 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   if (quotaMounted && remoteApiEnabled) void refreshRemoteQuota();
 });
 onLoad((options) => {
-  const requested = typeof options?.product === "string" ? options.product.trim() : "";
+  const fallback = new URLSearchParams(takeNavigationQuery("/pages/team/quota")).get("product");
+  const requested = typeof options?.product === "string" ? options.product.trim() : fallback?.trim() ?? "";
   focusedProductId.value = requested.slice(0, 64);
 });
 
@@ -183,6 +189,8 @@ const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.valu
  * 现在带上 id 并据此定位;若该商品根本不在配额档位里,页面**明说**,而不是静默展示无关档位。
  */
 const focusedProductId = ref("");
+const focusedProductHref = computed(() => `/pages/store/detail?id=${encodeURIComponent(focusedProductId.value)}`);
+const focusedProductName = computed(() => catalogProduct(focusedProductId.value)?.name ?? focusedProductId.value);
 
 function buildTier(productId: string, tint: string): QuotaTier | null {
   const p = getMockProduct(productId);
@@ -206,7 +214,6 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
     perks: [
       fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
       `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
-      fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
     ],
     roiBasis: { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) },
     tint,
@@ -221,6 +228,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
 // — so the card renders catalog facts and only falls back to the server row
 // while the catalog read has not landed.
 function catalogProduct(productId: string): Product | undefined {
+  if (productCatalogState.status !== "ready") return undefined;
   return productCatalogPresentation.value?.products.find((p) => p.id === productId);
 }
 function catalogProductName(productId: string, fallback: string): string {
@@ -228,22 +236,21 @@ function catalogProductName(productId: string, fallback: string): string {
 }
 function catalogProductPerks(productId: string, fallback: readonly string[]): string[] {
   const p = catalogProduct(productId);
-  if (!p) return fallback.map(quotaPerkText);
-  // Same three lines the mock path builds, so both modes read identically.
+  if (!p) return fallback.filter((perk) => !isAnnualizedQuotaPerk(perk)).map(quotaPerkText);
+  // Annualized output is rendered only with its complete calculation basis.
   return [
     fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
     `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
-    fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
   ];
 }
 /**
  * 年化 ROI 的推导输入,与上面那条 perk 文案**同源同算**(都走 annualRoiPct),
  * 所以页面上的比例与列出的算式不可能各说各话。
  */
-function catalogProductRoiBasis(productId: string): { dailyEarn: number; price: number; roi: number } | undefined {
+function catalogProductRoiBasis(productId: string): QuotaTier["roiBasis"] {
   const p = catalogProduct(productId);
   if (!p) return undefined;
-  return { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) };
+  return { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p), revision: productCatalogPresentation.value?.revision };
 }
 
 // The server row's perk strings are unlocalized and carry the raw column scale
@@ -261,12 +268,15 @@ function quotaPerkText(perk: string): string {
 
 /** 请求聚焦的商品是否确实在配额档位里(空 id = 未指定,不提示)。 */
 const focusedTierPresent = computed(() =>
-  !focusedProductId.value || tiers.value.some((tier) => tier.productId === focusedProductId.value));
+  !focusedProductId.value || (remoteApiEnabled && !remoteSnapshot.value)
+  || tiers.value.some((tier) => tier.productId === focusedProductId.value));
+const focusedTiers = computed(() => focusedProductId.value
+  ? tiers.value.filter((tier) => tier.productId === focusedProductId.value) : tiers.value);
 
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
     ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
-      productId: tier.productId, name: catalogProductName(tier.productId, tier.name), price: tier.price,
+      productId: tier.productId, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
       available: tier.available,
       unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",
