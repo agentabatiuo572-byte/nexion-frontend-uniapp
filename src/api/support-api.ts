@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { parseServerTimestamp } from "./server-time";
 import type { Conversation, ConversationCategoryAvailability, ConvMessage, SupportFaq, SupportSlaTarget, Ticket, TicketCategory, TicketMessage, TicketPriority, TicketStatus } from "@/domain/support";
 
 interface Page<T> { items: T[]; total: number }
@@ -45,7 +46,7 @@ function parseDismissal(value: unknown): ConversationDismissal {
 function row(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function text(value: unknown, empty = false): string | null { if (typeof value !== "string") return null; const v = value.trim(); return v || empty ? v : null; }
 function integer(value: unknown, min = 0): number | null { const v = typeof value === "number" ? value : Number(value); return Number.isSafeInteger(v) && v >= min ? v : null; }
-function time(value: unknown): number | null { if (typeof value !== "string" && typeof value !== "number") return null; const v = typeof value === "number" ? value : Date.parse(value); return Number.isFinite(v) && v > 0 ? v : null; }
+function time(value: unknown): number | null { const v = typeof value === "number" ? value : parseServerTimestamp(value); return v !== null && Number.isFinite(v) && v > 0 ? v : null; }
 function enumValue<T extends string>(value: unknown, allowed: readonly T[]): T | null { const v = text(value)?.toLowerCase() as T; return allowed.includes(v) ? v : null; }
 function requiredKey(key: string): string { const v = key.trim(); return v.length >= 8 && v.length <= 128 ? v : invalid("SUPPORT_IDEMPOTENCY_KEY_INVALID"); }
 function pathId(id: string): string { const v = id.trim(); return v ? encodeURIComponent(v) : invalid("SUPPORT_RESOURCE_ID_INVALID"); }
