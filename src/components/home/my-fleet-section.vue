@@ -13,7 +13,7 @@
 
     <!-- Slot rack: icon bays -->
     <view class="flex items-center" style="gap: 9px; margin-bottom: 14px">
-      <DeviceSlot v-for="d in slotDevices" :key="d.id" :device="d" />
+      <DeviceSlot v-for="d in slotDevices" :key="d.id" :device="d" :runtime-confirmed="fleetReady" />
       <AddDeviceRow v-if="fleetReady && slotDevices.length < app.slotCap" />
     </view>
 
@@ -22,7 +22,7 @@
     <!-- v-if:零设备时不渲染空壳(此前渲染成一条 2px 高的空卡,占着转化位);
          零设备的引导由上方 slot rack 的 AddDeviceRow 承担。 -->
     <view v-if="devices.length > 0" class="rounded-2xl overflow-hidden" style="background: var(--v5-surface)">
-      <DeviceRow v-for="(d, i) in devices" :key="d.id" :device="d" :divider="i < devices.length - 1" />
+      <DeviceRow v-for="(d, i) in devices" :key="d.id" :device="d" :divider="i < devices.length - 1" :runtime-confirmed="fleetReady" />
     </view>
   </view>
 </template>

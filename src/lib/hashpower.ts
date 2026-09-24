@@ -63,6 +63,22 @@ export function isDeviceOnline(
   return device.onlineHeartbeatAt != null && now >= device.onlineHeartbeatAt && now - device.onlineHeartbeatAt < timeoutMs;
 }
 
+/** Display-only tri-state; server runtime does not certify a fresh heartbeat for earnings. */
+export function deviceOnlineState(
+  device: Parameters<typeof isDeviceOnline>[0] & {
+    capacitySource?: "server" | "mock";
+    runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
+  },
+  now: number,
+  runtimeConfirmed = true,
+): "online" | "offline" | "unknown" {
+  if (device.capacitySource === "server") {
+    if (!runtimeConfirmed || (device.runtimeStatus !== "ONLINE" && device.runtimeStatus !== "OFFLINE")) return "unknown";
+    return device.status === "online" && device.runtimeStatus === "ONLINE" ? "online" : "offline";
+  }
+  return isDeviceOnline(device, now) ? "online" : "offline";
+}
+
 export type HashFactorKey = "offline" | "battery" | "thermal" | "continuity" | "peak";
 
 export interface HashFactors {

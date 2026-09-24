@@ -4,7 +4,7 @@
       <SubPageHeader back="/pages/earn/earn" :title="deviceTitle" :subtitle="deviceSubtitle" />
 
       <DeviceCardPC
-        v-if="device"
+        v-if="device && !fleetFailed"
         :device="device"
         :expanded="expanded"
         @toggle="expanded = !expanded"
