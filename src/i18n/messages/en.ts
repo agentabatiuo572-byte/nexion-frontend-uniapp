@@ -1778,7 +1778,7 @@ export const en = {
     sectionCount: "{n} of {total}",
     sectionManage: "Manage",
     fleetTitle: "Manage your fleet",
-    onlineLabel: "{n} online",
+    activatedLabel: "{n} activated",
     emptySlots: "{n} slots open",
     // Batch D — /me/devices renamed to "Device inventory" (设备仓库). Holds
     // the full per-device list with activate/deactivate toggles + trade-in
@@ -2830,7 +2830,7 @@ export const en = {
     quickActions: "Quick actions",
     walletSlotUnlock: "Unlock",
     walletSlotMore: "more",
-    walletSlotsLine: "{online} live · {open} slots open",
+    walletSlotsLine: "{active} activated · {open} slots open",
     withdrawalLocked: "Minimum not reached yet",
     withdrawalLockedBody: "You need at least ${min} to withdraw (${short} more). Eligibility depends on your available balance and the current withdrawal rules.",
     withdrawalLockedBrowse: "Browse hardware",

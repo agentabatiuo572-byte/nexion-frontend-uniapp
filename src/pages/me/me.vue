@@ -115,7 +115,6 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navReset, navTo } from "@/lib/route";
 import { nexGridBrandText } from "@/lib/brand-copy";
-import { isDeviceOnline } from "@/lib/hashpower";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
@@ -242,11 +241,8 @@ const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
-const onlineCount = computed(
-  () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
-);
 const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
-const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
+const activatedLabel = computed(() => fmt(t.value.myDevices.activatedLabel, { n: activeCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
 const rankValue = computed(() => remoteApiEnabled && !vrank.remoteReady ? "—" : `V${vrank.myRank}`);
@@ -300,7 +296,7 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.myDevices.sectionTitle,
     count: deviceSectionCount.value,
     items: [
-      { key: "inventory", label: t.value.myDevices.inventoryTitle, href: "/me/devices", icon: "device", meta: onlineLabel.value, tone: "success" },
+      { key: "inventory", label: t.value.myDevices.inventoryTitle, href: "/me/devices", icon: "device", meta: activatedLabel.value, tone: "success" },
       { key: "add", label: t.value.me.deviceAddLabel, href: "/store", icon: "plus", meta: t.value.me.deviceAddMeta, tone: "brand" },
       { key: "slots", label: t.value.myDevices.inventorySlotsLabel, href: "/me/devices", icon: "slots", meta: emptySlotsLabel.value, tone: "purple" },
       { key: "goals", label: t.value.me.goalsRow, href: "/me/goals", icon: "target", meta: t.value.me.setTarget, tone: "orange" },
