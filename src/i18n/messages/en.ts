@@ -2050,7 +2050,7 @@ export const en = {
       },
       withdraw: {
         q: "Can I withdraw earnings anytime?",
-        a: "Yes, from $20. Withdrawal handling follows the current rules and review status shown in your wallet. Withdrawals go to the payout address you set in your wallet.",
+        a: "You can request a withdrawal when your withdrawable balance meets the current minimum and the channel is available. Check your wallet for the current rules. For a bank withdrawal, the quoted VND amount is paid to your linked Vietnamese bank account. Requests may require review and processing; check the withdrawal order for the payout status.",
       },
       demand: {
         q: "What if AI demand drops?",

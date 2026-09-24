@@ -1980,7 +1980,7 @@ export const vi: Messages = {
       },
       withdraw: {
         q: "Tôi có thể rút thu nhập bất cứ lúc nào không?",
-        a: "Được, từ $20. Việc xử lý rút tiền tuân theo quy tắc và trạng thái xử lý hiện hiển thị trong Ví. Tiền rút sẽ chuyển vào địa chỉ rút tiền bạn đã thiết lập trong ví.",
+        a: "Bạn chỉ có thể yêu cầu rút khi số dư có thể rút đạt mức tối thiểu hiện hành và kênh rút khả dụng. Xem quy định hiện hành trong Ví. Nếu rút qua ngân hàng, số tiền VND theo báo giá được chi trả vào tài khoản ngân hàng Việt Nam đã liên kết. Yêu cầu có thể cần xác minh thêm và xử lý; hãy xem trạng thái đơn rút để biết kết quả chuyển tiền.",
       },
       demand: {
         q: "Nếu nhu cầu AI giảm thì sao?",
