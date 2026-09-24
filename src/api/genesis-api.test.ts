@@ -62,6 +62,27 @@ describe("genesis remote truth contract", () => {
     });
   });
 
+  it("keeps account orders readable when Genesis has no active series", async () => {
+    const account = {
+      serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      series: null, sale: null, eligibility: null,
+      marketEnabled: false, emissionOpen: false,
+      holdings: [], emissions: [], orders: [], walletBalanceUsdt: 0,
+    };
+    const request = vi.fn().mockResolvedValueOnce(account).mockResolvedValue({
+      serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      items: [], nextCursor: null,
+    });
+    await expect(createGenesisApi({ request } as never, "prod").account()).resolves.toMatchObject({
+      series: null, sale: null, eligibility: null, orders: [],
+    });
+    expect(request.mock.calls.map(([input]) => input.path)).toEqual([
+      "/api/genesis/account", "/api/genesis/account?history=orders", "/api/genesis/account?history=emissions",
+    ]);
+    await expect(createGenesisApi({ request: vi.fn().mockResolvedValue({ ...account, marketEnabled: true }) } as never, "prod").account())
+      .rejects.toMatchObject({ message: "GENESIS_RESPONSE_INVALID" });
+  });
+
   it("keeps unavailable market metrics null and accepts a negative server floor delta", () => {
     const state = parseGenesisPublicState({
       serverCanonical: true,

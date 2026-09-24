@@ -106,7 +106,7 @@ describe("Genesis remote fact orchestration", () => {
       applyEligibility: (value) => { applied.eligibility = value; },
     })).resolves.toBe(true);
 
-    expect(applied.account?.eligibility.holderStatus).toBe("READY");
+    expect(applied.account?.eligibility?.holderStatus).toBe("READY");
     expect(applied.eligibility?.reservedAllocation).toBe(800002.5);
     expect(applyPublicState).not.toHaveBeenCalled();
     expect(clearPublic).toHaveBeenCalledOnce();
@@ -160,7 +160,7 @@ describe("Genesis remote fact orchestration", () => {
     })).resolves.toBe(true);
 
     expect(clearAccount).not.toHaveBeenCalled();
-    expect(applied.account?.eligibility.holderStatus).toBe("READY");
+    expect(applied.account?.eligibility?.holderStatus).toBe("READY");
     expect(applyEligibilityError).toHaveBeenCalledWith("GENESIS_ELIGIBILITY_UNAVAILABLE");
   });
 

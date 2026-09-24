@@ -336,7 +336,7 @@ export const useGenesis = defineStore("genesis", () => {
     // Account responses are canonical development/production facts. Supply is
     // still owned by GET /api/genesis/state; account reads cannot replace it.
     const holdingMap: Record<string, string> = Object.create(null);
-    remoteRoyaltyPct.value = state.series.royaltyPct;
+    remoteRoyaltyPct.value = state.series?.royaltyPct ?? null;
     const ids = state.holdings.map((holding) => {
       const tokenId = tokenIdFor(holding.holdingNo);
       holdingMap[tokenId] = holding.holdingNo;
@@ -359,8 +359,10 @@ export const useGenesis = defineStore("genesis", () => {
   /** A successful mutation response is the canonical committed receipt. Apply
    * both its account facts and supply before any later readback can fail. */
   function applyCommittedPurchaseReceipt(state: GenesisAccountState): void {
-    totalSlots.value = state.series.totalSupply;
-    soldSlots.value = state.series.soldSupply;
+    if (state.series) {
+      totalSlots.value = state.series.totalSupply;
+      soldSlots.value = state.series.soldSupply;
+    }
     applyAccountState(state);
   }
 

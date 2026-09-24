@@ -135,8 +135,8 @@ export type GenesisCommandStatus = "SUCCEEDED" | "FAILED" | "PROCESSING" | "UNKN
 export interface GenesisAccountState {
   sourceEnvironment: GenesisSourceEnvironment;
   runId: string;
-  series: GenesisSeries;
-  sale: GenesisSalePolicy;
+  series: GenesisSeries | null;
+  sale: GenesisSalePolicy | null;
   marketEnabled: boolean;
   emissionOpen: boolean;
   holdings: GenesisHolding[];
@@ -145,7 +145,7 @@ export interface GenesisAccountState {
   ordersNextCursor?: string | null;
   emissionsNextCursor?: string | null;
   emissionTotals?: { paidUsdt: number; pendingUsdt: number } | null;
-  eligibility: GenesisEligibility;
+  eligibility: GenesisEligibility | null;
   walletBalanceUsdt: number;
   billNo?: string;
   receiptId?: string;
@@ -441,11 +441,13 @@ export function parseGenesisAccountState(
   mode: ApiEnvironment = "prod",
 ): GenesisAccountState {
   const row = record(value);
-  const series = parseSeries(row?.series);
-  const sale = parseSale(row?.sale);
+  const noSeries = row?.series === null && row.sale === null && row.eligibility === null;
+  const series = noSeries ? null : parseSeries(row?.series);
+  const sale = noSeries ? null : parseSale(row?.sale);
   const walletBalanceUsdt = number(row?.walletBalanceUsdt);
   const orders = row?.orders;
-  if (!row || !validAuthority(row, mode) || typeof row.marketEnabled !== "boolean"
+  if (!row || !validAuthority(row, mode) || (noSeries && row.marketEnabled !== false)
+      || typeof row.marketEnabled !== "boolean"
       || typeof row.emissionOpen !== "boolean" || !Array.isArray(row.holdings)
       || !Array.isArray(row.emissions) || !Array.isArray(orders) || walletBalanceUsdt === null) return invalid();
   return {
@@ -462,7 +464,7 @@ export function parseGenesisAccountState(
       paidUsdt: number(record(row.emissionTotals)?.paidUsdt) ?? invalid(),
       pendingUsdt: number(record(row.emissionTotals)?.pendingUsdt) ?? invalid(),
     },
-    eligibility: parseEligibility(row.eligibility, mode),
+    eligibility: noSeries ? null : parseEligibility(row.eligibility, mode),
     walletBalanceUsdt,
     billNo: text(row.billNo) ?? undefined,
     receiptId: text(row.receiptId) ?? undefined,
