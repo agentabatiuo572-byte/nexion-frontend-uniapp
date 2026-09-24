@@ -43,7 +43,7 @@ import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { fmt, openSlotsTemplate } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { trialReservesSlotNow } from "@/store/free-trial";
 
@@ -56,7 +56,7 @@ const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
 const activatedLabel = computed(() => fmt(t.value.myDevices.activatedLabel, { n: activeCount.value }));
-const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
+const emptySlotsLabel = computed(() => fmt(openSlotsTemplate(t.value.myDevices.emptySlots, emptySlots.value), { n: emptySlots.value }));
 
 function goDevices() {
   navTo("/pages/me/devices");
