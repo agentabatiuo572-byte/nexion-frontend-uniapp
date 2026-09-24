@@ -289,6 +289,7 @@ import { estimatePaybackDays } from "@/lib/product-payback";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { useEarnConfig } from "@/store/earn-config";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { useApp } from "@/store/app";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { toast } from "@/store/ui";
@@ -308,6 +309,7 @@ const phase = useProductPhase();
 const trustLanguage = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
 const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
 
+const app = useApp();
 const id = ref("");
 const catalogRetrying = ref(false);
 let detailPageVisible = false;
@@ -343,6 +345,11 @@ onLoad(async (options) => {
 onShow(() => {
   detailPageVisible = true;
   void refreshDetailFacts();
+});
+
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+  invalidateDetailFacts();
+  if (detailPageVisible && remoteApiEnabled && app.accountKey !== "default") void refreshDetailFacts();
 });
 
 async function retryCatalog() {
