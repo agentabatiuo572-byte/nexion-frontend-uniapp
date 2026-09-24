@@ -21,13 +21,6 @@ let loadVersion = 0;
 // /api/config/phone-tiers response is allowed to repopulate it.
 if (remoteApiEnabled) applyCanonicalPhoneTierYields([]);
 
-function unlockTierFor(minVRAM: number): string {
-  if (minVRAM <= 24) return "RTX 4090 PC (24GB)";
-  if (minVRAM <= 96) return "NexGridBox S1 (96GB)";
-  if (minVRAM <= 192) return "NexGridBox Pro (192GB)";
-  return "NexGridRack P1 (640GB)";
-}
-
 export async function refreshEarnConfig(): Promise<void> {
   if (!remoteApiEnabled) return;
   const version = ++loadVersion;
@@ -108,7 +101,7 @@ function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
       model: row.models[0] || row.taskName,
       minVRAM: row.minVRAM,
       rewardHint: `$${row.minReward.toFixed(3)}-$${row.maxReward.toFixed(2)}`,
-      unlockTier: unlockTierFor(row.minVRAM),
+      unlockTier: `${row.minVRAM}GB VRAM`,
     }));
 }
 

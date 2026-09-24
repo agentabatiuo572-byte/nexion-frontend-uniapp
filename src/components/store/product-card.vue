@@ -148,7 +148,7 @@ const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>
   featured: false,
 });
 const t = useT();
-const copy = computed(() => productCopy(t.value, props.product));
+const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled));
 
 const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
