@@ -44,7 +44,6 @@
             <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.requires }} <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-tech-cyan-ink)">{{ teaser.minVRAM }}GB VRAM</text> · {{ teaser.unlockTier }}</text>
           </view>
           <view class="text-right shrink-0">
-            <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ teaser.dailyPotentialUSD.toLocaleString() }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
             <view class="flex items-center justify-end gap-0.5" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">
               <text>{{ t.earn.upgradeNow }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
