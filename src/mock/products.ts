@@ -159,7 +159,7 @@ export const PRODUCTS: Product[] = [
       llmTokensPerSec: 38000,        // at 70B; ~4,200 at 405B
       videoMinPerHour: 12,           // 4K
       fineTuneMins: 20,              // LoRA-70B
-      unlocks: "Flagship compute pool (Fine-tune + 405B inference)",
+      unlocks: "Tasks matched to device VRAM and current requirements",
       bestForCategory: ["LL", "FT", "VG"],
     },
     status: "legacy",
@@ -288,7 +288,7 @@ export const PRODUCTS: Product[] = [
       "Distributed across global data centers",
     ],
     ai: {
-      unlocks: "Fractional access to network's IG + EM + SP pools",
+      unlocks: "Task allocation follows current compute eligibility",
       bestForCategory: ["IG", "EM", "SP"],
     },
     status: "active",

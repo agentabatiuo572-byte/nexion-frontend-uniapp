@@ -24,7 +24,8 @@ export interface ProductCopy {
 
 type CatalogEntry = { tagline: string; badge: string; unlocks: string };
 
-export function productCopy(t: Messages, p: Product): ProductCopy {
+export function productCopy(t: Messages, p: Product, serverCatalog = false): ProductCopy {
+  if (serverCatalog) return { tagline: p.tagline, badge: p.badge ?? "", unlocks: "" };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,

@@ -2106,7 +2106,7 @@ export const zh: Messages = {
       "stellarbox-pro": {
         tagline: "GPU 翻倍,赚钱能力也翻倍。",
         badge: "正热",
-        unlocks: "旗舰算力池(微调 + 405B 推理)",
+        unlocks: "按设备显存与当前任务门槛匹配",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5 倍 S1 吞吐 —— 为高阶任务池而生。",
@@ -2126,7 +2126,7 @@ export const zh: Messages = {
       "cloud-share": {
         tagline: "不用买机器 —— 直接买一份网络算力。",
         badge: "低门槛",
-        unlocks: "按份接入网络的图像生成 + 向量嵌入 + 语音池",
+        unlocks: "任务分配取决于当前算力资格",
       },
     },
     tradeinUpgrade: {

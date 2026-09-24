@@ -2174,7 +2174,7 @@ export const en = {
       "stellarbox-pro": {
         tagline: "Double the GPUs, double the earning power.",
         badge: "Trending",
-        unlocks: "Flagship compute pool (Fine-tune + 405B inference)",
+        unlocks: "Tasks matched to device VRAM and current requirements",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× S1 throughput — built for higher-tier task pools.",
@@ -2194,7 +2194,7 @@ export const en = {
       "cloud-share": {
         tagline: "No hardware needed — buy a slice of the network.",
         badge: "Low Barrier",
-        unlocks: "Fractional access to network's IG + EM + SP pools",
+        unlocks: "Task allocation follows current compute eligibility",
       },
     },
     tradeinUpgrade: {

@@ -2099,7 +2099,7 @@ export const vi: Messages = {
       "stellarbox-pro": {
         tagline: "Gấp đôi GPU, gấp đôi sức kiếm tiền.",
         badge: "Đang hot",
-        unlocks: "Bể tính toán hàng đầu (Tinh chỉnh + suy luận 405B)",
+        unlocks: "Tác vụ phù hợp với VRAM thiết bị và yêu cầu hiện tại",
       },
       "stellarbox-pro-v2": {
         tagline: "Thông lượng gấp 2.5× S1 — sinh ra cho các bể tác vụ cấp cao.",
@@ -2119,7 +2119,7 @@ export const vi: Messages = {
       "cloud-share": {
         tagline: "Không cần phần cứng — mua một phần của mạng lưới.",
         badge: "Rào cản thấp",
-        unlocks: "Truy cập theo phần vào các bể Tạo ảnh + Nhúng vector + Giọng nói",
+        unlocks: "Phân bổ tác vụ theo điều kiện năng lực tính toán hiện tại",
       },
     },
     tradeinUpgrade: {

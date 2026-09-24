@@ -407,7 +407,7 @@ const stockUnavailable = computed(() => !isShare.value
 const copy = computed(() =>
   product.value
     ? remoteApiEnabled
-      ? { tagline: product.value.tagline, badge: product.value.badge ?? "", unlocks: product.value.ai?.unlocks ?? "" }
+      ? productCopy(t.value, product.value, true)
       : productCopy(t.value, product.value)
     : { tagline: "", badge: "", unlocks: "" },
 );
@@ -522,7 +522,7 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
 // AI perf rows from product.ai. `unlocks` is per-SKU marketing copy → resolved
 // through productCopy() alongside tagline/badge, not read raw off the mock.
 const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
-  const ai = product.value?.ai;
+  const ai = remoteApiEnabled ? null : product.value?.ai;
   if (!ai) return [];
   const s = t.value.store;
   const rows: { k: string; v: string }[] = [];
