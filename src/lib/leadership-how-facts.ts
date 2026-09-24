@@ -14,7 +14,7 @@ export function leadershipHowFacts(snapshot: LeadershipHowSnapshot) {
   };
 }
 
-/** The current server distribution is the only valid set of rows to explain. */
-export function leadershipHowRanks(snapshot: LeadershipHowSnapshot): number[] {
-  return [...new Set(snapshot.distribution.map((row) => row.vRank))].sort((left, right) => left - right);
+/** Configured ranks remain visible even before anyone participates. */
+export function leadershipHowRanks(snapshot: LeadershipHowSnapshot, configuredRanks: readonly number[]): number[] {
+  return [...new Set(configuredRanks.filter((rank) => rank >= snapshot.unlockRank))].sort((left, right) => left - right);
 }

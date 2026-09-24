@@ -89,7 +89,7 @@
 
         <!-- V-rank vote-weight table — single surface container (form b): outer
              border dropped, rows hairlined, my row tinted (clip needs overflow). -->
-        <view class="rounded-2xl overflow-hidden" :style="tableCardStyle">
+        <view v-if="!remoteApiEnabled || rankReady" class="rounded-2xl overflow-hidden" :style="tableCardStyle">
           <view class="flex items-center justify-between" :style="tableHeadStyle">
             <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ t.pool.rankWeights }}</text>
             <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ totalPeopleText }}</text>
@@ -113,6 +113,10 @@
               <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
             </view>
           </view>
+        </view>
+        <view v-else class="text-center" style="padding: 24px" role="status">
+          <text :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ vState.remoteError ? t.pool.loadError : t.pool.loading }}</text>
+          <view v-if="vState.remoteError" class="active:opacity-70" style="margin-top: 14px" role="button" tabindex="0" @click="loadRemotePool" @keydown.enter.prevent="loadRemotePool" @keydown.space.prevent="loadRemotePool"><text>{{ t.pool.retry }}</text></view>
         </view>
 
         <!-- Past pools — transparent hairline group (form a, ledger idiom). -->
@@ -196,6 +200,7 @@ const remoteVotesByRank = computed(() => {
   for (const row of remotePool.value?.distribution ?? []) result[row.vRank] = row.votes;
   return result;
 });
+const configuredVotes = computed(() => new Map(vState.ladder.map((row) => [row.v, row.leadershipVotes])));
 const currentWeekPoolUSDT = computed(() => remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT);
 const totalVotes = computed(() => remoteApiEnabled ? remotePool.value?.totalVotes ?? 0 : pool.totalVotes());
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vState.myRank));
@@ -249,21 +254,21 @@ const voteRows = computed(() => {
   const ranks = Array.from({ length: 13 - poolUnlockRank.value }, (_, index) =>
     (poolUnlockRank.value + index) as VRank);
   const canonicalRows = remoteApiEnabled
-    ? leadershipMainRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, myRank.value, ranks)
+    ? leadershipMainRows(remotePool.value ?? { totalVotes: 0, distribution: [] }, myRank.value, ranks, configuredVotes.value)
     : [];
   const canonicalByRank = new Map(canonicalRows.map((row) => [row.rank, row]));
   return ranks.map((v) => {
     const canonical = canonicalByRank.get(v);
     const count = remoteApiEnabled ? canonical?.people ?? 0 : dist.value[v] ?? 0;
-    const votes = remoteApiEnabled ? canonical?.votes ?? 0 : V_VOTES[v];
+    const votes = remoteApiEnabled ? canonical?.votes ?? null : V_VOTES[v];
     const shareOfPool = remoteApiEnabled
       ? (canonical?.sharePct ?? 0) / 100
-      : totalVotes.value > 0 ? (count * votes) / totalVotes.value : 0;
+      : totalVotes.value > 0 ? (count * V_VOTES[v]) / totalVotes.value : 0;
     return {
       v,
       label: rankLabel(v, isZh.value, vState.ladder),
       isMine: remoteApiEnabled ? canonical?.isMine === true : v === vState.myRank,
-      peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes }),
+      peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes: votes ?? "—" }),
       shareOfPool,
       perPerson: ((currentWeekPoolUSDT.value * shareOfPool) / Math.max(count, 1)).toFixed(0),
     };
@@ -285,6 +290,7 @@ async function loadRemotePool() {
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
+  void vState.refreshCanonicalVRank();
   remoteState.value = "loading";
   remotePool.value = null;
   const current = () => mounted && pageVisible && request === remoteRequest && accountKey === app.accountKey
