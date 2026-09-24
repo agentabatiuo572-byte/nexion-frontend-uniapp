@@ -488,7 +488,7 @@ export const vi: Messages = {
     quickStakeFailed: "Tải thất bại",
     quickGenesisLabel: "Genesis",
     quickGenesisLeft: "Còn {n}",
-    quickMissionsActive: "{n} đang mở",
+    quickMissionsCount: "Tổng {n} nhiệm vụ",
     quickFactsLoading: "Đang cập nhật",
     quickFactsFailed: "Tạm thời không thể tải",
     quickDailyStreak: "Chuỗi {n} ngày",

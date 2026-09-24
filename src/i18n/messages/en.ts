@@ -493,7 +493,7 @@ export const en = {
     quickStakeFailed: "Load failed",
     quickGenesisLabel: "Genesis",
     quickGenesisLeft: "{n} left",
-    quickMissionsActive: "{n} active",
+    quickMissionsCount: "{n} tasks total",
     quickFactsLoading: "Updating",
     quickFactsFailed: "Temporarily unavailable",
     quickDailyStreak: "{n}-day streak",

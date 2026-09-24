@@ -112,7 +112,7 @@ function factSubtitle(fact: QuickFact, format: (value: number) => string): strin
 }
 const missionsSubtitle = computed(() => factSubtitle(
   quickMissionFact(remoteApiEnabled, quest.remoteStatus, quest.remoteQuests, now.value * 1000),
-  n => fmt(t.value.home.quickMissionsActive, { n }),
+  n => fmt(t.value.home.quickMissionsCount, { n }),
 ));
 const dailySubtitle = computed(() => factSubtitle(
   quickNumericFact(remoteApiEnabled, faucet.remoteReadState, faucet.signInStreak), n => fmt(t.value.home.quickDailyStreak, { n }),

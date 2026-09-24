@@ -477,7 +477,7 @@ export const zh: Messages = {
     quickStakeFailed: "读取失败",
     quickGenesisLabel: "创世",
     quickGenesisLeft: "剩 {n}",
-    quickMissionsActive: "{n} 个进行",
+    quickMissionsCount: "共 {n} 项任务",
     quickFactsLoading: "更新中",
     quickFactsFailed: "暂时无法读取",
     quickDailyStreak: "连签 {n} 天",
