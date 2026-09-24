@@ -27,6 +27,17 @@ describe("conversation message parser compatibility", () => {
       body: { conversationType: type.toUpperCase(), openingText: "Hello", clientMessageId: "create-conversation-key" } }));
   });
 
+  it("interprets unzoned business timestamps as UTC+08 and preserves explicit UTC", async () => {
+    const response = detail("support");
+    response.conversation.lastMessageAt = "2026-09-24 13:24:00";
+    response.messages[0].createdAt = "2026-09-24 13:24:00";
+    response.messages[1].createdAt = "2026-09-24T05:24:00Z";
+    const conversation = await createSupportApi({ request: async () => response } as never).conversation("CV-ended");
+    const instant = Date.parse("2026-09-24T05:24:00Z");
+    expect(conversation.lastTs).toBe(instant);
+    expect(conversation.messages.map(message => message.ts)).toEqual([instant, instant]);
+  });
+
   it.each(["agent", "user"])("accepts sent and read receipts for %s messages", async sender => {
     for (const receipt of [undefined, null, "sent", "READ"]) {
       const response = detail("support", sender);
