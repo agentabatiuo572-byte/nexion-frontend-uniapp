@@ -3895,7 +3895,7 @@ export const vi: Messages = {
     viewDetails: "Xem chi tiết",
     withdrawable: "Có thể rút",
     settled: "Đã tất toán",
-    coolingDown: "Đang chờ (30d)",
+    coolingDown: "Đang chờ",
     lifetime: "Tích lũy",
     contributors: "người đóng góp",
     withdrawUSDT: "Rút USDT",

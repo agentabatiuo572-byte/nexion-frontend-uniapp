@@ -3913,7 +3913,7 @@ export const zh: Messages = {
     viewDetails: "查看明细",
     withdrawable: "可提现",
     settled: "已到账",
-    coolingDown: "冷却中(30d)",
+    coolingDown: "冷却中",
     lifetime: "累计",
     contributors: "贡献者",
     withdrawUSDT: "提现 USDT",
