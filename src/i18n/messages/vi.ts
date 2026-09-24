@@ -2755,7 +2755,7 @@ export const vi: Messages = {
     achievementsRowValue: "{n}/{total}",
     leftCount: "còn ~{n}",
     trustCenter: "Trung tâm tin cậy",
-    auditsPartners: "Kiểm toán · đối tác",
+    auditsPartners: "NEX · Số liệu",
     learningRow: "Trung tâm hướng dẫn",
     walletCardsRow: "Thẻ ngân hàng",
     walletCardsMeta: "Quản lý thẻ",

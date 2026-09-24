@@ -2778,7 +2778,7 @@ export const zh: Messages = {
     achievementsRowValue: "{n} / {total}",
     leftCount: "剩约 {n} 张",
     trustCenter: "信任中心",
-    auditsPartners: "审计 · 合作方",
+    auditsPartners: "NEX · 平台数据",
     learningRow: "教程中心",
     walletCardsRow: "银行卡",
     walletCardsMeta: "卡片管理",
