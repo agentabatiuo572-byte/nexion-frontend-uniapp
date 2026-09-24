@@ -54,6 +54,13 @@
           </view>
         </view>
 
+        <view v-if="remoteApiEnabled && productCatalogState.status !== 'ready'" class="rounded-2xl" :style="remoteErrorStyle">
+          <text>{{ productCatalogState.status === 'error' ? t.store.catalogErrorTitle : t.store.catalogLoadingTitle }}</text>
+          <view v-if="productCatalogState.status === 'error'" :style="retryBtnStyle" role="button" tabindex="0" @click="retryCatalog" @keydown.enter.prevent="retryCatalog" @keydown.space.prevent="retryCatalog">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+
         <!-- Tier cards -->
         <QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" @navigate="go" />
 
@@ -144,7 +151,10 @@ async function refreshRemoteQuota() {
 }
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   resetQuotaPageState();
-  if (quotaMounted && remoteApiEnabled) void refreshRemoteQuota();
+  if (quotaMounted && remoteApiEnabled && app.accountKey !== "default") {
+    void refreshProductCatalog(true);
+    void refreshRemoteQuota();
+  }
 });
 onLoad((options) => {
   const fallback = new URLSearchParams(takeNavigationQuery("/pages/team/quota")).get("product");
@@ -168,6 +178,9 @@ onUnload(() => {
   quotaMounted = false;
   resetQuotaPageState();
 });
+function retryCatalog(): void {
+  void refreshProductCatalog(true);
+}
 // 礼包 NEX 数量单源派生自 platform config。
 const inviteHint = computed(() => remoteApiEnabled ? "—" : fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
@@ -269,13 +282,14 @@ function quotaPerkText(perk: string): string {
 /** 请求聚焦的商品是否确实在配额档位里(空 id = 未指定,不提示)。 */
 const focusedTierPresent = computed(() =>
   !focusedProductId.value || (remoteApiEnabled && !remoteSnapshot.value)
+  || (remoteApiEnabled && productCatalogState.status !== "ready")
   || tiers.value.some((tier) => tier.productId === focusedProductId.value));
 const focusedTiers = computed(() => focusedProductId.value
   ? tiers.value.filter((tier) => tier.productId === focusedProductId.value) : tiers.value);
 
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
-    ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
+    ? (productCatalogState.status !== "ready" ? [] : remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
       productId: tier.productId, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
       available: tier.available,

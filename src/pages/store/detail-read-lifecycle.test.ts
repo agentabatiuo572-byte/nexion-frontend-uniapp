@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ref, computed } from "vue";
+import { ref, computed, reactive, watch, nextTick } from "vue";
 import ts from "typescript";
 import page from "./detail.vue?raw";
 
@@ -28,11 +28,12 @@ function setup() {
   const trust = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
   const observe = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const productCatalogState = { status: "loading" };
+  const app = reactive({ accountKey: "default", accountBindingEpoch: 1 });
   let currentAccountScope = { accountKey: "user:1", epoch: 1 };
   const value = new Function(
-    "ref", "computed", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail",
+    "ref", "computed", "watch", "app", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail",
     lifecycleCode,
-  )(ref, computed, Promise, catalog, phase, true, trust,
+  )(ref, computed, watch, app, Promise, catalog, phase, true, trust,
     (callback: (options?: Record<string, string>) => Promise<void>) => loaded.push(callback),
     (callback: () => void) => shown.push(callback),
     () => currentAccountScope,
@@ -47,12 +48,33 @@ function setup() {
     catalogStatus: { value: string };
   };
   return {
-    shown, loaded, catalog, phase, trust, observe, value,
-    rebindAccount: () => { currentAccountScope = { accountKey: "user:2", epoch: 2 }; },
+    shown, loaded, catalog, phase, trust, observe, value, app,
+    rebindAccount: () => {
+      app.accountKey = "user:2";
+      app.accountBindingEpoch += 1;
+      currentAccountScope = { accountKey: "user:2", epoch: app.accountBindingEpoch };
+    },
   };
 }
 
 describe("store detail canonical read lifecycle", () => {
+  it("retries the direct detail read after cold session restore binds the account", async () => {
+    const s = setup();
+    s.catalog.mockResolvedValue(false);
+    await s.loaded[0]({ id: "stellarbox-pro" });
+    s.shown[0]();
+    await Promise.resolve();
+    expect(s.catalog).toHaveBeenCalledTimes(2);
+    s.rebindAccount();
+    await nextTick();
+    expect(s.catalog).toHaveBeenCalledTimes(3);
+    expect(s.value.id.value).toBe("stellarbox-pro");
+
+    s.app.accountBindingEpoch += 1;
+    await nextTick();
+    expect(s.catalog).toHaveBeenCalledTimes(4);
+  });
+
   it("starts the public Trust read only after the forced catalog revision settles, including a catalog failure", async () => {
     const catalogRead = deferred<boolean>();
     const s = setup();
