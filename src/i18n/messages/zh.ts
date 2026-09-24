@@ -1719,7 +1719,7 @@ export const zh: Messages = {
     sectionCount: "{n} / {total}",
     sectionManage: "管理",
     fleetTitle: "管理算力舰队",
-    onlineLabel: "{n} 在线",
+    activatedLabel: "{n} 已激活",
     emptySlots: "{n} 空闲槽位",
     // Batch D — /me/devices 改名为"设备仓库"。展示全部设备 + 激活/停用 +
     // 置换 promo banner。区别于上方 MyDevicesEntry 摘要卡片。
@@ -2759,7 +2759,7 @@ export const zh: Messages = {
     quickActions: "快捷操作",
     walletSlotUnlock: "解锁",
     walletSlotMore: "更多",
-    walletSlotsLine: "{online} 台在线 · {open} 个空位",
+    walletSlotsLine: "{active} 台已激活 · {open} 个空位",
     withdrawalLocked: "未达最低提现额",
     withdrawalLockedBody: "至少需要 ${min} 才能提现（还差 ${short}）。能否提现以可用余额和当前提现规则为准。",
     withdrawalLockedBrowse: "浏览设备",

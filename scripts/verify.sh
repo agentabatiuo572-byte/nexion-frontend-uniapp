@@ -857,10 +857,9 @@ sentinel_present "SPEC-1 R7 settle reads device online" src/store/app.ts 'isDevi
 sentinel_present "SPEC-1 R7 App stamps heartbeat" src/store/app.ts 'onlineHeartbeatAt: now'
 sentinel_present "SPEC-1 R7 home row uses true-online seam" src/components/home/device-row.vue 'isDeviceOnline\(props\.device, Date\.now\(\)\)'
 sentinel_present "SPEC-1 R7 home slot uses true-online seam" src/components/home/device-slot.vue 'isDeviceOnline\(props\.device, Date\.now\(\)\)'
-sentinel_present "SPEC-1 R7 me summary uses true-online seam" src/pages/me/me.vue 'isDeviceOnline\(device, Date\.now\(\)\)'
-sentinel_present "SPEC-1 R7 legacy me card uses true-online seam" src/components/me/my-devices-entry.vue 'isDeviceOnline\(device, Date\.now\(\)\)'
-sentinel_present "SPEC-1 R7 me summary binds label to true-online count" src/pages/me/me.vue 'onlineLabel.*n: onlineCount\.value'
-sentinel_present "SPEC-1 R7 legacy me card binds label to true-online count" src/components/me/my-devices-entry.vue 'onlineLabel.*n: onlineCount\.value'
+sentinel_present "BUG 264 me summary uses activated device count" src/pages/me/me.vue 'activatedLabel.*n: activeCount\.value'
+sentinel_present "BUG 264 legacy me card uses activated device count" src/components/me/my-devices-entry.vue 'activatedLabel.*n: activeCount\.value'
+sentinel_present "BUG 264 wallet summary uses activated device count" src/components/me/wallet-card.vue 'walletSlotsLine.*active: activeCount\.value'
 if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
   src/components/home/device-row.vue \
   src/components/home/device-slot.vue \

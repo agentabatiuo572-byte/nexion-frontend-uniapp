@@ -101,7 +101,6 @@ import { useBills } from "@/store/bills";
 import { useMarket } from "@/store/market";
 import { fundsServerEnabled } from "@/api/runtime";
 import { trialReservesSlotNow } from "@/store/free-trial";
-import { isDeviceOnline } from "@/lib/hashpower";
 import SectionHeader from "@/components/me/section-header.vue";
 import WalletActionBtn from "@/components/me/wallet-action-btn.vue";
 
@@ -144,10 +143,7 @@ const nexMarketLabel = computed(() => {
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const emptySlots = computed(() => Math.max(0, app.slotCap - activeCount.value - trialSlot.value));
-const onlineCount = computed(
-  () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length + trialSlot.value,
-);
-const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { online: onlineCount.value, open: emptySlots.value }));
+const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { active: activeCount.value, open: emptySlots.value }));
 
 const billsThisMonth = computed(() => {
   if (fundsServerEnabled && bills.summaryStatus !== "ready") return "--";
