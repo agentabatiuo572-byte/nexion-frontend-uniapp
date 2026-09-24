@@ -3162,7 +3162,7 @@ export const vi: Messages = {
     pinnedItem1:
       "Xem tiến độ và phản hồi trong chi tiết yêu cầu. Mục tiêu dịch vụ tùy theo danh mục.",
     pinnedItem2:
-      "Kiểm tra địa chỉ và mạng trong ví trước khi rút, rồi hoàn tất xác minh bảo mật theo hướng dẫn trên trang.",
+      "Trước khi rút, hãy kiểm tra thông tin nhận tiền theo kênh hiển thị trên trang: ngân hàng và tài khoản nhận tiền với kênh ngân hàng, hoặc địa chỉ ví và mạng với kênh on-chain. Hoàn tất xác minh bảo mật theo hướng dẫn trên trang.",
     pinnedItem3:
       "Xem chi tiết thiết bị để kiểm tra trạng thái hiện tại và lịch sử thu nhập.",
     pinnedItem4:
