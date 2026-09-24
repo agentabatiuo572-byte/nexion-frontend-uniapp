@@ -3279,7 +3279,7 @@ export const en = {
     pinnedItem1:
       "Track progress and replies in the ticket details. Service targets depend on the ticket category.",
     pinnedItem2:
-      "Check the address and network in your wallet before withdrawing, then complete the security checks shown on the page.",
+      "Before withdrawing, check the recipient details for the channel shown on the page: the bank and account for bank payouts, or the wallet address and network for on-chain payouts. Complete the security checks shown on the page.",
     pinnedItem3:
       "Check your device details for its current status and earnings records.",
     pinnedItem4:

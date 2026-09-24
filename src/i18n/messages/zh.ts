@@ -3186,7 +3186,7 @@ export const zh: Messages = {
     chEmailHint: "support@nexgrid.ai · 邮件支持",
     pinnedTitle: "客服置顶",
     pinnedItem1: "工单处理进度和回复请在工单详情中查看，服务目标按问题类别显示。",
-    pinnedItem2: "提现前请在钱包核对地址与网络，并按页面提示完成安全验证。",
+    pinnedItem2: "提现前请按页面提供的通道核对收款信息：银行通道核对收款银行和账户，链上通道核对钱包地址和网络，并按页面提示完成安全验证。",
     pinnedItem3: "设备运行状态和收益记录请在设备详情中查看。",
     pinnedItem4: "警惕假冒 NexGrid 私信 — 官方账号从不主动私信。",
     openChannel: "打开",
