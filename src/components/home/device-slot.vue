@@ -11,7 +11,7 @@
     :data-online="isOnline ? 'true' : 'false'"
     role="button"
     tabindex="0"
-    :aria-label="`${t.earn.deviceDetailTitle}: ${displayName} · ${isOnline ? t.earn.online : t.earn.offline}`"
+    :aria-label="`${t.earn.deviceDetailTitle}: ${displayName} · ${statusText}`"
     @click="go"
     @keydown.enter.prevent="go"
     @keydown.space.prevent="go"
@@ -28,16 +28,18 @@
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
-import { isDeviceOnline } from "@/lib/hashpower";
+import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
 import type { Device } from "@/store/types";
 
-const props = defineProps<{ device: Device }>();
+const props = defineProps<{ device: Device; runtimeConfirmed: boolean }>();
 const t = useT();
 // Stored device name is English + persisted → resolve from `kind` at render.
 const displayName = computed(() => deviceName(t.value, props.device));
 
-const isOnline = computed(() => isDeviceOnline(props.device, Date.now()));
+const onlineState = computed(() => deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed));
+const isOnline = computed(() => onlineState.value === "online");
+const statusText = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : t.value.earn.offline);
 const iconColor = computed(() => (isOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)"));
 const bayStyle = computed(() => ({
   width: "48px",
