@@ -2849,7 +2849,7 @@ export const en = {
     achievementsRowValue: "{n} of {total}",
     leftCount: "~{n} left",
     trustCenter: "Trust Center",
-    auditsPartners: "Audits · partners",
+    auditsPartners: "NEX · Stats",
     learningRow: "Learning center",
     walletCardsRow: "Bank cards",
     walletCardsMeta: "Card manager",
