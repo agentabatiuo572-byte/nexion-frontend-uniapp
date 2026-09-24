@@ -94,7 +94,7 @@
 import { navReset, navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { fmt, openSlotsTemplate } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
@@ -143,7 +143,7 @@ const nexMarketLabel = computed(() => {
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const emptySlots = computed(() => Math.max(0, app.slotCap - activeCount.value - trialSlot.value));
-const slotsLine = computed(() => fmt(t.value.me.walletSlotsLine, { active: activeCount.value, open: emptySlots.value }));
+const slotsLine = computed(() => fmt(openSlotsTemplate(t.value.me.walletSlotsLine, emptySlots.value), { active: activeCount.value, open: emptySlots.value }));
 
 const billsThisMonth = computed(() => {
   if (fundsServerEnabled && bills.summaryStatus !== "ready") return "--";
