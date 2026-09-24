@@ -12,7 +12,7 @@ describe("leadership How server facts", () => {
 
   it("shows explicit HOLD with an available retry", () => {
     expect(source).toContain("remoteState === 'hold' ? t.pool.settlementHold");
-    expect(source).toContain("remoteState !== 'loading'");
+    expect(source).toContain("remoteState === 'hold' || remoteState === 'error' || vState.remoteError");
     expect(source).toContain("@click=\"loadRemotePool\"");
   });
 });

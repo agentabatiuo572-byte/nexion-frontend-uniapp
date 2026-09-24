@@ -21,7 +21,16 @@ assert.match(howPage, /pool\.totalVotes\(\)/);
 // data inputs and derivation rather than its former inline loop variable.
 assert.match(howPage, /localDistribution\[vRank\] \?\? 0/);
 assert.match(howPage, /localVotes\[vRank\] \?\? 0/);
-assert.match(howPage, /leadershipHowRows\(snapshot, ranks\)/);
+assert.match(howPage, /leadershipHowRows\(snapshot, ranks, remoteApiEnabled \? configuredVotes\.value/);
+for (const [locale, configured, participants] of [
+  ["zh", "当前配置的等级票权", "实际参与"],
+  ["en", "configured vote weights", "actual participants"],
+  ["vi", "trọng số phiếu theo hạng", "người thực sự tham gia"],
+]) {
+  const messages = source(`../src/i18n/messages/${locale}.ts`);
+  const intro = messages.match(/poolHowItWorks: \{[\s\S]*?s2Intro: "([^"]+)"/)?.[1] ?? "";
+  assert.ok(intro.includes(configured) && intro.includes(participants), `${locale} pool vote explanation`);
+}
 
 const homeCard = source("../src/components/home/leadership-pool-card.vue");
 assert.match(homeCard, /teamInsightsApi\.leadershipPool\(\)/);

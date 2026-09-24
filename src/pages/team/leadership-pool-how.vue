@@ -4,9 +4,9 @@
       <SubPageHeader back="/pages/team/leadership-pool" />
       <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="purple" />
 
-      <view v-if="remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
-        <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.pool.loading : remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError }}</text>
-        <view v-if="remoteState !== 'loading'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemotePool" @keydown.enter.prevent="loadRemotePool" @keydown.space.prevent="loadRemotePool">
+      <view v-if="remoteState !== 'ready' || (remoteApiEnabled && !vState.remoteReady)" class="text-center" style="padding: 48px 20px">
+        <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'hold' ? t.pool.settlementHold : remoteState === 'error' || vState.remoteError ? t.pool.loadError : t.pool.loading }}</text>
+        <view v-if="remoteState === 'hold' || remoteState === 'error' || vState.remoteError" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemotePool" @keydown.enter.prevent="loadRemotePool" @keydown.space.prevent="loadRemotePool">
           <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.pool.retry }}</text>
         </view>
       </view>
@@ -67,7 +67,7 @@ import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useApp } from "@/store/app";
 import { useLeadershipPool, V_VOTES } from "@/store/leadership-pool";
-import type { VRank } from "@/store/v-rank";
+import { useVRank, type VRank } from "@/store/v-rank";
 import { leadershipHowRows } from "@/lib/leadership-pool-remote";
 import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
 import { leadershipHowFacts, leadershipHowRanks } from "@/lib/leadership-how-facts";
@@ -78,12 +78,14 @@ const t = useT();
 const w = computed(() => t.value.poolHowItWorks);
 const app = useApp();
 const pool = useLeadershipPool();
+const vState = useVRank();
 const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
 const remoteState = ref<"loading" | "ready" | "error" | "hold">(remoteApiEnabled ? "loading" : "ready");
 let remoteRequest = 0;
 let mounted = true;
 const localVotes: Record<number, number> = V_VOTES;
 const localDistribution: Record<number, number> = pool.globalVDistribution;
+const configuredVotes = computed(() => new Map(vState.ladder.map((row) => [row.v, row.leadershipVotes])));
 
 const facts = computed(() => remotePool.value ? leadershipHowFacts(remotePool.value) : null);
 const currentRulesText = computed(() => facts.value
@@ -94,12 +96,12 @@ const nextPayoutText = computed(() => facts.value
   : "");
 const voteRows = computed(() => {
   const ranks = remoteApiEnabled
-    ? leadershipHowRanks(remotePool.value ?? { injectRate: 0, unlockRank: 0, nextPayoutAt: "", distribution: [] })
+    ? leadershipHowRanks(remotePool.value ?? { injectRate: 0, unlockRank: 0, nextPayoutAt: "", distribution: [] }, vState.ladder.map((row) => row.v))
     : Object.keys(V_VOTES).map(Number).filter((rank): rank is VRank => rank >= 0 && rank <= 12).sort((left, right) => left - right);
   const snapshot = remoteApiEnabled
     ? remotePool.value ?? { totalVotes: 0, distribution: [] }
     : { totalVotes: pool.totalVotes(), distribution: ranks.map((vRank) => ({ vRank, people: localDistribution[vRank] ?? 0, votes: localVotes[vRank] ?? 0 })) };
-  return leadershipHowRows(snapshot, ranks).map((row) => ({
+  return leadershipHowRows(snapshot, ranks, remoteApiEnabled ? configuredVotes.value : new Map(Object.entries(localVotes).map(([rank, votes]) => [Number(rank), votes]))).map((row) => ({
     r: `V${row.rank}`,
     v: row.votes === null ? "—" : row.votes,
     s: row.sharePct === null ? "—" : `≈ ${row.sharePct.toFixed(2)}%`,
@@ -112,6 +114,7 @@ async function loadRemotePool() {
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
+  void vState.refreshCanonicalVRank();
   remoteState.value = "loading";
   remotePool.value = null;
   const current = () => mounted && request === remoteRequest && accountKey === app.accountKey

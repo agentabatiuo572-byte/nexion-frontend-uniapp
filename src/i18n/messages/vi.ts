@@ -4833,7 +4833,7 @@ export const vi: Messages = {
     s1Para2:
       "Hãy hình dung như một chương trình chia sẻ lợi nhuận. Nền tảng càng lớn, quỹ tuần càng to — và bạn càng nắm nhiều phiếu (nhờ leo cấp V), phần của bạn càng lớn.",
     s2Title: "Trọng số phiếu hạng hiện tại",
-    s2Intro: "Chỉ các hạng tham gia trong ảnh chụp máy chủ hiện tại được hiển thị.",
+    s2Intro: "Hiển thị trọng số phiếu theo hạng đang được máy chủ cấu hình; tỷ lệ chỉ tính từ người thực sự tham gia trong ảnh chụp máy chủ.",
     noVoteRows: "Hiện không có bản ghi phiếu để hiển thị.",
     colRank: "Cấp",
     colVotes: "Phiếu",

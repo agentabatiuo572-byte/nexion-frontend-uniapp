@@ -4980,7 +4980,7 @@ export const en = {
     s1Para2:
       "Think of it like a profit-sharing program. The more the platform grows, the bigger the weekly pool — and the more votes you hold (by climbing V ranks), the larger your slice.",
     s2Title: "Current rank vote weights",
-    s2Intro: "Only ranks participating in the current server snapshot are shown.",
+    s2Intro: "Shows current server configured vote weights by rank; shares use only actual participants in the server snapshot.",
     noVoteRows: "There are no vote records to show right now.",
     colRank: "Rank",
     colVotes: "Votes",

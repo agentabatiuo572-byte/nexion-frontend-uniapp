@@ -19,7 +19,7 @@ describe("leadership How facts", () => {
     expect(facts.nextPayoutAt).toBe(snapshot.nextPayoutAt);
   });
 
-  it("does not invent a V3 row when current F4 eligibility starts at V4", () => {
-    expect(leadershipHowRanks(snapshot)).toEqual([4, 6]);
+  it("shows every eligible configured rank, including ranks without participants", () => {
+    expect(leadershipHowRanks(snapshot, [0, 3, 4, 5, 6])).toEqual([4, 5, 6]);
   });
 });
