@@ -3,7 +3,7 @@
   {page.tsx + _client.tsx}. Dynamic [productId] → `?id=` query (onLoad).
 
   Wrapped in <AppChassis active="store">. Top→bottom:
-    in-page header (back + title/tier) → Hero (ProductRender + ribbon +
+    in-page header (back + product name) → Hero (ProductRender + ribbon +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
     ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec →
     Trust badges → FAQ accordion → sticky bottom Buy CTA.
@@ -18,7 +18,7 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
-      <!-- Back + title/tier now live in the sticky chassis nav header
+      <!-- Back + product name now live in the sticky chassis nav header
            (useSetPageHeader below) so they pin on scroll + frost content,
            mirroring the prototype's SetPageHeader. -->
 
@@ -451,12 +451,11 @@ const purchaseGate = computed(() => remoteApiEnabled
     }
   : localPurchaseGate!.gate.value);
 
-// Sticky chassis nav header (back + centered title/tier) — replaces the old
+// Sticky chassis nav header (back + centered product name) — replaces the old
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
 // SetPageHeader). Getter form: title resolves once the product loads (onLoad).
 useSetPageHeader(() => ({
   title: product.value?.name ?? t.value.store.coProductNotFound,
-  subtitle: product.value?.tier,
   backHref: "/store",
 }));
 
