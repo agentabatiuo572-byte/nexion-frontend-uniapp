@@ -2,6 +2,7 @@ import { isUserSession, type ApiResult, type AuthSessionResponse } from "./contr
 import { ApiError, asApiError } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
 import { withSessionCookieLock } from "./session-cookie-lock";
+import { acquireRotationNonce, clearRotationNonce, discardRotationNonce } from "./session-rotation-nonce";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -208,6 +209,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (!options.vault.clearIfUnchanged(expectedRevision)) {
       throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
     }
+    if (refreshCredentialMode === "cookie") discardRotationNonce();
     await options.onUnauthorized?.();
     throw new ApiError({ kind: "auth", message, status, code });
   }
@@ -216,7 +218,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return terminateSession(expectedRevision);
   }
 
-  async function refreshNow(): Promise<SessionSnapshot> {
+  async function refreshNow(rotationNonce?: string): Promise<SessionSnapshot> {
     const revision = options.vault.revision();
     const current = options.vault.read();
     if (refreshCredentialMode === "token" && !current?.refreshToken) return expireSession(revision);
@@ -227,6 +229,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         headers: {
           "Content-Type": "application/json",
           ...(refreshCredentialMode === "cookie" ? { "X-Nexion-Refresh-Mode": "cookie" } : {}),
+          ...(rotationNonce ? { "X-NexGrid-Rotation-Key": rotationNonce } : {}),
         },
         ...(refreshCredentialMode === "token" ? { body: { refreshToken: current!.refreshToken } } : {}),
         timeoutMs: 12_000,
@@ -272,10 +275,31 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (!refreshInFlight) {
       const revision = options.vault.revision();
       const refresh = refreshCredentialMode === "cookie"
-        ? withSessionCookieLock(refreshNow) : refreshNow();
+        ? withSessionCookieLock(async () => {
+          const nonce = acquireRotationNonce();
+          let session: SessionSnapshot;
+          try {
+            session = await refreshNow(nonce);
+          } catch (error) {
+            if (asApiError(error).message !== "USER_REFRESH_ROTATION_SUPERSEDED") throw error;
+            // Another tab may still be installing the newer shared cookie.
+            await new Promise(resolve => setTimeout(resolve, 100));
+            try {
+              session = await refreshNow(nonce);
+            } catch (retryError) {
+              if (asApiError(retryError).message === "USER_REFRESH_ROTATION_SUPERSEDED") {
+                return terminateSession(revision);
+              }
+              throw retryError;
+            }
+          }
+          clearRotationNonce(nonce);
+          return session;
+        }) : refreshNow();
       refreshInFlight = refresh.catch(async (error: unknown) => {
         const apiError = asApiError(error);
-        if (apiError.message === "COOKIE_LOCK_UNAVAILABLE" && options.vault.read()
+        if ((apiError.message === "COOKIE_LOCK_UNAVAILABLE"
+            || apiError.message === "COOKIE_ROTATION_STORAGE_UNAVAILABLE") && options.vault.read()
             && options.vault.clearIfUnchanged(revision)) await options.onUnauthorized?.();
         throw apiError;
       }).finally(() => {
