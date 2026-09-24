@@ -4033,7 +4033,7 @@ export const en = {
     viewDetails: "View details",
     withdrawable: "Withdrawable",
     settled: "Settled",
-    coolingDown: "Cooling (30d)",
+    coolingDown: "Cooling",
     lifetime: "Lifetime",
     contributors: "contributors",
     withdrawUSDT: "Withdraw USDT",
