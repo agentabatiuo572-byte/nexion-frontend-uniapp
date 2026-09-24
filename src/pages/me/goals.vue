@@ -153,7 +153,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGoals, type Goal } from "@/store/goals";
 import { useApp } from "@/store/app";
-import { toast } from "@/store/ui";
+import { useUI } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
 import { nexGridBrandText } from "@/lib/brand-copy";
 
@@ -164,6 +164,7 @@ const ONE_DAY_MS = 86400000;
 const t = useT();
 const goalsStore = useGoals();
 const app = useApp();
+const ui = useUI();
 
 const lifeTimeEarnings = computed(() => remoteApiEnabled ? goalsStore.lifetimeEarningsUsdt : app.earnings.total);
 const goals = computed(() => goalsStore.goals);
@@ -315,7 +316,7 @@ function goalPct(targetUSDT: number): number {
 async function onSave() {
   if (saveBlocked.value) return;
   if (target.value < 100) {
-    toast.warn(t.value.goals.minTargetWarn);
+    ui.pushToast({ kind: "warn", title: t.value.goals.minTargetWarn });
     return;
   }
   const intentKey = `${target.value}|${days.value}`;
@@ -338,10 +339,10 @@ async function onSave() {
     retryableSaveIntents.delete(intentKey);
     restoreEditorFromGoal(goalsStore.goals.at(-1));
     void goalsStore.refreshRecommendation(target.value, goalsStore.goals.at(-1)?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
-    toast.success(fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }));
+    ui.pushToast({ kind: "success", title: fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }) });
   } catch (error) {
     if (!isCurrentSave()) return;
-    toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);
+    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
   } finally {
     if (isCurrentSave()) savePending.value = false;
   }
@@ -351,7 +352,7 @@ async function remove(id: string) {
   try {
     await goalsStore.remove(id);
   } catch (error) {
-    toast.warn(error instanceof Error ? error.message : t.value.goals.serverUnavailable);
+    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
   }
 }
 
