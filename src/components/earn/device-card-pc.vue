@@ -278,27 +278,22 @@
       </view>
     </view>
 
-    <!-- Phone: locked-tasks loss-ad(从服务端 VRAM 门控任务池派生;无投影或无锁定项时隐藏) -->
+    <!-- Phone: VRAM-gated task examples (no personal earnings projection). -->
     <view v-if="device.kind === 'phone' && phoneLockedVisible && phoneTeasers.length" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
-      <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">${{ phoneLockedDaily }}</text>
-        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
-      </view>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
       <view class="space-y-1.5">
         <view v-for="(it, i) in phoneTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
-          <view class="flex items-center gap-1.5 min-w-0">
+          <view class="flex items-center gap-1.5 min-w-0 flex-1">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <text class="truncate">{{ it.model }}</text>
+            <view class="min-w-0"><text class="block truncate">{{ it.model }} · {{ workloadLabel(it.category) }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
             <!-- spec-sentinel-ok: workload VRAM requirement from lockedTeasers, not a catalog Product field -->
-            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
+            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">{{ it.minVRAM }} GB</text>
           </view>
         </view>
       </view>
@@ -316,26 +311,21 @@
       </view>
     </view>
 
-    <!-- FEAT-DEV01: hardware locked-tasks loss-ad(从 VRAM 门控任务池真派生;顶配设备无锁定项自动隐藏) -->
+    <!-- FEAT-DEV01: hardware VRAM-gated task examples. -->
     <view v-if="hwTeasers.length" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
-      <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning-ink); line-height: 1">${{ hwLockedDaily }}</text>
-        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
-      </view>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
       <view class="space-y-1.5">
         <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
-          <view class="flex items-center gap-1.5 min-w-0">
+          <view class="flex items-center gap-1.5 min-w-0 flex-1">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <text class="truncate">{{ it.model }}</text>
+            <view class="min-w-0"><text class="block truncate">{{ it.model }} · {{ workloadLabel(it.category) }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning-ink); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
-            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
+            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">{{ it.minVRAM }} GB</text>
           </view>
         </view>
       </view>
@@ -616,12 +606,10 @@ const sparkPoints = computed(() => {
     .join(" ");
 });
 
-// Phone locked-tasks loss-ad — derived from the server task-pricing projection
-// (same VRAM gate as the hardware card), never from baked constants.
+// Locked task examples use the server VRAM gate, not category throughput as income.
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const phoneLockedVisible = computed(() => promo.value.baseKind === "phone");
 const phoneTeasers = computed<LockedTeaser[]>(() => earnConfig.lockedTeasers(props.device.vramTotal, 3));
-const phoneLockedDaily = computed(() => phoneTeasers.value.reduce((s, it) => s + it.dailyPotentialUSD, 0));
 const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", String(phoneTeasers.value.length)));
 function goUnlock() {
   navTo(`/pages/store/detail?id=${promo.value.targetKind}`);
@@ -710,11 +698,10 @@ const capacityRowStyle = computed<CSSProperties>(() => ({
   color: capacityFloored.value ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
   fontWeight: capacityFloored.value ? 600 : 400,
 }));
-// 硬件版高阶任务 loss-ad:真派生(VRAM 门控),补贴期内不渲染(满产叙事自洽)。
+// 硬件版高阶任务示例:VRAM 门控,补贴期内不渲染。
 const hwTeasers = computed<LockedTeaser[]>(() =>
   degradable.value && !inSubsidy.value ? earnConfig.lockedTeasers(props.device.vramTotal, 3) : [],
 );
-const hwLockedDaily = computed(() => hwTeasers.value.reduce((s, x) => s + x.dailyPotentialUSD, 0));
 function goUnlockHw() {
   navTo("/pages/store/store");
 }

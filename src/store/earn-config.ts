@@ -108,7 +108,6 @@ function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
       model: row.models[0] || row.taskName,
       minVRAM: row.minVRAM,
       rewardHint: `$${row.minReward.toFixed(3)}-$${row.maxReward.toFixed(2)}`,
-      dailyPotentialUSD: Math.max(0, Math.round(row.dailyPotential)),
       unlockTier: unlockTierFor(row.minVRAM),
     }));
 }
