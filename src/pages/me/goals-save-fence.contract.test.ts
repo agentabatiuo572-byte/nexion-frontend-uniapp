@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
+import { createPinia, setActivePinia } from "pinia";
+import ts from "typescript";
 import { fmt } from "@/i18n/format";
 import { zh } from "@/i18n/messages/zh";
+import { useUI } from "@/store/ui";
 
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
 
@@ -51,5 +54,45 @@ describe("goal save toast placeholder contract", () => {
       .toBe("目标已保存 · 90 天达成 $1,000");
     expect(fmt(zh.goals.savedToast, { amount: (1234.56).toLocaleString("en-US"), days: 180 }))
       .toBe("目标已保存 · 180 天达成 $1,234.56");
+  });
+
+  it("shows both saved terms through the page-bound toast store after an async save", async () => {
+    const pagePinia = createPinia();
+    const pageUi = useUI(pagePinia);
+    const otherPinia = createPinia();
+    setActivePinia(otherPinia);
+    const goals: Array<{ id: string; targetUSDT: number; deadlineMs: number; createdAt: number; achieved: boolean }> = [];
+    const goalsStore = {
+      accountEpoch: 1,
+      goals,
+      setGoal: async (intent: { targetUSDT: number; deadlineMs: number }) => {
+        await Promise.resolve();
+        goals.push({ id: String(goals.length + 1), targetUSDT: intent.targetUSDT,
+          deadlineMs: intent.deadlineMs, createdAt: Date.now(), achieved: false });
+        return "saved";
+      },
+      refreshRecommendation: async () => {},
+    };
+    const target = { value: 500 };
+    const days = { value: 90 };
+    const savePending = { value: false };
+    const start = source.indexOf("async function onSave()");
+    const end = source.indexOf("async function remove(", start);
+    const implementation = ts.transpileModule(source.slice(start, end), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const makeSave = new Function("saveBlocked", "target", "days", "goalsStore", "savePending", "ui", "t", "fmt", "restoreEditorFromGoal", "ONE_DAY_MS",
+      `let saveEpoch = 0; const retryableSaveIntents = new Map(); ${implementation}; return onSave;`);
+    const save = makeSave({ value: false }, target, days, goalsStore, savePending, pageUi,
+      { value: { goals: zh.goals } }, fmt, () => {}, 86_400_000) as () => Promise<void>;
+
+    await save();
+    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存 · 90 天达成 $500");
+    days.value = 30;
+    await save();
+    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存 · 30 天达成 $500");
+    expect(useUI(otherPinia).toasts).toEqual([]);
+    expect(goals).toHaveLength(2);
+    expect(savePending.value).toBe(false);
   });
 });
