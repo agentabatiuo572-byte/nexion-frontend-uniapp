@@ -1,11 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "./api-client";
 import { createAuthApi } from "./auth-api";
 import { createSessionVault } from "./session-vault";
+import { acquireRotationNonce, discardRotationNonce } from "./session-rotation-nonce";
 
 const user = { userId: 3775, countryCode: "+86", phone: "18708173775", nickname: "NexGrid 3775", onboardingComplete: true };
 const cookieSession = { accessToken: "access", refreshToken: null, tokenType: "Bearer", user,
   sessionSyncKey: "a".repeat(64) };
+
+afterEach(() => discardRotationNonce());
 
 describe("H5 HttpOnly refresh-cookie session", () => {
   it("accepts a login response without exposing the refresh credential to JavaScript", async () => {
@@ -94,5 +97,18 @@ describe("H5 HttpOnly refresh-cookie session", () => {
       headers: { "X-Nexion-Refresh-Mode": "cookie" },
     });
     expect(vault.read()).toBeNull();
+  });
+
+  it("clears a persisted rotation proof on new login and logout", async () => {
+    const request = vi.fn().mockResolvedValue(cookieSession);
+    const auth = createAuthApi({ request } as never, createSessionVault(), { refreshCredentialMode: "cookie" });
+    const staleProof = acquireRotationNonce();
+
+    await auth.login({ countryCode: user.countryCode, phone: user.phone, password: "secret" });
+    const newProof = acquireRotationNonce();
+    expect(newProof).not.toBe(staleProof);
+
+    await auth.logout();
+    expect(acquireRotationNonce()).not.toBe(newProof);
   });
 });

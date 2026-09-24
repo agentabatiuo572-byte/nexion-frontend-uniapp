@@ -605,7 +605,8 @@ function beginServerSessionRestore(): Promise<boolean> {
     serverSessionProbeAt = Date.now();
     return true;
   })().catch((error: unknown) => {
-    if (error instanceof ApiError && error.message === "COOKIE_LOCK_UNAVAILABLE") {
+    if (error instanceof ApiError && (error.message === "COOKIE_LOCK_UNAVAILABLE"
+        || error.message === "COOKIE_ROTATION_STORAGE_UNAVAILABLE")) {
       secureBrowserUnsupported = true;
       serverSessionRestoreState = "failed";
       clearInvalidRemoteSessionState(useAuth());

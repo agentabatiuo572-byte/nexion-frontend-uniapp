@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { isRegistrationReceipt, isUserSession, type AuthSessionResponse, type RegistrationReceipt, type UserSession } from "./contracts";
 import { ApiError, asApiError } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
+import { discardRotationNonce } from "./session-rotation-nonce";
 
 export interface PasswordLoginRequest {
   countryCode: string;
@@ -216,6 +217,7 @@ function consumeLoginResponse(
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
   }
+  if (refreshCredentialMode === "cookie") discardRotationNonce();
   // saveIfUnchanged advances the vault exactly once. Returning that epoch lets
   // the UI discard this issuance without ever clearing a later account's vault.
   return { kind: "authenticated", user: session.user, vaultRevision: expectedRevision + 1, registrationReceipt };
@@ -250,6 +252,7 @@ function oauthExchangeFromResponse(
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
   }
+  if (refreshCredentialMode === "cookie") discardRotationNonce();
   return {
     user: data.user,
     vaultRevision: expectedRevision + 1,
@@ -477,7 +480,10 @@ export function createAuthApi(
           if (error instanceof ApiError
               && (error.kind === "auth" || error.status === 401 || error.status === 403)
               && error.message !== "SESSION_CHANGED_DURING_REFRESH"
-              && !vault.read()) return null;
+              && !vault.read()) {
+            discardRotationNonce();
+            return null;
+          }
           throw error;
         }).finally(() => {
           restoreInFlight = null;
@@ -508,6 +514,7 @@ export function createAuthApi(
         // Local logout is authoritative for this device even when offline.
       } finally {
         vault.clearIfUnchanged(revision);
+        if (refreshCredentialMode === "cookie") discardRotationNonce();
       }
     },
   };
