@@ -878,7 +878,7 @@ export const zh: Messages = {
     notHolderTitle: "暂无创世席位",
     notHolderBody: "1,000 个 OG 席位限量,剩 {n} 席。锁定 $NEX 上所优先权。",
     notHolderCta: "去认购",
-    previewModeBanner: "预览 · 持有人看到的内容。认购一个席位激活完整看板。",
+    previewModeBanner: "预览 · 此处展示持有人看板内容。当前认购状态以上方提示为准。",
     // ── 上所前(NEX 上所前)──
     pre: {
       allocLabel: "排放优先额度",

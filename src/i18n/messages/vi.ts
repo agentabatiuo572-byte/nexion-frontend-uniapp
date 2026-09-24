@@ -894,7 +894,7 @@ export const vi: Messages = {
     notHolderTitle: "Chưa có suất Genesis nào",
     notHolderBody: "Tổng cộng 1,000 suất OG · còn {n}. Khóa quyền ưu tiên khi $NEX lên sàn.",
     notHolderCta: "Nhận một suất",
-    previewModeBanner: "Xem trước · những gì chủ sở hữu thấy. Nhận một suất để kích hoạt bảng điều khiển của bạn.",
+    previewModeBanner: "Xem trước · Khám phá bảng điều khiển dành cho người sở hữu. Xem trạng thái bên trên để biết hiện có thể đăng ký mua hay không.",
     // ── Pre-listing state (before $NEX lists) ──
     pre: {
       allocLabel: "Suất $NEX đã dành riêng",

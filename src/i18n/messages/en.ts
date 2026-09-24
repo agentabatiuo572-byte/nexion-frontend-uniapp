@@ -938,7 +938,7 @@ export const en = {
     notHolderTitle: "No Genesis seats yet",
     notHolderBody: "1,000 OG seats total · {n} left. Lock in $NEX listing priority.",
     notHolderCta: "Claim a seat",
-    previewModeBanner: "Preview · what holders see. Claim a seat to activate your dashboard.",
+    previewModeBanner: "Preview · Explore the holder dashboard. Check the status above for current purchase availability.",
     // ── Pre-listing state (before $NEX lists) ──
     pre: {
       allocLabel: "Reserved $NEX allocation",
