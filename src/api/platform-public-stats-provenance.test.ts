@@ -32,6 +32,14 @@ describe("H9 public stats provenance", () => {
       runId: "",
       version: 3,
     });
+    expect(parsePlatformPublicStats(production, "prod").config).toMatchObject({
+      fleetDevices: 0,
+      onlineJitter: -1,
+      registeredUsersMonthlyGrowthPct: -1,
+      virtualUserCount: -1,
+      realUserCount: 4_321,
+    });
+    expect(parsePlatformPublicStats({ ...production, values: undefined }, "prod").config.fleetDevices).toBe(0);
   });
 
   it("development consumes the same PC-backed canonical projection", () => {

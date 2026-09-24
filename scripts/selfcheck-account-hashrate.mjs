@@ -457,8 +457,7 @@ function hw(kind, over = {}) {
 //   b) 名次固定靶不缩水:改用 **fixture 表**喂真纯函数(表与人口基数 = 819a6da 删掉的
 //      那份 10 档种子,逐字抄进本脚本;fixture 是「合法表长什么样」的行为固定靶,
 //      不是断言线上种子仍长这样);
-//   c) 表合法性校验已上移 src/api/platform-config-api.ts(parsePublicStats:<2 档抛
-//      H9_PUBLIC_STATS_RESPONSE_INVALID)—— 钉住该分支存在。
+//   c) 公网解析边界不读取运营表,仍返回空分位表与不可用哨兵。
 // ⚠️ 舰队取 8 个**算力互不相同**的形态:Pro / Pro v2 / Rack P1 / Rack P2 四 SKU 天花板
 //   并列 5280(G6 收同档 = 已知天花板①,见 account-hashrate.ts 文件头)——同算力必
 //   同名次(规格③确定性),那不是分位表能解的,靠 Pro 一档代表 + 机架台数拉开量级。
@@ -539,19 +538,20 @@ function hw(kind, over = {}) {
     beyond.kind === "ranked" && beyond.rank > 1 && beyond.rank <= ranks[ranks.length - 1],
     JSON.stringify(beyond));
 
-  // c) 合法性校验的新宿主。parsePublicStats 未导出(只能经 parsePlatformComputeConfig
-  //    全量 payload 走到,合法 payload fixture 又脆又重)—— 结构钉,剥注释后判:
-  //    <2 档分支必须与 H9_PUBLIC_STATS_RESPONSE_INVALID 同语句;逐行单调墙同错误码。
+  // c) 公网边界不消费运营表。保留本地纯函数对 fixture 分位表的校验,
+  //    但旧后端即使仍送 values,客户端也只能安装空表与不可用哨兵。
   const apiSrc = readFileSync(path.join(SRC, "api", "platform-config-api.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^[ \t]*\/\/.*$/gm, "")
     .replace(/[ \t]\/\/.*$/gm, "");
-  check("🔴 ⑥c platform-config-api 拒绝 <2 档分位表(!Array.isArray || length < 2 → 抛 H9_PUBLIC_STATS_RESPONSE_INVALID)",
-    /!Array\.isArray\(values\.hashratePercentileTable\)\s*\|\|\s*values\.hashratePercentileTable\.length\s*<\s*2\)[\s\S]{0,40}?invalid\("H9_PUBLIC_STATS_RESPONSE_INVALID"\)/.test(apiSrc),
-    "platform-config-api.ts 里找不到该分支(校验被删/改弱?)");
-  check("⑥c 逐行校验墙也在:tops 严格升序 / cumPct 单调不减,违例抛同一错误码",
-    /tops\s*<=\s*previousTops[\s\S]{0,160}?invalid\("H9_PUBLIC_STATS_RESPONSE_INVALID"\)/.test(apiSrc),
-    "逐行单调校验缺失或错误码漂移");
+  check("🔴 ⑥c platform-config-api 不读取公网运营分位表",
+    !/record\(projection\.values\)/.test(apiSrc)
+    && !/values\.hashratePercentileTable/.test(apiSrc),
+    "platform-config-api.ts 重新读取了运营 values/分位表");
+  check("🔴 ⑥c 公网解析仅安装空分位表与非法哨兵",
+    /hashratePercentileTable:\s*\[\]/.test(apiSrc)
+    && /virtualUserCount:\s*-1/.test(apiSrc),
+    "公网解析恢复了可用的虚拟排名分母或分位表");
 }
 
 // ── 接线门:纯函数对 ≠ 有人在用 ─────────────────────────────────────────────

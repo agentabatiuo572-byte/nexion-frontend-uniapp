@@ -11,11 +11,12 @@ const trust = fs.readFileSync(path.join(root, "src/pages/trust/trust.vue"), "utf
 const globe = fs.readFileSync(path.join(root, "src/pages/globe/globe.vue"), "utf8");
 const appStore = fs.readFileSync(path.join(root, "src/store/app.ts"), "utf8");
 
-test("H9 runtime parser matches the admin/backend percentile contract", () => {
-  assert.match(parser, /const tops = finiteNumber\(row\.tops\)/);
-  assert.match(parser, /tops < 0 \|\| tops <= previousTops/);
-  assert.match(parser, /cumPct < previousPct/);
-  assert.doesNotMatch(parser, /previousPct !== 100/);
+test("H9 public parser never installs operator metrics or percentile buckets", () => {
+  assert.doesNotMatch(parser, /record\(projection\.values\)/);
+  assert.match(parser, /fleetDevices: 0/);
+  assert.match(parser, /onlineJitter: -1/);
+  assert.match(parser, /registeredUsersMonthlyGrowthPct: -1/);
+  assert.match(parser, /hashratePercentileTable: \[\]/);
 });
 
 test("H9 rank denominator uses the real server user count, not the marketing display base", () => {

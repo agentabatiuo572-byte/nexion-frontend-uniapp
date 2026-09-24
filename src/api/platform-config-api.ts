@@ -316,49 +316,23 @@ function parseVerifiedStats(value: unknown): PlatformVerifiedStats | null {
 
 function parsePublicStats(value: unknown): PublicStatsConfig {
   const projection = record(value);
-  const version = finiteNumber(projection.version);
-  const values = record(projection.values);
-  const fleetDevices = finiteNumber(values.fleetDevices);
-  const onlineRatePct = finiteNumber(values.onlineRatePct);
-  const onlineJitter = finiteNumber(values.onlineJitter);
-  const registeredUsersBase = finiteNumber(values.registeredUsersBase);
-  const registeredUsersMonthlyGrowthPct = finiteNumber(values.registeredUsersMonthlyGrowthPct);
-  const registeredUsersAnchorAt = finiteNumber(values.registeredUsersAnchorAt);
-  const virtualUserCount = finiteNumber(values.virtualUserCount);
   const realUserCount = finiteNumber(projection.realUserCount);
-  if (!Number.isInteger(version) || version < 0
-      || !Number.isInteger(fleetDevices) || fleetDevices < 1_000 || fleetDevices > 1_000_000
-      || onlineRatePct < 50 || onlineRatePct > 100
-      || !Number.isInteger(onlineJitter) || onlineJitter < 0 || onlineJitter > 500
-      || !Number.isInteger(registeredUsersBase) || registeredUsersBase < 0 || registeredUsersBase > 100_000_000
-      || registeredUsersMonthlyGrowthPct < 0 || registeredUsersMonthlyGrowthPct > 50
-      || !Number.isInteger(registeredUsersAnchorAt) || registeredUsersAnchorAt <= 0
-      || !Number.isInteger(virtualUserCount) || virtualUserCount < 0 || virtualUserCount > 10_000_000
-      || !Number.isInteger(realUserCount) || realUserCount < 0 || realUserCount > 100_000_000
-      || !Array.isArray(values.hashratePercentileTable) || values.hashratePercentileTable.length < 2) invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
-  let previousTops = -1;
-  let previousPct = -1;
-  const hashratePercentileTable = values.hashratePercentileTable.map((raw) => {
-    const row = record(raw);
-    const tops = finiteNumber(row.tops);
-    const cumPct = finiteNumber(row.cumPct);
-    if (tops < 0 || tops <= previousTops || cumPct < previousPct || cumPct < 0 || cumPct > 100) {
-      return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
-    }
-    previousTops = tops;
-    previousPct = cumPct;
-    return { tops, cumPct };
-  });
+  if (!Number.isInteger(realUserCount) || realUserCount < 0 || realUserCount > 100_000_000) {
+    return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
+  }
+  // Legacy servers may still send operator-configured values. Never install them
+  // into the public store: old surfaces could render them as measured facts.
+  // Invalid sentinels keep every H9-derived public display unavailable.
   return {
-    fleetDevices,
-    onlineRatePct,
-    onlineJitter,
-    registeredUsersBase,
-    registeredUsersMonthlyGrowthPct,
-    registeredUsersAnchorAt,
+    fleetDevices: 0,
+    onlineRatePct: 0,
+    onlineJitter: -1,
+    registeredUsersBase: 0,
+    registeredUsersMonthlyGrowthPct: -1,
+    registeredUsersAnchorAt: 0,
     realUserCount,
-    virtualUserCount,
-    hashratePercentileTable,
+    virtualUserCount: -1,
+    hashratePercentileTable: [],
   };
 }
 
