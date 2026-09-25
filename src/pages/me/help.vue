@@ -131,7 +131,7 @@
           <view style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
             <view v-for="m in bot" :key="m.id" class="flex" :style="{ justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start' }">
               <view :style="bubbleStyle(m.from === 'user')">
-                <text :style="bubbleTextStyle(m.from === 'user')">{{ m.text }}</text>
+                <text :style="bubbleTextStyle(m.from === 'user')">{{ m.id === 'init' ? w.botGreeting : m.text }}</text>
                 <text v-if="m.meta" class="block" :style="bubbleMetaStyle(m.from === 'user')">{{ m.meta }}</text>
               </view>
             </view>
