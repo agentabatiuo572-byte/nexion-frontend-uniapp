@@ -1,5 +1,7 @@
 import type { AppHomeWorkload } from "@/api/app-home-api";
 import type { TaskCategory } from "@/store/types";
+import type { Messages } from "@/i18n/messages/en";
+import { marketWorkloadCopy } from "@/lib/workload-label";
 
 export type HomeMarketDeltaTone = "positive" | "negative" | "neutral";
 
@@ -30,16 +32,17 @@ function formatPrice(price: number | null): string {
   return "$" + price.toFixed(3);
 }
 
-export function presentHomeMarketWorkload(row: AppHomeWorkload): HomeMarketDisplayRow {
+export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): HomeMarketDisplayRow {
   const deltaTone: HomeMarketDeltaTone = row.deltaPct === null
     ? "neutral"
     : row.deltaPct >= 0 ? "positive" : "negative";
+  const copy = marketWorkloadCopy(t, row.code, row.name, row.unit);
 
   return {
-    tag: MARKET_TAGS[row.code],
-    name: row.name ?? "—",
+    tag: Object.prototype.hasOwnProperty.call(MARKET_TAGS, row.code) ? MARKET_TAGS[row.code] : row.code,
+    name: copy.name,
     priceText: formatPrice(row.price),
-    unitText: row.unit ? (row.unit.startsWith("/") ? row.unit : `/${row.unit}`) : "—",
+    unitText: copy.unit,
     deltaText: row.deltaPct === null
       ? "—"
       : `${row.deltaPct >= 0 ? "+" : ""}${row.deltaPct.toFixed(1)}%`,

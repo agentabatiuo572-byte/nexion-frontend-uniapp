@@ -32,8 +32,8 @@
         <view class="flex items-center gap-2.5">
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
-            <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ w.name ?? t.market.workloads[w.code].label }}</text>
-              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ w.unit ?? "—" }}</text>
+              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ workloadCopy(w).name }}</text>
+              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ workloadCopy(w).unit }}</text>
             </view>
             <text v-if="w.flagshipDelta !== null" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ t.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
           </view>
@@ -80,6 +80,7 @@ import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { nexGridBrandText } from "@/lib/brand-copy";
+import { marketWorkloadCopy } from "@/lib/workload-label";
 
 interface WorkloadPrice {
   code: TaskCategory;
@@ -127,6 +128,7 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
+const workloadCopy = (row: WorkloadPrice) => marketWorkloadCopy(t.value, row.code, row.name, row.unit);
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.deviceRankings ?? []).map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
