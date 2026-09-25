@@ -1,7 +1,7 @@
 <template>
   <AppChassis active="me">
     <view class="px-4" style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/learn/courses" />
+      <SubPageHeader :back="courseBack" />
       <view v-if="loading"><text>{{ t.learning.courseLoading }}</text></view>
       <view v-else-if="error" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
@@ -65,7 +65,8 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
 import type { LearningCourse, LearningQuizReceiptStatus, LearningResult } from "@/api/learning-api";
 import { ApiError } from "@/api/errors";
-import { navReplace } from "@/lib/route";
+import { navReplace, takeNavigationQuery } from "@/lib/route";
+import { preserveCourseSourceInH5, resolveCourseNavigation } from "./course-navigation";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -83,6 +84,8 @@ const t = useT();
 const locale = useLocaleStore();
 const app = useApp();
 const courseId = ref("");
+const courseBack = ref("/pages/learn/courses");
+const courseSource = ref<string | null>(null);
 const course = ref<LearningCourse | null>(null);
 const result = ref<LearningResult | null>(null);
 const answers = ref<number[]>([]);
@@ -390,7 +393,9 @@ function refreshForScopeChange() {
   if (mounted) void load();
 }
 onLoad((options) => {
-  const nextCourseId = typeof options?.id === "string" ? options.id : "";
+  const { id: nextCourseId, source, back } = resolveCourseNavigation(options, takeNavigationQuery("/pages/learn/course"));
+  courseBack.value = back;
+  courseSource.value = source;
   if (courseId.value === nextCourseId) return;
   courseId.value = nextCourseId;
   generation += 1;
@@ -401,7 +406,11 @@ onLoad((options) => {
 const courseVisibility = createPageVisibilityRefresh(() => { void load(); });
 bindPageVisibilityRefresh(courseVisibility, {
   mounted: (callback) => onMounted(() => { mounted = true; callback(); }),
-  shown: (callback) => onShow(() => { mounted = true; callback(); }),
+  shown: (callback) => onShow(() => {
+    mounted = true;
+    preserveCourseSourceInH5(courseId.value, courseSource.value);
+    callback();
+  }),
   hidden: (callback) => onHide(() => {
     mounted = false;
     generation += 1;

@@ -144,10 +144,11 @@ import { fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
-import { courseRewardId } from "./course-reward-link";
+import { courseRewardId, rewardsListCategory, type RewardsCat } from "./course-reward-link";
+import { courseRewardHref } from "@/pages/learn/course-navigation";
 import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
-import { navTo } from "@/lib/route";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
 import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -156,7 +157,6 @@ import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 
 // Mirrors L1's RewardsCat (pages/me/rewards.vue); unknown values fall back.
-type RewardsCat = "voucher" | "usdt" | "nex";
 // One screen's worth per load (receipts idiom — mock slices locally, real
 // backend pages via cursor+limit with the same size).
 const PAGE_SIZE = 10;
@@ -179,8 +179,7 @@ const remoteSessionReady = computed(() => binarySessionReady({
 
 const cat = ref<RewardsCat>("voucher");
 onLoad((options) => {
-  const o = (options || {}) as Record<string, string>;
-  cat.value = o.cat === "usdt" || o.cat === "nex" ? o.cat : "voucher";
+  cat.value = rewardsListCategory(options, takeNavigationQuery("/pages/me/rewards-list"));
 });
 
 const pageTitle = computed(() =>
@@ -293,7 +292,7 @@ function rewardTypeLabel(type: BillType): string {
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
 function openCourseReward(bill: Bill) {
   const id = courseRewardId(bill);
-  if (id) navTo(`/pages/learn/course?id=${encodeURIComponent(id)}`);
+  if (id) navTo(courseRewardHref(id));
 }
 function onUse(v: VoucherDef) {
   if (isSingleSkuVoucher(v)) {
