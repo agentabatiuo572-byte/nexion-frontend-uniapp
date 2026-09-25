@@ -118,6 +118,15 @@ describe("route navigation failure handling", () => {
     expect(takeNavigationQuery("/pages/team/quota")).toBe("");
   });
 
+  it("reads only the matching H5 hash query after a cold refresh", () => {
+    vi.stubGlobal("window", { location: { hash: "#/pages/store/detail?id=stellarbox-pro" } });
+    expect(takeNavigationQuery("/pages/store/detail")).toBe("?id=stellarbox-pro");
+    expect(takeNavigationQuery("/pages/team/quota")).toBe("");
+
+    (window.location as { hash: string }).hash = "#/pages/team/quota?product=stellarbox-pro";
+    expect(takeNavigationQuery("/pages/team/quota")).toBe("?product=stellarbox-pro");
+  });
+
   it("continues navigation when transient stores are not initialized yet", () => {
     mocks.throwTrialStore = true;
     mocks.throwVoucherStore = true;

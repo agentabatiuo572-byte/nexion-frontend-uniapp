@@ -175,8 +175,17 @@ type NavigationAttempt = (
 let pendingNavigationQuery: { path: string; query: string } | null = null;
 
 export function takeNavigationQuery(path: string): string {
-  const query = pendingNavigationQuery?.path === path ? pendingNavigationQuery.query : "";
+  let query = pendingNavigationQuery?.path === path ? pendingNavigationQuery.query : "";
   pendingNavigationQuery = null;
+  // A hard refresh has no in-memory navigation. Uni H5 may omit the hash
+  // query from onLoad, so read it only when it belongs to this page.
+  if (!query) {
+    try {
+      const hash = typeof window === "undefined" ? "" : window.location.hash.replace(/^#/, "");
+      const question = hash.indexOf("?");
+      if (question >= 0 && hash.slice(0, question) === path) query = hash.slice(question);
+    } catch { /* native runtime has no location */ }
+  }
   return query;
 }
 
