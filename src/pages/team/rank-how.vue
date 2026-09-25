@@ -28,8 +28,7 @@
           <view v-for="rank in content.ladder" :key="rank.v" class="flex items-center" style="gap: 10px; min-width: 0">
             <VBadgeIcon :v="rank.v as VRank" :size="22" />
             <text class="font-display tabular-nums" :style="ladderVStyle">V{{ rank.v }}</text>
-            <text :style="ladderTitleStyle">{{ rank.title }}</text>
-            <text v-if="isZh && rank.cnTitle !== rank.title" :style="ladderCnStyle">· {{ rank.cnTitle }}</text>
+            <text v-if="rankName(rank, locale.code)" :style="ladderTitleStyle">{{ rankName(rank, locale.code) }}</text>
           </view>
         </view>
         <text v-else class="block mt-3" :style="bodyStyle">{{ state.loading ? content.copy.loading : content.copy.emptyLadder }}</text>
@@ -126,11 +125,11 @@ import { navBack } from "@/lib/route";
 import { apiClient, expectedApiEnvironment, vRankApi } from "@/api/runtime";
 import { createRankHowPolicyApi } from "@/api/rank-how-policy-api";
 import { buildRankHowContent, createRankHowResource, type RankHowResourceState } from "@/lib/rank-how-content";
+import { rankName } from "@/lib/v-rank-copy";
 
 const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
 const locale = useLocaleStore();
-const isZh = computed(() => locale.code === "zh");
 const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
 const resource = createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => { state.value = value; } });
@@ -163,7 +162,6 @@ const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", l
 const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
 const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px", flexShrink: 0 };
 const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500, overflowWrap: "anywhere" };
-const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", overflowWrap: "anywhere" };
 const unavailableStyle: CSSProperties = { padding: "14px", background: "var(--v5-surface-2)" };
 const retryStyle: CSSProperties = { marginTop: "8px", color: "var(--v5-brand)", background: "var(--v5-surface-2)" };
 const reqCardStyle: CSSProperties = { background: "var(--v5-surface-2)", padding: "10px 12px" };

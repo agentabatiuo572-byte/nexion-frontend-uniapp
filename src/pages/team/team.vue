@@ -232,7 +232,7 @@ import {
 const t = useT();
 const app = useApp();
 const vrank = useVRank();
-const isZh = computed(() => useLocaleStore().code === "zh");
+const locale = useLocaleStore();
 const network = useNetwork();
 const commission = useCommission();
 const ledgerFailed = computed(() => remoteApiEnabled && (network.remoteStatus === "error" || commission.eventsStatus === "error"));
@@ -249,7 +249,7 @@ let remotePoolMounted = true;
 
 const myRank = computed(() => vrank.myRank);
 // 头衔显示名按语言取(中文界面出中文头衔),拼法收在 lib/v-rank-copy;远端档位未到仍显示 V—
-const myRankDisplay = computed(() => (remoteApiEnabled && !vrank.remoteReady ? "V—" : rankLabel(vrank.myRank, isZh.value, vrank.ladder)));
+const myRankDisplay = computed(() => (remoteApiEnabled && !vrank.remoteReady ? "V—" : rankLabel(vrank.myRank, locale.code, vrank.ladder)));
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);

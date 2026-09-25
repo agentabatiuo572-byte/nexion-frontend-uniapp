@@ -4,8 +4,11 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import source from "./profile.vue?raw";
 import { zh } from "@/i18n/messages/zh";
+import { en } from "@/i18n/messages/en";
+import { vi as vietnamese } from "@/i18n/messages/vi";
 import * as runtimeRevision from "@/api/order-api";
 import { profileVRankProjection } from "@/lib/profile-vrank-display";
+import { rankName } from "@/lib/v-rank-copy";
 import { createP318AccountPageFence } from "./p3-18-account-page-fence";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
 
@@ -23,7 +26,7 @@ afterEach(() => { cleanups.splice(0).forEach(fn => fn()); });
 const flush = async () => { await vue.nextTick(); for (let n = 0; n < 8; n++) await Promise.resolve(); };
 
 // Runs the actual page worker and Pinia V-rank store. All network edges are synthetic.
-function mount() {
+function mount(localeCode: "zh" | "en" | "vi" = "zh") {
   setActivePinia(createPinia()); runtimeRevision.advanceRuntimeRevision(null);
   const reads: Array<{ ladder: ReturnType<typeof deferred>; current: ReturnType<typeof deferred> }> = [];
   remote.vRankApi.ladder.mockReset().mockImplementation(() => {
@@ -48,11 +51,11 @@ function mount() {
     vue: { ...vue, onMounted: (fn: () => void) => hooks.mount.push(fn), onUnmounted: (fn: () => void) => hooks.unmount.push(fn) },
     "@dcloudio/uni-app": { onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
     "@/api/runtime": { remoteApiEnabled: true, profileApi: { profile: profileRead } },
-    "@/lib/route": { navTo: vi.fn() }, "@/i18n/use-t": { useT: () => vue.ref(zh) },
+    "@/lib/route": { navTo: vi.fn() }, "@/i18n/use-t": { useT: () => vue.ref({ zh, en, vi: vietnamese }[localeCode]) },
     "@/i18n/format": { dateLocale: () => "zh-CN" }, "@/store/app": { useApp: () => app },
     "@/store/auth": { useAuth: () => auth }, "@/store/profile": { useProfile: () => profile },
     "@/store/payout-address": { usePayoutAddress: () => payout }, "@/store/quest": { useQuest: () => ({}) },
-    "@/store/v-rank": { useVRank: () => rank }, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
+    "@/store/v-rank": { useVRank: () => rank }, "@/store/locale": { useLocaleStore: () => ({ code: localeCode }) },
     "@/store/payout-address-core": { PAYOUT_NETWORKS: ["usdt-trc20"], maskAddressMid: (address: string) => address },
     "@/store/ui": { toast }, "@/lib/account-scope": {
       captureAccountScope: () => ({ account: app.accountKey, epoch: app.accountBindingEpoch }),
@@ -61,6 +64,7 @@ function mount() {
     "@/lib/remote-profile-quest": { claimSetupProfileQuest: () => { throw Error("No reward writes in read fixture"); } },
     "@/lib/profile-save-flow": { reconcileProfileEdit }, "@/lib/secure-command-id": { requireCryptoUuid: vi.fn() },
     "@/lib/profile-date": { formatJoinedDate: () => "" }, "@/lib/profile-vrank-display": { profileVRankProjection },
+    "@/lib/v-rank-copy": { rankName },
     "@/lib/brand-copy": { nexGridBrandText: (value: string) => value },
     "@/api/order-api": runtimeRevision, "./p3-18-account-page-fence": { createP318AccountPageFence },
   };
@@ -74,14 +78,28 @@ function mount() {
   }, {}));
   const fire = (event: string) => hooks[event].forEach(fn => fn());
   cleanups.push(() => { fire("unmount"); scope.stop(); });
-  const accept = (index: number, value: number) => {
-    reads[index].ladder.resolve({ ranks: Array.from({ length: 13 }, (_, v) => ({ v, title: `Rank ${v}`, cnTitle: `级别${v}`, rewards: [] })) });
+  const accept = (index: number, value: number, published = false) => {
+    reads[index].ladder.resolve({ ranks: Array.from({ length: 13 }, (_, v) => {
+      const title = published && v < 2 ? ["注册会员", "活跃新星"][v] : `级别${v}`;
+      return { v, title: published ? title : `Rank ${v}`, cnTitle: title, rewards: [] };
+    }) });
     reads[index].current.resolve({ rankCode: `V${value}`, progress: { selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } });
   };
   return { page, rank, reads, accept, app, auth, payout, profile, profileReads, toast, fire };
 }
 
 describe("profile authoritative read lifecycle", () => {
+  it.each([
+    ["en", "Registered Member", "Rising Star"],
+    ["vi", "Thành viên đã đăng ký", "Ngôi sao mới"],
+  ] as const)("renders the published current and next rank in %s", async (localeCode, current, next) => {
+    const h = mount(localeCode);
+    const read = h.page.refreshVRankForCurrentAccount();
+    h.accept(0, 0, true);
+    await read;
+    expect(h.page.tierLabel.value).toBe(`V0 · ${current}`);
+    expect(h.page.tierProgressLine.value).toContain(`V1 · ${next}`);
+  });
   it("does not render a locally seeded tier or unset wallet while reads are unconfirmed", () => {
     const h = mount();
     expect(h.page.tierLabel.value).toBe("—"); expect(h.page.tierProgressLine.value).toBe("—");

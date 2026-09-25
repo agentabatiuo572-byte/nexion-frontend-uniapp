@@ -216,12 +216,12 @@ import {
 
 const t = useT();
 const vrank = useVRank();
-const isZh = computed(() => useLocaleStore().code === "zh");
+const locale = useLocaleStore();
 const app = useApp();
 
 const myRank = computed(() => vrank.myRank);
 const rankReady = computed(() => vrank.remoteReady);
-const requiredRankLabel = computed(() => rankLabel(5, isZh.value, vrank.ladder));
+const requiredRankLabel = computed(() => rankLabel(5, locale.code, vrank.ladder));
 const unlocked = computed(() => rankReady.value && vrank.myRank >= 5);
 
 interface Bucket {
@@ -322,7 +322,7 @@ function resetAgentPageState(): void {
 }
 
 const lockedSubText = computed(() =>
-  fmt(t.value.agent.lockedSub, { n: rankReady.value ? vrank.myRank : "—", title: rankReady.value ? rankTitle(vrank.myRank, isZh.value, vrank.ladder) : "—" }),
+  fmt(t.value.agent.lockedSub, { n: rankReady.value ? vrank.myRank : "—", title: rankReady.value ? rankTitle(vrank.myRank, locale.code, vrank.ladder) : "—" }),
 );
 function hostedByText(c: ApprovedCase): string {
   return fmt(t.value.agent.hostedBy, { name: c.host, attendees: c.attendees });

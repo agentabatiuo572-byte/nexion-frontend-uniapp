@@ -3,6 +3,7 @@ import * as vue from "vue";
 import { describe, expect, it, vi } from "vitest";
 import source from "./profile.vue?raw";
 import { zh } from "@/i18n/messages/zh";
+import { rankName } from "@/lib/v-rank-copy";
 
 type PayoutFixture = {
   hasAnyAddress: boolean;
@@ -49,6 +50,7 @@ function mountProfile(remote: boolean, payoutFixture: PayoutFixture) {
     "@/lib/secure-command-id": { requireCryptoUuid: vi.fn() },
     "@/lib/profile-date": { formatJoinedDate: vi.fn() },
     "@/lib/profile-vrank-display": { profileVRankProjection: vi.fn() },
+    "@/lib/v-rank-copy": { rankName },
     "@/api/order-api": { subscribeRuntimeRevision: vi.fn(() => () => undefined) },
     "./p3-18-account-page-fence": {
       createP318AccountPageFence: () => ({ capture: vi.fn(), isCurrent: vi.fn(() => true), invalidate: vi.fn() }),
