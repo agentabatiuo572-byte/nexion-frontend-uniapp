@@ -91,8 +91,8 @@ import { useOrders, type Order, type OrderStatus } from "@/store/orders";
 import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
 import { useSetPageHeader } from "@/composables/use-page-header";
-import { navTo } from "@/lib/route";
-import { onHide, onShow } from "@dcloudio/uni-app";
+import { navTo, takeNavigationQuery } from "@/lib/route";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -205,6 +205,7 @@ async function loadMoreOrders() {
 }
 onShow(() => {
   ordersPageActive = true;
+  preserveOrdersOriginInH5();
   void refreshOrders();
 });
 onHide(() => {
@@ -226,13 +227,39 @@ watch(remoteSessionReady, (ready, wasReady) => {
   if (ready && !wasReady && ordersPageActive) void refreshOrders();
 });
 
+const ordersBackHref = ref("/store");
+onLoad((options) => {
+  const query = new URLSearchParams(takeNavigationQuery("/pages/store/orders"));
+  const from = options?.from === "me" || options?.from === "store" ? options.from : query.get("from");
+  ordersBackHref.value = from === "me" ? "/me" : "/store";
+  preserveOrdersOriginInH5();
+});
+
+function preserveOrdersOriginInH5() {
+  // Uni H5 can drop navigateTo's query from the visible hash. Keep the source
+  // in this history entry so a refresh retains the correct cold-open fallback.
+  if (typeof window !== "undefined") {
+    try {
+      const hash = window.location.hash;
+      if (!/^#\/pages\/store\/orders(?:\?|$)/.test(hash)) return;
+      const question = hash.indexOf("?");
+      const query = new URLSearchParams(question < 0 ? "" : hash.slice(question + 1));
+      const from = ordersBackHref.value === "/me" ? "me" : "store";
+      if (query.get("from") === from || (from === "store" && !query.has("from"))) return;
+      query.set("from", from);
+      const path = question < 0 ? hash : hash.slice(0, question);
+      window.history.replaceState(window.history.state, "", `${window.location.href.slice(0, -hash.length)}${path}?${query}`);
+    } catch { /* Native runtimes have no browser history. */ }
+  }
+}
+
 // Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted
 // colocation, nothing ships to the user, so the old "track your hardware
 // shipments" subtitle was retired — deliberate product decision, see
 // docs/前端产品更新日志.md 2026-07-08).
 useSetPageHeader(() => ({
   title: t.value.headerTitles.storeOrders,
-  backHref: "/store",
+  backHref: ordersBackHref.value,
 }));
 
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)

@@ -71,6 +71,28 @@ describe("device E3 eligibility API", () => {
     });
   });
 
+  it("reads calibrated phone capability while keeping older fleet responses unknown", async () => {
+    const calibrated = fleetPayload(100);
+    Object.assign(calibrated.devices[0], {
+      deviceType: "MOBILE", productCode: "phone", gpuModel: "Mobile NPU · ~32.3 TOPS",
+      capabilityTops: 32.3, capabilityTier: 3,
+    });
+    await expect(createDeviceE3Api(client(calibrated), "dev").fleet()).resolves.toMatchObject({
+      devices: [{ capabilityTops: 32.3, capabilityTier: 3 }],
+    });
+    await expect(createDeviceE3Api(client(fleetPayload(100)), "dev").fleet()).resolves.toMatchObject({
+      devices: [{ capabilityTops: null, capabilityTier: null }],
+    });
+  });
+
+  it("rejects an invalid server phone capability instead of displaying a false value", async () => {
+    const invalid = fleetPayload(100);
+    Object.assign(invalid.devices[0], { capabilityTops: 0, capabilityTier: 6 });
+    await expect(createDeviceE3Api(client(invalid), "dev").fleet()).rejects.toMatchObject({
+      message: "E3_CANONICAL_RESPONSE_INVALID",
+    });
+  });
+
   it("projects the server-owned trade-in early-access policy", async () => {
     const api = createDeviceE3Api(client({
       enabled: true,

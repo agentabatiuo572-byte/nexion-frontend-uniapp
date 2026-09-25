@@ -1,7 +1,7 @@
 <template>
   <AppChassis active="earn">
     <view class="nx-device-detail pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/earn/earn" :title="deviceTitle" :subtitle="deviceSubtitle" />
+      <SubPageHeader :back="backHref" :title="deviceTitle" :subtitle="deviceSubtitle" />
 
       <DeviceCardPC
         v-if="device && !fleetFailed"
@@ -43,12 +43,12 @@
         :style="backButtonStyle"
         role="button"
         tabindex="0"
-        :aria-label="t.earn.backToEarn"
-        @click="goEarn"
-        @keydown.enter.prevent="goEarn"
-        @keydown.space.prevent="goEarn"
+        :aria-label="backLabel"
+        @click="goBack"
+        @keydown.enter.prevent="goBack"
+        @keydown.space.prevent="goBack"
       >
-        <text>{{ t.earn.backToEarn }}</text>
+        <text>{{ backLabel }}</text>
       </view>
     </view>
   </AppChassis>
@@ -56,12 +56,13 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
-import { navTo } from "@/lib/route";
+import { navBack, takeNavigationQuery } from "@/lib/route";
+import { deviceDetailBackHref } from "@/lib/device-detail-navigation";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
@@ -70,18 +71,57 @@ import { remoteApiEnabled } from "@/api/runtime";
 const app = useApp();
 const t = useT();
 const id = ref("");
+const rawRouteId = ref("");
+const backHref = ref("/pages/earn/earn");
 const loaded = ref(false);
 const expanded = ref(true);
 
 onLoad((options) => {
-  const rawId = ((options || {}) as Record<string, string>).id ?? "";
+  const routeOptions = (options || {}) as Record<string, string>;
+  const fallback = new URLSearchParams(takeNavigationQuery("/pages/earn/device-detail"));
+  const fallbackId = fallback.get("id") || "";
+  const rawId = routeOptions.id || fallbackId;
+  rawRouteId.value = rawId;
   try {
     id.value = decodeURIComponent(rawId);
   } catch {
     id.value = rawId;
   }
+  let fallbackMatches = !routeOptions.id;
+  if (!fallbackMatches && fallbackId) {
+    try { fallbackMatches = decodeURIComponent(fallbackId) === id.value; }
+    catch { fallbackMatches = fallbackId === rawId; }
+  }
+  backHref.value = deviceDetailBackHref(routeOptions.from || (fallbackMatches ? fallback.get("from") : null));
   loaded.value = true;
+  preserveDeviceDetailQueryInH5();
 });
+onShow(() => { preserveDeviceDetailQueryInH5(); });
+
+function preserveDeviceDetailQueryInH5() {
+  // Uni H5 can drop navigateTo's visible query. Persist the selected device
+  // and entry source in this history entry so a hard refresh can restore both.
+  if (typeof window === "undefined") return;
+  try {
+    const hash = window.location.hash;
+    if (!/^#\/pages\/earn\/device-detail(?:\?|$)/.test(hash)) return;
+    const question = hash.indexOf("?");
+    const query = new URLSearchParams(question < 0 ? "" : hash.slice(question + 1));
+    const source = backHref.value === "/pages/index/index" ? "home" : "earn";
+    let changed = false;
+    if (rawRouteId.value && query.get("id") !== rawRouteId.value) {
+      query.set("id", rawRouteId.value);
+      changed = true;
+    }
+    if (query.get("from") !== source && (source === "home" || query.has("from"))) {
+      query.set("from", source);
+      changed = true;
+    }
+    if (!changed) return;
+    const path = question < 0 ? hash : hash.slice(0, question);
+    window.history.replaceState(window.history.state, "", `${window.location.href.slice(0, -hash.length)}${path}?${query}`);
+  } catch { /* Native runtimes have no browser history. */ }
+}
 
 const device = computed(
   () => app.visibleDevices.find((item) => item.id === id.value && item.activatedAt !== null) ?? null,
@@ -101,9 +141,10 @@ const deviceTitle = computed(() =>
 const deviceSubtitle = computed(() =>
   device.value ? deviceGpuLabel(t.value, device.value) : "",
 );
+const backLabel = computed(() => backHref.value === "/pages/index/index" ? t.value.profile.back : t.value.earn.backToEarn);
 
-function goEarn() {
-  navTo("/earn");
+function goBack() {
+  navBack(backHref.value);
 }
 
 function retryFleet() {

@@ -24,6 +24,9 @@ export interface CanonicalE3Device {
   todayEarningsUsdt: number;
   todayEarningsNex: number;
   gpuModel: string;
+  /** Server-calibrated phone throughput; absent on older fleet responses. */
+  capabilityTops: number | null;
+  capabilityTier: number | null;
   vramTotalGb: number;
   basePowerW: number;
   location: string;
@@ -249,6 +252,8 @@ function device(value: unknown): CanonicalE3Device {
   if (!Object.prototype.hasOwnProperty.call(source, "capacitySubsidyEndsAt")) return invalid();
   const capacityPct = number(source.capacityPct);
   if (capacityPct > 100) return invalid();
+  const capabilityTier = source.capabilityTier == null ? null : integer(source.capabilityTier, 1);
+  if (capabilityTier !== null && capabilityTier > 5) return invalid();
   return {
     id: integer(source.id, 1),
     rowVersion: integer(source.rowVersion),
@@ -267,6 +272,8 @@ function device(value: unknown): CanonicalE3Device {
     todayEarningsUsdt: number(source.todayEarningsUsdt),
     todayEarningsNex: number(source.todayEarningsNex),
     gpuModel: string(source.gpuModel),
+    capabilityTops: source.capabilityTops == null ? null : number(source.capabilityTops, Number.MIN_VALUE),
+    capabilityTier,
     vramTotalGb: integer(source.vramTotalGb),
     basePowerW: number(source.basePowerW),
     location: string(source.location),

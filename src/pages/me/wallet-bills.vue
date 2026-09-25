@@ -132,15 +132,27 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
+import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
 import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import { navTo } from "@/lib/route";
-import { fundsServerEnabled } from "@/api/runtime";
+import { fundsServerEnabled, sessionVault } from "@/api/runtime";
+import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
 
 const t = useT();
+const app = useApp();
+const auth = useAuth();
 const billsStore = useBills();
 const deposits = useDeposits();
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: fundsServerEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 
 type Tab = "all" | "in" | "out";
 const TABS: Tab[] = ["all", "in", "out"];
@@ -157,7 +169,7 @@ const emptyDesc = computed(() => tab.value === "out" ? t.value.empty.billsOutDes
 const scrollAnchor = ref<unknown>(null);
 
 async function refreshLedger() {
-  if (!fundsServerEnabled) return;
+  if (!fundsServerEnabled || !remoteSessionReady.value) return;
   try { await activePager.value.refresh(); } catch { /* pager owns recoverable state */ }
 }
 async function loadMore() {
@@ -166,13 +178,18 @@ async function loadMore() {
 }
 onShow(() => { void refreshLedger(); });
 watch(tab, () => { void refreshLedger(); });
+// Cookie restore and same-page account rebind both reset the active ledger.
+watch([remoteSessionReady, () => app.accountBindingEpoch], ([ready, epoch], [wasReady, previousEpoch]) => {
+  if (ready && (!wasReady || epoch !== previousEpoch)) void refreshLedger();
+});
 useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,
   loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
   loadMore,
 });
-const initialLoading = computed(() => fundsServerEnabled && activePager.value.status === "loading" && activePager.value.rows.length === 0);
+const initialLoading = computed(() => fundsServerEnabled && !activePager.value.rows.length
+  && (!remoteSessionReady.value || activePager.value.status === "idle" || activePager.value.status === "loading"));
 const initialError = computed(() => fundsServerEnabled && activePager.value.status === "error" && activePager.value.rows.length === 0);
 const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.value.status === "error" && activePager.value.rows.length > 0);
 const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.rows.length > 0 && Boolean(activePager.value.error));

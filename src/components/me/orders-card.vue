@@ -52,7 +52,7 @@ function goStore() {
   navReset({ url: "/pages/store/store", fail: () => {} });
 }
 function goOrders() {
-  navTo("/pages/store/orders");
+  navTo("/pages/store/orders?from=me");
 }
 
 const ORDER_STATUS_STYLE: Record<string, { color: string; bg: string; border: string }> = {

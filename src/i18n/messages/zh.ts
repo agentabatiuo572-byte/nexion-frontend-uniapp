@@ -819,6 +819,7 @@ export const zh: Messages = {
     // 手机实时算力（有效算力 = 校准算力上限 × 实时状态因子）
     hashLabel: "实时算力",
     hashCapability: "算力上限",
+    hashCapabilityUnknown: "上方设备规格为估算值，服务端标定算力暂不可用；任务状态单独展示。",
     hashTier: "{n} 档",
     hashOutput: "{n}% 输出",
     hashFactorPeak: "满速 · 已充电在线",
@@ -1648,7 +1649,7 @@ export const zh: Messages = {
     pageTitle: "免费试用",
     pageHeaderSubtitle: "NexGridBox S1",
     toastActivated: "免费试用已激活 · NexGridBox S1",
-    offsetAccruedLabel: "已累积抵扣金",
+    offsetAccruedLabel: "本次购机可抵",
     offsetRemainderNote: "超出抵扣上限的 ${remainder} 购买后存入账户余额",
     offsetUsableUntil: "抵扣金可用至 {time}",
     buyCtaOffset: "立即购买 · 可抵 ${amount}",

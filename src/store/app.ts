@@ -635,6 +635,8 @@ export const useApp = defineStore("app", () => {
       name: device.name,
       gpu: device.gpuModel,
       gpuModel: device.gpuModel,
+      capabilityTops: device.capabilityTops ?? undefined,
+      capabilityTier: device.capabilityTier ?? undefined,
       vramTotal: device.vramTotalGb,
       basePower: device.basePowerW,
       baseRate: fullDailyUsdt,

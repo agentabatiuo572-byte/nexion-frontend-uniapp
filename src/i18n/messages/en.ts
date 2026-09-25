@@ -877,6 +877,7 @@ export const en = {
     // Phone live hashpower (effective = calibrated capability × live condition factors)
     hashLabel: "Live hashpower",
     hashCapability: "Capability",
+    hashCapabilityUnknown: "Device model specification is an estimate; server-calibrated hashpower is unavailable. Task status is shown separately.",
     hashTier: "Tier {n}",
     hashOutput: "{n}% output",
     hashFactorPeak: "Peak · charged & online",
@@ -1707,7 +1708,7 @@ export const en = {
     pageTitle: "Free trial",
     pageHeaderSubtitle: "NexGridBox S1",
     toastActivated: "Free trial activated · NexGridBox S1",
-    offsetAccruedLabel: "Trial credit accrued",
+    offsetAccruedLabel: "Available toward device purchase",
     offsetRemainderNote: "${remainder} above the credit cap goes to your balance after purchase",
     offsetUsableUntil: "Trial credit stays usable until {time}",
     buyCtaOffset: "Buy now · ${amount} credit applies",
