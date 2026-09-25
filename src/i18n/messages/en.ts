@@ -4245,10 +4245,10 @@ export const en = {
     s4Title: "What you need to know about risk",
     s4Intro:
       "Locked funds have limited availability. Review these rules before submitting:",
-    r1Label: "Funds are locked for the full term",
+    r1Label: "Locked funds cannot be used directly",
     r1Body:
-      "Once you stake, the money cannot be used for anything else until the unlock date — no withdrawal, no spend, no transfer.",
-    r2Label: "Early withdrawal forfeits accrued interest",
+      "Staked USDT cannot be withdrawn, spent or transferred directly. To exit before maturity, request early withdrawal under that position's recorded rules and accept the principal deduction and forfeited interest.",
+    r2Label: "Early withdrawal deducts principal and forfeits interest",
     r2Body:
       "Early withdrawal deducts a share of principal according to the term. Current rates for new stakes: {penalties}. All accrued interest is forfeited; existing positions follow the rules recorded for that position.",
     r3Label: "APY is variable and can adjust",
