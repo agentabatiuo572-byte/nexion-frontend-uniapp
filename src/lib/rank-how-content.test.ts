@@ -29,6 +29,48 @@ describe("rank-how published presentation", () => {
     expect(content.section("protection").body).toContain("未开启");
     expect(content.section("example").body).not.toMatch(/50,000|52,300|22,000/);
   });
+  it.each([
+    ["zh", "1,234,567.987654 USDT", "1.234568 USDT"],
+    ["en", "1,234,567.987654 USDT", "1.234568 USDT"],
+    ["vi", "1.234.567,987654 USDT", "1,234568 USDT"],
+  ])("renders server numbers in %s when native Intl is absent", (locale, large, rounded) => {
+    vi.stubGlobal("Intl", undefined);
+    try {
+      const changed = ranks.map(row => row.v === 2 ? { ...row, teamVolumeUSD: 1234567.987654, selfBuyUSD: 1.23456789 } : row);
+      const content = buildRankHowContent(policy, changed, enabled, locale, labels);
+      expect(content.section("example").body).toContain(large);
+      expect(content.section("example").body).toContain(rounded);
+      expect(content.section("rewards").body).toContain(locale === "vi" ? "321,123456 NEX" : "321.123456 NEX");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it.each([
+    ["zh", "1,000,000,000,000,000,000,000 USDT", "1.234566 USDT", "0.000001 USDT"],
+    ["en", "1,000,000,000,000,000,000,000 USDT", "1.234566 USDT", "0.000001 USDT"],
+    ["vi", "1.000.000.000.000.000.000.000 USDT", "1,234566 USDT", "0,000001 USDT"],
+  ])("keeps extreme and half-micro server values accurate in %s without Intl", (locale, huge, rounded, tiny) => {
+    vi.stubGlobal("Intl", undefined);
+    try {
+      const changed = ranks.map(row => row.v === 2 ? { ...row, teamVolumeUSD: 1e21, selfBuyUSD: 1.2345655 } : row);
+      const changedPolicy = { ...policy, rules: { ...policy.rules, qualifiedReferralSelfBuyUSD: 0.0000005 } };
+      const content = buildRankHowContent(changedPolicy, changed, enabled, locale, labels);
+      expect(content.section("example").body).toContain(huge);
+      expect(content.section("example").body).toContain(rounded);
+      expect(content.section("requirement-direct").body).toContain(tiny);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("carries six-decimal rounding into the whole number without Intl", () => {
+    vi.stubGlobal("Intl", undefined);
+    try {
+      const changed = ranks.map(row => row.v === 2 ? { ...row, selfBuyUSD: 9.9999995 } : row);
+      expect(buildRankHowContent(policy, changed, enabled, "en", labels).section("example").body).toContain("10 USDT");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("recomputes values after PC configuration changes", () => {
     const changed = ranks.map(r => r.v === 2 ? { ...r, teamVolumeUSD: 123, leadershipVotes: 29 } : r);
     const content = buildRankHowContent({ ...policy, rules: { ...policy.rules!, permanentProtection: true, leadershipConfigured: true } }, changed, enabled, "zh", labels);

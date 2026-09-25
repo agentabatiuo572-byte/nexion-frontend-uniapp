@@ -46,7 +46,29 @@ export function buildRankHowContent(policy: RankHowPolicy | null, ranks: Canonic
   // Prefer an example containing both team and qualified-leg conditions; never invent thresholds.
   const target = pairs.find(rank => (rank.teamVolumeUSD ?? 0) > 0 && (rank.requiredDownlineCount ?? 0) > 0) ?? pairs[0];
   const example = target ? { from: ladder.find(rank => rank.v === target.v - 1)!, to: target } : null;
-  const number = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(value);
+  // Native UniApp can omit Intl; round decimal digits without binary toFixed ties.
+  const number = (value: number) => {
+    const [mantissa, exponent = "0"] = Math.abs(value).toString().split("e");
+    const [integer, fraction = ""] = mantissa.split(".");
+    const digits = integer + fraction;
+    const point = integer.length + Number(exponent);
+    const whole = point > 0 ? digits.slice(0, point).padEnd(point, "0") : "0";
+    const tail = (point < 0 ? "0".repeat(-point) : "") + digits.slice(Math.max(point, 0));
+    const rounded = [...whole, ...tail.slice(0, 6).padEnd(6, "0")];
+    if (tail[6] >= "5") {
+      let carry = true;
+      for (let i = rounded.length - 1; i >= 0 && carry; i--) {
+        if (rounded[i] === "9") rounded[i] = "0";
+        else { rounded[i] = String(Number(rounded[i]) + 1); carry = false; }
+      }
+      if (carry) rounded.unshift("1");
+    }
+    const fixed = rounded.join("");
+    const vietnamese = locale.split("-")[0] === "vi";
+    const decimals = fixed.slice(-6).replace(/0+$/, "");
+    return (value < 0 ? "-" : "") + fixed.slice(0, -6).replace(/\B(?=(\d{3})+(?!\d))/g, vietnamese ? "." : ",")
+      + (decimals ? `${vietnamese ? "," : "."}${decimals}` : "");
+  };
   const money = (value: number | undefined) => value !== undefined && value > 0 ? `${number(value)} USDT` : copy.noThreshold;
   const tokens: Record<string, string | undefined> = {
     firstRank: ladder.length ? `V${ladder[0].v}` : undefined,
