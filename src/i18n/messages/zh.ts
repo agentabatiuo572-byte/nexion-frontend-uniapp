@@ -1733,6 +1733,7 @@ export const zh: Messages = {
     inventoryToastActivated: "已激活 {deviceName}",
     inventoryToastDeactivated: "已取消激活 {deviceName}",
     inventoryRemoteMutationFailed: "暂时无法确认设备状态,请重试。",
+    inventoryStaleWarning: "设备数据暂未更新，当前显示上次确认的状态。请重试。",
     inventoryRemoteWaitUnavailable: "服务端暂不支持任务完成后自动停用;可稍后重试,或选择立即停用。",
     inventoryConfirmDeactivateTitle: "取消激活 {deviceName}?",
     inventoryConfirmDeactivateMsg: "取消后该设备停止贡献收益与任务进度,可随时重新激活。",

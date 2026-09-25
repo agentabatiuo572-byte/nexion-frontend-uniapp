@@ -57,8 +57,9 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 // production-only delta is reviewed; this is not a file-level exemption.
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "ae19a15f2b050424de21be06c40d08a1b2a4855e6464fc9ed78dc2bd96162d62",
-  // Existing formal phone-calibration entry, trial state and physical-slot guard.
-  "devices.vue": "ff2a1662e252b3233c387cc24fc07708ff9ac53b5f4c2fddf3dc1d2c212bc00f",
+  // Formal phone-calibration and physical-slot controls appear only after fleet
+  // and trial authority; loading/failure cannot display a false empty inventory.
+  "devices.vue": "9f9e0c547cb6704d4b363c0953252ab1f68e82bcad0a359ed4a6f8c071923e9a",
   // Goal reads retain the 5174 structure while current-scope recovery makes
   // loading/error explicit, preserves a confirmed snapshot, and exposes retry.
   // Saving remains idempotent; a completed or unavailable recommendation has no purchase CTA.

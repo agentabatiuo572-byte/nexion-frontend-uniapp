@@ -1794,6 +1794,7 @@ export const en = {
     inventoryToastActivated: "{deviceName} activated",
     inventoryToastDeactivated: "{deviceName} deactivated",
     inventoryRemoteMutationFailed: "The device state could not be confirmed. Try again.",
+    inventoryStaleWarning: "Device data could not be updated. Showing the last confirmed state. Try again.",
     inventoryRemoteWaitUnavailable: "Server-side deactivation after the current task is not available yet. Try later or deactivate now.",
     inventoryConfirmDeactivateTitle: "Deactivate {deviceName}?",
     inventoryConfirmDeactivateMsg: "Once deactivated, the device stops earning and pauses task progress. You can reactivate any time.",

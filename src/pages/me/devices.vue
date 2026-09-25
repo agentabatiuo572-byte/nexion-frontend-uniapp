@@ -22,11 +22,30 @@
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.myDevices.inventoryTitle" />
 
-      <view class="mx-4" :style="slotCaptionStyle">
+      <view v-if="inventoryLoading" class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px">
+        <text>{{ t.earn.deviceLoading }}</text>
+      </view>
+      <EmptyState
+        v-else-if="inventoryError"
+        class="mx-4"
+        kind="recoverable-error"
+        :title="t.empty.errorTitle"
+        :desc="t.empty.errorDesc"
+        :cta-label="t.empty.errorCta"
+        emphasis
+        @cta="retryInventory"
+      />
+      <view v-if="inventoryStale" class="mx-4" role="status" style="padding: 12px; border-radius: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
+        <text class="block" style="font-size: 13px">{{ t.myDevices.inventoryStaleWarning }}</text>
+        <view class="inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory" @keydown.enter.prevent="retryInventory" @keydown.space.prevent="retryInventory">
+          <text>{{ t.empty.errorCta }}</text>
+        </view>
+      </view>
+      <view v-if="inventoryReady" class="mx-4" :style="slotCaptionStyle">
         <text class="block" :style="subtitleStyle">{{ slotMeterLabel }}</text>
       </view>
 
-      <view class="mx-4">
+      <view v-if="inventoryReady" class="mx-4">
         <!-- Slot meter — de-carded: sits on the page floor. -->
         <view :style="meterBlockStyle">
           <view class="flex items-center justify-between">
@@ -214,12 +233,13 @@ import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase"
 import { useProductPhase } from "@/composables/use-product-phase";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
-import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { isProductAvailable } from "@/store/product-availability";
-import { refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
@@ -227,6 +247,22 @@ const app = useApp();
 const session = useSession();
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
+
+// A fleet snapshot alone cannot establish the slot count: an active trial
+// reserves another slot. Keep the first render pending until both reads settle.
+const trialReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready"
+  || (trial.authorityStatus === "loading" && trial.authorityServerState !== null));
+const inventoryReady = computed(() => !remoteApiEnabled || (app.remoteFleetHasSnapshot && trialReady.value));
+const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetStatus === "error"
+  || trial.authorityStatus === "error"
+  || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
+const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
+const inventoryStale = computed(() => inventoryReady.value && remoteApiEnabled && app.remoteFleetStatus === "error");
+
+function retryInventory() {
+  void refreshRemoteFleetAfterCatalog(app.accountKey).catch(() => undefined);
+  void trial.poll(Date.now());
+}
 
 function deferredCommandSlot(device: Device, accountKey: string, version: number): string {
   return `${accountKey.trim().toLowerCase()}:deactivate-after-task:${device.id}:${version}`;
