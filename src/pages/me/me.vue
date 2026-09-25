@@ -65,7 +65,7 @@
                 <view v-else-if="item.dot" :style="quickDotStyle" />
               </view>
               <text :style="quickLabelStyle">{{ item.label }}</text>
-              <text v-if="item.meta" class="truncate" :style="quickMetaStyle(item.tone)">{{ item.meta }}</text>
+              <text v-if="item.meta" :class="item.key === 'slots' ? undefined : 'truncate'" :style="quickMetaStyle(item.tone, item.key === 'slots')">{{ item.meta }}</text>
             </view>
           </view>
         </view>
@@ -528,7 +528,7 @@ const quickLabelStyle: CSSProperties = {
   whiteSpace: "normal",
   wordBreak: "break-word",
 };
-function quickMetaStyle(tone: QuickTone = "muted"): CSSProperties {
+function quickMetaStyle(tone: QuickTone = "muted", wrap = false): CSSProperties {
   return {
     maxWidth: "76px",
     marginTop: "-3px",
@@ -538,7 +538,9 @@ function quickMetaStyle(tone: QuickTone = "muted"): CSSProperties {
     color: toneColor(tone),
     textAlign: "center",
     opacity: 0.9,
-    whiteSpace: "nowrap",
+    whiteSpace: wrap ? "normal" : "nowrap",
+    width: wrap ? "76px" : undefined,
+    overflowWrap: wrap ? "break-word" : undefined,
   };
 }
 
