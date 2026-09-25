@@ -126,14 +126,14 @@
       </view>
 
     <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
-    <view v-if="phoneRunning" style="padding: 0 20px 12px">
+    <view v-if="phoneRunning && live" style="padding: 0 20px 12px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
         <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
         <view class="flex items-center gap-1" :style="capChipStyle">
           <text style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }}</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ baselineTops.toFixed(1) }} TOPS</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ baselineTops?.toFixed(1) }} TOPS</text>
           <text style="color: var(--v5-ink-4)">·</text>
-          <text style="color: var(--v5-brand)">{{ fmt(t.earn.hashTier, { n: capTier }) }}</text>
+          <text style="color: var(--v5-brand)">{{ capTier == null ? '—' : fmt(t.earn.hashTier, { n: capTier }) }}</text>
         </view>
       </view>
       <view class="flex items-end justify-between">
@@ -157,6 +157,12 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
         <text style="font-size: 12px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
       </view>
+    </view>
+
+    <view v-else-if="phoneRunning" style="padding: 0 20px 12px">
+      <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
+      <text class="block" style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }} · — TOPS</text>
+      <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
     </view>
 
     <!-- Phone: reconnecting -->
@@ -542,16 +548,17 @@ function goTaskHistory() {
 const phoneRunning = computed(
   () => props.device.kind === "phone" && !reconnecting.value && !props.device.pausedReason,
 );
-// Phones always carry capability fields (createDevice seeds them); fall back to
-// the lib's single-source default rather than duplicating the literal here.
+// Local demo phones carry a seeded capability. Remote phones only use a
+// server-calibrated value; an older fleet response may not provide one.
 const FALLBACK_CAP = fallbackCapability();
-const baselineTops = computed(() => props.device.capabilityTops ?? (remoteApiEnabled ? 0 : FALLBACK_CAP.tops));
+const baselineTops = computed(() => props.device.capabilityTops ?? (remoteApiEnabled ? null : FALLBACK_CAP.tops));
 const cfg = useConfig();
-const capTier = computed(() => props.device.capabilityTier ?? (remoteApiEnabled ? "—" : FALLBACK_CAP.tier));
+const capTier = computed(() => props.device.capabilityTier ?? (remoteApiEnabled ? null : FALLBACK_CAP.tier));
 const deviceOnline = computed(() => isDeviceOnline(props.device, now.value));
-const live = computed(() =>
-  computeLiveHashpower({
-    baselineTops: baselineTops.value,
+const live = computed(() => {
+  const baseline = baselineTops.value;
+  return baseline == null ? null : computeLiveHashpower({
+    baselineTops: baseline,
     online: deviceOnline.value,
     isCharging: isCharging.value,
     isOnline: isOnline.value,
@@ -559,9 +566,10 @@ const live = computed(() =>
     continuityMs: props.device.miningSince ? Math.max(0, now.value - props.device.miningSince) : 0,
     nowSeed: now.value,
     onlineBonus: cfg.config.onlineBonus,
-  }),
-);
+  });
+});
 const factorLabel = computed(() => {
+  if (!live.value) return "";
   if (!deviceOnline.value) return t.value.earn.hashCarrierH5Mode;
   switch (live.value.dominant) {
     case "continuity":
@@ -583,7 +591,7 @@ const sparkBuf = ref<number[]>([]);
 watch(
   now,
   () => {
-    if (!phoneRunning.value) return;
+    if (!phoneRunning.value || !live.value) return;
     const next = [...sparkBuf.value, live.value.effectiveTops];
     sparkBuf.value = next.length > SPARK_LEN ? next.slice(-SPARK_LEN) : next;
   },
@@ -591,10 +599,10 @@ watch(
 );
 const sparkPoints = computed(() => {
   const buf = sparkBuf.value;
-  if (buf.length < 2) return "";
+  if (buf.length < 2 || baselineTops.value == null) return "";
   const W = 110;
   const H = 28;
-  const base = baselineTops.value || 1;
+  const base = baselineTops.value;
   const n = buf.length;
   return buf
     .map((v, i) => {

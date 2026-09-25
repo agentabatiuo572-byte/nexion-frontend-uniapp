@@ -59,6 +59,6 @@ const todayText = computed(() =>
 );
 
 function go() {
-  navTo(`/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}`);
+  navTo(`/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}&from=home`);
 }
 </script>

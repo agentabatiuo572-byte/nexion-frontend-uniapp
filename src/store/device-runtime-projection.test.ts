@@ -53,6 +53,17 @@ describe("remote fleet lifecycle and online state are independent", () => {
     expect(result.pendingDeactivate).toBe(true);
     expect(result.activatedAt).toBe(123);
   });
+  it("preserves server phone calibration separately from task and earnings facts", () => {
+    const result = project({ ...fixture, kind: "phone", capabilityTops: 32.3, capabilityTier: 3,
+      gpuModel: "Mobile NPU · ~32.3 TOPS", runtimeStatus: "ONLINE" }, 1000, 20);
+    expect(result.capabilityTops).toBe(32.3);
+    expect(result.capabilityTier).toBe(3);
+    expect(result.todayEarnings).toBe(7);
+    expect(result.cumulativeEarningsUsdt).toBe(9);
+    const older = project({ ...fixture, kind: "phone", gpuModel: "Mobile NPU · ~32.3 TOPS" }, 1000, 20);
+    expect(older.capabilityTops).toBeUndefined();
+    expect(older.capabilityTier).toBeUndefined();
+  });
   it("does not revive a deactivated asset from runtime status", () => {
     const result = project({ ...fixture, status: "DEACTIVATED", runtimeStatus: "ONLINE" }, 1000, 20);
     expect(result.activatedAt).toBeNull();

@@ -833,6 +833,7 @@ export const vi: Messages = {
     // Phone live hashpower (effective = calibrated capability × live condition factors)
     hashLabel: "Sức mạnh tính toán trực tiếp",
     hashCapability: "Năng lực",
+    hashCapabilityUnknown: "Thông số thiết bị ở trên chỉ là ước tính; công suất đã hiệu chuẩn từ máy chủ chưa có. Trạng thái tác vụ được hiển thị riêng.",
     hashTier: "Bậc {n}",
     hashOutput: "{n}% sản lượng",
     hashFactorPeak: "Đỉnh · đã sạc & online",
@@ -1655,7 +1656,7 @@ export const vi: Messages = {
     pageTitle: "Dùng thử miễn phí",
     pageHeaderSubtitle: "NexGridBox S1",
     toastActivated: "Đã kích hoạt dùng thử miễn phí · NexGridBox S1",
-    offsetAccruedLabel: "Tiền khấu trừ đã tích lũy",
+    offsetAccruedLabel: "Có thể khấu trừ khi mua máy",
     offsetRemainderNote: "${remainder} sẽ cộng vào số dư sau khi mua",
     offsetUsableUntil: "Tiền khấu trừ dùng được đến {time}",
     buyCtaOffset: "Mua ngay · khấu trừ ${amount}",
