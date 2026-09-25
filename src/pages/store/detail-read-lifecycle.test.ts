@@ -60,8 +60,9 @@ function setup() {
 describe("store detail canonical read lifecycle", () => {
   it("recomputes the product when the cold-start server catalog arrives", () => {
     const productStart = page.indexOf("const product = computed<Product | undefined>");
-    const productEnd = page.indexOf(";\n", productStart) + 1;
+    const productEnd = page.indexOf(";", productStart) + 1;
     expect(productStart).toBeGreaterThan(0);
+    expect(productEnd).toBeGreaterThan(productStart);
     const productCode = ts.transpileModule(
       `${page.slice(productStart, productEnd)}; return product;`,
       { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
