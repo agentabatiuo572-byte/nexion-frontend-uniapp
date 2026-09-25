@@ -1735,6 +1735,7 @@ export const vi: Messages = {
     inventoryToastActivated: "Đã kích hoạt {deviceName}",
     inventoryToastDeactivated: "Đã tắt {deviceName}",
     inventoryRemoteMutationFailed: "Chưa thể xác nhận trạng thái thiết bị. Vui lòng thử lại.",
+    inventoryStaleWarning: "Chưa cập nhật được dữ liệu thiết bị. Đang hiển thị trạng thái đã xác nhận lần trước. Vui lòng thử lại.",
     inventoryRemoteWaitUnavailable: "Máy chủ chưa hỗ trợ tự tắt sau tác vụ hiện tại. Hãy thử lại sau hoặc tắt ngay.",
     inventoryConfirmDeactivateTitle: "Tắt {deviceName}?",
     inventoryConfirmDeactivateMsg: "Sau khi tắt, thiết bị sẽ ngừng sinh lời và tạm dừng tiến độ nhiệm vụ. Bạn có thể bật lại bất cứ lúc nào.",
