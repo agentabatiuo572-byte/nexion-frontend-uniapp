@@ -4108,10 +4108,10 @@ export const vi: Messages = {
     s4Title: "Những điều bạn cần biết về rủi ro",
     s4Intro:
       "Tiền khóa bị hạn chế sử dụng. Hãy xem các quy tắc sau trước khi gửi:",
-    r1Label: "Tiền bị khóa suốt kỳ hạn",
+    r1Label: "Tiền khóa không thể dùng trực tiếp",
     r1Body:
-      "Khi đã khóa, số tiền không thể dùng vào việc gì khác cho tới ngày mở khóa — không rút, không tiêu, không chuyển.",
-    r2Label: "Rút sớm sẽ mất lãi đã tích lũy",
+      "USDT đã khóa không thể rút trực tiếp, chi tiêu hoặc chuyển khoản. Muốn thoát trước hạn, hãy yêu cầu rút sớm theo quy tắc đã ghi nhận cho vị thế đó và chấp nhận khoản khấu trừ gốc cùng phần lãi bị mất.",
+    r2Label: "Rút sớm bị trừ gốc và mất lãi",
     r2Body:
       "Rút sớm sẽ bị khấu trừ một phần tiền gốc theo kỳ hạn. Tỷ lệ hiện tại cho khoản khóa mới: {penalties}. Toàn bộ lãi tích lũy bị mất; vị thế hiện có áp dụng quy tắc đã ghi nhận cho vị thế đó.",
     r3Label: "APY biến động và có thể điều chỉnh",

@@ -20,6 +20,14 @@ describe('staking risk copy uses current policy and evidenced claims',()=>{
       // Appending the live placeholder to an obsolete fixed list must fail too.
       expect(messages.stakingHowItWorks.r2Body).not.toMatch(/\d+(?:[.,]\d+)?\s*[%％]/);
     });
+    it(`${locale} explains early exit without promising direct use of locked funds`,()=>{
+      const {r1Body,r2Label,r2Body}=messages.stakingHowItWorks;
+      expect(r1Body).toMatch(/不能直接|cannot be withdrawn|không thể rút trực tiếp/i);
+      expect(r1Body).toMatch(/提前赎回|early withdrawal|rút sớm/i);
+      expect(r2Label).toMatch(/本金.*利息|principal.*interest|gốc.*lãi/i);
+      expect(r2Body).toMatch(/已有持仓|existing positions|vị thế hiện có/i);
+      expect(r1Body).not.toMatch(/到期日前无法用作任何事|cannot be used for anything else until|không thể dùng vào việc gì khác cho tới/i);
+    });
     it(`${locale} does not retain the unapproved reserve guarantee`,()=>{
       expect(JSON.stringify(messages.stakingHowItWorks)).not.toContain('102.4');
     });
