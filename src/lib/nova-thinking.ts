@@ -1,3 +1,5 @@
+import { createAbortController } from "./abort-controller-compat";
+
 export type NovaThinkingStage = "understanding" | "checking" | "composing";
 
 export const NOVA_MIN_THINKING_MS = 1_800;
@@ -23,7 +25,7 @@ export function createLatestAbortableRequest(): LatestAbortableRequestControl {
   return {
     begin() {
       activeController?.abort();
-      activeController = new AbortController();
+      activeController = createAbortController();
       const controller = activeController;
       return { epoch: ++epoch, signal: controller.signal, abort: () => controller.abort() };
     },

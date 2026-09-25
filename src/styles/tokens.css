@@ -1,7 +1,7 @@
 /* NexGrid design tokens + global utility classes / animations
    Ported from Nexion-prototype/app/globals.css with Tailwind v4 directives
    (@import tailwindcss + @theme inline) stripped.
-   :root = light theme; html[data-theme=dark] = dark theme.
+   :root defines light tokens; an unset theme defaults to dark.
    The ~3219 [var(--*)] arbitrary-value classes + 1889 inline var() refs in
    ported pages resolve against these custom properties. */
 
@@ -263,20 +263,20 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Dark mode — applied when <html data-theme="dark">.
+   Dark mode — default until a saved light preference reaches the page WebView.
    Overrides v5 light tokens to a desaturated obsidian palette while
    keeping brand identity (brand / brand-2 / success / warning) hue-anchored.
    Soft variants get slight transparency for proper layering on dark surfaces.
    ───────────────────────────────────────────────────────────────────── */
 /* ─────────────────────────────────────────────────────────────────────
-   Dark mode — applied when <html data-theme="dark">.
+   Dark mode — default until a saved light preference reaches the page WebView.
    Per SKILL-nexgrid-v5-dark-design-system.md: v4 obsidian + lemon-green
    identity. Pure black page, #0F0F0F cards, #9EDC1D lemon brand, #FF6B35
    orange brand-2, #7C5CFF purple tech accent, #FFBE3D amber warning.
    All non-color v5 rules (typography / spacing / nesting / sheets /
    buttons / home indicator) remain identical — see the light SKILL.
    ───────────────────────────────────────────────────────────────────── */
-html[data-theme="dark"] {
+:root:not([data-theme="light"]) {
   /* Surface ladder — neutral obsidian, NO hue tint. Wider luminance steps
      than v4 baseline so cards visibly LIFT off the page floor (×1.5 step
      so 95% of users register hierarchy at first glance).
@@ -432,7 +432,7 @@ body {
    referenced Tailwind class strings, which Tailwind v4 mis-extracted
    into `bg-[var(--v5-surface)` and emitted `var(--*)` invalid CSS).
    Cards needing lift now add either inline `boxShadow` or `data-v5-lift`. */
-html[data-theme="dark"] [data-v5-lift] {
+:root:not([data-theme="light"]) [data-v5-lift] {
   box-shadow: var(--v5-card-shadow-lift);
 }
 

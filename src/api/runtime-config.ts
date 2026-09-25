@@ -5,6 +5,16 @@ export interface ApiRuntimeConfig {
   baseUrl: string;
 }
 
+/** The Vite build mode does not identify which server a debug App targets. */
+export function apiEnvironmentBadgeLabel(config: ApiRuntimeConfig, localDevelopmentLabel: string): string {
+  const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+  if (baseUrl === "https://18.142.169.24") return "NexGrid TEST";
+  if (config.environment === "dev" && /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/i.test(baseUrl)) {
+    return localDevelopmentLabel;
+  }
+  return "";
+}
+
 const runtimeEnv: Record<string, unknown> = import.meta.env.PROD
   ? {
     VITE_NEXGRID_API_BASE_URL: import.meta.env.VITE_NEXGRID_API_BASE_URL,

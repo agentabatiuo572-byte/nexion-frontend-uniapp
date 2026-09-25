@@ -7,7 +7,7 @@ import {
   remainingNovaThinkingMs,
 } from "./nova-thinking";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("Nova visible thinking cadence", () => {
   it("holds a fast answer until the minimum visible duration is reached", () => {
@@ -40,6 +40,16 @@ describe("Nova visible thinking cadence", () => {
 });
 
 describe("Nova request cancellation", () => {
+  it("cancels the native request when AbortController is absent", () => {
+    vi.stubGlobal("AbortController", undefined);
+    const control = createLatestAbortableRequest();
+    const request = control.begin();
+    const cancelled = vi.fn();
+    request.signal.addEventListener("abort", cancelled);
+    control.cancel();
+    expect(request.signal.aborted).toBe(true);
+    expect(cancelled).toHaveBeenCalledTimes(1);
+  });
   it("aborts the current model request and invalidates its epoch", () => {
     const control = createLatestAbortableRequest();
     const request = control.begin();

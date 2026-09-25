@@ -128,7 +128,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #216: the password-change validation error is associated to its own field
   // (aria-describedby + aria-invalid, one literal id per field), announced via
   // role=alert, and focus moves to the first invalid field; editing clears it.
-  "security.vue": "e90d8d133dbb7c1bccb2b91bb7b4d30f04f65723ef37b82dd91f7973df89c60e",
+  "security.vue": "a7b410aa4fe838f9073fd11f17c76db3ce79d743ba08229854120d1f36828e65",
   // R3: resolved tickets can receive replies; closed tickets remain read-only.
   // P1: the create form also renders its own PC-published Ticket Create knowledge surface.
   // Production ticket detail can request the server-paginated earlier history.

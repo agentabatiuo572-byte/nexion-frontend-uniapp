@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import uniPlugin from "@dcloudio/vite-plugin-uni";
 import UnoCSS from "unocss/vite";
+import { nativeSvgIcons } from "./scripts/native-svg-icons.mjs";
 import { mustBlockDevelopmentOAuthProxy } from "./src/lib/dev-preview-auth-boundary";
 
 // @dcloudio/vite-plugin-uni ships as CJS. With "type":"module" in package.json
@@ -31,7 +32,7 @@ export default defineConfig(({ mode }) => {
     : undefined;
 
   return {
-    plugins: [uni(), UnoCSS()],
+    plugins: [nativeSvgIcons(), uni(), UnoCSS()],
     // 只被懒编译页面引用的依赖必须在这里显式预打包:uni 的按需编译让启动扫描
     // 抓不到它们,首个访客触发运行时依赖重打包 → 在途模块请求 500 + 整页 reload,
     // uni 异步页面组件等满 60s 直接弹「连接服务器超时」。入口链上的依赖

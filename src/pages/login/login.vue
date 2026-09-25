@@ -22,7 +22,7 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
-      <view v-if="apiRuntimeConfig.environment === 'dev'" class="lg-mode-badge" data-testid="auth-runtime-label">
+      <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
       <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
@@ -155,6 +155,7 @@ import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
+import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
@@ -277,7 +278,7 @@ const titleText = computed(() => {
   if (mode.value === "reset") return t.value.login.resetTitle;
   return t.value.login.title;
 });
-const modeLabel = computed(() => t.value.security.developmentModeLabel);
+const modeLabel = computed(() => apiEnvironmentBadgeLabel(apiRuntimeConfig, t.value.security.developmentModeLabel));
 const developmentOtpCode = String(import.meta.env.VITE_NEXGRID_DEV_OTP_CODE || "").trim();
 const developmentOtpEnabled = computed(() =>
   apiRuntimeConfig.environment === "dev"

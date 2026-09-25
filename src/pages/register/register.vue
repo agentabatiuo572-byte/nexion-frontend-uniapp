@@ -32,7 +32,7 @@
 
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
-      <view v-if="apiRuntimeConfig.environment === 'dev'" class="rg-mode-badge" data-testid="auth-runtime-label">
+      <view v-if="modeLabel" class="rg-mode-badge" data-testid="auth-runtime-label">
         <text class="rg-mode-badge__t">{{ modeLabel }}</text>
       </view>
       <text class="rg-subtitle">
@@ -173,6 +173,7 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
+import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider } from "@/api/auth-api";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
@@ -315,7 +316,7 @@ const phoneFormatMessage = computed(() => {
     ? fmt(t.value.countryCodes.phoneInvalidHint, params)
     : fmt(t.value.countryCodes.phoneExampleHint, params);
 });
-const modeLabel = computed(() => t.value.security.developmentModeLabel);
+const modeLabel = computed(() => apiEnvironmentBadgeLabel(apiRuntimeConfig, t.value.security.developmentModeLabel));
 const developmentOtpCode = String(import.meta.env.VITE_NEXGRID_DEV_OTP_CODE || "").trim();
 const developmentOtpEnabled = computed(() =>
   apiRuntimeConfig.environment === "dev"
