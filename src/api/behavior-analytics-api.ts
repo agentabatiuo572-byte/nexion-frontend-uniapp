@@ -29,6 +29,14 @@ export type BehaviorEvent =
       yNorm: number;
       zone: BehaviorZone;
       elementId?: string;
+    })
+  | (BehaviorCommon & {
+      eventName: "store.viewed";
+      dwellMs?: never;
+      xNorm?: never;
+      yNorm?: never;
+      zone?: never;
+      elementId?: never;
     });
 
 export type BehaviorReceipt = {
@@ -50,6 +58,7 @@ const LOCALE = /^(?:und|[a-z]{2}(?:-[A-Z]{2})?)$/;
 const ZONES = new Set<BehaviorZone>(["TOP", "MAIN_CTA", "CONTENT", "BOTTOM"]);
 const PAGE_EVENT_FIELDS = new Set(["clientEventId", "eventName", "sessionId", "route", "dwellMs", "clientTs", "deviceType", "locale"]);
 const CLICK_EVENT_FIELDS = new Set(["clientEventId", "eventName", "sessionId", "route", "xNorm", "yNorm", "zone", "elementId", "clientTs", "deviceType", "locale"]);
+const STORE_EVENT_FIELDS = new Set(["clientEventId", "eventName", "sessionId", "route", "clientTs", "deviceType", "locale"]);
 
 function invalid(message: string): never {
   throw new ApiError({ kind: "protocol", message });
@@ -72,6 +81,10 @@ function validEvent(event: BehaviorEvent): boolean {
     return hasOnlyFields(event, PAGE_EVENT_FIELDS)
       && Number.isSafeInteger(event.dwellMs) && event.dwellMs >= 0 && event.dwellMs <= 86_400_000;
   }
+  if (event.eventName === "store.viewed") {
+    return event.route === "/pages/store/store" && hasOnlyFields(event, STORE_EVENT_FIELDS);
+  }
+  if (event.eventName !== "app.element_clicked") return false;
   return hasOnlyFields(event, CLICK_EVENT_FIELDS)
     && Number.isFinite(event.xNorm) && event.xNorm >= 0 && event.xNorm <= 1
     && Number.isFinite(event.yNorm) && event.yNorm >= 0 && event.yNorm <= 1

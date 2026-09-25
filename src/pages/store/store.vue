@@ -129,6 +129,7 @@ import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
+import { behaviorTracker, createStoreViewEvent } from "@/services/behavior-analytics";
 
 const t = useT();
 const app = useApp();
@@ -150,6 +151,8 @@ const focusProductId = ref("");
 const focusProductName = ref("");
 let storePageVisible = false;
 let storeObservationEpoch = 0;
+let storeViewReportedScope = "";
+let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<typeof createStoreViewEvent>; tries: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
@@ -167,6 +170,9 @@ onShow(() => {
 onHide(() => {
   storePageVisible = false;
   storeObservationEpoch += 1;
+  storeViewReportedScope = "";
+  if (storeViewAttempt?.timer) clearTimeout(storeViewAttempt.timer);
+  storeViewAttempt = null;
   // The goal-recommendation context belongs to the arrival from the earning
   // goal, not to the tab. A tab switch or a detail push must not keep claiming
   // "your goal sent you here" on the next look at an unrelated store visit.
@@ -176,6 +182,9 @@ onHide(() => {
 onUnmounted(() => {
   storePageVisible = false;
   storeObservationEpoch += 1;
+  storeViewReportedScope = "";
+  if (storeViewAttempt?.timer) clearTimeout(storeViewAttempt.timer);
+  storeViewAttempt = null;
   focusProductId.value = "";
   focusProductName.value = "";
 });
@@ -198,11 +207,34 @@ async function observeDayOneStorePage(): Promise<void> {
   const scope = captureAccountScope();
   const pageEpoch = storeObservationEpoch;
   await nextTick();
-  if (!storePageVisible || pageEpoch !== storeObservationEpoch || catalogStatus.value !== "ready") return;
+  const session = sessionVault.read();
+  if (!storePageVisible || pageEpoch !== storeObservationEpoch || catalogStatus.value !== "ready"
+    || !isCurrentAccountScope(scope) || !session) return;
+  const viewScope = `${pageEpoch}:${scope.accountKey}:${scope.epoch}`;
+  if (storeViewReportedScope !== viewScope && storeViewAttempt?.scopeKey !== viewScope) {
+    if (storeViewAttempt?.timer) clearTimeout(storeViewAttempt.timer);
+    const attempt = { scopeKey: viewScope, userId: session.user.userId, event: createStoreViewEvent(), tries: 0, timer: null as ReturnType<typeof setTimeout> | null };
+    storeViewAttempt = attempt;
+    const send = async (): Promise<void> => {
+      if (storeViewAttempt !== attempt || !storePageVisible || pageEpoch !== storeObservationEpoch
+        || !isCurrentAccountScope(scope) || sessionVault.read()?.user.userId !== attempt.userId) return;
+      attempt.tries += 1;
+      const recorded = await behaviorTracker.viewStore(attempt.event);
+      if (storeViewAttempt !== attempt || !storePageVisible || pageEpoch !== storeObservationEpoch
+        || !isCurrentAccountScope(scope) || sessionVault.read()?.user.userId !== attempt.userId) return;
+      if (recorded) {
+        storeViewReportedScope = viewScope;
+        storeViewAttempt = null;
+      } else if (attempt.tries < 3) {
+        attempt.timer = setTimeout(() => { attempt.timer = null; void send(); }, attempt.tries * 1000);
+      }
+    };
+    void send();
+  }
   void authenticatedPageObservationReporter.report({
     subject: "day-one:visit-store",
     scope,
-    session: sessionVault.read(),
+    session,
     visible: () => storePageVisible && pageEpoch === storeObservationEpoch,
     isCurrent: isCurrentAccountScope,
     submit: () => dayOnePageObservationApi.storePage(),

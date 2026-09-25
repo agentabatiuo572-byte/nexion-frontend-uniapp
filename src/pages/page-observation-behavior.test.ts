@@ -47,6 +47,8 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     isCurrentAccountScope: (scope: typeof currentScope) => scope.accountKey === currentScope.accountKey && scope.epoch === currentScope.epoch,
     sessionVault: { read: () => session },
     authenticatedPageObservationReporter: { report: (input: Parameters<typeof reporter.report>[0]) => { const promise = reporter.report(input); pending.push(promise); return promise; } },
+    behaviorTracker: { viewStore: vi.fn(async () => true) },
+    createStoreViewEvent: vi.fn(() => ({ clientEventId: "e".repeat(32), eventName: "store.viewed", sessionId: "s".repeat(32), route: "/pages/store/store", clientTs: 1_700_000_000_000, deviceType: "H5", locale: "zh-CN" })),
     dayOnePageObservationApi: createDayOnePageObservationApi({ request } as unknown as ApiClient),
     h3ObservationApi: createH3ObservationApi({ request } as unknown as ApiClient),
     invalidateDetailFacts: () => {}, stickyPageVisible: { value: true }, sticky: { hide: () => {} }, stickyOwner: "fixture",
@@ -58,6 +60,8 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
   const js = ts.transpileModule(`
     const { ${Object.keys(deps).join(",")} } = deps;
     let ${page.visible} = true, ${page.epoch} = 0;
+    let storeViewReportedScope = "";
+    let storeViewAttempt = null;
     ${fn.getText(ast)}
     return {
       run: ${page.fn}, hide: () => [${lifecycle("onHide").join(",")}].forEach(fn => fn()),
@@ -74,6 +78,75 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
 }
 
 describe("actual App page observers through the real API adapters and reporter", () => {
+  it("store conversion records once per visible entry after the catalog is ready", async () => {
+    const h = harness(pages[1]);
+    await h.run(); await h.run();
+    expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(1);
+    h.actual.hide(); h.actual.show();
+    await h.run();
+    expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(2);
+    h.deps.catalogStatus.value = "loading";
+    h.actual.hide(); h.actual.show();
+    await h.run();
+    expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(2);
+  });
+  it("store conversion retries a failed request with the same event, then stops after a duplicate receipt", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness(pages[1]);
+      h.deps.behaviorTracker.viewStore.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      await h.run();
+      await Promise.resolve();
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(2);
+      const sent = h.deps.behaviorTracker.viewStore.mock.calls as unknown as Array<[unknown]>;
+      expect(sent[1][0]).toEqual(sent[0][0]);
+      await h.run();
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(2);
+      h.actual.hide();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("store conversion bounds failed attempts and resets only on a new visible entry", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness(pages[1]);
+      h.deps.behaviorTracker.viewStore.mockResolvedValue(false);
+      await h.run();
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await h.run();
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(3);
+      h.actual.hide(); h.actual.show();
+      await h.run();
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(4);
+      h.actual.hide();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("store conversion never retries an old event under a changed token identity", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness(pages[1]);
+      h.deps.behaviorTracker.viewStore.mockResolvedValue(false);
+      await h.run();
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(1);
+      h.setSession({ accessToken: "new-user-token", user: { userId: 99 } });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(h.deps.behaviorTracker.viewStore).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   for (const page of pages) {
     it(`${page.file}: emits fixed authenticated requests after rendering, deduplicates triggers, and never claims`, async () => {
       const h = harness(page);
