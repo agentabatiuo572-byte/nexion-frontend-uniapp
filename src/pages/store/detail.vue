@@ -267,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, watch, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -288,7 +288,7 @@ import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy
 import { estimatePaybackDays } from "@/lib/product-payback";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { useEarnConfig } from "@/store/earn-config";
-import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { useApp } from "@/store/app";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { dayOnePageObservationApi, h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -338,7 +338,8 @@ async function refreshDetailFacts(): Promise<void> {
 
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
-  if (o.id) id.value = o.id;
+  const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail")).get("id");
+  id.value = (o.id || fallback || "").trim();
   await refreshDetailFacts();
 });
 
@@ -363,7 +364,12 @@ async function retryCatalog() {
 }
 
 const catalogStatus = computed(() => productCatalogState.status);
-const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
+// PRODUCTS is a plain compatibility array: its server replacement cannot
+// invalidate a computed that first ran while the cold-start catalog was empty.
+const product = computed<Product | undefined>(() => !id.value || (remoteApiEnabled && catalogStatus.value !== "ready") ? undefined
+  : remoteApiEnabled
+    ? productCatalogPresentation.value?.products.find((entry) => entry.id === id.value)
+    : getProduct(id.value));
 
 async function observeCanonicalProductDetail(): Promise<void> {
   const canonicalProduct = product.value;
@@ -675,9 +681,9 @@ const stickyOwner = Symbol("store-detail");
 const stickyPageVisible = ref(true);
 sticky.activate(stickyOwner);
 watch(
-  [stickyPageVisible, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage],
   () => {
-    if (!stickyPageVisible.value) {
+    if (!stickyPageVisible.value || (remoteApiEnabled && catalogStatus.value !== "ready")) {
       sticky.hide(stickyOwner);
       return;
     }

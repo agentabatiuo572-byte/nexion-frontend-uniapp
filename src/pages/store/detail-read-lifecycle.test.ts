@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ref, computed, reactive, watch, nextTick } from "vue";
+import { ref, computed, reactive, shallowRef, watch, nextTick } from "vue";
 import ts from "typescript";
 import page from "./detail.vue?raw";
 
@@ -31,14 +31,14 @@ function setup() {
   const app = reactive({ accountKey: "default", accountBindingEpoch: 1 });
   let currentAccountScope = { accountKey: "user:1", epoch: 1 };
   const value = new Function(
-    "ref", "computed", "watch", "app", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail",
+    "ref", "computed", "watch", "app", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail", "takeNavigationQuery",
     lifecycleCode,
   )(ref, computed, watch, app, Promise, catalog, phase, true, trust,
     (callback: (options?: Record<string, string>) => Promise<void>) => loaded.push(callback),
     (callback: () => void) => shown.push(callback),
     () => currentAccountScope,
     (scope: typeof currentAccountScope) => scope === currentAccountScope,
-    productCatalogState, observe,
+    productCatalogState, observe, () => "?id=stellarbox-pro",
   ) as {
     id: { value: string };
     catalogRetrying: { value: boolean };
@@ -58,6 +58,65 @@ function setup() {
 }
 
 describe("store detail canonical read lifecycle", () => {
+  it("recomputes the product when the cold-start server catalog arrives", () => {
+    const productStart = page.indexOf("const product = computed<Product | undefined>");
+    const productEnd = page.indexOf(";\n", productStart) + 1;
+    expect(productStart).toBeGreaterThan(0);
+    const productCode = ts.transpileModule(
+      `${page.slice(productStart, productEnd)}; return product;`,
+      { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
+    ).outputText;
+    const id = ref("stellarbox-pro");
+    const catalogStatus = ref<"loading" | "ready" | "error">("loading");
+    const presentation = shallowRef<{ products: Array<{ id: string; name: string }> } | null>(null);
+    const legacyProducts: Array<{ id: string; name: string }> = [];
+    const product = new Function("computed", "id", "catalogStatus", "remoteApiEnabled", "productCatalogPresentation", "getProduct", productCode)(
+      computed, id, catalogStatus, true, presentation, (key: string) => legacyProducts.find((entry) => entry.id === key),
+    ) as { value?: { id: string; name: string } };
+    expect(product.value).toBeUndefined();
+    presentation.value = { products: [{ id: "stellarbox-pro", name: "StellarBox Pro" }] };
+    catalogStatus.value = "ready";
+    expect(product.value?.name).toBe("StellarBox Pro");
+    catalogStatus.value = "error";
+    expect(product.value).toBeUndefined();
+  });
+
+  it("hides the purchase CTA while a forced catalog refresh is loading or failed", async () => {
+    const stickyStart = page.search(/watch\(\r?\n  \[stickyPageVisible, catalogStatus,/);
+    const stickyEnd = page.indexOf("onShow(() => {", stickyStart);
+    expect(stickyStart).toBeGreaterThan(0);
+    const ctaCode = ts.transpileModule(page.slice(stickyStart, stickyEnd), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+    }).outputText;
+    const catalogStatus = ref<"ready" | "loading" | "error">("ready");
+    // The presentation can retain a prior ready snapshot after a failed forced
+    // refresh. Its old product must never keep the purchase entry visible.
+    const product = ref({ id: "stellarbox-pro" });
+    const sticky = { show: vi.fn(), hide: vi.fn() };
+    new Function(
+      "watch", "stickyPageVisible", "catalogStatus", "product", "isShare", "isLocked",
+      "purchaseUnavailable", "stockUnavailable", "priceText", "dailyEarnText", "paybackLabel",
+      "purchaseGate", "eligibility", "purchaseEligibilityMessage", "sticky", "stickyOwner",
+      "remoteApiEnabled", "t", "paybackDays", "fmt", "purchaseEligibilityUnlockHref",
+      ctaCode,
+    )(
+      watch, ref(true), catalogStatus, product, ref(false), ref(false), ref(false), ref(false),
+      ref("1199"), ref("13"), ref("93"), ref({ blocked: false }), ref({ status: "ready", eligible: true }),
+      ref(""), sticky, Symbol("detail"), true, ref({ store: { cardBuyNow: "Buy", detPaybackUnavailableNote: "Unavailable" } }),
+      ref(null), vi.fn(), vi.fn(),
+    );
+    expect(sticky.show).toHaveBeenCalledOnce();
+    catalogStatus.value = "loading";
+    await nextTick();
+    expect(sticky.hide).toHaveBeenCalledOnce();
+    catalogStatus.value = "error";
+    await nextTick();
+    expect(sticky.hide).toHaveBeenCalledTimes(2);
+    catalogStatus.value = "ready";
+    await nextTick();
+    expect(sticky.show).toHaveBeenCalledTimes(2);
+  });
+
   it("retries the direct detail read after cold session restore binds the account", async () => {
     const s = setup();
     s.catalog.mockResolvedValue(false);
@@ -73,6 +132,14 @@ describe("store detail canonical read lifecycle", () => {
     s.app.accountBindingEpoch += 1;
     await nextTick();
     expect(s.catalog).toHaveBeenCalledTimes(4);
+  });
+
+  it("retains the SKU when a cold H5 onLoad omits its hash query", async () => {
+    const s = setup();
+    s.catalog.mockResolvedValue(true);
+    await s.loaded[0]();
+    expect(s.value.id.value).toBe("stellarbox-pro");
+    expect(s.catalog).toHaveBeenCalledOnce();
   });
 
   it("starts the public Trust read only after the forced catalog revision settles, including a catalog failure", async () => {
