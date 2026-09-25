@@ -1760,7 +1760,7 @@ export const en = {
     // Lifecycle toasts + urgency pushes (App-layer poll; zero auto-charge)
     graceStartToast: "Trial ended · production stopped. Your credit stays usable until {time}",
     endedToast: "Trial credit expired",
-    urgency24h: "24 hours left on your free trial · buy early and save ${amount}",
+    urgency24h: "Your free trial ends within 24 hours · buy early and save ${amount}",
     urgencyGrace24h: "Your ${amount} trial credit expires in 24 hours — use it before it's gone",
     urgencyGrace1h: "Last hour: your ${amount} trial credit is about to expire",
   },

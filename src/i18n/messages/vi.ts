@@ -1707,7 +1707,7 @@ export const vi: Messages = {
     convertedDevicesCta: "Xem thiết bị của tôi",
     graceStartToast: "Hết hạn dùng thử · thiết bị ngừng sinh lời, tiền khấu trừ dùng được đến {time}",
     endedToast: "Tiền khấu trừ đã hết hạn",
-    urgency24h: "Còn 24 giờ dùng thử miễn phí · mua sớm để tiết kiệm ${amount}",
+    urgency24h: "Dùng thử miễn phí hết hạn trong 24 giờ tới · mua sớm tiết kiệm ${amount}",
     urgencyGrace24h: "Tiền khấu trừ ${amount} của bạn sẽ hết hạn sau 24 giờ — dùng ngay kẻo lỡ",
     urgencyGrace1h: "Giờ cuối: ${amount} tiền khấu trừ sắp hết hạn",
   },
