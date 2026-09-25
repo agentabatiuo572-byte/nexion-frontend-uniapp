@@ -50,8 +50,9 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         </template>
-        <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 14px">
+        <text v-if="stakingAvailable !== true" class="block" :style="unavailableStyle">{{ stakingAvailable === false ? w.newStakesPaused : w.newStakesUnknown }}</text>
+        <text v-else class="block" :style="introStyle">{{ w.s3Intro }}</text>
+        <view v-if="stakingAvailable === true" style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" accent="amber" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" accent="amber" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" accent="amber" />
@@ -78,7 +79,7 @@
           <HowFaqRow :q="w.faqQ1" :a="w.faqA1" />
           <HowFaqRow :q="w.faqQ2" :a="w[faqAnswerKey]" />
           <HowFaqRow :q="w.faqQ3" :a="w.faqA3" />
-          <HowFaqRow :q="w.faqQ4" :a="w.faqA4" />
+          <HowFaqRow :q="w.faqQ4" :a="stakingAvailable === true ? w.faqA4 : stakingAvailable === false ? w.faqA4Paused : w.faqA4Unknown" />
           <HowFaqRow :q="w.faqQ5" :a="w.faqA5" />
         </view>
       </HowSection>

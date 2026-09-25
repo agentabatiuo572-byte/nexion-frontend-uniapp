@@ -4214,15 +4214,15 @@ export const en = {
   stakingHowItWorks: {
     navTitle: "How staking works",
     heroLabel: "STAKING VAULT",
-    heroTitle: "Choose a USDT lock term and accrue interest under the plan rules.",
+    heroTitle: "Understand USDT lock terms and position interest rules.",
     heroSub:
-      "Choose a lock period. Your money stays locked for that duration and earns a fixed annual rate. Unlock at maturity and claim principal + interest.",
+      "Existing positions accrue interest under their recorded term and rate. New positions depend on currently available plans.",
     s1Title: "What is staking?",
     s1Para1:
-      "Staking locks an amount of your account's USDT for the selected term: 30, 90, 180, or 365 days. Current rates and minimum amounts are shown in the plan table.",
+      "Staking locks an amount of your account's USDT for a selected term. The table shows rates and minimums for 30, 90, 180 and 365 days; opening a new position depends on the current plan status.",
     s1Para2:
       "Rates for each term follow the current plan. After a position opens successfully, interest follows its recorded rate and term. You can request principal and accrued interest at maturity.",
-    s2Title: "4 plans · pick your term",
+    s2Title: "4 plans · terms and rates",
     s2Caption: "Each plan trades off lock duration for annual yield. Example: staking $100.",
     colTerm: "Term",
     colApy: "APY",
@@ -4230,12 +4230,14 @@ export const en = {
     colReturn: "Interest earned",
     s2Footnote:
       "$100 is used only to compare maturity interest on equal amounts and may be below a plan's minimum. An actual stake must meet that plan's minimum; interest is calculated on the amount staked.",
-    s3Title: "How to stake (3 steps)",
+    s3Title: "Opening a position and current status",
+    newStakesPaused: "New staking positions are currently paused. You cannot choose a term, enter an amount or open a new position now. Existing positions remain viewable and follow their recorded rules.",
+    newStakesUnknown: "New staking availability cannot be confirmed. Refresh to check the plan status. Existing positions still follow their recorded rules.",
     s3Intro:
       "Review the term, amount and rules before submitting. Check your positions and wallet records for the result.",
     s3Step1Title: "Pick a plan and amount",
     s3Step1Body:
-      "Choose 30/90/180/365 days, then enter how much USDT to lock. Each plan's minimum is shown above, and the interface shows the exact interest you'll earn at maturity.",
+      "Choose a currently available term and enter the USDT amount to lock. Each plan's minimum is shown above; the interface estimates maturity interest for that amount and plan.",
     s3Step2Title: "Lock in",
     s3Step2Body:
       "After a position opens successfully, the corresponding USDT moves from available to locked funds. Its amount, rate and maturity date appear on the position card.",
@@ -4270,7 +4272,9 @@ export const en = {
       "Interest stops accruing at maturity. Open your positions to request a claim, then check the displayed status and wallet records for the outcome. After claiming, you can open a new position under an available plan.",
     faqQ4: "Can I have multiple positions at once?",
     faqA4:
-      "Yes — you can run as many independent positions as you want, each with its own term and amount. Common strategy: ladder several 90-day positions so something unlocks each month.",
+      "You can hold multiple independent positions. New positions depend on available plans and opening rules; each position follows its recorded term and amount.",
+    faqA4Paused: "You can hold multiple existing positions, but new staking positions are currently paused. Each existing position follows its recorded rules.",
+    faqA4Unknown: "You can hold multiple existing positions. New staking availability cannot be confirmed; refresh to check the plan status. Existing positions follow their recorded rules.",
     faqQ5: "Does staking count toward team volume or rank?",
     faqA5:
       "No. Staking is a personal financial product — it doesn't affect your V rank, team volume, or commission eligibility. It's purely about earning interest on idle USDT.",
