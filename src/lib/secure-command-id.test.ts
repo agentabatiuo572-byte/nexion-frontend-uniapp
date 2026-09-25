@@ -7,8 +7,24 @@ describe("secure command identifiers", () => {
     expect(requireCryptoUuid()).toBe("7a9bb4c6-55c7-4fbe-8c54-5b5bfbf60a01");
   });
 
+  it("uses secure random bytes when a native WebView lacks randomUUID", () => {
+    vi.stubGlobal("crypto", { getRandomValues: (bytes: Uint8Array) => {
+      bytes.set([
+        0x7a, 0x9b, 0xb4, 0xc6, 0x55, 0xc7, 0x4f, 0xbe,
+        0x0c, 0x54, 0x5b, 0x5b, 0xfb, 0xf6, 0x0a, 0x01,
+      ]);
+      return bytes;
+    } });
+    expect(requireCryptoUuid()).toBe("7a9bb4c6-55c7-4fbe-8c54-5b5bfbf60a01");
+  });
+
   it("fails closed when crypto UUID is unavailable", () => {
     vi.stubGlobal("crypto", {});
+    expect(() => requireCryptoUuid()).toThrow("CRYPTO_RANDOM_UUID_UNAVAILABLE");
+  });
+
+  it("fails closed when the native random source rejects the request", () => {
+    vi.stubGlobal("crypto", { getRandomValues: () => { throw new Error("native failure"); } });
     expect(() => requireCryptoUuid()).toThrow("CRYPTO_RANDOM_UUID_UNAVAILABLE");
   });
 });
