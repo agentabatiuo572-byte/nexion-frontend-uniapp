@@ -4260,6 +4260,10 @@ export const en = {
     faqQ2: "Can I stake from NEX balance instead of USDT?",
     faqA2:
       "No — staking is USDT-only. Convert NEX to USDT in Wallet → Exchange first, then stake.",
+    faqA2BothPaused: "Staking accepts USDT only. New stakes and NEX/USDT exchange are currently paused, so you cannot exchange NEX and stake now. Existing positions remain viewable on the staking page and follow their recorded rules.",
+    faqA2StakingPaused: "Staking accepts USDT only. New stakes are currently paused. You can still view existing positions on the staking page; they follow their recorded rules.",
+    faqA2ExchangePaused: "Staking accepts USDT only. NEX/USDT exchange is currently paused, so you cannot convert NEX first. If you already have USDT, choose an available staking plan. Existing positions follow their recorded rules.",
+    faqA2Unknown: "Staking accepts USDT only. The current staking or exchange status cannot be confirmed. Refresh to check available plans and exchange status before acting. Existing positions follow their recorded rules.",
     faqQ3: "What happens at maturity if I don't claim?",
     faqA3:
       "Interest stops accruing at maturity. Open your positions to request a claim, then check the displayed status and wallet records for the outcome. After claiming, you can open a new position under an available plan.",

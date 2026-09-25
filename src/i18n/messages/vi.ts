@@ -4123,6 +4123,10 @@ export const vi: Messages = {
     faqQ2: "Tôi có thể khóa bằng số dư NEX thay vì USDT không?",
     faqA2:
       "Không — staking chỉ dùng USDT. Trước tiên đổi NEX sang USDT ở Ví → Quy đổi, rồi mới khóa.",
+    faqA2BothPaused: "Staking chỉ nhận USDT. Hiện các gói staking ngừng mở vị thế mới và quy đổi NEX/USDT cũng tạm dừng, nên bạn chưa thể đổi NEX rồi staking. Vị thế hiện có vẫn xem được trên trang staking và áp dụng quy tắc đã ghi nhận.",
+    faqA2StakingPaused: "Staking chỉ nhận USDT. Hiện các gói ngừng mở vị thế mới. Bạn vẫn có thể xem vị thế hiện có trên trang staking; các vị thế này áp dụng quy tắc đã ghi nhận.",
+    faqA2ExchangePaused: "Staking chỉ nhận USDT. Quy đổi NEX/USDT hiện tạm dừng, nên bạn chưa thể đổi NEX trước. Nếu đã có USDT, bạn có thể chọn gói staking đang khả dụng. Vị thế hiện có áp dụng quy tắc đã ghi nhận.",
+    faqA2Unknown: "Staking chỉ nhận USDT. Hiện chưa thể xác nhận trạng thái staking hoặc quy đổi. Hãy tải lại để kiểm tra gói và trạng thái quy đổi trước khi thao tác. Vị thế hiện có áp dụng quy tắc đã ghi nhận.",
     faqQ3: "Nếu đáo hạn mà tôi không nhận thì sao?",
     faqA3:
       "Lãi ngừng tích lũy khi đáo hạn. Mở danh sách vị thế để yêu cầu nhận tiền, rồi kiểm tra trạng thái hiển thị và lịch sử ví để biết kết quả. Sau khi nhận, bạn có thể mở vị thế mới theo gói đang khả dụng.",

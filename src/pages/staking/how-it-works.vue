@@ -76,7 +76,7 @@
         </template>
         <view style="display: flex; flex-direction: column; gap: 10px">
           <HowFaqRow :q="w.faqQ1" :a="w.faqA1" />
-          <HowFaqRow :q="w.faqQ2" :a="w.faqA2" />
+          <HowFaqRow :q="w.faqQ2" :a="w[faqAnswerKey]" />
           <HowFaqRow :q="w.faqQ3" :a="w.faqA3" />
           <HowFaqRow :q="w.faqQ4" :a="w.faqA4" />
           <HowFaqRow :q="w.faqQ5" :a="w.faqA5" />
@@ -108,19 +108,37 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { resolveStakingPool } from "@/lib/staking-canonical";
+import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
+import { stakingFaqAnswerKey } from "./staking-faq-availability";
 
 const t = useT();
 const w = computed(() => t.value.stakingHowItWorks);
 const staking = useStaking();
 const retrying = ref(false);
+const exchangeAvailable = ref<boolean | null>(remoteApiEnabled ? null : true);
+const stakingAvailable = ref<boolean | null>(staking.isMockMode ? true : null);
+const faqAnswerKey = computed(() => stakingFaqAnswerKey(stakingAvailable.value, exchangeAvailable.value));
 const STAKING_RULE_EXAMPLE_PRINCIPAL = 100;
 onMounted(() => {
-  if (!staking.isMockMode) void staking.syncRemote();
+  void refreshStakingAvailability();
+  void refreshExchangeAvailability();
 });
+async function refreshStakingAvailability() {
+  if (staking.isMockMode) return;
+  stakingAvailable.value = null;
+  const ready = await staking.syncRemote();
+  stakingAvailable.value = ready ? staking.pools.some((pool) => pool.enabled && !pool.killed && pool.status === "ACTIVE") : null;
+}
+async function refreshExchangeAvailability() {
+  if (!remoteApiEnabled) return;
+  exchangeAvailable.value = null;
+  try { exchangeAvailable.value = (await exchangeApi.fetchCaps()).swapEnabled; }
+  catch { exchangeAvailable.value = null; }
+}
 async function retryRemote() {
   if (retrying.value) return;
   retrying.value = true;
-  try { await staking.syncRemote(); } finally { retrying.value = false; }
+  try { await Promise.all([refreshStakingAvailability(), refreshExchangeAvailability()]); } finally { retrying.value = false; }
 }
 
 // APY table — derived from canonical pools, with the local table available only
