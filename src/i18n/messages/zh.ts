@@ -3362,6 +3362,8 @@ export const zh: Messages = {
 
   exchangeHowItWorks: {
     navTitle: "兑换说明",
+    pausedTitle: "兑换目前已暂停",
+    pausedBody: "平台当前不接受新的 NEX 与 USDT 兑换申请。开放时间以兑换页的实时状态为准；历史记录仍可在兑换页查看。",
     heroLabel: "NEX ↔ USDT 兑换",
     heroTitle: "按实时市价把 NEX 换成 USDT(或反向)。",
     heroSub:

@@ -3459,6 +3459,8 @@ export const en = {
 
   exchangeHowItWorks: {
     navTitle: "How exchange works",
+    pausedTitle: "Exchange is currently paused",
+    pausedBody: "The platform is not accepting new NEX and USDT swaps. Check the exchange page for its current status; you can still view your history there.",
     heroLabel: "NEX ↔ USDT EXCHANGE",
     heroTitle: "Convert NEX to USDT (or back) at live market rate.",
     heroSub:
