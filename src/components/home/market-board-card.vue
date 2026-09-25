@@ -84,7 +84,7 @@ const marketBoardStatusText = computed(() => app.homeTruthStatus === "loading" |
 const marketNavigation = createMarketBoardNavigation(navTo);
 
 function displayRow(row: AppHomeWorkload) {
-  return presentHomeMarketWorkload(row);
+  return presentHomeMarketWorkload(row, t.value);
 }
 function deltaColor(row: AppHomeWorkload) {
   const tone = displayRow(row).deltaTone;
