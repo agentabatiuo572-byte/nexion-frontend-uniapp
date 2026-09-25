@@ -130,6 +130,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
+import { walletBillMonthKey, walletBillMonthLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useApp } from "@/store/app";
@@ -237,14 +238,13 @@ const filtered = computed<Bill[]>(() => {
 const grouped = computed<Array<{ month: string; rows: Bill[] }>>(() => {
   const map = new Map<string, Bill[]>();
   for (const b of filtered.value) {
-    const d = new Date(b.ts);
-    // 🔴 跟**应用**语言,不跟浏览器语言 —— undefined 会让越南语用户看到中文月份表头。
-    const key = d.toLocaleDateString(dateLocale(), { year: "numeric", month: "long" });
+    const key = walletBillMonthKey(b.ts);
     const arr = map.get(key) ?? [];
     arr.push(b);
     map.set(key, arr);
   }
-  return Array.from(map.entries()).map(([month, rows]) => ({ month, rows }));
+  const locale = dateLocale();
+  return Array.from(map.values()).map((rows) => ({ month: walletBillMonthLabel(rows[0].ts, locale), rows }));
 });
 
 function typeLabel(type: BillType): string {
@@ -274,12 +274,7 @@ function fmtAmount(b: Bill): string {
   return b.symbol === "USDT" ? abs.toFixed(4) : abs.toLocaleString();
 }
 function fmtTime(ts: number): string {
-  return new Date(ts).toLocaleString(dateLocale(), {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return walletBillTimeLabel(ts, dateLocale());
 }
 function billHash(b: Bill): string {
   // 冲正分录的 ref 带 `-REV` 后缀(与原扣款分录分开幂等键,见 marketplace / stake-sheet 等)。
