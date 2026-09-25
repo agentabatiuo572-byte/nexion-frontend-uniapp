@@ -1,6 +1,14 @@
+// App Plus service JavaScript lacks URL and URLSearchParams; install both before page modules run.
+import "core-js/modules/web.url";
+import "core-js/modules/web.url-search-params";
 import { createSSRApp, watch } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
+// #ifdef APP-PLUS
+import NativeSvg from "./components/native-svg.vue";
+import { syncNativeTheme } from "./lib/native-theme";
+import { useTheme } from "./store/theme";
+// #endif
 // #ifdef H5
 import PageLoadError from "./components/page-load-error.vue";
 // #endif
@@ -43,6 +51,14 @@ export function createApp() {
 
   const pinia = createPinia();
   app.use(pinia);
+  // #ifdef APP-PLUS
+  app.component("NxNativeSvg", NativeSvg);
+  app.mixin({
+    onReady() {
+      syncNativeTheme(useTheme(pinia).resolved);
+    },
+  });
+  // #endif
   // #ifdef H5
   app.component("NexGridPageLoadError", PageLoadError);
   // #endif

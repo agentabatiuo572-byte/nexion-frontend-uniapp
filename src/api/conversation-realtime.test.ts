@@ -6,8 +6,22 @@ class Socket implements RealtimeSocket {
   sent:string[]=[];send(s:string){this.sent.push(s)} close(){};
   frame(value:unknown){this.onmessage?.({data:JSON.stringify(value)})}
 }
-afterEach(()=>vi.useRealTimers());
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe('conversation realtime recovery',()=>{
+  it('starts and stops once when App Plus has no AbortController',async()=>{
+    vi.stubGlobal('AbortController',undefined);
+    vi.useFakeTimers();
+    let requestSignal:AbortSignal|undefined;
+    const ticket=vi.fn(async(signal:AbortSignal)=>{requestSignal=signal;return {ticket:'ready'}});
+    const client=new ConversationRealtime({ticket,socket:()=>new Socket(),url:'ws://local',reconcile:async()=>{}});
+    client.start();await vi.advanceTimersByTimeAsync(0);
+    expect(ticket).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(false);
+    client.stop();
+    expect(requestSignal?.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(ticket).toHaveBeenCalledTimes(1);
+  });
   it('keeps terminal authorization failure visible without polling or retrying the socket',async()=>{
     vi.useFakeTimers();
     const state=vi.fn();const reconcile=vi.fn();const socket=vi.fn();

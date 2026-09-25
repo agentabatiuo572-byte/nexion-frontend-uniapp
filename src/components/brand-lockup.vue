@@ -10,7 +10,7 @@
     lockup = 横版(图形 + NexGrid 字标),用在纯品牌行;
     mark   = 纯图形,用在「标 + 页面标题」这种字标位已被占用的地方。
 
-  深浅两版成对渲染、按 html[data-theme] 切换 —— 与 app-chassis 顶部品牌行同机制。
+  深浅两版成对渲染、按根节点 data-theme 切换 —— 与 app-chassis 顶部品牌行同机制。
   chassis 与 onboarding/intro 仍是各自内联的同款写法:它们一个是全站外壳、一个带首屏动画,
   本轮不动以免把风险面扩大;后续可收编进本组件。
 -->
@@ -60,10 +60,10 @@ const src = computed(() =>
 .nx-brand-lockup__img--dark {
   display: none;
 }
-html[data-theme="dark"] .nx-brand-lockup__img--light {
+:global(:root:not([data-theme="light"]) .nx-brand-lockup__img--light) {
   display: none;
 }
-html[data-theme="dark"] .nx-brand-lockup__img--dark {
+:global(:root:not([data-theme="light"]) .nx-brand-lockup__img--dark) {
   display: block;
 }
 </style>

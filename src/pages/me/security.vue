@@ -14,7 +14,7 @@
   <AppChassis active="me">
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
-      <view v-if="apiRuntimeConfig.environment === 'dev'" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
+      <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
       <view v-if="remoteApiEnabled && !remoteSecurity" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
@@ -169,6 +169,7 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { accountApi, authApi, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
 import type { AccountDeletionStatus } from "@/api/account-api";
@@ -224,7 +225,7 @@ const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
-const modeLabel = computed(() => t.value.security.developmentModeLabel);
+const modeLabel = computed(() => apiEnvironmentBadgeLabel(apiRuntimeConfig, t.value.security.developmentModeLabel));
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,

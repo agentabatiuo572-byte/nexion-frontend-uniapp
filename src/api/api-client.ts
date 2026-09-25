@@ -79,16 +79,22 @@ interface ApiClientOptions {
 
 function normalizeBaseUrl(value: string, allowInsecureHttp: boolean): string {
   const baseUrl = value.trim().replace(/\/+$/, "");
-  let parsed: URL;
-  try {
-    parsed = new URL(baseUrl);
-  } catch {
+  let protocol = "";
+  if (typeof URL === "function") {
+    try {
+      protocol = new URL(baseUrl).protocol;
+    } catch {
+      // Keep the same configuration error in browser runtimes.
+    }
+  } else {
+    // App Plus service JS does not provide the browser URL constructor.
+    const match = /^(https?):\/\/(?:\[[\da-f:.]+\]|[a-z\d.-]+)(?::(\d{1,5}))?(?:\/[^\s?#]*)?$/i.exec(baseUrl);
+    if (match && (!match[2] || Number(match[2]) <= 65535)) protocol = `${match[1].toLowerCase()}:`;
+  }
+  if (protocol !== "https:" && protocol !== "http:") {
     throw new ApiError({ kind: "configuration", message: "API_BASE_URL_INVALID" });
   }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new ApiError({ kind: "configuration", message: "API_BASE_URL_INVALID" });
-  }
-  if (parsed.protocol === "http:" && !allowInsecureHttp) {
+  if (protocol === "http:" && !allowInsecureHttp) {
     throw new ApiError({ kind: "configuration", message: "API_HTTPS_REQUIRED" });
   }
   return baseUrl;

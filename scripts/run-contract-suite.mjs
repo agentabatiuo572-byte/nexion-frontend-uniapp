@@ -23,6 +23,7 @@ const SCRIPTS = path.join(root, "scripts");
 
 const REGISTRY = {
   // ── chain:本执行器跑(原孤儿,z1 接入)──
+  "native-svg-icons.test.mjs": { how: "chain" },
   "hard-block-auth-contract.test.mjs": { how: "chain" },
   "session-ended-remote-contract.test.mjs": { how: "chain" },
   "hard-block-d5-runtime-contract.test.mjs": { how: "chain" },

@@ -1,9 +1,12 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+// #ifdef APP-PLUS
+import { syncNativeTheme } from "@/lib/native-theme";
+// #endif
 
 // Theme store — appearance preference: light / dark / system.
 // NexGrid is a dark-default design system. The H5 root (<html data-theme>) is
-// driven from here; App.vue applies the resolved theme on launch. The /me page
+// driven from here; App view layers receive the resolved theme when ready. The /me page
 // opens a picker sheet that calls setMode() with one of the three modes.
 //
 // `mode` is the user's *choice* (persisted, may be "system"). `resolved` is the
@@ -28,7 +31,7 @@ function hydrate(): ThemeMode {
 }
 
 // OS colour-scheme preference. H5 only (matchMedia); on App theming is at
-// packaging, so this dark-default platform reports dark.
+// native OS query is unavailable here, so this dark-default platform reports dark.
 function systemPrefersDark(): boolean {
   // #ifdef H5
   try {
@@ -45,8 +48,7 @@ function resolveMode(mode: ThemeMode): ResolvedTheme {
   return mode;
 }
 
-// Apply the resolved theme attribute on H5 (no-op on App, where theming is at
-// packaging).
+// Apply the resolved theme attribute in the current view layer.
 function applyTheme(mode: ThemeMode) {
   // #ifdef H5
   try {
@@ -54,6 +56,9 @@ function applyTheme(mode: ThemeMode) {
   } catch {
     // document unavailable
   }
+  // #endif
+  // #ifdef APP-PLUS
+  syncNativeTheme(resolveMode(mode));
   // #endif
 }
 
