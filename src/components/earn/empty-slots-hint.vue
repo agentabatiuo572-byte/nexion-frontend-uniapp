@@ -7,7 +7,7 @@
   <view class="mx-4 rounded-2xl overflow-hidden" :style="rootStyle">
     <!-- Slot rail at the top of the device list -->
     <view :style="slotRailStyle">
-      <view class="grid grid-cols-6 gap-1.5">
+      <view class="grid gap-1.5" style="grid-template-columns: repeat(auto-fill, minmax(56px, 1fr))">
         <view v-for="(slot, i) in slotCells" :key="i" :style="slotTileStyle(slot)" class="relative grid place-items-center overflow-hidden">
           <template v-if="slot.kind === 'filled'">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -26,7 +26,7 @@
               </svg>
             </view>
             <view aria-hidden class="absolute" :style="liveDotStyle('var(--v5-brand-2)')" />
-            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 12px; line-height: 13px; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2-ink)">{{ t.trial.slotTag }}</text>
+            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 12px; line-height: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2-ink)">{{ t.trial.slotTag }}</text>
           </template>
 
           <template v-else>
