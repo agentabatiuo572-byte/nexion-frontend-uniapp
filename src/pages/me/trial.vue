@@ -166,7 +166,8 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale, fmt } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { geoPolicyErrorKind, geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
@@ -218,7 +219,7 @@ const idleBody = computed(() => fmt(w.value.idleBody, { n: String(cfg.value.tria
 const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: trialOffset.value.remainderUSD.toFixed(2) }));
 const offsetUsableUntilText = computed(() =>
   fmt(w.value.offsetUsableUntil, {
-    time: freeTrial.graceEndsAt !== null ? new Date(freeTrial.graceEndsAt).toLocaleString(dateLocale()) : w.value.countdownDateEmpty,
+    time: freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt) : w.value.countdownDateEmpty,
   }),
 );
 const buyCtaText = computed(() =>
@@ -228,7 +229,7 @@ const buyCtaText = computed(() =>
 );
 const endedDesc = computed(() => {
   const at = freeTrial.finishedAt ?? freeTrial.graceEndsAt;
-  return fmt(w.value.endedDesc, { time: at !== null ? new Date(at).toLocaleString(dateLocale()) : w.value.countdownDateEmpty });
+  return fmt(w.value.endedDesc, { time: at !== null ? formatTrialDateTime(at) : w.value.countdownDateEmpty });
 });
 
 // none-state eligibility (异常2 — concrete reason, never a generic error).
