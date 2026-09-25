@@ -5,7 +5,16 @@
 -->
 <template>
   <AppChassis active="me">
-    <HowPublishedContent v-if="remoteApiEnabled" content-key="wallet-exchange-how" back="/pages/me/wallet-exchange" />
+    <HowPublishedContent v-if="remoteApiEnabled && exchangeAvailable === true" content-key="wallet-exchange-how" back="/pages/me/wallet-exchange" />
+    <view v-else-if="remoteApiEnabled" style="padding-bottom: 32px">
+      <SubPageHeader back="/pages/me/wallet-exchange" />
+      <view class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
+        <text class="block" style="font-size: 15px; font-weight: 600">{{ exchangeAvailable === false ? w.pausedTitle : exchangeLoading ? t.howPublished.loading : t.howPublished.unavailableTitle }}</text>
+        <text class="block" style="margin-top: 8px; font-size: 13px; line-height: 1.6">{{ exchangeAvailable === false ? w.pausedBody : exchangeLoading ? '' : t.exchange.remoteUnavailableClosed }}</text>
+        <view v-if="!exchangeLoading && exchangeAvailable === null" role="button" tabindex="0" style="margin-top: 16px; color: var(--v5-brand)" @click="loadExchangeCaps" @keydown.enter.prevent="loadExchangeCaps" @keydown.space.prevent="loadExchangeCaps"><text>{{ t.ui.retry }}</text></view>
+        <view v-if="exchangeAvailable === false" role="button" tabindex="0" style="margin-top: 16px; color: var(--v5-brand)" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ w.ctaBack }}</text></view>
+      </view>
+    </view>
     <view v-if="!remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
 
@@ -87,11 +96,12 @@
 </template>
 
 <script setup lang="ts">
+import { onShow } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
-import { computed, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
-import { remoteApiEnabled } from "@/api/runtime";
+import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -103,6 +113,26 @@ import { useT } from "@/i18n/use-t";
 
 const t = useT();
 const w = computed(() => t.value.exchangeHowItWorks);
+const exchangeAvailable = ref<boolean | null>(null);
+const exchangeLoading = ref(remoteApiEnabled);
+let capsRequest = 0;
+
+async function loadExchangeCaps() {
+  if (!remoteApiEnabled) return;
+  const request = ++capsRequest;
+  exchangeAvailable.value = null;
+  exchangeLoading.value = true;
+  try {
+    const caps = await exchangeApi.fetchCaps();
+    if (request === capsRequest) exchangeAvailable.value = caps.swapEnabled;
+  } catch {
+    // Unknown is not open: the guide must not claim swaps can be submitted.
+  } finally {
+    if (request === capsRequest) exchangeLoading.value = false;
+  }
+}
+onShow(() => { void loadExchangeCaps(); });
+onUnmounted(() => { capsRequest += 1; });
 
 function goBack() {
   navTo("/pages/me/wallet-exchange");

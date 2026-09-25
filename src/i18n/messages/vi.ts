@@ -3332,6 +3332,8 @@ export const vi: Messages = {
 
   exchangeHowItWorks: {
     navTitle: "Cách quy đổi hoạt động",
+    pausedTitle: "Quy đổi hiện đang tạm dừng",
+    pausedBody: "Nền tảng hiện không nhận yêu cầu quy đổi NEX và USDT mới. Hãy xem trạng thái hiện tại trên trang quy đổi; bạn vẫn có thể xem lịch sử tại đó.",
     heroLabel: "QUY ĐỔI NEX ↔ USDT",
     heroTitle: "Đổi NEX sang USDT (hoặc ngược lại) theo tỷ giá thị trường thời gian thực.",
     heroSub:

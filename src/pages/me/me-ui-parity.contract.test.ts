@@ -157,7 +157,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #88: cardholder input carries its visible label as an accessible name.
   "wallet-cards-new.vue": "6af630a5acf97669826202e3842042a8b28af8813f0657da0a6085336f7a3fc2",
   "wallet-cards.vue": "b9800456add8dee31bbf2182901b4d6d30b717f3ad6b54fc55dc11abc8308671",
-  "wallet-exchange-how.vue": "cdcabf7a5eb516b3612fcd458984a8266d6038ae363150c8146120276a9273aa",
+  // #287: the remote guide only presents the action tutorial when exchange caps
+  // confirm an open exchange; paused or unknown authority gets status/retry copy.
+  "wallet-exchange-how.vue": "3d8a047cf9cf93ffe304a019d475fe2cb0491adfe4f06e17e6d60c94ea005216",
   // Queued exchanges state that funds are reserved immediately and refunded on cancellation.
   // Server fee and six-decimal net proceeds are disclosed before confirmation;
   // an unknown remote snapshot is distinct from an empty transaction history.

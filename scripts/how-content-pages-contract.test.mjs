@@ -21,6 +21,9 @@ test("five general How-it-works pages use the shared published-content renderer"
       assert.match(source, /const howMode = howContentMode\(remoteApiEnabled\);/);
       assert.match(source, /v-if="howMode === 'published'"/);
       assert.match(source, /v-if="howMode === 'local'"/);
+    } else if (key === "wallet-exchange-how") {
+      assert.match(source, /v-if="remoteApiEnabled && exchangeAvailable === true"/);
+      assert.match(source, /exchangeApi\.fetchCaps\(\)/);
     } else {
       assert.match(source, /v-if="remoteApiEnabled"/);
     }
