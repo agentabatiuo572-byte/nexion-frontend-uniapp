@@ -36,4 +36,19 @@ describe("staking rules explanation", () => {
       expect(stakingMaturityCopy(source)).not.toMatch(automaticPayoutCopy);
     }
   });
+
+  it("shows opening steps only for a sellable server plan and explains paused or unknown states", () => {
+    expect(page).toContain('stakingAvailable.value = ready ? staking.pools.some((pool) => pool.enabled && !pool.killed && pool.status === "ACTIVE") : null;');
+    expect(page).toContain('v-if="stakingAvailable === true" style="display: flex; flex-direction: column; gap: 14px"');
+    expect(page).toContain('stakingAvailable === false ? w.newStakesPaused : w.newStakesUnknown');
+    expect(page).toContain('stakingAvailable === false ? w.faqA4Paused : w.faqA4Unknown');
+    for (const source of locales) {
+      const copy = stakingMaturityCopy(source);
+      expect(copy).toMatch(/newStakesPaused:/);
+      expect(copy).toMatch(/newStakesUnknown:/);
+      expect(copy).toMatch(/faqA4Paused:/);
+      expect(copy).toMatch(/faqA4Unknown:/);
+      expect(copy).toMatch(/position|持仓|vị thế/i);
+    }
+  });
 });

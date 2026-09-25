@@ -4077,15 +4077,15 @@ export const vi: Messages = {
   stakingHowItWorks: {
     navTitle: "Cách staking hoạt động",
     heroLabel: "KHO STAKING",
-    heroTitle: "Chọn kỳ hạn khóa USDT và tính lãi theo quy tắc của gói.",
+    heroTitle: "Tìm hiểu kỳ hạn khóa USDT và quy tắc tính lãi của vị thế.",
     heroSub:
-      "Chọn một kỳ hạn khóa. Tiền của bạn được khóa trong suốt thời gian đó và sinh lãi theo lãi suất năm cố định. Mở khóa khi đáo hạn và nhận cả gốc + lãi.",
+      "Vị thế hiện có tính lãi theo kỳ hạn và lãi suất đã ghi nhận. Việc mở vị thế mới phụ thuộc vào gói đang khả dụng.",
     s1Title: "Staking là gì?",
     s1Para1:
-      "Staking khóa một khoản USDT trong tài khoản theo kỳ hạn đã chọn: 30, 90, 180 hoặc 365 ngày. Lãi suất và số tiền tối thiểu hiện tại được hiển thị trong bảng gói.",
+      "Staking khóa một khoản USDT trong tài khoản theo kỳ hạn đã chọn. Bảng gói hiển thị lãi suất và số tiền tối thiểu cho 30, 90, 180 và 365 ngày; chỉ có thể mở vị thế mới khi gói hiện khả dụng.",
     s1Para2:
       "Lãi suất từng kỳ hạn theo gói hiện tại. Sau khi mở vị thế thành công, lãi được tính theo lãi suất và kỳ hạn đã ghi nhận. Khi đáo hạn, bạn có thể yêu cầu nhận gốc và lãi tích lũy.",
-    s2Title: "4 gói · chọn kỳ hạn của bạn",
+    s2Title: "4 gói · kỳ hạn và lãi suất",
     s2Caption: "Mỗi gói đánh đổi thời gian khóa lấy lợi suất năm. Ví dụ: khóa $100.",
     colTerm: "Kỳ hạn",
     colApy: "APY",
@@ -4093,12 +4093,14 @@ export const vi: Messages = {
     colReturn: "Lãi nhận được",
     s2Footnote:
       "$100 chỉ dùng để so sánh lãi đáo hạn trên cùng số tiền và có thể thấp hơn mức tối thiểu của một gói. Khoản khóa thực tế phải đáp ứng mức tối thiểu của gói; lãi được tính trên số tiền thực khóa.",
-    s3Title: "Cách staking (3 bước)",
+    s3Title: "Cách mở vị thế và trạng thái hiện tại",
+    newStakesPaused: "Các gói staking hiện tạm ngừng mở vị thế mới. Bạn chưa thể chọn kỳ hạn, nhập số tiền hoặc mở vị thế mới. Vị thế hiện có vẫn xem được và áp dụng quy tắc đã ghi nhận.",
+    newStakesUnknown: "Hiện chưa thể xác nhận có thể mở vị thế staking mới hay không. Hãy tải lại để kiểm tra trạng thái gói. Vị thế hiện có vẫn áp dụng quy tắc đã ghi nhận.",
     s3Intro:
       "Kiểm tra kỳ hạn, số tiền và quy tắc trước khi gửi. Xem vị thế và lịch sử ví để biết kết quả.",
     s3Step1Title: "Chọn gói và số tiền",
     s3Step1Body:
-      "Chọn 30/90/180/365 ngày, rồi nhập số USDT muốn khóa. Mức tối thiểu của từng gói hiển thị ở trên, và giao diện cho biết chính xác số lãi khi đáo hạn.",
+      "Chọn gói kỳ hạn hiện khả dụng rồi nhập số USDT muốn khóa. Mức tối thiểu của từng gói hiển thị ở trên; giao diện ước tính lãi đáo hạn theo số tiền và gói đó.",
     s3Step2Title: "Khóa vốn",
     s3Step2Body:
       "Sau khi mở vị thế thành công, khoản USDT tương ứng chuyển từ số dư khả dụng sang tiền khóa. Thẻ vị thế hiển thị số tiền, lãi suất và ngày đáo hạn.",
@@ -4133,7 +4135,9 @@ export const vi: Messages = {
       "Lãi ngừng tích lũy khi đáo hạn. Mở danh sách vị thế để yêu cầu nhận tiền, rồi kiểm tra trạng thái hiển thị và lịch sử ví để biết kết quả. Sau khi nhận, bạn có thể mở vị thế mới theo gói đang khả dụng.",
     faqQ4: "Tôi có thể có nhiều vị thế cùng lúc không?",
     faqA4:
-      "Được — bạn có thể mở bao nhiêu vị thế độc lập tùy thích, mỗi cái có kỳ hạn và số tiền riêng. Chiến lược phổ biến: chia thành nhiều vị thế 90 ngày lệch nhau để tháng nào cũng có một khoản mở khóa.",
+      "Bạn có thể giữ nhiều vị thế độc lập. Việc mở vị thế mới phụ thuộc vào gói khả dụng và quy tắc mở; mỗi vị thế theo kỳ hạn và số tiền đã ghi nhận riêng.",
+    faqA4Paused: "Bạn vẫn có thể giữ nhiều vị thế hiện có, nhưng các gói staking hiện tạm ngừng mở vị thế mới. Mỗi vị thế hiện có áp dụng quy tắc đã ghi nhận riêng.",
+    faqA4Unknown: "Bạn vẫn có thể giữ nhiều vị thế hiện có. Hiện chưa thể xác nhận có thể mở vị thế mới hay không; hãy tải lại để kiểm tra trạng thái gói. Vị thế hiện có áp dụng quy tắc đã ghi nhận.",
     faqQ5: "Staking có tính vào doanh số nhóm hay cấp bậc không?",
     faqA5:
       "Không. Staking là sản phẩm tài chính cá nhân — nó không ảnh hưởng đến cấp V, doanh số nhóm hay điều kiện nhận hoa hồng của bạn. Nó chỉ đơn thuần giúp USDT nhàn rỗi sinh lãi.",
