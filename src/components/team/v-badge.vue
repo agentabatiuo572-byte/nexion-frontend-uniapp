@@ -8,7 +8,7 @@
 <template>
   <text class="nx-vbadge font-mono-tabular" :style="badgeStyle">
     <text :style="vTextStyle">V{{ v }}</text>
-    <text v-if="showTitle && vRank.remoteReady" class="font-display" :style="titleStyle">{{ rankTitle(v, isZh, vRank.ladder) }}</text>
+    <text v-if="showTitle && vRank.remoteReady" class="font-display" :style="titleStyle">{{ rankTitle(v, locale.code, vRank.ladder) }}</text>
   </text>
 </template>
 
@@ -60,7 +60,7 @@ const SIZES = {
 } as const;
 
 const vRank = useVRank();
-const isZh = computed(() => useLocaleStore().code === "zh");
+const locale = useLocaleStore();
 const c = computed(() => COLORS[props.v]);
 const sz = computed(() => SIZES[props.size]);
 const isGradient = computed(() => c.value.bg.startsWith("linear"));

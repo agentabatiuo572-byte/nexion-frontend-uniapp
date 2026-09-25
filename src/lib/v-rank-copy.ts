@@ -9,34 +9,44 @@
 // 缺口结构定义在 store(`@/store/v-rank` 的 `RankGap`),措辞在这里 —— 与 product-copy.ts /
 // device-copy.ts 同一分层约定。
 import type { Messages } from "@/i18n/messages/en";
+import type { LocaleCode } from "@/i18n";
+import { publishedRankTitle } from "@/i18n/rank-titles";
 import type { RankGap, VRankDef } from "@/store/v-rank";
 import { fmt } from "@/i18n/format";
 
 /**
- * V 级头衔的显示名。中文界面用 `cnTitle`(主人 2026-08-17 拍板:V3 = 舰长),其余语言用英文权威名
- * (`title`;越南语没有独立头衔表)。此前这条判断在 `network-card.vue` / `rank-how.vue` / `network.vue`
- * 各写一份、而 V 级页阶梯 / 领导池 / 团队页 / V 徽章压根没判 —— 同一个头衔在中文界面出现过
- * 「舰长 / 队长 / Captain」三种写法。收成一处,谁渲染头衔都从这里取。
+ * F1 正式公开等级名称。服务端目前把同一中文配置写入 title/cnTitle，
+ * 英文、越文显示时只按完全匹配的正式中文名翻译；动态自定义名不猜测。
  *
  * 🔴 **档位表必须由调用方传进来**,不许在这里直读 `V_RANKS` —— 那张表源码明写 `⚠️ MOCK-ONLY`,
  * 而 store 的 `ladder` 在 remote 档是**空数组**(权威档位由服务端给)。直读 mock 表的后果是
  * 「接上真后端后页面照旧显示 mock 头衔」,本地永远看不出来(独立验收 2026-08-17 抓到)。
  * 取不到档位就只给 `V{n}`,由调用方决定要不要显示更明确的未知态。
  */
-export function rankTitle(v: number, isZh: boolean, ladder: readonly VRankDef[]): string {
-  const def = ladder[v];
-  if (!def) return "";
-  return (isZh && def.cnTitle) || def.title;
+export function rankName(def: Pick<VRankDef, "title" | "cnTitle">, locale: LocaleCode): string {
+  if (locale === "zh") return def.cnTitle || def.title;
+  if (locale === "vi") {
+    const vietnamese = publishedRankTitle(def.cnTitle, locale) || publishedRankTitle(def.title, locale);
+    if (vietnamese) return vietnamese;
+  }
+  if (!/\p{Script=Han}/u.test(def.title)) return def.title;
+  return publishedRankTitle(def.title, locale) || publishedRankTitle(def.cnTitle, locale);
 }
 
-/** `V3 舰长` / `V3 Captain` —— 阶梯行、解锁句、进度头都用这个拼法;档位未知时只给 `V3`。 */
-export function rankLabel(v: number, isZh: boolean, ladder: readonly VRankDef[]): string {
-  const title = rankTitle(v, isZh, ladder);
+export function rankTitle(v: number, locale: LocaleCode, ladder: readonly VRankDef[]): string {
+  const def = ladder[v];
+  if (!def) return "";
+  return rankName(def, locale);
+}
+
+/** `V3 一星大使` / `V3 One-Star Ambassador` —— 档位未知时只给 `V3`。 */
+export function rankLabel(v: number, locale: LocaleCode, ladder: readonly VRankDef[]): string {
+  const title = rankTitle(v, locale, ladder);
   return title ? `V${v} ${title}` : `V${v}`;
 }
 
 /** 一条晋升缺口 → 当前语言的一句话。 */
-export function rankGapText(t: Messages, gap: RankGap, isZh: boolean, ladder: readonly VRankDef[]): string {
+export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladder: readonly VRankDef[]): string {
   switch (gap.kind) {
     case "selfBuy":
       return fmt(t.rank.needSelfBuy, { n: gap.amount.toLocaleString() });
@@ -52,7 +62,7 @@ export function rankGapText(t: Messages, gap: RankGap, isZh: boolean, ladder: re
     case "teamVolume":
       return fmt(t.rank.needTeam, { n: gap.amount.toLocaleString() });
     case "vDownlines":
-      return fmt(t.rank.needV, { n: gap.n, title: rankTitle(gap.vLevel, isZh, ladder), v: gap.vLevel });
+      return fmt(t.rank.needV, { n: gap.n, title: rankTitle(gap.vLevel, locale, ladder), v: gap.vLevel });
   }
 }
 

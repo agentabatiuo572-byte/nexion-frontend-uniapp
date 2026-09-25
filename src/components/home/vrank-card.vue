@@ -14,12 +14,12 @@
 
     <view v-if="vrank.remoteReady" class="mt-1.5 flex items-baseline gap-2">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 26px; color: var(--v5-ink); letter-spacing: -0.022em; line-height: 1">V{{ myRank }}</text>
-      <text style="font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-ink-2); letter-spacing: -0.010em">{{ myDef?.title ?? '—' }}</text>
+      <text v-if="myTitle" style="font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-ink-2); letter-spacing: -0.010em">{{ myTitle }}</text>
     </view>
 
     <template v-if="vrank.remoteReady && next">
       <view class="mt-3 flex justify-between items-baseline font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">
-        <text>{{ t.home.rankNext }} · <text style="color: var(--v5-brand); font-weight: 500">V{{ next.v }} {{ next.title }}</text></text>
+        <text>{{ t.home.rankNext }} · <text style="color: var(--v5-brand); font-weight: 500">{{ rankLabel(next.v, locale.code, vrank.ladder) }}</text></text>
         <text class="tabular-nums" style="color: var(--v5-success); font-weight: 500">{{ pct }}%</text>
       </view>
       <view ref="elRef" class="mt-1.5 h-1.5 rounded-full overflow-hidden" style="background: var(--v5-surface-3)">
@@ -41,7 +41,7 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVRank, nextRankProgress } from "@/store/v-rank";
-import { rankGapText } from "@/lib/v-rank-copy";
+import { rankGapText, rankLabel, rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
@@ -51,13 +51,13 @@ const { elRef, inView } = useScrollGrowProgress();
 
 const myRank = computed(() => vrank.myRank);
 const totalRanks = computed(() => vrank.ladder.length);
-const myDef = computed(() => vrank.ladder[myRank.value]);
+const myTitle = computed(() => rankTitle(myRank.value, locale.code, vrank.ladder));
 const rankInfo = computed(() => nextRankProgress(vrank, vrank.ladder));
 const next = computed(() => rankInfo.value.next);
 const pct = computed(() => Math.round(rankInfo.value.progressPct * 100));
 const missing = computed(() => rankInfo.value.missing);
-const isZh = computed(() => useLocaleStore().code === "zh");
-const missingText = computed(() => missing.value.map((g) => rankGapText(t.value, g, isZh.value, vrank.ladder)).join(" · "));
+const locale = useLocaleStore();
+const missingText = computed(() => missing.value.map((g) => rankGapText(t.value, g, locale.code, vrank.ladder)).join(" · "));
 const unlockAtText = computed(() => (next.value ? fmt(t.value.home.rankUnlockAt, { n: next.value.v }) : ""));
 // 实物奖已删 → 改展示下一阶的 NEX 培育奖(cultivationBonus);为 0 时不显示 chip
 const rewardNex = computed(() => next.value?.cultivationBonus ?? 0);

@@ -3,7 +3,7 @@
   V-rank ladder progress toward the next rank: aspiration star anchor + "Toward V{n}
   {title} · {gap}" line + perk-unlock line + scroll-grow progress bar (≥80% =
   warning "hot" state). Max-rank reached → collapses to a single dignity row.
-  Reads useVRank + nextRankGap; locale fallback shows cnTitle only for `zh`.
+  Reads useVRank + nextRankGap; published rank names follow the active locale.
   Taps through to /team (not yet ported → nav fail:()=>{}).
 -->
 <template>
@@ -77,13 +77,12 @@ const vrank = useVRank();
 const locale = useLocaleStore();
 const { elRef, inView } = useScrollGrowProgress();
 
-const isZh = computed(() => locale.code === "zh");
 const myRank = computed(() => vrank.myRank);
 const gap = computed(() => nextRankGap(vrank));
 
 // 头衔的中英取舍收在 lib/v-rank-copy(主人 2026-08-17 拍板 V3 = 舰长;此前三处各写一份判断,
 // 中文界面出现「舰长 / 队长 / Captain」三种写法)
-const titleOf = (v: number): string => vrank.remoteReady ? rankTitle(v, isZh.value, vrank.ladder) : "—";
+const titleOf = (v: number): string => vrank.remoteReady ? rankTitle(v, locale.code, vrank.ladder) : "—";
 
 // ── Max-rank end state ──(实物奖已删 → 用通用「已达成」图标作 dignity 锚点)
 const maxPrizeIcon = "✓";

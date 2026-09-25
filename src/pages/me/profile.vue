@@ -154,6 +154,7 @@ import { reconcileProfileEdit } from "@/lib/profile-save-flow";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { formatJoinedDate } from "@/lib/profile-date";
 import { profileVRankProjection, type ProfileVRankDefinition } from "@/lib/profile-vrank-display";
+import { rankName } from "@/lib/v-rank-copy";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 
@@ -290,12 +291,12 @@ const walletAction = computed(() =>
 const userTier = computed<Tier>(() => (app.user.tier as Tier) ?? "L0");
 const remoteTier = computed(() => profileVRankProjection(vRank.remoteReady, vRank.myRank, vRank.ladder));
 function configuredRankName(rank: ProfileVRankDefinition): string {
-  return locale.code === "zh" ? rank.cnTitle : rank.title;
+  return rankName(rank, locale.code);
 }
 const tierLabel = computed(() => {
   if (!remoteApiEnabled) return t.value.profile.tierLabels[userTier.value];
   const projection = remoteTier.value;
-  return projection ? `V${projection.current.v} · ${configuredRankName(projection.current)}` : "—";
+  return projection ? [`V${projection.current.v}`, configuredRankName(projection.current)].filter(Boolean).join(" · ") : "—";
 });
 const tierProgressLine = computed(() => {
   if (remoteApiEnabled) {
@@ -303,7 +304,7 @@ const tierProgressLine = computed(() => {
     if (!projection || !projection.next) return "—";
     return t.value.profile.tierProgress.replace(
       "{next}",
-      `V${projection.next.v} · ${configuredRankName(projection.next)}`,
+      [`V${projection.next.v}`, configuredRankName(projection.next)].filter(Boolean).join(" · "),
     );
   }
   const idx = TIERS.indexOf(userTier.value);

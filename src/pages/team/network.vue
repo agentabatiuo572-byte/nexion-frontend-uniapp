@@ -231,7 +231,7 @@ interface Plotted {
 const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
-const isZh = computed(() => useLocaleStore().code === "zh");
+const locale = useLocaleStore();
 
 const members = computed(() => network.members);
 const myRank = computed(() => vRank.myRank);
@@ -296,7 +296,7 @@ function daysJoined(m: NetworkMember): number {
 }
 // 头衔显示名收在 lib/v-rank-copy，档位表只读取 canonical store projection。
 function memberRankTitle(m: NetworkMember): string {
-  return rankTitle(m.vRank, isZh.value, vRank.ladder);
+  return rankTitle(m.vRank, locale.code, vRank.ladder);
 }
 // Orb nodes are the only way into a member's detail sheet; name each one with the
 // member, their rank and the relation (direct / extended) so a screen reader user
@@ -313,7 +313,7 @@ function openSelf() {
 
 function nodeLabel(p: Plotted): string {
   const relation = p.kind === "direct" ? t.value.network.badgeDirect : t.value.network.badgeExtended;
-  return `${p.m.name} · ${rankLabel(p.m.vRank, isZh.value, vRank.ladder)} · ${relation}`;
+  return `${p.m.name} · ${rankLabel(p.m.vRank, locale.code, vRank.ladder)} · ${relation}`;
 }
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";

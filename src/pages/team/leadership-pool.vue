@@ -220,9 +220,9 @@ const weeklyDescText = computed(() => {
   const rate = `${(poolInjectRate.value * 100).toFixed(2).replace(/\\.00$/, "")}%`;
   return fmt(t.value.pool.weeklyDesc, { rate, n });
 });
-const isZh = computed(() => useLocaleStore().code === "zh");
+const locale = useLocaleStore();
 const rankReady = computed(() => vState.remoteReady);
-const poolUnlockRankLabel = computed(() => rankReady.value ? rankLabel(poolUnlockRank.value, isZh.value, vState.ladder) : "—");
+const poolUnlockRankLabel = computed(() => rankReady.value ? rankLabel(poolUnlockRank.value, locale.code, vState.ladder) : "—");
 const requiresUnlockRankParts = computed(() => {
   const sentence = fmt(t.value.pool.requiresUnlockRank, { rank: poolUnlockRankLabel.value });
   const i = sentence.indexOf(poolUnlockRankLabel.value);
@@ -230,7 +230,7 @@ const requiresUnlockRankParts = computed(() => {
   return [sentence, "", ""];
 });
 const currentlyVText = computed(() => fmt(t.value.pool.currentlyUnlockRank, {
-  n: myRank.value, title: rankTitle(myRank.value, isZh.value, vState.ladder), rank: poolUnlockRankLabel.value,
+  n: myRank.value, title: rankTitle(myRank.value, locale.code, vState.ladder), rank: poolUnlockRankLabel.value,
 }));
 const pathCtaText = computed(() => fmt(t.value.pool.seePathUnlockRank, { rank: poolUnlockRankLabel.value }));
 const totalPeopleText = computed(() =>
@@ -266,7 +266,7 @@ const voteRows = computed(() => {
       : totalVotes.value > 0 ? (count * V_VOTES[v]) / totalVotes.value : 0;
     return {
       v,
-      label: rankLabel(v, isZh.value, vState.ladder),
+      label: rankLabel(v, locale.code, vState.ladder),
       isMine: remoteApiEnabled ? canonical?.isMine === true : v === vState.myRank,
       peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes: votes ?? "—" }),
       shareOfPool,
