@@ -1701,7 +1701,7 @@ export const zh: Messages = {
     // 生命周期 toast + 紧迫推送(App 层 poll;零自动动作)
     graceStartToast: "试用已结束 · 设备停止产出,抵扣金可用至 {time}",
     endedToast: "抵扣金已失效",
-    urgency24h: "免费试用剩 24 小时 · 提前购买立省 ${amount}",
+    urgency24h: "免费试用将在 24 小时内结束 · 提前购买立省 ${amount}",
     urgencyGrace24h: "你的 ${amount} 抵扣金还有 24 小时失效,抓紧用掉",
     urgencyGrace1h: "最后 1 小时:${amount} 抵扣金即将失效",
   },
