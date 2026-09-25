@@ -5,7 +5,8 @@ import { ref } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const ordersSource = readFileSync(new URL("./orders.vue", import.meta.url), "utf8");
-const meSource = readFileSync(new URL("../../components/me/orders-card.vue", import.meta.url), "utf8");
+const meSource = readFileSync(new URL("../me/me.vue", import.meta.url), "utf8");
+const ordersCardSource = readFileSync(new URL("../../components/me/orders-card.vue", import.meta.url), "utf8");
 const start = ordersSource.indexOf('const ordersBackHref = ref("/store")');
 const end = ordersSource.indexOf("// Sticky chassis nav header", start);
 if (start < 0 || end < 0) throw new Error("orders return handler missing");
@@ -28,7 +29,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("orders return origin", () => {
   it("keeps My as the refresh fallback even when Uni drops the visible query", () => {
-    expect(meSource).toContain('navTo("/pages/store/orders?from=me")');
+    expect(ordersCardSource).toContain('navTo("/pages/store/orders?from=me")');
     const replaceState = vi.fn();
     vi.stubGlobal("window", {
       location: { hash: "#/pages/store/orders", href: "https://example.test/app/#/pages/store/orders" },
@@ -46,6 +47,24 @@ describe("orders return origin", () => {
     expect(replaceState).not.toHaveBeenCalled();
   });
 
+  it("carries the My origin from the account Orders row through a cold refresh", () => {
+    const accountEntry = meSource.match(/\{ key: "orders",[^\n]*href: "([^"]+)"/)?.[1];
+    expect(accountEntry).toBe("/store/orders?from=me");
+    expect(meSource).toContain("navTo(item.href)");
+    const query = new URL(accountEntry!, "https://example.test").search;
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", {
+      location: {
+        hash: `#/pages/store/orders${query}`,
+        href: `https://example.test/app/#/pages/store/orders${query}`,
+      },
+      history: { state: null, replaceState },
+    });
+
+    expect(open({}, query).backHref).toBe("/me");
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
   it("restores the marker on show if the H5 hash updates after onLoad", () => {
     const replaceState = vi.fn();
     vi.stubGlobal("window", {
@@ -59,7 +78,7 @@ describe("orders return origin", () => {
     (window.location as { hash: string; href: string }).href = "https://example.test/app/#/pages/store/orders";
     page.preserve();
     expect(replaceState).toHaveBeenCalledWith(null, "", "https://example.test/app/#/pages/store/orders?from=me");
-    expect(ordersSource).toContain("ordersPageActive = true;\n  preserveOrdersOriginInH5();");
+    expect(ordersSource).toMatch(/ordersPageActive = true;\r?\n  preserveOrdersOriginInH5\(\);/);
   });
 
   it("reconciles a stale visible source with the current entry source", () => {

@@ -38,7 +38,9 @@ function component(name: string): string {
 describe("Me button click-through parity", () => {
   it("keeps every 5174 quick button key and target route", () => {
     const formalRoutes = quickRoutes(formalMe);
-    expect(formalRoutes).toEqual(quickRoutes(prototypeMe));
+    expect(formalRoutes).toEqual(quickRoutes(prototypeMe).map(([key, href]) =>
+      [key, key === "orders" ? `${href}?from=me` : href],
+    ));
     expect(formalRoutes).toHaveLength(26);
 
     const declared = new Set(pages.pages.map((page) => page.path));
