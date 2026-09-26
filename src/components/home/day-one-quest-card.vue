@@ -35,7 +35,7 @@
           <view :style="barStyle" />
         </view>
         <view style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
-          <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ t.home.dayOneLoginRequired }}</text>
+          <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
           <template v-else>
             <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
             <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
@@ -97,9 +97,9 @@
       class="newcomer-task__toggle"
       :style="toggleStyle"
       role="button"
-      :tabindex="props.active && !questUnavailable ? 0 : -1"
+      :tabindex="props.active && (!questUnavailable || questLoadError) ? 0 : -1"
       :aria-expanded="expanded"
-      :aria-disabled="questUnavailable"
+      :aria-disabled="questUnavailable && !questLoadError"
       :aria-label="toggleLabel"
       @click="toggleExpanded"
       @keydown.enter.prevent="toggleExpanded"
@@ -196,6 +196,9 @@ const remoteTasks = computed<QuestTask[]>(() => {
     }));
 });
 const questUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus !== "ready");
+const questLoadError = computed(() => remoteApiEnabled && quest.remoteStatus === "error");
+const unavailableLabel = computed(() => questLoadError.value
+  ? t.value.home.dayOneUnavailable : t.value.home.dayOneLoading);
 const tasks = computed<QuestTask[]>(() => selectHomeQuestRows(
   remoteApiEnabled,
   quest.remoteStatus === "ready",
@@ -222,10 +225,11 @@ const nexEarned = computed(() => {
 const nexEarnedText = computed(() => nexEarned.value === null ? "—" : String(nexEarned.value));
 const viewTasksText = computed(() => fmt(t.value.home.dayOneViewTasks, { n: total.value }));
 const taskCountText = computed(() => questUnavailable.value
-  ? t.value.home.dayOneLoginRequired
+  ? unavailableLabel.value
   : fmt(t.value.home.dayOneTaskCount, { n: total.value }));
-const toggleLabel = computed(() => questUnavailable.value
-  ? t.value.home.dayOneLoginRequired
+const toggleLabel = computed(() => questLoadError.value
+  ? t.value.home.dayOneRetryLoad
+  : questUnavailable.value ? t.value.home.dayOneLoading
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
   if (!remoteApiEnabled) return String(mockReward);
@@ -267,6 +271,10 @@ function onRowTap(task: QuestTask) {
 }
 
 function toggleExpanded() {
+  if (questLoadError.value) {
+    void quest.refreshRemote();
+    return;
+  }
   if (questUnavailable.value) return;
   expanded.value = !expanded.value;
 }
