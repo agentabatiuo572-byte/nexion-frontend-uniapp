@@ -134,8 +134,8 @@ function safeShareUrlTemplate(key: ShareChannelKey, intentType: ShareIntentType,
     return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
   const resolved = template
-    .replaceAll("{link}", "https%3A%2F%2Fnexgrid.invalid%2Fref%2Fcode")
-    .replaceAll("{text}", "share-text");
+    .replace(/\{link\}/g, "https%3A%2F%2Fnexgrid.invalid%2Fref%2Fcode")
+    .replace(/\{text\}/g, "share-text");
   if (key === "sms") {
     if (!/^sms:\?body=[^#]*$/i.test(resolved)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   } else {
