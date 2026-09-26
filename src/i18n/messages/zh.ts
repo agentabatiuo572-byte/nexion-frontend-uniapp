@@ -1872,6 +1872,8 @@ export const zh: Messages = {
     useCta: "去使用",
     typeBonus: "奖励",
     courseDetail: "查看课程详情",
+    showSourceId: "查看来源编号",
+    hideSourceId: "收起来源编号",
     typeRefer: "推荐佣金",
     typeAchievement: "成就奖励",
     validUntil: "有效期至 {date}",

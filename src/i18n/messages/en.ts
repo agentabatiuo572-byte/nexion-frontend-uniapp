@@ -1934,6 +1934,8 @@ export const en = {
     useCta: "Use",
     typeBonus: "Bonus",
     courseDetail: "View course details",
+    showSourceId: "View source ID",
+    hideSourceId: "Hide source ID",
     typeRefer: "Referral",
     typeAchievement: "Achievement",
     validUntil: "Valid until {date}",
