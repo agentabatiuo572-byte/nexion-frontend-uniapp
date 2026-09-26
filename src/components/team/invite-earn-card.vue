@@ -131,7 +131,7 @@ import { useApp } from "@/store/app";
 import { useReferralReward } from "@/store/referral-reward";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
-import { buildShareLink, copyText } from "@/lib/share";
+import { buildShareLink, copyText, notifyUnavailableShareLink } from "@/lib/share";
 import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 
@@ -188,6 +188,11 @@ function guardCode(): boolean {
   toast.info(t.value.share.noCodeYet);
   return false;
 }
+function guardLink(): string {
+  const link = buildShareLink(referralCode.value);
+  if (!link) notifyUnavailableShareLink();
+  return link;
+}
 
 async function copyCode() {
   if (!guardCode()) return;
@@ -210,8 +215,9 @@ async function copyCode() {
   setTimeout(() => (copiedCode.value = false), 1500);
 }
 async function copyLink() {
-  if (!guardCode()) return;
-  const ok = await copyText(buildShareLink(referralCode.value));
+  const link = guardLink();
+  if (!link) return;
+  const ok = await copyText(link);
   if (!ok) {
     toast.info(t.value.share.copyFailed);
     return;
@@ -222,11 +228,11 @@ async function copyLink() {
   setTimeout(() => (copiedLink.value = false), 1500);
 }
 function openPoster() {
-  if (!guardCode()) return;
+  if (!guardLink()) return;
   posterOpen.value = true;
 }
 function openShare() {
-  if (!guardCode()) return;
+  if (!guardLink()) return;
   shareOpen.value = true;
 }
 

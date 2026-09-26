@@ -5897,6 +5897,7 @@ export const zh: Messages = {
     openFailedCopied: "未能打开 {channel},邀请文案已复制,粘贴即可发送",
     schemeCopied: "邀请文案已复制,打开 {channel} 粘贴发送",
     noCodeYet: "邀请码生成中,请稍后再试",
+    linkUnavailable: "邀请链接暂不可用，请检查网络后重试",
     copyFailed: "复制失败,请重试",
     shareText: "我在 NexGrid 每天都有算力收益进账。用我的链接注册,白拿 ${usd} + {nex} NEX → {link}",
     questRewardMemo: "首日任务 · 邀请好友",

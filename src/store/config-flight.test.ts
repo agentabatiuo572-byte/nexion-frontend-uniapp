@@ -72,4 +72,18 @@ describe("platform config flight", () => {
     expect(config.configStatus).toBe("failed");
     expect(config.syncFailed).toBe(true);
   });
+
+  it("drops a previously loaded share policy if the next server refresh fails", async () => {
+    platformConfig.mockResolvedValueOnce({
+      ...snapshot(),
+      share: { ...snapshot().share, baseUrl: "https://nexgrid.ai/ref/" },
+    }).mockRejectedValueOnce(new Error("CONFIG_OFFLINE"));
+    const config = useConfig();
+    await config.load();
+    expect(config.config.share.baseUrl).toBe("https://nexgrid.ai/ref/");
+    await config.load();
+    expect(config.configStatus).toBe("failed");
+    expect(config.config.share.baseUrl).toBe("");
+    expect(config.config.share.channels).toEqual([]);
+  });
 });

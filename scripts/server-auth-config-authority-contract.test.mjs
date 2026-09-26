@@ -150,9 +150,10 @@ test("remote policy branches use dedicated server contracts or stay fail-closed"
   const login = read("src/pages/login/login.vue");
   const share = read("src/lib/share.ts");
 
-  // The public E6/H8 projection does not contain K/D5 risk, OTP, or share
-  // policy.  Its pending snapshot must explicitly close those branches rather
-  // than spreading DEFAULT_PLATFORM_CONFIG through remote mode.
+  // The public E6/H8 projection does not contain K/D5 risk or OTP policy.
+  // Its pending snapshot must explicitly close those branches rather than
+  // spreading DEFAULT_PLATFORM_CONFIG through remote mode. Sharing requires
+  // the separately loaded server share base and never invents an H5 link.
   // withdrawRules 这一支曾锚在 dailyWithdrawLimitCount 上,该字段已按产品决定从
   // WithdrawRulesConfig 删除(每日笔数上限唯一来源 = GET /api/withdrawals/policy),
   // 锚点改用同样「关死」的 smallAmountThresholdUsd: 0(小额免审真停用),强度不变。
@@ -164,7 +165,8 @@ test("remote policy branches use dedicated server contracts or stay fail-closed"
   assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.sendPasswordResetOtp[\s\S]*?authApi\.sendLoginOtp/);
   assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.completeOtpLogin/);
   assert.match(login, /async function finishReset\(\) \{[\s\S]*?authApi\.completePasswordReset/);
-  assert.match(share, /export function buildShareLink[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?location\.origin[\s\S]*?return "";/);
+  assert.match(share, /if \(remoteApiEnabled && useConfig\(\)\.configStatus !== "ready"\) return "";/);
+  assert.match(share, /if \(remoteApiEnabled\) return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
   assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled\)/);
   assert.match(share, /const text = remoteApiEnabled[\s\S]*?referralShareText\([\s\S]*?def\.textTemplate \?\? "\{link\}"/);

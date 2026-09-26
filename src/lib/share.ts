@@ -45,27 +45,15 @@ export function currentShareReferralCode(): string {
   return useApp().user.referralCode.trim();
 }
 
-// 配置了 baseUrl 用短链;空(mock/dev)回退运行时 origin 直连 hash 路由。
-// 无码返回空串，全部分享入口据此 fail closed。
+// 服务端模式只使用已加载的分享基址；本地演示可回退到 H5 origin。
+// 无码或无服务端基址返回空串，全部分享入口据此 fail closed。
 export function buildShareLink(referralCode = currentShareReferralCode()): string {
   const code = referralCode.trim();
   if (!code) return "";
-  // Remote H8 gives us the invite code, but the public platform projection does
-  // not own a share-channel/base-url policy.  Do not compose a link from the
-  // mock seed in that mode; the current H5 origin is the only non-business
-  // transport fallback and contains no reward or channel policy.
+  if (remoteApiEnabled && useConfig().configStatus !== "ready") return "";
   const base = useConfig().config.share.baseUrl;
   if (base) return `${base}${code}`;
-  if (remoteApiEnabled) {
-    // A missing server base URL has no business fallback; the current origin
-    // is transport-only and is never composed from a mock domain.
-    // #ifdef H5
-    if (typeof location !== "undefined") {
-      return `${location.origin}${location.pathname}#/pages/ref/code?code=${code}`;
-    }
-    // #endif
-    return "";
-  }
+  if (remoteApiEnabled) return "";
   // #ifdef H5
   if (typeof location !== "undefined") {
     return `${location.origin}${location.pathname}#/pages/ref/code?code=${code}`;
@@ -73,6 +61,12 @@ export function buildShareLink(referralCode = currentShareReferralCode()): strin
   // #endif
   // 非 H5 且未配置 → canonical 域名兜底(F1 域名单源)。
   return `https://nexgrid.ai/ref/${code}`;
+}
+
+export function notifyUnavailableShareLink(): void {
+  const t = useT();
+  toast.info(currentShareReferralCode() ? t.value.share.linkUnavailable : t.value.share.noCodeYet);
+  if (remoteApiEnabled && useConfig().configStatus === "failed") void useConfig().ensureLoaded();
 }
 
 // 邀请文案(渠道预填):礼包金额 config 派生,en/zh 镜像模板。
@@ -141,7 +135,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
   const t = useT();
   const link = buildShareLink();
   if (!link) {
-    toast.info(t.value.share.noCodeYet);
+    notifyUnavailableShareLink();
     return;
   }
   const remoteRewardEnabled = useReferralReward().snapshot?.rewardEnabled === true;

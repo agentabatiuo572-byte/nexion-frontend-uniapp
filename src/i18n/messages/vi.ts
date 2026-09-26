@@ -5906,6 +5906,7 @@ export const vi: Messages = {
     openFailedCopied: "Không mở được {channel} — đã sao chép lời mời, hãy dán vào đó",
     schemeCopied: "Đã sao chép lời mời — mở {channel} rồi dán để gửi",
     noCodeYet: "Mã mời của bạn đang được chuẩn bị — thử lại sau ít phút",
+    linkUnavailable: "Chưa thể tải link mời — hãy kiểm tra kết nối rồi thử lại",
     copyFailed: "Sao chép thất bại — vui lòng thử lại",
     shareText: "Mình kiếm sản lượng điện toán mỗi ngày trên NexGrid. Đăng ký bằng link của mình và nhận ngay ${usd} + {nex} NEX miễn phí → {link}",
     questRewardMemo: "Nhiệm vụ ngày đầu · Mời một người bạn",

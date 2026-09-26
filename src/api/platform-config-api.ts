@@ -89,17 +89,36 @@ function optionalString(value: unknown): string {
   return value === undefined || value === null ? "" : string(value).trim();
 }
 
+function httpUrlParts(value: string): { protocol: string; hostname: string; username: string; password: string } | null {
+  if (typeof URL === "function") {
+    try {
+      return new URL(value);
+    } catch {
+      return null;
+    }
+  }
+  // App Plus service JS has no browser URL constructor. Validate the same
+  // absolute HTTP(S) boundary before accepting server-owned outbound URLs.
+  const match = /^(https?):\/\/([^/?#]+)(?:[/?][^#]*)?$/i.exec(value);
+  const authority = match?.[2] ?? "";
+  const host = /^(\[[\da-f:.]+\]|[a-z\d.-]+)(?::(\d{1,5}))?$/i.exec(authority);
+  const hostname = host?.[1] ?? "";
+  const validHost = hostname.startsWith("[")
+    ? hostname.slice(1, -1).includes(":") && !hostname.includes(":::")
+    : hostname.split(".").every((label) => /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(label));
+  if (!host || !validHost
+      || (host[2] && Number(host[2]) > 65535)) return null;
+  return { protocol: `${match![1].toLowerCase()}:`, hostname, username: "", password: "" };
+}
+
 function safeUrl(value: unknown, required: boolean, allowHttp: boolean): string {
   const url = optionalString(value);
   if (!url && !required) return "";
   if (!url || /[\s#@]/.test(url)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-  try {
-    const parsed = new URL(url);
-    if ((!allowHttp && parsed.protocol !== "https:") || (allowHttp && !["https:", "http:"].includes(parsed.protocol))) {
-      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-    }
-    if (!parsed.hostname || parsed.username || parsed.password) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-  } catch {
+  const parsed = httpUrlParts(url);
+  if (!parsed || (!allowHttp && parsed.protocol !== "https:")
+      || (allowHttp && !["https:", "http:"].includes(parsed.protocol))
+      || !parsed.hostname || parsed.username || parsed.password) {
     return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
   return url;
@@ -114,19 +133,16 @@ function safeShareUrlTemplate(key: ShareChannelKey, intentType: ShareIntentType,
   if (intentType !== "web" || (!template.includes("{link}") && !template.includes("{text}")) || /[\s#]/.test(template)) {
     return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
-  try {
-    const parsed = new URL(template
-      .replaceAll("{link}", "https%3A%2F%2Fnexgrid.invalid%2Fref%2Fcode")
-      .replaceAll("{text}", "share-text"));
-    if (key === "sms") {
-      if (parsed.protocol !== "sms:" || parsed.pathname !== "" || !parsed.search.startsWith("?body=") || parsed.hash) {
-        return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
-      }
-    } else if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
+  const resolved = template
+    .replaceAll("{link}", "https%3A%2F%2Fnexgrid.invalid%2Fref%2Fcode")
+    .replaceAll("{text}", "share-text");
+  if (key === "sms") {
+    if (!/^sms:\?body=[^#]*$/i.test(resolved)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  } else {
+    const parsed = httpUrlParts(resolved);
+    if (!parsed || parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
       return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
     }
-  } catch {
-    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
   return template;
 }

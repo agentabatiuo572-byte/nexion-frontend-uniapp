@@ -6058,6 +6058,7 @@ export const en = {
     openFailedCopied: "Couldn't open {channel} — invite text copied, paste it there",
     schemeCopied: "Invite text copied — open {channel} and paste to send",
     noCodeYet: "Your invite code is being prepared — try again shortly",
+    linkUnavailable: "Invite link unavailable — check your connection and try again",
     copyFailed: "Copy failed — try again",
     shareText: "I earn daily compute yield on NexGrid. Sign up with my link and grab ${usd} + {nex} NEX free → {link}",
     questRewardMemo: "Day-one quest · Invite a friend",
