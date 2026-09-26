@@ -11,6 +11,7 @@ import { profileVRankProjection } from "@/lib/profile-vrank-display";
 import { rankName } from "@/lib/v-rank-copy";
 import { createP318AccountPageFence } from "./p3-18-account-page-fence";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const remote = vi.hoisted(() => ({ remoteApiEnabled: true, vRankApi: { ladder: vi.fn(), current: vi.fn() } }));
 vi.mock("@/api/runtime", () => remote);
@@ -38,6 +39,7 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh") {
   const auth = vue.reactive({ accountId: "A", email: "" });
   const profile = vue.reactive({ displayName: "Confirmed", phoneE164: "", nicknameCandidates: [],
     refreshNicknameCandidates: vi.fn(async () => true),
+    setDisplayName: vi.fn(async () => true),
     projectServerNickname: vi.fn((nickname: string) => { profile.displayName = nickname; }),
   });
   const payout = vue.reactive({ hasAnyAddress: false, provenance: null as unknown, currentFor: () => undefined,
@@ -65,13 +67,13 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh") {
     "@/lib/profile-save-flow": { reconcileProfileEdit }, "@/lib/secure-command-id": { requireCryptoUuid: vi.fn() },
     "@/lib/profile-date": { formatJoinedDate: () => "" }, "@/lib/profile-vrank-display": { profileVRankProjection },
     "@/lib/v-rank-copy": { rankName },
-    "@/lib/brand-copy": { nexGridBrandText: (value: string) => value },
+    "@/lib/brand-copy": { nexGridBrandText },
     "@/api/order-api": runtimeRevision, "./p3-18-account-page-fence": { createP318AccountPageFence },
   };
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
   const output = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const scope = vue.effectScope();
-  const page = scope.run(() => new Function("require", "exports", output + ";return {refreshVRankForCurrentAccount,loadRemoteProfile,tierLabel,tierProgressLine,walletSub,walletAction,name,avatarUrl};")((id: string) => {
+  const page = scope.run(() => new Function("require", "exports", output + ";return {refreshVRankForCurrentAccount,loadRemoteProfile,tierLabel,tierProgressLine,walletSub,walletAction,name,dirty,displayName,avatarUrl};")((id: string) => {
     if (id.endsWith(".vue")) return {};
     if (!(id in modules)) throw Error(`Unexpected dependency ${id}`);
     return modules[id];
@@ -89,6 +91,19 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh") {
 }
 
 describe("profile authoritative read lifecycle", () => {
+  it("brands the nickname row for an untouched historical default without saving a renamed value", async () => {
+    const h = mount();
+    const oldBrand = "Nexi" + "on";
+    const read = h.page.loadRemoteProfile();
+    h.profileReads[0].resolve({ nickname: `${oldBrand} 3778`, avatarUrl: "", avatarRevision: "" });
+    await read;
+    expect(h.page.name.value).toBe(`${oldBrand} 3778`);
+    expect(h.page.displayName.value).toBe("UVEL 3778");
+    expect(h.page.dirty.value).toBe(false);
+    expect(source).toContain("{{ nexGridBrandText(name) }}");
+    expect(nexGridBrandText(h.page.name.value)).toBe("UVEL 3778");
+    expect(h.profile.setDisplayName).not.toHaveBeenCalled();
+  });
   it.each([
     ["en", "Registered Member", "Rising Star"],
     ["vi", "Thành viên đã đăng ký", "Ngôi sao mới"],

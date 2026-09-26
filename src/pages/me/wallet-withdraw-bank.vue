@@ -102,6 +102,7 @@ import { apiClient } from "@/api/runtime";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
+import { formatBankDateTime } from "@/lib/bank-date";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "@/lib/bank-withdrawal-state";
 import { navBack, navTo } from "@/lib/route";
@@ -128,7 +129,7 @@ let alive = true;
 let visible = false;
 const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
 const money = (value: number) => value.toLocaleString(dateLocale(), { maximumFractionDigits: 6 });
-const displayDate = (value: string) => new Date(parseServerTimestamp(value) ?? NaN).toLocaleString(dateLocale(), { timeZone: "Asia/Ho_Chi_Minh", timeZoneName: "short" });
+const displayDate = formatBankDateTime;
 const displayBank = (name: string) => name === "BANKQR" ? useTranslations.value.bankBinding.type : name;
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true

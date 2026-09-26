@@ -65,7 +65,7 @@
             :aria-label="t.profile.nicknameChange"
             @click="openNicknameSheet"
           >
-            <text class="flex-1 truncate" :style="nameValueStyle">{{ name }}</text>
+            <text class="flex-1 truncate" :style="nameValueStyle">{{ nexGridBrandText(name) }}</text>
             <text class="shrink-0" :style="nameChangeStyle">{{ t.profile.nicknameChange }}</text>
           </view>
           <text class="block" :style="fieldHintStyle">{{ t.profile.displayNameHint }}</text>
