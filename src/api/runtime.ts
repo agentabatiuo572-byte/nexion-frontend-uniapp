@@ -85,6 +85,10 @@ let refreshCredentialMode: RefreshCredentialMode = "token";
 // #ifdef H5
 refreshCredentialMode = "cookie";
 // #endif
+let clientSurface: "APP" | undefined;
+// #ifdef APP-PLUS
+clientSurface = "APP";
+// #endif
 export const h5RefreshCookieEnabled = refreshCredentialMode === "cookie";
 let unauthorizedHandler: (() => void | Promise<void>) | undefined;
 
@@ -105,7 +109,7 @@ export const apiClient = createRuntimeApiClient({
 });
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
-export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode });
+export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface });
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
 export const productCatalogApi = createProductCatalogApi(apiClient);
