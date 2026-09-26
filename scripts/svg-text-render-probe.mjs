@@ -55,8 +55,6 @@ export const ROUTE_MAP = {
   // Verify that boundary first, then render the illustration in an explicit local-mode fixture.
   "src/pages/team/binary-how.vue": { route: "pages/team/binary-how", publishedContentKey: "team-binary-how" },
   "src/pages/globe/globe.vue": { route: "pages/globe/globe" },
-  // 组件:商品详情 Cloud Share 档才走抽象云图(硬件档是照片 + HTML 叠字);2 丝印 + v-for 4 芯片 = 6
-  "src/components/store/product-render.vue": { route: "pages/store/detail?id=cloud-share", min: 6, whyMin: "静态 3 处里 1 处是 v-for 4 个芯片(GPU/CPU/RAM/SSD),提案 Done-when 钉 6" },
   // lucky-spin 转盘:v-html 字符串画的真 SVG text(P-121 追记点名保留的先例)。它是 sheet 里的内容,不在任何路由首屏,
   // 由 sheet 自己的走查覆盖;这里登记为不探(route:null)但写明理由,不让它静默逃出清单。
   "src/components/lucky-spin-sheet.vue": { route: null, whyMin: "转盘 sheet 内 v-html 真 SVG text,需点开 sheet 才在 DOM 里;不在本门探,登记只为不静默" },

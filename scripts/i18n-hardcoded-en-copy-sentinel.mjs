@@ -118,7 +118,7 @@ const NON_COPY_ATTRS = [
     id: "svg-geometry",
     why: "SVG 几何 / 绘制 / SMIL 动画属性:坐标 · 路径 · 颜色 · 描边与动画枚举(`round` / `indefinite` / `SourceAlpha`),与语言无关",
     names: ["d", "points", "viewBox", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "width", "height", "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "transform", "opacity", "offset", "stop-color", "stop-opacity", "filter", "preserveAspectRatio",
-      "attributeName", "repeatCount", "dur", "begin", "values", "keyTimes", "from", "to", "rotate", "path", "in", "stdDeviation", "focusable"],
+      "attributeName", "repeatCount", "dur", "begin", "values", "keyTimes", "from", "to", "rotate", "path", "stdDeviation", "focusable"],
   },
   {
     id: "element-mechanics",

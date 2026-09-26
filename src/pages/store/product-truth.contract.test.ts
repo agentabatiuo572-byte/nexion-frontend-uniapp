@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
 
 const detail = (import.meta.glob("./detail.vue", {
   query: "?raw",
@@ -20,7 +21,7 @@ const productImage = (import.meta.glob("../../lib/product-image.ts", {
   import: "default",
   eager: true,
 })["../../lib/product-image.ts"] ?? "") as string;
-const p2TestImage = import.meta.glob("../../static/img/products/stellarrack-p2-test-s1-reference.png", {
+const embeddedProductImages = import.meta.glob("../../static/img/products/*.png", {
   query: "?url",
   import: "default",
   eager: true,
@@ -32,22 +33,32 @@ const socialProof = (import.meta.glob("../../components/store/live-social-proof.
 })["../../components/store/live-social-proof.vue"] ?? "") as string;
 
 describe("store product truth rendering", () => {
-  it("uses the catalog product image in both card and detail views with a local fallback", () => {
+  it("uses only the canonical catalog image in both card and detail views", () => {
     expect(productCard).toContain("props.product.imageUrl");
-    expect(productCard).toContain("productImageMeta(props.product.id)");
+    expect(productCard).toContain("catalogProductImageUrl(props.product.imageUrl, failedImageUrl.value)");
     expect(detail).toContain(':product-id="product.id"');
+    expect(detail).toContain(':image-url="product.imageUrl"');
     expect(productRender).toContain("productId: string");
     expect(productRender).toContain("imageUrl?: string");
-    expect(productRender).toContain("props.imageUrl");
-    expect(productRender).toContain("productImageMeta(props.productId)");
+    expect(productRender).toContain("catalogProductImageUrl(props.imageUrl, failedImageUrl.value)");
+    expect(productImage).not.toContain("/static/img/products/");
+    expect(Object.keys(embeddedProductImages)).toHaveLength(0);
+    expect(productCard).not.toContain("productImageMeta");
+    expect(productRender).not.toContain("productImageMeta");
   });
 
-  it("uses the user-approved test visual for Rack P2 without reusing Rack P1", () => {
-    expect(productImage).toContain('"stellarrack-p1": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" }');
-    expect(productImage).toContain('"stellarrack-p2": { src: "/static/img/products/stellarrack-p2-test-s1-reference.png", tierCode: "Rack P2" }');
-    expect(productImage).not.toMatch(/"stellarrack-p2"\s*:\s*\{[^}]*nexgridrack-p1-v2\.png/);
-    expect(Object.keys(p2TestImage)).toHaveLength(1);
-    expect(productImage).toContain("Public-test visual only");
+  it("shows a neutral placeholder for missing or failed media, then accepts a new catalog URL", () => {
+    const original = "https://cdn.example.test/e1/s1?token=old";
+    const replaced = "https://cdn.example.test/e1/s1?token=new";
+    expect(catalogProductImageUrl(original, "")).toBe(original);
+    expect(catalogProductImageUrl(undefined, "")).toBeNull();
+    expect(catalogProductImageUrl(original, original)).toBeNull();
+    expect(catalogProductImageUrl(replaced, original)).toBe(replaced);
+    expect(productCard).toContain('v-else class="absolute inset-0 grid place-items-center"');
+    expect(productRender).toContain('v-else class="absolute inset-0 grid place-items-center"');
+    expect(productCard).not.toContain("Cloud Share schematic");
+    expect(productRender).not.toContain("Cloud Share — abstract distributed cloud");
+    expect(productTierCode("stellarrack-p2", "Flagship")).toBe("Rack P2");
   });
 
   it("keeps video playback on the detail page and falls back without autoplay", () => {
