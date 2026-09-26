@@ -13,10 +13,19 @@ export function withConversationRealtime(client:ApiClient):ApiClient {
     return result.data as T;
   }};
 }
+export function realtimeWebSocketOrigin(url:string):string|null {
+  const authority=/^wss:\/\/[^/]+/i.exec(url)?.[0];
+  return authority?authority.replace(/^wss/i,'https'):null;
+}
 /** SocketTask keeps this transport usable in H5 and the installed UniApp carrier. */
 export function createUniRealtimeSocket(url:string):RealtimeSocket {
   const socket:RealtimeSocket={onopen:null,onmessage:null,onclose:null,onerror:null,send:data=>task.send({data}),close:()=>task.close({})};
-  const task=uni.connectSocket({url,complete:()=>undefined});
+  let header:Record<string,string>|undefined;
+  // #ifdef APP-PLUS
+  const origin=realtimeWebSocketOrigin(url);
+  if(origin)header={Origin:origin};
+  // #endif
+  const task=uni.connectSocket({url,header,complete:()=>undefined});
   task.onOpen(()=>socket.onopen?.());
   task.onMessage(e=>{if(typeof e.data==='string')socket.onmessage?.({data:e.data});});
   task.onClose(e=>socket.onclose?.({code:e.code}));

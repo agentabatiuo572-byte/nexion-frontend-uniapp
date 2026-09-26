@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from './api-client';
 import { ConversationRealtime, type RealtimeSocket } from './conversation-realtime';
-import { setAppConversationRealtime, withConversationRealtime } from './app-conversation-realtime';
+import { realtimeWebSocketOrigin, setAppConversationRealtime, withConversationRealtime } from './app-conversation-realtime';
 class Socket implements RealtimeSocket {
   onopen: (() => void) | null = null;
   onmessage: ((event: {data:string}) => void) | null = null;
@@ -13,6 +13,11 @@ class Socket implements RealtimeSocket {
 }
 let realtime: ConversationRealtime;
 afterEach(() => { realtime?.stop(); setAppConversationRealtime(null); vi.useRealTimers(); });
+it('uses the public API origin for a native WebSocket handshake',()=>{
+  expect(realtimeWebSocketOrigin('wss://18.142.169.24/ws/conversations')).toBe('https://18.142.169.24');
+  expect(realtimeWebSocketOrigin('ws://127.0.0.1:8110/ws/conversations')).toBeNull();
+  expect(realtimeWebSocketOrigin('not-a-websocket-url')).toBeNull();
+});
 async function setup() {
   vi.useFakeTimers();
   const socket = new Socket();
