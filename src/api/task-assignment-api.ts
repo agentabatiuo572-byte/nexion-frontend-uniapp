@@ -11,11 +11,11 @@ export interface CanonicalTaskAssignment {
   taskClass: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
   model: string;
   client: string;
-  status: "CLAIMED" | "RUNNING" | "COMPLETED";
+  status: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
   rewardUsdt: number;
   requiredSeconds: number;
   startedAt: number;
-  completableAt: number;
+  completableAt: number | null;
   completedAt: number | null;
   receiptNo: string | null;
   proofNonce: string | null;
@@ -99,6 +99,7 @@ export interface CanonicalComputeReceiptPage {
 
 export interface TaskAssignmentApi {
   state(): Promise<CanonicalTaskAssignments>;
+  reportPhoneRuntime(calibrationDeviceId: string, batteryLevel: number | null, networkReachable: boolean, isCharging: boolean | null): Promise<void>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
   receipts(offset?: number, limit?: number, cursor?: string | null): Promise<CanonicalComputeReceiptPage>;
 }
@@ -171,10 +172,12 @@ function task(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignment {
   const proof = provenance(source, mode);
   const taskClass = text(source.taskClass).toUpperCase();
   const status = text(source.status).toUpperCase();
-  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || !/^(CLAIMED|RUNNING|COMPLETED)$/.test(status)) return invalid();
+  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || !/^(CLAIMED|RUNNING|PAUSED|COMPLETED)$/.test(status)) return invalid();
   const startedAt = timestamp(source.startedAt) as number;
-  const completableAt = timestamp(source.completableAt) as number;
-  if (completableAt < startedAt) return invalid();
+  const completableAt = timestamp(source.completableAt, status === "PAUSED");
+  if ((status !== "PAUSED" && completableAt === null) || (completableAt !== null && completableAt < startedAt)) return invalid();
+  const completedAt = timestamp(source.completedAt, true);
+  if (status === "COMPLETED" && completedAt === null) return invalid();
   return {
     taskNo: text(source.taskNo),
     deviceId: integer(source.deviceId, 1),
@@ -188,7 +191,7 @@ function task(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignment {
     requiredSeconds: integer(source.requiredSeconds, 1),
     startedAt,
     completableAt,
-    completedAt: timestamp(source.completedAt, true),
+    completedAt,
     receiptNo: source.receiptNo == null ? null : text(source.receiptNo),
     proofNonce: source.proofNonce == null ? null : text(source.proofNonce),
     proofExpiresAt: timestamp(source.proofExpiresAt, true),
@@ -301,6 +304,22 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
   return {
     async state() {
       return state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
+    },
+    async reportPhoneRuntime(calibrationDeviceId, batteryLevel, networkReachable, isCharging) {
+      const localDeviceId = typeof calibrationDeviceId === "string" ? calibrationDeviceId.trim() : "";
+      const validBattery = batteryLevel === null
+        ? networkReachable === false
+        : Number.isInteger(batteryLevel) && batteryLevel >= 0 && batteryLevel <= 100;
+      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(localDeviceId) || !validBattery
+        || typeof networkReachable !== "boolean"
+        || (isCharging !== null && typeof isCharging !== "boolean")) {
+        throw new ApiError({ kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID" });
+      }
+      await client.request<unknown>({
+        path: "/api/tasks/phone/runtime",
+        method: "POST",
+        body: { calibrationDeviceId: localDeviceId, batteryLevel, networkReachable, isCharging },
+      });
     },
     async receipt(receiptNo) {
       const normalizedReceiptNo = text(receiptNo);

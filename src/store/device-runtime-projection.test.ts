@@ -96,23 +96,34 @@ function findLabel(node: ts.Node) {
   ts.forEachChild(node, findLabel);
 }
 findLabel(cardAst);
-const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "t", `return (${labelBody})();`);
-const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online" }, myDevices: { inventoryPendingDeactivateChip: "pending" } } };
+const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "nativePhoneAvailable", `return (${labelBody})();`);
+const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online", phoneTaskPaused: "paused" }, myDevices: { inventoryPendingDeactivateChip: "pending", phoneActivationTitle: "activate phone", phoneActivationAppOnlyTitle: "use Android App" } } };
+const withoutTask = (props: unknown, reconnecting: unknown, idleGated: unknown, deviceOnline: unknown, t: unknown) =>
+  labelFactory(props, reconnecting, idleGated, deviceOnline, { value: null }, t, { value: true }, true);
 describe("actual device card runtime label", () => {
   it("does not expose mock heartbeat controls in the remote phone card", () => {
     expect(cardContent).toContain("v-if=\"device.kind === 'phone' && !remoteApiEnabled\"");
   });
   it.each([["ONLINE", "online"], ["OFFLINE", "offline"], ["UNKNOWN", "unknown"]])("renders server phone %s as %s", (runtimeStatus, expected) => {
-    expect(labelFactory({ device: { kind: "phone", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe(expected);
+    expect(withoutTask({ device: { kind: "phone", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe(expected);
   });
   it.each([undefined, "UNKNOWN"])("renders unknown rather than offline for %s", runtimeStatus => {
-    expect(labelFactory({ device: { kind: "cloud-share", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe("unknown");
+    expect(withoutTask({ device: { kind: "cloud-share", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe("unknown");
   });
   it("keeps pending deactivation above unknown runtime", () => {
-    expect(labelFactory({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"UNKNOWN", pendingDeactivate:true} }, {value:false}, {value:false}, {value:false}, texts)).toBe("pending");
+    expect(withoutTask({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"UNKNOWN", pendingDeactivate:true} }, {value:false}, {value:false}, {value:false}, texts)).toBe("pending");
   });
   it("renders known offline accurately", () => {
-    expect(labelFactory({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"OFFLINE"} }, {value:false}, {value:false}, {value:false}, texts)).toBe("offline");
+    expect(withoutTask({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"OFFLINE"} }, {value:false}, {value:false}, {value:false}, texts)).toBe("offline");
+  });
+  it("shows a server-paused phone task as paused even when the last runtime flag was ONLINE", () => {
+    expect(labelFactory({ device: {kind:"phone", capacitySource:"server", runtimeStatus:"ONLINE"} },
+      {value:false}, {value:false}, {value:false}, {value:{status:"PAUSED"}}, texts, {value:true}, true)).toBe("paused");
+  });
+  it("does not claim a different phone is running locally", () => {
+    const phone = { device: { kind: "phone", capacitySource: "server", runtimeStatus: "ONLINE" } };
+    expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, true)).toBe("activate phone");
+    expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, false)).toBe("use Android App");
   });
 });
 
@@ -140,7 +151,10 @@ describe("phone reconciliation remains reachable", () => {
   });
   it("navigates to the authenticated recalibration flow without a stale fleet gate", () => {
     const routes:string[]=[];
-    new Function("navTo", `${phoneNavigationBody}; goPhoneActivation();`)((route:string)=>routes.push(route));
+    new Function("navTo", "nativePhoneAvailable", `${phoneNavigationBody}; goPhoneActivation();`)((route:string)=>routes.push(route), true);
     expect(routes).toEqual(["/pages/onboarding/connect?mode=recalibrate"]);
+    routes.length = 0;
+    new Function("navTo", "nativePhoneAvailable", `${phoneNavigationBody}; goPhoneActivation();`)((route:string)=>routes.push(route), false);
+    expect(routes).toEqual([]);
   });
 });

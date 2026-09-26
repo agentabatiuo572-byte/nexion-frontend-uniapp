@@ -39,23 +39,7 @@
               </view>
             </view>
 
-            <view v-if="prog.next" :style="progressWrapStyle">
-              <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 6px">
-                <text :style="{ color: 'var(--v5-ink-3)' }">
-                  <text>{{ t.rank.next }} </text>
-                  <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">{{ rankLabel(prog.next.v, locale.code, rankDefs) }}</text>
-                </text>
-                <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">{{ Math.round(prog.progressPct * 100) }}%</text>
-              </view>
-              <view ref="rankBarRef" class="rounded-full overflow-hidden" :style="barTrackStyle">
-                <view class="rounded-full" :style="barFillStyle" />
-              </view>
-              <view v-if="prog.missing.length > 0" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px">
-                <view v-for="(m, i) in prog.missing" :key="i" class="flex items-center" style="gap: 6px">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ rankGapText(t, m, locale.code, rankDefs) }}</text>
-                </view>
-              </view>
+             <view v-if="prog.next" :style="progressWrapStyle">
               <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="upgradeCtaStyle" @click="go('/pages/store/store')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
                 <text>{{ t.rank.upgradeCta }}</text>
@@ -84,19 +68,6 @@
                 <text v-else-if="rowStatus(r.v) === 'current'" class="font-mono-tabular" :style="currentTagStyle">{{ t.rank.current }}</text>
               </view>
 
-              <text class="block" :style="condStyle">{{ formatConditions(r) }}</text>
-
-              <view class="flex" style="margin-top: 8px; gap: 6px; flex-wrap: wrap">
-                <text v-if="r.directBonus > 0.05" :style="chipStyle('default')">{{ t.rank.chips.direct }} {{ Math.round(r.directBonus * 100) }}%</text>
-                <text v-if="r.unilevelDepth > 1" :style="chipStyle('default')">{{ r.unilevelDepth >= 99 ? t.rank.chips.unlimitedExtended : t.teamV3.extendedRoyalty }}</text>
-                <!-- 平级奖励今天不派发(服务端能力位,与玩法说明同源)时,不能把配置比例
-                     写成已生效权益 —— 否则用户会以为升级即可获得 5% 平级收益(#79)。 -->
-                <text v-if="r.peerBonus > 0 && !vState.capabilities.peer" :style="chipStyle('muted')">{{ fmt(t.rank.chips.peerNotDispatched, { n: Math.round(r.peerBonus * 100) }) }}</text>
-                <text v-else-if="r.peerBonus > 0" :style="chipStyle('default')">{{ t.rank.chips.peer }} {{ Math.round(r.peerBonus * 100) }}%</text>
-                <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">{{ t.rank.chips.pool }} {{ r.leadershipVotes }} {{ t.rank.chips.votes }}</text>
-                <text v-if="r.cultivationBonus > 0" :style="chipStyle('lemon')">🎁 {{ r.cultivationBonus.toLocaleString() }} NEX</text>
-                <text v-for="reward in nonNexRewards(r)" :key="`${r.v}-${reward.type}-${reward.voucherId ?? reward.skuId ?? reward.customLabel ?? reward.amount}`" :style="chipStyle('lemon')">🎁 {{ rewardText(reward) }}</text>
-              </view>
             </view>
           </view>
         </view>

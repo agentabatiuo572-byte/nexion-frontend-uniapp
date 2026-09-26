@@ -711,6 +711,7 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
     // 不喂这个桩,注入执行会在 `if (!remoteApiEnabled)` 处抛 ReferenceError,
     // 表现成「什么都没发生」(debits=0 minted=[] bills=0)—— 看着像缺陷,其实是 harness 缺桩。
     remoteApiEnabled: false,
+    useGenesisConfig: () => ({ refresh: async () => {} }),
     purchasing,
     qty: { value: 1 },
     price: { value: 9999 },
@@ -725,6 +726,7 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
     postMoneyBill: buildPostMoneyBill(app, bills, toast),
     toast,
     emitClose: () => closes.push(1),
+    showConfirmedSuccess: () => toast.success("purchase confirmed"),
     GENESIS_ELIGIBILITY_POLICY: { maxPerUser: 5 },
   };
   return { env, app, minted, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
@@ -734,11 +736,11 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
   // 🔴 连点的语义 = **不等前一次结束就再点**,所以三次都不 await 地发出去,再统一 settle。
   //   逐个 await 会变成串行,守卫永远不会被触发,这一格就成了空转。
   const clicks = [f.handlePurchase(), f.handlePurchase(), f.handlePurchase()];
-  await Promise.allSettled(clicks);
+  const outcomes = await Promise.allSettled(clicks);
   check("C④ 双击/三击只买 1 台:1 次扣款 · 1 次铸造 · 1 行账单 · 1 次关闭",
     f.app.calls.filter((c) => c[0] === "debitBalance").length === 1
     && f.minted.length === 1 && f.minted[0] === 1 && f.billRows.length === 1 && f.closes.length === 1,
-    `debits=${f.app.calls.length} minted=${JSON.stringify(f.minted)} bills=${f.billRows.length}`);
+    `debits=${f.app.calls.length} minted=${JSON.stringify(f.minted)} bills=${f.billRows.length} rejected=${outcomes.filter((x) => x.status === "rejected").map((x) => String(x.reason))}`);
   check("C④ 只扣一台的钱($50000 − $9999 = $40001,不是扣两三台)",
     f.app.user.usdtBalance === 40001, `usdt=${f.app.user.usdtBalance}`);
   check("C④ 成交后继续持锁(面板正在关闭,解锁就是给双击留窗口)", f.purchasing.value === true);

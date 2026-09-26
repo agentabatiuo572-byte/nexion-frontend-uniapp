@@ -1,5 +1,5 @@
 <template>
-  <StandalonePageShell class="cn-root" :top-inset="24">
+  <StandalonePageShell class="cn-root" :top-inset="24" @click="rulesExpanded = false">
     <!-- Progress (3/3 full) -->
     <view class="cn-bars">
       <view class="cn-back active:opacity-60" role="button" :tabindex="activationBusy || phase === 'calibrating' ? -1 : 0" :aria-disabled="activationBusy || phase === 'calibrating'" :aria-label="t.login.back" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
@@ -12,11 +12,11 @@
 
     <view>
       <text class="cn-step">{{ stepText }}</text>
-      <text class="cn-title">{{ titleText }}</text>
-      <text class="cn-sub">{{ subText }}</text>
+      <text class="cn-title">{{ nativePhoneAvailable ? titleText : t.myDevices.phoneActivationAppOnlyTitle }}</text>
+      <text v-if="!nativePhoneAvailable || phase !== 'result'" class="cn-sub">{{ nativePhoneAvailable ? subText : t.myDevices.phoneActivationAppOnlyBody }}</text>
     </view>
 
-    <transition name="cn-fade" mode="out-in">
+    <transition v-if="nativePhoneAvailable" name="cn-fade" mode="out-in">
       <!-- Phase: intro -->
       <view v-if="phase === 'intro'" key="intro" class="cn-phase">
         <view class="cn-why">
@@ -24,7 +24,7 @@
           <view class="cn-why__list">
             <view v-for="(p, i) in whyPoints" :key="i" class="cn-point">
               <view class="cn-point__ic">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="p.color" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="p.icon" /><path v-if="p.icon2" :d="p.icon2" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="p.color" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="p.icon" /></svg>
               </view>
               <text class="cn-point__t">{{ p.text }}</text>
             </view>
@@ -45,44 +45,17 @@
 
       </view>
 
-      <!-- Phase: result -->
+      <!-- Phase: result: the server score is the only public calibration figure. -->
       <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
-        <view class="cn-score">
-          <view class="cn-score__cap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-            <text class="cn-score__cap-t">{{ t.onboarding.resultTitle }}</text>
-          </view>
+        <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore}/100`">
+          <view class="cn-score__aurora" aria-hidden="true" />
+          <svg class="cn-score__hex" viewBox="0 0 220 220" aria-hidden="true" focusable="false">
+            <path class="cn-score__ring cn-score__ring--halo" :d="scoreHexPath" />
+            <path class="cn-score__ring cn-score__ring--edge" :d="scoreHexPath" />
+          </svg>
           <view class="cn-score__num">
-            <text class="cn-score__v">{{ finalScore }}</text>
+            <text class="cn-score__v">{{ shownScore }}</text>
             <text class="cn-score__d">/100</text>
-          </view>
-          <text class="cn-score__tier">{{ tierLabel }}</text>
-          <view class="cn-score__yield">
-            <text class="cn-score__yield-cap">{{ t.onboarding.resultEstYield }}</text>
-            <text class="cn-score__yield-v">${{ finalYield.toFixed(2) }}/d</text>
-          </view>
-        </view>
-
-        <view class="cn-summary">
-          <view v-for="(r, i) in resultRows" :key="i" class="cn-row">
-            <view v-if="r.value !== '—'" class="cn-row__check">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </view>
-            <text class="cn-row__label">{{ r.label }}</text>
-            <text class="cn-row__val">{{ r.value }}</text>
-          </view>
-        </view>
-
-        <view class="cn-policy">
-          <view class="cn-policy__cap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-            <text class="cn-policy__cap-t">{{ t.onboarding.policyTitle }}</text>
-          </view>
-          <view class="cn-policy__list">
-            <view v-for="(l, i) in policyLines" :key="i" class="cn-policy__line">
-              <view class="cn-policy__dot" />
-              <text class="cn-policy__t">{{ l }}</text>
-            </view>
           </view>
         </view>
       </view>
@@ -101,7 +74,12 @@
       </view>
     </transition>
 
-    <view class="cn-cta">
+    <view v-if="!nativePhoneAvailable" class="cn-cta">
+      <view class="cn-go cn-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
+        <text class="cn-go__t cn-go__t--on">{{ t.login.back }}</text>
+      </view>
+    </view>
+    <view v-if="nativePhoneAvailable" class="cn-cta">
       <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
         <text class="cn-go__t cn-go__t--on">{{ activateText }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -115,16 +93,25 @@
         </view>
       </view>
     </view>
+    <view v-if="nativePhoneAvailable && phase === 'result'" class="cn-policy-float" @click.stop>
+      <view v-if="rulesExpanded" id="cn-policy-details" class="cn-policy-float__list" role="tooltip">
+        <text class="cn-policy-float__title">{{ t.onboarding.policyTitle }}</text>
+        <text v-for="(line, i) in policyLines" :key="i" class="cn-policy__t">{{ line }}</text>
+      </view>
+      <view class="cn-policy-float__button" role="button" tabindex="0" :aria-label="t.onboarding.policyTitle" :aria-expanded="rulesExpanded" aria-controls="cn-policy-details" @click="rulesExpanded = !rulesExpanded" @keydown.enter.prevent="rulesExpanded = !rulesExpanded" @keydown.space.prevent="rulesExpanded = !rulesExpanded">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+      </view>
+    </view>
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { onLoad, onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
@@ -151,18 +138,16 @@ const resumeDeferred = ref(false);
 type Phase = "intro" | "calibrating" | "result" | "error";
 type FailedAction = "calibration" | "activate" | "defer";
 const phase = ref<Phase>("intro");
+const rulesExpanded = ref(false);
+const shownScore = ref(0);
+let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
 // sandbox, and remote cannot turn device observations into business facts.
 const canonical = ref<OnboardingCalibration | null>(null);
-const finalTops = computed(() => canonical.value?.tops ?? 0);
 const finalScore = computed(() => canonical.value?.score ?? 0);
-const finalTier = computed(() => canonical.value?.tier ?? 0);
-const finalYield = computed(() => canonical.value?.baseRateUsdt ?? 0);
-const finalPing = computed(() => canonical.value?.signals?.pingMs ?? null);
-const finalBattery = computed(() => canonical.value?.signals?.batteryLevel ?? null);
 
 let mounted = true;
 let accountEpoch = 0;
@@ -214,25 +199,22 @@ const failureTitle = computed(() => failedAction.value === "calibration"
 const ICON = {
   cpu: "M12 20v2M12 2v2M17 20v2M17 2v2M2 12h2M2 17h2M2 7h2M20 12h2M20 17h2M20 7h2M7 20v2M7 2v2",
   cpu2: "M4 4h16v16H4zM9 9h6v6H9z",
-  globe: "M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
-  globe2: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z",
-  battery: "M7 7h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7M11 7l-4 5h4l-4 5",
 };
 
 const whyPoints = computed(() => [
   { icon: ICON.cpu2, color: "var(--v5-brand)", text: t.value.onboarding.calibrationWhyLine1 },
-  { icon: ICON.globe2, icon2: ICON.globe, color: "var(--v5-tech-cyan)", text: t.value.onboarding.calibrationWhyLine2 },
-  { icon: ICON.battery, color: "var(--v5-warning)", text: t.value.onboarding.calibrationWhyLine3 },
 ]);
 
 // Initial onboarding reuses the estimator's canonical result. Only an explicit
 // warehouse remeasurement/resume can replace an existing calibration.
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectDeviceSignals, key: () => `onboarding:${requireCryptoUuid()}` });
+const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string } | null = null;
 const activationBusy = ref(false);
 
 async function startCalibration() {
+  if (!nativePhoneAvailable) return;
   canonical.value = null;
   activationIntent = null;
   const requestScope = { ...currentScope(), generation: ++requestGeneration };
@@ -255,12 +237,25 @@ async function startCalibration() {
   }
 }
 
-const tierLabel = computed(() => fmt(t.value.onboarding.resultTier, { n: finalTier.value }));
-const resultRows = computed(() => [
-  { label: t.value.onboarding.testNpu, value: fmt(t.value.onboarding.resultComputeMetric, { n: finalTops.value }) },
-  { label: t.value.onboarding.testNetwork, value: finalPing.value === null ? "—" : `${finalPing.value}ms` },
-  { label: t.value.onboarding.testPower, value: finalBattery.value === null ? "—" : `${finalBattery.value}%` },
-]);
+// The real API remains authoritative; animation only counts up to its confirmed score.
+const scoreHexPath = "M110 20 L176 52 Q200 65 200 88 L200 132 Q200 155 176 168 L110 200 L44 168 Q20 155 20 132 L20 88 Q20 65 44 52 Z";
+watch([phase, finalScore], ([next, score]) => {
+  if (scoreTimer) clearInterval(scoreTimer);
+  scoreTimer = null;
+  shownScore.value = 0;
+  if (next !== "result") return;
+  const target = Math.max(0, Math.min(100, score));
+  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    shownScore.value = target;
+    return;
+  }
+  const start = Date.now();
+  scoreTimer = setInterval(() => {
+    const progress = Math.min(1, (Date.now() - start) / 900);
+    shownScore.value = Math.round(progress * target);
+    if (progress === 1 && scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
+  }, 30);
+}, { immediate: true });
 const policyLines = computed(() => [
   t.value.onboarding.policyLine1,
   t.value.onboarding.policyLine2,
@@ -273,7 +268,7 @@ watch(phase, (p) => {
 });
 
 function retryCalibration() {
-  if (activationBusy.value) return;
+  if (!nativePhoneAvailable || activationBusy.value) return;
   if (failedAction.value === "activate") {
     if (!canonical.value?.calibrationAvailable) {
       resumeDeferred.value = true;
@@ -314,7 +309,7 @@ function completeOnboardingLocally(): boolean {
 }
 
 async function activate() {
-  if (!mounted || !canonical.value?.calibrationAvailable || activationBusy.value) return;
+  if (!nativePhoneAvailable || !mounted || !canonical.value?.calibrationAvailable || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   const before = canonical.value;
@@ -361,7 +356,7 @@ async function activate() {
 }
 
 async function deferPhoneActivation() {
-  if (!mounted || activationBusy.value) return;
+  if (!nativePhoneAvailable || !mounted || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   try {
@@ -408,11 +403,12 @@ onLoad((options) => {
   if (o.mode === "resume") resumeDeferred.value = true;
 });
 onMounted(() => {
-  if (!isRecal.value && !resumeDeferred.value) phase.value = "calibrating";
+  if (nativePhoneAvailable && !isRecal.value && !resumeDeferred.value) phase.value = "calibrating";
 });
 onBackPress(() => { leaveConnect(); return true; });
 onUnmounted(() => {
   mounted = false;
+  if (scoreTimer) clearInterval(scoreTimer);
   requestGeneration += 1;
 });
 </script>
@@ -496,4 +492,19 @@ onUnmounted(() => {
 @keyframes cn-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .cn-fade-enter-active, .cn-fade-leave-active { transition: opacity 0.3s; }
 .cn-fade-enter-from, .cn-fade-leave-to { opacity: 0; }
+
+.cn-score--hex { --score-size: clamp(184px, 32vh, 306px); width: 100%; height: var(--score-size); box-sizing: border-box; display: grid; place-items: center; border: 0; background: transparent; box-shadow: none; padding: 0; overflow: visible; isolation: isolate; }
+.cn-score__aurora { grid-area: 1 / 1; width: min(70vw, 220px); height: min(70vw, 220px); border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--v5-brand) 42%, transparent), transparent 64%); filter: blur(24px); animation: cn-aurora 5s ease-in-out infinite alternate; }
+.cn-score__hex { grid-area: 1 / 1; width: calc(var(--score-size) - 16px); height: calc(var(--score-size) - 16px); animation: cn-hex-breathe 7s ease-in-out infinite; }
+.cn-score__ring { fill: none; stroke-linejoin: round; }
+.cn-score__ring--halo { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
+.cn-score__ring--edge { stroke: var(--v5-brand); stroke-width: 3.4; filter: drop-shadow(0 0 9px color-mix(in oklab, var(--v5-brand) 48%, transparent)); }
+.cn-score--hex .cn-score__num { grid-area: 1 / 1; z-index: 1; margin: 0; }
+.cn-policy-float { position: fixed; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); z-index: 20; }
+.cn-policy-float__button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); background: var(--v5-surface); }
+.cn-policy-float__list { position: absolute; right: 0; bottom: 54px; width: min(280px, calc(100vw - 40px)); box-sizing: border-box; padding: 16px; border-radius: 14px; background: var(--v5-surface-2); display: flex; flex-direction: column; gap: 8px; }
+.cn-policy-float__title { color: var(--v5-ink); font-size: 12px; font-weight: 600; }
+@keyframes cn-aurora { from { transform: scale(.95); opacity: .7; } to { transform: scale(1.08); opacity: 1; } }
+@keyframes cn-hex-breathe { 0%, 100% { transform: scale(.97) rotate(0deg); } 50% { transform: scale(1.03) rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .cn-score__aurora, .cn-score__hex { animation: none; } }
 </style>

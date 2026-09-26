@@ -171,6 +171,9 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     // selection made during this read wins; a device default never overwrites
     // the account preference merely because the user signed in.
     hydrateCurrentProfileLocale(options.registrationLocale);
+    // Logout disarms the phone poll. A same-process login can reLaunch without
+    // another App.onShow, so rearm only after this server session is accepted.
+    app.setRemoteTaskForeground(true);
   }
   // Login completion is a re-ack checkpoint. The helper fences its request to
   // this exact bearer/account and only starts business reads after the server

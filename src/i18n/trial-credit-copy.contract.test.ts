@@ -21,7 +21,7 @@ describe("trial credit product language", () => {
     const copy = `${JSON.stringify(zh.trial)}\n${trialStoreCopy(zh)}`;
 
     expect(zh.trial.heroEarnLabel).toBe("{days} 天预计抵扣金");
-    expect(zh.trial.ghostSubtitle).toBe("NexGridBox S1 试用抵扣金");
+    expect(zh.trial.ghostSubtitle).toBe("UVELBox S1 试用抵扣金");
     expect(copy).not.toMatch(/试用收益|预计收益|收益持续|收益停止|赚的钱|试用攒到|到手/);
   });
 
@@ -29,8 +29,8 @@ describe("trial credit product language", () => {
     const english = `${JSON.stringify(en.trial)}\n${trialStoreCopy(en)}`;
     const vietnamese = `${JSON.stringify(vi.trial)}\n${trialStoreCopy(vi)}`;
 
-    expect(en.trial.ghostSubtitle).toBe("NexGridBox S1 trial credit");
-    expect(vi.trial.ghostSubtitle).toBe("Tiền khấu trừ dùng thử NexGridBox S1");
+    expect(en.trial.ghostSubtitle).toBe("UVELBox S1 trial credit");
+    expect(vi.trial.ghostSubtitle).toBe("Tiền khấu trừ dùng thử UVELBox S1");
     expect(english).not.toMatch(/trial earnings|what you'll pocket/i);
     expect(vietnamese).not.toMatch(/lợi nhuận dùng thử|thu nhập dùng thử|số tiền bạn bỏ túi/i);
   });

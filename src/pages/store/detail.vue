@@ -48,7 +48,7 @@
            the detail readable, but never expose a purchase CTA for it. -->
       <template v-else-if="purchaseUnavailable">
         <view class="mx-4 rounded-2xl border" style="padding: 24px; border-color: var(--v5-border); background: var(--v5-surface)">
-          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ product.name }}</text>
+          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ nexGridBrandText(product.name) }}</text>
           <text class="block" style="margin-top: 8px; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3)">{{ t.store.specUnavailable }}</text>
         </view>
         <view aria-hidden style="height: 32px" />
@@ -79,14 +79,8 @@
             <text v-if="eligibilityQualificationConditions(policy).length > 1" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityPolicyMode(policy) }}</text>
             <text v-for="condition in eligibilityQualificationConditions(policy)" :key="condition.kind" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(condition) }}</text>
             <text v-if="eligibilityMonthlyStockCondition(policy)" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(eligibilityMonthlyStockCondition(policy)!) }}</text>
-            <!-- BUG 29: a policy the server returned without any condition
-                 detail must never render as a bare title — state the missing
-                 facts and the server's final result explicitly. -->
+            <!-- No server facts means this policy cannot claim its conditions are met. -->
             <text v-if="!eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
-            <!-- BUG 29(续):没有条件事实的策略**不得**报「已满足」。后端在额度行缺失或未启用时
-                 会下发 eligible=true + 空条件(F4B_NOT_CONFIGURED / F4B_QUOTA_UNAVAILABLE),
-                 原样渲染等于平台对购买资格作了一个自己无法兑现的承诺 —— 用户看到「结果:已满足」
-                 却看不到任何额度。没有事实支撑时只说明「未配置,不作为购买依据」。 -->
             <text v-if="eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
             <text v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityUnconfigured }}</text>
           </view>
@@ -109,7 +103,7 @@
             <!-- name + tagline + mult-badge -->
             <view class="flex items-start justify-between" style="gap: 12px">
               <view class="min-w-0">
-                <text class="block truncate" :style="nameStyle">{{ product.name }}</text>
+                <text class="block truncate" :style="nameStyle">{{ nexGridBrandText(product.name) }}</text>
                 <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
               </view>
               <text v-if="!isShare && speedup > 0" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
@@ -170,7 +164,7 @@
             </view>
 
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 8px">{{ t.store.detQuantityHint }}</text>
-            <!-- 4-cell roi-grid -->
+            <!-- Daily and monthly estimates from the current catalog; no hardware payback promise. -->
             <view class="grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr">
               <view :style="roiCellStyle(0)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
@@ -180,18 +174,6 @@
               <view :style="roiCellStyle(1)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ monthlyYieldText }}</text>
-                <text class="block" :style="roiSubStyle">{{ monthlyPctText }}{{ t.store.detPerMoSuffix }}</text>
-              </view>
-              <view :style="roiCellStyle(2)">
-                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detAnnual }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('success')">${{ annualYieldText }}</text>
-                <text class="block" :style="roiSubStyle">{{ annualPctText }}{{ t.store.detRoiSuffix }}</text>
-              </view>
-              <view :style="roiCellStyle(3)">
-                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detPayback }}</text>
-                <text v-if="paybackDays === null" class="block" :style="roiValStyle('brand')">{{ t.store.detPaybackUnavailable }}</text>
-                <text v-else class="block tabular-nums" :style="roiValStyle('brand')">{{ paybackDays }}<text style="font-size: 13px; color: var(--v5-ink-3); font-weight: 500; margin-left: 1px">{{ t.store.detDaySuffix }}</text></text>
-                <text class="block" :style="roiSubStyle">{{ paybackDays === null ? t.store.detPaybackUnavailableNote : t.store.detToBreakEven }}</text>
               </view>
             </view>
           </view>
@@ -279,6 +261,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
@@ -730,7 +713,7 @@ watch(
         amount: `$${priceText.value}`,
         amountSubtext: purchaseGate.value.soldOut
           ? t.value.store.gateSoldOut
-          : fmt(t.value.store.gateProgress, { pct: Math.round(purchaseGate.value.progressPct * 100) }),
+          : t.value.store.purchaseEligibilityIneligible,
         buttonLabel: purchaseGate.value.soldOut
           ? t.value.store.gateSoldOut
           : t.value.store.gateLockedCta,
@@ -741,11 +724,7 @@ watch(
     sticky.show({
       href: `/pages/store/checkout?product=${product.value.id}`,
       amount: `$${priceText.value}`,
-      amountSubtext: isShare.value
-        ? undefined
-        : paybackDays.value === null
-          ? t.value.store.detPaybackUnavailableNote
-          : fmt(t.value.store.detCtaPayback, { daily: dailyEarnText.value, payback: paybackLabel.value }),
+      amountSubtext: isShare.value ? undefined : `${t.value.store.detDaily}: $${dailyEarnText.value}`,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);

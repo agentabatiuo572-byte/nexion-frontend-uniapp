@@ -529,7 +529,10 @@ async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth)) return false;
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  return useApp().refreshRemoteFleet(undefined, { coalesce: true });
+  // A cold-start fleet read must follow the local phone's runtime report, so
+  // a stale PAUSED assignment cannot be projected ahead of its resume POST.
+  await useApp().syncRemoteTaskAssignments();
+  return true;
 }
 
 function readServerAuthenticatedAccountTrace(): boolean {
@@ -1216,7 +1219,7 @@ onLaunch(() => {
       void refreshAuthenticatedRemoteFleet();
     }
   }
-  // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
+  // UVEL defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
   // (system → OS scheme). Instantiating the store here also registers its live
   // OS-scheme listener for "system" mode.
@@ -1238,6 +1241,7 @@ onLaunch(() => {
 onShow(() => {
   attachSessionWatch();
   if (remoteApiEnabled) {
+    useApp().setRemoteTaskForeground(true);
     void useConfig().load();
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
@@ -1269,13 +1273,13 @@ onShow(() => {
   }
   if (canRefreshRemoteAccount(useAuth())) {
     void probeServerSession();
-    void useApp().refreshHomeTruth();
-    void refreshAuthenticatedRemoteFleet();
   }
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
+  if (remoteApiEnabled) void useApp().syncRemoteTaskAssignments();
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
+  if (remoteApiEnabled) useApp().setRemoteTaskForeground(false);
   detachSessionWatch();
   stopBusinessLoops();
   // 守卫与前台成对:这里是它**唯一**的停点(见 stopBusinessLoops 上方的不变量)。

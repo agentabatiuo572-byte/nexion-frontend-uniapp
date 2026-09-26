@@ -56,7 +56,8 @@ describe("remote registration completion owns its legal return target", () => {
     else state.current.mockResolvedValue(unacknowledged);
     const auth = { signIn: vi.fn(() => true), onboardingComplete: false };
     const session = { sessionId: "session", claim: () => ({ requiresRecalibration: false }) };
-    const app = { bindAccount: vi.fn(), projectServerIdentity: vi.fn(), refreshHomeTruth: vi.fn() };
+    const app = { bindAccount: vi.fn(), projectServerIdentity: vi.fn(), refreshHomeTruth: vi.fn(),
+      setRemoteTaskForeground: vi.fn() };
     // Execute the production completion body and real Terms runtime. Persistence
     // and account bootstrap are controlled here; route completion is withheld.
     const completeSignIn = compile(functionSource(completionSource, ["completeSignIn"]), {
@@ -82,6 +83,7 @@ describe("remote registration completion owns its legal return target", () => {
       navReset: state.nav,
     }, "finish");
     await finish();
+    expect(app.setRemoteTaskForeground).toHaveBeenCalledWith(true);
     expect(state.nav).toHaveBeenCalledWith(expect.objectContaining({ url: expected }));
     await vi.waitFor(() => expect(state.current).toHaveBeenCalledOnce());
     if (delayed) resolve(unacknowledged);

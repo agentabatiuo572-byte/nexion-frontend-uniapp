@@ -33,7 +33,7 @@
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
         <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayName }}</text>
         <view class="space-y-1">
-          <view class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
+          <view v-if="phoneLocalReady" class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
             <text style="font-size: 13px; color: var(--v5-ink)">{{ t.earn.quickMenu.stats }}</text>
           </view>
@@ -79,7 +79,7 @@
           <!-- 《09》§3:正收益=success(warning 专属 Pending/Cooling)。本行是设备
                今日**已实现**收益,非待结算 → success;同卡的 −$锁定日产 / 未解锁潜在
                收益仍用 warning(语义正确,不批量改)。 -->
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 20px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 20px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.012em">{{ phoneLocalReady ? `$${device.todayEarnings.toFixed(2)}` : '—' }}</text>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
         </view>
         <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
@@ -90,13 +90,18 @@
 
     <!-- Detail body (expanded; accordion) -->
     <view v-if="expanded" class="nx-device-card__details">
+      <view v-if="!phoneLocalReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
+        <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationTitle : t.myDevices.phoneActivationAppOnlyTitle }}</text>
+        <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationBody : t.myDevices.phoneActivationAppOnlyBody }}</text>
+        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding" @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
+      </view>
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayGpu }}<text v-if="displayLocation"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ displayLocation }}</text></text>
-        <view v-if="degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+        <view v-if="phoneLocalReady && degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
         </view>
-        <view v-else-if="degradable && lifecycle" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+        <view v-else-if="phoneLocalReady && degradable && lifecycle" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text style="opacity: 0.9">{{ t.earn.capacityChipLabel }}</text>
           <text>{{ (lifecycle.efficiency * 100).toFixed(0) }}%</text>
           <text style="opacity: 0.65">·</text>
@@ -104,7 +109,7 @@
         </view>
       </view>
 
-      <view v-if="!task && taskLockRemainingMinutes > 0" class="flex items-center justify-between"
+      <view v-if="phoneLocalReady && !task && taskLockRemainingMinutes > 0" class="flex items-center justify-between"
         style="margin: 0 20px 12px; padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb, var(--v5-warning) 10%, transparent)"
         :data-task-lock-until="device.taskLockUntil">
         <text style="font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.taskLockTitle }}</text>
@@ -112,14 +117,14 @@
       </view>
 
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
-      <view v-if="degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+      <view v-if="phoneLocalReady && degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
         <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
 
       <!-- FEAT-DEV01 异常1:产能触底 → 独立升级主 CTA(直达商城,权重提升;规格 ⑥ 矩阵第 6 行)。
            触底且有锁定任务清单时由下方 loss-ad 承载主 CTA(其样式随 floored 升权),此处不重复渲染 -->
-      <view v-if="capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
+      <view v-if="phoneLocalReady && capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
         <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
           <text :style="flooredCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
         </view>
@@ -183,7 +188,7 @@
     </view>
 
     <!-- Phone: paused (no task) -->
-    <view v-else-if="!task && device.kind === 'phone' && device.pausedReason" style="padding: 0 20px 16px">
+    <view v-else-if="phoneLocalReady && !task && device.kind === 'phone' && device.pausedReason" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <view class="rounded-xl p-3 flex items-start gap-2.5" :style="warnBoxStyle">
         <view class="rounded-lg grid place-items-center shrink-0" :style="warnIconStyle">
@@ -197,7 +202,7 @@
     </view>
 
     <!-- Phone: waiting placeholder -->
-    <view v-else-if="!task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
+    <view v-else-if="phoneLocalReady && !task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <view class="flex items-center gap-2" style="font-size: 13px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
         <svg class="nx-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -217,13 +222,15 @@
         <text style="color: var(--v5-ink-4)">·</text>
         <text>{{ task.location }}</text>
       </view>
-      <view class="mt-3 flex items-center gap-3">
+      <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
+      <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
+      <view v-if="task.status !== 'PAUSED'" class="mt-3 flex items-center gap-3">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
           <view class="h-full" :style="progressBarStyle" />
         </view>
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct }}%</text>
       </view>
-      <view class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
+      <view v-if="task.status !== 'PAUSED'" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
         <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
         <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} +${{ task.reward.toFixed(3) }}</text>
@@ -232,7 +239,7 @@
 
     <!-- Every device has its own canonical task stream. Keep the active task above;
          this list only mirrors settled task previews returned for this device. -->
-    <view class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
+    <view v-if="phoneLocalReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
         <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }} ({{ deviceTodayCompleted.length }})</text>
         <view
@@ -285,7 +292,7 @@
     </view>
 
     <!-- Phone: VRAM-gated task examples (no personal earnings projection). -->
-    <view v-if="device.kind === 'phone' && phoneLockedVisible && phoneTeasers.length" style="padding: 12px 20px 4px">
+    <view v-if="phoneLocalReady && device.kind === 'phone' && phoneLockedVisible && phoneTeasers.length" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
@@ -308,7 +315,7 @@
       </view>
     </view>
 
-    <view v-else-if="device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
+    <view v-else-if="phoneLocalReady && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.deviceCapabilityTitle }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.deviceCapabilityBody }}</text>
       <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0"
@@ -318,7 +325,7 @@
     </view>
 
     <!-- FEAT-DEV01: hardware VRAM-gated task examples. -->
-    <view v-if="hwTeasers.length" style="padding: 12px 20px 4px">
+    <view v-if="phoneLocalReady && hwTeasers.length" style="padding: 12px 20px 4px">
       <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
@@ -341,7 +348,7 @@
     </view>
 
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
-    <view style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
+    <view v-if="phoneLocalReady" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
@@ -367,6 +374,8 @@ import {
   readMonotonicNowMs,
 } from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
@@ -379,7 +388,7 @@ import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
-import { computeLiveHashpower, isDeviceOnline } from "@/lib/hashpower";
+import { canShowLivePhoneHashpower, computeLiveHashpower, isDeviceOnline } from "@/lib/hashpower";
 import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -389,6 +398,8 @@ import { shanghaiClockTime, todayCompletedTasks } from "@/lib/today-completed-ta
 const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
 const app = useApp();
+const session = useSession();
+const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 const t = useT();
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
@@ -402,8 +413,12 @@ function workloadLabel(category: TaskCategory): string {
 // Device identity is resolved from `kind` too — the stored name/gpu/location
 // are English and persist per account. See lib/device-copy.ts.
 const displayName = computed(() => deviceName(t.value, props.device));
-const displayGpu = computed(() => deviceGpuLabel(t.value, props.device));
+const phoneLocalReady = computed(() => !remoteApiEnabled || props.device.kind !== "phone"
+  || (nativePhoneAvailable && session.isCurrentDeviceCalibrated(app.accountKey) && !app.remotePhoneBindingInvalid));
+const displayGpu = computed(() => phoneLocalReady.value
+  ? deviceGpuLabel(t.value, props.device) : t.value.earn.hashCapabilityUnknown);
 const displayLocation = computed(() => deviceLocation(t.value, props.device));
+function goPhoneBinding() { if (nativePhoneAvailable) navTo("/pages/onboarding/connect?mode=recalibrate"); }
 
 // 1s re-render so progress + countdown tick.
 const now = ref(Date.now());
@@ -432,7 +447,7 @@ const KIND_ICON_PATHS: Record<DeviceKind, string> = {
 };
 const kindIconPath = computed(() => KIND_ICON_PATHS[props.device.kind] ?? KIND_ICON_PATHS.phone);
 
-const task = computed(() => props.device.currentTask);
+const task = computed(() => phoneLocalReady.value ? props.device.currentTask : null);
 // Task progress advances from the server snapshot plus a monotonic receive clock.
 // Browser wall-clock changes therefore cannot fast-forward or rewind task earnings.
 const liveTaskNow = computed(() => {
@@ -449,7 +464,7 @@ const taskLockRemainingMinutes = computed(() => {
   const lockUntil = props.device.taskLockUntil ?? 0;
   return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
 });
-const reconnecting = computed(() => props.device.kind === "phone" && props.device.interruptedAt != null);
+const reconnecting = computed(() => phoneLocalReady.value && props.device.kind === "phone" && props.device.interruptedAt != null);
 const elapsedRatio = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
@@ -466,8 +481,11 @@ const idleGated = computed(
 );
 
 const statusLabel = computed(() => {
+  if (!phoneLocalReady.value) return nativePhoneAvailable
+    ? t.value.myDevices.phoneActivationTitle : t.value.myDevices.phoneActivationAppOnlyTitle;
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
+  if (task.value?.status === "PAUSED") return t.value.earn.phoneTaskPaused;
   if (idleGated.value) return t.value.earn.idle;
   if (props.device.capacitySource === "server" && props.device.kind === "phone") {
     if (props.device.runtimeStatus === "ONLINE") return t.value.earn.online;
@@ -484,15 +502,17 @@ const statusLabel = computed(() => {
   return t.value.earn.online;
 });
 const statusColor = computed(() => {
+  if (!phoneLocalReady.value) return "var(--v5-warning-ink)";
   if (props.device.pendingDeactivate) return "var(--v5-warning)";
   if (reconnecting.value) return "var(--v5-warning)";
+  if (task.value?.status === "PAUSED") return "var(--v5-warning-ink)";
   if (props.device.capacitySource === "server" && props.device.kind === "phone") {
     return props.device.runtimeStatus === "ONLINE" ? "var(--v5-brand)" : "var(--v5-ink-3)";
   }
   if (idleGated.value || !deviceOnline.value) return "var(--v5-ink-3)";
   return "var(--v5-brand)";
 });
-const statusGlow = computed(() => !props.device.pendingDeactivate && !reconnecting.value && !idleGated.value && deviceOnline.value);
+const statusGlow = computed(() => phoneLocalReady.value && !props.device.pendingDeactivate && !reconnecting.value && !idleGated.value && deviceOnline.value);
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
@@ -546,7 +566,7 @@ function goTaskHistory() {
 // while running (charging + online + no interrupt) — paused/reconnect states use
 // their own blocks. Toggling charger/network visibly moves the number.
 const phoneRunning = computed(
-  () => props.device.kind === "phone" && !reconnecting.value && !props.device.pausedReason,
+  () => phoneLocalReady.value && canShowLivePhoneHashpower(props.device),
 );
 // Local demo phones carry a seeded capability. Remote phones only use a
 // server-calibrated value; an older fleet response may not provide one.
@@ -554,7 +574,7 @@ const FALLBACK_CAP = fallbackCapability();
 const baselineTops = computed(() => props.device.capabilityTops ?? (remoteApiEnabled ? null : FALLBACK_CAP.tops));
 const cfg = useConfig();
 const capTier = computed(() => props.device.capabilityTier ?? (remoteApiEnabled ? null : FALLBACK_CAP.tier));
-const deviceOnline = computed(() => isDeviceOnline(props.device, now.value));
+const deviceOnline = computed(() => phoneLocalReady.value && isDeviceOnline(props.device, now.value));
 const live = computed(() => {
   const baseline = baselineTops.value;
   return baseline == null ? null : computeLiveHashpower({

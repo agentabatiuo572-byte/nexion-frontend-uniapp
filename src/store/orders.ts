@@ -2,7 +2,7 @@
  * Ported from Nexion-prototype/lib/store/orders.ts
  * (zustand persist → Pinia + uni storage).
  *
- * Unified 4-stage flow for every product (NexGridBox tiers + Cloud Share).
+ * Unified 4-stage flow for every product (UVELBox tiers + Cloud Share).
  * No shipping fiction — every device is platform-hosted in our DC, so the
  * only meaningful states are: order placed → paid → DC provisioning → live.
  *
@@ -103,7 +103,7 @@ export function timelineFor(_productId: Order["productId"]): OrderStatus[] {
 }
 
 function pickDataCenter(productId: Order["productId"]): Order["dataCenter"] {
-  // NexGridRack (P1/P2) lives in Frankfurt, everything else in Singapore.
+  // UVELRack (P1/P2) lives in Frankfurt, everything else in Singapore.
   return productId === "stellarrack-p1" || productId === "stellarrack-p2"
     ? "Frankfurt DC"
     : "Singapore DC";
@@ -114,7 +114,7 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
     case "provisioning":
       return `Allocating rack slot in ${dc}…`;
     case "activated":
-      return "Device live · joined NexGrid network";
+      return "Device live · joined UVEL network";
     default:
       return undefined;
   }
@@ -469,7 +469,7 @@ export const useOrders = defineStore("orders", () => {
                   {
                     status: "activated",
                     ts: Date.now(),
-                    note: "Device live · joined NexGrid network",
+                    note: "Device live · joined UVEL network",
                   },
                 ],
               }

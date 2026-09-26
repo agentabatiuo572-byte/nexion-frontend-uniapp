@@ -79,5 +79,7 @@ export function createRemoteFleetRefreshCoordinator() {
     return active?.key === lease.key && active.revision === lease.revision;
   }
 
-  return { refresh, invalidate, isCurrent };
+  function hasInFlight(): boolean { return inFlight !== null; }
+
+  return { refresh, invalidate, isCurrent, hasInFlight };
 }

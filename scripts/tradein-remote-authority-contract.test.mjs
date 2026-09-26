@@ -74,7 +74,8 @@ test("remote device and product cards do not render a locally estimated trade-in
 test("remote ladder and device capability use server facts or fail closed", () => {
   const ladder = read("src/components/me/tradein-ladder-sheet.vue");
   const card = read("src/components/earn/device-card-pc.vue");
-  assert.match(ladder, /deviceE3Api\.tradeinConfig/);
+  assert.match(ladder, /t\.tradein\.ladderFootnote/);
+  assert.doesNotMatch(ladder.split("</template>")[0], /tradeCredit|creditAmount|\$\{\{/);
   assert.match(card, /remoteApiEnabled \? null : FALLBACK_CAP\.tops/);
   assert.match(card, /remoteApiEnabled \? null : FALLBACK_CAP\.tier/);
   assert.match(card, /v-else-if="phoneRunning"[\s\S]*hashCapabilityUnknown/);

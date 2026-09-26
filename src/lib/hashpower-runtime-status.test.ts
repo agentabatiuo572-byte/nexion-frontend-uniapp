@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deviceOnlineState, isDeviceOnline } from "./hashpower";
+import { canShowLivePhoneHashpower, deviceOnlineState, isDeviceOnline } from "./hashpower";
 
 describe("device online state", () => {
   it.each([
@@ -24,5 +24,21 @@ describe("device online state", () => {
     const device = { kind: "phone", status: "online" as const, onlineHeartbeatAt: 9_000 };
     expect(deviceOnlineState(device, 10_000)).toBe("online");
     expect(deviceOnlineState(device, 200_000)).toBe("offline");
+  });
+});
+
+describe("live phone TOPS visibility", () => {
+  const phone = { kind: "phone", currentTask: null } as Parameters<typeof canShowLivePhoneHashpower>[0];
+
+  it("hides live TOPS when the server pauses an assigned task even without a local pause reason", () => {
+    const paused = { ...phone, currentTask: { status: "PAUSED" } } as Parameters<typeof canShowLivePhoneHashpower>[0];
+    expect(canShowLivePhoneHashpower(paused)).toBe(false);
+  });
+
+  it("shows live TOPS for an unpaused phone and hides it for local interruption or hardware", () => {
+    expect(canShowLivePhoneHashpower(phone)).toBe(true);
+    expect(canShowLivePhoneHashpower({ ...phone, pausedReason: "low-battery" })).toBe(false);
+    expect(canShowLivePhoneHashpower({ ...phone, interruptedAt: 100 })).toBe(false);
+    expect(canShowLivePhoneHashpower({ ...phone, kind: "pc-gpu" })).toBe(false);
   });
 });

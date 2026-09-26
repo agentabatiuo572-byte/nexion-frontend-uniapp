@@ -21,7 +21,7 @@
               <text style="font-size: 28px">👑</text>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block truncate" :style="collTitleStyle">NexGrid Genesis Node</text>
+              <text class="block truncate" :style="collTitleStyle">UVEL Genesis Node</text>
               <text class="block" :style="marketScopeLineStyle">{{ t.marketplace.internalMarketLine }}</text>
             </view>
           </view>

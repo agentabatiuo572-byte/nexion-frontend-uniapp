@@ -48,7 +48,7 @@ test("explicit logout revokes the remote refresh session before local state is c
   const me = read("src/pages/me/me.vue");
 
   assert.match(me, /import \{[^}]*authApi[^}]*remoteApiEnabled[^}]*\} from "@\/api\/runtime"/);
-  assert.match(me, /async function handleSignOut\(\)[\s\S]*?if \(remoteApiEnabled\) await authApi\.logout\(\);[\s\S]*?session\.signOutSession\(\);[\s\S]*?auth\.signOut\(\);/);
+  assert.match(me, /async function handleSignOut\(\)[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?await app\.pauseLocalPhoneRuntimeBeforeSignOut\(\);[\s\S]*?await authApi\.logout\(\);[\s\S]*?\}[\s\S]*?session\.signOutSession\(\);[\s\S]*?auth\.signOut\(\);/);
 });
 
 test("registration OTP send uses the public auth route and a delivery-specific fallback", () => {

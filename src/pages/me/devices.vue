@@ -68,17 +68,17 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block" :style="phoneActivationTitleStyle">{{ t.myDevices.phoneActivationTitle }}</text>
-              <text class="block" :style="phoneActivationBodyStyle">{{ t.myDevices.phoneActivationBody }}</text>
+              <text class="block" :style="phoneActivationTitleStyle">{{ nativePhoneAvailable ? t.myDevices.phoneActivationTitle : t.myDevices.phoneActivationAppOnlyTitle }}</text>
+              <text class="block" :style="phoneActivationBodyStyle">{{ nativePhoneAvailable ? t.myDevices.phoneActivationBody : t.myDevices.phoneActivationAppOnlyBody }}</text>
               <text class="block" :style="phoneActivationRewardStyle">{{ t.myDevices.phoneActivationRewardGate }}</text>
             </view>
           </view>
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation" @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
+          <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation" @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
             <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
           </view>
         </view>
 
-        <!-- Trial device — NexGridBox S1 on free trial (shadow, not a real device).
+        <!-- Trial device — UVELBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
           <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
@@ -87,7 +87,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex flex-wrap items-center" style="gap: 6px">
-                <text class="truncate" :style="trialNameStyle">NexGridBox S1</text>
+                <text class="truncate" :style="trialNameStyle">UVELBox S1</text>
                 <text :style="trialBadgeStyle">{{ trialLabels.badge }}</text>
               </view>
               <text class="block" :style="trialSubStyle">{{ trial.status === 'grace' ? t.trial.ghostRibbonGrace : t.trial.deviceRowSub }}</text>
@@ -224,6 +224,7 @@ import { trialCardLabels } from "@/lib/trial-card-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { PRODUCTS } from "@/mock/products";
@@ -245,6 +246,7 @@ import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device
 const t = useT();
 const app = useApp();
 const session = useSession();
+const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
@@ -289,7 +291,7 @@ const phoneNeedsActivation = computed(() => {
   const phones = app.visibleDevices.filter((device) => device.kind === "phone");
   if (phones.some(requiresActivationConfirmation)) return true;
   return !phones.some((device) => device.activatedAt !== null)
-    || !session.isCurrentDeviceCalibrated(app.accountKey);
+    || app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey);
 });
 
 // Trial reserves a slot too (shadow device, not in devices[]).
@@ -443,6 +445,7 @@ function onSheetWait() {
 }
 
 function goPhoneActivation() {
+  if (!nativePhoneAvailable) return;
   navTo("/pages/onboarding/connect?mode=recalibrate");
 }
 

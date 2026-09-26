@@ -49,7 +49,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" :style="heroLabelStyle">{{ statusLabel(order.status) }}</text>
-              <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ order.productName }}</text>
+              <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ nexGridBrandText(order.productName) }}</text>
             </view>
           </view>
 
@@ -85,7 +85,7 @@
           <view v-if="order.lineItems?.length" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border)">
             <view v-for="item in order.lineItems" :key="item.sku" class="flex items-center justify-between" style="padding: 4px 0; gap: 12px">
               <view class="flex-1 min-w-0">
-                <text class="block truncate" style="font-size: 12px; color: var(--v5-ink)">{{ item.name }}</text>
+                <text class="block truncate" style="font-size: 12px; color: var(--v5-ink)">{{ nexGridBrandText(item.name) }}</text>
                 <text class="block tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ item.sku }} · {{ item.quantity }} × ${{ item.unitPriceUsdt.toLocaleString() }}</text>
               </view>
               <text class="shrink-0 tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">${{ item.lineAmountUsdt.toLocaleString() }}</text>
@@ -149,7 +149,7 @@
           </view>
         </view>
 
-        <!-- Pending remote orders can retry only the idempotent NexGrid wallet debit. -->
+        <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
         <view v-if="cancellable" class="mx-4" style="margin-top: 12px; margin-bottom: 24px">
           <view
             v-if="canPayFromWallet"
@@ -191,6 +191,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -425,7 +426,7 @@ function eventFor(stage: OrderStatus) {
 function eventText(stage: OrderStatus): string {
   const evt = eventFor(stage);
   if (!evt) return "";
-  return `${dt(evt.ts)}${evt.note ? ` · ${evt.note}` : ""}`;
+  return dt(evt.ts);
 }
 
 function dt(ts: number): string {

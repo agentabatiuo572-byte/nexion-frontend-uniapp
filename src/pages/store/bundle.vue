@@ -16,7 +16,7 @@
   结算分两档:
   - mock:余额直付——保留原型体验。
   - 远端:POST /api/orders/bundle 由服务端锁库存、计算阶梯折扣并创建一张 BUNDLE 订单；
-    随后只能通过 NexGrid 钱包扣款接口完成支付与设备激活，不拉起第三方收银台。
+    随后只能通过 UVEL 钱包扣款接口完成支付与设备激活，不拉起第三方收银台。
     客户端只展示预估，最终金额以服务器回执为准，结果未知时复用同一幂等键。
 -->
 <template>
@@ -90,14 +90,14 @@
           :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
         >
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="itemNameStyle">{{ p.name }}</text>
+            <text class="block truncate" :style="itemNameStyle">{{ nexGridBrandText(p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
             </text>
             <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: p.name })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: nexGridBrandText(p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -115,12 +115,12 @@
             role="button"
             tabindex="0"
             :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
-              ? `${p.name} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: p.name })"
+              ? `${nexGridBrandText(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: nexGridBrandText(p.name) })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
-              <text class="block truncate" :style="suggestionNameStyle">{{ p.name }}</text>
+              <text class="block truncate" :style="suggestionNameStyle">{{ nexGridBrandText(p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
                 <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
               </text>
@@ -195,6 +195,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
@@ -444,7 +445,7 @@ async function onAddSuggestion(p: Product) {
   }
   if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
   cart.add(p.id);
-  toast.success(fmt(t.value.bundle.addedToBundle, { name: p.name }));
+  toast.success(fmt(t.value.bundle.addedToBundle, { name: nexGridBrandText(p.name) }));
 }
 interface PendingBundleCommands { commands: Record<string, PendingBundleCommand | string> }
 const BUNDLE_COMMAND_KEY = "nexgrid-bundle-order-command-v1";

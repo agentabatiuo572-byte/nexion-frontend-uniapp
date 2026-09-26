@@ -21,41 +21,11 @@
           <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         </view>
         <view>
-          <text class="block font-display" :style="nameStyle">{{ tier.name }}</text>
-          <text class="block font-mono-tabular" :style="stockLineStyle">{{ stockLineText }}</text>
+          <text class="block font-display" :style="nameStyle">{{ displayName }}</text>
+          <text class="block font-mono-tabular" :style="stockLineStyle">{{ priceLineText }}</text>
         </view>
       </view>
       <text class="font-mono-tabular" :style="badgeStyle">{{ unlocked ? t.quota.unlocked : t.quota.locked }}</text>
-    </view>
-
-    <!-- stock progress -->
-    <view style="margin-top: 12px">
-      <view ref="stockBarRef" class="rounded-full overflow-hidden" :style="stockTrackStyle">
-        <view class="rounded-full" :style="stockFillStyle" />
-      </view>
-      <view class="flex items-center justify-between font-mono-tabular" :style="stockStatsStyle">
-        <text>{{ fmt(t.quota.soldPct, { pct: Math.round(stockPct * 100) }) }}</text>
-        <text>{{ fmt(t.quota.leftLabel, { n: stockLeft }) }}</text>
-      </view>
-    </view>
-
-    <!-- conditions -->
-    <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
-      <text class="block font-mono-tabular" :style="unlockHeadStyle">{{ tier.unlockKind === "either" ? t.quota.unlockEither : t.quota.unlockAll }}</text>
-      <view v-for="(c, i) in tier.conditions" :key="i">
-        <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 4px">
-          <view class="flex items-center" style="gap: 4px">
-            <svg v-if="c.current >= c.required" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-            <text :style="{ color: 'var(--v5-ink-2)' }">{{ c.label }}</text>
-          </view>
-          <text class="font-mono-tabular tabular-nums">
-            <text :style="{ color: c.current >= c.required ? 'var(--v5-success)' : 'var(--v5-ink)' }">{{ c.kind === "volume" ? `$${c.current.toLocaleString()}` : c.current }}</text>
-            <text :style="{ color: 'var(--v5-ink-3)' }"> / {{ c.kind === "volume" ? `$${c.required.toLocaleString()}` : c.required }}</text>
-          </text>
-        </view>
-        <QuotaConditionBar :pct="Math.min(1, c.current / c.required)" :met="c.current >= c.required" :tint="tier.tint" />
-      </view>
     </view>
 
     <!-- perks -->
@@ -66,31 +36,18 @@
       </view>
     </view>
 
-    <!-- Percentage and its inputs share this guard, so a missing catalog cannot
-         leave an unexplained annualized claim beside the NEX/day figure. -->
-    <view v-if="tier.roiBasis" :style="roiBasisWrapStyle">
-      <text class="block font-mono-tabular" :style="roiBasisStyle">{{ fmt(t.quota.perkRoi, { roi: tier.roiBasis.roi }) }}</text>
-      <text class="block font-mono-tabular" :style="roiBasisStyle">{{ fmt(t.quota.perkRoiBasis, {
-        dailyEarn: tier.roiBasis.dailyEarn.toFixed(2),
-        price: tier.roiBasis.price.toLocaleString(),
-        roi: tier.roiBasis.roi,
-      }) }}</text>
-      <text class="block" :style="roiNoteStyle">{{ fmt(t.quota.perkRoiRevision, { revision: tier.roiBasis.revision || t.quota.perkRoiRevisionUnknown }) }}</text>
-      <text class="block" :style="roiNoteStyle">{{ t.quota.perkRoiNotGuaranteed }}</text>
-    </view>
-
     <!-- CTA -->
     <view style="margin-top: 12px">
-      <view v-if="unlocked && stockLeft > 0 && tier.available !== false" class="flex items-center justify-center active:opacity-90" :style="buyCtaStyle" role="button" tabindex="0" :aria-label="fmt(t.quota.buyCta, { name: tier.name })" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
+      <view v-if="unlocked && stockLeft > 0 && tier.available !== false" class="flex items-center justify-center active:opacity-90" :style="buyCtaStyle" role="button" tabindex="0" :aria-label="fmt(t.quota.buyCta, { name: displayName })" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-        <text :style="{ color: 'var(--v5-on-brand)' }" style="pointer-events: none">{{ fmt(t.quota.buyCta, { name: tier.name }) }}</text>
+        <text :style="{ color: 'var(--v5-on-brand)' }" style="pointer-events: none">{{ fmt(t.quota.buyCta, { name: displayName }) }}</text>
       </view>
       <view v-else-if="stockLeft <= 0 || tier.available === false" class="flex items-center justify-center" :style="lockedCtaStyle" aria-disabled="true">
         <text>{{ t.quota.stockUnavailable }}</text>
       </view>
-      <view v-else class="flex items-center justify-center active:opacity-80" :style="lockedCtaStyle" role="button" tabindex="0" :aria-label="t.quota.inviteToUnlock" @click="emit('navigate', '/pages/team/team')">
+      <view v-else class="flex items-center justify-center active:opacity-80" :style="lockedCtaStyle" role="button" tabindex="0" :aria-label="t.store.purchaseEligibilityIneligible" @click="emit('navigate', `/pages/store/detail?id=${tier.productId}`)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-        <text :style="{ color: 'var(--v5-ink-2)' }" style="pointer-events: none">{{ t.quota.inviteToUnlock }}</text>
+        <text :style="{ color: 'var(--v5-ink-2)' }" style="pointer-events: none">{{ t.store.purchaseEligibilityIneligible }}</text>
       </view>
     </view>
   </view>
@@ -101,6 +58,7 @@ import { computed, type CSSProperties } from "vue";
 import QuotaConditionBar from "./quota-condition-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 export interface QuotaCondition {
@@ -132,6 +90,7 @@ const props = defineProps<{ tier: QuotaTier }>();
 const emit = defineEmits<{ navigate: [url: string] }>();
 
 const t = useT();
+const displayName = computed(() => nexGridBrandText(props.tier.name));
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 
 const unlocked = computed(() => {
@@ -140,8 +99,8 @@ const unlocked = computed(() => {
 });
 const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, props.tier.soldThisMonth / props.tier.monthlyStock) : 1);
 const stockLeft = computed(() => Math.max(0, props.tier.monthlyStock - props.tier.soldThisMonth));
-const stockLineText = computed(() =>
-  fmt(t.value.quota.priceLine, { price: props.tier.price.toLocaleString(), left: stockLeft.value, stock: props.tier.monthlyStock }),
+const priceLineText = computed(() =>
+  fmt(t.value.quota.priceLine, { price: props.tier.price.toLocaleString() }),
 );
 
 // ─── styles ───

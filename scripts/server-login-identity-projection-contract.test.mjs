@@ -61,7 +61,8 @@ test("remote fleet reads cannot start without a matching in-memory server sessio
   const appStore = read("src/store/app.ts");
   assert.match(appShell, /function canRefreshRemoteAccount\(auth:/);
   assert.match(appShell, /sessionVault\.read\(\)[\s\S]*?auth\.accountId === `user:\$\{serverSession\.user\.userId\}`/);
-  assert.match(appShell, /async function refreshAuthenticatedRemoteFleet\(\)[\s\S]*if \(!canRefreshRemoteAccount\(auth\)\) return false;[\s\S]*return useApp\(\)\.refreshRemoteFleet\(undefined, \{ coalesce: true \}\);/);
+  assert.match(appShell, /async function refreshAuthenticatedRemoteFleet\(\)[\s\S]*if \(!canRefreshRemoteAccount\(auth\)\) return false;[\s\S]*await useApp\(\)\.syncRemoteTaskAssignments\(\);/);
+  assert.match(appStore, /async function syncRemoteTaskAssignments\(\)[\s\S]*reportPhoneRuntime\([\s\S]*readRemoteTaskAssignments\(request\)[\s\S]*refreshRemoteFleet\(request, \{ coalesce: true \}\)/);
   assert.match(appShell, /if \(canRefreshRemoteAccount\(auth\)\) \{[\s\S]*refreshHomeTruth\(\);[\s\S]*refreshAuthenticatedRemoteFleet\(\);/);
   assert.doesNotMatch(appShell, /if \(remoteApiEnabled\) void useApp\(\)\.refreshRemoteFleet\(\);/);
   assert.match(appStore, /const activeSession = sessionVault\.read\(\);/);

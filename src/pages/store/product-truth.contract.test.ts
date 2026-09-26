@@ -90,14 +90,15 @@ describe("locked card gate affordance tells the truth", () => {
   });
 
   it("routes a locked card to the product page in remote mode instead of expanding nothing", () => {
-    // remote 分支必须先于 local 的展开翻转,且确实走 goDetail。
-    expect(productCard).toMatch(/if \(remoteApiEnabled\) \{[\s\S]{0,220}?goDetail\(\);/);
-    // 展开区在 remote 下不渲染,所以那条翻转语句不能是 remote 的唯一效果。
-    expect(productCard).toMatch(/if \(!gate\.value\.soldOut\) gateDetailsOpen\.value = !gateDetailsOpen\.value;/);
+    const gateClick = productCard.slice(productCard.indexOf("function toggleGateDetails()"), productCard.indexOf("// Text helpers", productCard.indexOf("function toggleGateDetails()")));
+    expect(gateClick).toContain('if (eligibility.value.status === "error") { void retryEligibility(); return; }');
+    expect(gateClick).toMatch(/if \(remoteApiEnabled\) \{[\s\S]*?goDetail\(\);\s*return;/);
+    expect(gateClick).not.toContain("gateDetailsOpen.value = !gateDetailsOpen.value");
   });
 
-  it("uses a forward chevron in remote mode rather than an expand chevron", () => {
-    expect(productCard).toMatch(/v-if="remoteApiEnabled" width="13" height="13"[^>]*><path d="m9 18 6-6-6-6"/);
-    expect(productCard).toMatch(/v-else width="13" height="13"[^>]*><path d="m6 9 6 6 6-6"/);
+  it("uses a forward chevron for the gate route rather than an expand chevron", () => {
+    const gateMarkup = productCard.slice(productCard.indexOf("<!-- Purchase gate"), productCard.indexOf("<!-- Trade-in callout"));
+    expect(gateMarkup).toContain('<path d="m9 18 6-6-6-6"');
+    expect(gateMarkup).not.toContain('<path d="m6 9 6 6 6-6"');
   });
 });

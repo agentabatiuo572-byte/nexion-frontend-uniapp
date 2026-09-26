@@ -7,20 +7,21 @@ const OLD = "Nexi" + "on";
 
 describe("nexGridBrandText", () => {
   it("归一服务端存量行的旧品牌文案,大小写不敏感", () => {
-    expect(nexGridBrandText(`${OLD} 1831`)).toBe("NexGrid 1831");
-    expect(nexGridBrandText(`${OLD} App / H5`)).toBe("NexGrid App / H5");
-    expect(nexGridBrandText(`欢迎来到 ${OLD}`)).toBe("欢迎来到 NexGrid");
-    expect(nexGridBrandText(`${OLD.toUpperCase()} OPS`)).toBe("NexGrid OPS");
+    expect(nexGridBrandText(`${OLD} 1831`)).toBe("UVEL 1831");
+    expect(nexGridBrandText(`${OLD} App / H5`)).toBe("UVEL App / H5");
+    expect(nexGridBrandText(`欢迎来到 ${OLD}`)).toBe("欢迎来到 UVEL");
+    expect(nexGridBrandText(`${OLD.toUpperCase()} OPS`)).toBe("UVEL OPS");
   });
 
   it("商品名逐词归一(旧词是词根,不是整名)", () => {
-    expect(nexGridBrandText(`${OLD}Box Pro v2`)).toBe("NexGridBox Pro v2");
-    expect(nexGridBrandText(`${OLD}Rack P1`)).toBe("NexGridRack P1");
-    expect(nexGridBrandText(`${OLD} V-Rank`)).toBe("NexGrid V-Rank");
+    expect(nexGridBrandText(`${OLD}Box Pro v2`)).toBe("UVELBox Pro v2");
+    expect(nexGridBrandText(`${OLD}Rack P1`)).toBe("UVELRack P1");
+    expect(nexGridBrandText(`${OLD} V-Rank`)).toBe("UVEL V-Rank");
   });
 
   it("已在新品牌下的文案原样透传", () => {
-    expect(nexGridBrandText("NexGridBox S1")).toBe("NexGridBox S1");
+    expect(nexGridBrandText("NexGridBox S1")).toBe("UVELBox S1");
+    expect(nexGridBrandText("UVELBox S1")).toBe("UVELBox S1");
     expect(nexGridBrandText("")).toBe("");
   });
 });

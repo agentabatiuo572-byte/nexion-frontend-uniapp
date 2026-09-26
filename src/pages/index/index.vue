@@ -16,6 +16,13 @@
         <TechMoneyCard />
       </view>
       <TrialGhostSlot />
+      <view v-if="phoneNeedsBinding" class="rounded-2xl" style="padding: 16px; background: var(--v5-brand-soft)" role="status">
+        <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ t.myDevices.phoneActivationTitle }}</text>
+        <text class="block" style="margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--v5-ink-2)">{{ t.myDevices.phoneActivationBody }}</text>
+        <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 8px; color: var(--v5-brand); font-size: 13px; font-weight: 600" role="button" tabindex="0" data-home-action="phone-binding" @click="goPhoneBinding" @keydown.enter.prevent="goPhoneBinding" @keydown.space.prevent="goPhoneBinding">
+          <text>{{ t.myDevices.phoneActivationCta }} →</text>
+        </view>
+      </view>
 
       <view
         v-if="visibleTaskCards.length"
@@ -100,6 +107,7 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -127,6 +135,9 @@ import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
+import { navTo } from "@/lib/route";
 import {
   deriveHomeTaskCards,
   createHomeNewcomerContentResizer,
@@ -144,6 +155,11 @@ interface TouchPoint {
 
 const TASK_CAROUSEL_INTERVAL_MS = 5000;
 const t = useT();
+const app = useApp();
+const session = useSession();
+const phoneNeedsBinding = computed(() => remoteApiEnabled && hasNativeAndroidPhoneRuntime() && app.accountKey !== "default"
+  && (app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey)));
+function goPhoneBinding() { if (hasNativeAndroidPhoneRuntime()) navTo("/pages/onboarding/connect?mode=recalibrate"); }
 // 🔴 首页承载 QuickActionRow(创世快捷入口,受闸文案),必须跟着重读配置(独立验收 P1:
 //   此前只有 3 个创世页接了 onShow,首页与商城页漏接 —— 用户停在首页,运营切关闭,
 //   首页仍在催「仅剩 N 席」)。

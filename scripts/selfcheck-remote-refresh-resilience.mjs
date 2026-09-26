@@ -257,7 +257,8 @@ function throwingRuntimeStub(mode) {
   // 字段结构 = runtime-config.ts 的 ApiRuntimeConfig 接口;modeExplicit 置 true,
   // sandbox 轮的 developmentFundsEnabled 表达式才能按真语义判真。
   const special = {
-    apiRuntimeConfig: `export const apiRuntimeConfig = { mode: ${JSON.stringify(mode)}, modeExplicit: true, baseUrl: "http://unreachable.invalid" };`,
+    apiRuntimeConfig: `export const apiRuntimeConfig = { mode: ${JSON.stringify(mode)}, environment: ${JSON.stringify(mode === "remote" ? "prod" : "dev")}, modeExplicit: true, baseUrl: "http://unreachable.invalid" };`,
+    expectedApiEnvironment: `export const expectedApiEnvironment = apiRuntimeConfig.environment;`,
     // app#refreshRemoteFleet now correctly refuses a USER read without a
     // matching in-memory session. Give the harness a coherent non-secret
     // identity so this remains an authority-unavailable test instead of a

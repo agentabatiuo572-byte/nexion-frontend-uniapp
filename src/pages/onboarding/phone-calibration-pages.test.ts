@@ -20,7 +20,7 @@ const cleanups: Array<() => void> = [];
 afterEach(() => { cleanups.splice(0).forEach(fn => fn()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function settle() { for (let n = 0; n < 15; n++) await vue.nextTick(); }
 
-function mount(name: "connect" | "estimator", api: any, query: Record<string, string> = {}) {
+function mount(name: "connect" | "estimator", api: any, query: Record<string, string> = {}, nativePhone = true) {
   const hooks: Record<string, (...args: any[]) => void> = {};
   const auth = vue.reactive({ accountId: "user:42", email: "", isAuthenticated: true,
     completeOnboarding: vi.fn(() => true), requireOnboarding: vi.fn(), signOut: vi.fn() });
@@ -38,6 +38,7 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
     "@/store/auth-account": { markAuthAccountOnboardingComplete: () => true },
     "@/lib/secure-command-id": { requireCryptoUuid: () => "fixed-unique-command" },
     "@/lib/device-id": { getDeviceId: () => "phone-1" },
+    "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => nativePhone },
     "@/lib/device-signals": { collectDeviceSignals: () => raw },
     "@/api/runtime": { onboardingCalibrationApi: api, remoteApiEnabled: true },
     "@/lib/account-scope": { captureAccountScope: () => ({ epoch }), isCurrentAccountScope: (scope: any) => scope.epoch === epoch },
@@ -60,6 +61,27 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
 }
 
 describe("real onboarding page workers", () => {
+  it("does not calibrate or activate a browser installation, while Android can", async () => {
+    const browserApi = { result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
+    const browserEstimate = mount("estimator", browserApi, {}, false);
+    const browserConnect = mount("connect", browserApi, {}, false);
+    await settle();
+    browserConnect.page.phase.value = "calibrating";
+    await settle();
+    await browserConnect.page.activate();
+    expect(browserApi.result).not.toHaveBeenCalled();
+    expect(browserApi.calibrate).not.toHaveBeenCalled();
+    expect(browserApi.activate).not.toHaveBeenCalled();
+    expect(browserEstimate.page.detected.value).toBe(false);
+
+    const androidApi = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn(),
+      activate: vi.fn().mockResolvedValue({ ...record, revision: 4, activationStatus: "ACTIVE" }) };
+    const androidConnect = mount("connect", androidApi, {}, true);
+    await settle();
+    await androidConnect.page.activate();
+    expect(androidApi.result).toHaveBeenCalled();
+    expect(androidApi.activate).toHaveBeenCalled();
+  });
   it("automatically creates an estimate on first registration and enables the next step", async () => {
     vi.useFakeTimers();
     const api = { result: vi.fn().mockRejectedValue(missing()), calibrate: vi.fn().mockResolvedValue(record), activate: vi.fn() };

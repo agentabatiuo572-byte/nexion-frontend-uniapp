@@ -62,7 +62,7 @@
         </view>
       </view>
 
-      <!-- CTA(已登录 → 进入 NexGrid,隐藏注册入口;异常2) -->
+      <!-- CTA(已登录 → 进入 UVEL,隐藏注册入口;异常2) -->
       <view v-if="!authed && referralCta === 'referral'" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
         <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ rewardEnabled ? fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) : t.ref.joinCta }}</text>

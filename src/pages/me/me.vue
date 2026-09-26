@@ -92,7 +92,7 @@
       </view>
 
       <!-- i18n-en-ok: 版本指纹(品牌 · 语义化版本 · 构建号),报障时要跟日志逐字对得上,本地化会让对不上 -->
-      <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4)">NexGrid · v3.2.0 · build 6824</text>
+      <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4)">UVEL · v3.2.0 · build 6824</text>
     </CardStagger>
   </AppChassis>
 
@@ -553,12 +553,16 @@ async function handleSignOut() {
     confirmLabel: t.value.me.signOutConfirmLabel,
   });
   if (ok) {
-    // The server owns refresh-token revocation. authApi.logout always clears
-    // this device locally in its finally block, including an offline failure.
-    if (remoteApiEnabled) await authApi.logout();
     // Self sign-out: void in-flight tasks (rollback) + release the shared
     // session record (other tabs see "logged-out") before clearing auth.
     app.interruptAllTasks("logged-out");
+    if (remoteApiEnabled) {
+      // Stop new heartbeats, let any healthy POST finish, then pause this phone
+      // before the authenticated session is revoked. Offline failure falls
+      // back to the server's 120-second heartbeat timeout.
+      await app.pauseLocalPhoneRuntimeBeforeSignOut();
+      await authApi.logout();
+    }
     session.signOutSession();
     auth.signOut();
     // 登出兜底:清全部账号级数据的内存残留(P2-8 纵深防御;下次登录会重绑真账号)。

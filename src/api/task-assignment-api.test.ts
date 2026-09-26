@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
 import { createTaskAssignmentApi } from "./task-assignment-api";
+import { createApiClient } from "./api-client";
+import { createSessionVault } from "./session-vault";
+
+it("preserves a Spring binding rejection carried in a successful HTTP envelope", async () => {
+  const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: {
+    code: 409, message: "TASK_ASSIGNMENT_PHONE_BINDING_INVALID", data: null,
+  } });
+  const client = createApiClient({ baseUrl: "https://api.example.com", vault: createSessionVault(),
+    transport: { request } });
+  await expect(client.request({ path: "/api/tasks/phone/runtime", authenticated: false }))
+    .rejects.toMatchObject({ kind: "business", status: 200, code: 409,
+      message: "TASK_ASSIGNMENT_PHONE_BINDING_INVALID" });
+});
 
 describe("task assignment server receipt projection", () => {
   it("accepts the production-shaped development projection returned by Java", async () => {
@@ -187,13 +200,66 @@ describe("task assignment server receipt projection", () => {
     });
   });
 
-  it("exposes only read projections in every client environment", () => {
+  it("exposes read projections plus the phone telemetry report without task money mutations", () => {
     const request = vi.fn();
     const devApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
     const prodApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
 
-    expect(Object.keys(devApi).sort()).toEqual(["receipt", "receipts", "state"]);
-    expect(Object.keys(prodApi).sort()).toEqual(["receipt", "receipts", "state"]);
+    expect(Object.keys(devApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "state"]);
+    expect(Object.keys(prodApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "state"]);
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it("keeps a server-paused phone task without inventing a completion estimate", async () => {
+    const request = vi.fn().mockResolvedValue({
+      serverNow: "2026-09-26 18:00:00", source: "server", sourceEnvironment: "PRODUCTION",
+      runId: "", serverCanonical: true,
+      devices: [{
+        deviceId: 811, instanceNo: "PHONE-811", deviceType: "MOBILE", lockUntil: null,
+        recentTasks: [], currentTask: {
+          taskNo: "CTA-PAUSED", deviceId: 811, taskId: "ll-1", taskName: "Inference",
+          taskClass: "LL", model: "Model", client: "UVEL App", status: "PAUSED",
+          rewardUsdt: 0.25, requiredSeconds: 60, startedAt: "2026-09-26 17:58:00",
+          completableAt: null, completedAt: null, receiptNo: null, proofNonce: null,
+          proofExpiresAt: null, source: "server", sourceEnvironment: "PRODUCTION",
+          runId: "", serverCanonical: true,
+        },
+      }],
+    });
+    const projection = await createTaskAssignmentApi({ request } as unknown as ApiClient, "dev").state();
+    expect(projection.devices[0]?.currentTask).toMatchObject({ status: "PAUSED", completableAt: null });
+  });
+
+  it("reports validated native phone observations without using charging as an eligibility input", async () => {
+    const request = vi.fn().mockResolvedValue(null);
+    const api = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
+    await api.reportPhoneRuntime("local-install-abc", 19, true, false);
+    expect(request).toHaveBeenCalledWith({
+      path: "/api/tasks/phone/runtime", method: "POST",
+      body: { calibrationDeviceId: "local-install-abc", batteryLevel: 19, networkReachable: true, isCharging: false },
+    });
+    await api.reportPhoneRuntime("local-install-abc", 19, true, null);
+    expect(request).toHaveBeenLastCalledWith({
+      path: "/api/tasks/phone/runtime", method: "POST",
+      body: { calibrationDeviceId: "local-install-abc", batteryLevel: 19, networkReachable: true, isCharging: null },
+    });
+    await api.reportPhoneRuntime("local-install-abc", null, false, null);
+    expect(request).toHaveBeenLastCalledWith({
+      path: "/api/tasks/phone/runtime", method: "POST",
+      body: { calibrationDeviceId: "local-install-abc", batteryLevel: null, networkReachable: false, isCharging: null },
+    });
+    await expect(api.reportPhoneRuntime("local-install-abc", null, true, null)).rejects.toMatchObject({
+      kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID",
+    });
+    await expect(api.reportPhoneRuntime("local-install-abc", -1, true, false)).rejects.toMatchObject({
+      kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID",
+    });
+    await expect(api.reportPhoneRuntime("", 19, true, false)).rejects.toMatchObject({
+      kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID",
+    });
+    await expect(api.reportPhoneRuntime("other device", 19, true, false)).rejects.toMatchObject({
+      kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID",
+    });
+    expect(request).toHaveBeenCalledTimes(3);
   });
 });
