@@ -150,6 +150,68 @@ describe("genesis remote truth contract", () => {
     });
   });
 
+  it("preserves server-supplied Genesis prices and market states", () => {
+    // The approved 5174 values are a deterministic parser fixture, not a live policy assertion.
+    const approved5174 = {
+      serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+      halted: false, revision: "5174-fixture", source: "nx_emergency_control_setting:killswitch.genesis",
+      series: {
+        seriesCode: "genesis-main", name: "Genesis", totalSupply: 1000,
+        soldSupply: 100, remainingSupply: 900, priceUsdt: 9999,
+        royaltyPct: 2.5, dailyEmissionRatePct: 0.1,
+      },
+      market: { enabled: true }, emission: { open: true },
+      sale: {
+        serverCanonical: true, eligibilityEnabled: true, available: true, open: true,
+        maxPerUser: 5, minAccountAgeDays: 0, presaleEnabled: false,
+        showCountdown: false, unitPriceUsdt: 9999,
+      },
+      listings: [], transactions: [],
+      tiers: [
+        { id: "tier-1", from: 0, to: 100, priceUSDT: 7999 },
+        { id: "tier-2", from: 100, to: 550, priceUSDT: 9999 },
+        { id: "tier-3", from: 550, to: 1000, priceUSDT: 11999 },
+      ],
+      tiersVersion: 1, marketOpenState: "open", marketOpenStateVersion: 1,
+      closedNoticeKey: "default", showcaseEnabled: true, catalogAvailable: true,
+      tradeAvailable: true, tradeBlockedReason: "NONE",
+      marketStats: { floorUsdt: null, volume24hUsdt: 0, owners: 0, floorDeltaPct: null, lastSaleUsdt: null },
+    };
+    const state = parseGenesisPublicState(approved5174);
+
+    expect(state.series).toMatchObject({ totalSupply: 1000, priceUsdt: 9999, royaltyPct: 2.5, dailyEmissionRatePct: 0.1 });
+    expect(state.tiers.map(({ from, to, priceUSDT }) => ({ from, to, priceUSDT }))).toEqual([
+      { from: 0, to: 100, priceUSDT: 7999 },
+      { from: 100, to: 550, priceUSDT: 9999 },
+      { from: 550, to: 1000, priceUSDT: 11999 },
+    ]);
+    expect(state).toMatchObject({ marketOpenState: "open", marketEnabled: true, sale: {
+      eligibilityEnabled: true, available: true, open: true, maxPerUser: 5,
+      minAccountAgeDays: 0, presaleEnabled: false, showCountdown: false, unitPriceUsdt: 9999,
+    } });
+    const changed = parseGenesisPublicState({
+      ...approved5174,
+      series: { ...approved5174.series, priceUsdt: 7999 },
+      sale: { ...approved5174.sale, unitPriceUsdt: 7999, maxPerUser: 2, minAccountAgeDays: 30 },
+      tiers: [
+        { id: "changed-1", from: 0, to: 200, priceUSDT: 7999 },
+        { id: "changed-2", from: 200, to: 700, priceUSDT: 10999 },
+        { id: "changed-3", from: 700, to: 1000, priceUSDT: 12999 },
+      ],
+      market: { enabled: false }, marketOpenState: "closed",
+      tradeAvailable: false, tradeBlockedReason: "GENESIS_MARKET_CLOSED",
+    });
+    expect(changed).toMatchObject({
+      series: { priceUsdt: 7999 }, sale: { unitPriceUsdt: 7999, maxPerUser: 2, minAccountAgeDays: 30 },
+      marketOpenState: "closed", marketEnabled: false, tradeAvailable: false,
+    });
+    expect(changed.tiers.map(({ from, to, priceUSDT }) => ({ from, to, priceUSDT }))).toEqual([
+      { from: 0, to: 200, priceUSDT: 7999 },
+      { from: 200, to: 700, priceUSDT: 10999 },
+      { from: 700, to: 1000, priceUSDT: 12999 },
+    ]);
+  });
+
   it("strictly parses holder allocation, priority, reasons, policy version and provenance", async () => {
     const request = vi.fn().mockResolvedValue({
       serverCanonical: true,
