@@ -16,7 +16,9 @@ export function resolveWalletBillMemo(bill: DisplayBill, memo: Record<string, st
   if (typeof keyed === "string" && keyed) {
     const label = bill.memoParams ? fmt(keyed, bill.memoParams) : keyed;
     const courseTitle = bill.memoKey === "learningReward" && bill.ref ? courseTitles[bill.ref] : undefined;
-    return courseTitle ? `${label} · ${courseTitle}` : label;
+    return bill.memoKey === "learningReward" && bill.ref
+      ? `${label} · ${courseTitle || bill.ref}`
+      : label;
   }
   return memo.other ?? "Other ledger entry";
 }

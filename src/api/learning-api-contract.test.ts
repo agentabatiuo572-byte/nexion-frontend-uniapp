@@ -101,6 +101,18 @@ test.each(["dev", "prod"] as const)("%s learning reads Java production-shaped fa
   });
 });
 
+test("learning overview accepts only exact-version historical reward titles", async () => {
+  const response = {
+    courses: [], completedCourses: 0, totalCourses: 0, earnedNex: "10",
+    rewardTitles: { "nexgrid-account-safety-202609@v1": "Account safety" } as Record<string, string>,
+    serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
+  };
+  const api = createLearningApi({ request: async () => response } as never);
+  await expect(api.courses("en")).resolves.toMatchObject({ rewardTitles: response.rewardTitles });
+  response.rewardTitles = { "wrong reference": "Draft title" };
+  await expect(api.courses("en")).resolves.toMatchObject({ rewardTitles: {} });
+});
+
 test("development learning rejects a sandbox projection", async () => {
   advanceRuntimeRevision(RUN);
   const api = createLearningApi({ request: async () => ({
