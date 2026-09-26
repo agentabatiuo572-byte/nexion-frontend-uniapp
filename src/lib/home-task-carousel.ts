@@ -1,5 +1,6 @@
 import type { CanonicalPromoBanner, CanonicalQuest, QuestSnapshot, QuestTaskCategory } from "@/api/quest-api";
 import { isCurrentQuest } from "./actionable-quest";
+import { nexGridBrandText } from "./brand-copy";
 
 export type HomeTaskCardId = "newcomer" | "weekly";
 
@@ -147,9 +148,9 @@ export function presentHomeWeeklyCard(
       rewardNex: Math.round(source.quest.rewardNex * multiplier),
       countdownDays: hours === null ? null : Math.floor(hours / 24),
       countdownHours: hours === null ? null : hours % 24,
-      subtitle: metadata?.targetDevice
+      subtitle: nexGridBrandText(metadata?.targetDevice
         ? `${source.quest.name} · ${metadata.targetDevice}`
-        : source.quest.name,
+        : source.quest.name),
       targetDevice: metadata?.targetDevice ?? null,
       targetDaily: metadata?.targetDaily ?? null,
       category: source.quest.category,

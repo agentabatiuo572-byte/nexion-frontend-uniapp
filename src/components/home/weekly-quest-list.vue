@@ -87,6 +87,7 @@ import {
   type QuestTargetAvailability,
 } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -134,7 +135,7 @@ function rewardOf(q: CanonicalQuest): number {
   return Math.round(q.rewardNex * mult.value);
 }
 function titleOf(q: CanonicalQuest): string {
-  return q.name;
+  return nexGridBrandText(q.name);
 }
 function categoryOf(q: CanonicalQuest): string {
   return ({
