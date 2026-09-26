@@ -5,14 +5,9 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./share-channel-sheet.vue", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 describe("team share sheet 5174 parity", () => {
-  it("never renders an empty channel grid when the A3 projection is unavailable", () => {
-    expect(source).toContain("return list.length ? list : fallbackVisibleChannels()");
-    expect(source).not.toContain("list.length || remoteApiEnabled");
-    const fallback = source.slice(source.indexOf("const FALLBACK"), source.indexOf("const channels"));
-    expect([...fallback.matchAll(/key: "([^"]+)"/g)].map((row) => row[1])).toEqual([
-      "zalo", "telegram", "whatsapp", "messenger", "sms", "x", "copy", "poster", "system",
-    ]);
-    expect(source).toContain("fallbackVisibleChannels()");
+  it("renders only server-configured share channels", () => {
+    expect(source).toContain("const channels = computed<ShareChannelDef[]>(() => visibleChannels())");
+    expect(source).not.toContain("FALLBACK_TEXT");
   });
 
   it("keeps the server reward amount while localizing the explanatory copy", () => {

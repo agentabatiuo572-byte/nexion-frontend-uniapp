@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPlatformConfigApi, parsePlatformExperienceConfig } from "./platform-config-api";
+import { createPlatformConfigApi, parsePlatformComputeConfig, parsePlatformExperienceConfig } from "./platform-config-api";
 
 const valid = {
   featureFlags: {
@@ -82,6 +82,43 @@ const validPlatform = {
 };
 
 describe("platform experience config contract", () => {
+  it("parses the server share base and channels in App Plus without browser URL", () => {
+    vi.stubGlobal("URL", undefined);
+    try {
+      const platform = {
+        ...validPlatform,
+        share: {
+          ...valid.share,
+          channels: [
+            { key: "telegram", intentType: "web", textTemplate: "Join {link}", urlTemplate: "https://t.me/share/url?url={link}&text={text}", enabled: true },
+            { key: "sms", intentType: "web", textTemplate: "Join {link}", urlTemplate: "sms:?body={text}", enabled: true },
+            { key: "copy", intentType: "copy", enabled: true },
+          ],
+        },
+      };
+      expect(parsePlatformComputeConfig(platform).share).toMatchObject({ baseUrl: "https://nexgrid.ai/ref/" });
+      expect(parsePlatformExperienceConfig({ ...valid, share: { ...valid.share, baseUrl: "https://[2001:db8::1]/ref/" } }).share.baseUrl)
+        .toBe("https://[2001:db8::1]/ref/");
+      expect(parsePlatformExperienceConfig({ ...valid, share: { ...valid.share, channels: [{
+        key: "sms", intentType: "web", textTemplate: "Join {link}", urlTemplate: "SMS:?body={text}", enabled: true,
+      }] } }).share.channels[0].urlTemplate).toBe("SMS:?body={text}");
+      for (const baseUrl of ["http://nexgrid.ai/ref/", "https://user@evil.example/ref/", "https://evil..example/ref/", "https://evil.example:70000/ref/"]) {
+        expect(() => parsePlatformExperienceConfig({
+          ...valid,
+          share: { ...valid.share, baseUrl },
+        })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+      }
+      expect(() => parsePlatformExperienceConfig({
+        ...valid,
+        share: { ...valid.share, channels: [{
+          key: "telegram", intentType: "web", textTemplate: "Join {link}", urlTemplate: "https://user@evil.example/?text={text}", enabled: true,
+        }] },
+      })).toThrow("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("parses server-owned flags, share channels, and official release metadata", () => {
     expect(parsePlatformExperienceConfig(valid)).toMatchObject(valid);
   });

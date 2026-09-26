@@ -176,6 +176,7 @@ export const useConfig = defineStore("config", () => {
         welcomeGift: { ...unavailableServerConfig.rewards.welcomeGift },
         inviterReward: { ...unavailableServerConfig.rewards.inviterReward },
       },
+      share: unavailableServerConfig.share,
     };
     syncFailed.value = true;
   }

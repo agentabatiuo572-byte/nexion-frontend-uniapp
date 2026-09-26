@@ -113,7 +113,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
 import { toast } from "@/store/ui";
-import { activateChannel, buildShareLink, copyText, currentShareReferralCode } from "@/lib/share";
+import { activateChannel, buildShareLink, copyText, currentShareReferralCode, notifyUnavailableShareLink } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
@@ -133,6 +133,7 @@ const tpl = ref<TplKey>("brand");
 const showUsername = ref(true);
 const genState = ref<GenState>("idle");
 const imgSrc = ref("");
+const generatedLink = ref("");
 
 const rewardEnabled = computed(() => cfg.config.rewards.enabled);
 const giftUsdt = computed(() => rewardEnabled.value ? cfg.config.rewards.welcomeGift.usdtAmount : 0);
@@ -447,8 +448,9 @@ function paint(link: string, myToken: number) {
         destHeight: 1000,
         fileType: "png",
         success: (res) => {
-          if (myToken !== genToken) return;
+          if (myToken !== genToken || link !== buildShareLink()) return;
           imgSrc.value = res.tempFilePath;
+          generatedLink.value = link;
           genState.value = "ready";
         },
         fail: () => {
@@ -467,12 +469,13 @@ let genToken = 0;
 function regenerate() {
   const link = buildShareLink();
   if (!link) {
-    toast.info(t.value.share.noCodeYet);
+    notifyUnavailableShareLink();
     emit("close");
     return;
   }
   const myToken = ++genToken;
   genState.value = "generating";
+  generatedLink.value = "";
   void nextTick(() => {
     // canvas 挂载/尺寸就绪缓冲;绘制异常一律落 failed(异常1,不白屏)。
     setTimeout(() => {
@@ -480,7 +483,7 @@ function regenerate() {
       // 标先备好再画:paint 是同步的,中途插异步会打乱绘制顺序。
       // 异步回来要重新核 token —— 这期间用户可能已经切模板/关面板(沿用既有防竞态口径)。
       void ensureBrandLogo().then(() => {
-        if (myToken !== genToken || !props.open) return;
+        if (myToken !== genToken || !props.open || link !== buildShareLink()) return;
         try {
           paint(link, myToken);
         } catch {
@@ -492,7 +495,7 @@ function regenerate() {
 }
 
 watch(
-  () => [props.open, tpl.value, showUsername.value] as const,
+  () => [props.open, tpl.value, showUsername.value, buildShareLink()] as const,
   ([open]) => {
     if (open) {
       regenerate();
@@ -500,6 +503,7 @@ watch(
       // 关面板即作废在途生成,防复开时旧回调闪写。
       genToken++;
       genState.value = "idle";
+      generatedLink.value = "";
     }
   },
 );
@@ -509,15 +513,29 @@ watch(availableTpls, (list) => {
 });
 
 // ── 动作 ────────────────────────────────────────────────────────────────
+function posterLinkReady(): boolean {
+  if (genState.value !== "ready") return false;
+  const link = buildShareLink();
+  if (!link) {
+    notifyUnavailableShareLink();
+    return false;
+  }
+  if (link !== generatedLink.value) {
+    regenerate();
+    return false;
+  }
+  return true;
+}
 let saving = false;
 function saveImage() {
-  if (genState.value !== "ready" || saving) return;
+  if (!posterLinkReady() || saving) return;
   saving = true;
   setTimeout(() => (saving = false), 900);
   // #ifdef H5
   void (async () => {
     try {
       const blob = await (await fetch(imgSrc.value)).blob();
+      if (!posterLinkReady()) return;
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u;
@@ -545,8 +563,8 @@ function saveImage() {
 }
 
 async function copyLinkAction() {
-  if (genState.value !== "ready") return;
-  const ok = await copyText(buildShareLink());
+  if (!posterLinkReady()) return;
+  const ok = await copyText(generatedLink.value);
   if (ok) {
     toast.success(t.value.team.inviteLinkCopied);
   } else {
@@ -555,7 +573,7 @@ async function copyLinkAction() {
 }
 
 async function onChannel(c: ShareChannelDef) {
-  if (genState.value !== "ready") return;
+  if (!posterLinkReady()) return;
   await activateChannel(c, "poster_sheet", channelLabel(c.key));
 }
 

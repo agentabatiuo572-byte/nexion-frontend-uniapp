@@ -3,7 +3,7 @@
   规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE3]。
   渠道表来自 platform config(share.channels,顺序即展示序);intent 分派走
   lib/share.activateChannel(web 直开 / scheme 复制降级 / copy / system),poster
-  项切到海报面板(emit)。配置为空时兜底 5174 推荐渠道矩阵,面板永不空(异常1)。
+  项切到海报面板(emit)。渠道只读服务端配置。
   cancel 为 ghost 弱权重(转化场景 cancel 必弱于渠道,nexgrid-design)。
 -->
 <template>
@@ -71,36 +71,7 @@ const rewardLineText = computed(() => {
   return `${base} · ${promo}`;
 });
 
-// 渠道配置空 → 兜底 5174 推荐矩阵,避免真实 App 只剩空壳。金额仍由服务端返回,
-// 这里只补不涉及资金口径的分享 transport；A3 一旦下发配置即完全覆盖该兜底。
-const FALLBACK_TEXT = "Join NexGrid with my invitation: {link}";
-const FALLBACK: ShareChannelDef[] = [
-  { key: "zalo", intentType: "scheme", textTemplate: FALLBACK_TEXT, androidPackage: "com.zing.zalo", iosScheme: "zalo://", enabled: true },
-  { key: "telegram", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://t.me/share/url?url={link}&text={text}", enabled: true },
-  { key: "whatsapp", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://wa.me/?text={text}", enabled: true },
-  { key: "messenger", intentType: "scheme", textTemplate: FALLBACK_TEXT, androidPackage: "com.facebook.orca", iosScheme: "fb-messenger://", enabled: true },
-  { key: "sms", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "sms:?body={text}", enabled: true },
-  { key: "x", intentType: "web", textTemplate: FALLBACK_TEXT, urlTemplate: "https://twitter.com/intent/tweet?text={text}", enabled: true },
-  { key: "copy", intentType: "copy", enabled: true },
-  { key: "poster", intentType: "poster", enabled: true },
-  { key: "system", intentType: "system", enabled: true },
-];
-function fallbackVisibleChannels(): ShareChannelDef[] {
-  let list = FALLBACK;
-  // #ifdef H5
-  list = list.filter(
-    (channel) => channel.intentType !== "system" || (typeof navigator !== "undefined" && typeof navigator.share === "function"),
-  );
-  // #endif
-  // #ifndef H5
-  list = list.filter((channel) => channel.intentType !== "system");
-  // #endif
-  return list;
-}
-const channels = computed<ShareChannelDef[]>(() => {
-  const list = visibleChannels();
-  return list.length ? list : fallbackVisibleChannels();
-});
+const channels = computed<ShareChannelDef[]>(() => visibleChannels());
 
 interface ChannelMeta {
   label: string;
