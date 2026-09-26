@@ -107,7 +107,7 @@ function productMediaUrl(value: unknown): string | undefined {
     return parsed.toString();
   } catch {
     // An invalid optional image must not blank the whole canonical catalogue.
-    // The renderer will use its product-tier fallback instead.
+    // The renderer shows a neutral placeholder instead.
     return undefined;
   }
 }

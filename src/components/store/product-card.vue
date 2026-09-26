@@ -4,8 +4,8 @@
   detail page; the footer Buy/Stake CTA taps to checkout (stops propagation).
 
   Top→bottom:
-    · ProductRender hero photo (S1/Pro/Rack) or cyan Cloud-Share schematic,
-      with folded-corner badge ribbon + tier-code chip + Legacy chip overlay.
+    · Catalog hero photo or neutral placeholder, with badge ribbon, tier-code
+      chip and Legacy chip overlay.
     · Body: name, ROI hero (daily earn / trade-in). Specs and AI throughput
       stay on the detail page.
     · Footer: price + frosted Buy CTA.
@@ -15,15 +15,9 @@
   <view class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :style="cardStyle" @click="goDetail">
     <view v-if="featured" aria-hidden :style="featuredGlowStyle" />
 
-    <!-- ───── Hero photo banner ───── -->
+    <!-- ───── Catalog photo or neutral placeholder ───── -->
     <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail" @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
-      <!-- Cloud Share schematic -->
-      <view v-if="isShare && !photo" class="absolute inset-0 grid place-items-center" style="color: var(--v5-tech-cyan-ink)">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
-      </view>
-      <!-- Real product photo -->
-      <image v-else-if="photo" :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
-      <!-- Fallback box icon -->
+      <image v-if="photo" :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
       <view v-else class="absolute inset-0 grid place-items-center" style="color: var(--v5-ink-3)">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
       </view>
@@ -41,10 +35,6 @@
       <view v-if="photo" class="absolute flex flex-col items-start gap-1.5" style="bottom: 12px; left: 14px; pointer-events: none">
         <text class="font-mono-tabular" :style="tierChipStyle">{{ photo.tierCode }}</text>
         <text v-if="product.status === 'legacy'" class="font-mono-tabular" :style="legacyChipStyle">{{ t.store.cardLegacyBadge }}</text>
-      </view>
-      <!-- Cloud chip -->
-      <view v-if="isShare && !photo" class="absolute" style="bottom: 28px; left: 14px; pointer-events: none">
-        <text class="font-mono-tabular" :style="cloudChipStyle">{{ t.store.cardCloudDistributed }}</text>
       </view>
     </view>
 
@@ -135,7 +125,7 @@ import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
 import { nexGridBrandText } from "@/lib/brand-copy";
-import { productImageMeta } from "@/lib/product-image";
+import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import { productCatalogState } from "@/store/product-catalog";
@@ -153,13 +143,11 @@ const stockUnavailable = computed(() => !isShare.value
   && (props.product.stock ?? 0) <= 0);
 const failedImageUrl = ref("");
 watch(() => props.product.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
-// Product videos stay detail-only: listing cards use a static product poster
+// Product videos stay detail-only: listing cards use the catalog image
 // so browsing never triggers downloads or playback before the user chooses it.
 const photo = computed(() => {
-  const fallback = productImageMeta(props.product.id);
-  const imageUrl = failedImageUrl.value === props.product.imageUrl ? undefined : props.product.imageUrl;
-  if (imageUrl) return { src: imageUrl, tierCode: fallback?.tierCode ?? props.product.tier };
-  return isShare.value || !fallback?.src ? null : { src: fallback.src, tierCode: fallback.tierCode };
+  const imageUrl = catalogProductImageUrl(props.product.imageUrl, failedImageUrl.value);
+  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.id, props.product.tier) } : null;
 });
 function fallbackProductImage() {
   failedImageUrl.value = props.product.imageUrl ?? "";
@@ -326,12 +314,9 @@ const featuredGlowStyle: CSSProperties = {
 const renderWrapStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "180px",
-  background: isShare.value
-    ? "repeating-linear-gradient(135deg, color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent) 0 8px, transparent 8px 18px)," +
-      "linear-gradient(135deg, var(--v5-tech-cyan-soft) 0%, var(--v5-surface-2) 100%)"
-    : photo.value
-      ? "linear-gradient(135deg, #101216 0%, #0A0B0E 60%, #000000 100%)"
-      : "var(--v5-surface-2)",
+  background: photo.value
+    ? "linear-gradient(135deg, #101216 0%, #0A0B0E 60%, #000000 100%)"
+    : "var(--v5-surface-2)",
 }));
 const vignetteStyle: CSSProperties = {
   position: "absolute",
@@ -378,19 +363,6 @@ const legacyChipStyle: CSSProperties = {
   background: "rgba(0,0,0,0.55)",
   padding: "3px 8px",
   borderRadius: "4px",
-};
-const cloudChipStyle: CSSProperties = {
-  fontSize: "12px",
-  letterSpacing: "0.22em",
-  color: "var(--v5-tech-cyan-ink)",
-  lineHeight: 1,
-  // 原为硬编码 rgba(255,255,255,0.85):亮色主题下压在浅色媒体区上 ΔE=0 直接隐形,
-  // 且违反「颜色用 token 不写字面值」。换成 tech-cyan 软底 —— 与本行 ink 同语义配对,
-  // 也是 tech-money-card 既有的 soft+ink 组合,双主题都有定义。
-  background: "var(--v5-tech-cyan-soft)",
-  padding: "5px 9px",
-  borderRadius: "4px",
-  fontWeight: 600,
 };
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
