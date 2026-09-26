@@ -10,7 +10,9 @@
 // newly added product degrades to English instead of crashing. verify.sh
 // asserts id parity so that fallback stays unreachable in practice.
 
-import type { Messages } from "@/i18n/messages/en";
+import { en, type Messages } from "@/i18n/messages/en";
+import { vi } from "@/i18n/messages/vi";
+import { zh } from "@/i18n/messages/zh";
 import type { Product } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
@@ -24,8 +26,21 @@ export interface ProductCopy {
 
 type CatalogEntry = { tagline: string; badge: string; unlocks: string };
 
+const badgeSources = [en.store, vi.store, zh.store];
+
+// Match known free-text marketing labels by meaning; leave custom copy intact.
+function serverBadge(t: Messages, badge: string | undefined): string {
+  if (!badge) return "";
+  if (badgeSources.some((store) => store.bestSeller === badge || store.catalog["stellarbox-s1"].badge === badge)) return t.store.bestSeller;
+  if (badgeSources.some((store) => store.trending === badge || store.catalog["stellarbox-pro"].badge === badge)) return t.store.catalog["stellarbox-pro"].badge;
+  for (const id of Object.keys(en.store.catalog) as (keyof typeof en.store.catalog)[]) {
+    if (badgeSources.some((store) => store.catalog[id].badge === badge)) return t.store.catalog[id].badge;
+  }
+  return badge;
+}
+
 export function productCopy(t: Messages, p: Product, serverCatalog = false): ProductCopy {
-  if (serverCatalog) return { tagline: p.tagline, badge: p.badge ?? "", unlocks: "" };
+  if (serverCatalog) return { tagline: p.tagline, badge: serverBadge(t, p.badge), unlocks: "" };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
