@@ -82,6 +82,28 @@ const validPlatform = {
 };
 
 describe("platform experience config contract", () => {
+  it("parses share URL templates when App Plus lacks String.replaceAll", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(String.prototype, "replaceAll");
+    Object.defineProperty(String.prototype, "replaceAll", { configurable: true, value: undefined });
+    let parsedBase = "";
+    try {
+      parsedBase = parsePlatformComputeConfig({
+        ...validPlatform,
+        share: {
+          ...valid.share,
+          channels: [
+            { key: "telegram", intentType: "web", textTemplate: "Join {link}", urlTemplate: "https://t.me/share/url?url={link}&text={text}", enabled: true },
+            { key: "sms", intentType: "web", textTemplate: "Join {link}", urlTemplate: "sms:?body={text}", enabled: true },
+          ],
+        },
+      }).share.baseUrl;
+    } finally {
+      if (descriptor) Object.defineProperty(String.prototype, "replaceAll", descriptor);
+      else Reflect.deleteProperty(String.prototype, "replaceAll");
+    }
+    expect(parsedBase).toBe("https://nexgrid.ai/ref/");
+  });
+
   it("parses the server share base and channels in App Plus without browser URL", () => {
     vi.stubGlobal("URL", undefined);
     try {
