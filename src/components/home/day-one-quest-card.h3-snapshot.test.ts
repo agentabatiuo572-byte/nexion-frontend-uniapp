@@ -3,6 +3,8 @@ import { createSSRApp } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import { describe, expect, it } from "vitest";
 import dayOneCardSource from "./day-one-quest-card.vue?raw";
+import weeklyQuestListSource from "./weekly-quest-list.vue?raw";
+import weeklyQuestHeroSource from "./weekly-quest-hero.vue?raw";
 
 const template = dayOneCardSource.match(/<template>([\s\S]*?)^<\/template>/m)?.[1];
 if (!template) throw new Error("DAY_ONE_CARD_TEMPLATE_MISSING");
@@ -59,6 +61,14 @@ function renderCard(
 }
 
 describe("DayOneQuestCard H3 snapshot presentation", () => {
+  it("brands server task names only at the day-one and weekly display boundary", () => {
+    expect(dayOneCardSource).toContain("label: nexGridBrandText(row.name)");
+    expect(dayOneCardSource).toContain("id: row.questCode");
+    expect(dayOneCardSource).toContain("href: row.actionRoute");
+    expect(weeklyQuestListSource).toContain("return nexGridBrandText(q.name)");
+    expect(weeklyQuestHeroSource).toContain("nexGridBrandText(quest.value?.name ?? \"\")");
+  });
+
   it("shows a retry control for a failed read without falsely requesting sign-in", async () => {
     const html = await renderCard({ empty: false, claimed: false, unverified: false, claimCode: null }, true);
     expect(html).toContain(home.dayOneUnavailable);

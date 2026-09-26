@@ -131,6 +131,15 @@ describe("home task carousel", () => {
     expect(conversionBannerSource).not.toContain('v-if="!weeklyQuest"');
   });
 
+  it("brands the weekly card's server name only in its visible subtitle", () => {
+    const rawQuest = { ...weeklyQuest, name: "查看 NexGridBox S1 ROI" };
+    const view = presentHomeWeeklyCard({ kind: "quest", quest: rawQuest }, null, 1, Date.parse("2026-09-05T00:00:00+08:00"));
+    expect(view.subtitle).toBe("查看 UVELBox S1 ROI");
+    expect(view.actionRoute).toBe(rawQuest.actionRoute);
+    expect(view.rewardNex).toBe(rawQuest.rewardNex);
+    expect(rawQuest.name).toBe("查看 NexGridBox S1 ROI");
+  });
+
   it("does not invent weekly display metadata when PC H3 has no presentation row", () => {
     expect(presentHomeWeeklyCard({ kind: "quest", quest: weeklyQuest }, null, 1.2, Date.parse("2026-09-05T00:00:00+08:00"))).toEqual({
       multiplier: 1.2,

@@ -19,6 +19,15 @@ describe("nexGridBrandText", () => {
     expect(nexGridBrandText(`${OLD} V-Rank`)).toBe("UVEL V-Rank");
   });
 
+  it("keeps the remote Day-One quest's zh/en/vi wording while replacing its brand", () => {
+    const names = [
+      ["查看 NexGridBox S1 ROI", "查看 UVELBox S1 ROI"],
+      ["View NexGridBox S1 ROI", "View UVELBox S1 ROI"],
+      ["Xem ROI của NexGridBox S1", "Xem ROI của UVELBox S1"],
+    ];
+    for (const [before, after] of names) expect(nexGridBrandText(before)).toBe(after);
+  });
+
   it("已在新品牌下的文案原样透传", () => {
     expect(nexGridBrandText("NexGridBox S1")).toBe("UVELBox S1");
     expect(nexGridBrandText("UVELBox S1")).toBe("UVELBox S1");

@@ -84,6 +84,7 @@ import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { isCurrentQuest } from "@/lib/actionable-quest";
 import { toast } from "@/store/ui";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
@@ -131,7 +132,7 @@ const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].inc
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
 const periodExpired = computed(() => Date.parse(quest.value?.eligibleUntil ?? "") <= nowTick.value * 1000);
 
-const titleText = computed(() => quest.value?.name ?? "");
+const titleText = computed(() => nexGridBrandText(quest.value?.name ?? ""));
 const categoryText = computed(() => quest.value ? ({
   wallet: t.value.home.dayOneCatWallet,
   explore: t.value.home.dayOneCatExplore,

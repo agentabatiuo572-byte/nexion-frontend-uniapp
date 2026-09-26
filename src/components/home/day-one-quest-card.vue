@@ -125,6 +125,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 interface QuestTask {
   id: string;
@@ -187,7 +188,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
     .map((row, index) => ({
       id: row.questCode,
       order: index + 1,
-      label: row.name,
+      label: nexGridBrandText(row.name),
       nex: null,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
