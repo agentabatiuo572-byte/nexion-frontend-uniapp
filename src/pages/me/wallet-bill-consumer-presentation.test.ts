@@ -61,9 +61,9 @@ describe("controlled wallet descriptions on every consumer", () => {
   it("distinguishes same-day course rewards by their course reference", () => {
     const s = rewardsView("learningReward");
     s.records.value[0].ref = "nexgrid-account-safety-202609@v1";
-    expect(s.view.value[0].memo).toBe(en.bills.memo.learningReward);
+    expect(s.view.value[0].memo).toBe(`${en.bills.memo.learningReward} · nexgrid-account-safety-202609@v1`);
     s.courseTitles.value = { "nexgrid-account-safety-202609@v2": "Wrong version" };
-    expect(s.view.value[0].memo).toBe(en.bills.memo.learningReward);
+    expect(s.view.value[0].memo).toBe(`${en.bills.memo.learningReward} · nexgrid-account-safety-202609@v1`);
     s.courseTitles.value = { "nexgrid-account-safety-202609@v1": "Account safety: recognize risks" };
     expect(s.view.value[0].memo).toBe(`${en.bills.memo.learningReward} · Account safety: recognize risks`);
     s.t.value = zh;
