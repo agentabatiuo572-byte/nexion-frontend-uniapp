@@ -2259,6 +2259,7 @@ export const vi: Messages = {
     purchaseEligibilityConditionGap: "Còn thiếu {gap}",
     purchaseEligibilityQuotaDepleted: "Đã hết số lượng có thể bán trong tháng",
     purchaseEligibilityNoFacts: "Máy chủ không trả về chi tiết điều kiện này.",
+    purchaseEligibilityNoExtraRestriction: "Mục này không đặt thêm điều kiện mua.",
     purchaseEligibilityPolicyMet: "Kết quả: đã đáp ứng",
     // zentao #29: chính sách không có dữ kiện điều kiện thì không được báo là đã đáp ứng.
     purchaseEligibilityUnconfigured: "Kết quả: chưa cấu hình; không dùng làm căn cứ mua",

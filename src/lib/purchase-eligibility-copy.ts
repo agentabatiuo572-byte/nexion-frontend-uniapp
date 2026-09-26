@@ -1,10 +1,18 @@
 import {
   PURCHASE_ELIGIBILITY_SOURCE,
+  type PurchaseEligibilityPolicy,
   type PurchaseEligibilitySnapshot,
 } from "@/api/purchase-eligibility-api";
 
 export type PurchaseEligibilityRequestStatus = "idle" | "loading" | "ready" | "error";
 export type PurchaseEligibilityMessage = "eligible" | "ineligible" | "quotaDepleted" | "error";
+
+/** Empty conditions are open only when the server names a known open policy. */
+export function purchaseEligibilityPolicyHasNoRestriction(policy: PurchaseEligibilityPolicy): boolean {
+  return policy.eligible && policy.conditions.length === 0
+    && (policy.policy === "E1" && policy.decisionCode === "ELIGIBLE"
+      || policy.policy === "F4B" && policy.decisionCode === "F4B_NOT_CONFIGURED");
+}
 
 /** Send a rank-only denial to the rank progression page, not an unrelated quota tier. */
 export function purchaseEligibilityUnlockHref(snapshot: PurchaseEligibilitySnapshot, productNo: string): string {

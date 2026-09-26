@@ -28,10 +28,8 @@ describe("store detail payback and eligibility copy", () => {
 /**
  * zentao #29:购买资格卡对「没有条件事实」的策略宣称「结果:已满足」。
  *
- * 后端在额度行缺失或未启用时下发 eligible=true + 空条件列表
- * (AppCanonicalBoundaryService: F4B_NOT_CONFIGURED / F4B_QUOTA_UNAVAILABLE)。
- * 原样渲染等于平台对购买资格作了一个自己无法兑现的承诺 —— 用户看到「已满足」
- * 却看不到任何额度、已售、剩余。没有事实支撑的结论不得上屏。
+ * 已知 E1/ELIGIBLE 与 F4B/F4B_NOT_CONFIGURED 的空条件表示没有额外限制；
+ * F4B_QUOTA_UNAVAILABLE 等未知空条件仍不得宣称「已满足」。
  */
 describe("store detail eligibility never claims a met result without facts", () => {
   it("keeps unknown and denied server decisions visibly closed", () => {
@@ -43,15 +41,23 @@ describe("store detail eligibility never claims a met result without facts", () 
     const metResults = detail.match(/<text\b[^>]*>\{\{\s*policy\.eligible\s*\?[^}]*purchaseEligibilityPolicyMet[^}]*\}\}<\/text>/g) ?? [];
     expect(metResults).toHaveLength(1);
     expect(metResults[0]).toContain('v-if="eligibilityPolicyHasFacts(policy)"');
-    expect(detail).toContain('v-if="!eligibilityPolicyHasFacts(policy)"');
-    expect(detail).toContain('v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityUnconfigured }}');
+    expect(detail).toContain('v-else-if="eligibilityPolicyHasNoRestriction(policy)"');
+    expect(detail).toContain('{{ t.store.purchaseEligibilityNoExtraRestriction }}');
+    expect(detail).toContain('v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}');
   });
 
-  it.each([en, zh, vi])("provides trilingual not-configured copy", (messages) => {
-    expect(messages.store.purchaseEligibilityUnconfigured).toBeTruthy();
+  it.each([en, zh, vi])("provides trilingual no-extra-restriction copy", (messages) => {
+    expect(messages.store.purchaseEligibilityNoExtraRestriction).toBeTruthy();
     // 三语必须各自成句,不能整份复制粘贴。
-    const values = [en.store.purchaseEligibilityUnconfigured, zh.store.purchaseEligibilityUnconfigured, vi.store.purchaseEligibilityUnconfigured];
+    const values = [en.store.purchaseEligibilityNoExtraRestriction, zh.store.purchaseEligibilityNoExtraRestriction, vi.store.purchaseEligibilityNoExtraRestriction];
     expect(new Set(values).size).toBe(3);
+  });
+
+  it("uses only a confirmed activated phone for personal comparison", () => {
+    expect(detail).toContain("app.remoteFleetHasSnapshot ? activePhoneDailyRate(app.visibleDevices) : 0");
+    expect(detail).toContain("storeYieldMultiplier(product.value.dailyEarn, phoneDailyEarnValue.value)");
+    expect(detail).toContain('v-if="!isShare && phoneDailyEarnValue > 0"');
+    expect(detail).not.toContain("earnConfig.phoneTiers.value?.tiers");
   });
 
   it("shows server policy facts without exposing raw backend codes", () => {

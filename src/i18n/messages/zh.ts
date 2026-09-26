@@ -2271,6 +2271,7 @@ export const zh: Messages = {
     purchaseEligibilityConditionGap: "还差 {gap}",
     purchaseEligibilityQuotaDepleted: "本月可售名额已用尽",
     purchaseEligibilityNoFacts: "服务端未返回该条件的明细。",
+    purchaseEligibilityNoExtraRestriction: "此项未设置额外购买限制。",
     purchaseEligibilityPolicyMet: "结果：已满足",
     // zentao #29:服务端只回了「未配置」这类占位策略(没有任何条件事实)时,不得宣称「已满足」——
     // 没有事实支撑的「已满足」等于对购买资格作了一个平台无法兑现的承诺。
