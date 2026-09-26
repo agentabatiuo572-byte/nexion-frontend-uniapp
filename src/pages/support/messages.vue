@@ -206,6 +206,10 @@ onHide(leaveInbox);
 onUnmounted(leaveInbox);
 
 function retryConversations() {
+  if (convStore.realtimeFallback) {
+    convStore.stopRealtime();
+    convStore.startRealtime();
+  }
   void refreshInbox();
 }
 
