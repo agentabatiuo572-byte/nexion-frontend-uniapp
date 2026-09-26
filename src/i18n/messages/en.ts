@@ -1186,7 +1186,7 @@ export const en = {
     recReasonServer: "The server selected this catalog product using its verified daily yield.",
     loading: "Loading server goals…",
     serverUnavailable: "Goals are temporarily unavailable. Try again later.",
-    noEligibleProduct: "No available device has enough verified daily capacity for this target and deadline. Adjust the target or deadline.",
+    noEligibleProduct: "No device currently meets both your purchase requirements and the verified daily yield needed for this goal and deadline. Check purchase requirements or adjust your goal.",
   },
 
 
@@ -3337,6 +3337,7 @@ export const en = {
     inputPlaceholder: "Type a message…",
     agentTyping: "typing…",
     sessionEnded: "Session ended",
+    serverIdleClosed: "This conversation ended after {n} minutes of inactivity. You can start a new conversation.",
     restartSession: "Start a new session",
     convertTicket: "Create ticket",
     convertTicketFailed: "Could not create ticket. Refresh and try again.",

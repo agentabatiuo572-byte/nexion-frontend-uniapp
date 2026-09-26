@@ -17,6 +17,7 @@
 //   node scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest   红测(判据自证有效)
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 // 字符集:汉字基本区 + 扩展 A + CJK 标点 + 全角形式。只判汉字块的话,纯标点文案
 // (「」、。—— 之类)与全角标点整段免疫(独立审计 P2 实证)。
@@ -103,6 +104,12 @@ const VALUE_EXEMPTIONS = [
       ),
   },
   {
+    id: "support-idle-close-source-token",
+    why: "后端闲置关闭系统消息的原文字节仅用于严格识别；展示内容由三语词典生成，授权范围限于该正则取值",
+    files: ["src/lib/support-idle-message.ts"],
+    strip: (line) => line.replace(/^(\s*const closed = )\/\^会话已因用户闲置 \(\[1-9\]\\d\*\) 分钟自动结束,可重新发起会话。\$\/(\.exec\(text\);)/, "$1/^([1-9]\\d*)$/$2"),
+  },
+  {
     id: "fullwidth-percent-token",
     why: "服务端奖励文案兼容解析的全角百分号字节，不是客户端展示文案；仅在归一化函数定义面授权该 token",
     files: ["src/pages/daily/daily-reward-view.ts"],
@@ -123,9 +130,30 @@ const LEGACY_CONFIG_TOKENS = ["开", "开放", "关", "关闭"];
 export { stripComments } from "./lib/sfc-strip-comments.mjs";
 import { stripComments } from "./lib/sfc-strip-comments.mjs";
 
+function supportIdleRegexLines(source) {
+  const parsed = ts.createSourceFile("support-idle-message.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const lines = new Set();
+  const expected = String.raw`/^会话已因用户闲置 ([1-9]\d*) 分钟自动结束,可重新发起会话。$/`;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "closed") {
+      const call = node.initializer;
+      const access = call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) ? call.expression : null;
+      const regex = access?.expression;
+      if (access?.name.text === "exec" && regex && ts.isRegularExpressionLiteral(regex) && regex.text === expected
+          && call.arguments.length === 1 && ts.isIdentifier(call.arguments[0]) && call.arguments[0].text === "text") {
+        lines.add(parsed.getLineAndCharacterOfPosition(regex.getStart(parsed)).line + 1);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  return lines;
+}
+
 export function scanSource(file, src) {
   const stripped = decodeEscapes(stripComments(src, file.endsWith(".vue")));
   const fileRule = FILE_EXEMPTIONS.find((rule) => rule.match(file));
+  const idleRegexLines = file === "src/lib/support-idle-message.ts" ? supportIdleRegexLines(src) : null;
   const hits = [];
   stripped.split(/\r?\n/).forEach((line, idx) => {
     if (!CJK.test(line)) return;
@@ -135,6 +163,7 @@ export function scanSource(file, src) {
     const used = [];
     for (const rule of VALUE_EXEMPTIONS) {
       if (!rule.files.includes(file)) continue;
+      if (rule.id === "support-idle-close-source-token" && !idleRegexLines?.has(idx + 1)) continue;
       const next = rule.strip(rest);
       if (cjkCount(next) < cjkCount(rest)) used.push(rule.id);
       rest = next;
@@ -254,6 +283,11 @@ function selftest() {
     ["🔴 同文件里非授权取值的中文照抓(不是整文件豁免)", "src/lib/trial-config-enum.ts", 'throw new Error("试用配置无效");', 1],
     ["🔴 只认整串相等:授权 token 作子串不逃逸", "src/lib/trial-config-enum.ts", 'const a = "开放试用";', 1],
     ["🔴 legacy 豁免带文件作用域:消费面写同样的字照抓", "src/pages/x/a.vue", "<template><view>开放</view></template>", 1],
+    ["豁免:后端闲置关闭原文字节仅作匹配", "src/lib/support-idle-message.ts", 'const closed = /^会话已因用户闲置 ([1-9]\\d*) 分钟自动结束,可重新发起会话。$/.exec(text);', 0],
+    ["🔴 闲置关闭匹配旁的用户文案仍须翻译", "src/lib/support-idle-message.ts", 'const closed = /^会话已因用户闲置 ([1-9]\\d*) 分钟自动结束,可重新发起会话。$/.exec(text); const title = "会话结束";', 1],
+    ["🔴 闲置关闭原文藏进调试字符串仍被拦", "src/lib/support-idle-message.ts", 'const debug = "const closed = /^会话已因用户闲置 ([1-9]\\d*) 分钟自动结束,可重新发起会话。$/.exec(text);";', 1],
+    ["🔴 闲置关闭原文藏进多行模板字符串仍被拦", "src/lib/support-idle-message.ts", 'const title = `\nconst closed = /^会话已因用户闲置 ([1-9]\\d*) 分钟自动结束,可重新发起会话。$/.exec(text);\n`;', 1],
+    ["🔴 闲置关闭原文的显示面仍被拦", "src/pages/support/chat.vue", 'const title = "会话已因用户闲置 5 分钟自动结束,可重新发起会话。";', 1],
     ["豁免:全角百分号只作解析 token", "src/pages/daily/daily-reward-view.ts", 'const sign = text.endsWith("％") ? "％" : "%";', 0],
     ["🔴 全角百分号豁免带文件作用域", "src/pages/x/a.vue", '<template><text>％</text></template>', 1],
     ["🔴 \\u 转义绕过被解码后照抓", "src/pages/x/a.ts", 'const a = "\\u6559\\u7a0b\\u4e2d\\u5fc3";', 1],

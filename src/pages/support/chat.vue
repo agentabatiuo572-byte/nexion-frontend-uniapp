@@ -116,6 +116,7 @@ import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
 import type { ThreadMsg, QuickChip } from "@/components/support/thread-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { localizedIdleClose } from "@/lib/support-idle-message";
 import { navTo, navBack } from "@/lib/route";
 import { createSendLimiter } from "@/lib/send-limiter";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
@@ -525,13 +526,21 @@ const threadMessages = computed<ThreadMsg[]>(() => {
   const c = conv.value;
   if (!c) return [];
   const lastUser = c.messages.map((m) => m.sender).lastIndexOf("user");
-  return c.messages.map((m, i) => ({
+  const messages: ThreadMsg[] = c.messages.map((m, i) => ({
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
-    text: m.text,
+    text: m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
+      ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text,
     receipt: receiptFor(m.status, i === lastUser),
   }));
+  const last = c.messages[c.messages.length - 1];
+  const idleClose = c.status === "closed" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE" && (!last || c.lastTs > last.ts)
+    ? localizedIdleClose(c.lastMessage, t.value.conversations) : null;
+  return idleClose ? [...messages, {
+    id: `idle-close:${c.id}:${c.lastTs}`, side: "left" as const,
+    tone: "system" as const, text: idleClose,
+  }] : messages;
 });
 
 async function loadEarlierHumanHistory() {

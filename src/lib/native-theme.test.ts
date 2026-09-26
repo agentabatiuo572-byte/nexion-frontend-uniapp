@@ -4,6 +4,17 @@ import { syncNativeTheme } from "./native-theme";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("native theme view bridge", () => {
+  it("keeps native status icons legible across dark and light themes", () => {
+    const setStatusBarStyle = vi.fn();
+    vi.stubGlobal("plus", { navigator: { setStatusBarStyle } });
+    vi.stubGlobal("getCurrentPages", () => []);
+
+    syncNativeTheme("dark");
+    syncNativeTheme("light");
+    expect(setStatusBarStyle).toHaveBeenNthCalledWith(1, "light");
+    expect(setStatusBarStyle).toHaveBeenNthCalledWith(2, "dark");
+  });
+
   it("sets the resolved theme in every open Uni page WebView", () => {
     const first = vi.fn();
     const second = vi.fn();

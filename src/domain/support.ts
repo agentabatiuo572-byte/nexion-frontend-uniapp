@@ -70,6 +70,8 @@ export interface Conversation {
   lastTs: number;
   /** Server maximum public message ID; list rows do not contain the transcript. */
   lastPublicMessageId?: number;
+  /** Optional server provenance for a generated idle-close preview. */
+  lastMessageKind?: "IDLE_TIMEOUT_CLOSE" | null;
   lastMessage: string;
   sessionStatus: ConvSessionStatus;
   /** True when the server intentionally returned only the newest message window. */

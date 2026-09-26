@@ -155,10 +155,11 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { localizedIdleClose } from "@/lib/support-idle-message";
 import { navTo } from "@/lib/route";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
-import type { ConversationType, ConvMessage } from "@/domain/support";
+import type { Conversation, ConversationType, ConvMessage } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -294,7 +295,10 @@ function cleanPreview(s: string): string {
   return s.replace(/\*\*/g, "").replace(/\s*\n+\s*/g, " ").trim();
 }
 
-function msgText(m: ConvMessage, _name: string): string { return m.text; }
+function msgText(m: ConvMessage, c: Conversation): string {
+  return m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
+    ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text;
+}
 
 function displayAgentName(name: string): string {
   const normalized = name.trim();
@@ -336,10 +340,15 @@ const rows = computed<Row[]>(() => {
   return convStore.byType(sel).map((c) => {
     const last = c.messages.length ? c.messages[c.messages.length - 1] : null;
     const typing = convStore.typingIds[c.id] === true;
+    // The server excludes SYSTEM rows from detail history, so the closed header
+    // can be newer than the last loaded user/agent message.
+    const idleClose = c.status === "closed" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE" && (!last || c.lastTs > last.ts)
+      ? localizedIdleClose(c.lastMessage, t.value.conversations) : null;
+    const latestText = idleClose ?? (last && last.ts >= c.lastTs ? msgText(last, c) : c.lastMessage);
     return {
       id: c.id,
       name: displayAgentName(c.agentName),
-      preview: typing ? t.value.conversations.agentTyping : last ? cleanPreview(msgText(last, c.agentName)) : cleanPreview(c.lastMessage) || t.value.conversations[c.roleKey],
+      preview: typing ? t.value.conversations.agentTyping : cleanPreview(latestText) || t.value.conversations[c.roleKey],
       time: relTime(c.lastTs),
       unread: c.unread,
       isAi: false,

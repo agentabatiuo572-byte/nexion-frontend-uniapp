@@ -1128,7 +1128,7 @@ export const zh: Messages = {
     recReasonServer: "服务端依据真实商品目录的已核日产能选出该推荐。",
     loading: "正在加载服务端目标…",
     serverUnavailable: "目标服务暂时不可用，请稍后重试。",
-    noEligibleProduct: "当前没有日产能足以覆盖该目标与期限的可用设备。请调整目标或期限。",
+    noEligibleProduct: "当前没有同时符合你账号购买条件、且已核日产能足以覆盖该目标与期限的设备。可查看购买条件，或调整目标与期限。",
   },
 
 
@@ -3241,6 +3241,7 @@ export const zh: Messages = {
     inputPlaceholder: "输入消息…",
     agentTyping: "正在输入…",
     sessionEnded: "会话已结束",
+    serverIdleClosed: "会话已因用户闲置 {n} 分钟自动结束，可重新发起会话。",
     restartSession: "重新发起会话",
     convertTicket: "转为工单",
     convertTicketFailed: "转工单失败，请刷新后重试。",
