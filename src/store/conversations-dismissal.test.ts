@@ -3,6 +3,9 @@ import { createPinia, setActivePinia } from 'pinia';
 import type { Conversation } from '@/domain/support';
 import { createSupportApi } from '@/api/support-api';
 import { ApiError } from '@/api/errors';
+import { installSupportStorage } from '@/test/storage-setup';
+
+installSupportStorage();
 
 const api = vi.hoisted(() => ({ authorityRevision: vi.fn(async () => 'run-1'), commandResult: vi.fn(async () => null),
   conversations: vi.fn(), conversationDismissals: vi.fn(async () => []), dismissConversation: vi.fn() }));

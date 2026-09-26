@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { sha256 as nativeSha256 } from "js-sha256/build/sha256.min.mjs";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
+
+test("pure JS SHA-256 matches UTF-8 digest across Unicode and block boundaries", () => {
+  for (const value of ["support-create", "测试 🧪 hỗ trợ", "a".repeat(55), "b".repeat(64), "c".repeat(129), "bad:\ufffd"]) {
+    assert.equal(nativeSha256(value), createHash("sha256").update(value, "utf8").digest("hex"));
+  }
+});
 
 test("M App support production paths use the server API and never local support mocks", async () => {
   const [runtime, tickets, conversations, ticketPage, messagesPage, chatPage, helpPage] = await Promise.all([
@@ -19,7 +27,7 @@ test("M App support production paths use the server API and never local support 
   for (const source of [tickets, conversations, ticketPage, messagesPage, chatPage, helpPage]) {
     assert.doesNotMatch(source, /@\/mock\/(tickets|conversations|faq)/);
   }
-  for (const source of [tickets, conversations]) assert.match(source, /support-pending-commands/);
+  for (const source of [tickets, conversations]) assert.match(source, /restoreSupportPending/);
   assert.match(tickets, /supportApi\.(tickets|createTicket|replyTicket|closeTicket)/);
   assert.match(conversations, /supportApi\.(conversations|conversation|startConversation|replyConversation|convertConversationToTicket)/);
   assert.match(conversations, /markConversationRead/);
@@ -44,7 +52,7 @@ test("support mutations are single-flight and retain one key across unknown-resu
   for (const source of [tickets, conversations]) {
     assert.match(source, /pendingKeys/);
     assert.match(source, /inFlight/);
-    assert.match(source, /await opaqueIntentSlot\(intent\)/);
+    assert.match(source, /opaqueSupportIntentSlot\(intent\)/);
     assert.match(source, /scope\.pending\.get\(fingerprint\) \?\? mutationKey/);
     assert.match(source, /scope\.pending\.delete\(fingerprint\)/);
   }
@@ -238,22 +246,25 @@ test("conversation list and detail localize an unassigned server owner after ref
 });
 
 test("unknown support commands persist opaque account-scoped slots and reconcile them after reload", async () => {
-  const [tickets, conversations, scope] = await Promise.all([read("src/store/tickets.ts"), read("src/store/conversations.ts"), read("src/lib/account-scope.ts")]);
+  const [tickets, conversations, scope, intentSlot, pendingStorage] = await Promise.all([read("src/store/tickets.ts"), read("src/store/conversations.ts"), read("src/lib/account-scope.ts"), read("src/lib/support-intent-slot.ts"), read("src/lib/support-pending-storage.ts")]);
   for (const source of [tickets, conversations]) {
-    assert.match(source, /localStorage/);
-    assert.match(source, /support-pending-commands/);
+    assert.match(source, /persistSupportPending/);
     assert.match(source, /bindAccount\(accountKey: string\)/);
     assert.match(source, /authorityRevision\(\)/);
-    assert.match(source, /:\$\{runId\}:/);
-    assert.match(source, /opaqueIntentSlot/);
-    assert.match(source, /crypto\.subtle\.digest\("SHA-256"/);
+    assert.match(source, /opaqueSupportIntentSlot/);
     assert.match(source, /async function reconcilePending/);
     assert.match(source, /supportApi\.commandResult\(key\)/);
-    assert.doesNotMatch(source, /localStorage\.removeItem\(pendingStorageKey/);
     assert.match(source, /scope\.pending\.delete\(fingerprint\)/);
     assert.doesNotMatch(source, /token|bearer/i);
     assert.doesNotMatch(source, /Object\.fromEntries\(pendingKeys\)/);
   }
+  assert.match(intentSlot, /sha256\(wellFormed\)/);
+  assert.match(pendingStorage, /support-pending-commands/);
+  assert.match(pendingStorage, /:\$\{runId\}:/);
+  assert.match(pendingStorage, /uni\.getStorageSync/);
+  assert.match(pendingStorage, /uni\.setStorageSync/);
+  assert.match(pendingStorage, /stored !== value/);
+  assert.doesNotMatch(pendingStorage, /removeItem/);
   assert.match(scope, /useTickets\(\)\.bindAccount\(accountKey\)/);
   assert.match(scope, /useConversations\(\)\.bindAccount\(accountKey\)/);
 });
@@ -262,7 +273,6 @@ test("account switches retain opaque unknown commands for the original account a
   const [tickets, conversations, api] = await Promise.all([read("src/store/tickets.ts"), read("src/store/conversations.ts"), read("src/api/support-api.ts")]);
   for (const source of [tickets, conversations]) {
     assert.match(source, /pendingKeys = new Map\(\);[\s\S]*?preparePendingRun\(\)\.then\(reconcilePending\)/);
-    assert.doesNotMatch(source, /localStorage\.removeItem\(pendingStorageKey/);
   }
   assert.match(api, /const supportRoot = "\/api\/app\/support";/);
   assert.doesNotMatch(api, /support\/acceptance/);

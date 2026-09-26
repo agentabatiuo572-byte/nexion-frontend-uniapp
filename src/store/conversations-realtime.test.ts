@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import { installSupportStorage } from "@/test/storage-setup";
+
+installSupportStorage();
 
 const harness = vi.hoisted(() => {
   class FakeRealtime {

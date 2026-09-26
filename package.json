@@ -92,6 +92,7 @@
     "@dcloudio/uni-mp-xhs": "3.0.0-4080420251103001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-4080420251103001",
     "core-js": "3.49.0",
+    "js-sha256": "1.0.0",
     "pinia": "^2.2.8",
     "qrcode-generator": "^1.5.0",
     "vue": "^3.4.21",

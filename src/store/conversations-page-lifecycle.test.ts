@@ -3,6 +3,9 @@ import { createPinia, setActivePinia } from 'pinia';
 import { effectScope, nextTick, reactive, ref, watch } from 'vue';
 import ts from 'typescript';
 import messagesPage from '../pages/support/messages.vue?raw';
+import { installSupportStorage } from '@/test/storage-setup';
+
+installSupportStorage();
 
 const runtime = vi.hoisted(() => ({ remoteApiEnabled: true, supportApi: {
   authorityRevision: vi.fn(), commandResult: vi.fn(), conversations: vi.fn(),
