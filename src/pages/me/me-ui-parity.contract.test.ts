@@ -99,7 +99,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // confirmed empty address book offers setup. Layout and styles are unchanged.
   // #89: avatar, wallet row and save action expose names, link/button roles and
   // Enter/Space activation. Layout and styles are unchanged.
-  "profile.vue": "1d41442da5a5583a4f34102537fd1cbf2b57787dc3b0f218b92925e96ea0b66d",
+  // #332: only the visible historical nickname text is brand-normalized; layout and style remain paired.
+  "profile.vue": "6d37b1dbf66eae2553f2387fb310749e7ac06ede608534715c95b2d874d79323",
   // R2-06: server facts take precedence over the Prototype's fabricated earnings curve;
   // an unavailable server percentile occupies the same label/value slot as a neutral unknown,
   // without inventing a rank or changing the surrounding 5174 layout.

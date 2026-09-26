@@ -78,6 +78,7 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     // Existing bindings can change immediately, even with a legacy nextChangeAt in the future, after SMS.
     await gotoProtected("/pages/me/wallet"); await gotoProtected("/pages/me/wallet-cards-new");
     await page.locator(".bound-summary").waitFor(); assert.equal(await account.isEditable(),true);
+    assert.match(await page.locator(".bound-summary").innerText(), /20\d\d-\d\d-\d\d \d\d:\d\d:\d\d UTC\+7/);
     assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /7 (days|天|ngày)/);
     await account.fill("00123456789"); await holder.fill("NGUYEN VAN A");
     const otp=page.locator('[data-testid="bank-otp"] input'), send=page.getByTestId("bank-send-otp");

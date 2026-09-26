@@ -193,6 +193,7 @@ import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
+import { scrollCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
@@ -669,7 +670,7 @@ function go(tab: { key: string; route: string }) {
     if (!dom) return;
     let reduce = false;
     try { reduce = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { /* App 端无 matchMedia */ }
-    dom.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    scrollCurrentTabToTop(dom, reduce);
     return;
   }
   navTo(tab.route);

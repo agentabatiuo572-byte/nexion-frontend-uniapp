@@ -1105,7 +1105,7 @@ export const zh: Messages = {
     navTitle: "收益目标",
     heroLabel: "目标追踪",
     heroTitle: "设个目标,看推荐路径。",
-    heroSubtitle: "你已累计赚到 ${current}。选个目标 + 期限,我们推荐能达成的设备 tier。",
+    heroSubtitle: "你已累计赚到 ${current}。选好收益目标和期限，我们会推荐合适的设备档位。",
     targetLabel: "目标金额",
     deadlineLabel: "期限",
     recHeader: "推荐路径",
