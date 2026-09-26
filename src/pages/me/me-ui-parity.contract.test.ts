@@ -86,7 +86,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // slot while the first authoritative trial read is in flight, so the card cannot
   // appear late and push every module below it down.
   // #303: the device-slot remainder wraps inside its tile so Vietnamese copy stays complete.
-  "me.vue": "15887ededa3fef52c842c14bc4f63b693edd1182b3398427f8c9364d8f71c2b1",
+  // #320: the support subtitle also wraps inside its four-column tile.
+  "me.vue": "1940e48c8a451fcd764e19199964ca29b9425107bea051b9e4ece530fa9dde91",
   // Keep the selected zero-count category visible and show category-specific empty copy;
   // loading and request failures must not render a successful empty-feed message.
   // #94/#210: the mutually exclusive category chips are a radiogroup (role=radio +

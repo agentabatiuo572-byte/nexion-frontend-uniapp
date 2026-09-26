@@ -98,9 +98,10 @@ function parseConversationHeader(value: unknown): Conversation {
   const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt); const unread = integer(v?.unreadCount); const agentName = text(v?.ownerAgentName, true);
   const lastMessage = text(v?.lastMessage, true);
   const lastPublicMessageId = v?.lastPublicMessageId == null ? 0 : integer(v.lastPublicMessageId);
+  const lastMessageKind = v?.lastMessageKind === "IDLE_TIMEOUT_CLOSE" ? "IDLE_TIMEOUT_CLOSE" : null;
   if (!v || !id || !type || !status || version === null || lastTs === null || unread === null || agentName === null || lastMessage === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
   if (lastPublicMessageId === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, lastPublicMessageId, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false, historyNextCursor: null };
+  return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, lastPublicMessageId, lastMessageKind, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false, historyNextCursor: null };
 }
 function parseConversationMessage(value: unknown): ConvMessage {
   const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);

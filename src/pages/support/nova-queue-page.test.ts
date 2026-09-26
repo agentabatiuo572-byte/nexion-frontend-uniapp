@@ -6,6 +6,8 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useNova } from "@/store/nova";
 import { zh } from "@/i18n/messages/zh";
+import { vi as vietnamese } from "@/i18n/messages/vi";
+import { localizedIdleClose } from "@/lib/support-idle-message";
 import * as thinking from "@/lib/nova-thinking";
 import * as failure from "@/lib/nova-failure";
 import * as limiter from "@/lib/send-limiter";
@@ -36,6 +38,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
 }, enabled = ["ai", "advisor", "support"], realtime: { ready?: boolean; online?: boolean; typing?: boolean; remote?: boolean } = {}) {
   const hooks: Record<string, (...args: any[]) => any> = {};
   const app = vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
+  const currentLocale = vue.ref(zh);
   const api = { status: vi.fn(async () => ({ available: true })),
     history: vi.fn(async () => ({ conversationId: null, messages: [] })), chat: vi.fn() };
   const startConversation = vi.fn(async (_type: string, _text: string) => "new-conversation");
@@ -44,8 +47,9 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
   const modules: Record<string, unknown> = {
     vue: { ...vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
-    "@/i18n/use-t": { useT: () => vue.ref(zh) },
+    "@/i18n/use-t": { useT: () => currentLocale },
     "@/i18n/format": format,
+    "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/route": { navTo: vi.fn(), navBack: vi.fn() },
     "@/lib/send-limiter": limiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
@@ -84,13 +88,48 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     }, {},
   );
   hooks.onLoad(query);
-  return { page, hooks, app, api, startConversation, openConversation,watchRealtime, nova: useNova(), navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
+  return { page, hooks, app, api, startConversation, openConversation,watchRealtime, nova: useNova(), currentLocale, navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
 }
 
 beforeEach(() => { setActivePinia(createPinia()); vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("human conversation restart", () => {
+  it("shows the server-owned idle-close header after older public history and switches language", async () => {
+    const text = "会话已因用户闲置 5 分钟自动结束,可重新发起会话。";
+    const raw = {
+      conversation: { conversationNo: "CV-idle", conversationType: "support", status: "CLOSED", version: 2,
+        ownerAgentName: "", unreadCount: 0, lastMessage: text, lastMessageAt: "2026-09-01T00:05:00Z",
+        lastMessageKind: "IDLE_TIMEOUT_CLOSE" },
+      messages: [{ id: 1, senderType: "user", content: "Old message", createdAt: "2026-09-01T00:00:00Z", receiptStatus: null }],
+      historyTruncated: false, nextCursor: null,
+    };
+    const conversation = await createSupportApi({ request: async () => raw } as never).conversation("CV-idle");
+    const current = mount({ cid: conversation.id }, conversation);
+    expect(current.page.threadMessages.value[current.page.threadMessages.value.length - 1])
+      .toMatchObject({ tone: "system", text: expect.stringContaining("5 分钟") });
+    current.currentLocale.value = vietnamese;
+    await vue.nextTick();
+    expect(current.page.threadMessages.value[current.page.threadMessages.value.length - 1])
+      .toMatchObject({ tone: "system", text: expect.stringContaining("5 phút") });
+    current.page.cleanup();
+  });
+  it("does not create a system notice for manually archived exact-copy user text", async () => {
+    const text = "会话已因用户闲置 5 分钟自动结束,可重新发起会话。";
+    const raw = {
+      conversation: { conversationNo: "CV-copy", conversationType: "support", status: "CLOSED", version: 2,
+        ownerAgentName: "", unreadCount: 0, lastMessage: text, lastMessageAt: "2026-09-01T00:05:00Z" },
+      messages: [{ id: 1, senderType: "user", content: text, createdAt: "2026-09-01T00:04:59Z", receiptStatus: null }],
+      historyTruncated: false, nextCursor: null,
+    };
+    const conversation = await createSupportApi({ request: async () => raw } as never).conversation("CV-copy");
+    const current = mount({ cid: conversation.id }, conversation);
+    current.currentLocale.value = vietnamese;
+    await vue.nextTick();
+    expect(current.page.threadMessages.value).toHaveLength(1);
+    expect(current.page.threadMessages.value[0]).toMatchObject({ tone: "user", text });
+    current.page.cleanup();
+  });
   it.each([true,false])('resumes the original first-message creation after foreground, responseBeforeShow=%s',async responseBeforeShow=>{
     const current=mount({start:'advisor'});await current.hooks.onShow();
     const pending=deferred<string>();current.startConversation.mockReturnValueOnce(pending.promise);

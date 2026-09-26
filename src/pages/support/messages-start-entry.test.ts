@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
+import { localizedIdleClose } from "@/lib/support-idle-message";
 import { installSupportStorage } from "@/test/storage-setup";
 
 installSupportStorage();
@@ -32,7 +33,7 @@ afterEach(() => { mounted.splice(0).forEach(app => app.unmount()); });
 const flatten = (node: Element): Element[] => [node, ...node.children.flatMap(flatten)];
 
 function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" | "failed" | "loading" = "empty", locale = zh) {
-  const rows = state === "ended" || state === "active" ? [{ id: "CV-1", type, agentName: "Unassigned", messages: [], lastMessage: "Hello", lastTs: Date.now(), unread: 0, sessionStatus: state, roleKey: "roleAdvisor", avatarTint: "blue" }] : [];
+  const rows = Vue.reactive(state === "ended" || state === "active" ? [{ id: "CV-1", type, status: state === "ended" ? "closed" : "open", agentName: "Unassigned", messages: [], lastMessage: "Hello", lastTs: Date.now(), unread: 0, sessionStatus: state, roleKey: "roleAdvisor", avatarTint: "blue" }] : []);
   const store = Vue.reactive({
     categoryAvailabilityStatus: state === "loading" ? "loading" : state === "failed" ? "failed" : "ready",
     error: state === "failed" ? "unavailable" : null, enabled: true, typingIds: {},
@@ -45,9 +46,11 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
   });
   const navTo = vi.fn();
   const account = Vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1 });
+  const currentLocale = Vue.ref(locale);
   const modules: Record<string, unknown> = {
     vue: Vue, "@dcloudio/uni-app": { onShow: vi.fn(), onHide: vi.fn() },
-    "@/i18n/use-t": { useT: () => Vue.ref(locale) }, "@/i18n/format": { fmt: (value: string) => value },
+    "@/i18n/use-t": { useT: () => currentLocale }, "@/i18n/format": { fmt: (value: string) => value },
+    "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/route": { navTo }, "@/store/conversations": { useConversations: () => store },
     "@/store/nova": { useNova: () => ({ messages: [], unread: 0 }) }, "@/store/app": { useApp: () => account },
     "@/api/runtime": { remoteApiEnabled: true }, "@/lib/active-page-refresh": { registerActivePageRefresh: vi.fn() },
@@ -60,10 +63,34 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
     throw new Error(`Unexpected dependency: ${name}`);
   }, {});
   const root = element("root"); const app = renderer.createApp(component); app.mount(root); mounted.push(app);
-  return { root, store, navTo, account };
+  return { root, store, navTo, account, rows, currentLocale };
 }
 
 describe("human conversation contact entry", () => {
+  it("keeps the server idle-close preview newer than loaded history and follows the selected language", async () => {
+    const current = mount("support", "ended", vietnamese);
+    const row = current.rows[0] as any;
+    row.messages = [{ id: "1", sender: "user", text: "Older message", ts: Date.now() - 300_000 }];
+    row.lastMessage = "会话已因用户闲置 5 分钟自动结束,可重新发起会话。";
+    row.lastMessageKind = "IDLE_TIMEOUT_CLOSE";
+    row.lastTs = Date.now();
+    await Vue.nextTick();
+    const preview = () => flatten(current.root).find(node => node.props.class === "nx-conv-rowprev")!.text;
+    expect(preview()).toContain("5 phút");
+    current.currentLocale.value = en;
+    await Vue.nextTick();
+    expect(preview()).toContain("5 minutes");
+  });
+  it("keeps a manually closed user's exact idle-close copy verbatim", async () => {
+    const current = mount("support", "ended", vietnamese);
+    const row = current.rows[0] as any;
+    row.lastMessage = "会话已因用户闲置 5 分钟自动结束,可重新发起会话。";
+    row.lastTs = Date.now();
+    await Vue.nextTick();
+    const preview = flatten(current.root).find(node => node.props.class === "nx-conv-rowprev")!.text;
+    expect(preview).toContain("会话已因用户闲置 5 分钟自动结束");
+    expect(preview).not.toContain("5 phút");
+  });
   it.each(["same-user rebind", "A to B to A"])("ignores an old removal failure after %s", async scenario => {
     const current = mount("advisor", "active");
     let reject!: (error: Error) => void;
@@ -203,6 +230,7 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
     vue: { ...Vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
     "@/i18n/use-t": { useT: () => Vue.ref(zh) }, "@/i18n/format": chatFormat,
+    "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/route": navigation, "@/lib/send-limiter": chatLimiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 }, "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => store }, "@/store/nova": { useNova }, "@/store/app": { useApp: () => app },

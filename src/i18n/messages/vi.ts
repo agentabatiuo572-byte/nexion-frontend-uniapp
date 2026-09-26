@@ -1142,7 +1142,7 @@ export const vi: Messages = {
     recReasonServer: "Máy chủ đã chọn sản phẩm từ danh mục thật dựa trên sản lượng ngày đã xác minh.",
     loading: "Đang tải mục tiêu từ máy chủ…",
     serverUnavailable: "Mục tiêu tạm thời không khả dụng. Vui lòng thử lại sau.",
-    noEligibleProduct: "Không có thiết bị khả dụng nào có sản lượng ngày đã xác minh đủ cho mục tiêu và hạn này. Hãy điều chỉnh mục tiêu hoặc hạn.",
+    noEligibleProduct: "Hiện không có thiết bị nào vừa đáp ứng điều kiện mua của tài khoản bạn, vừa có sản lượng ngày đã xác minh đủ cho mục tiêu và thời hạn này. Hãy xem điều kiện mua hoặc điều chỉnh mục tiêu.",
   },
 
 
@@ -3215,6 +3215,7 @@ export const vi: Messages = {
     inputPlaceholder: "Nhập tin nhắn…",
     agentTyping: "đang nhập…",
     sessionEnded: "Phiên đã kết thúc",
+    serverIdleClosed: "Cuộc trò chuyện đã tự kết thúc sau {n} phút không hoạt động. Bạn có thể bắt đầu cuộc trò chuyện mới.",
     restartSession: "Bắt đầu phiên mới",
     convertTicket: "Tạo phiếu hỗ trợ",
     convertTicketFailed: "Không thể tạo phiếu. Hãy tải lại và thử lại.",

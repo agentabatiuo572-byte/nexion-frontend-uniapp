@@ -65,7 +65,7 @@
                 <view v-else-if="item.dot" :style="quickDotStyle" />
               </view>
               <text :style="quickLabelStyle">{{ item.label }}</text>
-              <text v-if="item.meta" :class="item.key === 'slots' ? undefined : 'truncate'" :style="quickMetaStyle(item.tone, item.key === 'slots')">{{ item.meta }}</text>
+              <text v-if="item.meta" :class="item.key === 'slots' || item.key === 'support' ? undefined : 'truncate'" :style="quickMetaStyle(item.tone, item.key === 'slots' || item.key === 'support')">{{ item.meta }}</text>
             </view>
           </view>
         </view>
