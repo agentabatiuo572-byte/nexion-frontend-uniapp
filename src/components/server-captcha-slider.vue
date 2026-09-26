@@ -75,6 +75,7 @@ import { useT } from "@/i18n/use-t";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { apiClient } from "@/api/runtime";
 import { createCaptchaApi, type CaptchaScene, type ServerCaptchaChallenge } from "@/api/captcha-api";
+import { readMonotonicNowMs } from "@/lib/server-deadline-clock";
 const props=defineProps<{phone:string;scene:CaptchaScene}>();
 const emit=defineEmits<{(e:"success",ticket:string):void;(e:"close"):void}>();
 const t=useT(),api=createCaptchaApi(apiClient),instance=getCurrentInstance();
@@ -108,8 +109,8 @@ async function loadChallenge(){
 function reloadChallenge(){void loadChallenge();}function onRetry(){void loadChallenge();}
 function pointerX(e:TouchEvent|MouseEvent){const touch=e as TouchEvent;return touch.touches?.length?touch.touches[0].clientX:(e as MouseEvent).clientX;}
 function nativeX(){const c=challenge.value;return c?Math.round(curX.value/maxHandle.value*(c.width-c.pieceWidth)):0;}
-function recordPoint(){if(gestureStart===null)gestureStart=performance.now();if(trail.length>=128)trail.splice(1,1);trail.push({x:nativeX(),t:Math.round(performance.now()-gestureStart)});}
-function onDown(e:TouchEvent|MouseEvent){if(closed||busy.value||verified.value||!challenge.value)return;inputMethod="pointer";trail=[];gestureStart=performance.now();dragging.value=true;startPX=pointerX(e)-curX.value;recordPoint();}
+function recordPoint(){const now=readMonotonicNowMs();if(gestureStart===null)gestureStart=now;if(trail.length>=128)trail.splice(1,1);trail.push({x:nativeX(),t:Math.max(trail[trail.length-1]?.t??0,Math.round(now-gestureStart))});}
+function onDown(e:TouchEvent|MouseEvent){if(closed||busy.value||verified.value||!challenge.value)return;inputMethod="pointer";trail=[];gestureStart=null;dragging.value=true;startPX=pointerX(e)-curX.value;recordPoint();}
 function onMove(e:TouchEvent|MouseEvent){if(!dragging.value||busy.value)return;curX.value=Math.min(maxHandle.value,Math.max(0,pointerX(e)-startPX));recordPoint();}
 async function onUp(){
  if(closed||!dragging.value||busy.value||!challenge.value)return;dragging.value=false;if(curX.value<=0)return;recordPoint();
@@ -121,7 +122,7 @@ async function onUp(){
 }
 function onHandleKeydown(e:KeyboardEvent){
  if(closed||busy.value||verified.value||!challenge.value)return;const key=e.key;if(!["ArrowRight","ArrowLeft","Home","End","Enter"," "].includes(key))return;e.preventDefault();inputMethod="keyboard";
- if(gestureStart===null){gestureStart=performance.now();trail=[];recordPoint();}
+ if(gestureStart===null){trail=[];recordPoint();}
  if(key==="Enter"||key===" "){dragging.value=true;void onUp();return;}
  const step=e.shiftKey?10:2;curX.value=Math.min(maxHandle.value,Math.max(0,key==="Home"?0:key==="End"?maxHandle.value:curX.value+(key==="ArrowRight"?step:-step)));recordPoint();
 }
