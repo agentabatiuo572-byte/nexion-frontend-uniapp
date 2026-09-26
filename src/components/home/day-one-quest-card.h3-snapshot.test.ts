@@ -19,7 +19,9 @@ const render = new Function("Vue", compile(template, {
 const home = {
   dayOneFirstDayReward: "Day-One reward",
   dayOneEndsIn: "Ends in",
-  dayOneLoginRequired: "Sign in to view",
+  dayOneLoading: "Loading live tasks…",
+  dayOneUnavailable: "Tasks unavailable",
+  dayOneRetryLoad: "Tap to retry",
   dayOneDoneSuffix: "done",
   dayOneRewardClaimed: "Reward claimed",
   dayOneRewardUnclaimed: "Reward not claimed",
@@ -31,15 +33,21 @@ const home = {
   dayOneEarnedSuffix: "earned",
 };
 
-function renderCard(claimState: { empty: boolean; claimed: boolean; unverified: boolean; claimCode: string | null }) {
+function renderCard(
+  claimState: { empty: boolean; claimed: boolean; unverified: boolean; claimCode: string | null },
+  unavailable = false,
+) {
   const component = {
     setup: () => ({
       props: { active: true }, expanded: false, rootStyle: {}, t: { home },
-      taskCountText: "0 tasks", rewardText: "—", questUnavailable: false,
+      taskCountText: unavailable ? home.dayOneUnavailable : "0 tasks", rewardText: "—",
+      questUnavailable: unavailable, questLoadError: unavailable,
+      unavailableLabel: home.dayOneUnavailable,
       remoteApiEnabled: true, dayOneWindow: null, remainingLabel: "—", barStyle: {},
       completedCount: 0, total: 0, claimState, nexEarnedText: "0", tasks: [],
       quest: { dayOneClaiming: false, dayOneClaimError: false }, toggleStyle: {},
-      toggleLabel: "View tasks", isActionable: () => false, onRowTap: () => undefined,
+      toggleLabel: unavailable ? home.dayOneRetryLoad : "View tasks",
+      isActionable: () => false, onRowTap: () => undefined,
       onClaim: () => undefined, toggleExpanded: () => undefined,
       isDone: () => false,
       rowStyle: () => ({}), circleStyle: () => ({}), labelStyle: () => ({}),
@@ -51,6 +59,14 @@ function renderCard(claimState: { empty: boolean; claimed: boolean; unverified: 
 }
 
 describe("DayOneQuestCard H3 snapshot presentation", () => {
+  it("shows a retry control for a failed read without falsely requesting sign-in", async () => {
+    const html = await renderCard({ empty: false, claimed: false, unverified: false, claimCode: null }, true);
+    expect(html).toContain(home.dayOneUnavailable);
+    expect(html).toContain(home.dayOneRetryLoad);
+    expect(html).toContain('aria-disabled="false"');
+    expect(html).not.toContain("Sign in to view");
+  });
+
   it("renders EMPTY as no active onboarding tasks and exposes no reward claim control", async () => {
     const html = await renderCard({ empty: true, claimed: false, unverified: false, claimCode: null });
     expect(html).toContain(home.dayOneNoActiveTasks);
