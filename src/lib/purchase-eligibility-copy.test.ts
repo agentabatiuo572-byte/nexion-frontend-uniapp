@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "./purchase-eligibility-copy";
+import { purchaseEligibilityPolicyHasNoRestriction, purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "./purchase-eligibility-copy";
 
 const base = {
   productNo: "stellarbox-pro-v2",
@@ -26,6 +26,16 @@ test("unknown, malformed, or failed remote decisions map to error and never loca
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: false, decisionCode: "CLIENT_GUESSED" })).toBe("error");
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: true, decisionCode: "PURCHASE_GATE_NOT_MET" })).toBe("error");
   expect(resolvePurchaseEligibilityMessage("ready", { ...base, eligible: true, decisionCode: "ELIGIBLE" })).toBe("eligible");
+});
+
+test("known empty E1 and F4B policies mean no extra restriction, while unknown empty policies stay unconfirmed", () => {
+  expect(purchaseEligibilityPolicyHasNoRestriction(base.policies[0])).toBe(true);
+  expect(purchaseEligibilityPolicyHasNoRestriction(base.policies[1])).toBe(true);
+  expect(purchaseEligibilityPolicyHasNoRestriction({ ...base.policies[1], decisionCode: "F4B_QUOTA_UNAVAILABLE" })).toBe(false);
+  expect(purchaseEligibilityPolicyHasNoRestriction({ ...base.policies[1], eligible: false })).toBe(false);
+  expect(purchaseEligibilityPolicyHasNoRestriction({ ...base.policies[0], conditions: [
+    { kind: "rank", current: 2, required: 2, gap: 0, met: true },
+  ] })).toBe(false);
 });
 
 test("rank-only product opens rank progression instead of another product quota", () => {

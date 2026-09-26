@@ -2340,6 +2340,7 @@ export const en = {
     purchaseEligibilityConditionGap: "{gap} more needed",
     purchaseEligibilityQuotaDepleted: "Monthly available inventory is sold out",
     purchaseEligibilityNoFacts: "The server returned no condition details for this requirement.",
+    purchaseEligibilityNoExtraRestriction: "No additional purchase restriction applies under this policy.",
     purchaseEligibilityPolicyMet: "Result: met",
     // zentao #29: a placeholder policy with no condition facts must not be reported as met.
     purchaseEligibilityUnconfigured: "Result: not configured; not used as a purchase basis",

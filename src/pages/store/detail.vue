@@ -79,10 +79,9 @@
             <text v-if="eligibilityQualificationConditions(policy).length > 1" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityPolicyMode(policy) }}</text>
             <text v-for="condition in eligibilityQualificationConditions(policy)" :key="condition.kind" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(condition) }}</text>
             <text v-if="eligibilityMonthlyStockCondition(policy)" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(eligibilityMonthlyStockCondition(policy)!) }}</text>
-            <!-- No server facts means this policy cannot claim its conditions are met. -->
-            <text v-if="!eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
             <text v-if="eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
-            <text v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityUnconfigured }}</text>
+            <text v-else-if="eligibilityPolicyHasNoRestriction(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoExtraRestriction }}</text>
+            <text v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
           </view>
         </view>
         <!-- === Section 1: Hero === -->
@@ -131,7 +130,7 @@
         </view>
 
         <!-- === Section 2: Vs phone strip === -->
-        <view v-if="!isShare" class="mx-4 mt-3 rounded-2xl flex items-center" :style="vsStripStyle">
+        <view v-if="!isShare && phoneDailyEarnValue > 0" class="mx-4 mt-3 rounded-2xl flex items-center" :style="vsStripStyle">
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
@@ -169,7 +168,7 @@
               <view :style="roiCellStyle(0)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
-                <text class="block" :style="roiSubStyle">{{ vsPhoneSubText }}</text>
+                <text v-if="phoneDailyEarnValue > 0" class="block" :style="roiSubStyle">{{ vsPhoneSubText }}</text>
               </view>
               <view :style="roiCellStyle(1)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
@@ -270,7 +269,7 @@ import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { estimatePaybackDays } from "@/lib/product-payback";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
-import { useEarnConfig } from "@/store/earn-config";
+import { activePhoneDailyRate, storeYieldMultiplier } from "@/lib/store-upgrade";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { useApp } from "@/store/app";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -281,7 +280,7 @@ import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-o
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import type { PurchaseEligibilityCondition, PurchaseEligibilityPolicy } from "@/api/purchase-eligibility-api";
-import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import { purchaseEligibilityPolicyHasNoRestriction as eligibilityPolicyHasNoRestriction, purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
@@ -459,23 +458,16 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
-// 「你的手机」是平台手机档位配置里的典型档(Tier 3),对所有商品都是同一个数 —— 它从来
-// 不是商品属性(后端也没有这一列)。0 = 运营配置取不到,此时降级、不许拿旧值或猜测顶上,
-// 否则页面会用一个编出来的基准去宣称倍数。
-// 🔴 必须读与商城主列表**同一个响应式源**(earnConfig.phoneTiers)。原先这里读的是
-//    mock/phone-tiers 的可变兼容表,它没有任何响应式依赖:computed 只在首次求值时
-//    读一次 —— 那一刻 server 模式的表刚被 applyCanonicalPhoneTierYields([]) 清空,
-//    于是详情页永久停在「暂无数据」,而列表因为依赖 earnConfig.phoneTiers 的 ref
-//    已经拿到 $0.06/天(BUG 28)。
-const earnConfig = useEarnConfig();
-const phoneDailyEarnValue = computed(() =>
-  (remoteApiEnabled ? earnConfig.phoneTiers.value?.tiers : getPhoneTierYields())
-    ?.find((row) => row.tier === 3)?.baseRateUsdt ?? 0,
-);
+// "Your phone" uses the same activated fleet rate as the Store overview.
+// Without a confirmed fleet, hide the personal comparison instead of using a
+// global tier as if it described this handset.
+const phoneDailyEarnValue = computed(() => remoteApiEnabled
+  ? app.remoteFleetHasSnapshot ? activePhoneDailyRate(app.visibleDevices) : 0
+  : getPhoneTierYields().find((row) => row.tier === 3)?.baseRateUsdt ?? 0);
 const speedup = computed(() =>
   product.value && !isShare.value
     && phoneDailyEarnValue.value > 0
-    ? Math.round(product.value.dailyEarn / phoneDailyEarnValue.value)
+    ? storeYieldMultiplier(product.value.dailyEarn, phoneDailyEarnValue.value)
     : 0,
 );
 const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);

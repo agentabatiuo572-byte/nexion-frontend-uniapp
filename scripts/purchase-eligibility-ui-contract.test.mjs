@@ -30,8 +30,9 @@ test("Gen-2 detail hides the sticky buy CTA until the server decision is ready",
   assert.match(page, /eligibilityMonthlyStockCondition\(policy\)/);
   assert.match(page, /eligibilityConditionText\(condition\)/);
   assert.match(page, /eligibilityPolicyHasFacts\(policy\)/);
+  assert.match(page, /eligibilityPolicyHasNoRestriction\(policy\)/);
   assert.match(page, /purchaseEligibilityNoFacts/);
-  assert.match(page, /purchaseEligibilityUnconfigured/);
+  assert.match(page, /purchaseEligibilityNoExtraRestriction/);
   assert.match(page, /purchaseEligibilityQuotaEitherAndStock/);
   assert.doesNotMatch(page, /\{\{ policy\.decisionCode \}\}/);
   assert.doesNotMatch(page, /\{\{ condition\.kind \}\}/);
