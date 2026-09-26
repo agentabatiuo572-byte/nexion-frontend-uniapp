@@ -285,13 +285,16 @@ function oauthDevelopmentChallengeFromResponse(value: unknown): string {
 export function createAuthApi(
   client: ApiClient,
   vault: SessionVault,
-  options: { refreshCredentialMode?: RefreshCredentialMode } = {},
+  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP" } = {},
 ): AuthApi {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let restoreInFlight: Promise<SessionSnapshot | null> | null = null;
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
+  const sessionIssuanceHeaders = options.clientSurface === "APP"
+    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": "APP" }
+    : cookieHeaders;
   const revokeRefreshTokenBestEffort = (refreshToken: string) => {
     void client.request({
       path: "/auth/users/logout",
@@ -330,7 +333,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
-        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
+        ...(sessionIssuanceHeaders ? { headers: sessionIssuanceHeaders } : {}),
         acceptedResponses: [{
           status: 428,
           code: 428,
@@ -354,7 +357,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
-        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
+        ...(sessionIssuanceHeaders ? { headers: sessionIssuanceHeaders } : {}),
       });
       const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
       if (result.kind !== "authenticated") {
@@ -402,7 +405,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
-        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
+        ...(sessionIssuanceHeaders ? { headers: sessionIssuanceHeaders } : {}),
       });
       return consumeLoginResponse(data, vault, revision, refreshCredentialMode);
     },
@@ -435,7 +438,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
-        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
+        ...(sessionIssuanceHeaders ? { headers: sessionIssuanceHeaders } : {}),
       });
       const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
       if (result.kind !== "authenticated") {
@@ -465,7 +468,7 @@ export function createAuthApi(
         method: "POST",
         body,
         authenticated: false,
-        ...(cookieHeaders ? { headers: cookieHeaders } : {}),
+        ...(sessionIssuanceHeaders ? { headers: sessionIssuanceHeaders } : {}),
       });
       return oauthExchangeFromResponse(data, vault, revision, refreshCredentialMode);
     },
