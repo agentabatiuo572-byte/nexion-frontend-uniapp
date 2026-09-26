@@ -38,7 +38,7 @@
           :style="orderRowStyle(i === orderList.length - 1)"
           role="button"
           tabindex="0"
-          :aria-label="`${o.productName} ${o.id}`"
+          :aria-label="`${nexGridBrandText(o.productName)} ${o.id}`"
           @click.stop="goOrder(o)"
         >
           <view class="flex items-start" style="gap: 12px">
@@ -47,7 +47,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between" style="gap: 8px">
-                <text class="truncate" style="font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">{{ o.productName }}</text>
+                <text class="truncate" style="font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">{{ nexGridBrandText(o.productName) }}</text>
                 <text class="shrink-0" :style="statusChipStyle(o.status)">{{ badge(o.status).label }}</text>
               </view>
               <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
@@ -87,6 +87,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
 import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";

@@ -89,10 +89,19 @@
       </view>
     </transition>
   </view>
+  <view v-if="showSuccess" class="nx-genesis-success fixed inset-0 grid place-items-center" style="z-index: 920; padding: 20px; background: var(--v5-bg-color-mask)" role="dialog" aria-modal="true" :aria-label="successTitle">
+    <view style="width: 100%; max-width: 360px; padding: 28px 22px; border-radius: 24px; background: var(--v5-surface); text-align: center; box-shadow: var(--v5-card-shadow-lift-strong)">
+      <text class="block" style="font-size: 26px; color: var(--v5-genesis-gold-on-dark)" aria-hidden="true">✦</text>
+      <text class="block" style="margin-top: 10px; font-size: 20px; font-weight: 650; color: var(--v5-ink)">{{ successTitle }}</text>
+      <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.genesis.purchaseSubtitle }}</text>
+      <view class="active:opacity-85" role="button" tabindex="0" style="margin-top: 22px; padding: 12px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font-weight: 600" @click="viewHolder" @keydown.enter.prevent="viewHolder" @keydown.space.prevent="viewHolder"><text>{{ t.genesis.purchaseViewHolder }}</text></view>
+      <view class="active:opacity-70" role="button" tabindex="0" style="margin-top: 10px; padding: 10px; color: var(--v5-ink-3)" @click="closeSuccess" @keydown.enter.prevent="closeSuccess" @keydown.space.prevent="closeSuccess"><text>{{ t.ui.close }}</text></view>
+    </view>
+  </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, computed, watch, nextTick, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_ELIGIBILITY_POLICY } from "@/store/genesis";
@@ -105,6 +114,8 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { useGenesisConfig } from "@/store/genesis-config";
+import { navTo } from "@/lib/route";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
@@ -119,6 +130,26 @@ const { gate } = useGenesisEligibility();
 const { block, blockText } = useGenesisSaleGate();
 
 const qty = ref(1);
+const showSuccess = ref(false);
+const successfulQuantity = ref(0);
+const successTitle = computed(() => fmt(t.value.genesis.purchaseSuccess, { n: successfulQuantity.value, s: successfulQuantity.value > 1 ? "s" : "" }));
+function closeSuccess() { showSuccess.value = false; }
+function viewHolder() { closeSuccess(); navTo("/pages/genesis/holder"); }
+function showConfirmedSuccess() {
+  successfulQuantity.value = qty.value;
+  showSuccess.value = true;
+}
+// Keep one focus lifecycle across the sheet → success-dialog handoff. The
+// original trigger regains focus only after the success dialog closes.
+const dialogOpen = computed(() => props.open || showSuccess.value);
+useDialogA11y(dialogOpen, () => typeof document === "undefined" ? null
+  : document.querySelector<HTMLElement>(showSuccess.value ? ".nx-genesis-success" : ".nx-genesis-purchase-root"),
+  () => { if (showSuccess.value) closeSuccess(); else emitClose(); });
+watch(showSuccess, async (open) => {
+  if (!open || typeof document === "undefined") return;
+  await nextTick();
+  document.querySelector<HTMLElement>('.nx-genesis-success [tabindex="0"]')?.focus();
+});
 /**
  * 🔴 成交在途守卫。`emitClose()` 只是把 open 传给父级,面板要等下一次渲染才真卸载 ——
  * 移动端快速双击会在这个窗口里第二次进到 handlePurchase,扣两笔钱、铸两份额度。
@@ -197,6 +228,11 @@ async function handlePurchase() {
     //   这一段是原实现原样恢复,只多套一层 `!remoteApiEnabled`;远端模式一行都不走。
     //   顺序不可调:扣款⊗记账(一次提交)→ 铸席位 → 失败冲正。理由见 money-receipt.ts。
     if (!remoteApiEnabled) {
+      await useGenesisConfig().refresh();
+      if (sheetBlocked.value || !gate.value.eligible) {
+        toast.error(sheetBlocked.value ? sheetBlockText.value : t.value.genesisEligibility.toastIneligible);
+        return;
+      }
       const cost = qty.value * price.value;
       const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
       const before = app.captureMoney();
@@ -239,12 +275,9 @@ async function handlePurchase() {
         } else toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
         return;
       }
-      toast.success(
-        fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
-        t.value.genesis.purchaseSubtitle,
-      );
       committed = true;
       emitClose();
+      showConfirmedSuccess();
       return;
     }
     // The Genesis store and App wallet store have independent epoch counters.
@@ -285,12 +318,9 @@ async function handlePurchase() {
         result.walletReceiptSourceEnvironment,
       );
     }
-    toast.success(
-      fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
-      t.value.genesis.purchaseSubtitle,
-    );
     committed = true;
     emitClose();
+    showConfirmedSuccess();
   } finally {
     if (!committed) purchasing.value = false;
   }
@@ -417,7 +447,6 @@ const submitStyle = computed<CSSProperties>(() => ({
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-genesis-purchase-root", emitClose);
 </script>
 
 <style scoped>

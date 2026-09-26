@@ -35,6 +35,6 @@ onMounted(() => {
 
 // 登录响应 /api/app/profile 投影的是服务端完整昵称；首页不得擅自按空格截断。
 // 存量账号的默认昵称在服务端仍是改名前的旧品牌,渲染层归一(见 lib/brand-copy.ts)。
-const nickname = computed(() => nexGridBrandText(homeGreetingName(profile.displayName, "NexGrid")));
+const nickname = computed(() => nexGridBrandText(homeGreetingName(profile.displayName, "UVEL")));
 const greetingLine = computed(() => `${greeting.value}, ${nickname.value}`);
 </script>

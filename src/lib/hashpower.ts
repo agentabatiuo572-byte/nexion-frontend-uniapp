@@ -2,7 +2,7 @@
  * Live effective hashpower derivation — single source for the phone card's
  * real-time "算力" number and curve.
  *
- *   online  (fresh heartbeat): effectiveTops = baselineTops × charge × network × thermal × continuity × jitter
+ *   online  (fresh heartbeat): effectiveTops = baselineTops × network × thermal × continuity × jitter
  *   offline (no/stale beat):   effectiveTops = baselineTops × H5_BASE_FACTOR × network × jitter   (基础托管)
  *
  * SPEC-1 R7: the online tier is driven by the device's fresh resident-agent
@@ -14,7 +14,7 @@
  * monotonic, globally-ordered baselines, this guarantees the displayed number
  * is always plausible (a budget phone's peak stays below a flagship's typical).
  *
- * The App factors are all things the user can see and act on (charge the phone,
+ * The App factors are all things the user can see and act on (keep enough battery,
  * stay online, keep it cool, stay connected on ONE device) — so the number feels
  * measured and earned. ContinuityFactor rewards keeping the app running on this
  * physical device and is reset on new-device recalibration.
@@ -22,7 +22,7 @@
  * Pure & deterministic given inputs (jitter is a smooth function of nowSeed, not
  * Math.random) so the curve is stable across re-renders.
  */
-import type { ThermalState } from "@/store/types";
+import type { Device, ThermalState } from "@/store/types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 
 /** Continuous-online time at which the stability bonus reaches full — DEFAULT 2h,
@@ -44,6 +44,12 @@ export const H5_BASE_FACTOR = DEFAULT_PLATFORM_CONFIG.onlineBonus.h5BaseFactor;
  * timestamp test with the server-canonical conclusion produced from candidate
  * `POST /api/device/:id/heartbeat` (PRD §6.11/§12.2). */
 export const ONLINE_HEARTBEAT_TIMEOUT_MS = 3 * 60 * 1000;
+
+/** A server-paused task must not be presented as producing live phone TOPS. */
+export function canShowLivePhoneHashpower(device: Pick<Device, "kind" | "interruptedAt" | "pausedReason" | "currentTask">): boolean {
+  return device.kind === "phone" && device.interruptedAt == null
+    && !device.pausedReason && device.currentTask?.status !== "PAUSED";
+}
 
 /** Single online seam for both earnings and display. Phone truth comes from the
  * resident-agent heartbeat; hosted hardware keeps its service-managed status.
@@ -160,7 +166,7 @@ export function computeLiveHashpower(input: LiveHashInput): LiveHashpower {
   }
 
   // ── Device truly online: full live factors ──
-  const charge = input.isCharging ? 1 : 0.6;
+  const charge = 1; // charging is telemetry, not a task or ranking factor
   const thermal = thermalFactor(input.thermalState);
   const continuity = continuityFactor(input.continuityMs, continuityFullMs);
 
@@ -170,7 +176,6 @@ export function computeLiveHashpower(input: LiveHashInput): LiveHashpower {
 
   let dominant: HashFactorKey;
   if (network === 0) dominant = "offline";
-  else if (charge < 1) dominant = "battery";
   else if (thermal < 1) dominant = "thermal";
   else if (continuity < 0.999) dominant = "continuity";
   else dominant = "peak";

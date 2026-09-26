@@ -81,7 +81,6 @@
               <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
               <text class="tabular-nums" :style="payTotalStyle">${{ netPriceText }}</text>
             </view>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ paybackLine }}</text>
             <!-- FEAT-TRIAL02: conversion credit chips (promo + accrued credit) -->
             <view v-if="promoDiscount > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
@@ -151,7 +150,7 @@
         <view v-else-if="step === 'confirm'" class="mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
           <text class="block font-mono-tabular" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
           <view style="margin-top: 12px">
-            <CheckoutRow :label="t.store.coRowProduct" :value="product.name" />
+            <CheckoutRow :label="t.store.coRowProduct" :value="nexGridBrandText(product.name)" />
             <CheckoutRow :label="t.store.coRowQuantity" value="1" />
             <CheckoutRow :label="t.store.coRowPayment" :value="paymentLabel" />
             <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
@@ -189,7 +188,7 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
           <text class="block" :style="centerTitleStyle">{{ remoteOrderFailure ? t.tradein.errPurchaseFailed : t.store.coAwaiting }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? `${t.store.coServerStatus}: ${remoteOrderFailure}` : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? t.store.coRecoverOriginalOrder : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
@@ -265,6 +264,7 @@ import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";

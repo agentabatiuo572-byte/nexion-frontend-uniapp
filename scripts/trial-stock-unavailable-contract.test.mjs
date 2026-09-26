@@ -17,7 +17,7 @@ test("zero-stock S1 stays visible but every trial and purchase CTA is disabled",
   assert.match(card, /@keydown\.enter\.prevent\.stop="onBuy"/);
   assert.doesNotMatch(card, /<text role="button" tabindex="0" @click\.stop="onBuy">/);
   assert.doesNotMatch(card, /:style="cardStyle" role="button"/);
-  assert.match(card, /:style="renderWrapStyle" role="button" tabindex="0" :aria-label="product\.name"/);
+  assert.match(card, /:style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText\(product\.name\)"/);
   assert.match(detail, /const stockUnavailable = computed/);
   assert.match(detail, /disabled:\s*true/);
   assert.match(detail, /buttonLabel:\s*t\.value\.store\.temporarilyOutOfStock/);

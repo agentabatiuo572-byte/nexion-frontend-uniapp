@@ -1,6 +1,6 @@
 <!--
   OnGridSection — ZONE 2 "what the network is computing now" (ported from
-  mission-control.tsx OnGridSection). Header (On NexGrid grid · now · Map) + 3
+  mission-control.tsx OnGridSection). Header (On UVEL grid · now · Map) + 3
   client rows (company badge · company · model·city · GPUs) + live footer. The formal
   App reads every row from the Java Home projection; Mock rows live only in 5174.
 -->

@@ -24,6 +24,6 @@ describe("remote inline help bot", () => {
       turnId: "8c12eaf3-744d-405e-b2fb-64b3d81267be",
     };
 
-    expect(novaHelpSource(response)).toBe("NexGrid AI");
+    expect(novaHelpSource(response)).toBe("UVEL AI");
   });
 });

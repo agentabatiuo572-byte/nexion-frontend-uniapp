@@ -43,9 +43,6 @@
             </view>
           </view>
           <text class="block font-display tabular-nums" :style="heroBigStyle">{{ remoteApiEnabled ? (remoteState === 'ready' ? `$${remoteTotalUSDT.toFixed(2)}` : '—') : `$${totalRoyalty.toFixed(2)}` }}</text>
-          <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
-            <text>{{ remoteApiEnabled ? canonicalPolicyText : heroRateLineText }}</text>
-          </view>
         </view>
 
         <view v-if="remoteApiEnabled && remoteState === 'ready' && commission.configStatus === 'ready'" :style="remoteBreakdownStyle">
@@ -65,7 +62,7 @@
             </view>
             <text class="font-display tabular-nums" :style="remoteAmountStyle">${{ remoteExtended.amountUSDT.toFixed(2) }}</text>
           </view>
-          <text class="block font-mono-tabular" :style="remoteSplitNoteStyle">+{{ remoteTotalNEX.toLocaleString() }} NEX · {{ canonicalPeriodText }} · {{ canonicalPolicyText }}</text>
+          <text class="block font-mono-tabular" :style="remoteSplitNoteStyle">+{{ remoteTotalNEX.toLocaleString() }} NEX</text>
         </view>
 
         <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
@@ -76,7 +73,6 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
             <text class="block" :style="compSubStyle">{{ t.unilevel.directSub }}</text>
-            <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
           </view>
           <view class="text-right shrink-0">
             <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
@@ -89,56 +85,10 @@
             <view class="flex-1 min-w-0">
               <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
               <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
-              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 12px">
-                <view>
-                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
-                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
-                </view>
-                <view>
-                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
-                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
-                </view>
-              </view>
             </view>
             <view class="text-right shrink-0">
               <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
             </view>
-          </view>
-          <view class="flex items-start" :style="algoNoteStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
-          </view>
-        </view>
-
-        <!-- Partner Status tier progression — frosted-glass card (owner
-             2026-07-09); the four tier cells keep their fills, borders
-             dropped (selection/comparison whitelist, podium idiom: current
-             cell tinted, rest dimmed surface-2). -->
-        <view v-if="!remoteApiEnabled" :style="glassCardStyle">
-          <text class="block font-mono-tabular" :style="{ fontSize: '12px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
-          <text class="block" :style="{ marginTop: '8px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ t.unilevel.rateTierNote }}</text>
-
-          <view class="grid grid-cols-4" style="margin-top: 16px; gap: 6px">
-            <view v-for="tier in rateTiers" :key="tier.id" class="rounded-lg text-center" :style="tierCardStyle(tier)">
-              <text class="block font-display" :style="{ fontSize: '12px', fontWeight: 600, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-3)' }">{{ t.unilevel.rateTiers[tier.id].name }}</text>
-              <text class="block" :style="{ fontSize: '12px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25; 10px = scale floor (was off-scale 8.5) -->
-              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
-            </view>
-          </view>
-
-          <view v-if="next" style="margin-top: 18px">
-            <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 8px">
-              <text :style="{ color: 'var(--v5-ink-3)' }">{{ rateTierCurrentText }}</text>
-              <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">${{ monthlyNetworkVolume.toLocaleString() }} / ${{ next.minVolume.toLocaleString() }}</text>
-            </view>
-            <view class="rounded-full overflow-hidden" :style="{ height: '8px', background: 'color-mix(in srgb, var(--v5-surface-2) 60%, transparent)' }">
-              <view class="rounded-full" :style="tierProgressFillStyle" />
-            </view>
-            <text class="block" :style="{ marginTop: '10px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.5 }">{{ rateTierProgressText }}</text>
-          </view>
-          <view v-else class="inline-flex items-center" :style="maxedChipStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
-            <text>{{ rateTierMaxedText }}</text>
           </view>
         </view>
 

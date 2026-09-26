@@ -44,7 +44,6 @@
             </view>
           </view>
           <text class="block font-display tabular-nums" :style="heroAmtStyle">+${{ periodMatch.toFixed(2) }}</text>
-          <text class="block" :style="heroFormulaStyle">{{ formulaText }}</text>
         </view>
 
         <!-- blocked warning -->
@@ -86,46 +85,6 @@
           <text :style="{ fontSize: '12px', color: 'var(--v5-ink-2)' }">{{ t.binary.memberDetailsUnavailable }}</text>
           <view role="button" tabindex="0" class="active:opacity-70" :style="memberReadRetryStyle" @click="retryNetworkMembers" @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers">
             <text>{{ t.network.retry }}</text>
-          </view>
-        </view>
-
-        <!-- strong / weak gap — frosted-glass block (owner 2026-07-09), fill
-             only, zero border (bg-filled cards carry no border line). -->
-        <view :style="gapBlockStyle">
-          <text class="block font-mono-tabular" :style="gapCapStyle">{{ t.binary.strongWeakGap }}</text>
-          <view style="display: flex; flex-direction: column; gap: 8px">
-            <view>
-              <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 4px">
-                <text :style="{ color: 'var(--v5-ink)' }">{{ t.binary.strong }} ${{ strongVol.toLocaleString() }}</text>
-                <text class="font-mono-tabular" :style="{ color: 'var(--v5-ink-3)' }">{{ strongVol > 0 ? 100 : 0 }}%</text>
-              </view>
-              <view class="rounded-full overflow-hidden" :style="gapBarTrackStyle">
-                <view class="h-full rounded-full" :style="{ width: strongVol > 0 ? '100%' : '0%', background: 'var(--v5-brand)' }" />
-              </view>
-            </view>
-            <view>
-              <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 4px">
-                <text :style="{ color: 'var(--v5-ink)' }">{{ t.binary.weak }} ${{ weakVol.toLocaleString() }}</text>
-                <text class="font-mono-tabular" :style="{ color: 'var(--v5-warning)' }">{{ strongVol > 0 ? ((weakVol / strongVol) * 100).toFixed(0) : 0 }}%</text>
-              </view>
-              <view class="rounded-full overflow-hidden" :style="gapBarTrackStyle">
-                <view class="h-full rounded-full" :style="{ width: strongVol > 0 ? `${(weakVol / strongVol) * 100}%` : '0%', background: 'var(--v5-warning)' }" />
-              </view>
-            </view>
-            <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '8px', lineHeight: 1.375 }">{{ gapHintText }}</text>
-          </view>
-        </view>
-
-        <!-- auto-placement entry -->
-        <view class="rounded-2xl active:scale-[0.98]" :style="spilloverStyle" @click="go('/pages/team/unilevel')">
-          <view class="flex items-start" style="gap: 10px">
-            <view class="rounded-lg grid place-items-center shrink-0" :style="spilloverIconStyle">
-              <text :style="{ fontSize: '20px' }">↳</text>
-            </view>
-            <view class="flex-1">
-              <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ spilloverTitleText }}</text>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px', lineHeight: 1.375 }">{{ t.binary.spilloverHint }}</text>
-            </view>
           </view>
         </view>
 

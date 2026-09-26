@@ -8,7 +8,7 @@
 export type BrandVariant = "lockup" | "mark";
 
 /** 批准包原始像素:横版 compact 356×120 · 纯图形 180×180。 */
-const RATIO: Record<BrandVariant, number> = { lockup: 356 / 120, mark: 1 };
+const RATIO: Record<BrandVariant, number> = { lockup: 712 / 246, mark: 1 };
 
 /** 批准包写死的最小渲染宽度。 */
 const MIN_WIDTH: Record<BrandVariant, number> = { lockup: 120, mark: 32 };

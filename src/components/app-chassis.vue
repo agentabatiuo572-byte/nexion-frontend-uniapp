@@ -1,7 +1,7 @@
 <!--
   AppChassis — page shell (uni has no root layout / App.vue renders no template,
   P-004). Route-aware like the prototype's root layout (header.tsx + tab-bar.tsx):
-    · TAB routes (home/earn/store/team/me): brand row (N badge + NexGrid/title +
+    · TAB routes (home/earn/store/team/me): brand row (N badge + UVEL/title +
       search + bell-badge) + FLOATING frosted-glass pill TabBar (5 tabs, active =
       gradient brand pill) + home indicator. Liquid-Glass faithful to v5.
     · SUB routes (everything else): NO brand row + NO 5-tab pill (the page carries

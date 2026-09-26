@@ -7,11 +7,11 @@
 //   ② **未激活不计**:activatedAt === null 的设备一台都不许进和。
 //   ③ **不在产不计 / 无设备为 0**:参照系 = settleDevice 那张不结算清单,它实际是
 //      **5 条**(store/app.ts:234-240:未激活 / status 非 online / cloud-share /
-//      pausedReason 非空 / 手机未充电或无 WiFi)。排名的在产判据只取其中 3 条
+//      pausedReason 非空 / 手机低电量或无网络)。排名的在产判据只取其中 3 条
 //      (未激活 / 非 online / pausedReason),差出来的两条是**刻意取舍**,别当 bug 修:
 //      · cloud-share:收益另路、算力在网(排名照算 G2 兜底 90);
-//      · 手机不充电:结算给 $0,排名照算打折正数(charge 0.6,28.3 标定实测 16.5)——
-//        与设备卡显示自洽,展示≠结算;断网那半条由既有模型 network 因子归 0。
+//      · 手机充电状态只作遥测,不影响结算或排名;低电量由 pausedReason 阻断。
+//        断网由既有模型 network 因子归 0。
 //      🔴 **心跳过期 ≠ 不在产**:H5 上没有常驻
 //      App 心跳的手机照样按 hosted 档真给钱、设备卡照样显示 TOPS,排名里必须同样有数,
 //      判成 0 就会对一个正在赚钱的用户说「未上榜,激活设备就上榜」。
@@ -208,8 +208,9 @@ function hw(kind, over = {}) {
     near(one(p), expected, 1e-9), `得到 ${one(p)},既有模型给 ${expected}`);
   check("④ 手机天花板取标定值 capabilityTops,不走日产反推",
     ceiling(p) === 33.3, `得到 ${ceiling(p)}`);
-  check("④ 手机不充电时贡献下降(条件因子真的生效,不是拿天花板直接求和)",
-    one(phone(30, { isCharging: false })) < one(phone(30)) && one(phone(30, { isCharging: false })) > 0);
+  check("④ 充电状态仅作遥测,同一手机的算力不随充电线变化",
+    near(one(phone(30, { isCharging: false })), one(phone(30)), 1e-9)
+      && one(phone(30, { isCharging: false })) > 0);
   check("④ 手机断网时贡献为 0(既有模型的 network 因子)",
     one(phone(30, { isWifiConnected: false })) === 0);
 

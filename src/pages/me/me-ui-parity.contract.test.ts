@@ -59,7 +59,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "ae19a15f2b050424de21be06c40d08a1b2a4855e6464fc9ed78dc2bd96162d62",
   // Formal phone-calibration and physical-slot controls appear only after fleet
   // and trial authority; loading/failure cannot display a false empty inventory.
-  "devices.vue": "9f9e0c547cb6704d4b363c0953252ab1f68e82bcad0a359ed4a6f8c071923e9a",
+  "devices.vue": "c92d943634ab67f4d13e41f5dee04a0bad09b9ff4759872067bed273e40becb8",
   // Goal reads retain the 5174 structure while current-scope recovery makes
   // loading/error explicit, preserves a confirmed snapshot, and exposes retry.
   // Saving remains idempotent; a completed or unavailable recommendation has no purchase CTA.
@@ -87,7 +87,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // appear late and push every module below it down.
   // #303: the device-slot remainder wraps inside its tile so Vietnamese copy stays complete.
   // #320: the support subtitle also wraps inside its four-column tile.
-  "me.vue": "1940e48c8a451fcd764e19199964ca29b9425107bea051b9e4ece530fa9dde91",
+  "me.vue": "025fd9f7a5f3f05571732e671be11a51b5b8bb3d3543e5ec3e09af0e4ac78185",
   // Keep the selected zero-count category visible and show category-specific empty copy;
   // loading and request failures must not render a successful empty-feed message.
   // #94/#210: the mutually exclusive category chips are a radiogroup (role=radio +

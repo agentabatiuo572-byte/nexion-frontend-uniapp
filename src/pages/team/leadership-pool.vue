@@ -52,20 +52,6 @@
               <VBadge :v="myRank" size="sm" />
             </view>
             <text class="block font-display tabular-nums" :style="projectedStyle">${{ projectedPayout.toFixed(2) }}</text>
-            <view class="grid grid-cols-3 text-center" style="margin-top: 12px; gap: 8px">
-              <view>
-                <text class="block" :style="statLabelStyle">{{ t.pool.yourVotes }}</text>
-                <text class="block font-display tabular-nums" :style="statValueStyle">{{ myVotes }}</text>
-              </view>
-              <view>
-                <text class="block" :style="statLabelStyle">{{ t.pool.totalVotes }}</text>
-                <text class="block font-display tabular-nums" :style="statValueStyle">{{ totalVotes.toLocaleString() }}</text>
-              </view>
-              <view>
-                <text class="block" :style="statLabelStyle">{{ t.pool.yourShare }}</text>
-                <text class="block font-display tabular-nums" :style="statValueStyle">{{ (myShare * 100).toFixed(2) }}%</text>
-              </view>
-            </view>
           </template>
           <template v-else>
             <text class="block font-mono-tabular" :style="statusCapStyle('var(--v5-ink-3)')">{{ t.pool.locked }}</text>
@@ -82,42 +68,6 @@
           </template>
         </view>
 
-        <!-- Top-concentration caption (derived, true) -->
-        <view :style="concentrationStripStyle">
-          <text :style="concentrationTextStyle">{{ concentrationText }}</text>
-        </view>
-
-        <!-- V-rank vote-weight table — single surface container (form b): outer
-             border dropped, rows hairlined, my row tinted (clip needs overflow). -->
-        <view v-if="!remoteApiEnabled || rankReady" class="rounded-2xl overflow-hidden" :style="tableCardStyle">
-          <view class="flex items-center justify-between" :style="tableHeadStyle">
-            <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ t.pool.rankWeights }}</text>
-            <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ totalPeopleText }}</text>
-          </view>
-          <view
-            v-for="(row, i) in voteRows"
-            :key="row.v"
-            class="flex items-center"
-            :style="voteRowStyle(row.isMine, i === voteRows.length - 1)"
-          >
-            <VBadgeIcon :v="row.v" :size="32" />
-            <view class="flex-1 min-w-0">
-              <view class="flex items-center" style="gap: 6px">
-                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ row.label }}</text>
-                <text v-if="row.isMine" class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ t.pool.youTag }}</text>
-              </view>
-              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ row.peopleVotes }}</text>
-            </view>
-            <view class="text-right">
-              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ (row.shareOfPool * 100).toFixed(2) }}%</text>
-              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
-            </view>
-          </view>
-        </view>
-        <view v-else class="text-center" style="padding: 24px" role="status">
-          <text :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ vState.remoteError ? t.pool.loadError : t.pool.loading }}</text>
-          <view v-if="vState.remoteError" class="active:opacity-70" style="margin-top: 14px" role="button" tabindex="0" @click="loadRemotePool" @keydown.enter.prevent="loadRemotePool" @keydown.space.prevent="loadRemotePool"><text>{{ t.pool.retry }}</text></view>
-        </view>
 
         <!-- Past pools — transparent hairline group (form a, ledger idiom). -->
         <view v-if="poolHistory.length > 0" :style="pastGroupStyle">

@@ -24,7 +24,7 @@
       <view aria-hidden :style="vignetteStyle" />
       <!-- Brand overlay — flat 2D label, does NOT tilt with the product -->
       <view class="absolute text-right" style="bottom: 10px; right: 16px; pointer-events: none">
-        <text class="block" :style="brandStyle">NEXGRID</text>
+        <text class="block" :style="brandStyle">UVEL</text>
         <text class="block" :style="tierCodeStyle">{{ displayTierCode }}</text>
       </view>
     </template>

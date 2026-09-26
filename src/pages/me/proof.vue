@@ -357,11 +357,11 @@ const topPctText = computed(() => topPct.value === null ? "—" : `Top ${topPct.
 const shareText = computed(() => {
   if (variant.value === "streak")
     return longestOrCurrent.value === null
-      ? `🔥 My NexGrid streak is not available right now. Daily check-ins = passive NEX. Join me: ${referralLink.value}`
-      : `🔥 ${longestOrCurrent.value}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
+      ? `🔥 My UVEL streak is not available right now. Daily check-ins = passive NEX. Join me: ${referralLink.value}`
+      : `🔥 ${longestOrCurrent.value}-day streak on UVEL. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
-    return `🌐 My NexGrid network has ${totalMembers.value ?? "—"} members. Explore NexGrid: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotalText.value} on NexGrid in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
+    return `🌐 My UVEL network has ${totalMembers.value ?? "—"} members. Explore UVEL: ${referralLink.value}`;
+  return `💸 Earned $${earningsTotalText.value} on UVEL in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
@@ -380,7 +380,7 @@ function nativeShare() {
       provider: "weixin",
       type: 0,
       href: referralLink.value,
-      title: "NexGrid · Proof of Contribution",
+      title: "UVEL · Proof of Contribution",
       summary: shareText.value,
       success: () => {},
       fail: () => copyText(shareText.value, t.value.proof.sharedToast),
@@ -444,7 +444,7 @@ function drawProofPoster(): Promise<void> {
       ctx.fillRect(72, 72, 18, 76);
       ctx.setFillStyle("#f7fbff");
       ctx.setFontSize(54);
-      ctx.fillText("NexGrid", 116, 128);
+      ctx.fillText("UVEL", 116, 128);
       ctx.setFillStyle("#9cabbd");
       ctx.setFontSize(24);
       ctx.fillText("PROOF OF CONTRIBUTION", 72, 204);

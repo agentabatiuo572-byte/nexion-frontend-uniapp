@@ -132,7 +132,7 @@ export const V_RANKS: VRankDef[] = [
     cultivationBonus: 0, rewards: [],
   },
   {
-    v: 10, title: "NexGrid Founder", cnTitle: "联合创始",
+    v: 10, title: "UVEL Founder", cnTitle: "联合创始",
     conditions: { teamVolumeUSD: 30_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 128,
@@ -232,7 +232,7 @@ export const useVRank = defineStore("vRank", () => {
   // peerBonus 是「配置比例」,不是「已生效权益」—— 渲染时必须靠这个位区分(#79)。
   // 本地(mock)模式没有服务端能力位,按「会派发」处理,与 V_RANKS 的展示一致。
   const capabilities = ref<{ peer: boolean; genesis: boolean }>({ peer: true, genesis: true });
-  const prizeName = ref(remoteApiEnabled ? "" : "NexGrid V-Rank");
+  const prizeName = ref(remoteApiEnabled ? "" : "UVEL V-Rank");
   const remoteReady = ref(!remoteApiEnabled);
   const remoteError = ref<string | null>(null);
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);

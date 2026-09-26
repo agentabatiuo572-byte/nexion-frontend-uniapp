@@ -7,8 +7,8 @@ import { vi } from "@/i18n/messages/vi";
 describe("store detail payback and eligibility copy", () => {
   it("renders an unavailable payback without a day suffix and keeps CTA copy finite", () => {
     expect(detail).toContain("estimatePaybackDays");
-    expect(detail).toContain("paybackDays === null");
-    expect(detail).toContain("t.store.detPaybackUnavailable");
+    expect(detail).toContain("if (days === null)");
+    expect(detail).toContain("t.value.store.detPaybackUnavailable");
     expect(detail).not.toContain("Math.round(product.value.price / product.value.dailyEarn)");
   });
 
@@ -34,13 +34,17 @@ describe("store detail payback and eligibility copy", () => {
  * 却看不到任何额度、已售、剩余。没有事实支撑的结论不得上屏。
  */
 describe("store detail eligibility never claims a met result without facts", () => {
-  it("gates the met/unmet result on the presence of condition facts", () => {
-    // 结果行必须与事实判据同条件;此前它无条件渲染。
-    const gatedResult = detail.match(/v-if="eligibilityPolicyHasFacts\(policy\)"[\s\S]{0,220}?purchaseEligibilityPolicyMet/);
-    expect(gatedResult, "结果行必须挂在 eligibilityPolicyHasFacts 判据下").not.toBeNull();
-    expect(detail).toContain("purchaseEligibilityUnconfigured");
-    // 不得再出现无条件的 eligible 三元结果行。
-    expect(detail).not.toMatch(/<text class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle\(policy\)">\{\{ policy\.eligible/);
+  it("keeps unknown and denied server decisions visibly closed", () => {
+    expect(detail).toContain("remoteApiEnabled && eligibility.status !== 'ready'");
+    expect(detail).toContain("t.store.purchaseEligibilityFailClosed");
+    expect(detail).toContain("remoteApiEnabled && !eligibility.eligible");
+    expect(detail).toContain("eligibilityDenyBody");
+    expect(detail).toContain("t.value.store.purchaseEligibilityConditionsUnmet");
+    const metResults = detail.match(/<text\b[^>]*>\{\{\s*policy\.eligible\s*\?[^}]*purchaseEligibilityPolicyMet[^}]*\}\}<\/text>/g) ?? [];
+    expect(metResults).toHaveLength(1);
+    expect(metResults[0]).toContain('v-if="eligibilityPolicyHasFacts(policy)"');
+    expect(detail).toContain('v-if="!eligibilityPolicyHasFacts(policy)"');
+    expect(detail).toContain('v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityUnconfigured }}');
   });
 
   it.each([en, zh, vi])("provides trilingual not-configured copy", (messages) => {
@@ -50,7 +54,10 @@ describe("store detail eligibility never claims a met result without facts", () 
     expect(new Set(values).size).toBe(3);
   });
 
-  it("keeps the missing-facts line so the operator-visible cause stays explicit", () => {
-    expect(detail).toContain("t.store.purchaseEligibilityNoFacts");
+  it("shows server policy facts without exposing raw backend codes", () => {
+    expect(detail).toContain('data-testid="detail-purchase-policy-facts"');
+    expect(detail).toContain("eligibilityPolicyTitle(policy)");
+    expect(detail).toContain("eligibilityConditionText(condition)");
+    expect(detail).not.toContain("{{ policy.decisionCode }}");
   });
 });

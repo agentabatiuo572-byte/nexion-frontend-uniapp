@@ -1,6 +1,6 @@
 <!--
   Hardware Quota — ported from Nexion-prototype/app/(main)/team/quota/page.tsx.
-  Higher tiers (NexGridBox Pro / Rack P1) gated behind activated-direct-invite /
+  Higher tiers (UVELBox Pro / Rack P1) gated behind activated-direct-invite /
   team-volume milestones. De-carded hero (active-invites count directly on the
   page floor, hairline footer) + 2 QuotaTierCards (whitelist tier cards, fill
   no border) + invite CTA (tint fill, border dropped) → /team. Sub-page →
@@ -39,9 +39,6 @@
             <view class="rounded-2xl grid place-items-center" :style="heroIconStyle">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </view>
-          </view>
-          <view :style="heroFooterStyle">
-            <text class="block" :style="heroBodyStyle">{{ t.quota.heroBody }}</text>
           </view>
         </view>
 
@@ -234,7 +231,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
 }
 
 // BUG 34/33: quota rows carry their own display_name/perk strings, which drift
-// from the live catalog the store renders ("NexGridBox Pro" vs the catalog's
+// from the live catalog the store renders ("UVELBox Pro" vs the catalog's
 // "StellarBox Pro"; raw "80.000000 NEX/day"). The catalog is the single naming
 // and economics source — the server already refuses a quota snapshot whose
 // productNo is missing from it (AppTeamQuotaService → TEAM_QUOTA_CATALOG_NOT_READY)

@@ -15,5 +15,5 @@ export function buildRemoteHelpRequest(
 }
 
 export function novaHelpSource(_response: NovaAiChatResponse): string {
-  return "NexGrid AI";
+  return "UVEL AI";
 }

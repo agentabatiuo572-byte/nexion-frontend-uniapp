@@ -12,12 +12,12 @@
 
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
-      <text class="est-title">{{ t.onboarding.estimatorTitleH }}</text>
-      <text class="est-hint">{{ deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting) }}</text>
+      <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : t.myDevices.phoneActivationAppOnlyTitle }}</text>
+      <text class="est-hint">{{ nativePhoneAvailable ? (deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : t.myDevices.phoneActivationAppOnlyBody }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
-    <view class="est-reveal">
+    <view v-if="nativePhoneAvailable" class="est-reveal">
       <transition name="est-fade" mode="out-in">
         <view v-if="loadFailed || deferred" key="failed" class="est-loading est-loading--failed">
           <text class="est-loading__t">{{ deferred ? t.onboarding.activationDefer : t.onboarding.calibrationFailedTitle }}</text>
@@ -90,7 +90,10 @@
 
     <!-- CTA -->
     <view class="est-cta">
-      <view class="est-go" :class="{ 'est-go--on': detected, 'active:scale-[0.98]': detected }" role="button" :tabindex="detected ? 0 : -1" :aria-disabled="!detected" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
+      <view v-if="!nativePhoneAvailable" class="est-go est-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+        <text class="est-go__t">{{ t.login.back }}</text>
+      </view>
+      <view v-else class="est-go" :class="{ 'est-go--on': detected, 'active:scale-[0.98]': detected }" role="button" :tabindex="detected ? 0 : -1" :aria-disabled="!detected" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
         <text class="est-go__t">{{ t.onboarding.startEarning }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="detected ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -105,6 +108,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { getDeviceId } from "@/lib/device-id";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { useApp } from "@/store/app";
@@ -147,6 +151,7 @@ let accountWatchKey = String(app.accountKey || "");
 let deferIntent: { revision: number; idempotencyKey: string } | null = null;
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectDeviceSignals, key: () => `onboarding:${requireCryptoUuid()}` });
+const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
   return {
@@ -161,6 +166,7 @@ function isCurrent(scope: { estimator: EstimatorScope; remote: RemoteAccountRequ
 }
 
 function loadCalibration() {
+  if (!nativePhoneAvailable) return;
   const scope = scopePair();
   loadFailed.value = false;
   deferred.value = false;
@@ -197,6 +203,7 @@ function loadCalibration() {
 
 function retryCalibration() {
   if (deferBusy.value) return;
+  if (!nativePhoneAvailable) return;
   if (loading.value) return;
   if (deferred.value) {
     navReset({ url: "/pages/onboarding/connect?mode=resume", fail: () => {} });
@@ -249,7 +256,7 @@ onBackPress(() => {
 });
 
 function goConnect() {
-  if (!detected.value || !calibration.value?.calibrationAvailable) return;
+  if (!nativePhoneAvailable || !detected.value || !calibration.value?.calibrationAvailable) return;
   navReset({ url: "/pages/onboarding/connect", fail: () => {} });
 }
 
@@ -267,7 +274,7 @@ function leaveEstimator() {
 }
 
 async function deferPhoneActivation() {
-  if (!mounted || deferBusy.value || loading.value) return;
+  if (!nativePhoneAvailable || !mounted || deferBusy.value || loading.value) return;
   deferBusy.value = true;
   const scope = scopePair();
   const deviceId = getDeviceId();

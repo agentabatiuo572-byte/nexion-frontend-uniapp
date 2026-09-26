@@ -28,10 +28,11 @@ describe("Genesis purchase visible wallet projection", () => {
     expect(sheetSource).toContain("result.walletReceiptSourceEnvironment");
     expect(sheetSource).toContain("app.adoptDevelopmentGenesisWallet(");
     const purchaseStart = sheetSource.indexOf("const result = await genesis.purchase(qty.value)");
-    const successToast = sheetSource.indexOf("toast.success(", purchaseStart);
+    const successCommit = sheetSource.indexOf("committed = true", purchaseStart);
     const projection = sheetSource.indexOf("app.adoptDevelopmentGenesisWallet(", purchaseStart);
     expect(projection).toBeGreaterThan(purchaseStart);
-    expect(projection).toBeLessThan(successToast);
+    expect(projection).toBeLessThan(successCommit);
+    expect(sheetSource.indexOf("showConfirmedSuccess()", successCommit)).toBeGreaterThan(successCommit);
   });
 
   it("rejects a canonical receipt after the bound account changes", () => {

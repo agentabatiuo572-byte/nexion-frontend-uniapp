@@ -8,7 +8,9 @@ function source(path: string): string {
 
 describe("remote fleet refresh callsite safety", () => {
   it("allows sharing only on established read-only lifecycle paths", () => {
-    expect(source("../App.vue")).toContain("refreshRemoteFleet(undefined, { coalesce: true })");
+    const appLifecycle = source("../App.vue");
+    expect(appLifecycle).toContain("syncRemoteTaskAssignments()");
+    expect(appLifecycle).not.toContain("refreshRemoteFleet(undefined, { coalesce: true })");
     expect(source("../lib/e3-fleet-bootstrap.ts")).toContain("refreshRemoteFleet(undefined, { coalesce: true })");
     expect(source("./app.ts")).toContain("refreshRemoteFleet(request, { coalesce: true })");
 

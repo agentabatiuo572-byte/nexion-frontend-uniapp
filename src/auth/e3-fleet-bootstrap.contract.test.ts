@@ -12,7 +12,7 @@ describe("E3 fleet bootstrap and projection atomicity", () => {
   it("gates App cold start and onShow fleet refresh on the authenticated catalog", () => {
     expect(appShell).toContain("async function refreshAuthenticatedRemoteFleet()");
     expect(appShell).toContain("await refreshProductCatalog()");
-    expect(appShell).toContain("return useApp().refreshRemoteFleet(undefined, { coalesce: true })");
+    expect(appShell).toContain("await useApp().syncRemoteTaskAssignments()");
     expect(appShell).not.toContain("if (canRefreshRemoteAccount(auth)) void useApp().refreshRemoteFleet();");
   });
 

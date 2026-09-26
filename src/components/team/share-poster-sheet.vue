@@ -353,7 +353,7 @@ function paint(link: string, myToken: number) {
   } else {
     ctx.setFillStyle(INK_ON_DARK);
     ctx.setFontSize(15);
-    ctx.fillText("NexGrid", 16, 38);
+    ctx.fillText("UVEL", 16, 38);
   }
   ctx.setFillStyle(FAINT_ON_DARK);
   ctx.setFontSize(9);

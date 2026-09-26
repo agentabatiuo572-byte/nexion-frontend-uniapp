@@ -21,7 +21,7 @@ describe("Earn server task progression refresh", () => {
     const fleet = appSource.slice(fleetStart, fleetEnd);
     expect(fleet).toContain("readRemoteTaskAssignments(request)");
     expect(fleet).not.toContain("taskAssignmentApi.state()");
-    expect(appSource).toContain("receivedAt + REMOTE_TASK_SYNC_MS");
+    expect(appSource).toContain("receivedAt + TASK_ASSIGNMENT_CACHE_MS");
   });
 
   it("refreshes both device tasks and today earnings whenever Earn becomes visible", () => {

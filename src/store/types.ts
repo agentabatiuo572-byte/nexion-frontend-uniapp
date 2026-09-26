@@ -18,17 +18,8 @@ export type DeviceStatus = "online" | "offline";
 
 export type ThermalState = "nominal" | "fair" | "serious" | "critical";
 
-// Mobile-only gating (v3.2). Both checks are universal hard requirements,
-// no user opt-out:
-//   - Charging — task pickup requires the phone to be plugged in. Protects
-//     battery life and matches the intro hero promise "插上充电就开始接".
-//   - Network — task pickup requires a reachable network (Wi-Fi OR
-//     cellular both qualify; the scheduler ping-tests the inference
-//     gateway before assigning each job).
-// No `PhoneSettings` interface anymore: forcing either gate via a toggle
-// would only let users break their own device, and the historical
-// batteryThreshold knob was unreachable code once charging became
-// universal (the no-charger branch always caught the !isCharging case).
+// Mobile task pickup pauses below 20% battery or when the network is lost.
+// Charging remains telemetry and does not decide the pause state.
 
 // 6 AI workload categories per design doc §5.2.4
 export type TaskCategory = "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
@@ -53,7 +44,7 @@ export interface CurrentTask {
   startedAt: number;   // epoch ms
   reward: number;      // USDT
   /** Server status is present only for the remote authority projection. */
-  status?: "CLAIMED" | "RUNNING" | "COMPLETED";
+  status?: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
   /** Server-issued estimated completion time; it never certifies settlement. */
   completableAt?: number | null;
 }
@@ -165,7 +156,7 @@ export interface Device {
   // null = eligible (earnings accruing); string = paused, with the reason
   // surfaced in the device card status pill. Mirror "real" distributed-
   // compute apps which gate workload pickup on charge + network conditions.
-  pausedReason?: "no-charger" | "no-network" | null;
+  pausedReason?: "low-battery" | "no-network" | null;
   /** Epoch ms when the current power/network interruption began while a task
    *  was in flight; null/undefined = not interrupted. Drives the reconnect
    *  grace window (see lib/store/interrupt.ts): the task is held (suspended,

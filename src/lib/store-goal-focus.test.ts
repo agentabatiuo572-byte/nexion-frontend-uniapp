@@ -4,7 +4,7 @@ import { resolveStoreGoalFocus } from "./store-goal-focus";
 
 describe("store goal focus", () => {
   it("keeps the recommendation SKU when the display hint is double encoded", () => {
-    const product = { id: "stellarbox-pro-v2", name: "NexGridBox Pro v2" } as Product;
+    const product = { id: "stellarbox-pro-v2", name: "UVELBox Pro v2" } as Product;
     const hint = encodeURIComponent(encodeURIComponent("Nexi" + "onBox Pro v2"));
 
     expect(resolveStoreGoalFocus(product.id, hint, [product], [product], true)).toMatchObject({

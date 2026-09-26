@@ -50,7 +50,7 @@
         <!-- ══ Holder · 上所前 ══ -->
         <template v-else-if="!dividendsOpen">
           <!-- Allocation hero -->
-          <view :style="heroCardStyle">
+          <view :style="vipCardStyle">
             <view class="flex items-start" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="avatarStyle">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
@@ -70,28 +70,13 @@
             </view>
             <text v-if="remoteApiEnabled" class="block" :style="serverFactStyle">{{ holderFactText }}</text>
 
-            <view class="grid grid-cols-2" :style="heroStatGridStyle">
+            <view :style="heroStatGridStyle">
               <view>
                 <text class="block truncate" :style="cellLabelStyle">{{ t.genesisHolder.pre.priority }}</text>
                 <text class="block" :style="cellValStyle('var(--v5-brand)')">{{ priorityText }}</text>
               </view>
-              <view>
-                <text class="block truncate" :style="cellLabelStyle">{{ t.genesisHolder.pre.multiplier }}</text>
-                <text class="block tabular-nums" :style="cellValStyle('var(--v5-ink)')">1.0×</text>
-              </view>
             </view>
             <text class="block" :style="discStyle">{{ t.genesisHolder.pre.disc }}</text>
-          </view>
-
-          <!-- Listing progress -->
-          <view :style="cardStyle">
-            <text class="block" :style="cardTitleStyle">{{ t.genesisHolder.pre.progressLabel }}</text>
-            <view :style="progTrackStyle"><view :style="progFillStyle" /></view>
-            <view class="flex items-center justify-between" :style="progMetaStyle">
-              <text>{{ progressStageText }}</text>
-              <text>{{ progressUnlockText }}</text>
-            </view>
-            <text class="block active:opacity-70" :style="howLinkStyle" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
           </view>
 
           <!-- Points leaderboard -->
@@ -239,6 +224,7 @@
         </template>
 
         <text class="block text-center" :style="noteStyle">{{ t.genesisHolder.disclosureNote }}</text>
+        <text v-if="hasNodes && !dividendsOpen" class="block text-center active:opacity-70" :style="howLinkStyle" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
       </view>
     </view>
   </AppChassis>
@@ -430,6 +416,12 @@ function goStaking() {
 // floor (2px optical inset); internal stat-grid divider stays as a hairline.
 const heroCardStyle: CSSProperties = {
   padding: "0 2px",
+};
+const vipCardStyle: CSSProperties = {
+  padding: "22px",
+  borderRadius: "24px",
+  background: "radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 24%, transparent), transparent 48%), linear-gradient(135deg, var(--v5-surface), var(--v5-surface-2))",
+  boxShadow: "0 14px 36px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 12%, transparent)",
 };
 const avatarStyle: CSSProperties = {
   width: "56px",

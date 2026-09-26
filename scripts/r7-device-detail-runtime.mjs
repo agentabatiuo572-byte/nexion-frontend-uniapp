@@ -316,28 +316,29 @@ try {
   await detail.locator(".nx-device-card__details").waitFor({ state: "visible" });
   assert((await detail.locator(".nx-device-card").getAttribute("data-online")) === "false", "stale phone detail advertised true-online");
   assert(
-    /基础托管模式|Base hosting mode/.test(await detail.locator(".nx-device-status-label").innerText()),
-    "stale phone detail did not label base-hosting mode",
+    /请在 Android App 中激活手机算力|Activate phone compute in the Android App/.test(await detail.locator(".nx-device-status-label").innerText()),
+    "H5 phone detail did not direct activation to the Android App",
   );
+  assert(!(await detail.locator(".nx-device-card").innerText()).includes("TOPS"),
+    "H5 phone detail displayed another phone's compute capacity");
   const cardHeader = detail.locator(".nx-device-card__header");
   await cardHeader.focus();
   await cardHeader.press("Shift+F10");
   await detail.locator(".nx-device-quick-menu").waitFor({ state: "visible" });
-  assert(
-    await detail.locator(".nx-device-quick-stats").evaluate((element) => element === document.activeElement),
-    "keyboard-opened device quick menu did not move focus inside",
-  );
-  await detail.locator(".nx-device-quick-stats").press("Shift+Tab");
+  assert(await detail.locator(".nx-device-quick-stats").count() === 0,
+    "H5 phone detail exposed another phone's stats shortcut");
+  const firstMenuAction = detail.locator(".nx-device-quick-menu [tabindex='0']").first();
+  assert(await firstMenuAction.evaluate((element) => element === document.activeElement),
+    "keyboard-opened device quick menu did not move focus inside");
+  await firstMenuAction.press("Shift+Tab");
   assert(
     await detail.locator(".nx-device-quick-menu [tabindex='0']").last().evaluate((element) => element === document.activeElement),
     "device quick menu Shift+Tab escaped instead of wrapping to the last action",
   );
   await detail.locator(".nx-device-quick-menu [tabindex='0']").last().press("Tab");
-  assert(
-    await detail.locator(".nx-device-quick-stats").evaluate((element) => element === document.activeElement),
-    "device quick menu Tab escaped instead of wrapping to the first action",
-  );
-  await detail.locator(".nx-device-quick-stats").press("Escape");
+  assert(await firstMenuAction.evaluate((element) => element === document.activeElement),
+    "device quick menu Tab escaped instead of wrapping to the first action");
+  await firstMenuAction.press("Escape");
   await detail.locator(".nx-device-quick-menu").waitFor({ state: "detached" });
   assert(await cardHeader.evaluate((element) => element === document.activeElement), "device quick menu did not restore header focus");
 

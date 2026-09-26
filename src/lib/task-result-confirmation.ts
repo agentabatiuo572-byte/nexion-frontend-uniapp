@@ -1,4 +1,4 @@
-export type ServerTaskStatus = "CLAIMED" | "RUNNING" | "COMPLETED";
+export type ServerTaskStatus = "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
 
 export interface TaskResultConfirmationInput {
   /** Present only for the server-authoritative task projection. */

@@ -16,7 +16,7 @@
     <view v-if="featured" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Hero photo banner ───── -->
-    <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="product.name" @click.stop="goDetail" @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
+    <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail" @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
       <!-- Cloud Share schematic -->
       <view v-if="isShare && !photo" class="absolute inset-0 grid place-items-center" style="color: var(--v5-tech-cyan-ink)">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
@@ -52,7 +52,7 @@
     <view class="relative" style="padding: 14px 16px">
       <view>
         <view class="min-w-0">
-          <text class="block" :style="nameStyle">{{ product.name }}</text>
+          <text class="block" :style="nameStyle">{{ nexGridBrandText(product.name) }}</text>
         </view>
       </view>
 
@@ -90,14 +90,9 @@
             <!-- 🔴 remote 模式没有可展开内容,别用「展开箭头」暗示它会展开(zentao #239):
                  那里点它是**去详情页**看条件,所以画一个前进箭头。 -->
             <view v-if="!gate.soldOut" class="grid place-items-center" :style="gateToggleStyle">
-              <svg v-if="remoteApiEnabled" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-              <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <view v-if="!remoteApiEnabled && !gate.soldOut && gateDetailsOpen" class="mt-1.5 flex flex-wrap" style="gap: 6px">
-            <text v-for="(c, i) in gateCondTexts" :key="i" :style="gateCondStyle">{{ c }}</text>
-          </view>
-          <text v-if="!remoteApiEnabled && !gate.soldOut && gateDetailsOpen" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
           <text v-if="remoteApiEnabled && eligibility.status === 'error'" class="block" :style="gateMetaStyle">{{ t.store.purchaseEligibilityError }}</text>
         </view>
 
@@ -139,6 +134,7 @@ import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
+import { nexGridBrandText } from "@/lib/brand-copy";
 import { productImageMeta } from "@/lib/product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
@@ -290,7 +286,7 @@ function toggleGateDetails() {
     goDetail();
     return;
   }
-  if (!gate.value.soldOut) gateDetailsOpen.value = !gateDetailsOpen.value;
+  if (!gate.value.soldOut) goDetail();
 }
 
 // Text helpers (toFixed / toLocaleString / fmt) — kept out of template for clarity

@@ -65,15 +65,15 @@ describe("连签增益只在目标业务可用时承诺可激活(BUG 195)", () =
 });
 
 describe("等级卡不把下一阶奖励说成本阶奖励(BUG 196)", () => {
-  it("标签写明是晋升后可得,而不是笼统的「奖励:」", () => {
-    expect(team).toContain("prizeOnPromotion");
-    // 渲染的是 rankInfo.next(下一阶),标签必须点明 —— 用旧的 prize 键就是本缺陷。
-    const block = team.slice(team.indexOf("rankInfo.next?.cultivationBonus"), team.indexOf("rankPrizeValueStyle"));
-    expect(block).toContain("prizeOnPromotion");
-    expect(block).not.toContain("t.teamV3.prize ");
+  it("精简等级卡只展示当前阶位,不把下一阶奖励当成当前奖励", () => {
+    const rankCard = team.slice(team.indexOf("<!-- My V-rank summary -->"), team.indexOf("<!-- Unified quick nav -->"));
+    expect(rankCard).toContain("{{ myRankDisplay }}");
+    expect(rankCard).not.toContain("cultivationBonus");
+    expect(rankCard).not.toContain("prize");
   });
 
-  it("标签里带上目标阶位,用户知道升到哪一阶才拿得到", () => {
-    expect(team).toMatch(/prizeOnPromotion,\s*\{\s*v:\s*vrank\.myRank \+ 1\s*\}/);
+  it("等级卡仍能进入服务器阶位详情查看奖励", () => {
+    const rankCard = team.slice(team.indexOf("<!-- My V-rank summary -->"), team.indexOf("<!-- Unified quick nav -->"));
+    expect(rankCard).toContain("go('/pages/team/rank')");
   });
 });

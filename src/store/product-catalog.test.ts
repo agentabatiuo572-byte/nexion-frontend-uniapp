@@ -30,7 +30,7 @@ describe("product catalog refresh", () => {
   });
 
   it("keeps only a presentation snapshot during refresh/error, accepts real deletions, and clears on rebind", async () => {
-    const snapshot = { products: [{ id: "confirmed", name: "NexGridBox S1" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "one" };
+    const snapshot = { products: [{ id: "confirmed", name: "UVELBox S1" }], source: "nx_product", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true, revision: "one" };
     mocks.catalog.mockResolvedValueOnce(snapshot);
     const catalog = await import("./product-catalog");
     expect(catalog.productCatalogPresentation.value).toBeNull();
@@ -65,7 +65,7 @@ describe("product catalog refresh", () => {
     await catalog.refreshProductCatalog(true);
 
     expect(catalog.productCatalogPresentation.value?.products[0]).toMatchObject({
-      id: "stellarbox-pro-v2", name: "NexGridBox Pro v2",
+      id: "stellarbox-pro-v2", name: "UVELBox Pro v2",
     });
     expect(mocks.replace).toHaveBeenCalledWith(snapshot.products);
     expect(snapshot.products[0].name).toBe(legacyName);

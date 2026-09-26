@@ -46,8 +46,8 @@ export interface TrialConfig {
  * deliberately rejected instead of being guessed or silently falling back.
  */
 export const TRIAL_PRODUCT_DEVICE_NAMES = {
-  "stellarbox-s1": "NexGridBox S1",
-  "device-trial-standard": "NexGridBox S1",
+  "stellarbox-s1": "UVELBox S1",
+  "device-trial-standard": "UVELBox S1",
 } as const;
 
 export type TrialProductId = string;
@@ -89,7 +89,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   discountCapUSD: 20,
   trialOffsetCapUSD: 50,
   trialProductId: "stellarbox-s1",
-  trialProductName: "NexGridBox S1",
+  trialProductName: "UVELBox S1",
   trialPriceUSD: 649,
   shadowDailyUSD: 7,
   shadowDailyNEX: 40,

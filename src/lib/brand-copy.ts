@@ -13,11 +13,11 @@
 // 旧词用拆词构造,与 scripts/verify.sh 的 no_oldbrand_check 同法 —— 直接写字面量会被本仓
 // 自己的品牌哨兵抓红,而这里的字符串恰恰就是哨兵要守的那个旧词。
 const LEGACY_BRAND = "Nexi" + "on";
-const BRAND = "NexGrid";
+const BRAND = "UVEL";
 
 const LEGACY_BRAND_PATTERN = new RegExp(LEGACY_BRAND, "gi");
 
 /** 服务端历史值 → 现品牌文案。大小写不敏感,命中即整词替换。 */
 export function nexGridBrandText(value: string): string {
-  return value.replace(LEGACY_BRAND_PATTERN, BRAND);
+  return value.replace(LEGACY_BRAND_PATTERN, BRAND).replace(/NexGrid/gi, BRAND);
 }

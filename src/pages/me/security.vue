@@ -780,6 +780,8 @@ async function handleDeleteAccount() {
           releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
           toast.success(t.value.security.deleteAccountToast, request.requestNo);
           deletionCommandKey.value = "";
+          app.interruptAllTasks("logged-out");
+          await app.pauseLocalPhoneRuntimeBeforeSignOut();
           await authApi.logout();
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
         } catch (cause) {
@@ -796,7 +798,7 @@ async function handleDeleteAccount() {
         toast.success(t.value.security.deleteAccountToast);
       }
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      app.interruptAllTasks("logged-out");
+      if (!remoteApiEnabled) app.interruptAllTasks("logged-out");
       session.signOutSession();
       auth.signOut();
       // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。

@@ -315,6 +315,7 @@ const LEDGER = {
   "/api/team/rank": "TBD-NAME: 团队等级读;同上",
   "/api/tasks/route": "TBD-NAME: 按显存派发任务路由;PRD §6.8 有容量概念,未定义该端点",
   "/api/tasks/assignments": "TBD-NAME: 任务派单读;PRD 未定义",
+  "/api/tasks/phone/runtime": "BACKEND: AppTaskAssignmentController 已实现;用户已确认手机任务电量低于 20% 或离线暂停,原生 App 上报电量和网络,充电状态不参与门控",
   "/api/tasks/receipts": "BACKEND: AppTaskAssignmentController 已实现;后台 PRD v2 §457 Proof-of-Compute 收据列表",
   "/api/tasks/receipts/:param": "BACKEND: AppTaskAssignmentController 已实现;后台 PRD v2 §457 单条收据详情",
   // 🔴 裸 /api/exchange ≠ PRD 的 /api/exchange/swap(§9.4.3)。回源核过:PRD 只定义了

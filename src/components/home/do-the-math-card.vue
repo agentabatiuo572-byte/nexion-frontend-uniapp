@@ -43,7 +43,7 @@
         </view>
 
         <!-- 去线(主人 2026-08-17 全站令):mt-7 = 原 mt-4 + pt-3 的总间距 -->
-        <view class="mt-7 grid grid-cols-3">
+        <view class="mt-7 grid grid-cols-2">
           <!-- 每列拉满行高 + 标签贴顶数值贴底:第三列标签("对比 <机型>")会折成两行,
                不这么做的话它的数值被推低 15px,三列数字读起来是歪的(去掉分隔虚线后更明显) -->
           <view v-for="s in stats" :key="s.k" style="display: flex; flex-direction: column; justify-content: space-between">
@@ -68,6 +68,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { deviceNameInline } from "@/lib/device-copy";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const t = useT();
 const app = useApp();
@@ -76,7 +77,7 @@ const calculator = computed(() => app.homeTruth?.doTheMath ?? null);
 const baseShort = computed(() => calculator.value
   ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
   : "");
-const targetLabel = computed(() => calculator.value?.target.name ?? "");
+const targetLabel = computed(() => nexGridBrandText(calculator.value?.target.name ?? ""));
 const baseWidthPct = computed(() => calculator.value
   ? Math.max(0.4, (calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt) * 100)
   : 0.4);
@@ -108,7 +109,6 @@ const headlineSegs = computed(() => {
 
 const stats = computed(() => calculator.value ? [
   { k: t.value.home.doMathDaily, v: `$${calculator.value.target.dailyUsdt.toFixed(2)}`, tone: "var(--v5-ink)" },
-  { k: t.value.home.doMathPayback, v: `${calculator.value.paybackDays} d`, tone: "var(--v5-brand)" },
   { k: fmt(t.value.home.doMathVs, { base: baseShort.value }), v: `${calculator.value.multiplier}×`, tone: "var(--v5-success)" },
 ] : []);
 

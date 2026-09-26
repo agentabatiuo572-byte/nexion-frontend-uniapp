@@ -21,11 +21,11 @@ function mount() {
   }), key: () => "first-calibration" });
   const code = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const load = new Function("scopePair", "isCurrent", "loading", "deferred", "loadFailed", "calibration", "detected",
-    "calibrationFlow", "getDeviceId", "auth", "scheduleReveal", "mounted", "isCurrentEstimatorScope", "createEstimatorScope", "app", "accountEpoch", "generation",
+    "calibrationFlow", "getDeviceId", "auth", "scheduleReveal", "mounted", "isCurrentEstimatorScope", "createEstimatorScope", "app", "accountEpoch", "generation", "nativePhoneAvailable",
     `${code}\nreturn loadCalibration;`,
   )(() => ({}), () => current, loading, deferred, loadFailed, calibration, detected, calibrationFlow, () => "test-device",
     { accountId: "user:42", isAuthenticated: true }, () => { detected.value = true; }, true,
-    () => current, () => ({}), { accountKey: "user:42" }, 0, 0);
+    () => current, () => ({}), { accountKey: "user:42" }, 0, 0, true);
   return { load, result, calibrate, loading, deferred, loadFailed, calibration, detected, invalidate: () => { current = false; } };
 }
 async function settle() { for (let i = 0; i < 20; i++) await Promise.resolve(); }
