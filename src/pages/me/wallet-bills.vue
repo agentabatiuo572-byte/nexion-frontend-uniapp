@@ -77,11 +77,13 @@
                 <text class="truncate" :style="typeLabelStyle">{{ typeLabel(b.type) }}</text>
                 <text :style="statusBadgeStyle(b.status)">{{ statusLabel(b.status) }}</text>
               </view>
-              <view class="truncate" :style="memoStyle">
+              <view :class="b.memoKey === 'learningReward' ? '' : 'truncate'" :style="memoStyle">
                 <text>{{ billMemo(b) }}</text>
-                <text v-if="b.ref" style="color: var(--v5-ink-4); margin: 0 4px">·</text>
-                <text v-if="b.ref" class="font-mono-tabular">{{ b.ref }}</text>
+                <text v-if="b.ref && b.memoKey !== 'learningReward'" style="color: var(--v5-ink-4); margin: 0 4px">·</text>
+                <text v-if="b.ref && b.memoKey !== 'learningReward'" class="font-mono-tabular">{{ b.ref }}</text>
               </view>
+              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)" @keydown.enter.prevent="toggleSourceRef(b.id)" @keydown.space.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
+              <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
               <text class="block" :style="timeStyle">{{ fmtTime(b.ts) }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
@@ -132,6 +134,7 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { walletBillMonthKey, walletBillMonthLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
+import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -146,6 +149,9 @@ const t = useT();
 const app = useApp();
 const auth = useAuth();
 const billsStore = useBills();
+const courseTitles = useCourseRewardTitles();
+const sourceRefOpen = ref("");
+watch(() => app.accountBindingEpoch, () => { sourceRefOpen.value = ""; });
 const deposits = useDeposits();
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: fundsServerEnabled,
@@ -264,8 +270,9 @@ function monthLabel(month: string, n: number): string {
  * 之前种子行是英文硬串,越南语用户会在同一个列表里看到中文表头 + 英文摘要 + 越南语新行,三种语言。
  */
 function billMemo(b: Bill): string {
-  return resolveWalletBillMemo(b, t.value.bills.memo as Record<string, string>);
+  return resolveWalletBillMemo(b, t.value.bills.memo as Record<string, string>, courseTitles.value);
 }
+function toggleSourceRef(id: string) { sourceRefOpen.value = sourceRefOpen.value === id ? "" : id; }
 function runningBalanceLabel(bal: number): string {
   return `${t.value.bills.runningBalance}: $${bal.toFixed(2)}`;
 }

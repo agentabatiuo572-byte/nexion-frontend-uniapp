@@ -1868,6 +1868,8 @@ export const vi: Messages = {
     useCta: "Dùng",
     typeBonus: "Thưởng",
     courseDetail: "Xem chi tiết khóa học",
+    showSourceId: "Xem mã nguồn thưởng",
+    hideSourceId: "Ẩn mã nguồn thưởng",
     typeRefer: "Giới thiệu",
     typeAchievement: "Thành tựu",
     validUntil: "Có hiệu lực đến {date}",

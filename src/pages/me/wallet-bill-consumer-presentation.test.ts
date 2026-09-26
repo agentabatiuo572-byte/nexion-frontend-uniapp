@@ -15,7 +15,7 @@ function section(file: string, start: string, end: string): string {
   return ts.transpile(source.slice(first, last), { target: ts.ScriptTarget.ES2022 });
 }
 const row = (memoKey = "questReward") => ({ id: "ledger-1", ts: 1, symbol: "NEX", amount: 5,
-  status: "posted", type: "achievement", memo: "", memoKey });
+  status: "posted", type: "achievement", memo: "", memoKey, ref: undefined as string | undefined });
 
 function nexView(memoKey?: string) {
   const bills = reactive({ summaryStatus: "ready", summary: { recentNexBills: [row(memoKey)] } });
@@ -28,10 +28,11 @@ function nexView(memoKey?: string) {
 function rewardsView(memoKey?: string) {
   const records = ref([row(memoKey)]);
   const t = ref(en);
+  const courseTitles = ref<Record<string, string>>({});
   const code = section("./rewards-list.vue", "const visibleRecords = computed", "const hasMore = computed");
-  const view = new Function("computed", "fundsServerEnabled", "records", "visibleCount", "t", "resolveWalletBillMemo",
-    `${code}; return visibleRecords;`)(computed, true, records, ref(10), t, resolveWalletBillMemo);
-  return { records, t, view };
+  const view = new Function("computed", "fundsServerEnabled", "records", "visibleCount", "t", "resolveWalletBillMemo", "courseTitles",
+    `${code}; return visibleRecords;`)(computed, true, records, ref(10), t, resolveWalletBillMemo, courseTitles);
+  return { records, t, courseTitles, view };
 }
 
 describe("controlled wallet descriptions on every consumer", () => {
@@ -58,12 +59,17 @@ describe("controlled wallet descriptions on every consumer", () => {
     expect(rewardsView("futureCode").view.value[0].memo).toBe(en.bills.memo.other);
   });
   it("distinguishes same-day course rewards by their course reference", () => {
-    // zentao #219:三门课程同日各发 10 NEX,账本三笔完全同名。课程奖励现在有
-    // 自己的表现码,行上带 courseId@version,用户与客服才能逐笔对上课程。
     const s = rewardsView("learningReward");
+    s.records.value[0].ref = "nexgrid-account-safety-202609@v1";
     expect(s.view.value[0].memo).toBe(en.bills.memo.learningReward);
+    s.courseTitles.value = { "nexgrid-account-safety-202609@v2": "Wrong version" };
+    expect(s.view.value[0].memo).toBe(en.bills.memo.learningReward);
+    s.courseTitles.value = { "nexgrid-account-safety-202609@v1": "Account safety: recognize risks" };
+    expect(s.view.value[0].memo).toBe(`${en.bills.memo.learningReward} · Account safety: recognize risks`);
     s.t.value = zh;
-    expect(s.view.value[0].memo).toBe(zh.bills.memo.learningReward);
+    s.courseTitles.value = { "nexgrid-account-safety-202609@v1": "账户安全：识别风险与寻求帮助" };
+    expect(s.view.value[0].memo).toBe(`${zh.bills.memo.learningReward} · 账户安全：识别风险与寻求帮助`);
+    expect(s.records.value[0].ref).toBe("nexgrid-account-safety-202609@v1");
     expect(zh.bills.memo.learningReward).not.toBe(zh.bills.memo.bonus);
     expect(en.bills.memo.learningReward).not.toBe(en.bills.memo.bonus);
   });

@@ -153,7 +153,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #220: the empty-state description follows the active filter, so the expense tab no
   // longer reuses the income wording ("充值和到账").
   // #94: 类型单选组补齐 roving tabindex + 左右方向键(同上)。
-  "wallet-bills.vue": "4fe232cb79b7e25673bc2b8bb786e7d69257d0151e146158323cbf7a25faf353",
+  // #327 keeps the original bill row layout while placing a course source ID behind a disclosure.
+  "wallet-bills.vue": "99d16af1555cba4853ff6dcd47f2dbe2c1a319830253270f01878f49549ac91a",
   // Authorized bank selector and real beneficiary binding reuse the original visual tokens.
   // Bank account/holder replace PAN semantics; expiry/CVV remain visible but are not collected.
   // #88: cardholder input carries its visible label as an accessible name.

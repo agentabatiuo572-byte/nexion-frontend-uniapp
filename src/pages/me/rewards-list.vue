@@ -101,11 +101,11 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
-              <!-- 课程奖励带可区分的来源标识(zentao #219):同额同日多笔奖励靠
-                   courseId@version 逐笔追溯;其它奖励没有 ref 时只显示原 memo。 -->
-              <text v-if="b.ref" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
-              <text v-else class="block truncate" :style="rowSubStyle">{{ b.memo }}</text>
+              <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
+              <text v-else :class="b.memoKey === 'learningReward' ? 'block' : 'block truncate'" :style="rowSubStyle">{{ b.memo }}</text>
               <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: 4px" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)" @keydown.enter.prevent="onKeyboardActivate($event, () => openCourseReward(b))">{{ t.rewards.courseDetail }} ›</text>
+              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => toggleSourceRef(b.id))" @keydown.space.prevent="onKeyboardActivate($event, () => toggleSourceRef(b.id))">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
+              <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
               <text class="block tabular-nums" :style="rewardAmountStyle">+{{ b.amount.toLocaleString() }} {{ b.symbol }}</text>
@@ -142,6 +142,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
+import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
 import { courseRewardId, rewardsListCategory, type RewardsCat } from "./course-reward-link";
@@ -166,6 +167,9 @@ const app = useApp();
 const auth = useAuth();
 const voucher = useVoucher();
 const bills = useBills();
+const courseTitles = useCourseRewardTitles();
+const sourceRefOpen = ref("");
+watch(() => app.accountBindingEpoch, () => { sourceRefOpen.value = ""; });
 // The voucher/reward reads are protected; on a cold H5 load they must wait for
 // the cookie restore to bind this account, otherwise AUTH_REQUIRED surfaces as
 // "暂时无法确认账号状态" even though the same account's summary read succeeded.
@@ -207,7 +211,7 @@ const records = computed(() => fundsServerEnabled
   : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
 const visibleCount = ref(PAGE_SIZE);
 const visibleRecords = computed(() => (fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value))
-  .map((bill) => ({ ...bill, memo: resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>) })));
+  .map((bill) => ({ ...bill, memo: resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>, courseTitles.value) })));
 const hasMore = computed(() => fundsServerEnabled ? activePager.value.hasMore : visibleCount.value < records.value.length);
 const scrollAnchor = ref<unknown>(null);
 const initialLoading = computed(() => fundsServerEnabled && activePager.value.status === "loading" && records.value.length === 0);
@@ -290,6 +294,7 @@ function rewardTypeLabel(type: BillType): string {
   return t.value.rewards.typeBonus;
 }
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) { if (!event.repeat) action(); }
+function toggleSourceRef(id: string) { sourceRefOpen.value = sourceRefOpen.value === id ? "" : id; }
 function openCourseReward(bill: Bill) {
   const id = courseRewardId(bill);
   if (id) navTo(courseRewardHref(id));
