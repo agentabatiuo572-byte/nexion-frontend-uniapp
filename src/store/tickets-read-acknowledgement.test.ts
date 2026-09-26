@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { ApiError } from "@/api/errors";
+import { installSupportStorage } from "@/test/storage-setup";
 import type { Ticket } from "@/domain/support";
+
+installSupportStorage();
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -49,9 +52,107 @@ beforeEach(() => {
   vi.clearAllMocks();
   remote.supportApi.authorityRevision.mockResolvedValue("support-run-1");
   remote.supportApi.tickets.mockResolvedValue({ items: [], total: 0 });
+  remote.supportApi.createTicket.mockReset();
 });
 
 describe("ticket read acknowledgement", () => {
+  it("creates one ticket for concurrent identical sends without Web Crypto", async () => {
+    vi.stubGlobal("crypto", undefined);
+    vi.stubGlobal("TextEncoder", undefined);
+    try {
+      const store = useTickets();
+      const created = deferred<Ticket>();
+      remote.supportApi.createTicket.mockReturnValue(created.promise);
+      const input = { category: "technical" as const, subject: "测试", body: "Need help 🧪" };
+
+      const first = store.createTicket(input);
+      const second = store.createTicket(input);
+      await vi.waitFor(() => expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1));
+      expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1);
+      created.resolve(ticket("TK-ONE", 1, 0));
+      expect(await Promise.all([first, second])).toEqual(["TK-ONE", "TK-ONE"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shares an authoritative recovery with concurrent identical ticket sends", async () => {
+    const store = useTickets();
+    const sent = deferred<Ticket>();
+    remote.supportApi.createTicket.mockReturnValue(sent.promise);
+    remote.supportApi.commandResult.mockResolvedValueOnce({ kind: "ticket", ticket: ticket("TK-RECOVERED", 1, 0) } as never);
+    const input = { category: "technical" as const, subject: "Same", body: "Same body" };
+    const first = store.createTicket(input);
+    const second = store.createTicket(input);
+    await vi.waitFor(() => expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1));
+    sent.reject(new ApiError({ kind: "network", message: "unknown" }));
+    expect(await Promise.all([first, second])).toEqual(["TK-RECOVERED", "TK-RECOVERED"]);
+    expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the native pending key after an unknown result and App restart", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("plus", {});
+    vi.stubGlobal("localStorage", undefined);
+    vi.stubGlobal("uni", {
+      getStorageSync: (key: string) => storage.get(key) ?? "",
+      setStorageSync: (key: string, value: string) => storage.set(key, value),
+    });
+    try {
+      const input = { category: "technical" as const, subject: "Native retry", body: "One message" };
+      remote.supportApi.createTicket.mockRejectedValueOnce(new ApiError({ kind: "network", message: "unknown" }));
+      const firstStore = useTickets(); firstStore.bindAccount("account-a");
+      await expect(firstStore.createTicket(input)).rejects.toMatchObject({ kind: "network" });
+      const firstKey = remote.supportApi.createTicket.mock.calls[0][1];
+      expect([...storage.values()].some(value => value.includes(firstKey))).toBe(true);
+
+      setActivePinia(createPinia());
+      const restored = useTickets(); restored.bindAccount("account-a");
+      remote.supportApi.createTicket.mockResolvedValueOnce(ticket("TK-ONE", 1, 0));
+      await expect(restored.createTicket(input)).resolves.toBe("TK-ONE");
+      expect(remote.supportApi.createTicket.mock.calls[1][1]).toBe(firstKey);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not send when native pending-key storage silently drops a write", async () => {
+    vi.stubGlobal("plus", {});
+    vi.stubGlobal("localStorage", undefined);
+    vi.stubGlobal("uni", { getStorageSync: () => "", setStorageSync: () => undefined });
+    try {
+      const store = useTickets();
+      await expect(store.createTicket({ category: "technical", subject: "Subject", body: "Body" }))
+        .rejects.toThrow("SUPPORT_PENDING_PERSIST_FAILED");
+      expect(remote.supportApi.createTicket).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not let a prior account epoch erase a newer uncertain ticket key", async () => {
+    const store = useTickets();
+    store.bindAccount("account-a");
+    const old = deferred<Ticket>();
+    remote.supportApi.createTicket.mockReturnValueOnce(old.promise);
+    const oldDone = store.createTicket({ category: "technical", subject: "Old", body: "Old body" }).catch(error => error);
+    await vi.waitFor(() => expect(remote.supportApi.createTicket).toHaveBeenCalledTimes(1));
+
+    store.bindAccount("account-b"); store.bindAccount("account-a");
+    remote.supportApi.createTicket.mockRejectedValueOnce(new ApiError({ kind: "network", message: "unknown" }));
+    const input = { category: "technical" as const, subject: "New", body: "New body" };
+    await expect(store.createTicket(input)).rejects.toMatchObject({ kind: "network" });
+    const newerKey = remote.supportApi.createTicket.mock.calls[1][1];
+    old.resolve(ticket("TK-OLD", 1, 0));
+    await oldDone;
+
+    setActivePinia(createPinia());
+    const restored = useTickets(); restored.bindAccount("account-a");
+    remote.supportApi.createTicket.mockResolvedValueOnce(ticket("TK-NEW", 1, 0));
+    await expect(restored.createTicket(input)).resolves.toBe("TK-NEW");
+    expect(remote.supportApi.createTicket.mock.calls[2][1]).toBe(newerKey);
+  });
+
   it("rejects a late detail response after an account switch instead of returning an unusable ticket", async () => {
     const store = useTickets();
     const response = deferred<Ticket>();

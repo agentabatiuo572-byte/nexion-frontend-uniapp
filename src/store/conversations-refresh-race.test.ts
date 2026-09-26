@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { ApiError } from "@/api/errors";
+import { installSupportStorage } from "@/test/storage-setup";
+
+installSupportStorage();
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -42,6 +45,22 @@ describe("conversation list refresh generation fence", () => {
   const human = () => ({ id: "CV-cold", type: "support", status: "open", version: 1, lastTs: 1,
     messages: [], unread: 0, agentName: "Agent", roleKey: "roleSupport", avatarTint: "blue",
     lastMessage: "Confirmed history", sessionStatus: "active" });
+
+  it("creates one support conversation for concurrent identical sends without Web Crypto", async () => {
+    vi.stubGlobal("crypto", undefined);
+    vi.stubGlobal("TextEncoder", undefined);
+    const store = useConversations();
+    await store.refreshCategories();
+    const created = deferred<any>();
+    runtime.supportApi.startConversation.mockReturnValue(created.promise);
+
+    const first = store.startConversation("support", "测试 🧪");
+    const second = store.startConversation("support", "测试 🧪");
+    await vi.waitFor(() => expect(runtime.supportApi.startConversation).toHaveBeenCalledTimes(1));
+    expect(runtime.supportApi.startConversation).toHaveBeenCalledTimes(1);
+    created.resolve(human());
+    expect(await Promise.all([first, second])).toEqual(["CV-cold", "CV-cold"]);
+  });
 
   it("shares recovered success across two concurrent replies with the same intent", async () => {
     const store = useConversations(); store.conversations.push(human() as never);

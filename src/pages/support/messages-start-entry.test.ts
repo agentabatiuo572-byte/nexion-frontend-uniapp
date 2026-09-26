@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
+import { installSupportStorage } from "@/test/storage-setup";
+
+installSupportStorage();
 
 const source = readFileSync(new URL("./messages.vue", import.meta.url), "utf8");
 const { descriptor } = parse(source);

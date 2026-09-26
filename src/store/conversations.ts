@@ -9,23 +9,15 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import type { ConversationDismissal } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
+import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
+import { restoreSupportPending, persistSupportPending } from "@/lib/support-pending-storage";
 
 function mutationKey(scope: string): string {
   const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
   return `support-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
-const PENDING_STORAGE = "support-pending-commands";
-const pendingStorageKey = (accountKey: string, runId: string) => `${PENDING_STORAGE}:${accountKey}:${runId}:conversations`;
-async function opaqueIntentSlot(intent: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(intent));
-  return `sha256:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-function restorePending(accountKey: string, runId: string): Map<string, string> {
-  try { return new Map(Object.entries(JSON.parse(localStorage.getItem(pendingStorageKey(accountKey, runId)) ?? "{}") as Record<string, string>).filter(([slot, key]) => /^sha256:[a-f0-9]{64}$/.test(slot) && /^support-[a-z0-9-]+-/.test(key))); } catch { return new Map(); }
-}
-function persistPending(accountKey: string, runId: string, values: Map<string, string>) {
-  try { localStorage.setItem(pendingStorageKey(accountKey, runId), JSON.stringify(Object.fromEntries(values))); } catch { /* H5 storage can be unavailable */ }
-}
+const restorePending = (accountKey: string, runId: string) => restoreSupportPending(accountKey, runId, "conversations");
+const persistPending = (accountKey: string, runId: string, values: Map<string, string>) => persistSupportPending(accountKey, runId, "conversations", values);
 type CommandScope = { accountKey: string; epoch: number; runId: string; pending: Map<string, string>; inFlight: Map<string, Promise<unknown>> };
 type SnapshotScope = { accountKey: string; epoch: number; runId: string };
 type AccountScope = Pick<SnapshotScope, "accountKey" | "epoch">;
@@ -114,8 +106,9 @@ export const useConversations = defineStore("conversations", () => {
     const runId = await supportApi.authorityRevision();
     if (epoch !== accountEpoch || accountKey !== accountKeyValue) return;
     if (runId === pendingRunId) return;
+    const restored = restorePending(accountKey, runId);
     pendingRunId = runId;
-    pendingKeys = restorePending(accountKey, runId);
+    pendingKeys = restored;
   }
 
   function scopeIsCurrent(scope: CommandScope): boolean {
@@ -137,11 +130,12 @@ export const useConversations = defineStore("conversations", () => {
     const startingPending = pendingKeys;
     const startingInFlight = inFlight;
     const runId = await supportApi.authorityRevision();
-    if (epoch !== accountEpoch || accountKey !== accountKeyValue || startingRunId !== pendingRunId
-      || startingPending !== pendingKeys || startingInFlight !== inFlight) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+    if (epoch !== accountEpoch || accountKey !== accountKeyValue || startingInFlight !== inFlight) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     if (runId !== pendingRunId) {
+      if (startingRunId !== pendingRunId || startingPending !== pendingKeys) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
+      const restored = restorePending(accountKey, runId);
       pendingRunId = runId;
-      pendingKeys = restorePending(accountKey, runId);
+      pendingKeys = restored;
     }
     return { accountKey, epoch, runId, pending: pendingKeys, inFlight };
   }
@@ -151,12 +145,19 @@ export const useConversations = defineStore("conversations", () => {
     return error.status === 409 || (error.status ?? 0) >= 500 || error.kind === "network" || error.kind === "protocol";
   }
 
+  function completePending(scope: CommandScope, fingerprint: string): void {
+    const next = new Map(scope.pending);
+    next.delete(fingerprint);
+    persistPending(scope.accountKey, scope.runId, next);
+    scope.pending.delete(fingerprint);
+  }
+
   async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>, expectedAccount?: AccountScope): Promise<T> {
     const scope = await commandScope();
     if (expectedAccount && (expectedAccount.epoch !== scope.epoch || expectedAccount.accountKey !== scope.accountKey)) {
       throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     }
-    const fingerprint = await opaqueIntentSlot(intent);
+    const fingerprint = opaqueSupportIntentSlot(intent);
     if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const running = scope.inFlight.get(fingerprint) as Promise<T> | undefined;
     if (running) return running;
@@ -171,16 +172,14 @@ export const useConversations = defineStore("conversations", () => {
         if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
         const result = await action(key);
         if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
-        scope.pending.delete(fingerprint);
-        persistPending(scope.accountKey, scope.runId, scope.pending);
+        completePending(scope, fingerprint);
         return result;
       } catch (cause) {
         if (recover && mustReadBack(cause) && scopeIsCurrent(scope)) {
           const adopted = await recover(key);
           if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
           if (adopted !== null) {
-            scope.pending.delete(fingerprint);
-            persistPending(scope.accountKey, scope.runId, scope.pending);
+            completePending(scope, fingerprint);
             return adopted;
           }
         }
@@ -369,8 +368,7 @@ export const useConversations = defineStore("conversations", () => {
         if (scopeIsCurrent(scope) && result.kind === "conversation") replace(result.conversation);
         if (scopeIsCurrent(scope) && result.kind === "conversation-ticket") replace(result.conversation);
         if (result.kind !== "conversation" && result.kind !== "conversation-ticket") continue;
-        scope.pending.delete(fingerprint);
-        persistPending(scope.accountKey, scope.runId, scope.pending);
+        completePending(scope, fingerprint);
       } catch { /* unknown remains durable until the authoritative readback succeeds */ }
     }
   }
