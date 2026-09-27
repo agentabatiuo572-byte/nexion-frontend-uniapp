@@ -253,6 +253,11 @@ function positiveNumber(value: unknown): number {
   return parsed > 0 ? parsed : invalid();
 }
 
+function nonNegativeNumber(value: unknown): number {
+  const parsed = finiteNumber(value);
+  return parsed >= 0 ? parsed : invalid();
+}
+
 function rewardAmount(value: unknown): number {
   const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(text)) {
@@ -392,7 +397,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
       || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean"
       || compute.domain !== "E6") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   const experience = parsePlatformExperienceConfig(value);
-  const h5BaseFactor = positiveNumber(onlineBonus.h5BaseFactor);
+  const h5BaseFactor = nonNegativeNumber(onlineBonus.h5BaseFactor);
   const continuityFullHours = positiveNumber(onlineBonus.continuityFullHours);
   if (h5BaseFactor > 1) return invalid();
 
@@ -409,7 +414,10 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   const flag = flags[0];
   if (typeof flag.enabled !== "boolean" || flag.enabled !== featureFlags.computeShareEnabled) return invalid();
   const coefficientValues = Object.fromEntries(
-    coefficients.map((row) => [nonEmptyString(row.key), positiveNumber(row.value)]),
+    coefficients.map((row) => {
+      const key = nonEmptyString(row.key);
+      return [key, key === "h5BaseFactor" ? nonNegativeNumber(row.value) : positiveNumber(row.value)];
+    }),
   ) as Record<string, number>;
   if (
     coefficientValues.h5BaseFactor !== h5BaseFactor

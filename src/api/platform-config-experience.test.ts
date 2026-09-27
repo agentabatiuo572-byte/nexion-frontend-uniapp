@@ -82,6 +82,38 @@ const validPlatform = {
 };
 
 describe("platform experience config contract", () => {
+  it("accepts the retired zero H5 factor while keeping other coefficients strict", () => {
+    const retired = {
+      ...validPlatform,
+      onlineBonus: { h5BaseFactor: 0, continuityFullHours: 24 },
+      computerCompute: {
+        ...validPlatform.computerCompute,
+        coefficients: [
+          { key: "h5BaseFactor", value: "0" },
+          { key: "continuityFullHours", value: 24 },
+        ],
+      },
+    };
+    expect(parsePlatformComputeConfig(retired).share.baseUrl).toBe("https://nexgrid.ai/ref/");
+    for (const value of ["-0.1", "0.1"]) {
+      expect(() => parsePlatformComputeConfig({
+        ...retired,
+        computerCompute: {
+          ...retired.computerCompute,
+          coefficients: [{ key: "h5BaseFactor", value }, retired.computerCompute.coefficients[1]],
+        },
+      })).toThrow("E6_PLATFORM_CONFIG_RESPONSE_INVALID");
+    }
+    expect(() => parsePlatformComputeConfig({
+      ...retired,
+      onlineBonus: { h5BaseFactor: -0.1, continuityFullHours: 24 },
+    })).toThrow("E6_PLATFORM_CONFIG_RESPONSE_INVALID");
+    expect(() => parsePlatformComputeConfig({
+      ...retired,
+      onlineBonus: { h5BaseFactor: 0, continuityFullHours: 0 },
+    })).toThrow("E6_PLATFORM_CONFIG_RESPONSE_INVALID");
+  });
+
   it("parses share URL templates when App Plus lacks String.replaceAll", () => {
     const descriptor = Object.getOwnPropertyDescriptor(String.prototype, "replaceAll");
     Object.defineProperty(String.prototype, "replaceAll", { configurable: true, value: undefined });

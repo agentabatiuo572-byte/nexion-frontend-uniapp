@@ -40,8 +40,7 @@ export interface ComputeShareContent {
 // 原 mock 寄存器 lib/mock/admin/compute-config.ts 已死,admin 已 server-canonical)。
 // PROD wires server→client; value authority lives in the real backend.
 export interface OnlineBonus {
-  // 无新鲜设备心跳时的基础托管系数(沿用 h5BaseFactor 配置键)∈(0,1]:
-  // effectiveTops = baseline × h5BaseFactor × network × jitter.
+  // 已退役的 H5 基础系数，后端固定为 0；保留此字段以校验 E6 两处投影一致。
   h5BaseFactor: number;
   // App 连续在线满额时长(小时): continuity 因子在此时长达到满额 1.0(此前自 0.85 线性爬升)。
   continuityFullHours: number;
