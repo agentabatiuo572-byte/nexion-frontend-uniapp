@@ -1,6 +1,6 @@
 <!-- Weekly Tier 2 is server-authoritative; pending rows use PC-configured routes. -->
 <template>
-  <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
+  <view v-if="mounted && wq.error && !wq.snapshot" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
     <text :style="pendingLabelStyle">{{ w.loadError }}</text>
   </view>
   <view v-else-if="mounted && !wq.snapshot" class="mx-4 mt-3 px-4 py-3" :style="cardStyle">
@@ -14,6 +14,10 @@
         <text class="block tabular-nums" :style="countStyle">{{ progressText }}</text>
         <text v-if="tier2Quests[0]" class="block tabular-nums" :style="periodStyle">{{ periodText }}</text>
       </view>
+    </view>
+
+    <view v-if="wq.error && !wq.claimErrorQuestCode" class="px-4 py-2 active:opacity-70" role="button" tabindex="0" :style="refreshErrorStyle" @click="retry">
+      <text>{{ w.refreshError }}</text>
     </view>
 
     <!-- Quest rows -->
@@ -39,6 +43,7 @@
           <view class="flex-1">
             <text class="block" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
             <text class="block" :style="categoryLabelStyle">{{ w.rewardReady }}</text>
+            <text v-if="wq.error && wq.claimErrorQuestCode === q.questCode" class="block" role="status" :style="claimErrorStyle">{{ claimErrorText }}</text>
           </view>
           <text :style="claimRewardStyle">{{ claimTextFor(q) }}</text>
         </view>
@@ -121,6 +126,8 @@ const periodText = computed(() => {
   const minutes = totalMinutes % 60;
   return fmt(w.value.periodEndsIn, { time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}` });
 });
+const claimErrorText = computed(() => wq.error === "WEEKLY_QUEST_CLAIM_OUTCOME_UNKNOWN"
+  ? w.value.claimOutcomeUnknown : w.value.claimFailed);
 
 function isClaimed(q: CanonicalQuest): boolean {
   return q.status === "CLAIMED";
@@ -273,6 +280,8 @@ const categoryLabelStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
+const claimErrorStyle: CSSProperties = { ...categoryLabelStyle, color: "var(--v5-danger)" };
+const refreshErrorStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", borderBottom: "1px solid var(--v5-border)" };
 /** 「未开放」标记与奖励数字同槽位:同样是 12px 等宽,但不得像可赚取的金额一样抢眼。 */
 const pendingPausedStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

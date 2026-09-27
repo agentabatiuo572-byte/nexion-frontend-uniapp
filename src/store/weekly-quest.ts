@@ -24,6 +24,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const snapshot = ref<QuestSnapshot | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const claimErrorQuestCode = ref<string | null>(null);
   const claimNotice = ref<QuestClaimNotice | null>(null);
   const claiming = ref<string | null>(null);
   let accountKeyValue = "default";
@@ -86,27 +87,33 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     rolloverTimer = setTimeout(() => void refresh(), delay);
   }
 
-  async function refresh(): Promise<boolean> {
+  async function refresh(fromSettledClaim = false): Promise<boolean> {
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
+    const startedClaimSequence = claimSequence;
+    const startedDuringClaim = claiming.value !== null;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
+    const predatesClaim = () => (startedDuringClaim && !fromSettledClaim) || claimSequence !== startedClaimSequence;
     if (!remoteApiEnabled) {
       if (isCurrentRequest()) {
         snapshot.value = null;
         scheduleRollover(null);
         error.value = "WEEKLY_QUEST_SERVER_REQUIRED";
+        claimErrorQuestCode.value = null;
         loading.value = false;
       }
       return false;
     }
     loading.value = true;
-    error.value = null;
+    if (!claimErrorQuestCode.value) error.value = null;
     claimNotice.value = null;
     try {
       const next = await questApi.state(locale.code);
-      if (!isCurrentRequest()) return false;
+      if (!isCurrentRequest() || predatesClaim()) return false;
       snapshot.value = next;
       scheduleRollover(next);
+      error.value = null;
+      claimErrorQuestCode.value = null;
       try {
         retireClaimedCommands(next);
       } catch (cause) {
@@ -114,7 +121,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       }
       return true;
     } catch (cause) {
-      if (isCurrentRequest()) {
+      if (isCurrentRequest() && !predatesClaim() && !claimErrorQuestCode.value) {
         error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_LOAD_FAILED";
       }
       return false;
@@ -134,6 +141,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
     claiming.value = quest.questCode;
     error.value = null;
+    claimErrorQuestCode.value = null;
     claimNotice.value = null;
     try {
       const key = acquireWeeklyQuestCommandKey(accountKeyValue, quest.questCode, quest.instanceKey);
@@ -155,6 +163,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       return true;
     } catch (cause) {
       if (!isCurrentRequest()) return false;
+      claimErrorQuestCode.value = quest.questCode;
       const message = cause instanceof Error ? cause.message : "WEEKLY_QUEST_CLAIM_FAILED";
       if (message.startsWith("WEEKLY_QUEST_COMMAND_")) {
         error.value = message;
@@ -187,7 +196,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
         return false;
       }
       if (notice) {
-        await refresh();
+        await refresh(true);
         if (!isCurrentRequest()) return false;
         // This is a confirmed terminal reply, never a new reward. Read back
         // server state before allowing the UI to explain the changed status.
@@ -209,6 +218,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     scheduleRollover(null);
     loading.value = false;
     error.value = null;
+    claimErrorQuestCode.value = null;
     claimNotice.value = null;
     claiming.value = null;
     accountKeyValue = accountKey.trim().toLowerCase() || "default";
@@ -219,5 +229,5 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     if (remoteApiEnabled) void refresh();
   });
 
-  return { snapshot, loading, error, claimNotice, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
+  return { snapshot, loading, error, claimErrorQuestCode, claimNotice, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
 });
