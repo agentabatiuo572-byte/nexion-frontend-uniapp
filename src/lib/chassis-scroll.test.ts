@@ -1,22 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveChassisScrollElement, scrollCurrentTabToTop } from "./chassis-scroll";
+import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "./chassis-scroll";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("current tab reselection", () => {
-  it("uses the actual App WebView scroll node when uni's view ref is a proxy", () => {
-    class WebViewElement {
-      scrollTop = 783;
-      classList = { contains: (name: string) => name === "nx-content" };
-    }
-    vi.stubGlobal("HTMLElement", WebViewElement);
-    const actual = new WebViewElement();
+  it("scrolls the active App WebView when the service layer has no document", () => {
+    vi.stubGlobal("document", undefined);
+    const actual = { scrollTop: 783 };
     const proxy = { $el: { scrollTop: 783 } };
-    const found = resolveChassisScrollElement(proxy, () => actual as unknown as HTMLElement);
-    expect(found).toBe(actual);
-    found!.scrollTop = 0;
+    const evalJS = vi.fn((script: string) => {
+      new Function("document", script)({ querySelector: (selector: string) => selector === ".nx-content" ? actual : null });
+    });
+    expect(scrollNativeCurrentTabToTop({ $getAppWebview: () => ({ evalJS }) })).toBe(true);
+    expect(evalJS).toHaveBeenCalledOnce();
     expect(actual.scrollTop).toBe(0);
     expect(proxy.$el.scrollTop).toBe(783);
+  });
+
+  it("ignores a page whose native WebView has already closed", () => {
+    expect(scrollNativeCurrentTabToTop(null)).toBe(false);
+    expect(scrollNativeCurrentTabToTop({ $getAppWebview: () => { throw Error("closed"); } })).toBe(false);
   });
 
   it("keeps the H5 ref's own scroll node", () => {
