@@ -2231,6 +2231,7 @@ export const zh: Messages = {
     shareReferenceAnnual: "参考年化区间",
     shareAnnualUnavailable: "年化区间暂不可用",
     shareYieldDisclaimer: "仅供参考，非保证收益；实际入账以已结算任务收据为准。",
+    cloudShareLowBarrierTagline: "云算力份额·低门槛",
     cardPerDaySuffix: "/天",
     cardNexPerDay: "+{n} NEX",
     cardStockCompact: "库存剩余 {n} 件",
