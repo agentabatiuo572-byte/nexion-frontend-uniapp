@@ -193,7 +193,7 @@ import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
-import { resolveChassisScrollElement, scrollCurrentTabToTop } from "@/lib/chassis-scroll";
+import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
@@ -384,15 +384,14 @@ const refreshing = computed(() => refresh.isRefreshing);
 const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
 const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
 
-// H5's uni <view> ref exposes the DOM element via $el. On APP-PLUS the ref can
-// instead be a uni proxy: writing its scrollTop does not move the WebView node.
+// H5's uni <view> ref exposes the DOM element via $el. APP-PLUS page logic has
+// no document; its ref still serves scroll-memory reads, while writes use evalJS.
 function chassisScrollDom(): HTMLElement | null {
   const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
   // #ifdef APP-PLUS
-  return resolveChassisScrollElement(raw, () => document.querySelector<HTMLElement>(".nx-content"));
+  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
   // #endif
-  return (raw && typeof raw === "object" && "$el" in (raw as object)
-    ? (raw as { $el?: HTMLElement }).$el : raw) as HTMLElement | null;
+  return resolveChassisScrollElement(raw, () => null);
 }
 function currentScrollTop(): number {
   return chassisScrollDom()?.scrollTop ?? 0;
@@ -670,12 +669,13 @@ function go(tab: { key: string; route: string }) {
   // behavior 显式跟随系统「减少动态」偏好——CSS 的 scroll-behavior 兜底管不到
   // JS scrollTo 的显式 behavior 参数。App 端无 matchMedia,try 兜住即可。
   if (tab.key === activeTab.value) {
-    const dom = chassisScrollDom();
-    if (!dom) return;
     // #ifdef APP-PLUS
-    dom.scrollTop = 0;
+    const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+    scrollNativeCurrentTabToTop(pages[pages.length - 1]);
     // #endif
     // #ifndef APP-PLUS
+    const dom = chassisScrollDom();
+    if (!dom) return;
     let reduce = false;
     try { reduce = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { /* App 端无 matchMedia */ }
     scrollCurrentTabToTop(dom, reduce);

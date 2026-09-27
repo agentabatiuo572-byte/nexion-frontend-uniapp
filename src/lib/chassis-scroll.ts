@@ -6,6 +6,18 @@ export function resolveChassisScrollElement(raw: unknown, fallback: () => HTMLEl
     && candidate.classList.contains("nx-content") ? candidate : fallback();
 }
 
+/** App page logic runs outside the WebView DOM; execute the scroll in that view. */
+export function scrollNativeCurrentTabToTop(page: { $getAppWebview?: () => { evalJS: (script: string) => void } } | null | undefined): boolean {
+  try {
+    const webview = page?.$getAppWebview?.();
+    if (!webview) return false;
+    webview.evalJS("var content = document.querySelector('.nx-content'); if (content) content.scrollTop = 0;");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function scrollCurrentTabToTop(target: { scrollTop: number; scrollTo?: (options: ScrollToOptions) => void }, reduceMotion: boolean): void {
   try {
     if (typeof target.scrollTo === "function") {
