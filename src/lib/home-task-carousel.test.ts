@@ -154,6 +154,14 @@ describe("home task carousel", () => {
     });
   });
 
+  it("keeps the Share NEX task card while hiding an unavailable USD daily rate", () => {
+    const sharePromo = { ...pausedPromo, targetDevice: "Cloud Share", targetDaily: null, status: "active" as const };
+    const view = presentHomeWeeklyCard(selectHomeWeeklySource([], sharePromo), sharePromo, 1);
+    expect(view.rewardNex).toBe(1200);
+    expect(view.targetDaily).toBeNull();
+    expect(conversionBannerSource).toContain('v-if="weeklyCard.targetDaily !== null"');
+  });
+
   it("routes every pending weekly entry through the PC-configured actionRoute", () => {
     expect(conversionBannerSource).toContain("navTo(weeklyCard.value.actionRoute)");
     expect(conversionBannerSource).toContain("weeklyCard.value.category");

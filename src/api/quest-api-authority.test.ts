@@ -16,6 +16,39 @@ const quest = {
 };
 
 describe("quest API authority", () => {
+  it("keeps Share weekly promo available without exposing legacy daily USD", async () => {
+    const promo = {
+      bannerCode: "HOME_WEEKLY_UPSELL", baseReward: 800, multiplier: 1.5,
+      countdownDays: 4, countdownHours: 12, targetDevice: "opaque-share-sku",
+      productType: "SHARE", targetDaily: null, status: "active",
+    };
+    const response = {
+      quests: [quest], dayOneRewardNex: 500, promoBanner: promo,
+      questBonusMultiplier: 1, rhythmMonth: 1, serverCanonical: true,
+      sourceEnvironment: "PRODUCTION", runId: "", source: "nx_mission + nx_user_mission",
+    };
+    await expect(createQuestApi({ request: async () => response } as never, "prod").state())
+      .resolves.toMatchObject({ promoBanner: { targetDaily: null, baseReward: 800 } });
+
+    const legacyResponse = { ...response, promoBanner: { ...promo, productType: undefined, targetDevice: "Cloud Share", targetDaily: 0.19 } };
+    await expect(createQuestApi({ request: async () => legacyResponse } as never, "prod").state())
+      .resolves.toMatchObject({ promoBanner: { targetDaily: null } });
+
+    for (const targetDevice of ["云共享", "雲共享"]) {
+      const localizedLegacy = { ...legacyResponse, promoBanner: { ...legacyResponse.promoBanner, targetDevice } };
+      await expect(createQuestApi({ request: async () => localizedLegacy } as never, "prod").state())
+        .resolves.toMatchObject({ promoBanner: { targetDaily: null } });
+    }
+
+    const deviceResponse = { ...response, promoBanner: { ...promo, productType: "DEVICE", targetDevice: "StellarBox Pro", targetDaily: 1.5 } };
+    await expect(createQuestApi({ request: async () => deviceResponse } as never, "prod").state())
+      .resolves.toMatchObject({ promoBanner: { targetDaily: 1.5 } });
+
+    const namedDevice = { ...response, promoBanner: { ...promo, productType: "DEVICE", targetDevice: "Cloud Share research device", targetDaily: 1.5 } };
+    await expect(createQuestApi({ request: async () => namedDevice } as never, "prod").state())
+      .resolves.toMatchObject({ promoBanner: { targetDaily: 1.5 } });
+  });
+
   it("keeps a complete Day-One snapshot's required member count with the immutable row projection", async () => {
     const request = vi.fn().mockResolvedValue({
       quests: [quest], dayOneRewardNex: 500, dayOneRequiredTaskCount: 1, dayOneSnapshotStatus: "SNAPSHOT",

@@ -29,7 +29,7 @@ export interface CanonicalPromoBanner {
   countdownDays: number;
   countdownHours: number;
   targetDevice: string;
-  targetDaily: number;
+  targetDaily: number | null;
   status: "active" | "paused";
 }
 
@@ -145,12 +145,15 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   const countdownDays = number(row.countdownDays, 0, 365);
   const countdownHours = number(row.countdownHours, 0, 23);
   const targetDevice = text(row.targetDevice);
-  const targetDaily = number(row.targetDaily, 0, 1_000_000);
+  const productType = text(row.productType)?.toUpperCase();
+  const shareTarget = productType === "SHARE"
+    || (productType == null && /cloud[\s_-]*share|\u4e91\u5171\u4eab|\u96f2\u5171\u4eab/i.test(targetDevice ?? ""));
+  const targetDaily = shareTarget ? null : number(row.targetDaily, 0, 1_000_000);
   const status = text(row.status)?.toLowerCase() as "active" | "paused";
   if (!bannerCode || baseReward === null || multiplier === null
       || countdownDays === null || !Number.isInteger(countdownDays)
       || countdownHours === null || !Number.isInteger(countdownHours) || countdownHours > 23
-      || !targetDevice || targetDaily === null || !["active", "paused"].includes(status)) {
+      || !targetDevice || (!shareTarget && targetDaily === null) || !["active", "paused"].includes(status)) {
     return invalid("QUEST_PROMO_RESPONSE_INVALID");
   }
   return {
