@@ -39,9 +39,13 @@ function serverBadge(t: Messages, badge: string | undefined): string {
   return badge;
 }
 
+function normalizedPublishedTagline(value: string): string {
+  return value.normalize("NFKC").trim().replace(/\s*[·・]\s*/gu, "·");
+}
+
 export function productCopy(t: Messages, p: Product, serverCatalog = false): ProductCopy {
   if (serverCatalog) return {
-    tagline: p.id === "cloud-share" && p.tagline === zh.store.cloudShareLowBarrierTagline
+    tagline: p.id === "cloud-share" && normalizedPublishedTagline(p.tagline) === zh.store.cloudShareLowBarrierTagline
       ? t.store.cloudShareLowBarrierTagline : p.tagline,
     badge: serverBadge(t, p.badge),
     unlocks: "",

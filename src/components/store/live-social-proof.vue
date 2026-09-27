@@ -40,6 +40,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { remoteApiEnabled, storefrontActivityApi } from "@/api/runtime";
 import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
 import { useApp } from "@/store/app";
@@ -157,7 +158,7 @@ const remoteRows = computed<FlatRow[]>(() => {
   const proof = remoteProof.value;
   if (!proof) return [];
   const rows: FlatRow[] = [
-    { n: proof.windowSales, label: `${t.value.store.soldLabel} · ${proof.windowDays}d`, color: "var(--v5-brand)" },
+    { n: proof.windowSales, label: `${t.value.store.soldLabel} · ${fmt(t.value.store.detPaybackDays, { n: proof.windowDays })}`, color: "var(--v5-brand)" },
     { n: proof.cumulativeSales, label: t.value.store.liveProof.cumulativeSalesLabel, color: "var(--v5-success-ink)" },
   ];
   const stock = props.product.stock;
