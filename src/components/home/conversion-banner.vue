@@ -79,10 +79,12 @@
 <script setup lang="ts">
 import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { useContentCopy } from "@/store/content-copy";
 import { refreshCanonicalOrders } from "@/store/order-canonical";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { presentHomeWeeklyCard, selectHomeWeeklySource } from "@/lib/home-task-carousel";
+import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -100,6 +102,7 @@ const props = withDefaults(defineProps<{ active?: boolean }>(), {
   active: true,
 });
 const t = useT();
+const locale = useLocaleStore();
 const managedCopy = useContentCopy();
 const wq = useWeeklyQuest();
 const now = useNow();
@@ -121,6 +124,9 @@ const weeklyCard = computed(() => presentHomeWeeklyCard(
   wq.snapshot?.promoBanner ?? null,
   wq.multiplier,
   now.value * 1000,
+  weeklySource.value?.kind === "quest"
+    ? weeklyQuestDisplayName(weeklySource.value.quest, locale.code, t.value)
+    : undefined,
 ));
 /**
  * 这张卡指向的业务现在整体不可用吗(BUG 127 / 155)。

@@ -65,8 +65,8 @@ describe("DayOneQuestCard H3 snapshot presentation", () => {
     expect(dayOneCardSource).toContain("label: nexGridBrandText(row.name)");
     expect(dayOneCardSource).toContain("id: row.questCode");
     expect(dayOneCardSource).toContain("href: row.actionRoute");
-    expect(weeklyQuestListSource).toContain("return nexGridBrandText(q.name)");
-    expect(weeklyQuestHeroSource).toContain("nexGridBrandText(quest.value?.name ?? \"\")");
+    expect(weeklyQuestListSource).toContain("return weeklyQuestDisplayName(q, locale.code, t.value)");
+    expect(weeklyQuestHeroSource).toContain("weeklyQuestDisplayName(quest.value, locale.code, t.value)");
   });
 
   it("shows a retry control for a failed read without falsely requesting sign-in", async () => {

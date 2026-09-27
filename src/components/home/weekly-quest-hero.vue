@@ -80,14 +80,16 @@ import {
 } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { isCurrentQuest } from "@/lib/actionable-quest";
 import { toast } from "@/store/ui";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
 const t = useT();
+const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
 const nowTick = useNow();
@@ -133,7 +135,7 @@ const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].inc
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
 const periodExpired = computed(() => Date.parse(quest.value?.eligibleUntil ?? "") <= nowTick.value * 1000);
 
-const titleText = computed(() => nexGridBrandText(quest.value?.name ?? ""));
+const titleText = computed(() => quest.value ? weeklyQuestDisplayName(quest.value, locale.code, t.value) : "");
 const categoryText = computed(() => quest.value ? ({
   wallet: t.value.home.dayOneCatWallet,
   explore: t.value.home.dayOneCatExplore,

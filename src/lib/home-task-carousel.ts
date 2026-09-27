@@ -121,6 +121,7 @@ export function presentHomeWeeklyCard(
   presentation: CanonicalPromoBanner | null,
   questBonusMultiplier: number,
   now = Date.now(),
+  displayQuestName?: string,
 ): HomeWeeklyCardView {
   if (!source) {
     return {
@@ -137,6 +138,8 @@ export function presentHomeWeeklyCard(
   }
 
   const metadata = source.kind === "promo" ? source.promo : presentation;
+  const targetDevice = metadata?.targetDevice === "StellarBox Pro"
+    ? "UVELBox Pro" : metadata?.targetDevice ?? null;
   if (source.kind === "quest") {
     const remaining = Math.max(0, Date.parse(source.quest.eligibleUntil) - now);
     const hours = Number.isFinite(remaining) ? Math.floor(remaining / 3600000) : null;
@@ -148,10 +151,10 @@ export function presentHomeWeeklyCard(
       rewardNex: Math.round(source.quest.rewardNex * multiplier),
       countdownDays: hours === null ? null : Math.floor(hours / 24),
       countdownHours: hours === null ? null : hours % 24,
-      subtitle: nexGridBrandText(metadata?.targetDevice
-        ? `${source.quest.name} · ${metadata.targetDevice}`
-        : source.quest.name),
-      targetDevice: metadata?.targetDevice ?? null,
+      subtitle: nexGridBrandText(targetDevice
+        ? `${displayQuestName ?? source.quest.name} · ${targetDevice}`
+        : displayQuestName ?? source.quest.name),
+      targetDevice,
       targetDaily: metadata?.targetDaily ?? null,
       category: source.quest.category,
       actionRoute: source.quest.actionRoute,
@@ -163,8 +166,8 @@ export function presentHomeWeeklyCard(
     rewardNex: Math.round(source.promo.baseReward * source.promo.multiplier),
     countdownDays: source.promo.countdownDays,
     countdownHours: source.promo.countdownHours,
-    subtitle: source.promo.targetDevice,
-    targetDevice: source.promo.targetDevice,
+    subtitle: targetDevice,
+    targetDevice,
     targetDaily: source.promo.targetDaily,
     category: null,
     actionRoute: "/pages/store/store",

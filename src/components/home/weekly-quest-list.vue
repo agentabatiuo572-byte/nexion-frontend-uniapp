@@ -79,6 +79,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
@@ -92,9 +93,10 @@ import {
   type QuestTargetAvailability,
 } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
 const t = useT();
+const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
 const mounted = ref(false);
@@ -142,7 +144,7 @@ function rewardOf(q: CanonicalQuest): number {
   return Math.round(q.rewardNex * mult.value);
 }
 function titleOf(q: CanonicalQuest): string {
-  return nexGridBrandText(q.name);
+  return weeklyQuestDisplayName(q, locale.code, t.value);
 }
 function categoryOf(q: CanonicalQuest): string {
   return ({
