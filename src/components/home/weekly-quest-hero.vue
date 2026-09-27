@@ -20,6 +20,7 @@
         <text class="block" :style="titleStyle">{{ titleText }}</text>
         <!-- Body 12.5 ink-3 -->
         <text class="block" :style="bodyStyle">{{ bodyText }}</text>
+        <text v-if="quest && wq.error && wq.claimErrorQuestCode === quest.questCode" class="block" role="status" :style="claimErrorStyle">{{ claimErrorText }}</text>
 
         <view class="mt-3 flex items-center justify-between" style="gap: 10px">
           <view class="flex items-baseline" style="gap: 4px">
@@ -144,6 +145,9 @@ const bodyText = computed(() => quest.value?.status === "PENDING" ? w.value.prog
 const ctaText = computed(() => wq.loading ? w.value.refreshing : w.value.goComplete);
 const promoChipText = computed(() => fmt(w.value.promoChip, { mult: mult.value.toFixed(1) }));
 const claimText = computed(() => fmt(w.value.claim, { n: rewardDisplay.value }));
+const claimErrorText = computed(() => wq.error === "WEEKLY_QUEST_CLAIM_OUTCOME_UNKNOWN"
+  ? w.value.claimOutcomeUnknown : w.value.claimFailed);
+const claimErrorStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-danger)" };
 const periodText = computed(() => {
   const remainingMs = Date.parse(quest.value?.eligibleUntil ?? "") - nowTick.value * 1000;
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return fmt(w.value.periodEndsIn, { time: "00:00:00" });

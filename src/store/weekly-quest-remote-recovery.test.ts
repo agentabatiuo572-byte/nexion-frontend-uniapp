@@ -223,6 +223,82 @@ describe("weekly quest remote claim recovery", () => {
     expect(store.error).toBe("weekly service unavailable");
   });
 
+  it("keeps all three weekly rows when one claim is rejected with 422", async () => {
+    const rows = ["BROWSE_3_PRODUCTS", "CHECK_IN", "SHARE_STORE"].map((questCode) => ({
+      ...current, questCode, layer: "WEEKLY_T2" as const, name: questCode,
+    }));
+    const confirmed = { ...snapshot(), quests: rows };
+    remote.questApi.state.mockResolvedValueOnce(confirmed)
+      .mockRejectedValueOnce(new Error("refresh temporarily unavailable"))
+      .mockResolvedValueOnce(confirmed);
+    remote.questApi.claim.mockRejectedValueOnce(new ApiError({
+      kind: "business", message: "QUEST_PROGRESS_NOT_MET", code: 422,
+    }));
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+    const loaded = store.snapshot;
+
+    await expect(store.claim(rows[0]!)).resolves.toBe(false);
+    expect(store.snapshot).toBe(loaded);
+    expect(store.tier2Quests.map((quest) => quest.questCode)).toEqual(rows.map((quest) => quest.questCode));
+    expect(store.claimErrorQuestCode).toBe("BROWSE_3_PRODUCTS");
+    expect(store.error).toBe("QUEST_PROGRESS_NOT_MET");
+    expect(peekWeeklyQuestCommandKey("user:a", rows[0]!.questCode, rows[0]!.instanceKey)).toBeNull();
+    expect(remote.questApi.claim).toHaveBeenCalledTimes(1);
+
+    await expect(store.refresh()).resolves.toBe(false);
+    expect(store.snapshot).toBe(loaded);
+    expect(store.claimErrorQuestCode).toBe("BROWSE_3_PRODUCTS");
+    expect(store.error).toBe("QUEST_PROGRESS_NOT_MET");
+
+    await expect(store.refresh()).resolves.toBe(true);
+    expect(store.claimErrorQuestCode).toBeNull();
+    expect(store.tier2Quests).toHaveLength(3);
+  });
+
+  it("keeps the loaded rows for a transport-level HTTP 422 rejection", async () => {
+    const confirmed = { ...snapshot(), quests: [{ ...current, layer: "WEEKLY_T2" as const }] };
+    remote.questApi.state.mockResolvedValueOnce(confirmed);
+    remote.questApi.claim.mockRejectedValueOnce(new ApiError({
+      kind: "http", message: "HTTP_422", status: 422,
+    }));
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+    const loaded = store.snapshot;
+
+    await expect(store.claim(confirmed.quests[0]!)).resolves.toBe(false);
+    expect(store.snapshot).toBe(loaded);
+    expect(store.claimErrorQuestCode).toBe(current.questCode);
+    expect(store.error).toBe("HTTP_422");
+    expect(remote.questApi.claim).toHaveBeenCalledTimes(1);
+    expect(peekWeeklyQuestCommandKey("user:a", current.questCode, current.instanceKey)).toBeNull();
+  });
+
+  it("does not let a pre-claim GET erase a later 422 row failure", async () => {
+    const confirmed = { ...snapshot(), quests: [{ ...current, layer: "WEEKLY_T2" as const }] };
+    let finishOldRead: (value: typeof confirmed) => void = () => undefined;
+    const oldRead = new Promise<typeof confirmed>((resolve) => { finishOldRead = resolve; });
+    remote.questApi.state.mockResolvedValueOnce(confirmed).mockImplementationOnce(() => oldRead);
+    remote.questApi.claim.mockRejectedValueOnce(new ApiError({
+      kind: "business", message: "QUEST_PROGRESS_NOT_MET", code: 422,
+    }));
+    const store = useWeeklyQuest();
+    store.bindAccount("user:a");
+    await flush();
+    const loaded = store.snapshot;
+
+    const staleRefresh = store.refresh();
+    await flush();
+    await expect(store.claim(confirmed.quests[0]!)).resolves.toBe(false);
+    finishOldRead(confirmed);
+    await expect(staleRefresh).resolves.toBe(false);
+    expect(store.snapshot).toBe(loaded);
+    expect(store.claimErrorQuestCode).toBe(current.questCode);
+    expect(store.error).toBe("QUEST_PROGRESS_NOT_MET");
+  });
+
   it("refreshes an already-claimed response without treating it as a new claim", async () => {
     remote.questApi.state.mockResolvedValueOnce(snapshot()).mockResolvedValueOnce(snapshot("CLAIMED"));
     remote.questApi.claim.mockRejectedValueOnce(new ApiError({

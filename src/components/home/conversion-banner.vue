@@ -145,7 +145,7 @@ const questTargetClosed = computed(() => {
 });
 
 const weeklyState = computed<"loading" | "error" | "empty" | "ready">(() => {
-  if (wq.error) return "error";
+  if (wq.error && !wq.claimErrorQuestCode) return "error";
   if (wq.loading || !wq.snapshot) return "loading";
   return weeklySource.value ? "ready" : "empty";
 });
