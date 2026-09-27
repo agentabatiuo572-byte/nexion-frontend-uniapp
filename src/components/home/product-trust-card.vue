@@ -40,21 +40,23 @@ import { navTo } from "@/lib/route";
 import { computed, onMounted, type CSSProperties } from "vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { selectHomepageProductTrust } from "@/lib/home-data-presenters";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { productCopy, specText } from "@/lib/product-copy";
+import { localizedDatacenterValue, productCopy, specText } from "@/lib/product-copy";
 
 const t = useT();
+const locale = useLocaleStore();
 const selected = computed(() => {
   if (remoteApiEnabled && productCatalogState.status !== "ready") return null;
   return selectHomepageProductTrust(PRODUCTS);
 });
 const tagline = computed(() => selected.value
-  ? productCopy(t.value, selected.value.product, remoteApiEnabled).tagline : "");
+  ? productCopy(t.value, selected.value.product, remoteApiEnabled, locale.code).tagline : "");
 const specs = computed(() => selected.value ? [
   { label: t.value.home.productTrustGpu, value: specText(t.value, selected.value.gpu) },
-  { label: t.value.home.productTrustDatacenter, value: specText(t.value, selected.value.datacenter) },
+  { label: t.value.home.productTrustDatacenter, value: specText(t.value, localizedDatacenterValue(selected.value.datacenter, locale.code)) },
   { label: t.value.home.productTrustWarranty, value: specText(t.value, selected.value.warranty) },
 ] : []);
 

@@ -62,6 +62,18 @@ const FILE_EXEMPTIONS = [
 
 const VALUE_EXEMPTIONS = [
   {
+    id: "published-pro-tagline-source-token",
+    why: "已发布商品中文标语只在此处与服务端原值精确比对；用户看到的是按 locale 选取的英文、越文或服务端中文",
+    files: ["src/lib/product-copy.ts"],
+    strip: (line) => line.replace(/^(\s*const PRO_PUBLISHED_TAGLINE = )("中端主力·AI 推理 \+ 挖掘")(\s*;\s*)$/, (_m, prefix, _value, suffix) => `${prefix}""${suffix}`),
+  },
+  {
+    id: "virginia-datacenter-source-token",
+    why: "机房位置中文只在此处识别服务端原值，物理位置仍取服务端；展示层按 locale 翻译已知地名",
+    files: ["src/lib/product-copy.ts"],
+    strip: (line) => line.replace(/^(\s*const VIRGINIA_DATACENTER = )("美国·弗吉尼亚")(\s*;\s*)$/, (_m, prefix, _value, suffix) => `${prefix}""${suffix}`),
+  },
+  {
     id: "cloud-share-promo-alias-token",
     why: "旧服务端周促销目标的简繁中文别名只用于识别商品类型并隐藏旧日产，不作为页面文案展示",
     files: ["src/api/quest-api.ts"],
@@ -283,6 +295,11 @@ function selftest() {
     ["support token other file rejected", "src/pages/x/a.vue", 'return normalized === "备勤池";', 1],
     ["support token substring rejected", "src/pages/support/chat.vue", 'return normalized === "备勤池客服";', 1],
     // legacy-config-token —— 阴阳两面各测一遍:只测 true 那行会让 "关"/"关闭" 半边判据无人验证。
+    ["豁免:已发布 Pro 标语原值仅作匹配", "src/lib/product-copy.ts", 'const PRO_PUBLISHED_TAGLINE = "中端主力·AI 推理 + 挖掘";', 0],
+    ["豁免:弗吉尼亚机房原值仅作匹配", "src/lib/product-copy.ts", 'const VIRGINIA_DATACENTER = "美国·弗吉尼亚";', 0],
+    ["🔴 同文件的商品显示文案仍被抓", "src/lib/product-copy.ts", 'const title = "中端主力·AI 推理 + 挖掘";', 1],
+    ["🔴 同文件的其他机房仍被抓", "src/lib/product-copy.ts", 'const VIRGINIA_DATACENTER = "美国·纽约";', 1],
+    ["🔴 已发布标语豁免带文件作用域", "src/pages/store/detail.vue", '<template><text>中端主力·AI 推理 + 挖掘</text></template>', 1],
     ["豁免:legacy 配置取值放行(true 侧)", "src/lib/trial-config-enum.ts", 'if (["true", "1", "enabled", "on", "开", "开放"].includes(v)) return true;', 0],
     ["豁免:legacy 配置取值放行(false 侧)", "src/lib/trial-config-enum.ts", 'if (["false", "0", "disabled", "off", "关", "关闭"].includes(v)) return false;', 0],
     // 下面三格证明这条豁免**不是**整文件放行、也不是「含授权字就放行」:
