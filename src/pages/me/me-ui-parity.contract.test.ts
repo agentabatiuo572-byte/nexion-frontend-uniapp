@@ -87,7 +87,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // appear late and push every module below it down.
   // #303: the device-slot remainder wraps inside its tile so Vietnamese copy stays complete.
   // #320: the support subtitle also wraps inside its four-column tile.
-  "me.vue": "025fd9f7a5f3f05571732e671be11a51b5b8bb3d3543e5ec3e09af0e4ac78185",
+  // #338: all quick-entry subtitles wrap instead of clipping in English and Vietnamese.
+  "me.vue": "0b501c0e750bab33b46ca6a27f758d7d1bb6daf81d71551ff731f99617d94883",
   // Keep the selected zero-count category visible and show category-specific empty copy;
   // loading and request failures must not render a successful empty-feed message.
   // #94/#210: the mutually exclusive category chips are a radiogroup (role=radio +

@@ -2955,6 +2955,7 @@ export const zh: Messages = {
     locSingaporeDc: "新加坡数据中心",
     locFrankfurtDc: "法兰克福数据中心",
     locLinkedComputer: "已连接的电脑",
+    locUserDevice: "你的设备",
     promoNoActive: "(暂无在线设备)",
   },
   receipt: {

@@ -2930,6 +2930,7 @@ export const vi: Messages = {
     locSingaporeDc: "Trung tâm dữ liệu Singapore",
     locFrankfurtDc: "Trung tâm dữ liệu Frankfurt",
     locLinkedComputer: "Máy tính đã liên kết",
+    locUserDevice: "Thiết bị của bạn",
     promoNoActive: "(chưa có thiết bị hoạt động)",
   },
   receipt: {
