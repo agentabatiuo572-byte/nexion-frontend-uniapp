@@ -225,7 +225,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
       fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
       `${specText(t.value, p.gpu)} · ${specText(t.value, p.vram)}`,
     ],
-    roiBasis: { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) },
+    roiBasis: p.productType === "SHARE" ? undefined : { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) },
     tint,
   };
 }
@@ -259,7 +259,7 @@ function catalogProductPerks(productId: string, fallback: readonly string[]): st
  */
 function catalogProductRoiBasis(productId: string): QuotaTier["roiBasis"] {
   const p = catalogProduct(productId);
-  if (!p) return undefined;
+  if (!p || p.productType === "SHARE") return undefined;
   return { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p), revision: productCatalogPresentation.value?.revision };
 }
 

@@ -22,7 +22,7 @@ const phoneTiers: EarnPhoneTier[] = [1, 2, 3, 4, 5].map((tier) => ({
 }));
 
 describe("store yield authority", () => {
-  it("derives the five-step storefront ladder from E2 phone config and the E1 catalog", () => {
+  it("keeps Cloud Share out of a daily USD ladder", () => {
     const result = buildStoreYieldAuthority([
       product("cloud-share", "Share", 0.19, 3),
       product("stellarbox-s1", "Entry", 7, 40),
@@ -38,7 +38,7 @@ describe("store yield authority", () => {
     expect(result.entry).toEqual({ usd: 7, nex: 40 });
     expect(result.pro).toEqual({ usd: 13, nex: 80 });
     expect(result.rack).toEqual({ usd: 45, nex: 300 });
-    expect(result.ladder.map((row) => row.id)).toEqual(["phone", "share", "entry", "pro", "rack"]);
+    expect(result.ladder.map((row) => row.id)).toEqual(["phone", "entry", "pro", "rack"]);
     expect(result.ladder.at(-1)?.widthPct).toBe(100);
   });
 
@@ -47,9 +47,8 @@ describe("store yield authority", () => {
 
     expect(result.complete).toBe(false);
     expect(result.multiplier).toBeNull();
-    expect(result.ladder).toHaveLength(5);
+    expect(result.ladder).toHaveLength(4);
     expect(result.entry).toBeNull();
-    expect(result.share).toBeNull();
   });
 
   it("matches the four named comparison SKUs exactly instead of guessing by tier", () => {
@@ -70,7 +69,6 @@ describe("store yield authority", () => {
       product("stellarbox-s1", "Entry", 7, 40),
     ], phoneTiers, { source: "mock", sourceEnvironment: "SANDBOX", runId: "sandbox-run", serverCanonical: true });
 
-    expect(result.share).toBeNull();
     expect(result.entry).toBeNull();
   });
 

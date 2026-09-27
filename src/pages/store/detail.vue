@@ -117,16 +117,17 @@
           </view>
         </view>
 
-        <!-- === Section 1.5: Cloud Share daily output (entry device — same earning model as the card) === -->
+        <!-- === Cloud Share E1 annual reference and NEX allocation === -->
         <view v-if="isShare" class="mx-4 mt-3 rounded-2xl" style="padding: 16px 18px; background: var(--v5-surface)">
           <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-            <text>{{ t.store.cardYouEarn }}</text>
+            <text>{{ t.store.shareReferenceAnnual }}</text>
           </view>
           <view class="flex items-baseline flex-wrap" style="margin-top: 6px; gap: 8px">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 34px; color: var(--v5-warning); letter-spacing: -0.022em; line-height: 1">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 34px; color: var(--v5-warning); letter-spacing: -0.022em; line-height: 1">{{ shareYieldText }}</text>
             <text class="font-mono-tabular tabular-nums" style="margin-left: auto; font-size: 13px; color: var(--v5-warning); font-weight: 500">+{{ product.dailyEarnNEX }} NEX/d</text>
           </view>
+          <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--v5-ink-4)">{{ t.store.shareYieldDisclaimer }}</text>
         </view>
 
         <!-- === Section 2: Vs phone strip === -->
@@ -576,6 +577,9 @@ const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
 // or said nothing at all (strip degraded, this line still claimed $0.06).
 const vsPhoneSubText = computed(() => fmt(t.value.store.detVsPhone, { n: phoneDailyEarnText.value }));
 const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
+const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
+  ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
+  : t.value.store.shareAnnualUnavailable);
 const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
 const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));
 const annualYieldText = computed(() => annualYield.value.toFixed(0));

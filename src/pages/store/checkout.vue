@@ -267,7 +267,7 @@ import { deviceName } from "@/lib/device-copy";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
-import { getProduct, annualRoiPct, type Product } from "@/mock/products";
+import { getProduct, type Product } from "@/mock/products";
 import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, tradeInEarlyWindowOk } from "@/store/product-phase";
@@ -984,14 +984,6 @@ const cardFee = computed(() => (remoteApiEnabled && appliedTradeinView.value?.ca
 const cardFeeText = computed(() => cardFee.value.toLocaleString());
 const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
-const paybackLine = computed(() => {
-  const p = product.value;
-  if (!p) return "";
-  return fmt(t.value.store.coEstPayback, {
-    days: Math.round(p.price / p.dailyEarn),
-    roi: annualRoiPct(p),
-  });
-});
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 const activatingSubText = computed(() => {
   const p = product.value;

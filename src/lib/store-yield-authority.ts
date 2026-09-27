@@ -7,14 +7,13 @@ export interface YieldAmount {
 }
 
 export interface StoreYieldLadderRow {
-  id: "phone" | "share" | "entry" | "pro" | "rack";
+  id: "phone" | "entry" | "pro" | "rack";
   amount: YieldAmount | null;
   widthPct: number;
 }
 
 export interface StoreYieldAuthority {
   phone: YieldAmount | null;
-  share: YieldAmount | null;
   entry: YieldAmount | null;
   pro: YieldAmount | null;
   rack: YieldAmount | null;
@@ -31,7 +30,6 @@ export interface StoreYieldCatalogProof {
 }
 
 const LADDER_PRODUCT_IDS = {
-  share: "cloud-share",
   entry: "stellarbox-s1",
   pro: "stellarbox-pro",
   rack: "stellarrack-p1",
@@ -54,18 +52,17 @@ export function buildStoreYieldAuthority(
     && proof.runId === "" && proof.serverCanonical ? products : [];
   const typicalPhone = phoneTiers.find((row) => row.tier === 3);
   const phone = typicalPhone ? { usd: typicalPhone.baseRateUsdt, nex: typicalPhone.baseRateNex } : null;
-  const share = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.share);
   const entry = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.entry);
   const pro = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.pro);
   const rack = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.rack);
-  const complete = [phone, share, entry, pro, rack].every((amount) => amount !== null);
+  const complete = [phone, entry, pro, rack].every((amount) => amount !== null);
   const multiplier = phone && entry && phone.usd > 0 ? Math.round(entry.usd / phone.usd) : null;
-  const maximum = Math.max(0, ...[phone, share, entry, pro, rack].map((amount) => amount?.usd ?? 0));
+  const maximum = Math.max(0, ...[phone, entry, pro, rack].map((amount) => amount?.usd ?? 0));
   const rows: Array<[StoreYieldLadderRow["id"], YieldAmount | null]> = [
-    ["phone", phone], ["share", share], ["entry", entry], ["pro", pro], ["rack", rack],
+    ["phone", phone], ["entry", entry], ["pro", pro], ["rack", rack],
   ];
   return {
-    phone, share, entry, pro, rack, multiplier, complete,
+    phone, entry, pro, rack, multiplier, complete,
     ladder: rows.map(([id, amount]) => ({
       id,
       amount,

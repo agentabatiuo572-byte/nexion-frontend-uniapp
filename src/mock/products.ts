@@ -51,11 +51,11 @@ export interface Product {
   warranty?: string;
   phoneDailyEarn?: string;
   phoneDailyEarnNEX?: string;
-  dailyEarn: number;        // USDT/day
+  dailyEarn: number;        // USDT/day for DEVICE; zero protocol placeholder for SHARE
   dailyEarnNEX: number;     // NEX/day (spec §3.1)
-  // Q9: annual ROI is DERIVED, not stored — see annualRoiPct() below. A stored
-  // value drifted out of sync with dailyEarn/price; deriving from one source
-  // keeps ROI and payback mathematically consistent and impossible to drift.
+  /** E1 reference annual range for SHARE; this is not a settlement guarantee. */
+  shareYieldMin?: number;
+  shareYieldMax?: number;
   price: number;
   monthlyPrice?: number;
   installMonths?: number;
@@ -277,14 +277,16 @@ export const PRODUCTS: Product[] = [
     badge: "Low Barrier",
     gpu: "Distributed",
     vram: "—",
-    dailyEarn: 0.19,
+    dailyEarn: 0,
     dailyEarnNEX: 3,
+    shareYieldMin: 8,
+    shareYieldMax: 12,
     price: 19.9,
     sold: 12483,
     features: [
       "Instant activation",
       "Buy as little as $19.9",
-      "Fixed-income style returns",
+      "Reference annual range; returns are not guaranteed",
       "Distributed across global data centers",
     ],
     ai: {
@@ -311,11 +313,7 @@ export function getProduct(id: string): Product | undefined {
   return PRODUCTS.find((p) => p.id === id);
 }
 
-/**
- * Q9 single source of truth: annual gross ROI %, derived from the same basis
- * as the payback estimate (price / dailyEarn). Deriving guarantees ROI and
- * payback can never disagree. Share-tier (no hardware) lands at ~13%.
- */
+/** Daily USD based ROI is only meaningful for DEVICE SKUs, never Cloud Share. */
 export function annualRoiPct(p: Pick<Product, "dailyEarn" | "price">): number {
   return Math.round(((p.dailyEarn * 365) / p.price) * 100);
 }

@@ -1,6 +1,6 @@
 <!--
-  ClusterLadder — 5-tier yield ladder (ported from store/page.tsx
-  ClusterLadderV5). Phone → Share → Box S1 → Box Pro → Rack P1, drawn bottom-up
+  ClusterLadder — daily USD yield ladder (ported from store/page.tsx
+  ClusterLadderV5). Phone → Box S1 → Box Pro → Rack P1, drawn bottom-up
   (column-reverse) with the user "←you" marker on Phone. Each row: label · bar
   (width = relative yield) · $/d. Drives the "climb the ladder" upgrade intent.
 -->
@@ -57,13 +57,12 @@ interface Tier {
 }
 
 const tiers = computed<Tier[]>(() => {
-  const kindForRow: Record<string, string> = { phone: "phone", share: "cloud-share", entry: "stellarbox-s1", pro: "stellarbox-pro", rack: "stellarrack-p1" };
+  const kindForRow: Record<string, string> = { phone: "phone", entry: "stellarbox-s1", pro: "stellarbox-pro", rack: "stellarrack-p1" };
   const rows: Tier[] = props.authority.ladder.map((row: StoreYieldLadderRow) => {
   const you = kindForRow[row.id] === props.owned?.kind;
   const amount = you && props.owned ? { usd: props.owned.baseRate, nex: props.owned.baseRateNEX } : row.amount;
   const labels = {
     phone: t.value.store.ladderPhone,
-    share: t.value.store.ladderShare,
     entry: t.value.store.ladderS1,
     pro: t.value.store.ladderPro,
     rack: t.value.store.ladderRack,
@@ -77,11 +76,11 @@ const tiers = computed<Tier[]>(() => {
     width: row.widthPct,
     you,
     rack: row.id === "rack",
-    fill: row.id === "share" ? "var(--v5-ink-4)" : "var(--v5-brand)",
-    fillOpacity: row.id === "share" ? 0.25 : row.id === "entry" ? 0.35 : row.id === "pro" ? 0.55 : 0.75,
+    fill: "var(--v5-brand)",
+    fillOpacity: row.id === "entry" ? 0.35 : row.id === "pro" ? 0.55 : 0.75,
   };
   });
-  if (props.owned && !rows.some((row) => row.you)) {
+  if (props.owned && props.owned.kind !== "cloud-share" && !rows.some((row) => row.you)) {
     const amount = { usd: props.owned.baseRate, nex: props.owned.baseRateNEX };
     const maximum = Math.max(amount.usd, ...props.authority.ladder.map((row) => row.amount?.usd ?? 0));
     const ownedRow = { id: props.owned.kind, label: props.owned.name, y: storefrontUsd(amount),

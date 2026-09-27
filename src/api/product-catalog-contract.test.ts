@@ -108,9 +108,15 @@ describe("product catalog strict specification contract", () => {
       vram: null,
       power: null,
       datacenter: null,
+      dailyEarn: 0,
+      shareYieldMin: 8,
+      shareYieldMax: 12,
     };
     const parsed = parseProductCatalogPayload({ source: "nx_product", ...proof, serverCanonical: true, revision: null, products: [cloudShare] });
-    expect(parsed.products[0]).toMatchObject({ id: "cloud-share", productType: "SHARE", inventoryMode: "UNLIMITED", stock: undefined });
+    expect(parsed.products[0]).toMatchObject({ id: "cloud-share", productType: "SHARE", inventoryMode: "UNLIMITED", stock: undefined, dailyEarn: 0, shareYieldMin: 8, shareYieldMax: 12 });
+    const withoutRange = { ...cloudShare, shareYieldMin: null, shareYieldMax: null };
+    expect(parseProductCatalogPayload({ source: "nx_product", ...proof, serverCanonical: true, revision: null, products: [withoutRange] }).products[0].shareYieldMin).toBeUndefined();
+    expect(() => parseProductCatalogPayload({ source: "nx_product", ...proof, serverCanonical: true, revision: null, products: [{ ...cloudShare, shareYieldMax: null }] })).toThrow("PRODUCT_CATALOG_RESPONSE_INVALID");
   });
 
   it("rejects unlimited inventory for a physical device", () => {

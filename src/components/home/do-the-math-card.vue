@@ -73,7 +73,10 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 const t = useT();
 const app = useApp();
 
-const calculator = computed(() => app.homeTruth?.doTheMath ?? null);
+const calculator = computed(() => {
+  const value = app.homeTruth?.doTheMath;
+  return value && value.base.kind !== "cloud-share" && value.target.kind !== "cloud-share" ? value : null;
+});
 const baseShort = computed(() => calculator.value
   ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
   : "");
