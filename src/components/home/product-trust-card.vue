@@ -18,7 +18,7 @@
       <view class="flex items-center justify-between" style="margin-top: 13px; gap: 12px">
         <view class="min-w-0">
           <text class="block truncate" :style="productNameStyle">{{ selected.product.name }}</text>
-          <text class="block truncate" :style="taglineStyle">{{ selected.product.tagline }}</text>
+          <text class="block truncate" :style="taglineStyle">{{ tagline }}</text>
         </view>
         <view :style="pricePillStyle">
           <text class="tabular-nums" :style="priceStyle">${{ selected.product.price.toLocaleString() }}</text>
@@ -43,13 +43,15 @@ import { useT } from "@/i18n/use-t";
 import { selectHomepageProductTrust } from "@/lib/home-data-presenters";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { specText } from "@/lib/product-copy";
+import { productCopy, specText } from "@/lib/product-copy";
 
 const t = useT();
 const selected = computed(() => {
   if (remoteApiEnabled && productCatalogState.status !== "ready") return null;
   return selectHomepageProductTrust(PRODUCTS);
 });
+const tagline = computed(() => selected.value
+  ? productCopy(t.value, selected.value.product, remoteApiEnabled).tagline : "");
 const specs = computed(() => selected.value ? [
   { label: t.value.home.productTrustGpu, value: specText(t.value, selected.value.gpu) },
   { label: t.value.home.productTrustDatacenter, value: specText(t.value, selected.value.datacenter) },

@@ -2219,6 +2219,7 @@ export const vi: Messages = {
     shareReferenceAnnual: "Khoảng lợi suất năm tham khảo",
     shareAnnualUnavailable: "Chưa có khoảng lợi suất năm",
     shareYieldDisclaimer: "Chỉ để tham khảo, không bảo đảm lợi nhuận. Số tiền thực nhận theo biên nhận tác vụ đã quyết toán.",
+    cloudShareLowBarrierTagline: "Suất điện toán đám mây · dễ tham gia",
     cardPerDaySuffix: "/ngày",
     cardNexPerDay: "+{n} NEX",
     cardStockCompact: "Còn {n} máy trong kho",

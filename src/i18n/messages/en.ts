@@ -2300,6 +2300,7 @@ export const en = {
     shareReferenceAnnual: "Reference annual range",
     shareAnnualUnavailable: "Annual range unavailable",
     shareYieldDisclaimer: "Reference only, not guaranteed. Actual credits follow settled task receipts.",
+    cloudShareLowBarrierTagline: "Cloud compute share · low entry barrier",
     cardPerDaySuffix: "/day",
     cardNexPerDay: "+{n} NEX",
     cardStockCompact: "{n} units in stock",

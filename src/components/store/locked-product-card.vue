@@ -57,7 +57,7 @@ import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { productNotificationApi } from "@/api/runtime";
+import { productNotificationApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
@@ -71,7 +71,7 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 const props = defineProps<{ product: Product }>();
 const app = useApp();
 const t = useT();
-const copy = computed(() => productCopy(t.value, props.product));
+const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled));
 const gpuText = computed(() => specText(t.value, props.product.gpu));
 const vramText = computed(() => specText(t.value, props.product.vram));
 
