@@ -65,7 +65,7 @@
                 <view v-else-if="item.dot" :style="quickDotStyle" />
               </view>
               <text :style="quickLabelStyle">{{ item.label }}</text>
-              <text v-if="item.meta" :class="item.key === 'slots' || item.key === 'support' ? undefined : 'truncate'" :style="quickMetaStyle(item.tone, item.key === 'slots' || item.key === 'support')">{{ item.meta }}</text>
+              <text v-if="item.meta" :style="quickMetaStyle(item.tone)">{{ item.meta }}</text>
             </view>
           </view>
         </view>
@@ -518,19 +518,19 @@ const quickBadgeStyle: CSSProperties = {
   textAlign: "center",
 };
 const quickLabelStyle: CSSProperties = {
-  maxWidth: "78px",
+  maxWidth: "100%",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "clamp(10px, 3vw, 12px)",
   fontWeight: 500,
   lineHeight: 1.2,
   color: "var(--v5-ink)",
   textAlign: "center",
   whiteSpace: "normal",
-  wordBreak: "break-word",
+  wordBreak: "normal",
 };
-function quickMetaStyle(tone: QuickTone = "muted", wrap = false): CSSProperties {
+function quickMetaStyle(tone: QuickTone = "muted"): CSSProperties {
   return {
-    maxWidth: "76px",
+    maxWidth: "100%",
     marginTop: "-3px",
     fontFamily: "var(--font-v5)",
     fontSize: "12px",
@@ -538,9 +538,8 @@ function quickMetaStyle(tone: QuickTone = "muted", wrap = false): CSSProperties 
     color: toneColor(tone),
     textAlign: "center",
     opacity: 0.9,
-    whiteSpace: wrap ? "normal" : "nowrap",
-    width: wrap ? "76px" : undefined,
-    overflowWrap: wrap ? "break-word" : undefined,
+    whiteSpace: "normal",
+    overflowWrap: "break-word",
   };
 }
 

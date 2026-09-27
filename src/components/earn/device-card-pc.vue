@@ -67,7 +67,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
         </view>
         <view class="min-w-0" style="flex: 1">
-          <text class="block truncate" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ displayName }}</text>
+          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink); white-space: normal">{{ displayName }}</text>
           <view class="flex items-center gap-1.5" style="margin-top: 3px">
             <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
             <text class="nx-device-status-label" style="font-size: 12px" :style="{ color: statusColor }">{{ statusLabel }}</text>

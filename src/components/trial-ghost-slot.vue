@@ -88,7 +88,7 @@
 
       <!-- Bottom row — early-buy savings (left) + de-emphasized buy pill (right) -->
       <view class="mt-3 flex items-center justify-between gap-2">
-        <text class="text-[12px] font-medium min-w-0 truncate" style="color: var(--v5-brand-2-ink)">{{ discountText }}</text>
+        <text class="text-[12px] font-medium min-w-0" style="color: var(--v5-brand-2-ink); flex: 1; white-space: normal">{{ discountText }}</text>
         <view
           class="shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 h-9 active:scale-[0.97] transition-transform"
           style="background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 13px"

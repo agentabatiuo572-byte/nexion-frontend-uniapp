@@ -3038,6 +3038,7 @@ export const en = {
     locSingaporeDc: "Singapore Data Center",
     locFrankfurtDc: "Frankfurt Data Center",
     locLinkedComputer: "Linked computer",
+    locUserDevice: "Your device",
     promoNoActive: "(no active device)",
   },
   receipt: {
