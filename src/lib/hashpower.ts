@@ -45,9 +45,9 @@ export const H5_BASE_FACTOR = DEFAULT_PLATFORM_CONFIG.onlineBonus.h5BaseFactor;
  * `POST /api/device/:id/heartbeat` (PRD §6.11/§12.2). */
 export const ONLINE_HEARTBEAT_TIMEOUT_MS = 3 * 60 * 1000;
 
-/** A server-paused task must not be presented as producing live phone TOPS. */
-export function canShowLivePhoneHashpower(device: Pick<Device, "kind" | "interruptedAt" | "pausedReason" | "currentTask">): boolean {
-  return device.kind === "phone" && device.interruptedAt == null
+/** A server phone has calibrated capacity but no measured live TOPS signal. */
+export function canShowLivePhoneHashpower(device: Pick<Device, "kind" | "capacitySource" | "interruptedAt" | "pausedReason" | "currentTask">): boolean {
+  return device.kind === "phone" && device.capacitySource !== "server" && device.interruptedAt == null
     && !device.pausedReason && device.currentTask?.status !== "PAUSED";
 }
 

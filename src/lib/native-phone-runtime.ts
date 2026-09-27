@@ -14,14 +14,16 @@ export function hasNativeAndroidPhoneRuntime(): boolean {
 }
 
 /** Android BatteryManager through the built-in HTML5+ Native.js bridge. */
-export function readAndroidBattery(android: Pick<PlusAndroid, "importClass" | "getAttribute" | "runtimeMainActivity" | "invoke">): BatteryObservation | null {
+export function readAndroidBattery(android: Pick<PlusAndroid, "importClass" | "runtimeMainActivity" | "invoke">): BatteryObservation | null {
   try {
     const context = android.importClass("android.content.Context");
     const managerClass = android.importClass("android.os.BatteryManager");
     if (!context || !managerClass) return null;
-    const serviceName = android.getAttribute(context, "BATTERY_SERVICE");
-    const capacityProperty = android.getAttribute(managerClass, "BATTERY_PROPERTY_CAPACITY");
-    if (typeof serviceName !== "string" || !Number.isInteger(capacityProperty)) return null;
+    // Native.js exposes Java class constants directly; getAttribute() returns
+    // null for these static fields on some Android WebViews (including Samsung).
+    const serviceName = (context as PlusAndroidClassObject & { BATTERY_SERVICE?: unknown }).BATTERY_SERVICE;
+    const capacityProperty = (managerClass as PlusAndroidClassObject & { BATTERY_PROPERTY_CAPACITY?: unknown }).BATTERY_PROPERTY_CAPACITY;
+    if (typeof serviceName !== "string" || typeof capacityProperty !== "number" || !Number.isInteger(capacityProperty)) return null;
     const activity = android.runtimeMainActivity();
     if (!activity) return null;
     const manager = android.invoke(activity, "getSystemService", serviceName);
@@ -72,7 +74,7 @@ async function collectNativePhoneRuntimeImpl(): Promise<NativePhoneRuntime | nul
       fail: () => resolve(null),
     });
   });
-  if (network === null || network === "unknown") return null;
+  if (network !== "none" && !["wifi", "2g", "3g", "4g", "5g", "ethernet"].includes(network ?? "")) return null;
   return {
     batteryLevel: battery.batteryLevel,
     networkReachable: network !== "none",

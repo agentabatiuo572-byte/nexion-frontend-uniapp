@@ -130,7 +130,18 @@
         </view>
       </view>
 
-    <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
+    <!-- Server phones expose calibrated capacity; local factors are not measured live TOPS. -->
+    <view v-if="phoneLocalReady && device.kind === 'phone' && device.capacitySource === 'server'" style="padding: 0 20px 12px">
+      <view class="flex items-center justify-between gap-2">
+        <text :style="sectionLabelStyle">{{ t.earn.hashCapability }}</text>
+        <view class="flex items-center gap-1.5">
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ baselineTops == null ? t.earn.hashCapabilityUnknown : `${baselineTops.toFixed(1)} TOPS` }}</text>
+          <text v-if="capTier != null" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashTier, { n: capTier }) }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Mock phone: live hashpower (effective vs calibrated capability ceiling) -->
     <view v-if="phoneRunning && live" style="padding: 0 20px 12px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
         <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
@@ -559,12 +570,8 @@ function goTaskHistory() {
   navTo("/pages/me/receipts");
 }
 
-// ── Phone live hashpower (effective = calibrated capability × condition factors) ──
-// The stable capability (TOPS·Tier) is the comparable identity number; the live
-// effective value oscillates beneath that ceiling with the phone's current
-// condition (continuous-online stability bonus, thermal, jitter). Only shown
-// while running (charging + online + no interrupt) — paused/reconnect states use
-// their own blocks. Toggling charger/network visibly moves the number.
+// ── Mock phone live hashpower (effective = capability × local demo factors) ──
+// Server phones show their calibrated capacity above without a fabricated live value.
 const phoneRunning = computed(
   () => phoneLocalReady.value && canShowLivePhoneHashpower(props.device),
 );
