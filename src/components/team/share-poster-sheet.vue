@@ -110,6 +110,8 @@ import qrcode from "qrcode-generator";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { nexGridBrandText } from "@/lib/brand-copy";
+import { remoteApiEnabled } from "@/api/runtime";
+import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
@@ -149,11 +151,24 @@ const rewardEffectiveAtText = computed(() => {
   return fmt(t.value.share.posterRewardEffectiveAt, { date: at.toLocaleDateString(dateLocale()) });
 });
 
+// 与 Earn 的设备位口径一致；远端设备清单未确认时不展示产出模板。
+const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
+const runningDevices = computed(() => fleetReady.value
+  ? app.visibleDevices.filter(isActiveSlotDevice).length : 0);
+const yieldTodayUsdt = computed(() => {
+  if (!remoteApiEnabled) return app.earnings.today;
+  if (app.homeTruthStatus !== "ready") return null;
+  const period = app.homeTruth?.earnings.today;
+  if (!period) return null;
+  if (period.usdt === null && period.nex === null && period.jobCount === null) return 0;
+  return period.usdt ?? app.remoteRealizedToday?.usdt ?? null;
+});
+
 // yield 模板依赖用户真设备数据；gift 模板仅在 H8 奖励开启时可用。
 const availableTpls = computed(() => {
   const list: { key: TplKey; label: string; tint: string }[] = [];
   if (rewardEnabled.value) list.push({ key: "gift", label: t.value.share.tplGift, tint: "var(--v5-brand)" });
-  if (app.devices.length > 0) list.push({ key: "yield", label: t.value.share.tplYield, tint: "var(--v5-tech-cyan)" });
+  if (runningDevices.value > 0 && yieldTodayUsdt.value !== null) list.push({ key: "yield", label: t.value.share.tplYield, tint: "var(--v5-tech-cyan)" });
   list.push({ key: "brand", label: t.value.share.tplBrand, tint: "var(--v5-warning)" });
   return list;
 });
@@ -379,6 +394,8 @@ function paint(link: string, myToken: number) {
     ctx.fillText(t.value.share.posterGiftSub1, 20, 272);
     ctx.fillText(t.value.share.posterGiftSub2, 20, 290);
   } else if (tpl.value === "yield") {
+    const today = yieldTodayUsdt.value;
+    if (today === null) throw new Error("POSTER_YIELD_UNAVAILABLE");
     ctx.setFillStyle(brand);
     ctx.setFontSize(10);
     ctx.fillText(t.value.share.posterYieldCap, 20, 158);
@@ -387,7 +404,7 @@ function paint(link: string, myToken: number) {
     ctx.fillText(t.value.share.posterYieldSub, 20, 184);
     ctx.setFillStyle(brand);
     ctx.setFontSize(38);
-    ctx.fillText(`+$${app.earnings.today.toFixed(2)}`, 20, 232);
+    ctx.fillText(`+$${today.toFixed(2)}`, 20, 232);
     ctx.setFillStyle(FAINT_ON_DARK);
     ctx.setFontSize(9.5);
     ctx.fillText(t.value.share.posterYieldDevices, 20, 262);
@@ -398,7 +415,7 @@ function paint(link: string, myToken: number) {
     );
     ctx.setFillStyle(INK_ON_DARK);
     ctx.setFontSize(12.5);
-    ctx.fillText(fmt(t.value.share.posterYieldUnit, { n: app.devices.length }), 20, 280);
+    ctx.fillText(fmt(t.value.share.posterYieldUnit, { n: runningDevices.value }), 20, 280);
     ctx.setFillStyle(brand);
     ctx.fillText(
       rewardEnabled.value ? `$${usd} + ${nex} NEX` : t.value.share.posterYieldInviteValueNoReward,
@@ -497,7 +514,7 @@ function regenerate() {
 }
 
 watch(
-  () => [props.open, tpl.value, showUsername.value, buildShareLink()] as const,
+  () => [props.open, tpl.value, showUsername.value, buildShareLink(), runningDevices.value, yieldTodayUsdt.value] as const,
   ([open]) => {
     if (open) {
       regenerate();
@@ -509,6 +526,11 @@ watch(
     }
   },
 );
+watch(() => props.open, (open) => {
+  if (!open || !remoteApiEnabled) return;
+  void app.refreshRemoteFleet(undefined, { coalesce: true });
+  void app.refreshHomeTruth();
+});
 // 当前模板失效时回落到仍可用的首个模板。
 watch(availableTpls, (list) => {
   if (!list.some((x) => x.key === tpl.value)) tpl.value = list[0]?.key ?? "brand";
