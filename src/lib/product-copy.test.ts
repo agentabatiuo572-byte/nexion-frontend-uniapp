@@ -17,8 +17,15 @@ describe("server catalog copy", () => {
     expect(productCopy(vi, cloudShare, true).tagline).toBe("Suất điện toán đám mây · dễ tham gia");
   });
 
+  it("localizes server separator spacing and full-width separator variants", () => {
+    for (const tagline of ["云算力份额 · 低门槛", " 云算力份额 · 低门槛 ", "云算力份额・低门槛", "云算力份额･低门槛"]) {
+      expect(productCopy(vi, { ...cloudShare, tagline }, true).tagline).toBe("Suất điện toán đám mây · dễ tham gia");
+    }
+  });
+
   it("preserves later operator edits and other products' server text", () => {
     expect(productCopy(vi, { ...cloudShare, tagline: "New offer" }, true).tagline).toBe("New offer");
+    expect(productCopy(vi, { ...cloudShare, tagline: "云算力份额 · 限时活动" }, true).tagline).toBe("云算力份额 · 限时活动");
     expect(productCopy(vi, { ...cloudShare, id: "another-share" }, true).tagline).toBe(cloudShare.tagline);
   });
 });
