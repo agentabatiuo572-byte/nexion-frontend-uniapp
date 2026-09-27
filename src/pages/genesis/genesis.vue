@@ -90,7 +90,7 @@
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 8px">
                 <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
-                <text v-if="tr.state === 'current'" :style="tierChipLiveStyle">{{ t.genesis.tier.live }}</text>
+                <text v-if="tr.state === 'current' && dockActive" :style="tierChipLiveStyle">{{ t.genesis.tier.live }}</text>
                 <text v-else-if="tr.state === 'sold'" :style="tierChipSoldStyle">{{ t.genesis.tier.soldOut }}</text>
               </view>
               <!-- 🔴 「还剩 N 席」也是名额紧迫文案,与 hero 那处同一条规则(FEAT-GEN10 ④)。

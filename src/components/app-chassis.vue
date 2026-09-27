@@ -193,7 +193,7 @@ import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
-import { scrollCurrentTabToTop } from "@/lib/chassis-scroll";
+import { resolveChassisScrollElement, scrollCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import {
@@ -384,11 +384,15 @@ const refreshing = computed(() => refresh.isRefreshing);
 const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
 const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
 
-// uni <view> template ref → DOM element via $el on H5 (P-019); read scrollTop
-// directly so the pull only arms when the content is at the very top.
+// H5's uni <view> ref exposes the DOM element via $el. On APP-PLUS the ref can
+// instead be a uni proxy: writing its scrollTop does not move the WebView node.
 function chassisScrollDom(): HTMLElement | null {
   const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
-  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
+  // #ifdef APP-PLUS
+  return resolveChassisScrollElement(raw, () => document.querySelector<HTMLElement>(".nx-content"));
+  // #endif
+  return (raw && typeof raw === "object" && "$el" in (raw as object)
+    ? (raw as { $el?: HTMLElement }).$el : raw) as HTMLElement | null;
 }
 function currentScrollTop(): number {
   return chassisScrollDom()?.scrollTop ?? 0;
@@ -668,9 +672,14 @@ function go(tab: { key: string; route: string }) {
   if (tab.key === activeTab.value) {
     const dom = chassisScrollDom();
     if (!dom) return;
+    // #ifdef APP-PLUS
+    dom.scrollTop = 0;
+    // #endif
+    // #ifndef APP-PLUS
     let reduce = false;
     try { reduce = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { /* App 端无 matchMedia */ }
     scrollCurrentTabToTop(dom, reduce);
+    // #endif
     return;
   }
   navTo(tab.route);

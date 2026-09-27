@@ -1,7 +1,35 @@
-import { describe, expect, it, vi } from "vitest";
-import { scrollCurrentTabToTop } from "./chassis-scroll";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveChassisScrollElement, scrollCurrentTabToTop } from "./chassis-scroll";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("current tab reselection", () => {
+  it("uses the actual App WebView scroll node when uni's view ref is a proxy", () => {
+    class WebViewElement {
+      scrollTop = 783;
+      classList = { contains: (name: string) => name === "nx-content" };
+    }
+    vi.stubGlobal("HTMLElement", WebViewElement);
+    const actual = new WebViewElement();
+    const proxy = { $el: { scrollTop: 783 } };
+    const found = resolveChassisScrollElement(proxy, () => actual as unknown as HTMLElement);
+    expect(found).toBe(actual);
+    found!.scrollTop = 0;
+    expect(actual.scrollTop).toBe(0);
+    expect(proxy.$el.scrollTop).toBe(783);
+  });
+
+  it("keeps the H5 ref's own scroll node", () => {
+    class H5Element {
+      classList = { contains: (name: string) => name === "nx-content" };
+    }
+    vi.stubGlobal("HTMLElement", H5Element);
+    const actual = new H5Element();
+    const fallback = vi.fn(() => null);
+    expect(resolveChassisScrollElement({ $el: actual }, fallback)).toBe(actual);
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
   it("resets native Android view scrollTop when scrollTo is absent or unsupported", () => {
     const native = { scrollTop: 640 };
     scrollCurrentTabToTop(native, false);
