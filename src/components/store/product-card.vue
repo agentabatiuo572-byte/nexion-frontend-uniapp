@@ -122,6 +122,7 @@ import type { DeviceKind } from "@/store/types";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { computeTradeInCredit } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
@@ -136,7 +137,8 @@ const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>
   featured: false,
 });
 const t = useT();
-const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled));
+const locale = useLocaleStore();
+const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
 
 const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");

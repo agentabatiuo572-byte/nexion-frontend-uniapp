@@ -55,6 +55,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { productNotificationApi, remoteApiEnabled } from "@/api/runtime";
@@ -71,7 +72,8 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 const props = defineProps<{ product: Product }>();
 const app = useApp();
 const t = useT();
-const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled));
+const locale = useLocaleStore();
+const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
 const gpuText = computed(() => specText(t.value, props.product.gpu));
 const vramText = computed(() => specText(t.value, props.product.vram));
 
