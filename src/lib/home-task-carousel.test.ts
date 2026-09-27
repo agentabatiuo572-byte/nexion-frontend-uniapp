@@ -122,8 +122,8 @@ describe("home task carousel", () => {
       rewardNex: 30,
       countdownDays: 2,
       countdownHours: 0,
-      subtitle: "Complete a learning course · StellarBox Pro",
-      targetDevice: "StellarBox Pro",
+      subtitle: "Complete a learning course · UVELBox Pro",
+      targetDevice: "UVELBox Pro",
       targetDaily: 1.5,
       category: "explore",
       actionRoute: "/pages/learn/courses",
@@ -138,6 +138,17 @@ describe("home task carousel", () => {
     expect(view.actionRoute).toBe(rawQuest.actionRoute);
     expect(view.rewardNex).toBe(rawQuest.rewardNex);
     expect(rawQuest.name).toBe("查看 NexGridBox S1 ROI");
+  });
+
+  it("shows the localized mission name and current SKU name without changing the quest", () => {
+    const quest = { ...weeklyQuest, questCode: "weekly_t2_invite_friend", name: "邀请 1 位朋友注册" };
+    const view = presentHomeWeeklyCard(
+      { kind: "quest", quest }, pausedPromo, 1, Date.parse("2026-09-05T00:00:00+08:00"),
+      "Mời 1 người bạn đăng ký",
+    );
+    expect(view.subtitle).toBe("Mời 1 người bạn đăng ký · UVELBox Pro");
+    expect(view.targetDevice).toBe("UVELBox Pro");
+    expect(quest.name).toBe("邀请 1 位朋友注册");
   });
 
   it("does not invent weekly display metadata when PC H3 has no presentation row", () => {
