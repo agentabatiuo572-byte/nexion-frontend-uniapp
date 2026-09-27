@@ -35,6 +35,10 @@ describe("live phone TOPS visibility", () => {
     expect(canShowLivePhoneHashpower(paused)).toBe(false);
   });
 
+  it.each(["ONLINE", "OFFLINE"] as const)("does not label locally simulated %s server capacity as live TOPS", (runtimeStatus) => {
+    expect(canShowLivePhoneHashpower({ ...phone, capacitySource: "server", runtimeStatus, capabilityTops: 9.5 } as Parameters<typeof canShowLivePhoneHashpower>[0])).toBe(false);
+  });
+
   it("shows live TOPS for an unpaused phone and hides it for local interruption or hardware", () => {
     expect(canShowLivePhoneHashpower(phone)).toBe(true);
     expect(canShowLivePhoneHashpower({ ...phone, pausedReason: "low-battery" })).toBe(false);
