@@ -62,7 +62,7 @@
           <text class="weekly-quest__reward-unit">NEX</text>
         </view>
         <text class="weekly-quest__subtitle" :aria-label="subtitleText" :title="subtitleText">{{ subtitleText }}</text>
-        <view class="weekly-quest__rate">
+        <view v-if="weeklyCard.targetDaily !== null" class="weekly-quest__rate">
           <text class="weekly-quest__rate-value">${{ targetDailyText }}</text>
           <text class="weekly-quest__rate-unit">/d</text>
         </view>

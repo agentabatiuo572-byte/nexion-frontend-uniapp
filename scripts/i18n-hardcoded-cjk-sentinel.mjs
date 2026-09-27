@@ -62,6 +62,12 @@ const FILE_EXEMPTIONS = [
 
 const VALUE_EXEMPTIONS = [
   {
+    id: "cloud-share-promo-alias-token",
+    why: "旧服务端周促销目标的简繁中文别名只用于识别商品类型并隐藏旧日产，不作为页面文案展示",
+    files: ["src/api/quest-api.ts"],
+    strip: (line) => line.replace(/^(\s*\|\| \(productType == null && \/cloud\[\\s_-\]\*share\|)云共享\|雲共享(\/i\.test\(targetDevice \?\? ""\)\);)$/, "$1$2"),
+  },
+  {
     id: "quota-annualized-source-token",
     why: "服务端配额权益里的年化是待过滤的数据标识，不是客户端展示文案；只授权此识别表达式中的该词",
     files: ["src/lib/quota-perk.ts"],
