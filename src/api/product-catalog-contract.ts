@@ -178,6 +178,10 @@ function product(value: unknown): CatalogProduct {
   if (!PRODUCT_TYPES.has(productType) || !INVENTORY_MODES.has(inventoryMode)) return invalid();
   if (inventoryMode === "UNLIMITED" && (productType !== "SHARE" || source.stock != null)) return invalid();
   if (inventoryMode === "FINITE" && source.stock == null) return invalid();
+  const shareYieldMin = optionalNumber(source.shareYieldMin);
+  const shareYieldMax = optionalNumber(source.shareYieldMax);
+  if (productType === "SHARE" && ((shareYieldMin === undefined) !== (shareYieldMax === undefined)
+    || (shareYieldMin !== undefined && (shareYieldMin <= 0 || shareYieldMax! < shareYieldMin)))) return invalid();
 
   return {
     id: nonEmptyString(source.id),
@@ -195,6 +199,8 @@ function product(value: unknown): CatalogProduct {
     warranty: displayString(source.warranty),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
+    shareYieldMin,
+    shareYieldMax,
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
     imageUrl: productMediaUrl(source.imageUrl),

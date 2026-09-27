@@ -92,8 +92,9 @@
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="itemNameStyle">{{ nexGridBrandText(p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
-              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` }) }}</text>
+              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
             </text>
+            <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
             <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
@@ -283,7 +284,14 @@ const bundleQuote = computed(() => quoteBundleAmountUsdt(
 const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
-const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + p.dailyEarn, 0));
+const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + (p.productType === "SHARE" ? 0 : p.dailyEarn), 0));
+function bundleProductYieldText(p: Product): string {
+  if (p.productType !== "SHARE") return fmt(t.value.uiChrome.earnsPerDay, { amount: `+$${p.dailyEarn.toFixed(2)}` });
+  const range = p.shareYieldMin != null && p.shareYieldMax != null
+    ? `${p.shareYieldMin}%–${p.shareYieldMax}%`
+    : t.value.store.shareAnnualUnavailable;
+  return `${t.value.store.shareReferenceAnnual}: ${range}`;
+}
 
 // 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
 const suggestions = computed(() =>

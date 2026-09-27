@@ -121,8 +121,7 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
   { rank: 1, name: "UVELRack P1", dailyEarn: 45, bestFor: "rackP1", kind: "stellarrack-p1" },
   { rank: 2, name: "UVELBox Pro", dailyEarn: 13, bestFor: "boxPro", kind: "stellarbox-pro" },
   { rank: 3, name: "UVELBox S1", dailyEarn: 7, bestFor: "boxS1", kind: "stellarbox-s1" },
-  { rank: 4, name: "Inference Share", dailyEarn: 0.19, bestFor: "cloudShare", kind: "cloud-share" },
-  { rank: 5, dailyEarn: 0.06, bestFor: "phone", isPhone: true },
+  { rank: 4, dailyEarn: 0.06, bestFor: "phone", isPhone: true },
 ];
 
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
@@ -130,7 +129,7 @@ const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   : PRICE_INDEX);
 const workloadCopy = (row: WorkloadPrice) => marketWorkloadCopy(t.value, row.code, row.name, row.unit);
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function formatPrice(n: number): string {

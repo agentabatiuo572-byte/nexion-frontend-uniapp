@@ -52,17 +52,19 @@
         <!-- Eyebrow -->
         <view class="font-mono-tabular inline-flex items-center gap-1.5" :style="earnEyebrowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ t.store.cardYouEarn }}</text>
+          <text>{{ isShare ? t.store.shareReferenceAnnual : t.store.cardYouEarn }}</text>
         </view>
 
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
-          <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+          <text v-if="isShare" class="tabular-nums" :style="bigEarnStyle">{{ shareYieldText }}</text>
+          <text v-else class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
           <!-- 「/天」单位后缀恒用弱化色,不跟数字的强调色走 —— 与同行美元侧同一档 ink-3
                (主人 2026-08-17:两侧 /天 字色必须一致) -->
           <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-warning-ink); font-weight: 500">{{ nexPerDayText }}<text style="color: var(--v5-ink-3)">{{ t.store.cardPerDaySuffix }}</text></text>
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
+        <text v-if="isShare" class="block mt-1.5" style="font-size: 12px; line-height: 1.35; color: var(--v5-ink-4)">{{ t.store.shareYieldDisclaimer }}</text>
 
         <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
         <view v-if="copy.unlocks" class="mt-1.5 flex items-center gap-1.5">
@@ -279,6 +281,9 @@ function toggleGateDetails() {
 
 // Text helpers (toFixed / toLocaleString / fmt) — kept out of template for clarity
 const dailyEarnText = computed(() => props.product.dailyEarn.toFixed(2));
+const shareYieldText = computed(() => props.product.shareYieldMin != null && props.product.shareYieldMax != null
+  ? `${props.product.shareYieldMin}%–${props.product.shareYieldMax}%`
+  : t.value.store.shareAnnualUnavailable);
 const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: props.product.dailyEarnNEX }));
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: bestTradeinCredit.value.toFixed(2) }),
