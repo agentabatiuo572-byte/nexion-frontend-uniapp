@@ -3,14 +3,16 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
-import { rebindAccountScopedStores } from "@/lib/account-scope";
+import { rebindAccountScopedStores, captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
-import { authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { authApi, onboardingCalibrationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { getDeviceId } from "@/lib/device-id";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
-import { hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
+import { afterLegalTermsAcknowledged, hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
 import type { LocaleCode } from "@/i18n";
 import { resolvePostSignInRoute } from "@/auth/post-sign-in-route";
@@ -180,9 +182,22 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // confirms the current version is acknowledged.
   if (remoteApiEnabled && options.serverProfile) {
     const expectedUserId = options.serverProfile.userId;
-    void scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index").then(() => {
+    afterLegalTermsAcknowledged(async () => {
       const current = sessionVault.read();
-      if (!current || current.user.userId !== expectedUserId || hasPendingLegalTermsRequirement()) return;
+      if (!current || current.user.userId !== expectedUserId) return;
+      if (hasPendingLegalTermsRequirement()) return false;
+      if (hasNativeAndroidPhoneRuntime()) {
+        const phoneScope = captureAccountScope();
+        let phoneStatus = "UNAVAILABLE";
+        try { phoneStatus = await onboardingCalibrationApi.phoneLogin(getDeviceId()); } catch { /* The phone screen owns retry; other assets remain available. */ }
+        const latest = sessionVault.read();
+        if (!isCurrentAccountScope(phoneScope) || !latest || latest.user.userId !== expectedUserId) return;
+        if (hasPendingLegalTermsRequirement()) return false;
+        if (phoneStatus === "BOUND") session.markCalibrated(options.identity);
+        if (phoneStatus !== "BOUND" && !options.deferNavigation) {
+          void navReset({ url: "/pages/onboarding/connect?mode=login", fail: () => {} });
+        }
+      }
       // App.onShow is not guaranteed after an H5 reLaunch. Complete the
       // canonical catalogue/fleet bootstrap only after the legal boundary.
       void app.refreshHomeTruth();
@@ -191,6 +206,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
       // fails closed at the server endpoint.
       void refreshEarningsReleaseStatus(options.identity).catch(() => {});
     });
+    void scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index");
   }
   const dest = resolvePostSignInRoute({
     onboardingComplete: auth.onboardingComplete,

@@ -20,8 +20,8 @@
     <view v-if="nativePhoneAvailable" class="est-reveal">
       <transition name="est-fade" mode="out-in">
         <view v-if="loadFailed || deferred" key="failed" class="est-loading est-loading--failed">
-          <text class="est-loading__t">{{ deferred ? t.onboarding.activationDefer : t.onboarding.calibrationFailedTitle }}</text>
-          <text v-if="loadFailed" class="est-failed__hint">{{ t.onboarding.calibrationRetry }}</text>
+          <text class="est-loading__t">{{ deferred ? t.onboarding.activationDefer : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
+          <text v-if="loadFailed" class="est-failed__hint">{{ calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingBody : t.onboarding.calibrationRetry }}</text>
           <text class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
           <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
           <view class="est-failed__actions">
@@ -53,7 +53,7 @@
           </view>
           <view class="est-phone__body">
             <text class="est-phone__name">{{ t.onboarding.yourPhone }}</text>
-            <text class="est-phone__spec">{{ calibration?.tops }} TOPS · {{ calibration?.tierName }}</text>
+            <text class="est-phone__spec">{{ calibration?.computeValue }} {{ t.onboarding.phoneComputeUnit }} · {{ calibration?.tierName }}</text>
           </view>
           <view class="est-phone__rate">
             <text class="est-phone__rate-v">{{ phoneRateLabel }}</text>
@@ -165,7 +165,7 @@ function isCurrent(scope: { estimator: EstimatorScope; remote: RemoteAccountRequ
     && isCurrentAccountScope(scope.remote);
 }
 
-function loadCalibration() {
+function loadCalibration(recalibrate = false) {
   if (!nativePhoneAvailable) return;
   const scope = scopePair();
   loadFailed.value = false;
@@ -173,6 +173,7 @@ function loadCalibration() {
   loading.value = true;
   void Promise.resolve().then(() => calibrationFlow.run({ deviceId: getDeviceId(), accountKey: auth.accountId,
     isCurrent: () => isCurrent(scope) && auth.isAuthenticated,
+    recalibrate,
   })).then((result) => {
     if (!isCurrent(scope)) return;
     if (result.activationStatus === "DEFERRED") {
@@ -181,8 +182,8 @@ function loadCalibration() {
       deferred.value = true;
       return;
     }
-    if (!result.calibrationAvailable || (result.activationStatus !== "CALIBRATED" && result.activationStatus !== "ACTIVE")) {
-      calibration.value = null;
+    if (!result.calibrationAvailable || result.calibrationStatus !== "MATCHED" || (result.activationStatus !== "CALIBRATED" && result.activationStatus !== "ACTIVE")) {
+      calibration.value = result;
       detected.value = false;
       loadFailed.value = true;
       return;
@@ -211,9 +212,11 @@ function retryCalibration() {
   }
   generation += 1;
   if (timer) clearTimeout(timer);
+  const needsCalibration = calibration.value !== null && calibration.value.calibrationStatus !== "MATCHED";
   detected.value = false;
   calibration.value = null;
-  loadCalibration();
+  calibrationFlow.reset();
+  loadCalibration(needsCalibration);
 }
 
 function scheduleReveal() {

@@ -6,10 +6,10 @@ import { ApiError } from "@/api/errors";
 import { createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
 
 const canonical = { userId: 42, deviceId: "test-device", serverCanonical: true, source: "server",
-  sourceEnvironment: "PRODUCTION", runId: "", revision: 0, activationStatus: "CALIBRATED", calibrationAvailable: true };
+  sourceEnvironment: "PRODUCTION", runId: "", revision: 0, activationStatus: "CALIBRATED", calibrationAvailable: true, calibrationStatus: "MATCHED" };
 
 function mount() {
-  const start = source.indexOf("function loadCalibration()");
+  const start = source.indexOf("function loadCalibration(");
   const end = source.indexOf("function retryCalibration()", start);
   const loading = ref(false), deferred = ref(false), loadFailed = ref(false), calibration = ref<unknown>(null), detected = ref(false);
   let current = true;

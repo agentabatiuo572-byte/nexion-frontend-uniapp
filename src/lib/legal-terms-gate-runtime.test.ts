@@ -57,6 +57,41 @@ async function settleGate(): Promise<void> {
 }
 
 describe("legal terms runtime gate", () => {
+  it("retains unfinished login work when another legal verification starts in flight", async () => {
+    const runtime = await loadRuntime();
+    let resolve!: (done: boolean) => void;
+    const resumed = vi.fn().mockImplementationOnce(() => new Promise<boolean>(done => { resolve = done; }))
+      .mockResolvedValueOnce(true);
+    runtime.afterLegalTermsAcknowledged(resumed);
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    await settleGate();
+    state.current.mockResolvedValue(snapshot(false));
+    await runtime.scheduleLegalTermsGate("/pages/index/index");
+    resolve(false);
+    await settleGate();
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    await settleGate();
+    expect(resumed).toHaveBeenCalledTimes(2);
+  });
+  it("resumes login once after Terms acknowledgement and fences a later login", async () => {
+    const runtime = await loadRuntime();
+    const resumed = vi.fn(async () => {});
+    runtime.afterLegalTermsAcknowledged(resumed);
+    state.current.mockResolvedValue(snapshot(false));
+    await runtime.scheduleLegalTermsGate("/pages/index/index");
+    expect(resumed).not.toHaveBeenCalled();
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    await settleGate();
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    await settleGate();
+    expect(resumed).toHaveBeenCalledTimes(1);
+    runtime.afterLegalTermsAcknowledged(resumed);
+    state.session = { accessToken: "another-login", user: { userId: 7 } };
+    state.sessionRevision++;
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    await settleGate();
+    expect(resumed).toHaveBeenCalledTimes(1);
+  });
   it("retries a verification failure instead of treating it as a known unacknowledged version", async () => {
     state.current.mockRejectedValueOnce(new Error("network"));
     const runtime=await loadRuntime();await runtime.scheduleLegalTermsGate("/pages/me/me");

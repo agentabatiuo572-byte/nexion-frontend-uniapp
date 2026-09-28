@@ -15,7 +15,8 @@ describe("onboarding calibration read and presentation contract", () => {
     expect(estimator).toContain("createPhoneCalibrationFlow");
     expect(estimator).toMatch(/if \(result\.activationStatus === "DEFERRED"\) \{[\s\S]*?deferred\.value = true;[\s\S]*?return;/);
     expect(estimator).toContain('"/pages/onboarding/connect?mode=resume"');
-    expect(estimator).toContain("deferred ? t.onboarding.activationDefer : t.onboarding.calibrationFailedTitle");
+    expect(estimator).toContain("deferred ? t.onboarding.activationDefer");
+    expect(estimator).toContain("calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle");
     expect(estimator).toContain("isCurrent: () => isCurrent(scope) && auth.isAuthenticated");
   });
 

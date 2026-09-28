@@ -35,6 +35,20 @@ describe("onboarding calibration API", () => {
     expect(() => parseOnboardingCalibration({ ...valid, sourceEnvironment: "SANDBOX", runId: "retired" })).toThrow();
   });
 
+  it("keeps unknown hardware pending and accepts platform points outside the legacy fake TOPS scale", () => {
+    const pending = { ...valid, calibrationAvailable: false, calibrationStatus: "PENDING_VERIFICATION",
+      pendingReason: "RULES_UNAVAILABLE", computeUnit: "platform", computeValue: null, ruleId: null, ruleVersion: 0,
+      score: null, tier: null, tierName: null, tops: null, baseRateUsdt: null, baseRateNex: null, comparisonConfig: [] };
+    expect(parseOnboardingCalibration(pending)).toMatchObject({ calibrationStatus: "PENDING_VERIFICATION", calibrationAvailable: false, computeValue: null });
+    expect(() => parseOnboardingCalibration({ ...pending, activationStatus: "ACTIVE" })).toThrow();
+    expect(() => parseOnboardingCalibration({ ...valid, calibrationStatus: "PENDING_VERIFICATION", computeUnit: "platform", computeValue: null, ruleId: null, ruleVersion: 0 })).toThrow();
+    const matched = { ...valid, calibrationStatus: "MATCHED", computeUnit: "platform", computeValue: 120.5,
+      score: 121, tops: 120.5, ruleId: "fixture", ruleVersion: 2 };
+    expect(parseOnboardingCalibration(matched)).toMatchObject({ computeValue: 120.5, ruleVersion: 2 });
+    expect(() => parseOnboardingCalibration({ ...matched, tops: 119 })).toThrow();
+    expect(() => parseOnboardingCalibration({ ...matched, ruleId: null })).toThrow();
+  });
+
   it("rejects a client/mock projection or out-of-range raw signal", () => {
     expect(() => parseOnboardingCalibration({ ...valid, source: "mock" })).toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
     expect(() => parseOnboardingCalibration({ ...valid, signals: { ...valid.signals, batteryLevel: 101 } })).toThrow();

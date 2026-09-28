@@ -135,7 +135,7 @@
       <view class="flex items-center justify-between gap-2">
         <text :style="sectionLabelStyle">{{ t.earn.hashCapability }}</text>
         <view class="flex items-center gap-1.5">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ baselineTops == null ? t.earn.hashCapabilityUnknown : `${baselineTops.toFixed(1)} TOPS` }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ baselineTops == null ? t.earn.hashCapabilityUnknown : `${baselineTops} ${t.onboarding.phoneComputeUnit}` }}</text>
           <text v-if="capTier != null" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashTier, { n: capTier }) }}</text>
         </view>
       </view>
@@ -147,7 +147,7 @@
         <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
         <view class="flex items-center gap-1" :style="capChipStyle">
           <text style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }}</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ baselineTops?.toFixed(1) }} TOPS</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ baselineTops?.toFixed(1) }} {{ t.onboarding.phoneComputeUnit }}</text>
           <text style="color: var(--v5-ink-4)">·</text>
           <text style="color: var(--v5-brand)">{{ capTier == null ? '—' : fmt(t.earn.hashTier, { n: capTier }) }}</text>
         </view>
@@ -155,7 +155,7 @@
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
           <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ live.effectiveTops.toFixed(1) }}</text>
-          <text style="font-size: 12px; font-weight: 600; color: var(--v5-ink-3)">TOPS</text>
+          <text style="font-size: 12px; font-weight: 600; color: var(--v5-ink-3)">{{ t.onboarding.phoneComputeUnit }}</text>
         </view>
         <svg width="110" height="28" viewBox="0 0 110 28" preserveAspectRatio="none" fill="none">
           <polyline :points="sparkPoints" fill="none" stroke="var(--v5-brand)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -177,7 +177,7 @@
 
     <view v-else-if="phoneRunning" style="padding: 0 20px 12px">
       <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
-      <text class="block" style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }} · — TOPS</text>
+      <text class="block" style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }} · — {{ t.onboarding.phoneComputeUnit }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
     </view>
 
