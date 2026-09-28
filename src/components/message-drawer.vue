@@ -67,6 +67,8 @@
         </view>
       </scroll-view>
 
+      <text v-if="remoteApiEnabled && notifs.items.length" class="md-original-note">{{ t.notifs.originalTextNote }}</text>
+
       <!-- List -->
       <scroll-view scroll-y class="md-list" :show-scrollbar="false">
         <view v-if="notifs.error" class="md-empty">
@@ -99,6 +101,7 @@
                 </view>
               </view>
               <text v-if="n.body" class="md-row-preview" :style="{ color: n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink-3)' }">{{ n.body }}</text>
+              <text v-if="remoteApiEnabled" class="md-row-time">{{ t.notifs.originalTextLabel }}</text>
               <text class="md-row-time" :style="{ color: 'var(--v5-ink-4)' }">{{ timeAgo(n.ts) }}</text>
             </view>
           </view>
@@ -137,6 +140,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useNotifications, type NotifKind, type Notification } from "@/store/notifications";
@@ -414,6 +418,13 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   color: var(--v5-brand);
 }
 /* ── list ── */
+.md-original-note {
+  display: block;
+  padding: 8px 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--v5-ink-3);
+}
 .md-list {
   flex: 1;
   min-height: 0;

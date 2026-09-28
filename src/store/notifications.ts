@@ -54,8 +54,8 @@ export const useNotifications = defineStore("notifications", () => {
     const next = page.items.filter((item) => !seenIds.has(String(item.id))).map((item) => {
       seenIds.add(String(item.id));
       return {
-        id: String(item.id), kind: knownKind(item.kind), priority: item.priority, title: nexGridBrandText(item.title),
-        body: item.body ? nexGridBrandText(item.body) : undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
+        id: String(item.id), kind: knownKind(item.kind), priority: item.priority, title: item.title,
+        body: item.body || undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
         ts: item.createdAt, readAt: item.readAt,
       };
     });

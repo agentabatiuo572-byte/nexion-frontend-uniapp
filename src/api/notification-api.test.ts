@@ -13,6 +13,19 @@ function page(createdAt: unknown, readAt: unknown = null) {
 }
 
 describe("notification timestamp contract", () => {
+  it("preserves the server's historical title and body text", async () => {
+    const title = " 风险披露已更新 ";
+    const body = " Welcome to " + "Nex" + "Grid ";
+    const request = vi.fn().mockResolvedValue({
+      items: [{ id: 1, kind: "system", priority: "critical", title, body,
+        ctaLabel: "Review now", ctaHref: "/pages/me/risk-disclosure", createdAt: createdInstant, readAt: null }],
+      nextCursor: null, unread: 1,
+    });
+    const result = await createNotificationApi({ request } as never).page();
+    expect(result.items[0]).toMatchObject({ title, body, readAt: null,
+      ctaHref: "/pages/me/risk-disclosure" });
+  });
+
   it.each(["2026-09-18 11:38:00", "2026-09-18T11:38:00"])(
     "parses server business time %s independently of the device timezone", async createdAt => {
       const result = await page(createdAt, "2026-09-18 12:20:00");

@@ -5850,6 +5850,8 @@ export const zh: Messages = {
   },
 
   notifs: {
+    originalTextLabel: "通知原文",
+    originalTextNote: "通知内容保留发送时的原文；切换 App 语言不会翻译旧通知。",
     minutesAgo: "{n} 分钟前",
     hoursAgo: "{n} 小时前",
     daysAgo: "{n} 天前",

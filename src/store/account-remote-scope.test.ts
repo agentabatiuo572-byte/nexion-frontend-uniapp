@@ -86,6 +86,21 @@ beforeEach(() => {
 });
 
 describe("remote account fences", () => {
+  it("keeps persisted notification wording exactly as returned by the server", async () => {
+    const original = page("B");
+    original.items[0].title = "风险披露已更新";
+    original.items[0].body = "Welcome to " + "Nex" + "Grid";
+    remote.notificationApi.page.mockResolvedValueOnce(original);
+    const store = useNotifications();
+    await store.refreshRemote();
+    expect(store.items[0]).toMatchObject({
+      title: original.items[0].title,
+      body: original.items[0].body,
+      readAt: null,
+      ctaHref: original.items[0].ctaHref,
+    });
+  });
+
   it("drops a late card list from the previous account", async () => {
     const store = useCards();
     await flush();
