@@ -66,6 +66,7 @@ describe("remote registration completion owns its legal return target", () => {
       rebindAccountScopedStores: vi.fn(), readAccountSessionRecords: () => [{ sessionId: "session" }],
       useProfile: () => ({ projectServerIdentity: vi.fn() }), hydrateCurrentProfileLocale: vi.fn(),
       scheduleLegalTermsGate: gate.scheduleLegalTermsGate, hasPendingLegalTermsRequirement: gate.hasPendingLegalTermsRequirement,
+      afterLegalTermsAcknowledged: gate.afterLegalTermsAcknowledged,
       sessionVault: { read: () => ({ user: { userId: 7 } }) }, refreshRemoteFleetAfterCatalog: vi.fn(),
       refreshEarningsReleaseStatus: vi.fn(), resolvePostSignInRoute, navReset: state.nav,
     }, "completeSignIn");

@@ -36,6 +36,13 @@ let pendingRequirement: {
 const latestGateRouteByKey = new Map<string, string>();
 let acknowledgedSession: { locale: string; sessionFence: LegalTermsSessionFence } | null = null;
 let retryPrompt: object | null = null;
+let afterAcknowledgement: { sessionFence: LegalTermsSessionFence; run: () => Promise<boolean | void> } | null = null;
+
+/** Login work survives the Terms page, but never a different login session. */
+export function afterLegalTermsAcknowledged(run: () => Promise<boolean | void>): void {
+  const current = fence();
+  afterAcknowledgement = current ? { sessionFence: current, run } : null;
+}
 
 function hasPriorAcknowledgement(locale: string): boolean {
   const current = fence();
@@ -185,6 +192,18 @@ export function recordLegalTermsAcknowledged(
   if (lastRedirectAttempt?.key === key) lastRedirectAttempt = null;
   failedKeys.delete(key);
   latestGateRouteByKey.delete(key);
+  const continuation = afterAcknowledgement;
+  if (continuation) {
+    afterAcknowledgement = null;
+    void Promise.resolve().then(async () => {
+      const latest = fence();
+      if (!latest || latest.userId !== continuation.sessionFence.userId
+          || !(sameLegalTermsSession(continuation.sessionFence, latest)
+            || sessionVault.isRefreshContinuation(continuation.sessionFence.sessionRevision ?? -1))) return;
+      const completed = await continuation.run();
+      if (completed === false && !afterAcknowledgement) afterAcknowledgement = continuation;
+    }).catch(() => { /* Individual business reads retain their own retry states. */ });
+  }
 }
 
 /**

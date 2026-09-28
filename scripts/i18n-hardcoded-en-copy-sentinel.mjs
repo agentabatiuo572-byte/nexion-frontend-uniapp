@@ -67,7 +67,7 @@ const TECH_TOKENS = [
   {
     id: "unit-abbrev",
     why: "行业通用的计量 / 技术缩写(显存 GB · 算力 TOPS · 年化 APY · VRAM · 毫秒 ms):各语言技术语境里都直接用原文",
-    tokens: ["GB", "TOPS", "APY", "VRAM", "ms"],
+    tokens: ["GB", "APY", "VRAM", "ms"],
   },
   {
     id: "input-format-mask",

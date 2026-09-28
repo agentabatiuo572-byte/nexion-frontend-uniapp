@@ -1,10 +1,13 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { nativePhoneRequest } from "@/lib/native-phone-proof";
 
 export type OnboardingCalibrationEnvironment = "PRODUCTION";
 export type PhoneActivationStatus = "CALIBRATED" | "ACTIVE" | "DEFERRED";
 
 export interface CalibrationSignals {
+  platform?: string;
+  soc?: string;
   memGB: number | null;
   cores: number | null;
   model: string;
@@ -29,6 +32,13 @@ export interface CalibrationComparison {
 }
 
 interface OnboardingCalibrationBase {
+  userDeviceId?: number | null;
+  calibrationStatus?: "MATCHED" | "PENDING_VERIFICATION";
+  pendingReason?: string;
+  computeValue?: number | null;
+  ruleId?: string | null;
+  ruleVersion?: number | null;
+  computeUnit?: "platform";
   userId: number;
   deviceId: string;
   serverCanonical: true;
@@ -64,9 +74,15 @@ export interface DeferredOnboardingCalibration extends OnboardingCalibrationBase
   signals: null;
 }
 
-export type OnboardingCalibration = MeasuredOnboardingCalibration | DeferredOnboardingCalibration;
+export interface PendingOnboardingCalibration extends Omit<DeferredOnboardingCalibration, "activationStatus" | "signals"> {
+  activationStatus: PhoneActivationStatus;
+  calibrationStatus: "PENDING_VERIFICATION";
+  signals: CalibrationSignals;
+}
+export type OnboardingCalibration = MeasuredOnboardingCalibration | DeferredOnboardingCalibration | PendingOnboardingCalibration;
 
 export interface OnboardingCalibrationApi {
+  phoneLogin(deviceId: string): Promise<string>;
   calibrate(deviceId: string, signals: CalibrationRequestSignals, expectedRevision: number, idempotencyKey: string): Promise<OnboardingCalibration>;
   result(deviceId: string): Promise<OnboardingCalibration>;
   activate(deviceId: string, expectedRevision: number, idempotencyKey: string): Promise<OnboardingCalibration>;
@@ -125,6 +141,8 @@ function nullableBoundedInteger(value: unknown, min: number, max: number): numbe
 function signals(value: unknown): CalibrationSignals {
   const row = record(value);
   return {
+    platform: row.platform == null ? "" : optionalText(row.platform, 32),
+    soc: row.soc == null ? "" : optionalText(row.soc, 128),
     memGB: nullableNumber(row.memGB, 0, 128), cores: nullableBoundedInteger(row.cores, 1, 256), model: optionalText(row.model, 128), brand: optionalText(row.brand, 128),
     gpu: optionalText(row.gpu, 256), pxDensity: nullableNumber(row.pxDensity, 1, 10_000), pingMs: nullableNumber(row.pingMs, 0, 5_000),
     batteryLevel: nullableBoundedInteger(row.batteryLevel, 0, 100), charging: row.charging === null ? null : bool(row.charging), networkReachable: row.networkReachable === null ? null : bool(row.networkReachable),
@@ -145,6 +163,12 @@ export function parseOnboardingCalibration(
       || runId !== "") return invalid();
   if (row.activationStatus !== "CALIBRATED" && row.activationStatus !== "ACTIVE" && row.activationStatus !== "DEFERRED") return invalid();
   if (typeof row.calibrationAvailable !== "boolean") return invalid();
+  const status = row.calibrationStatus;
+  if (status !== undefined && status !== "MATCHED" && status !== "PENDING_VERIFICATION") return invalid();
+  if (status && row.computeUnit !== "platform") return invalid();
+  if (status === "PENDING_VERIFICATION" && row.calibrationAvailable) return invalid();
+  if (status === "MATCHED" && (!row.calibrationAvailable || row.computeValue !== row.tops
+      || row.ruleId == null || row.ruleVersion == null)) return invalid();
   const comparisonConfig = Array.isArray(row.comparisonConfig) ? row.comparisonConfig.map((entry) => {
     const item = record(entry);
     return { key: text(item.key), label: text(item.label),
@@ -156,8 +180,24 @@ export function parseOnboardingCalibration(
     userId: integer(row.userId, 1), deviceId: text(row.deviceId), serverCanonical: true, source: "server",
     sourceEnvironment, runId,
     revision: integer(row.revision), configRevision: integer(row.configRevision), activationStatus: row.activationStatus,
+    userDeviceId: row.userDeviceId == null ? null : integer(row.userDeviceId, 1),
+    ...(status ? {
+      calibrationStatus: status as "MATCHED" | "PENDING_VERIFICATION", computeUnit: "platform" as const,
+      computeValue: row.computeValue === null ? null : number(row.computeValue, Number.MIN_VALUE, 1_000_000),
+      ruleId: row.ruleId == null ? null : text(row.ruleId),
+      ruleVersion: row.ruleVersion == null ? null : integer(row.ruleVersion, status === "MATCHED" ? 1 : 0),
+      pendingReason: row.pendingReason == null ? "" : text(row.pendingReason),
+    } : {}),
   } as const;
   if (!row.calibrationAvailable) {
+    if (status === "PENDING_VERIFICATION") {
+      if (row.activationStatus === "ACTIVE" || comparisonConfig.length !== 0
+          || row.score !== null || row.tier !== null || row.tierName !== null || row.tops !== null
+          || row.baseRateUsdt !== null || row.baseRateNex !== null || row.computeValue !== null) return invalid();
+      return { ...common, calibrationStatus: "PENDING_VERIFICATION", calibrationAvailable: false,
+        score: null, tier: null, tierName: null, tops: null, baseRateUsdt: null, baseRateNex: null,
+        signals: signals(row.signals), comparisonConfig };
+    }
     if (row.activationStatus !== "DEFERRED" || common.configRevision !== 0 || comparisonConfig.length !== 0
         || row.score !== null || row.tier !== null || row.tierName !== null || row.tops !== null
         || row.baseRateUsdt !== null || row.baseRateNex !== null || row.signals !== null) return invalid();
@@ -169,8 +209,8 @@ export function parseOnboardingCalibration(
   if (!Number.isInteger(row.tier) || (row.tier as number) < 1 || (row.tier as number) > 5) return invalid();
   return {
     ...common, calibrationAvailable: true,
-    score: boundedInteger(row.score, 62, 98),
-    tier: row.tier as number, tierName: text(row.tierName), tops: number(row.tops, 8, 58),
+    score: status === "MATCHED" ? boundedInteger(row.score, 0, 1_000_000) : boundedInteger(row.score, 62, 98),
+    tier: row.tier as number, tierName: text(row.tierName), tops: status === "MATCHED" ? number(row.tops, Number.MIN_VALUE, 1_000_000) : number(row.tops, 8, 58),
     baseRateUsdt: number(row.baseRateUsdt, Number.MIN_VALUE), baseRateNex: number(row.baseRateNex, Number.MIN_VALUE), signals: signals(row.signals), comparisonConfig,
   };
 }
@@ -185,12 +225,20 @@ function key(value: string): string {
 
 export function createOnboardingCalibrationApi(client: ApiClient, environment: OnboardingCalibrationEnvironment = "PRODUCTION"): OnboardingCalibrationApi {
   return {
+    async phoneLogin(deviceId) {
+      const response = record(await nativePhoneRequest(client, text(deviceId), {
+        method: "POST", path: "/api/onboarding/phone-installation/login", body: { deviceId: text(deviceId) },
+      }));
+      if (!["BOUND", "NEEDS_CALIBRATION", "REPLACEMENT_REQUIRED", "PHONE_REPLACEMENT_DISABLED",
+        "PHONE_REPLACEMENT_COOLDOWN", "PHONE_REPLACEMENT_POLICY_UNAVAILABLE"].includes(String(response.status))) return invalid();
+      return String(response.status);
+    },
     async calibrate(deviceId, rawSignals, expectedRevision, idempotencyKey) {
       const normalizedDeviceId = text(deviceId);
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await client.request({
+      const response = await nativePhoneRequest(client, normalizedDeviceId, {
         method: "POST", path: "/api/onboarding/calibrate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision, signals: rawSignals },
       });
@@ -208,7 +256,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await client.request({
+      const response = await nativePhoneRequest(client, normalizedDeviceId, {
         method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });
@@ -219,7 +267,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await client.request({
+      const response = await nativePhoneRequest(client, normalizedDeviceId, {
         method: "POST", path: "/api/onboarding/calibrate/defer", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });

@@ -14,6 +14,7 @@ const raw = { memGB: null, cores: null, model: "", brand: "", gpu: "", pxDensity
   pingMs: null, batteryLevel: null, charging: null, networkReachable: null };
 const record = { userId: 42, deviceId: "phone-1", serverCanonical: true, source: "server", sourceEnvironment: "PRODUCTION",
   runId: "", revision: 3, configRevision: 1, activationStatus: "CALIBRATED", calibrationAvailable: true,
+  calibrationStatus: "MATCHED", computeValue: 8, computeUnit: "platform", ruleVersion: 1, ruleId: "android-test",
   score: 62, tier: 1, tierName: "Tier 1", tops: 8, baseRateUsdt: 0.04, baseRateNex: 6, signals: raw, comparisonConfig: [] };
 const missing = () => new ApiError({ kind: "http", status: 404, message: "ONBOARDING_CALIBRATION_NOT_FOUND" });
 const cleanups: Array<() => void> = [];
@@ -24,7 +25,7 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
   const hooks: Record<string, (...args: any[]) => void> = {};
   const auth = vue.reactive({ accountId: "user:42", email: "", isAuthenticated: true,
     completeOnboarding: vi.fn(() => true), requireOnboarding: vi.fn(), signOut: vi.fn() });
-  const app = vue.reactive({ accountKey: "user:42", devices: [], applyPhoneCalibration: vi.fn(),
+  const app = vue.reactive({ accountKey: "user:42", devices: [],
     refreshRemoteFleet: vi.fn(async () => {}), resumeMining: vi.fn() });
   const navReset = vi.fn();
   const confirmDeferredPhoneActivation = vi.fn();
@@ -61,6 +62,35 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
 }
 
 describe("real onboarding page workers", () => {
+  it("checks the server on native login before allowing a denied replacement to calibrate", async () => {
+    const api = { phoneLogin: vi.fn().mockResolvedValueOnce("PHONE_REPLACEMENT_DISABLED").mockResolvedValue("REPLACEMENT_REQUIRED"),
+      result: vi.fn().mockResolvedValue(record), calibrate: vi.fn().mockResolvedValue(record), activate: vi.fn() };
+    const { page } = mount("connect",api,{mode:"login"}); await settle();
+    expect(page.phase.value).toBe("error"); expect(api.result).not.toHaveBeenCalled();
+    await page.activate(); expect(api.activate).not.toHaveBeenCalled();
+    page.retryCalibration(); await settle();
+    expect(page.phase.value).toBe("intro"); expect(api.calibrate).not.toHaveBeenCalled();
+    page.phase.value="calibrating"; await settle(); expect(api.calibrate).toHaveBeenCalledOnce();
+  });
+  it("retains unknown hardware and recalibrates on explicit retry without allowing activation", async () => {
+    const pending = { ...record, calibrationAvailable: false, calibrationStatus: "PENDING_VERIFICATION",
+      computeValue: null, tier: null, tops: null, score: null, baseRateUsdt: null, baseRateNex: null };
+    for (const name of ["connect", "estimator"] as const) {
+      const api = { result: vi.fn().mockResolvedValue(pending), calibrate: vi.fn().mockResolvedValue(record), activate: vi.fn() };
+      const { page } = mount(name, api); await settle();
+      if (name === "connect") {
+        expect(page.canonical.value.calibrationStatus).toBe("PENDING_VERIFICATION");
+        expect(page.phase.value).toBe("error");
+        await page.activate();
+      } else {
+        expect(page.calibration.value.calibrationStatus).toBe("PENDING_VERIFICATION");
+        expect(page.detected.value).toBe(false);
+      }
+      expect(api.activate).not.toHaveBeenCalled();
+      page.retryCalibration(); await settle();
+      expect(api.calibrate).toHaveBeenCalledOnce();
+    }
+  });
   it("does not calibrate or activate a browser installation, while Android can", async () => {
     const browserApi = { result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
     const browserEstimate = mount("estimator", browserApi, {}, false);
@@ -100,7 +130,7 @@ describe("real onboarding page workers", () => {
     expect(api.calibrate).not.toHaveBeenCalled(); expect(api.activate).not.toHaveBeenCalled();
     await page.activate();
     expect(api.activate).toHaveBeenCalledWith("phone-1", 3, "phone-activation:active:fixed-unique-command");
-    expect(app.applyPhoneCalibration).toHaveBeenCalledOnce();
+    expect(app.refreshRemoteFleet).toHaveBeenCalledOnce();
     expect(navReset).toHaveBeenCalledWith(expect.objectContaining({ url: "/pages/index/index" }));
   });
   it("warehouse recalibration starts only on click and uses the latest revision", async () => {
@@ -115,7 +145,7 @@ describe("real onboarding page workers", () => {
     const api = { result: vi.fn().mockResolvedValueOnce(record).mockResolvedValue({ ...record, revision: 4, activationStatus: "ACTIVE" }),
       calibrate: vi.fn(), activate: vi.fn().mockRejectedValue(new ApiError({ kind: "network", message: "lost response" })) };
     const { page, app, navReset } = mount("connect", api); await settle(); await page.activate();
-    expect(api.activate).toHaveBeenCalledOnce(); expect(app.applyPhoneCalibration).toHaveBeenCalledOnce();
+    expect(api.activate).toHaveBeenCalledOnce(); expect(app.refreshRemoteFleet).toHaveBeenCalledOnce();
     expect(navReset).toHaveBeenCalledWith(expect.objectContaining({ url: "/pages/index/index" }));
   });
   it("does not keep retrying an obsolete activation revision after a conflict", async () => {
@@ -123,9 +153,9 @@ describe("real onboarding page workers", () => {
       activate: vi.fn().mockRejectedValueOnce(new ApiError({ kind: "http", status: 409, message: "REVISION_CONFLICT" }))
         .mockResolvedValue({ ...record, revision: 6, activationStatus: "ACTIVE" }) };
     const { page, app } = mount("connect", api); await settle(); await page.activate();
-    expect(page.phase.value).toBe("error"); expect(app.applyPhoneCalibration).not.toHaveBeenCalled();
+    expect(page.phase.value).toBe("error"); expect(app.refreshRemoteFleet).not.toHaveBeenCalled();
     page.retryCalibration(); await settle();
-    expect(api.activate.mock.calls[1][1]).toBe(5); expect(app.applyPhoneCalibration).toHaveBeenCalledOnce();
+    expect(api.activate.mock.calls[1][1]).toBe(5); expect(app.refreshRemoteFleet).toHaveBeenCalledOnce();
   });
   it("rereads server state on the next explicit defer retry after an uncertain write", async () => {
     const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn() };

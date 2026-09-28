@@ -37,7 +37,6 @@ import { commitWithdrawal } from "@/store/withdrawal-eligibility";
 import { advanceArrival, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import { mockServerNow } from "@/store/server-time";
 import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
-import type { DeviceCapability } from "@/lib/device-capability";
 import { useReceipts } from "./receipts";
 import { generateReceipt } from "@/mock/receipt";
 import {
@@ -1387,31 +1386,6 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
   }
 
-  // Apply a calibration result to the phone device: refreshes its yield baseline
-  // + displayed NPU spec from the (deterministic, per-device) capability, and
-  // starts a fresh continuity run. Called by the onboarding/recalibration ritual
-  // after measureDeviceCapability(). PROD: GET /api/onboarding/calibrate/result
-  // returns score/tier/yield baseline; the client applies that result here.
-  function applyPhoneCalibration(cap: DeviceCapability) {
-    devices.value = devices.value.map((d) =>
-      d.kind === "phone"
-        ? {
-            ...d,
-            baseRate: cap.baseRateUsdt,
-            baseRateNEX: cap.baseRateNex,
-            gpu: `Mobile NPU · ~${cap.tops} TOPS`,
-            capabilityScore: cap.score,
-            capabilityTops: cap.tops,
-            capabilityTier: cap.tier,
-            miningSince: Date.now(),
-            onlineHeartbeatAt: null,
-          }
-        : d,
-    );
-    // persist-verdict-ok: 手机校准遥测,非资金;失败时内存已拨回,下一次心跳重写
-    persistAccountSnapshot();
-  }
-
   // Session invalidated (self logged-out / admin revoked): immediately cancel
   // every in-flight task across the fleet WITHOUT a grace window and WITHOUT
   // issuing a receipt — the in-progress job's reward is forfeited (the
@@ -2457,7 +2431,7 @@ export const useApp = defineStore("app", () => {
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, pauseLocalPhoneRuntimeBeforeSignOut,
-    tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
+    tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,

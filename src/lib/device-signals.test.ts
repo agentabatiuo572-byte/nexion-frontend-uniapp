@@ -1,33 +1,39 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { collectDeviceSignals } from "./device-signals";
+import { readAndroidGpu } from "./native-phone-gpu";
 
-describe("device signal collection", () => {
+describe("native device signals", () => {
   afterEach(() => vi.unstubAllGlobals());
-  it("leaves unavailable battery, network, and latency observations unknown", () => {
-vi.stubGlobal("uni", { getSystemInfoSync: vi.fn(() => ({ model: "Test", brand: "TestBrand" })) });
-    vi.stubGlobal("navigator", {});
-    expect(collectDeviceSignals()).toMatchObject({
-      batteryLevel: null,
-      charging: null,
-      networkReachable: null,
-      pingMs: null,
-      memGB: null,
-      cores: null,
-      pxDensity: null,
+  it("does not inspect browser hardware or turn browser observations into phone capability", () => {
+    const browser = vi.fn(() => { throw new Error("must not inspect browser hardware"); });
+    vi.stubGlobal("plus", undefined);
+    vi.stubGlobal("navigator", { deviceMemory: 64, hardwareConcurrency: 16 });
+    vi.stubGlobal("document", { createElement: browser });
+    vi.stubGlobal("uni", { getSystemInfoSync: browser });
+    expect(collectDeviceSignals()).toEqual({ platform: "", soc: "", memGB: null, cores: null,
+      model: "", brand: "", gpu: "", pxDensity: null, pingMs: null, batteryLevel: null,
+      charging: null, networkReachable: null });
+    expect(browser).not.toHaveBeenCalled();
+  });
+  it("uses native SoC and physical memory and preserves missing GPU as unknown", () => {
+    vi.stubGlobal("document", undefined);
+    vi.stubGlobal("plus", { os: { name: "Android" }, android: {
+      importClass: (name: string) => name === "android.os.Build" ? { MODEL: "Test phone", BRAND: "Test", SOC_MODEL: "Test SoC" } : {},
+      runtimeMainActivity: () => ({}), newObject: () => ({}), getAttribute: () => 8 * 1024 ** 3,
+      invoke: (_object: unknown, method: string) => method === "availableProcessors" ? 8 : {},
+    } });
+    expect(collectDeviceSignals()).toMatchObject({ platform: "android", soc: "Test SoC", model: "Test phone", memGB: 8, cores: 8, gpu: "", pxDensity: null });
+  });
+  it("reads the native GPU without a DOM and releases its offscreen context", () => {
+    const invoke = vi.fn((_object: unknown, method: string) => {
+      if (["eglInitialize", "eglChooseConfig", "eglMakeCurrent", "equals"].includes(method)) return true;
+      if (method === "glGetString") return "Adreno test renderer";
+      return {};
     });
-  });
-  it("keeps unsupported or out-of-contract observations unknown", () => {
-    vi.stubGlobal("uni", { getSystemInfoSync: () => ({ model: "M".repeat(200), brand: "B".repeat(200), batteryLevel: -1 }) });
-    vi.stubGlobal("navigator", { deviceMemory: 500, hardwareConcurrency: 1.5 });
-    vi.stubGlobal("window", { devicePixelRatio: 100, screen: { width: 1000, height: 1000 } });
-    const result = collectDeviceSignals();
-    expect(result).toMatchObject({ memGB: null, cores: null, batteryLevel: null, pxDensity: null });
-    expect(result.model).toHaveLength(128); expect(result.brand).toHaveLength(128);
-  });
-  it("still returns a valid raw observation payload when every browser probe is unavailable", () => {
-    vi.stubGlobal("uni", { getSystemInfoSync: () => { throw new Error("unsupported"); } });
-    vi.stubGlobal("navigator", undefined); vi.stubGlobal("window", undefined); vi.stubGlobal("document", undefined);
-    expect(collectDeviceSignals()).toEqual({ memGB: null, cores: null, model: "", brand: "", gpu: "",
-      pxDensity: null, pingMs: null, batteryLevel: null, charging: null, networkReachable: null });
+    const android = { invoke, importClass: () => ({ EGL_NO_CONTEXT: {}, EGL_NO_SURFACE: {} }) } as unknown as PlusAndroid;
+    expect(readAndroidGpu(android)).toBe("Adreno test renderer");
+    expect(invoke.mock.calls.some((call) => call[1] === "eglDestroySurface")).toBe(true);
+    expect(invoke.mock.calls.some((call) => call[1] === "eglDestroyContext")).toBe(true);
+    expect(invoke.mock.calls.some((call) => call[1] === "eglTerminate")).toBe(false);
   });
 });

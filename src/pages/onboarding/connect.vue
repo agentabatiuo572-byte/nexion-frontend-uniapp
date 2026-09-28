@@ -47,7 +47,7 @@
 
       <!-- Phase: result: the server score is the only public calibration figure. -->
       <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
-        <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore}/100`">
+        <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
           <view class="cn-score__aurora" aria-hidden="true" />
           <svg class="cn-score__hex" viewBox="0 0 220 220" aria-hidden="true" focusable="false">
             <path class="cn-score__ring cn-score__ring--halo" :d="scoreHexPath" />
@@ -55,7 +55,7 @@
           </svg>
           <view class="cn-score__num">
             <text class="cn-score__v">{{ shownScore }}</text>
-            <text class="cn-score__d">/100</text>
+            <text class="cn-score__d">{{ t.onboarding.phoneComputeUnit }}</text>
           </view>
         </view>
       </view>
@@ -133,6 +133,8 @@ const auth = useAuth();
 // Recalibrate mode (?mode=recalibrate) = new-device re-measure; otherwise the
 // first-time onboarding calibration. Set in onLoad.
 const isRecal = ref(false);
+const isLogin = ref(false);
+let loginCheckNeeded = false;
 const resumeDeferred = ref(false);
 
 type Phase = "intro" | "calibrating" | "result" | "error";
@@ -142,12 +144,13 @@ const rulesExpanded = ref(false);
 const shownScore = ref(0);
 let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
+const failureCode = ref("");
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
 // sandbox, and remote cannot turn device observations into business facts.
 const canonical = ref<OnboardingCalibration | null>(null);
-const finalScore = computed(() => canonical.value?.score ?? 0);
+const finalScore = computed(() => canonical.value?.computeValue ?? 0);
 
 let mounted = true;
 let accountEpoch = 0;
@@ -188,10 +191,17 @@ const titleText = computed(() => phase.value === "error" && failedAction.value !
   : isRecal.value ? t.value.onboarding.recalTitle : t.value.onboarding.calibrationTitle);
 const subText = computed(() => (isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle));
 const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalActivate : t.value.onboarding.activatePhone));
-const failureDetail = computed(() => failedAction.value === "calibration"
+const failureDetail = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
+  ? t.value.onboarding.phoneCalibrationPendingBody
+  : failureCode.value === "PHONE_REPLACEMENT_DISABLED" ? t.value.onboarding.phoneReplacementDisabled
+  : failureCode.value === "PHONE_REPLACEMENT_COOLDOWN" ? t.value.onboarding.phoneReplacementCooldown
+  : failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED" ? t.value.onboarding.phoneCalibrationRulesChanged
+  : failedAction.value === "calibration"
   ? t.value.onboarding.calibrationRetry
   : t.value.onboarding.activationBindRetry);
-const failureTitle = computed(() => failedAction.value === "calibration"
+const failureTitle = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
+  ? t.value.onboarding.phoneCalibrationPendingTitle
+  : failedAction.value === "calibration"
   ? t.value.onboarding.calibrationFailedTitle
   : t.value.onboarding.activationFailedTitle);
 
@@ -215,10 +225,23 @@ const activationBusy = ref(false);
 
 async function startCalibration() {
   if (!nativePhoneAvailable) return;
+  failureCode.value = "";
   canonical.value = null;
   activationIntent = null;
   const requestScope = { ...currentScope(), generation: ++requestGeneration };
   try {
+    if (loginCheckNeeded) {
+      const status = await onboardingCalibrationApi.phoneLogin(getDeviceId());
+      if (!scopeIsCurrent(requestScope)) return;
+      if (status === "BOUND") {
+        navReset({ url: "/pages/index/index", fail: () => {} });
+        return;
+      }
+      if (status !== "NEEDS_CALIBRATION" && status !== "REPLACEMENT_REQUIRED") throw new Error(status);
+      loginCheckNeeded = false;
+      phase.value = "intro";
+      return;
+    }
     const result = await calibrationFlow.run({ deviceId: getDeviceId(), accountKey: accountKey(),
       isCurrent: () => scopeIsCurrent(requestScope), recalibrate: isRecal.value || resumeDeferred.value });
     if (!acceptCurrentCanonical(requestScope, result)) return;
@@ -228,10 +251,16 @@ async function startCalibration() {
       phase.value = "intro";
       return;
     }
-    if (!result.calibrationAvailable) throw new Error("ONBOARDING_CALIBRATION_UNAVAILABLE");
+    if (!result.calibrationAvailable || result.calibrationStatus !== "MATCHED") {
+      failedAction.value = "calibration";
+      resumeDeferred.value = true;
+      phase.value = "error";
+      return;
+    }
     phase.value = "result";
-  } catch {
+  } catch (cause) {
     if (!mounted || !isCurrentOnboardingCalibrationScope(requestScope, currentScope())) return;
+    failureCode.value = cause instanceof Error ? cause.message : "";
     failedAction.value = "calibration";
     phase.value = "error";
   }
@@ -244,7 +273,7 @@ watch([phase, finalScore], ([next, score]) => {
   scoreTimer = null;
   shownScore.value = 0;
   if (next !== "result") return;
-  const target = Math.max(0, Math.min(100, score));
+  const target = Math.max(0, score);
   if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     shownScore.value = target;
     return;
@@ -252,7 +281,7 @@ watch([phase, finalScore], ([next, score]) => {
   const start = Date.now();
   scoreTimer = setInterval(() => {
     const progress = Math.min(1, (Date.now() - start) / 900);
-    shownScore.value = Math.round(progress * target);
+    shownScore.value = progress === 1 ? target : Math.round(progress * target);
     if (progress === 1 && scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
   }, 30);
 }, { immediate: true });
@@ -269,6 +298,12 @@ watch(phase, (p) => {
 
 function retryCalibration() {
   if (!nativePhoneAvailable || activationBusy.value) return;
+  if (failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED") {
+    calibrationFlow.reset();
+    resumeDeferred.value = true;
+    phase.value = "calibrating";
+    return;
+  }
   if (failedAction.value === "activate") {
     if (!canonical.value?.calibrationAvailable) {
       resumeDeferred.value = true;
@@ -309,7 +344,8 @@ function completeOnboardingLocally(): boolean {
 }
 
 async function activate() {
-  if (!nativePhoneAvailable || !mounted || !canonical.value?.calibrationAvailable || activationBusy.value) return;
+  if (!nativePhoneAvailable || !mounted || !canonical.value?.calibrationAvailable
+      || canonical.value.calibrationStatus !== "MATCHED" || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   const before = canonical.value;
@@ -332,8 +368,6 @@ async function activate() {
     }
     if (!acceptCurrentCanonical(requestScope, activated)) return;
     if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
-    app.applyPhoneCalibration({ score: activated.score!, tier: activated.tier!, tops: activated.tops!,
-      baseRateUsdt: activated.baseRateUsdt!, baseRateNex: activated.baseRateNex!, signals: activated.signals! });
     if (!useSession().markCalibrated(auth.email || auth.accountId || "default")
         || !completeOnboardingLocally()) {
       throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
@@ -345,8 +379,9 @@ async function activate() {
     void app.refreshRemoteFleet();
     if (isRecal.value) app.resumeMining();
     navReset({ url: "/pages/index/index", fail: () => {} });
-  } catch {
+  } catch (cause) {
     if (scopeIsCurrent(requestScope)) {
+      failureCode.value = cause instanceof Error ? cause.message : "";
       failedAction.value = "activate";
       phase.value = "error";
     }
@@ -356,6 +391,7 @@ async function activate() {
 }
 
 async function deferPhoneActivation() {
+  if (isLogin.value) { void navReset({ url: "/pages/index/index", fail: () => {} }); return; }
   if (!nativePhoneAvailable || !mounted || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
@@ -394,16 +430,17 @@ async function deferPhoneActivation() {
 function leaveConnect() {
   if (activationBusy.value || phase.value === "calibrating") return;
   requestGeneration += 1;
-  navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
+  navReset({ url: isLogin.value ? "/pages/index/index" : isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
 }
 
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.mode === "recalibrate") isRecal.value = true;
   if (o.mode === "resume") resumeDeferred.value = true;
+  if (o.mode === "login") { isLogin.value = true; isRecal.value = true; loginCheckNeeded = true; }
 });
 onMounted(() => {
-  if (nativePhoneAvailable && !isRecal.value && !resumeDeferred.value) phase.value = "calibrating";
+  if (nativePhoneAvailable && (isLogin.value || (!isRecal.value && !resumeDeferred.value))) phase.value = "calibrating";
 });
 onBackPress(() => { leaveConnect(); return true; });
 onUnmounted(() => {

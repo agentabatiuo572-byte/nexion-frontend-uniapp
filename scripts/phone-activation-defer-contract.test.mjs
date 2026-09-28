@@ -67,7 +67,8 @@ test("deferred activation is a persisted non-active state, not a forced recalibr
 test("successful activation is confirmed by the server before local compute starts", () => {
   const page = read("src/pages/onboarding/connect.vue");
   assert.match(page, /await onboardingCalibrationApi\.activate\(/);
-  assert.ok(page.indexOf("await onboardingCalibrationApi.activate(") < page.indexOf("app.applyPhoneCalibration("));
+  assert.ok(page.indexOf("await onboardingCalibrationApi.activate(") < page.indexOf("app.refreshRemoteFleet("));
+  assert.doesNotMatch(page, /applyPhoneCalibration/);
 });
 
 test("new phone fixture starts inactive and produces no seeded phone reward", () => {

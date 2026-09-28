@@ -53,6 +53,8 @@ export interface ApiRequest {
 }
 
 export interface ApiClient {
+  /** Holds the current authentication identity across a multi-request operation. */
+  captureSessionGuard?(): () => void;
   request<T>(request: ApiRequest): Promise<T>;
   upload<T>(request: ApiUploadRequest): Promise<T>;
   refreshSession(): Promise<SessionSnapshot>;
@@ -467,7 +469,18 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return envelope.data as T;
   }
 
-  return { request, upload, refreshSession };
+  function captureSessionGuard(): () => void {
+    const original = options.vault.read();
+    const revision = options.vault.revision();
+    return () => {
+      const current = options.vault.read();
+      if (!original || !current || current.user.userId !== original.user.userId
+          || (options.vault.revision() !== revision && !options.vault.isRefreshContinuation(revision))) {
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      }
+    };
+  }
+  return { request, upload, refreshSession, captureSessionGuard };
 }
 
 export function createUniHttpTransport(): HttpTransport {

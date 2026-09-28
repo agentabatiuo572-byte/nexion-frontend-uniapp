@@ -315,7 +315,7 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
         || (isCharging !== null && typeof isCharging !== "boolean")) {
         throw new ApiError({ kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID" });
       }
-      await client.request<unknown>({
+      await nativePhoneRequest<unknown>(client, localDeviceId, {
         path: "/api/tasks/phone/runtime",
         method: "POST",
         body: { calibrationDeviceId: localDeviceId, batteryLevel, networkReachable, isCharging },
@@ -345,3 +345,4 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
     },
   };
 }
+import { nativePhoneRequest } from "@/lib/native-phone-proof";
