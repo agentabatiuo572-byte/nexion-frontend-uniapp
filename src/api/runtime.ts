@@ -2,6 +2,7 @@ import { createAccountApi } from "./account-api";
 import { createUniHttpTransport } from "./api-client";
 import { createAuthApi } from "./auth-api";
 import { createPaymentApi } from "./payment-api";
+import { createCregisDepositApi } from "./cregis-deposit-api";
 import { createProductCatalogApi } from "./product-catalog-api";
 import { createProductNotificationApi } from "./product-notification-api";
 import { createProductPhaseApi } from "./product-phase-api";
@@ -112,6 +113,7 @@ export const apiClient = createRuntimeApiClient({
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface });
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
+export const cregisDepositApi = createCregisDepositApi(apiClient);
 export const productCatalogApi = createProductCatalogApi(apiClient);
 export const productNotificationApi = createProductNotificationApi(apiClient, expectedApiEnvironment);
 export const productPhaseApi = createProductPhaseApi(apiClient);

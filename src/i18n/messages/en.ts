@@ -6178,6 +6178,8 @@ export const en = {
     confirmingProgress: "Confirming {n}/{total}",
     depositCredited: "Credited",
     dustHoldNote: "Below the minimum deposit — see Bills for the outcome",
+    dustHoldServerNote: "Below the minimum deposit. Not credited yet; check this page or contact support.",
+    reviewHoldNote: "This deposit has not been added to your balance yet. Check this page or contact support.",
     depositReturned: "Returned · see Bills",
     confirmDelayed: "Network congested — confirmation is taking longer",
     channelPaused: "Paused — please choose another network",

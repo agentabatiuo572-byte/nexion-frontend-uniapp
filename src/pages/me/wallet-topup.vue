@@ -1,8 +1,6 @@
 <!--
   WalletTopup — 充值页(PAY-规格 [FEAT-PAY01] ⑤ 信息架构,参照 pay-vn-rails.html)。
-  顶部 segmented 通道切换 —「USDT 链上」= <DepositUsdtPane>(三网络 chip + 专属地址
-  QR + 最近入金);「银行转账」= <DepositBankPane>(VietQR 意向单流,[FEAT-PAY02]);
-  「银行卡」= <TopupCardForm> 原样接入。
+  正式模式提供 USDT-BEP20 与银行转账两个入口；本地非正式模式仍可展示旧卡片原型。
 
   Wrapped in <AppChassis active="me">. Header is the shared sticky <SubPageHeader>
   (back=/pages/me/wallet).
@@ -12,13 +10,9 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
-      <!-- Remote runtime: VietQR is the server-authoritative funding rail. -->
-      <DepositBankPane v-if="remoteApiEnabled" />
-
-      <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
-      <view v-else class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.wallet.chooseMethod">
+      <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.wallet.chooseMethod">
         <view
-          v-for="(s, i) in SEGMENTS"
+          v-for="(s, i) in segments"
           :key="s.id"
           :class="['nx-topup-seg flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
@@ -34,16 +28,9 @@
         </view>
       </view>
 
-      <template v-if="!remoteApiEnabled">
-        <!-- USDT 链上通道段 -->
-        <DepositUsdtPane v-if="seg === 'crypto'" />
-
-        <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
-        <DepositBankPane v-else-if="seg === 'bank'" />
-
-        <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
-        <TopupCardForm v-else @change-channel="seg = 'crypto'" />
-      </template>
+      <DepositUsdtPane v-if="seg === 'crypto'" />
+      <DepositBankPane v-else-if="seg === 'bank'" />
+      <TopupCardForm v-else @change-channel="seg = 'crypto'" />
     </view>
   </AppChassis>
 </template>
@@ -62,6 +49,7 @@ import { useDeposits } from "@/store/deposits";
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
 const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
+const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card") : SEGMENTS;
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 function segLabel(id: Seg): string {
   const tc = t.value.topupChrome;
@@ -78,7 +66,7 @@ function segLabel(id: Seg): string {
  * 这恰恰是「方向键动了但焦点没动」那类复验失败的成因,必须在 nextTick 之后聚焦。
  */
 function moveSeg(index: number, delta: number): void {
-  const next = SEGMENTS[(index + delta + SEGMENTS.length) % SEGMENTS.length];
+  const next = segments[(index + delta + segments.length) % segments.length];
   if (!next || next.id === seg.value) return;
   seg.value = next.id;
   void nextTick(() => {

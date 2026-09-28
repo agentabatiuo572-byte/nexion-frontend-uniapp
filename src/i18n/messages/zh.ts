@@ -6017,6 +6017,8 @@ export const zh: Messages = {
     confirmingProgress: "确认中 {n}/{total}",
     depositCredited: "已到账",
     dustHoldNote: "低于最低充值额 · 处理结果以账单为准",
+    dustHoldServerNote: "低于最低充值额，暂未计入余额；请在本页查看状态或联系客服",
+    reviewHoldNote: "该笔充值暂未计入余额，请在本页查看状态或联系客服",
     depositReturned: "已退回 · 详情见账单",
     confirmDelayed: "网络拥堵,确认时间延长",
     channelPaused: "暂停服务,请选择其他网络",

@@ -61,7 +61,6 @@ const LEDGER = {
   "GET /api/config/v-ranks": "PRD §9.11c.1",
   "GET /api/config/bank-accounts": "PRD §9.2.8",
   "GET /api/config/deposit-channels": "PRD §9.2.8",
-  "/api/config/deposit-channels": "PRD §9.2.8",
   "/api/config/leadership-pool": "PRD §9.11c.1",
   "/api/config/tradein": "PRD §7.5.1 / §9.11c.1",
   "GET /api/config/fx": "PRD §9.11c.1",
