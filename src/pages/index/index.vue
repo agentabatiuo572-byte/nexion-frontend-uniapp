@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, onUnmounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useGenesisConfig } from "@/store/genesis-config";
@@ -369,7 +369,16 @@ watch(taskCardSignature, () => {
   taskCarouselAnnouncement.value = "";
 });
 
+function onTaskWindowResize() {
+  measureNewcomerContent();
+}
+
+onMounted(() => {
+  uni.onWindowResize(onTaskWindowResize);
+});
+
 onUnmounted(() => {
+  uni.offWindowResize(onTaskWindowResize);
   newcomerContentResizer.invalidate();
 });
 

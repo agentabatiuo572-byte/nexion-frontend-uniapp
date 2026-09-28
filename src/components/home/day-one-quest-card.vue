@@ -10,7 +10,7 @@
     <view class="newcomer-task__summary">
       <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
         <view style="min-width: 0">
-          <view style="display: flex; align-items: center; gap: 7px">
+          <view style="display: flex; align-items: center; flex-wrap: wrap; gap: 7px">
             <view class="newcomer-task__mark" aria-hidden="true">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m13 2-9 12h8l-1 8 9-12h-8z" />
@@ -24,9 +24,9 @@
             <text style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
           </view>
         </view>
-        <view v-if="!questUnavailable && (!remoteApiEnabled || dayOneWindow)" style="text-align: right">
-          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
-          <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
+        <view v-if="!questUnavailable && (!remoteApiEnabled || dayOneWindow)" style="text-align: right; flex-shrink: 0">
+          <text v-if="!dayOneExpired" class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
+          <text class="block" :style="{ marginTop: dayOneExpired ? '0' : '4px' }" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1" :aria-label="dayOneExpired ? t.home.dayOneExpired : undefined">{{ dayOneExpired ? t.quest.expired : remainingLabel }}</text>
         </view>
       </view>
 
@@ -243,6 +243,7 @@ const remainingMs = computed(() => remoteApiEnabled
     ? Date.parse(dayOneWindow.value?.eligibleUntil ?? "") - nowTick.value * 1000
     : 18 * 60 * 60 * 1000 + 24 * 60 * 1000 - ((nowTick.value * 1000) % 60_000));
 const dayOneExpired = computed(() => remoteApiEnabled && Number.isFinite(remainingMs.value) && remainingMs.value <= 0);
+watch(dayOneExpired, () => emit("content-resize"), { flush: "post" });
 const remainingLabel = computed(() => {
   const remaining = remainingMs.value;
   if (!Number.isFinite(remaining)) return "—";
@@ -350,7 +351,7 @@ function rewardStyle(task: QuestTask): CSSProperties {
 const rootStyle = computed<CSSProperties>(() => ({
   position: "relative",
   boxSizing: "border-box",
-  height: expanded.value || (remoteApiEnabled && (claimState.value.claimCode || quest.dayOneClaiming || quest.dayOneClaimError)) ? "auto" : "var(--home-task-card-height, 184px)",
+  height: "auto",
   minHeight: "var(--home-task-card-height, 184px)",
   borderRadius: "16px",
   background: "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",

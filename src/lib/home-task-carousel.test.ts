@@ -229,12 +229,16 @@ describe("home task carousel", () => {
     expect(resizer.measure(0)).toBe(true);
     pendingMeasurements.shift()?.(260.8);
     expect(viewportHeight).toBe(261);
+    // A wider viewport can shrink the card back to the baseline height.
+    expect(resizer.measure(0)).toBe(true);
+    pendingMeasurements.shift()?.(184);
+    expect(viewportHeight).toBe(184);
     // A locale-change resize remains measurable, while a hidden or late card
     // notification cannot alter the weekly viewport.
     expect(resizer.measure(0)).toBe(true);
     activeIndex = 1;
     pendingMeasurements.shift()?.(320);
-    expect(viewportHeight).toBe(261);
+    expect(viewportHeight).toBe(184);
     expect(resolveHomeTaskCarouselHeight(0)).toBe(HOME_TASK_CARD_COLLAPSED_HEIGHT);
     expect(shouldMeasureHomeNewcomerContent(cards, 0, 1)).toBe(false);
 
@@ -242,7 +246,7 @@ describe("home task carousel", () => {
     expect(resizer.measure(0)).toBe(true);
     resizer.invalidate();
     pendingMeasurements.shift()?.(400);
-    expect(viewportHeight).toBe(261);
+    expect(viewportHeight).toBe(184);
     resizer.reset();
     expect(viewportHeight).toBe(HOME_TASK_CARD_COLLAPSED_HEIGHT);
 
@@ -251,5 +255,7 @@ describe("home task carousel", () => {
     expect(homePageSource).toContain('@content-resize="onNewcomerContentResize(index)"');
     expect(homePageSource).toContain("createHomeNewcomerContentResizer");
     expect(homePageSource).toContain("newcomerContentResizer.measure(taskSlide.value)");
+    expect(homePageSource).toContain("uni.onWindowResize(onTaskWindowResize)");
+    expect(homePageSource).toContain("uni.offWindowResize(onTaskWindowResize)");
   });
 });

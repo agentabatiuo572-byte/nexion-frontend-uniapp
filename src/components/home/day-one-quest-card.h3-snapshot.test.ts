@@ -21,6 +21,7 @@ const render = new Function("Vue", compile(template, {
 const home = {
   dayOneFirstDayReward: "Day-One reward",
   dayOneEndsIn: "Ends in",
+  dayOneExpired: "Eligibility ended",
   dayOneLoading: "Loading live tasks…",
   dayOneUnavailable: "Tasks unavailable",
   dayOneRetryLoad: "Tap to retry",
@@ -38,14 +39,16 @@ const home = {
 function renderCard(
   claimState: { empty: boolean; claimed: boolean; unverified: boolean; claimCode: string | null },
   unavailable = false,
+  expired = false,
 ) {
   const component = {
     setup: () => ({
-      props: { active: true }, expanded: false, rootStyle: {}, t: { home },
+      props: { active: true }, expanded: false, rootStyle: {}, t: { home, quest: { expired: "EXPIRED" } },
       taskCountText: unavailable ? home.dayOneUnavailable : "0 tasks", rewardText: "—",
       questUnavailable: unavailable, questLoadError: unavailable,
       unavailableLabel: home.dayOneUnavailable,
-      remoteApiEnabled: true, dayOneWindow: null, remainingLabel: "—", barStyle: {},
+      remoteApiEnabled: true, dayOneWindow: expired ? {} : null, dayOneExpired: expired,
+      remainingLabel: "—", barStyle: {},
       completedCount: 0, total: 0, claimState, nexEarnedText: "0", tasks: [],
       quest: { dayOneClaiming: false, dayOneClaimError: false }, toggleStyle: {},
       toggleLabel: unavailable ? home.dayOneRetryLoad : "View tasks",
@@ -89,5 +92,12 @@ describe("DayOneQuestCard H3 snapshot presentation", () => {
     const html = await renderCard({ empty: false, claimed: false, unverified: false, claimCode: "frozen-1" });
     expect(html).toContain(home.dayOneClaimReward);
     expect(html).toContain("newcomer-task__claim");
+  });
+
+  it("shows an expired state without an active countdown label", async () => {
+    const html = await renderCard({ empty: false, claimed: false, unverified: false, claimCode: null }, false, true);
+    expect(html).toContain("EXPIRED");
+    expect(html).toContain('aria-label="Eligibility ended"');
+    expect(html).not.toContain("Ends in");
   });
 });
