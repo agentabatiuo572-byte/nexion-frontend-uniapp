@@ -5859,6 +5859,8 @@ export const vi: Messages = {
   },
 
   notifs: {
+    originalTextLabel: "Thông báo gốc",
+    originalTextNote: "Nội dung thông báo được giữ nguyên như lúc gửi. Đổi ngôn ngữ ứng dụng không dịch các thông báo cũ.",
     minutesAgo: "{n} phút trước",
     hoursAgo: "{n} giờ trước",
     daysAgo: "{n} ngày trước",

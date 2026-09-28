@@ -74,8 +74,8 @@ function parseNotification(value: unknown): CanonicalNotification {
   const id = integer(row?.id, 1);
   const kind = text(row?.kind);
   const priority = text(row?.priority)?.toLowerCase() as CanonicalNotificationPriority;
-  const title = text(row?.title);
-  const body = text(row?.body, true);
+  const title = typeof row?.title === "string" && row.title.trim() ? row.title : null;
+  const body = typeof row?.body === "string" ? row.body : null;
   const ctaLabel = text(row?.ctaLabel, true);
   const ctaHref = text(row?.ctaHref, true);
   const createdAt = timestamp(row?.createdAt);

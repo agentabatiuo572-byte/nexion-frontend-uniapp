@@ -6011,6 +6011,8 @@ export const en = {
   },
 
   notifs: {
+    originalTextLabel: "Original notification",
+    originalTextNote: "Notification content is kept as sent. Changing the app language does not translate earlier messages.",
     minutesAgo: "{n}m ago",
     hoursAgo: "{n}h ago",
     daysAgo: "{n}d ago",

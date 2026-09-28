@@ -66,6 +66,8 @@
         </view>
       </scroll-view>
 
+      <text v-if="remoteApiEnabled && notifs.items.length" class="block px-4" :style="timeStyle">{{ t.notifs.originalTextNote }}</text>
+
       <!-- Timeline -->
       <view class="px-4">
         <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle">
@@ -112,6 +114,7 @@
                 <text class="shrink-0" :style="timeStyle">{{ timeAgo(n.ts) }}</text>
               </view>
               <text v-if="n.body" class="block" :style="bodyStyle">{{ n.body }}</text>
+              <text v-if="remoteApiEnabled" class="block" :style="timeStyle">{{ t.notifs.originalTextLabel }}</text>
               <text v-if="n.ctaLabel" class="block" :style="ctaStyle(n.kind)">{{ n.ctaLabel }} →</text>
             </view>
           </view>
