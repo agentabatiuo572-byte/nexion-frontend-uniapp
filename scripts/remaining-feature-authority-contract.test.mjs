@@ -210,11 +210,13 @@ test("remote passwordless login uses the server OTP contract", () => {
   assert.doesNotMatch(page, /PASSWORD_RESET_PROVIDER_HOLD/);
 });
 
-test("remote top-up exposes only authoritative VietQR while external rails stay HOLD", () => {
+test("remote top-up exposes server-backed USDT and VietQR without card", () => {
   const topup = read("src/pages/me/wallet-topup.vue");
   const pane = read("src/components/me/deposit-bank-pane.vue");
   const deposits = read("src/store/deposits.ts");
-  assert.match(topup, /remoteApiEnabled[\s\S]{0,500}DepositBankPane/);
+  assert.match(topup, /const segments = remoteApiEnabled \? SEGMENTS\.filter\(\(item\) => item\.id !== "card"\)/);
+  assert.match(topup, /<DepositUsdtPane v-if="seg === 'crypto'" \/>/);
+  assert.match(topup, /<DepositBankPane v-else-if="seg === 'bank'" \/>/);
   assert.doesNotMatch(topup, /v-if="remoteApiEnabled"[\s\S]{0,200}railsClosedTitle/);
   assert.match(deposits, /paymentApi\.createVietQrIntent\(/);
   assert.match(deposits, /paymentApi\.listVietQrIntents\(/);

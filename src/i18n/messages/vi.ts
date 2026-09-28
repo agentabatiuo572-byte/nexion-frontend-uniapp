@@ -6024,6 +6024,8 @@ export const vi: Messages = {
     confirmingProgress: "Đang xác nhận {n}/{total}",
     depositCredited: "Đã vào tài khoản",
     dustHoldNote: "Dưới mức nạp tối thiểu · kết quả sẽ hiển thị trong Hóa đơn",
+    dustHoldServerNote: "Dưới mức nạp tối thiểu, chưa cộng vào số dư; xem trạng thái tại đây hoặc liên hệ hỗ trợ.",
+    reviewHoldNote: "Khoản nạp này chưa được cộng vào số dư. Vui lòng xem trạng thái tại đây hoặc liên hệ hỗ trợ.",
     depositReturned: "Đã hoàn trả · xem Hóa đơn",
     confirmDelayed: "Mạng tắc nghẽn, xác nhận lâu hơn bình thường",
     channelPaused: "Tạm dừng dịch vụ, vui lòng chọn mạng khác",

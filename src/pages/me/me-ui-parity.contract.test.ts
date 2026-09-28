@@ -190,7 +190,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // #88: channel tabs expose a group name and per-tab names alongside aria-selected.
   // #94: 通道 tablist 补齐 roving tabindex(选中项 0、其余 -1)与左右方向键 ——
   //      只加 role=tab 而每个成员都 tabindex="0" 不是 roving,组内方向键也无效。
-  "wallet-topup.vue": "124e03f7fb3a1debb1ed8a658e3c612d4c84f9ac486189c190a3484acd507b9b",
+  // The formal page now exposes the approved USDT-BEP20 channel alongside the bank rail.
+  "wallet-topup.vue": "6835cbe6f5e688fe1c465861807c01d9b37df11eff7cdf070396d21e55987d9b",
   // Deep-link tracking waits for an owned exact read and distinguishes loading,
   // retryable read failure, and server-confirmed absence from a memory miss.
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
