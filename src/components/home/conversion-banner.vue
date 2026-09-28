@@ -38,8 +38,6 @@
             </svg>
           </view>
           <text class="weekly-quest__title">{{ t.home.weeklyQuestEyebrow }}</text>
-          <text v-if="categoryText" class="weekly-quest__category">{{ categoryText }}</text>
-          <text class="weekly-quest__multiplier">{{ weeklyState === "ready" && promoMult !== null ? `${promoMult}×` : "—" }}</text>
         </view>
         <view class="weekly-quest__countdown">
           <text class="weekly-quest__countdown-label">{{ t.home.weeklyQuestEndsIn }}</text>
@@ -57,9 +55,15 @@
         <text class="weekly-quest__state-copy">{{ t.weeklyQuest.noTaskAction }}</text>
       </view>
       <view v-else class="weekly-quest__body">
-        <view class="weekly-quest__reward">
-          <text class="weekly-quest__reward-value">+{{ finalRewardText }}</text>
-          <text class="weekly-quest__reward-unit">NEX</text>
+        <view class="weekly-quest__reward-row">
+          <view class="weekly-quest__reward">
+            <text class="weekly-quest__reward-value" :style="{ fontSize: rewardFontSize }">+{{ finalRewardText }}</text>
+            <text class="weekly-quest__reward-unit">NEX</text>
+          </view>
+          <view class="weekly-quest__badges">
+            <text v-if="categoryText" class="weekly-quest__category">{{ categoryText }}</text>
+            <text class="weekly-quest__multiplier">{{ weeklyState === "ready" && promoMult !== null ? `${promoMult}×` : "—" }}</text>
+          </view>
         </view>
         <text class="weekly-quest__subtitle" :aria-label="subtitleText" :title="subtitleText">{{ subtitleText }}</text>
         <view v-if="weeklyCard.targetDaily !== null" class="weekly-quest__rate">
@@ -160,6 +164,11 @@ const finalRewardText = computed(() => {
   const reward = weeklyCard.value.rewardNex;
   return reward === null ? "—" : reward.toLocaleString();
 });
+// Scale long server rewards so the full number and task badges share one row.
+const rewardFontSize = computed(() => {
+  const chars = Math.max(7, finalRewardText.value.length);
+  return `${Math.max(12, Math.min(34, Math.floor((34 * 7) / chars)))}px`;
+});
 
 const remainingLabel = computed(() => {
   const days = weeklyCard.value.countdownDays;
@@ -258,7 +267,7 @@ function onCardAction() {
   z-index: 1;
   box-sizing: border-box;
   height: 100%;
-  padding: 14px 16px;
+  padding: 8px 16px;
 }
 
 .weekly-quest__header {
@@ -273,6 +282,7 @@ function onCardAction() {
 .weekly-quest__identity {
   display: flex;
   min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 7px;
 }
@@ -288,17 +298,20 @@ function onCardAction() {
 }
 
 .weekly-quest__title {
+  min-width: 0;
+  overflow: hidden;
   font-family: var(--font-v5);
   font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .weekly-quest__multiplier {
   display: inline-flex;
-  height: 22px;
-  padding: 0 8px;
+  height: 18px;
+  padding: 0 6px;
   align-items: center;
   border-radius: 999px;
   border: 1px solid var(--v5-brand);
@@ -338,18 +351,35 @@ function onCardAction() {
 .weekly-quest__body {
   position: relative;
   z-index: 2;
-  width: 62%;
-  margin-top: 6px;
+  width: 100%;
+  margin-top: 0;
+}
+
+.weekly-quest__reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.weekly-quest__badges {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
 }
 
 .weekly-quest__category {
-  padding: 2px 6px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--v5-brand-soft);
   font-family: var(--font-v5);
   font-size: 12px;
   font-weight: 500;
   color: var(--v5-brand);
+  line-height: 14px;
   white-space: nowrap;
 }
 
@@ -395,8 +425,9 @@ function onCardAction() {
 }
 
 .weekly-quest__subtitle {
-  display: block;
-  margin-top: 4px;
+  display: -webkit-box;
+  width: 90%;
+  margin-top: 0;
   overflow: hidden;
   font-family: var(--font-v5);
   font-size: 13px;
@@ -404,14 +435,15 @@ function onCardAction() {
   color: var(--v5-ink-3);
   letter-spacing: -0.008em;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .weekly-quest__rate {
   display: flex;
   align-items: baseline;
-  margin-top: 3px;
+  margin-top: 0;
   font-family: var(--font-jet-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   line-height: 1;
