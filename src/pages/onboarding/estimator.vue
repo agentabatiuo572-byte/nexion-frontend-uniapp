@@ -13,23 +13,23 @@
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
       <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-      <text class="est-hint">{{ nativePhoneAvailable ? (deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : t.myDevices.phoneActivationAppOnlyBody }}</text>
+      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : t.myDevices.phoneActivationAppOnlyBody }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
     <view v-if="nativePhoneAvailable" class="est-reveal">
       <transition name="est-fade" mode="out-in">
         <view v-if="loadFailed || deferred" key="failed" class="est-loading est-loading--failed">
-          <text class="est-loading__t">{{ deferred ? t.onboarding.activationDefer : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
-          <text v-if="loadFailed" class="est-failed__hint">{{ calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingBody : t.onboarding.calibrationRetry }}</text>
-          <text class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
+          <text class="est-loading__t">{{ deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDefer : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
+          <text v-if="loadFailed" class="est-failed__hint">{{ failureDetail }}</text>
+          <text v-if="!deferFailed" class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
           <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
           <view class="est-failed__actions">
             <view class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
               @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
               <text>{{ deferred ? t.onboarding.calibrationStart : t.onboarding.activationRetry }}</text>
             </view>
-            <view class="est-failed__button" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
+            <view v-if="!deferFailed" class="est-failed__button" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
               @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
               <text>{{ t.onboarding.activationDefer }}</text>
             </view>
@@ -122,16 +122,23 @@ import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { collectDeviceSignals } from "@/lib/device-signals";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
+import { phoneCalibrationErrorDetail } from "@/lib/phone-calibration-error";
 
 const t = useT();
 const app = useApp();
 const auth = useAuth();
 const detected = ref(false);
 const loadFailed = ref(false);
+const failureCode = ref("");
+const deferFailed = ref(false);
 const deferred = ref(false);
 const loading = ref(false);
 const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
+const failureDetail = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION"
+  ? t.value.onboarding.phoneCalibrationPendingBody
+  : phoneCalibrationErrorDetail(failureCode.value, t.value.onboarding, deferFailed.value)
+    ?? (deferFailed.value ? t.value.onboarding.activationDeferFailed : t.value.onboarding.calibrationRetry));
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
 const phone = comparison("phone");
 const s1 = comparison("s1");
@@ -169,6 +176,8 @@ function loadCalibration(recalibrate = false) {
   if (!nativePhoneAvailable) return;
   const scope = scopePair();
   loadFailed.value = false;
+  failureCode.value = "";
+  deferFailed.value = false;
   deferred.value = false;
   loading.value = true;
   void Promise.resolve().then(() => calibrationFlow.run({ deviceId: getDeviceId(), accountKey: auth.accountId,
@@ -190,10 +199,11 @@ function loadCalibration(recalibrate = false) {
     }
     calibration.value = result;
     scheduleReveal();
-  }).catch(() => {
+  }).catch((cause) => {
     if (!mounted || !isCurrentEstimatorScope(scope.estimator,
       createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation))) return;
     calibration.value = null;
+    failureCode.value = cause instanceof Error ? cause.message : "";
     detected.value = false;
     loadFailed.value = true;
   }).finally(() => {
@@ -206,6 +216,7 @@ function retryCalibration() {
   if (deferBusy.value) return;
   if (!nativePhoneAvailable) return;
   if (loading.value) return;
+  if (deferFailed.value) { void deferPhoneActivation(); return; }
   if (deferred.value) {
     navReset({ url: "/pages/onboarding/connect?mode=resume", fail: () => {} });
     return;
@@ -237,6 +248,8 @@ watch(() => String(app.accountKey || ""), (next) => {
   calibrationFlow.reset();
   detected.value = false;
   loadFailed.value = false;
+  failureCode.value = "";
+  deferFailed.value = false;
   deferred.value = false;
   calibration.value = null;
   loadCalibration();
@@ -308,8 +321,12 @@ async function deferPhoneActivation() {
 
     uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
     navReset({ url: "/pages/index/index", fail: () => {} });
-  } catch {
+  } catch (cause) {
     if (isCurrent(scope)) {
+      calibration.value = null;
+      failureCode.value = cause instanceof Error ? cause.message : "";
+      deferFailed.value = true;
+      loadFailed.value = true;
       uni.showToast({ title: t.value.onboarding.activationDeferFailed, icon: "none" });
     }
   } finally {

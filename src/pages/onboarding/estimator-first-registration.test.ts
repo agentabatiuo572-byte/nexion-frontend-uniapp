@@ -12,6 +12,7 @@ function mount() {
   const start = source.indexOf("function loadCalibration(");
   const end = source.indexOf("function retryCalibration()", start);
   const loading = ref(false), deferred = ref(false), loadFailed = ref(false), calibration = ref<unknown>(null), detected = ref(false);
+  const failureCode = ref(""), deferFailed = ref(false);
   let current = true;
   const result = vi.fn();
   const calibrate = vi.fn();
@@ -20,10 +21,10 @@ function mount() {
     batteryLevel: null, charging: null, networkReachable: null,
   }), key: () => "first-calibration" });
   const code = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  const load = new Function("scopePair", "isCurrent", "loading", "deferred", "loadFailed", "calibration", "detected",
+  const load = new Function("scopePair", "isCurrent", "loading", "deferred", "loadFailed", "failureCode", "deferFailed", "calibration", "detected",
     "calibrationFlow", "getDeviceId", "auth", "scheduleReveal", "mounted", "isCurrentEstimatorScope", "createEstimatorScope", "app", "accountEpoch", "generation", "nativePhoneAvailable",
     `${code}\nreturn loadCalibration;`,
-  )(() => ({}), () => current, loading, deferred, loadFailed, calibration, detected, calibrationFlow, () => "test-device",
+  )(() => ({}), () => current, loading, deferred, loadFailed, failureCode, deferFailed, calibration, detected, calibrationFlow, () => "test-device",
     { accountId: "user:42", isAuthenticated: true }, () => { detected.value = true; }, true,
     () => current, () => ({}), { accountKey: "user:42" }, 0, 0, true);
   return { load, result, calibrate, loading, deferred, loadFailed, calibration, detected, invalidate: () => { current = false; } };
