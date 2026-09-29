@@ -47,10 +47,10 @@ function mountPage() {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
   const controls = scope.run(() => new Function(
-    'ref', 'watch', 'app', 'convStore', 'remoteApiEnabled', 'nova', 'novaAiApi',
+    'ref', 'watch', 'app', 'convStore', 'remoteApiEnabled', 'NOVA_SUPPORT_VISIBLE', 'nova', 'novaAiApi',
     'registerActivePageRefresh', 'onShow', 'onHide', 'onUnmounted',
     code + '\nreturn { retryConversations };',
-  )(ref, watch, app, store, true, { ensureRemoteHistory: async () => {} }, {},
+  )(ref, watch, app, store, true, false, { ensureRemoteHistory: async () => {} }, {},
     (callback: () => Promise<void>) => { activeRefresh = callback; return release; },
     (callback: () => Promise<void>) => { show = callback; },
     (callback: () => void) => { hide = callback; },

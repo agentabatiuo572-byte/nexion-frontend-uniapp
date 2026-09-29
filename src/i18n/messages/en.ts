@@ -1019,7 +1019,7 @@ export const en = {
       genesis: "Genesis activity",
       system: "System / compliance / regulatory",
     },
-    notifFooter: "Disabling a category suppresses the Nova drawer + notification center entries. Critical compliance notifications cannot be disabled.",
+    notifFooter: "Disabling a category suppresses its notification center entries. Critical compliance notifications cannot be disabled.",
     // zentao #214: mandatory categories cannot be switched off; say why the row is locked.
     notifMandatoryHint: "Critical compliance notice — always on, cannot be disabled",
   },
@@ -1114,7 +1114,7 @@ export const en = {
       product: "Store products",
       member: "Network members",
       faq: "FAQ + guides",
-      help: "Nova help",
+      help: "Help Center",
     },
     // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。

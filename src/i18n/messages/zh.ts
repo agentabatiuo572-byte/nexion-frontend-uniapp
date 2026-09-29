@@ -959,7 +959,7 @@ export const zh: Messages = {
       genesis: "创世节点动态",
       system: "系统 / 合规 / 监管",
     },
-    notifFooter: "禁用某类后,Nova 侧栏与通知中心不再推送对应条目。关键合规通知不可禁用。",
+    notifFooter: "禁用某类后,通知中心不再推送对应条目。关键合规通知不可禁用。",
     // 简报 #214:强制类开关不可操作,行内说明它为何锁定。
     notifMandatoryHint: "关键合规通知,强制开启,不可禁用",
   },
@@ -1054,7 +1054,7 @@ export const zh: Messages = {
       product: "商城商品",
       member: "网络成员",
       faq: "FAQ + 指南",
-      help: "Nova 帮助",
+      help: "帮助中心",
     },
     // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。

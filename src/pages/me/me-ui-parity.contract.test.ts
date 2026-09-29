@@ -249,7 +249,7 @@ describe("Me page 5174 normal-state UI parity", () => {
   it("derives the Message Center badge from conversations instead of notification campaigns", () => {
     expect(source).toContain('import { useConversations } from "@/store/conversations"');
     expect(source).toContain('import { useNova } from "@/store/nova"');
-    expect(source).toContain("const conversationUnread = computed(() => conversations.totalUnread + nova.unread)");
+    expect(source).toContain("const conversationUnread = computed(() => conversations.totalUnread + (NOVA_SUPPORT_VISIBLE ? nova.unread : 0))");
     expect(source).toContain('key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: conversationUnread.value > 0 ? String(conversationUnread.value) : undefined');
     expect(source).not.toContain("const unreadNotifs = computed(() => notifications.unread)");
   });

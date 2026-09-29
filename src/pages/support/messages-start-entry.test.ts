@@ -51,6 +51,7 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
     vue: Vue, "@dcloudio/uni-app": { onShow: vi.fn(), onHide: vi.fn() },
     "@/i18n/use-t": { useT: () => currentLocale }, "@/i18n/format": { fmt: (value: string) => value },
     "@/lib/support-idle-message": { localizedIdleClose },
+    "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: false },
     "@/lib/route": { navTo }, "@/store/conversations": { useConversations: () => store },
     "@/store/nova": { useNova: () => ({ messages: [], unread: 0 }) }, "@/store/app": { useApp: () => account },
     "@/api/runtime": { remoteApiEnabled: true }, "@/lib/active-page-refresh": { registerActivePageRefresh: vi.fn() },
@@ -224,13 +225,14 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
   const watchRealtime = vi.spyOn(store, "watchRealtime");
   const app = Vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
   const hooks: Record<string, (...args: any[]) => any> = {};
-  const navigation = { navTo: vi.fn(), navBack: vi.fn() };
+  const navigation = { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn() };
   const toast = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
   const modules: Record<string, unknown> = {
     vue: { ...Vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
     "@/i18n/use-t": { useT: () => Vue.ref(zh) }, "@/i18n/format": chatFormat,
     "@/lib/support-idle-message": { localizedIdleClose },
+    "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: false },
     "@/lib/route": navigation, "@/lib/send-limiter": chatLimiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 }, "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => store }, "@/store/nova": { useNova }, "@/store/app": { useApp: () => app },
@@ -249,6 +251,12 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
 }
 
 describe("real chat and store account recovery", () => {
+  it("redirects an old AI link before opening a category or sending a request", async () => {
+    const current = mountRealHumanChat({ type: "ai" });
+    expect(current.navigation.navReplace).toHaveBeenCalledExactlyOnceWith("/pages/support/messages");
+    await current.hooks.onShow();
+    expect(chatTransport.conversationCategories).not.toHaveBeenCalled();
+  });
   it("navigates once when the ticket conversion is clicked twice before completion", async () => {
     const current = mountRealHumanChat(); await current.hooks.onShow(); const gate = chatDeferred();
     chatTransport.convertConversationToTicket.mockReturnValueOnce(gate.promise);

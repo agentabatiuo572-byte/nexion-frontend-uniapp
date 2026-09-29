@@ -44,17 +44,18 @@ test("remote team projection never turns errors into zero or local royalty money
   assert.match(page, /projectionErrorTitle/);
 });
 
-test("global search always offers the real Nova route and carries the query", async () => {
+test("global search offers Help Center and old AI links return to the inbox", async () => {
   const [search, chat] = await Promise.all([
     read("src/pages/search/search.vue"),
     read("src/pages/support/chat.vue"),
   ]);
   assert.match(search, /group: "help"/);
-  assert.match(search, /type=ai&prompt=/);
+  assert.match(search, /href: "\/pages\/me\/help"/);
+  assert.doesNotMatch(search, /type=ai/);
   assert.match(search, /refreshProductCatalog/);
   assert.match(search, /refreshCanonicalNetwork/);
-  assert.match(chat, /initialPrompt/);
-  assert.match(chat, /key: "search-query"/);
+  assert.match(chat, /if \(!NOVA_SUPPORT_VISIBLE\) \{/);
+  assert.match(chat, /navReplace\("\/pages\/support\/messages"\)/);
 });
 
 test("remote device activation and deactivation use server CAS and verify the fleet before success", async () => {
@@ -233,6 +234,6 @@ test("remote globe and search refresh when account or canonical catalog changes"
   assert.match(globe, /void loadRegions\(\)/);
   assert.match(search, /productCatalogState/);
   assert.match(search, /productCatalogState\.status === "ready"/);
-  assert.match(search, /@keydown\.enter\.prevent="openNova\(''\)"/);
-  assert.match(search, /@keydown\.space\.prevent="openNova\(''\)"/);
+  assert.match(search, /@keydown\.enter\.prevent="openHelp"/);
+  assert.match(search, /@keydown\.space\.prevent="openHelp"/);
 });

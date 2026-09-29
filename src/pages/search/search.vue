@@ -5,8 +5,8 @@
   products, user devices, and network members. Real-time filter, grouped results.
 
   Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
-  backHref="/" → SubPageHeader back="/pages/index/index". Search and Nova
-  navigation report a visible recovery action when the target cannot open.
+  backHref="/" → SubPageHeader back="/pages/index/index". Search
+  navigation reports a visible recovery action when the target cannot open.
 -->
 <template>
   <AppChassis active="home">
@@ -41,9 +41,9 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
-        <view class="nx-search-nova active:opacity-75" role="button" tabindex="0"
-          @click="openNova('')" @keydown.enter.prevent="openNova('')" @keydown.space.prevent="openNova('')">
-          <text>{{ t.search.askNova }}</text>
+        <view class="nx-search-help active:opacity-75" role="button" tabindex="0"
+          @click="openHelp" @keydown.enter.prevent="openHelp" @keydown.space.prevent="openHelp">
+          <text>{{ t.me.helpFaq }}</text>
         </view>
       </view>
 
@@ -65,8 +65,8 @@
         kind="no-search-results"
         :title="t.empty.searchTitle"
         :desc="t.empty.searchDesc"
-        :cta-label="t.search.askNova"
-        @cta="openNova(q)"
+        :cta-label="t.me.helpFaq"
+        @cta="openHelp"
       />
 
       <EmptyState
@@ -330,9 +330,8 @@ const results = computed<Hit[]>(() => {
   }
   const help: Hit = {
     group: "help",
-    label: t.value.search.askNova,
-    sublabel: t.value.search.askNovaWithQuery.replace("{query}", q.value.trim()),
-    href: `/pages/support/chat?type=ai&prompt=${encodeURIComponent(q.value.trim())}`,
+    label: t.value.me.helpFaq,
+    href: "/pages/me/help",
   };
   return out.length ? [...out.slice(0, 29), help] : [];
 });
@@ -389,9 +388,8 @@ function openHit(h: Hit) {
   navigateWithFeedback(h.href);
 }
 
-function openNova(query: string) {
-  const suffix = query.trim() ? `&prompt=${encodeURIComponent(query.trim())}` : "";
-  navigateWithFeedback(`/pages/support/chat?type=ai${suffix}`);
+function openHelp() {
+  navigateWithFeedback("/pages/me/help");
 }
 
 function retryNavigation() {
@@ -463,7 +461,7 @@ function rowStyle(isLast: boolean): CSSProperties {
 .nx-search-row:active {
   background: var(--v5-surface-2);
 }
-.nx-search-nova {
+.nx-search-help {
   width: max-content;
   margin: 14px auto 0;
   padding: 9px 14px;

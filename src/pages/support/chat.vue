@@ -16,6 +16,7 @@
 -->
 <template>
   <view class="cp-root">
+    <template v-if="!hiddenAiRoute">
     <!-- Simulated device status bar (preview shell only) — bare page draws its own. -->
     <DeviceStatusBar />
 
@@ -102,6 +103,13 @@
          carry its own GlobalUi or toast/confirm/netError raised here (e.g. the send
          rate-limit warning) would post to the store with nothing rendering them. -->
     <GlobalUi />
+    </template>
+    <view v-else style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px">
+      <text role="status">{{ t.conversations.categoryDisabled }}</text>
+      <view role="button" tabindex="0" @click="navReplace('/pages/support/messages')" @keydown.enter.prevent="navReplace('/pages/support/messages')" @keydown.space.prevent="navReplace('/pages/support/messages')">
+        <text>{{ t.me.supportHubRow }}</text>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -117,7 +125,8 @@ import type { ThreadMsg, QuickChip } from "@/components/support/thread-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { localizedIdleClose } from "@/lib/support-idle-message";
-import { navTo, navBack } from "@/lib/route";
+import { navTo, navBack, navReplace } from "@/lib/route";
+import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import { createSendLimiter } from "@/lib/send-limiter";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { isDeviceOnline } from "@/lib/hashpower";
@@ -152,6 +161,7 @@ const locale = useLocaleStore();
 
 const cid = ref("");
 const isAi = ref(false);
+const hiddenAiRoute = ref(false);
 const initialPrompt = ref("");
 // Nova availability belongs only to ?type=ai. Human advisor/support routes must
 // never inherit a provisional local-model state before their route is resolved.
@@ -258,6 +268,11 @@ const revealTick = ref(0);
 
 onLoad((q) => {
   if (q?.type === "ai") {
+    if (!NOVA_SUPPORT_VISIBLE) {
+      hiddenAiRoute.value = true;
+      void navReplace("/pages/support/messages");
+      return;
+    }
     isAi.value = true;
     if (typeof q?.prompt === "string") initialPrompt.value = q.prompt.trim().slice(0, 800);
     return;
@@ -280,6 +295,7 @@ onLoad((q) => {
 // sessionStatus guards) makes redundant ticks free. A real backend pushes these
 // events — the interval then becomes a harmless no-op.
 onShow(async () => {
+  if (hiddenAiRoute.value) return;
   novaPageVisible = true;
   // Mark the human route visible before any category await. If this page hides,
   // stop() invalidates the captured epoch, so an older onShow cannot revive it.

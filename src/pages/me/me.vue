@@ -128,6 +128,7 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
+import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
 import { useVoucher } from "@/store/voucher";
@@ -276,7 +277,7 @@ const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   : security.twoFactorEnabled);
 // “消息中心”打开的是客服/顾问/Nova 会话，不是顶部铃铛的运营通知流。
 // 两套角标必须分别跟随各自页面的数据源，避免通知 Campaign 数量冒充会话未读数。
-const conversationUnread = computed(() => conversations.totalUnread + nova.unread);
+const conversationUnread = computed(() => conversations.totalUnread + (NOVA_SUPPORT_VISIBLE ? nova.unread : 0));
 // My Rewards unread dot — unused valid vouchers keep it lit (state-based)
 // OR reward credits newer than the seen-watermark (cleared on page open).
 const rewardsDot = computed(() => voucher.claimedUnused.length > 0 || rewardsSeen.hasUnseen);
