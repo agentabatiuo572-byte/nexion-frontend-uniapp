@@ -37,6 +37,8 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
   const store = Vue.reactive({
     categoryAvailabilityStatus: state === "loading" ? "loading" : state === "failed" ? "failed" : "ready",
     error: state === "failed" ? "unavailable" : null, enabled: true, typingIds: {},
+    advisor: { assignmentState: "UNBOUND", availability: "UNBOUND", currentAdvisorName: null },
+    advisorLoading: false, advisorError: false,
     conversations: rows, dismissingIds: {}, dismissalAvailable: true, dismissConversation: vi.fn(async () => undefined),
     hidden: false,
     byType: (key: string) => key === type && !store.hidden ? rows : [],
@@ -132,7 +134,7 @@ describe("human conversation contact entry", () => {
   it("keeps existing conversations usable while an older backend lacks removal support", async () => {
     const current = mount("advisor", "active"); current.store.dismissalAvailable = false; await Vue.nextTick();
     expect(flatten(current.root).some(node => String(node.props["aria-label"]).startsWith("从列表移除 · "))).toBe(false);
-    expect(flatten(current.root).some(node => node.props["aria-label"] === "待分配客服")).toBe(true);
+    expect(flatten(current.root).some(node => node.props["aria-label"] === "尚未分配顾问")).toBe(true);
   });
   it("removes via the row action without opening the chat and exposes the retained-history explanation", async () => {
     const current = mount("advisor", "active");
@@ -193,12 +195,16 @@ import * as chatFailure from "@/lib/nova-failure";
 import * as chatLimiter from "@/lib/send-limiter";
 import * as chatSecure from "@/lib/secure-command-id";
 import * as chatFormat from "@/i18n/format";
+import * as chatApiErrors from "@/api/errors";
+import { isSupportAttachmentNotReady } from "@/api/support-api";
 
 const chatTransport = vi.hoisted(() => ({
   authorityRevision: vi.fn(async () => "canonical-v1"), commandResult: vi.fn(async () => null),
   conversation: vi.fn(), replyConversation: vi.fn(), startConversation: vi.fn(), convertConversationToTicket: vi.fn(),
   conversationCategories: vi.fn(async () => ({ advisor: true, support: true, ai: false })),
   conversations: vi.fn(async () => ({ items: [] })), conversationDismissals: vi.fn(async () => []),
+  advisor: vi.fn(async () => ({ assignmentId: null, currentAdvisorId: null, currentAdvisorName: null, assignmentState: "UNBOUND", availability: "UNBOUND" })),
+  attachmentPolicy: vi.fn(async () => ({ available: false })),
 }));
 vi.mock("@/api/runtime", () => ({ supportApi: chatTransport, remoteApiEnabled: true,
   apiClient: { request: vi.fn() }, apiRuntimeConfig: {}, novaAiApi: {} }));
@@ -225,7 +231,7 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
   const watchRealtime = vi.spyOn(store, "watchRealtime");
   const app = Vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
   const hooks: Record<string, (...args: any[]) => any> = {};
-  const navigation = { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn() };
+  const navigation = { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn(async () => true) };
   const toast = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
   const modules: Record<string, unknown> = {
     vue: { ...Vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
@@ -238,6 +244,8 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
     "@/store/conversations": { useConversations: () => store }, "@/store/nova": { useNova }, "@/store/app": { useApp: () => app },
     "@/store/ui": { toast, confirm: vi.fn(), useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/mock/nova-templates": {}, "@/api/runtime": { novaAiApi: {}, remoteApiEnabled: true },
+    "@/api/errors": chatApiErrors,
+    "@/api/support-api": { isSupportAttachmentNotReady },
     "@/lib/nova-failure": chatFailure, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": chatSecure, "@/lib/nova-thinking": chatThinking, "./conversation-realtime-page": chatRealtime,
   };
@@ -401,17 +409,18 @@ const composerScript = ts.transpileModule(composerCompiled.content, { compilerOp
 // Read the production template expression, then feed its value to the actual
 // child SFC. This includes the draft-owning component, unlike script-only tests.
 const composerBindingSource = readFileSync(new URL("./chat.vue", import.meta.url), "utf8").match(/:composer-key="([^"]+)"/)![1];
-const humanComposerBinding = new Function("app", "cid", "startType", "isAi", "nova", `return ${composerBindingSource};`);
+const humanComposerBinding = new Function("app", "cid", "startType", "isAi", "nova", "convStore", `return ${composerBindingSource};`);
 describe("rendered human composer account boundary", () => {
   it.each(["existing same account", "existing A to B to A", "new same account", "new A to B to A"])("clears an unsent private draft across %s rebinding", async scenario => {
     const state = Vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1 });
     const thread = new Function("require", "exports", composerScript + ";return exports.default;")((name: string) => {
       if (name === "vue") return { ...Vue, onMounted: vi.fn() };
+      if (name === "@/composables/use-dialog-a11y") return { useDialogA11y: vi.fn() };
       throw new Error(`Unexpected composer dependency: ${name}`);
     }, {});
     const empty: unknown[] = [], root = element("root");
-    const app = renderer.createApp({ render: () => Vue.h(thread, { messages: empty, inputPlaceholder: "Message", sendLabel: "Send",
-      composerKey: humanComposerBinding(state, scenario.startsWith("existing") ? "CV-same" : "", scenario.startsWith("new") ? "support" : null, false, {}) }) });
+    const app = renderer.createApp({ render: () => Vue.h(thread, { messages: empty, inputPlaceholder: "Message", inputLabel: "Message", sendLabel: "Send",
+      composerKey: humanComposerBinding(state, scenario.startsWith("existing") ? "CV-same" : "", scenario.startsWith("new") ? "support" : null, false, {}, { scopeInvalidated: 0 }) }) });
     app.component("scroll-view", { setup: (_props: unknown, { slots }: any) => () => Vue.h("scroll-view", slots.default?.()) });
     app.mount(root); mounted.push(app);
     const input = () => flatten(root).find(node => node.tag === "input")!;

@@ -25,12 +25,21 @@ export interface HttpResponse {
 export interface HttpTransport {
   request(request: HttpRequest): Promise<HttpResponse>;
   upload?(request: HttpUploadRequest): Promise<HttpResponse>;
+  download?(request: HttpDownloadRequest): Promise<{ status: number; filePath: string }>;
 }
 
 export interface HttpUploadRequest {
   url: string;
   filePath: string;
   name: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  signal?: AbortSignal;
+  formData?: Record<string, string>;
+}
+
+export interface HttpDownloadRequest {
+  url: string;
   headers: Record<string, string>;
   timeoutMs: number;
   signal?: AbortSignal;
@@ -57,6 +66,7 @@ export interface ApiClient {
   captureSessionGuard?(): () => void;
   request<T>(request: ApiRequest): Promise<T>;
   upload<T>(request: ApiUploadRequest): Promise<T>;
+  download?(request: { path: string; signal?: AbortSignal }): Promise<string>;
   refreshSession(): Promise<SessionSnapshot>;
 }
 
@@ -68,6 +78,7 @@ export interface ApiUploadRequest {
   idempotencyKey?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  formData?: Record<string, string>;
 }
 
 interface ApiClientOptions {
@@ -412,6 +423,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       headers,
       timeoutMs: apiRequest.timeoutMs ?? 30_000,
       signal: apiRequest.signal,
+      formData: apiRequest.formData,
     };
     const executeUpload = () => options.transport.upload!(uploadRequest)
       .then((response) => executeResponse<T>(response));
@@ -447,6 +459,34 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
   }
 
+  async function download(apiRequest: { path: string; signal?: AbortSignal }): Promise<string> {
+    if (!options.transport.download) throw new ApiError({ kind: "configuration", message: "FILE_DOWNLOAD_TRANSPORT_UNAVAILABLE" });
+    const session = options.vault.read();
+    if (!session?.accessToken) throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
+    const sessionRevision = options.vault.revision();
+    const run = (token: string) => options.transport.download!({
+      url: `${baseUrl}/${apiRequest.path.replace(/^\/+/, "")}`,
+      headers: { Authorization: `${session.tokenType || "Bearer"} ${token}`, "Cache-Control": "no-store" },
+      timeoutMs: 30_000,
+      signal: apiRequest.signal,
+    });
+    let expectedRevision = sessionRevision;
+    let result = await run(session.accessToken);
+    if (result.status === 401 && options.vault.revision() === sessionRevision) {
+      const renewed = await refreshSession();
+      if (!renewed?.accessToken || renewed.user.userId !== session.user.userId) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      expectedRevision = options.vault.revision();
+      result = await run(renewed.accessToken);
+    }
+    captureSessionGuardForDownload(session.user.userId, expectedRevision);
+    if (result.status < 200 || result.status >= 300) throw new ApiError({ kind: result.status === 401 ? "auth" : "http", message: `HTTP_${result.status}`, status: result.status });
+    return result.filePath;
+  }
+
+  function captureSessionGuardForDownload(userId: number, revision: number): void {
+    if (options.vault.revision() !== revision || options.vault.read()?.user.userId !== userId) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+  }
+
   async function executeResponse<T>(response: HttpResponse): Promise<T> {
     const responseData = decodeTransportData(response.data);
     const envelope = isEnvelope(responseData) ? responseData : null;
@@ -480,7 +520,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       }
     };
   }
-  return { request, upload, refreshSession, captureSessionGuard };
+  return { request, upload, download, refreshSession, captureSessionGuard };
 }
 
 export function createUniHttpTransport(): HttpTransport {
@@ -558,6 +598,7 @@ export function createUniHttpTransport(): HttpTransport {
           url: request.url,
           filePath: request.filePath,
           name: request.name,
+          formData: request.formData,
           header: request.headers,
           timeout: request.timeoutMs,
           success: (response) => finish(() => resolve({
@@ -568,6 +609,22 @@ export function createUniHttpTransport(): HttpTransport {
           fail: () => finish(() => reject(request.signal?.aborted
             ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
             : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }))),
+        });
+      });
+    },
+    download(request) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let task: { abort?: () => void } | undefined;
+        const cleanup = () => request.signal?.removeEventListener("abort", onAbort);
+        const finish = (action: () => void) => { if (!settled) { settled = true; cleanup(); action(); } };
+        const onAbort = () => { task?.abort?.(); finish(() => reject(new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false }))); };
+        if (request.signal?.aborted) { onAbort(); return; }
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        task = uni.downloadFile({
+          url: request.url, header: request.headers, timeout: request.timeoutMs,
+          success: response => finish(() => resolve({ status: response.statusCode, filePath: response.tempFilePath })),
+          fail: () => finish(() => reject(new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }))),
         });
       });
     },

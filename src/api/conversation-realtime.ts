@@ -11,6 +11,7 @@ interface Options {
   url:string; ticket:(signal:AbortSignal)=>Promise<{ticket:string}>; socket:(url:string)=>RealtimeSocket;
   reconcile:(signal:AbortSignal)=>Promise<void>; state?:(ready:boolean,terminal:boolean)=>void;
   presence?:(value:RealtimePresence|null)=>void;
+  scopeInvalidated?:(customerId:number)=>void;
 }
 type Timer=ReturnType<typeof setTimeout>;
 export class ConversationRealtime {
@@ -79,6 +80,10 @@ export class ConversationRealtime {
               this.eventIds.add(f.eventId);if(this.eventIds.size>2048)this.eventIds.delete(this.eventIds.values().next().value!);
               this.dirty=true;if(!this.syncing){clearTimeout(this.eventTimer);this.eventTimer=setTimeout(()=>void this.sync(epoch),80)}break;
             case 'presence':if(f.conversationNo===this.watched)this.options.presence?.(f);break;
+            case 'scope-invalidated':
+              if(f.reason==='ASSIGNMENT_CHANGED' && Number.isSafeInteger(f.customerId) && f.customerId>0)
+                this.options.scopeInvalidated?.(f.customerId);
+              break;
             case 'error':this.disconnect(true,f.code===401||f.code===403);break;
           }
         }catch{this.disconnect(true);}

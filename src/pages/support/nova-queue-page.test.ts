@@ -14,6 +14,7 @@ import * as limiter from "@/lib/send-limiter";
 import * as secureId from "@/lib/secure-command-id";
 import * as format from "@/i18n/format";
 import { ApiError } from "@/api/errors";
+import * as apiErrors from "@/api/errors";
 import * as realtimePage from "./conversation-realtime-page";
 import { createSupportApi } from "@/api/support-api";
 
@@ -44,18 +45,28 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
   const startConversation = vi.fn(async (_type: string, _text: string) => "new-conversation");
   const openConversation = vi.fn(async () => conversation);
   const watchRealtime=vi.fn();
+  const humanComposers = vue.reactive<Record<string, any>>({});
   const modules: Record<string, unknown> = {
     vue: { ...vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
     "@/i18n/use-t": { useT: () => currentLocale },
     "@/i18n/format": format,
     "@/lib/support-idle-message": { localizedIdleClose },
-    "@/lib/route": { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn() },
+    "@/lib/route": { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn(async () => true) },
     "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: true },
     "@/lib/send-limiter": limiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => ({
+      humanComposers,
+      composer: (key: string) => humanComposers[key] ?? { text: "", imageDraft: null, failedSend: null },
+      saveComposer: (key: string, value: any) => { humanComposers[key] = value; },
+      clearComposer: (key: string) => { delete humanComposers[key]; },
+      refreshAdvisor: vi.fn(async () => undefined),
+      advisor: null,
+      advisorLoading: false,
+      advisorError: false,
+      scopeInvalidated: 0,
       get: () => conversation,
       open: openConversation,
       watchRealtime,
@@ -74,7 +85,10 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     "@/store/ui": { toast: { warn: vi.fn(), info: vi.fn(), error: vi.fn() }, confirm: async () => true,
       useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/mock/nova-templates": {},
-    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: realtime.remote ?? true },
+    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: realtime.remote ?? true,
+      supportApi: { attachmentPolicy: vi.fn(async () => ({ available: false })) } },
+    "@/api/errors": apiErrors,
+    "@/api/support-api": { isSupportAttachmentNotReady: () => false },
     "@/lib/nova-failure": failure,
     "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": secureId,
@@ -215,7 +229,7 @@ describe("human conversation restart", () => {
     await next.hooks.onShow();
     expect(next.navigation.navBack).not.toHaveBeenCalled();
     await next.page.onSend("Please help with my question");
-    expect(next.startConversation).toHaveBeenCalledExactlyOnceWith("advisor", "Please help with my question");
+    expect(next.startConversation).toHaveBeenCalledExactlyOnceWith("advisor", "Please help with my question", undefined);
     expect(next.navigation.navBack).not.toHaveBeenCalled();
     old.page.cleanup();
     next.page.cleanup();
