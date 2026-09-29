@@ -67,11 +67,12 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
       if (current()) state.error = error instanceof Error && /BANK_CHANGE_OTP_(COOLDOWN|DAILY_LIMIT)/.test(error.message) ? "otpRateLimited" : "otpSend";
     } finally { if (current()) state.busy = false; }
   }
-  async function submit() {
-    if (state.busy || (state.phase !== "uncertain" && !canContinue())) return;
+  async function submit(accountRoutingConfirmed = false) {
+    if (state.busy || (state.phase !== "uncertain" && (!accountRoutingConfirmed || !canContinue()))) return;
+    if (state.phase === "uncertain" && !pending) return;
     if (!pending) {
       try {
-        pending = { body: { bankCode: "", account: state.account.trim(), holder: state.holder.trim(),
+        pending = { body: { bankCode: "", account: state.account.trim(), holder: state.holder.trim(), accountRoutingConfirmed: true,
           ...(state.config?.beneficiary ? { challengeNo: state.challengeNo, code: state.code } : {}) },
           key: `bank-bind:${requireCryptoUuid()}`, receipt: null };
       } catch { state.error = "bind"; return; }

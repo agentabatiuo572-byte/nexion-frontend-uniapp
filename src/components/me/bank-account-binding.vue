@@ -13,7 +13,7 @@
       </view>
 
       <view v-if="state.config?.beneficiary" class="bound-summary" role="status">
-        <text class="head-title">{{ state.config.beneficiary.bankName === 'BANKQR' ? c.type : state.config.beneficiary.bankName }} · {{ state.config.beneficiary.maskedAccount }}</text>
+        <text class="head-title">{{ c.accountRoutedLabel }} · {{ state.config.beneficiary.maskedAccount }}</text>
         <text class="hint" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <text class="hint">{{ t.bankWithdrawal.effective }}: {{ displayDate(state.config.beneficiary.effectiveAt) }}</text>
       </view>
@@ -22,7 +22,15 @@
       <view v-if="state.error === 'load' || state.error === 'unsupported' || state.error === 'routingUnverified'" class="text-action" role="button" tabindex="0" :aria-disabled="state.busy" @click="form.load" @keydown.enter.prevent="form.load" @keydown.space.prevent="form.load"><text>{{ c.retry }}</text></view>
 
       <template v-if="state.phase !== 'saved'">
-        <view class="binding-fields">
+        <view v-if="review" class="binding-review" role="group" :aria-label="c.reviewTitle" data-testid="bank-binding-review">
+          <text class="head-title" role="heading" aria-level="2">{{ c.reviewTitle }}</text>
+          <text class="hint">{{ c.reviewHint }}</text>
+          <view class="review-row"><text>{{ c.accountLabel }}</text><text class="mono" data-testid="bank-review-account">{{ review.account }}</text></view>
+          <view class="review-row"><text>{{ c.holderLabel }}</text><text data-testid="bank-review-holder">{{ review.holder }}</text></view>
+          <view class="submit ready" role="button" tabindex="0" data-testid="bank-bind-confirm" @click="confirmBinding" @keydown.enter.prevent="confirmBinding" @keydown.space.prevent="confirmBinding"><text>{{ c.confirmSave }}</text></view>
+          <view class="text-action" role="button" tabindex="0" data-testid="bank-bind-edit" @click="cancelReview" @keydown.enter.prevent="cancelReview" @keydown.space.prevent="cancelReview"><text>{{ c.editDetails }}</text></view>
+        </view>
+        <view v-else class="binding-fields">
           <text v-if="state.config && directBankBindingAvailable(state.config)" class="hint" role="status" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text>
           <text class="field-label">{{ c.accountLabel }} <text class="required">*</text></text>
           <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
@@ -41,7 +49,7 @@
           </view>
           <text class="hint">{{ c.singleAccount }}</text>
         </view>
-        <view class="submit" :class="{ ready: canSubmit }" role="button" tabindex="0" data-testid="bank-bind-continue" :aria-disabled="!canSubmit" @click="submitBinding" @keydown.enter.prevent="submitBinding" @keydown.space.prevent="submitBinding">
+        <view v-if="!review" class="submit" :class="{ ready: canSubmit }" role="button" tabindex="0" data-testid="bank-bind-continue" :aria-disabled="!canSubmit" @click="submitBinding" @keydown.enter.prevent="submitBinding" @keydown.space.prevent="submitBinding">
           <text>{{ state.busy ? t.bankWithdrawal.loading : state.phase === 'uncertain' ? c.retryOriginal : canSubmit ? c.continue : t.cards.formSubmitDisabled }}</text>
         </view>
         <text class="disclaimer">{{ c.disclaimer }}</text>
@@ -71,8 +79,10 @@ import { navReplace } from "@/lib/route";
 
 const props = defineProps<{ active: boolean; returnTo: string }>();
 const t = useT(), c = computed(() => t.value.bankBinding), app = useApp();
-const form = createBankBindingForm(createBankWithdrawalApi(apiClient), () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`);
+const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`;
+const form = createBankBindingForm(createBankWithdrawalApi(apiClient), identity);
 const state = form.state, now = ref(Date.now());
+const review = ref<{ account: string; holder: string; code: string; challengeNo: string; owner: string; config: typeof state.config } | null>(null);
 const accountStatus = computed(() => state.config?.beneficiary ? t.value.bankWithdrawal.accountStatus[bankAccountNotice(state.config.beneficiary)] : "");
 const fieldsDisabled = computed(() => state.busy || state.phase !== "details" || !directBankBindingAvailable(state.config));
 const canSubmit = computed(() => { void now.value; return !state.busy && (state.phase === "uncertain" || form.canContinue()); });
@@ -81,7 +91,23 @@ const resendSeconds = computed(() => Math.max(0, Math.ceil((state.resendAt - now
 function sendOtp() { if (canSendOtp.value) void form.sendOtp(); }
 const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, routingUnverified: c.value.routingUnverified, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
 const displayDate = formatBankDateTime;
-function submitBinding() { if (canSubmit.value) void form.submit(); }
+function submitBinding() {
+  if (!canSubmit.value) return;
+  if (state.phase === "uncertain") { void form.submit(); return; }
+  review.value = { account: state.account.trim(), holder: state.holder.trim(), code: state.code,
+    challengeNo: state.challengeNo, owner: identity(), config: state.config };
+  void nextTick(() => { if (typeof document !== "undefined") document.querySelector<HTMLElement>('[data-testid="bank-bind-confirm"]')?.focus(); });
+}
+function cancelReview() { review.value = null; void nextTick(() => { if (typeof document !== "undefined") document.querySelector<HTMLElement>('[data-testid="bank-bind-continue"]')?.focus(); }); }
+function confirmBinding() {
+  const checked = review.value;
+  if (!checked) return;
+  review.value = null;
+  if (checked.owner !== identity() || checked.config !== state.config || checked.account !== state.account.trim()
+    || checked.holder !== state.holder.trim() || checked.code !== state.code || checked.challengeNo !== state.challengeNo
+    || !form.canContinue()) return;
+  void form.submit(true);
+}
 watch(() => state.phase, async phase => {
   if (phase !== "saved") return;
   await nextTick();
@@ -89,6 +115,7 @@ watch(() => state.phase, async phase => {
 });
 let timer: ReturnType<typeof setInterval> | undefined;
 function reset() {
+  review.value = null;
   form.reset();
   if (timer) clearInterval(timer); timer = undefined;
   if (props.active) { now.value = Date.now(); timer = setInterval(() => { now.value = Date.now(); }, 1000); void form.load(); }
@@ -122,6 +149,8 @@ function done() { void navReplace(props.returnTo === "/pages/me/wallet-cards" ? 
 .error-note { display: block; margin: 12px 0; padding: 12px; background: color-mix(in srgb, var(--v5-danger) 10%, transparent); border-radius: 8px; color: var(--v5-danger); font-size: 12px; line-height: 1.6; }
 .text-action { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); font-size: 13px; }
 .bound-summary { padding: 14px 2px; border-bottom: 1px solid var(--v5-border); }
+.binding-review { padding: 16px 2px 0; }
+.review-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--v5-border); font-size: 13px; overflow-wrap: anywhere; }
 .saved-note { display: block; margin: 20px 0; font-size: 13px; color: var(--v5-brand); }
 [aria-disabled="true"] { cursor: default; }
 </style>

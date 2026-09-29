@@ -68,6 +68,8 @@ describe("bank account authority and settlement evidence", () => {
     expect(bankAccountNotice({ ...beneficiary, bankCode: "", bankName: "BANKQR" })).toBe("unverified");
     expect(bankAccountNotice({ ...beneficiary, bankRoutingVerified: undefined })).toBe("unverified");
     expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankCode: "", bankName: "BANKQR" } })).toBe(false);
+    expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankCode: "", bankName: "ACCOUNT_ROUTED" } })).toBe(true);
+    expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankCode: "", bankName: "ACCOUNT_ROUTED", bankRoutingVerified: false } })).toBe(false);
     expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankRoutingVerified: false } })).toBe(false);
     expect(bankCanQuote({ ...config, beneficiary: { ...beneficiary, bankRoutingVerified: undefined } })).toBe(false);
   });
