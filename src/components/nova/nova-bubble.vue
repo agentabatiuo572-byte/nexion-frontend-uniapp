@@ -18,9 +18,13 @@
 -->
 <template>
   <view>
-    <view v-if="visible" class="nx-nova-bubble nova-float" :class="{ 'nx-nova-bubble--dimmed': dimmed }" @click="open">
+    <view v-if="visible" class="nx-nova-bubble nova-float" :class="{ 'nx-nova-bubble--dimmed': dimmed }" role="button" tabindex="0" :aria-label="t.conversations.title" @click="open" @keydown.enter.prevent="open" @keydown.space.prevent="open">
       <view class="nx-nova-btn nova-pulse">
-        <NovaAvatar :size="36" pulse />
+        <NovaAvatar v-if="NOVA_SUPPORT_VISIBLE" :size="36" pulse />
+        <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 14v-2a9 9 0 0 1 18 0v2" />
+          <path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" />
+        </svg>
         <view v-if="showUnreadBadge" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
       </view>
     </view>
@@ -40,6 +44,7 @@ import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import NovaAvatar from "./nova-avatar.vue";
+import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 
 // dimmed:chassis 在页面滚动期间置真 —— 浮标横在内容上,滚动时先让路(淡出 +
 // 不吃点击),停下由 chassis 复位再淡回。不传 = 旧行为(undefined 即 falsy)。
@@ -63,8 +68,8 @@ const humanUnread = computed(() =>
   [...conversations.byType("advisor"), ...conversations.byType("support")]
     .reduce((sum, row) => sum + row.unread, 0),
 );
-const totalUnread = computed(() => nova.unread + humanUnread.value);
-const visible = computed(() => remoteApiEnabled || totalUnread.value > 0);
+const totalUnread = computed(() => (NOVA_SUPPORT_VISIBLE ? nova.unread : 0) + humanUnread.value);
+const visible = computed(() => !NOVA_SUPPORT_VISIBLE || remoteApiEnabled || totalUnread.value > 0);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
 
@@ -169,6 +174,7 @@ onMounted(() => {
     void conversations.refresh().catch(() => undefined);
     return;
   }
+  if (!NOVA_SUPPORT_VISIBLE) return;
   timers.push(setTimeout(() => {
     nova.push(welcomeMessage(t.value), { cooldownKey: "welcome", cooldownMs: WELCOME_COOLDOWN });
   }, WELCOME_DELAY));

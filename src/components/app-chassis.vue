@@ -135,7 +135,7 @@
       <DeviceHomeIndicator />
     </view>
 
-    <NovaBubble v-if="NOVA_SUPPORT_VISIBLE && isTabRoute" :dimmed="scrolling" />
+    <NovaBubble v-if="isTabRoute" :dimmed="scrolling" />
 
     <!-- Chassis-level overlays (each self-gates on its own store's open state,
          mirroring the prototype IOSFrame). Ported P-043. -->
@@ -162,7 +162,6 @@ import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, pr
 import GlobalUi from "@/components/global-ui.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
-import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
