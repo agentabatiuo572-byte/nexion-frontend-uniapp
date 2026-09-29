@@ -4,14 +4,23 @@ import { moveCalculatorRadio, syncAmountName } from "./calculator-webview-access
 describe("calculator WebView accessibility", () => {
   it("names the actual editable input and updates its name with the language", () => {
     let name: string | null = null;
+    let hostName = "锁仓金额(USDT)";
     const setAttribute = vi.fn((_key: string, value: string) => { name = value; });
-    const card = { querySelector: () => ({ getAttribute: () => name, setAttribute }) };
+    const card = { querySelector: (selector: string) => selector === "uni-input"
+      ? { getAttribute: () => hostName, setAttribute: vi.fn() }
+      : { getAttribute: () => name, setAttribute } };
     for (const label of ["锁仓金额(USDT)", "Stake amount (USDT)", "Số tiền khóa (USDT)"]) {
       syncAmountName(card, label);
       expect(name).toBe(label);
     }
     syncAmountName(card, "Số tiền khóa (USDT)");
     expect(setAttribute).toHaveBeenCalledTimes(3);
+
+    // App-Vue may deliver the renderjs prop after mounted. Its uni-input host
+    // still has the current translated name, and MutationObserver can resync it.
+    hostName = "Stake amount (USDT)";
+    syncAmountName(card);
+    expect(name).toBe(hostName);
   });
 
   it("moves selection and focus across radios, wrapping in both directions", () => {

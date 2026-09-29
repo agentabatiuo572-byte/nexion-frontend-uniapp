@@ -14,15 +14,17 @@ import { moveCalculatorRadio, syncAmountName } from "./calculator-webview-access
 // App-Vue's logic layer has no DOM. This Options API child runs in the WebView.
 export default {
   mounted() {
-    this.card = this.$el.closest(".nx-compound-calculator");
+    // In App-Vue renderjs, $el can be a UniApp wrapper rather than an Element.
+    this.card = document.querySelector(".nx-compound-calculator");
     if (!this.card) return;
     this.card.addEventListener("keydown", this.onKeydown, true);
-    if (!this.sync(this.prop)) {
-      this.observer = new MutationObserver(() => {
-        if (this.sync(this.prop)) this.observer.disconnect();
-      });
-      this.observer.observe(this.card, { childList: true, subtree: true });
-    }
+    this.sync(this.prop);
+    this.observer = new MutationObserver(() => this.sync());
+    this.observer.observe(this.card, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
+  },
+  beforeUnmount() {
+    this.observer?.disconnect();
+    this.card?.removeEventListener("keydown", this.onKeydown, true);
   },
   methods: {
     sync(label) {

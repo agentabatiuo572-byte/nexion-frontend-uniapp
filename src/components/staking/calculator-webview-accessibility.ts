@@ -3,7 +3,8 @@ type Radio = { click(): void; focus(): void };
 
 export function syncAmountName(card: { querySelector(selector: string): NamedInput | null } | null, label?: string): boolean {
   const input = card?.querySelector("uni-input .uni-input-input");
-  if (input && label && input.getAttribute("aria-label") !== label) input.setAttribute("aria-label", label);
+  const name = label || card?.querySelector("uni-input")?.getAttribute("aria-label");
+  if (input && name && input.getAttribute("aria-label") !== name) input.setAttribute("aria-label", name);
   return !!input;
 }
 
