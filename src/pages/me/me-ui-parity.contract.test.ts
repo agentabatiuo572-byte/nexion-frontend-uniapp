@@ -198,7 +198,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Per-transaction maximum, daily count capacity and channel availability remain distinct.
   // Withdrawal methods share the selection page; USDT has no duplicate bank entry.
   // Local financial snapshot freshness/retry controls remain unchanged.
-  "wallet-withdraw.vue": "60e3ad63c63486cabca84d4815ca5d62c46ca82f5843c33fa4700abb0753eb73",
+  "wallet-withdraw.vue": "a7e2ab7259e8e08851ca219fc02860b94b5f5b2e30ccfa9596a5738717956da5",
   // P2: unavailable funds render as unknown and retain the last confirmed snapshot with retry.
   "wallet.vue": "ccab754cc7fad16663e64b3c19115f0fe08d2245abaefd72e7c926efc6176140",
 };

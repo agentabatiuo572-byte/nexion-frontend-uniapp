@@ -20,6 +20,8 @@ test("accepts an explicit zero-day policy and rejects negative, fractional or mi
   };
   const api = createWithdrawalApi({ request: async () => policy } as never);
   await expect(api.policy()).resolves.toMatchObject({ cooldownDays: 0, dailyLimitCount: 10 });
+  await expect(createWithdrawalApi({ request: async () => ({ ...policy, enabledNetworks: [] }) } as never).policy())
+    .resolves.toMatchObject({ enabledNetworks: [], withdrawalEnabled: true });
   for (const days of [-1, 0.5, undefined, null, "", false]) {
     const invalid = createWithdrawalApi({ request: async () => ({ ...policy, cooldownDays: days }) } as never);
     await expect(invalid.policy()).rejects.toThrow("WITHDRAWAL_POLICY_INVALID");

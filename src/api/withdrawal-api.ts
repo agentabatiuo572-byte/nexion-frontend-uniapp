@@ -392,7 +392,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
       || typeof row.complianceHoldEnabled !== "boolean"
       || typeof row.withdrawalEnabled !== "boolean" || row.gateSource !== "J1"
       || enabledNetworks.length !== (rawEnabledNetworks as unknown[])?.length
-      || enabledNetworks.length === 0 || row.source !== "D5+H1") {
+      || row.source !== "D5+H1") {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_POLICY_INVALID" });
   }
   return {
