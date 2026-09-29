@@ -89,7 +89,7 @@
       <NetworkPulseCard />
 
       <!-- ZONE 3: AI advisor bridge -->
-      <NovaCardSlot v-if="!remoteApiEnabled" />
+      <NovaCardSlot v-if="NOVA_SUPPORT_VISIBLE && !remoteApiEnabled" />
 
       <!-- ZONE 5: money & ROI -->
       <DoTheMathCard />
@@ -123,6 +123,7 @@ import MyFleetSection from "@/components/home/my-fleet-section.vue";
 import OnGridSection from "@/components/home/on-grid-section.vue";
 import NetworkPulseCard from "@/components/home/network-pulse-card.vue";
 import NovaCardSlot from "@/components/home/nova-card-slot.vue";
+import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import NexPriceCard from "@/components/home/nex-price-card.vue";

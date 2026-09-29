@@ -161,6 +161,7 @@ import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import type { Conversation, ConversationType, ConvMessage } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
+import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import { useApp } from "@/store/app";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
@@ -185,7 +186,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], () => {
 async function refreshInbox(): Promise<void> {
   if (!inboxVisible) return;
   const tasks: Promise<unknown>[] = [convStore.refresh(), convStore.refreshCategories()];
-  if (remoteApiEnabled) {
+  if (NOVA_SUPPORT_VISIBLE && remoteApiEnabled) {
     tasks.push(nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history()));
   }
   await Promise.allSettled(tasks);
@@ -248,7 +249,7 @@ const TYPES = computed<{ key: ConversationType; tint: string; icon: string }[]>(
     { key: "advisor", tint: "var(--v5-brand)", icon: ADVISOR_ICON },
     { key: "support", tint: "var(--v5-tech-cyan)", icon: SUPPORT_ICON },
   ];
-  available.push({ key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON });
+  if (NOVA_SUPPORT_VISIBLE) available.push({ key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON });
   return available.filter((row) => convStore.categoryReadable(row.key));
 });
 

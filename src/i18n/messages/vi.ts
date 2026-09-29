@@ -975,7 +975,7 @@ export const vi: Messages = {
       genesis: "Hoạt động Genesis",
       system: "Hệ thống / tuân thủ / pháp lý",
     },
-    notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong ngăn Nova và trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
+    notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
     // zentao #214: mục bắt buộc không thể tắt; nêu lý do dòng này bị khoá.
     notifMandatoryHint: "Thông báo tuân thủ quan trọng — luôn bật, không thể tắt",
   },
@@ -1070,7 +1070,7 @@ export const vi: Messages = {
       product: "Sản phẩm cửa hàng",
       member: "Thành viên mạng lưới",
       faq: "FAQ + hướng dẫn",
-      help: "Trợ giúp Nova",
+      help: "Trung tâm trợ giúp",
     },
     // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。

@@ -4,6 +4,9 @@ import ts from "typescript";
 import page from "./search.vue?raw";
 import { resolveSearchResultState } from "@/lib/search-source-state";
 import { specRow } from "@/lib/product-copy";
+import { zh } from "@/i18n/messages/zh";
+import { en } from "@/i18n/messages/en";
+import { vi as viMessages } from "@/i18n/messages/vi";
 
 const start = page.indexOf("const results = computed<Hit[]>");
 const end = page.indexOf("// Grouped as", start);
@@ -20,6 +23,7 @@ function setup(query: string, remoteApiEnabled = true) {
   const products = ref<{ id: string; name: string; tagline: string; gpu?: string; vram?: string; price: number }[]>([]);
   const messages = ref({
     search: { routes: {}, faqEntries: {}, askNova: "问问 Nova", askNovaWithQuery: "解答{query}" },
+    me: { helpFaq: "帮助中心" },
     store: { mockTagline: "Mock H100 tagline", specGpu: "GPU", specVram: "VRAM" },
   });
   const productCopy = vi.fn((copy: typeof messages.value) => ({ tagline: copy.store.mockTagline }));
@@ -66,6 +70,18 @@ describe("global search uses the published Help Center FAQ corpus", () => {
     const state = setup("页面数据没有更新");
     expect(state.results.value).toContainEqual({ group: "faq", label: "页面数据没有更新怎么办？",
       sublabel: "请刷新页面后重试。", href: "/pages/me/help?faqId=faq%2Fa%3Fb" });
+  });
+
+  it("offers Help Center instead of Nova when a result exists", () => {
+    const state = setup("页面数据没有更新");
+    expect(state.results.value.find((hit: { group: string }) => hit.group === "help")).toEqual({
+      group: "help", label: "帮助中心", href: "/pages/me/help",
+    });
+    expect(state.results.value.some((hit: { href: string }) => hit.href.includes("type=ai"))).toBe(false);
+    for (const copy of [zh, en, viMessages]) {
+      expect(copy.search.groupLabels.help).not.toMatch(/Nova/i);
+      expect(copy.preferences.notifFooter).not.toMatch(/Nova/i);
+    }
   });
 
   it("matches the current published answer and removes a question when its projection is replaced", () => {
