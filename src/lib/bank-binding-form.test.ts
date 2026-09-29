@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBankBindingForm, directBankBindingAvailable, validBankRecipient } from "./bank-binding-form";
 import { ApiError } from "@/api/errors";
+import { BANK_HOLDER_NAME_RE } from "./native-unicode-regex";
 
 const beneficiary = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2099-09-17T00:00:00Z", nextChangeAt: "2099-09-23T00:00:00Z" };
 const config = { enabled: false, banks: [], bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR", bankSelection: "ACCOUNT_ROUTED" as const, bankRoutingVerified: true, beneficiary: null };
@@ -15,8 +16,14 @@ function fixture() {
 describe("bank binding form", () => {
   it("validates account and holder without requiring a bank, OTP, PAN expiry or CVV", () => {
     expect(validBankRecipient({ account: "001234", holder: "Nguyễn Văn An" })).toBe(true);
+    for (const holder of ["TEST ACCOUNT", "张三", "歐陽娜娜", "𠮷田", "김민수", "Nguye\u0302\u0303n Va\u0306n A", "José O'Connor-Smith"])
+      expect(validBankRecipient({ account: "0".repeat(32), holder })).toBe(true);
+    expect(BANK_HOLDER_NAME_RE.source).not.toMatch(/\\[pP]\{/);
+    expect(BANK_HOLDER_NAME_RE.test("A\uFA6EB")).toBe(false);
     for (const draft of [{ account: "12345", holder: "NGUYEN VAN A" },
-      { account: "1234x5678", holder: "NGUYEN VAN A" }, { account: "001234", holder: "A" }])
+      { account: "1234x5678", holder: "NGUYEN VAN A" }, { account: "001234", holder: "A" },
+      { account: "001234", holder: "TEST123" }, { account: "001234", holder: "A×B" },
+      { account: "001234", holder: "A😀B" }])
       expect(validBankRecipient(draft)).toBe(false);
   });
   it("requires explicit verified account routing before any binding or OTP", async () => {
@@ -70,7 +77,8 @@ describe("bank binding form", () => {
   });
   it("requires SMS for replacement even when the legacy cooldown date is in the future", async () => {
     const { form, api, fill } = fixture(); api.config.mockResolvedValue({ ...config, bindingOtpRequired: true, beneficiary });
-    await form.load(); fill(); expect(form.canContinue()).toBe(false);
+    await form.load(); fill(); form.state.account = "0".repeat(32); form.state.holder = "TEST ACCOUNT";
+    expect(form.canContinue()).toBe(false);
     expect(form.canSendOtp()).toBe(true); await form.sendOtp(); form.state.code="123456";
     expect(form.canContinue()).toBe(true); expect(form.canSendOtp()).toBe(false);
     await form.submit(true); expect(form.state.phase).toBe("saved");

@@ -13,6 +13,7 @@ import type { LocaleCode } from "@/i18n";
 import { publishedRankTitle } from "@/i18n/rank-titles";
 import type { RankGap, VRankDef } from "@/store/v-rank";
 import { fmt } from "@/i18n/format";
+import { HAN_SCRIPT_RE } from "@/lib/native-unicode-regex";
 
 /**
  * F1 正式公开等级名称。服务端目前把同一中文配置写入 title/cnTitle，
@@ -29,7 +30,7 @@ export function rankName(def: Pick<VRankDef, "title" | "cnTitle">, locale: Local
     const vietnamese = publishedRankTitle(def.cnTitle, locale) || publishedRankTitle(def.title, locale);
     if (vietnamese) return vietnamese;
   }
-  if (!/\p{Script=Han}/u.test(def.title)) return def.title;
+  if (!HAN_SCRIPT_RE.test(def.title)) return def.title;
   return publishedRankTitle(def.title, locale) || publishedRankTitle(def.cnTitle, locale);
 }
 
