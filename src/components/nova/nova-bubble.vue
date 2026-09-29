@@ -20,11 +20,7 @@
   <view>
     <view v-if="visible" class="nx-nova-bubble nova-float" :class="{ 'nx-nova-bubble--dimmed': dimmed }" role="button" tabindex="0" :aria-label="t.conversations.title" @click="open" @keydown.enter.prevent="open" @keydown.space.prevent="open">
       <view class="nx-nova-btn nova-pulse">
-        <NovaAvatar v-if="NOVA_SUPPORT_VISIBLE" :size="36" pulse />
-        <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 14v-2a9 9 0 0 1 18 0v2" />
-          <path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" />
-        </svg>
+        <NovaAvatar :size="36" pulse />
         <view v-if="showUnreadBadge" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
       </view>
     </view>

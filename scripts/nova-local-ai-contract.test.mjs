@@ -63,8 +63,8 @@ test("floating human support stays available while Nova remains hidden", () => {
   assert.doesNotMatch(chassis, /<NovaBubble[^>]*v-(show|else)/);
   assert.doesNotMatch(chassis, /NovaBubble[^>]+!remoteApiEnabled/);
   assert.match(bubble, /const visible = computed\(\(\) => !NOVA_SUPPORT_VISIBLE \|\| remoteApiEnabled \|\| totalUnread\.value > 0\)/);
-  assert.match(bubble, /<NovaAvatar v-if="NOVA_SUPPORT_VISIBLE"/);
-  assert.match(bubble, /<svg v-else[^>]*aria-hidden="true"/);
+  assert.match(bubble, /<NovaAvatar :size="36" pulse \/>/);
+  assert.doesNotMatch(bubble, /<svg v-else[^>]*aria-hidden="true"/);
   assert.match(bubble, /\(NOVA_SUPPORT_VISIBLE \? nova\.unread : 0\) \+ humanUnread\.value/);
   assert.match(bubble, /if \(!NOVA_SUPPORT_VISIBLE\) return;/);
   assert.match(bubble, /v-if="showUnreadBadge"/);
