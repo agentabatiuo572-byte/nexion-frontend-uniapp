@@ -16,7 +16,7 @@
       <text v-if="!nativePhoneAvailable || phase !== 'result'" class="cn-sub">{{ nativePhoneAvailable ? subText : t.myDevices.phoneActivationAppOnlyBody }}</text>
     </view>
 
-    <transition v-if="nativePhoneAvailable" name="cn-fade" mode="out-in">
+    <view v-if="nativePhoneAvailable">
       <!-- Phase: intro -->
       <view v-if="phase === 'intro'" key="intro" class="cn-phase">
         <view class="cn-why">
@@ -72,7 +72,7 @@
           <text class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
         </view>
       </view>
-    </transition>
+    </view>
 
     <view v-if="!nativePhoneAvailable" class="cn-cta">
       <view class="cn-go cn-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
@@ -440,9 +440,11 @@ function leaveConnect() {
 
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
-  if (o.mode === "recalibrate") isRecal.value = true;
-  if (o.mode === "resume") resumeDeferred.value = true;
-  if (o.mode === "login") { isLogin.value = true; isRecal.value = true; loginCheckNeeded = true; }
+  isLogin.value = o.mode === "login";
+  isRecal.value = isLogin.value || o.mode === "recalibrate";
+  resumeDeferred.value = o.mode === "resume";
+  loginCheckNeeded = isLogin.value;
+  phase.value = "intro";
 });
 onMounted(() => {
   if (nativePhoneAvailable && (isLogin.value || (!isRecal.value && !resumeDeferred.value))) phase.value = "calibrating";
@@ -532,8 +534,6 @@ onUnmounted(() => {
 
 .anim-up { animation: cn-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes cn-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.cn-fade-enter-active, .cn-fade-leave-active { transition: opacity 0.3s; }
-.cn-fade-enter-from, .cn-fade-leave-to { opacity: 0; }
 
 .cn-score--hex { --score-size: clamp(184px, 32vh, 306px); width: 100%; height: var(--score-size); box-sizing: border-box; display: grid; place-items: center; border: 0; background: transparent; box-shadow: none; padding: 0; overflow: visible; isolation: isolate; }
 .cn-score__aurora { grid-area: 1 / 1; width: min(70vw, 220px); height: min(70vw, 220px); border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--v5-brand) 42%, transparent), transparent 64%); filter: blur(24px); animation: cn-aurora 5s ease-in-out infinite alternate; }
