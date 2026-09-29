@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rankLabel, rankName } from "./v-rank-copy";
 import type { VRankDef } from "@/store/v-rank";
+import { HAN_SCRIPT_RE } from "./native-unicode-regex";
 
 const published = [
   ["注册会员", "Registered Member", "Thành viên đã đăng ký"],
@@ -36,5 +37,11 @@ describe("canonical V-rank title locale", () => {
     expect(rankName({ title: "运营自定义", cnTitle: "运营自定义" }, "zh")).toBe("运营自定义");
     expect(rankLabel(0, "en", [{ title: "运营自定义", cnTitle: "运营自定义" } as VRankDef])).toBe("V0");
     expect(rankLabel(0, "vi", [{ title: "运营自定义", cnTitle: "运营自定义" } as VRankDef])).toBe("V0");
+  });
+  it("keeps Han detection compatible with older Android render engines", () => {
+    expect(HAN_SCRIPT_RE.source).not.toMatch(/\\[pP]\{/);
+    expect(rankName({ title: "A股团队", cnTitle: "A股团队" }, "en")).toBe("");
+    expect(rankName({ title: "𠮷田团队", cnTitle: "𠮷田团队" }, "en")).toBe("");
+    expect(rankName({ title: "Server Rank", cnTitle: "注册会员" }, "en")).toBe("Server Rank");
   });
 });

@@ -2,6 +2,7 @@ import { reactive } from "vue";
 import type { BankConfig, BankBeneficiary, createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { BANK_HOLDER_NAME_RE } from "@/lib/native-unicode-regex";
 
 type Recipient = { account: string; holder: string };
 type BindingApi = Pick<ReturnType<typeof createBankWithdrawalApi>, "config" | "bind" | "sendOtp">;
@@ -10,7 +11,7 @@ type Phase = "details" | "uncertain" | "saved";
 export function validBankRecipient(draft: Recipient): boolean {
   const name = draft.holder.trim();
   return /^[0-9]{6,32}$/.test(draft.account.trim()) && name.length >= 2 && name.length <= 100
-    && /^[\p{L}\p{M} .'-]+$/u.test(name);
+    && BANK_HOLDER_NAME_RE.test(name);
 }
 /** Account-only binding needs explicit server proof that bank routing is verified. */
 export function directBankBindingAvailable(config: BankConfig | null): boolean {
