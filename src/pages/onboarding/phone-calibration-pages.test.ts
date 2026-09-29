@@ -9,6 +9,7 @@ import * as flow from "@/lib/phone-calibration-flow";
 import * as estimatorScope from "@/lib/estimator-scope";
 import * as calibrationScope from "@/lib/onboarding-calibration-scope";
 import * as format from "@/i18n/format";
+import * as phoneCalibrationError from "@/lib/phone-calibration-error";
 
 const raw = { memGB: null, cores: null, model: "", brand: "", gpu: "", pxDensity: null,
   pingMs: null, batteryLevel: null, charging: null, networkReachable: null };
@@ -45,11 +46,12 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
     "@/lib/account-scope": { captureAccountScope: () => ({ epoch }), isCurrentAccountScope: (scope: any) => scope.epoch === epoch },
     "@/lib/estimator-scope": estimatorScope, "@/lib/onboarding-calibration-scope": calibrationScope,
     "@/lib/phone-calibration-flow": flow,
+    "@/lib/phone-calibration-error": phoneCalibrationError,
     "@/lib/defer-phone-activation": { confirmDeferredPhoneActivation },
   };
   vi.stubGlobal("uni", { showToast: vi.fn() });
   const source = readFileSync(new URL(`./${name}.vue`, import.meta.url), "utf8").split('<script setup lang="ts">')[1].split("</script>")[0];
-  const fields = name === "connect" ? "phase, canonical, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, calibration, retryCalibration, goConnect";
+  const fields = name === "connect" ? "phase, canonical, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, deferPhoneActivation";
   const code = ts.transpileModule(`${source}\nexport const page = { ${fields} };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -206,5 +208,40 @@ describe("real onboarding page workers", () => {
     const { page } = mount("connect", api); await settle(); expect(page.phase.value).toBe("error");
     page.retryCalibration(); await settle(); expect(page.phase.value).toBe("result");
     expect(api.calibrate).toHaveBeenCalledOnce();
+  });
+  it("estimator retries a failed defer against fresh server state without recalibrating", async () => {
+    const pending = { ...record, calibrationStatus: "PENDING_VERIFICATION", calibrationAvailable: false };
+    const api = { result: vi.fn().mockResolvedValue(pending), calibrate: vi.fn() };
+    const { page, confirmDeferredPhoneActivation, navReset } = mount("estimator", api); await settle();
+    confirmDeferredPhoneActivation.mockRejectedValueOnce(new ApiError({
+      kind: "http", status: 403, message: "PHONE_NATIVE_SESSION_REQUIRED",
+    })).mockResolvedValue({ ...record, revision: 5, activationStatus: "DEFERRED" });
+
+    await page.deferPhoneActivation();
+    expect(page.deferFailed.value).toBe(true);
+    expect(page.failureDetail.value).toContain("服务器尚无法保存");
+    expect(page.calibration.value).toBeNull();
+    expect(navReset).not.toHaveBeenCalled();
+
+    page.retryCalibration(); await settle();
+    expect(confirmDeferredPhoneActivation).toHaveBeenCalledTimes(2);
+    expect(confirmDeferredPhoneActivation.mock.calls[1][0].current).toBeNull();
+    expect(api.calibrate).not.toHaveBeenCalled();
+    expect(navReset).toHaveBeenCalledWith(expect.objectContaining({ url: "/pages/index/index" }));
+  });
+  it("shows the package trust error and keeps defer failures explicit without activating", async () => {
+    const api = { result: vi.fn().mockRejectedValue(missing()), calibrate: vi.fn().mockRejectedValue(
+      new ApiError({ kind: "http", status: 503, message: "PHONE_NATIVE_PROOF_NOT_CONFIGURED" })), activate: vi.fn() };
+    const { page, confirmDeferredPhoneActivation, navReset } = mount("connect", api); await settle();
+    expect(page.phase.value).toBe("error");
+    expect(page.failureDetail.value).toContain("服务器尚未信任");
+    confirmDeferredPhoneActivation.mockRejectedValue(new ApiError({
+      kind: "http", status: 403, message: "PHONE_NATIVE_SESSION_REQUIRED",
+    }));
+    await page.deferPhoneActivation();
+    expect(page.failureTitle.value).toBe("暂不激活未保存");
+    expect(page.failureDetail.value).toContain("服务器尚无法保存");
+    expect(navReset).not.toHaveBeenCalled();
+    expect(api.activate).not.toHaveBeenCalled();
   });
 });
