@@ -10,7 +10,7 @@
         <text class="screen-title" data-testid="bank-order-status" role="status" aria-live="polite" aria-atomic="true">{{ statusLabel }}</text>
         <text class="intro">{{ c.resultNotes[outcome] }}</text>
         <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ money(order.bank.amountVnd) }}</text><text class="currency">VND</text></view>
-        <view class="account-card"><text class="muted">{{ displayBank(order.bank.bankName) }}</text><text class="account-number">{{ order.bank.maskedAccount }}</text></view>
+        <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ order.bank.maskedAccount }}</text></view>
         <view class="details">
           <view class="row"><text>{{ c.orderNumber }}</text><text>{{ order.withdrawalNo }}</text></view>
           <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
@@ -37,7 +37,7 @@
         <view v-if="recipient" class="account-card">
           <text class="muted">{{ c.recipientTitle }}</text>
           <text class="account-number">{{ recipient.maskedAccount }}</text>
-          <text class="bank-name">{{ displayBank(recipient.bankName) }}</text>
+          <text class="bank-name">{{ useTranslations.bankBinding.accountRoutedLabel }}</text>
         </view>
         <view v-if="(config.beneficiary && !hasVerifiedBankIdentity(config.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
 
@@ -130,7 +130,6 @@ let visible = false;
 const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
 const money = (value: number) => value.toLocaleString(dateLocale(), { maximumFractionDigits: 6 });
 const displayDate = formatBankDateTime;
-const displayBank = (name: string) => name === "BANKQR" ? useTranslations.value.bankBinding.type : name;
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
   && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"

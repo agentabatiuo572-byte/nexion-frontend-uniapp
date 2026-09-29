@@ -23,9 +23,9 @@ export async function verifyBankBindingPage(page, gotoProtected) {
         const replay=fixture.binds.some(call=>call.key===request.idempotencyKey);
         if (fixture.beneficiary && !replay && (request.body.challengeNo!=="PAYOUT-BANK-"+"a".repeat(32) || request.body.code!=="123456")) throw new ApiError({kind:"business",code:422,message:"BANK_CHANGE_OTP_INVALID"});
         fixture.binds.push({body:request.body,key:request.idempotencyKey});
-        if ((!fixture.beneficiary && Object.keys(request.body).sort().join(",")!=="account,bankCode,holder") || request.body.account!=="00123456789" || request.body.bankCode!=="") throw new Error("BANK_BINDING_FIELD_MAPPING_INVALID");
-        fixture.beneficiary = {bankCode:"",bankName:"BANKQR",maskedAccount:"****6789",
-          canWithdraw:true,effectiveAt:new Date().toISOString(),nextChangeAt:new Date(Date.now()+604800000).toISOString()};
+        if ((!fixture.beneficiary && Object.keys(request.body).sort().join(",")!=="account,accountRoutingConfirmed,bankCode,holder") || request.body.account!=="00123456789" || request.body.bankCode!=="" || request.body.accountRoutingConfirmed!==true) throw new Error("BANK_BINDING_FIELD_MAPPING_INVALID");
+        fixture.beneficiary = {bankCode:"",bankName:"ACCOUNT_ROUTED",maskedAccount:"****6789",
+          bankRoutingVerified:true,canWithdraw:true,effectiveAt:new Date().toISOString(),nextChangeAt:new Date(Date.now()+604800000).toISOString()};
         if(fixture.loseResponse) { fixture.loseResponse=false; throw new ApiError({kind:"network",message:"FIXTURE_LOST_RESPONSE"}); }
         return {beneficiary:fixture.beneficiary};
       }
@@ -60,15 +60,25 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     await page.screenshot({path:path.join(artifact,"bank-form.png"),fullPage:true});
     await page.evaluate(()=>{window.__bindingFixture.loseResponse=true;});
     await submit.press("Enter");
+    const confirm=page.getByTestId("bank-bind-confirm"), edit=page.getByTestId("bank-bind-edit");
+    await confirm.waitFor();
+    assert.equal(await page.getByTestId("bank-review-account").innerText(),"00123456789");
+    assert.equal(await page.getByTestId("bank-review-holder").innerText(),"NGUYEN VAN A");
+    await page.screenshot({path:path.join(artifact,"bank-review.png"),fullPage:true});
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.binds.length),0);
+    await edit.press("Enter");
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.binds.length),0);
+    await submit.press("Enter"); await confirm.press("Enter");
     await page.waitForFunction(()=>window.__bindingFixture.binds.length===1);
     await page.locator(".error-note").waitFor();
     assert.equal(await account.isEditable(),false);
     assert.equal(await page.getByRole("dialog").count(),0);
     await submit.press("Enter");
     await page.getByTestId("bank-bind-saved").waitFor();
+    assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /ACCOUNT_ROUTED|BANKQR/);
     assert.equal(await page.getByTestId("bank-binding-verify").count(),0);
     assert.doesNotMatch(await page.getByTestId("bank-account-binding").innerText(), /24 (hours|小时|giờ)/);
-    assert.match(await page.getByTestId("bank-binding-status").innerText(), /route is unverified|路由尚未核实|Tuyến ngân hàng nhận chưa được xác minh/i);
+    assert.match(await page.getByTestId("bank-binding-status").innerText(), /Receiving account saved|收款账户已绑定|Đã liên kết tài khoản nhận tiền/i);
     await page.waitForFunction(()=>document.activeElement?.getAttribute('data-testid')==='bank-bind-done');
     const calls=await page.evaluate(()=>window.__bindingFixture.binds);
     assert.equal(calls.length,2); assert.deepEqual(calls[0],calls[1]);
@@ -93,7 +103,9 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     await page.waitForFunction(()=>document.querySelector('[data-testid="bank-bind-continue"]')?.getAttribute("aria-disabled")==="false");
     await page.screenshot({path:path.join(artifact,"bank-change-sms.png"),fullPage:true});
     await page.evaluate(()=>{window.__bindingFixture.loseResponse=true;});
-    await submit.press("Enter"); await page.locator(".error-note").waitFor();
+    await submit.press("Enter");
+    assert.equal(await page.evaluate(()=>window.__bindingFixture.binds.length),2);
+    await confirm.press("Enter"); await page.locator(".error-note").waitFor();
     await visitSmsApp();
     assert.equal(await account.isEditable(),false);
     await submit.press("Enter"); await page.getByTestId("bank-bind-saved").waitFor();
@@ -104,7 +116,7 @@ export async function verifyBankBindingPage(page, gotoProtected) {
     // An unverified bank route cannot accept recipient details or create a binding.
     await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.beneficiary=null;window.__bindingFixture.routingVerified=false;});
     await gotoProtected("/pages/me/wallet-cards-new"); await page.locator(".error-note").waitFor();
-    assert.match(await page.locator(".error-note").innerText(),/cannot be verified|无法验证|Chưa thể xác minh/i);
+    assert.match(await page.locator(".error-note").innerText(),/routing has not been confirmed|路由方式尚未确认|Chưa xác nhận được cách định tuyến/i);
     assert.equal(await account.isEditable(),false); assert.equal(await holder.isEditable(),false);
     assert.equal(await submit.getAttribute("aria-disabled"),"true");
     await gotoProtected("/pages/me/wallet"); await page.evaluate(()=>{window.__bindingFixture.routingVerified=true;window.__bindingFixture.loadFails=true;});

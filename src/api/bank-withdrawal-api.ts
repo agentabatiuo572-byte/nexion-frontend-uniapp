@@ -52,9 +52,12 @@ function record(value: unknown): Record<string, unknown> {
 }
 function text(value: unknown): string { if (typeof value !== "string" || !value.trim()) throw invalid(); return value; }
 function bankCode(value: unknown): string { if (typeof value !== "string" || !/^(?:[A-Za-z0-9]{2,16})?$/.test(value)) throw invalid(); return value; }
+/** A server-confirmed payout routing contract, not verification of a bank or account holder. */
 export function hasVerifiedBankIdentity(bank: { bankCode: string; bankName: string; bankRoutingVerified?: boolean }): boolean {
-  return bank.bankRoutingVerified === true && !!bank.bankCode.trim() && bank.bankCode.trim().toUpperCase() !== "BANKQR"
-    && !!bank.bankName.trim() && bank.bankName.trim().toUpperCase() !== "BANKQR";
+  if (bank.bankRoutingVerified !== true) return false;
+  if (!bank.bankCode.trim()) return bank.bankName === "ACCOUNT_ROUTED";
+  return bank.bankCode.trim().toUpperCase() !== "BANKQR"
+    && !!bank.bankName.trim() && !["BANKQR", "ACCOUNT_ROUTED"].includes(bank.bankName.trim().toUpperCase());
 }
 function number(value: unknown): number {
   if ((typeof value !== "number" && typeof value !== "string") || String(value).trim() === "") throw invalid();
@@ -187,7 +190,7 @@ export function createBankWithdrawalApi(client: ApiClient) {
         || !Number.isInteger(retryAfterSeconds) || retryAfterSeconds < 60 || retryAfterSeconds > 86400) throw invalid();
       return { challengeNo, expiresInSeconds, retryAfterSeconds };
     },
-    async bind(body: { bankCode: string; account: string; holder: string; challengeNo?: string; code?: string }, key: string): Promise<BankBeneficiary> {
+    async bind(body: { bankCode: string; account: string; holder: string; accountRoutingConfirmed: true; challengeNo?: string; code?: string }, key: string): Promise<BankBeneficiary> {
       const r = record(await client.request({ path: `${base}/beneficiary`, method: "POST", body, idempotencyKey: key, authenticated: true }));
       const saved = beneficiary(r.beneficiary);
       if (saved.bankCode !== body.bankCode || !saved.maskedAccount.endsWith(body.account.slice(-4))) throw invalid();

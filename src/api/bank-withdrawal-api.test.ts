@@ -11,7 +11,7 @@ const receipt = { state: "COMMITTED", withdrawalNo: "WD-TEST", withdrawal: { wit
 describe("bank withdrawal server contract", () => {
   test("binding rejects a receipt for another bank/account and never accepts an unmasked recipient", async () => {
     const saved = { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789", effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true };
-    const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A" };
+    const body = { bankCode: "", account: "00123456789", holder: "NGUYEN VAN A", accountRoutingConfirmed: true as const };
     const request = vi.fn().mockResolvedValue({ beneficiary: saved });
     const api = createBankWithdrawalApi({ request } as never);
     await expect(api.bind(body, "bind-test")).resolves.toMatchObject({ ...saved, canWithdraw: false });
@@ -32,6 +32,9 @@ describe("bank withdrawal server contract", () => {
   test("placeholder BANKQR quotes remain readable for recovery, but not a verified bank identity", async () => {
     expect(parseBankQuote({ ...quote, bankCode: "", bankName: "BANKQR" }).bankCode).toBe("");
     expect(hasVerifiedBankIdentity({ bankCode: "", bankName: "BANKQR", bankRoutingVerified: true })).toBe(false);
+    expect(hasVerifiedBankIdentity({ bankCode: "", bankName: "ACCOUNT_ROUTED" })).toBe(false);
+    expect(hasVerifiedBankIdentity({ bankCode: "", bankName: "ACCOUNT_ROUTED", bankRoutingVerified: true })).toBe(true);
+    expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "ACCOUNT_ROUTED", bankRoutingVerified: true })).toBe(false);
     expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "BANKQR", bankRoutingVerified: true })).toBe(false);
     expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "Vietcombank" })).toBe(false);
     expect(hasVerifiedBankIdentity({ bankCode: "VCB", bankName: "Vietcombank", bankRoutingVerified: true })).toBe(true);
@@ -46,6 +49,10 @@ describe("bank withdrawal server contract", () => {
     request.mockResolvedValue({ enabled: true, banks: [], beneficiary: { bankCode: "", bankName: "BANKQR", maskedAccount: "****6789",
       effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true }, unresolvedIntent: null });
     expect(await api.config()).toMatchObject({ beneficiary: { canWithdraw: false }, unresolvedIntent: null });
+    request.mockResolvedValue({ enabled: true, banks: [], beneficiary: { bankCode: "", bankName: "ACCOUNT_ROUTED", maskedAccount: "****6789",
+      effectiveAt: "2026-09-17T00:00:00Z", nextChangeAt: "2026-09-23T00:00:00Z", canWithdraw: true, bankRoutingVerified: true }, unresolvedIntent: null });
+    expect(await api.config()).toMatchObject({ beneficiary: { canWithdraw: true }, unresolvedIntent: null });
+    expect(parseBankQuote({ ...quote, bankCode: "", bankName: "ACCOUNT_ROUTED", bankRoutingVerified: true })).toMatchObject({ bankCode: "", bankRoutingVerified: true });
   });
   test("rejects a contradictory bank routing contract instead of treating it as an older server", async () => {
     const response = { enabled: true, banks: [], beneficiary: null, bankCodeRequired: false, bindingOtpRequired: false, payType: "BANKQR" };
