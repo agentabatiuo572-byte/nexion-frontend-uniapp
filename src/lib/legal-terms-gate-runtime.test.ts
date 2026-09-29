@@ -122,6 +122,80 @@ describe("legal terms runtime gate", () => {
     });
   });
 
+  it.each([true, false])("retries one transient terms read while gated; next version acknowledged=%s", async (acknowledged) => {
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "network", message: "REQUEST_TIMEOUT", retryable: true }))
+      .mockResolvedValueOnce({ ...snapshot(acknowledged), version: "v5", acknowledgedAt: acknowledged ? "2026-08-30T00:00:01" : null });
+    const check = runtime.scheduleLegalTermsGate("/pages/support/tickets");
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    await check;
+    expect(state.current).toHaveBeenCalledTimes(3);
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(uni.reLaunch).toHaveBeenCalledTimes(acknowledged ? 0 : 1);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(!acknowledged);
+  });
+
+  it("shows the retry prompt after a second transient failure", async () => {
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValue(new ApiError({ kind: "http", message: "HTTP_503", status: 503, retryable: true }));
+    await runtime.scheduleLegalTermsGate("/pages/support/tickets");
+    expect(state.current).toHaveBeenCalledTimes(3);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.showModal).toHaveBeenCalledOnce();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("cold session retries before deciding whether server acknowledgement exists; second read succeeds=%s", async (succeeds) => {
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    const timeout = new ApiError({ kind: "network", message: "REQUEST_TIMEOUT", retryable: true });
+    state.current.mockRejectedValueOnce(timeout);
+    if (succeeds) state.current.mockResolvedValueOnce(snapshot(true));
+    else state.current.mockRejectedValueOnce(timeout);
+    await runtime.scheduleLegalTermsGate("/pages/support/tickets");
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(uni.reLaunch).toHaveBeenCalledTimes(succeeds ? 0 : 1);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(!succeeds);
+  });
+
+  it("does not retry a transient read for a different account", async () => {
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "network", message: "REQUEST_TIMEOUT", retryable: true }));
+    const check = runtime.scheduleLegalTermsGate("/pages/support/tickets");
+    await settleGate();
+    state.session = { accessToken: "token-b", user: { userId: 8 } };
+    state.sessionRevision++;
+    await check;
+    expect(state.current).toHaveBeenCalledOnce();
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it("rechecks with the renewed token instead of retrying the old session during backoff", async () => {
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "network", message: "REQUEST_TIMEOUT", retryable: true }))
+      .mockResolvedValueOnce(snapshot(true));
+    const check = runtime.scheduleLegalTermsGate("/pages/support/tickets");
+    await settleGate();
+    state.session = { accessToken: "token-b", user: { userId: 7 } };
+    state.sessionRevision++;
+    state.refreshContinuation = true;
+    await check;
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(uni.showLoading).toHaveBeenCalledTimes(2);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
   it.each(["network", "HTTP_503", "LEGAL_TERMS_RESPONSE_INVALID"])("keeps an acknowledged user on the current page after %s, gated until retry succeeds", async (failure) => {
     const runtime = await loadRuntime();
     state.current.mockResolvedValueOnce(snapshot(true));

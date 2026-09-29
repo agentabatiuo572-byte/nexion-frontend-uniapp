@@ -3,6 +3,7 @@ import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { getT } from "@/i18n/use-t";
 import { captureRuntimeRevision } from "@/api/order-api";
+import { ApiError } from "@/api/errors";
 import { pendingProfileLocaleHydration } from "./locale-profile-hydration";
 import {
   buildLegalTermsRoute,
@@ -257,7 +258,15 @@ export function scheduleLegalTermsGate(returnTo = "/pages/index/index"): Promise
     if (!ownsRead() || !sameLegalTermsSession(requestFence, fence()) || requestLocale !== useLocaleStore().code) {
       throw new Error("LEGAL_TERMS_LANGUAGE_HYDRATION_SUPERSEDED");
     }
-    return legalTermsApi.current(requestLocale, "GLOBAL", true);
+    try {
+      return await legalTermsApi.current(requestLocale, "GLOBAL", true);
+    } catch (error) {
+      if (!(error instanceof ApiError) || !error.retryable) throw error;
+      // Keep business actions gated while one transient read gets a second chance.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!ownsRead() || !sameLegalTermsSession(requestFence, fence()) || requestLocale !== useLocaleStore().code) throw error;
+      return legalTermsApi.current(requestLocale, "GLOBAL", true);
+    }
   });
   const promise = read
     .then((snapshot) => {
