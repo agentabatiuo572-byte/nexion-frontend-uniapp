@@ -41,6 +41,7 @@
       <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation" @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)">
         <text>{{ t.conversations.restartSession }}</text>
       </view>
+      <view v-if="!isAi && convStore.advisorError" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()" @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><text>{{ t.conversations.image.retryPolicy }}</text></view>
       <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket" @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)">
         <text>{{ t.conversations.convertTicket }}</text>
       </view>
@@ -67,6 +68,7 @@
       :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
       <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
     </view>
+    <view v-if="!isAi && convStore.advisor?.assignmentState === 'UNBOUND' && conv?.messages.some(message => message.sender === 'user')" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
@@ -83,9 +85,30 @@
       :closed="isClosedSession"
       :restart-label="isAi && remoteApiEnabled ? t.nova.localRetry : t.conversations.restartSession"
       :queue-labels="isAi && remoteApiEnabled ? t.nova.queue : undefined"
-      :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : app.accountBindingEpoch + ':' + (cid || startType || '')"
+      :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : app.accountBindingEpoch + ':' + convStore.scopeInvalidated + ':' + (cid || startType || '')"
+      :initial-draft="!isAi ? draftText : undefined"
       :max-input-length="isAi && remoteApiEnabled ? 2000 : undefined"
+      :image-labels="!isAi ? t.conversations.image : undefined"
+      :attach-disabled="!isAi && attachmentPolicy?.available !== true"
+      :attach-unavailable="!isAi && attachmentPolicy?.available !== true ? (!remoteApiEnabled || attachmentPolicyError || attachmentPolicy?.available === false ? t.conversations.image.unavailable : t.conversations.image.checkingPolicy) : undefined"
+      :attach-retry="remoteApiEnabled && attachmentPolicyError"
+      :attachment-draft="attachmentDisplay"
+      :attachment-preview-src="!isAi ? imageDraft?.filePath : undefined"
+      :failed-send-label="failedHumanLabel"
+      :can-discard-send="failedHumanSend?.settled"
+      :can-retry-send="failedHumanSend?.retryable !== false && !humanSendBusy"
+      :send-blocked="!!failedHumanSend || humanSendBusy"
       @send="onSend"
+      @draft-change="draftText = $event"
+      @attach="chooseSupportImage"
+      @retry-policy="loadAttachmentPolicy"
+      @retry-upload="retrySupportUpload"
+      @replace-attachment="replaceSupportAttachment"
+      @cancel-attachment="cancelSupportAttachment"
+      @retry-image="retryPrivateImage"
+      @retry-message="retryHumanSend"
+      @edit-message="editHumanSend"
+      @discard-message="discardHumanSend"
       @queue-action="onQueueAction"
       @queue-save="onQueueSave"
       @chip="onChip"
@@ -130,13 +153,15 @@ import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import { createSendLimiter } from "@/lib/send-limiter";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { isDeviceOnline } from "@/lib/hashpower";
-import { useConversations, type CategoryRefreshOutcome } from "@/store/conversations";
+import { useConversations, type CategoryRefreshOutcome, type HumanComposer } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
 import { toast, confirm, useUI } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
 import type { ConversationType } from "@/domain/support";
-import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
+import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
+import { isSettledRejection, asApiError } from "@/api/errors";
+import { isSupportAttachmentNotReady, type SupportAttachmentPolicy } from "@/api/support-api";
 import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -158,6 +183,147 @@ const convStore = useConversations();
 const nova = useNova();
 const app = useApp();
 const locale = useLocaleStore();
+type ImageDraft = { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean };
+type FailedHumanSend = { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number };
+const imageDraft = ref<ImageDraft | null>(null);
+const failedHumanSend = ref<FailedHumanSend | null>(null);
+const humanSendBusy = ref(false);
+const draftText = ref("");
+const attachmentPolicy = ref<SupportAttachmentPolicy | null>(null);
+const attachmentPolicyError = ref(false);
+const imageSources = ref<Record<string, string>>({});
+const imageFailures = ref<Record<string, boolean>>({});
+let imageEpoch = 0;
+let imageLoads = new Set<string>();
+function clearPrivateImages() {
+  imageEpoch += 1;
+  imageLoads = new Set();
+  for (const source of Object.values(imageSources.value)) if (source.startsWith("blob:") && typeof URL !== "undefined") URL.revokeObjectURL(source);
+  imageSources.value = {}; imageFailures.value = {};
+}
+watch(() => [app.accountBindingEpoch, convStore.scopeInvalidated], () => {
+  clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
+  if (novaPageVisible && !isAi.value && remoteApiEnabled) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
+}, { flush: "sync" });
+async function loadPrivateImages() {
+  const epoch = imageEpoch, binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
+  for (const message of conv.value?.messages ?? []) {
+    const id = message.attachmentId;
+    if (!id || imageSources.value[id] || imageFailures.value[id] || imageLoads.has(id)) continue;
+    imageLoads.add(id);
+    try {
+      const source = await supportApi.attachmentContent(id);
+      if (epoch !== imageEpoch || binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated || !novaPageVisible) {
+        if (source.startsWith("blob:") && typeof URL !== "undefined") URL.revokeObjectURL(source);
+        return;
+      }
+      imageSources.value = { ...imageSources.value, [id]: source };
+    } catch { if (epoch === imageEpoch) imageFailures.value = { ...imageFailures.value, [id]: true }; }
+    finally { if (epoch === imageEpoch) imageLoads.delete(id); }
+  }
+}
+const attachmentDisplay = computed(() => imageDraft.value && !isAi.value ? {
+  state: imageDraft.value.state,
+  replaceOnly: imageDraft.value.replaceOnly,
+  label: imageDraft.value.state === "ready" ? t.value.conversations.image.ready
+    : imageDraft.value.state === "uploading" ? t.value.conversations.image.uploading
+      : t.value.conversations.image[imageDraft.value.error ?? "uploadFailed"],
+} : null);
+const failedHumanLabel = computed(() => failedHumanSend.value
+  ? `${failedHumanSend.value.kind === "expired" ? t.value.conversations.image.expired
+    : failedHumanSend.value.kind === "failed" ? t.value.conversations.image.sendFailed
+      : t.value.conversations.image.sendUnknown} · ${t.value.conversations.image.attempts} ${failedHumanSend.value.attempts}`
+  : undefined);
+
+async function chooseSupportImage() {
+  if (isAi.value || imageDraft.value || failedHumanSend.value) return;
+  try {
+    const policy = attachmentPolicy.value ?? await supportApi.attachmentPolicy();
+    attachmentPolicy.value = policy;
+    if (!policy.available) { toast.info(t.value.conversations.image.unavailable, ""); return; }
+    const selected = await new Promise<UniNamespace.ChooseImageSuccessCallbackResult>((resolve, reject) =>
+      uni.chooseImage({ count: 1, sizeType: ["original"], sourceType: ["album", "camera"], success: resolve, fail: reject }));
+    const path = selected.tempFilePaths[0];
+    if (!path) return;
+    const selectedFile = Array.isArray(selected.tempFiles) ? selected.tempFiles[0] : selected.tempFiles;
+    if (policy.maxBytes && selectedFile?.size > policy.maxBytes) { toast.info(t.value.conversations.image.tooLarge, ""); return; }
+    const id = requireCryptoUuid();
+    imageDraft.value = { filePath: path, clientUploadId: id, key: `support-upload-${id}`, state: "uploading" };
+    await retrySupportUpload();
+  } catch (cause) {
+    const message = typeof cause === "object" && cause !== null && "errMsg" in cause ? String(cause.errMsg) : "";
+    if (!/cancel/i.test(message)) toast.error(t.value.conversations.image.uploadFailed, "");
+  }
+}
+async function loadAttachmentPolicy() {
+  if (!remoteApiEnabled) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
+  attachmentPolicyError.value = false;
+  try {
+    const result = await supportApi.attachmentPolicy();
+    if (binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated) attachmentPolicy.value = result;
+  } catch {
+    if (binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated) { attachmentPolicy.value = null; attachmentPolicyError.value = true; }
+  }
+}
+async function retrySupportUpload() {
+  const draft = imageDraft.value;
+  if (!draft || draft.state === "ready" || draft.replaceOnly || !draft.filePath) return;
+  draft.state = "uploading";
+  try {
+    const result = await supportApi.uploadAttachment(draft.filePath, draft.clientUploadId, draft.key);
+    if (imageDraft.value !== draft) return;
+    draft.attachmentId = result.id; draft.state = "ready"; draft.error = undefined;
+  } catch (cause) {
+    if (imageDraft.value !== draft) return;
+    draft.state = "failed";
+    const error = asApiError(cause);
+    draft.error = error.status === 413 ? "tooLarge" : error.status === 415 ? "unsupported" : "uploadFailed";
+  }
+}
+async function cancelSupportAttachment() {
+  const draft = imageDraft.value;
+  if (!draft) return;
+  if (draft.attachmentId && !draft.replaceOnly) {
+    try { await supportApi.cancelAttachment(draft.attachmentId, `support-cancel-${draft.clientUploadId}`); }
+    catch (cause) {
+      if (asApiError(cause).status !== 404) { toast.error(t.value.conversations.image.cancelFailed, ""); return; }
+    }
+  }
+  if (imageDraft.value === draft) imageDraft.value = null;
+}
+async function replaceSupportAttachment() {
+  if (failedHumanSend.value || humanSendBusy.value) return;
+  await cancelSupportAttachment();
+  if (!imageDraft.value) await chooseSupportImage();
+}
+function retryPrivateImage(id: string) {
+  if (!conv.value?.messages.some(message => message.attachmentId === id)) return;
+  delete imageFailures.value[id];
+  void loadPrivateImages();
+}
+async function retryHumanSend() {
+  const failed = failedHumanSend.value;
+  if (!failed?.retryable || humanSendBusy.value) return;
+  if (!failed.settled) {
+    try {
+      if (!await convStore.hasPendingHumanSend(humanComposerKey.value, failed)) {
+        failedHumanSend.value = { ...failed, settled: true, retryable: false, kind: "failed" };
+        return;
+      }
+    } catch { return; }
+  }
+  failedHumanSend.value = null;
+  humanSendBusy.value = true;
+  try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1); }
+  finally { humanSendBusy.value = false; }
+}
+function discardHumanSend() { if (failedHumanSend.value?.settled) failedHumanSend.value = null; }
+function editHumanSend() {
+  if (!failedHumanSend.value?.settled) return;
+  draftText.value = failedHumanSend.value.text;
+  failedHumanSend.value = null;
+}
 
 const cid = ref("");
 const isAi = ref(false);
@@ -193,6 +359,35 @@ let categoryGate: {
 } | null = null;
 const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
+const humanComposerKey = computed(() => cid.value ? `conversation:${cid.value}` : startType.value ? `start:${startType.value}` : "");
+let recoveredNavigation = "";
+function restoreRecoveredComposer(saved: HumanComposer | null | undefined, key: string) {
+  if (!saved?.recoveredId || !startType.value || cid.value || !novaPageVisible || recoveredNavigation === saved.recoveredId) return;
+  const id = saved.recoveredId;
+  recoveredNavigation = id;
+  void navReplace(`/pages/support/chat?cid=${encodeURIComponent(id)}`).then(ok => {
+    if (ok) convStore.clearComposer(key);
+    else recoveredNavigation = "";
+  });
+}
+watch(humanComposerKey, (key, previous) => {
+  if (previous) convStore.saveComposer(previous, { ...convStore.composer(previous), text: draftText.value, imageDraft: imageDraft.value,
+    failedSend: failedHumanSend.value ?? (humanSendBusy.value ? convStore.composer(previous).failedSend : null) });
+  const saved = key ? convStore.composer(key) : null;
+  draftText.value = saved?.text ?? "";
+  imageDraft.value = saved?.imageDraft ?? null;
+  failedHumanSend.value = saved?.failedSend ?? null;
+  restoreRecoveredComposer(saved, key);
+}, { flush: "sync" });
+watch([draftText, imageDraft, failedHumanSend], () => {
+  if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value,
+    failedSend: failedHumanSend.value ?? (humanSendBusy.value ? convStore.composer(humanComposerKey.value).failedSend : null) });
+}, { deep: true, flush: "sync" });
+watch(() => convStore.humanComposers[humanComposerKey.value], saved => {
+  if (!saved) return;
+  if (failedHumanSend.value && !saved.failedSend) failedHumanSend.value = null;
+  restoreRecoveredComposer(saved, humanComposerKey.value);
+});
 const humanRealtime = createHumanThreadRealtimeLifecycle({
   currentId: () => cid.value,
   isAi: () => isAi.value,
@@ -213,8 +408,17 @@ const humanCreateRecovery = createHumanConversationCreationRecovery({
 });
 
 function restoreCompletedHumanCreate(activateRealtime = false) {
+  const type = startType.value;
   const restoredId = humanCreateRecovery.restore();
   if (restoredId && activateRealtime) humanRealtime.activateIfCurrent(restoredId);
+  if (restoredId && novaPageVisible && type) {
+    const key = `start:${type}`;
+    recoveredNavigation = restoredId;
+    void navReplace(`/pages/support/chat?cid=${encodeURIComponent(restoredId)}`).then(ok => {
+      if (ok) convStore.clearComposer(key);
+      else recoveredNavigation = "";
+    });
+  }
 }
 
 function stopHumanThreadPolling() {
@@ -297,10 +501,15 @@ onLoad((q) => {
 onShow(async () => {
   if (hiddenAiRoute.value) return;
   novaPageVisible = true;
+  if (!isAi.value && remoteApiEnabled) {
+    void convStore.refreshAdvisor();
+    void loadAttachmentPolicy();
+  }
   // Mark the human route visible before any category await. If this page hides,
   // stop() invalidates the captured epoch, so an older onShow cannot revive it.
   const humanOpenEpoch = isAi.value ? null : humanRealtime.show();
   restoreCompletedHumanCreate();
+  restoreRecoveredComposer(convStore.composer(humanComposerKey.value), humanComposerKey.value);
   novaHistoryLoading.value = false;
   revealTick.value += 1;
   const requestedCategory = isAi.value ? "ai" : startType.value;
@@ -339,10 +548,12 @@ onShow(async () => {
   }
   else if (cid.value && humanOpenEpoch !== null) {
     await openHumanConversation(humanOpenEpoch, cid.value);
+    void loadPrivateImages();
   }
 });
 onHide(() => {
   novaPageVisible = false;
+  clearPrivateImages();
   categoryGate = null;
   ++handoffAttemptEpoch;
   handoffBusy.value = false;
@@ -385,6 +596,7 @@ watch(() => app.accountKey, () => {
 }, { flush: "sync" });
 
 const conv = computed(() => (cid.value ? convStore.get(cid.value) : undefined));
+watch(() => conv.value?.messages?.map(message => message.attachmentId).join("|"), () => { if (novaPageVisible && !isAi.value) void loadPrivateImages(); });
 const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
   conv.value?.type === "advisor" || conv.value?.type === "support" ? conv.value.type : startType.value,
 );
@@ -400,6 +612,10 @@ const isClosedSession = computed(() =>
 
 const headerName = computed(() => {
   if (isAi.value) return t.value.nova.name;
+  if (convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.image.unassigned;
+  if (convStore.advisor?.currentAdvisorName) return convStore.advisor.currentAdvisorName;
+  if (convStore.advisorError) return t.value.conversations.image.advisorUnavailable;
+  if (convStore.advisorLoading) return t.value.conversations.image.loadingAdvisor;
   if (conv.value) return displayAgentName(conv.value.agentName);
   return humanType.value === "advisor" ? t.value.conversations.typeAdvisor : humanType.value === "support" ? t.value.conversations.typeSupport : "";
 });
@@ -425,7 +641,7 @@ function isWaitingForAgent(name: string): boolean {
   const normalized = name.trim();
   return !normalized || normalized.toLowerCase() === "unassigned" || normalized === "备勤池";
 }
-const waitingForAgent = computed(() => !!conv.value && isWaitingForAgent(conv.value.agentName));
+const waitingForAgent = computed(() => convStore.advisor?.assignmentState === "UNBOUND" || (!!conv.value && !convStore.advisor && isWaitingForAgent(conv.value.agentName)));
 const humanPresence = computed(() => {
   // Nova never consumes a human thread's connection or presence state.
   if (isAi.value) return { online: undefined, mutedDot: false };
@@ -443,11 +659,17 @@ const headerRole = computed(() => {
     if (novaProviderHold.value) return t.value.nova.localUnavailable;
     return remoteApiEnabled ? t.value.nova.localRole : t.value.conversations.roleAi;
   }
+  if (convStore.advisorError) return t.value.conversations.image.advisorUnavailable;
+  if (startType.value && convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.waitingAgent;
+  if (startType.value && convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;
+  if (startType.value && convStore.advisor?.availability === "BUSY") return t.value.conversations.image.busyAdvisor;
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
   if (isTransferredSession.value) return t.value.conversations.sessionTransferred;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
   if (!remoteApiEnabled) return t.value.conversations[conv.value.roleKey];
+  if (convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;
+  if (convStore.advisor?.availability === "BUSY") return t.value.conversations.image.busyAdvisor;
   if (waitingForAgent.value) return t.value.conversations.waitingAgent;
   if (!convStore.realtimeReady) return t.value.conversations.connecting;
   if (humanPresence.value.online === false) return t.value.conversations.offline;
@@ -492,6 +714,7 @@ const emptyHint = computed(() => {
   if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
   if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
   if (isAi.value) return remoteApiEnabled ? t.value.nova.localEmptyHint : t.value.nova.emptyHint;
+  if (convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.image.unassignedHint;
   return humanType.value === "advisor" ? t.value.conversations.listEmptyAdvisor : t.value.conversations.listEmptySupport;
 });
 
@@ -548,6 +771,11 @@ const threadMessages = computed<ThreadMsg[]>(() => {
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
     text: m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
       ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text,
+    imageSrc: m.attachmentId ? imageSources.value[m.attachmentId] : undefined,
+    imageAttachmentId: m.attachmentId,
+    imageLoading: !!m.attachmentId && !imageSources.value[m.attachmentId] && !imageFailures.value[m.attachmentId],
+    imageError: !!m.attachmentId && !!imageFailures.value[m.attachmentId],
+    meta: `${m.sender === "user" ? t.value.conversations.image.you : m.authorName || (c.type === "advisor" ? t.value.conversations.typeAdvisor : t.value.conversations.typeSupport)} · ${new Date(m.ts).toLocaleTimeString(locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US", { hour: "2-digit", minute: "2-digit" })}`,
     receipt: receiptFor(m.status, i === lastUser),
   }));
   const last = c.messages[c.messages.length - 1];
@@ -871,6 +1099,9 @@ async function onSend(text: string, restore?: () => void) {
     void drainNovaQueue();
     return;
   }
+  if (humanSendBusy.value) { restore?.(); return; }
+  humanSendBusy.value = true;
+  try {
   // Do not supersede an in-flight page read; preserve the draft for its result.
   if (!isAi.value && humanOpenRequest !== null) { restore?.(); return; }
   if (!isAi.value && !cid.value && startType.value && remoteApiEnabled) {
@@ -896,6 +1127,11 @@ async function onSend(text: string, restore?: () => void) {
     }, AI_REPLY_MS);
     return;
   }
+  await sendHumanMessage(text, imageDraft.value?.state === "ready" ? imageDraft.value.attachmentId : undefined, restore);
+  } finally { humanSendBusy.value = false; }
+}
+
+async function sendHumanMessage(text: string, attachmentId?: string, restore?: () => void, attempts = 1) {
   const id = cid.value;
   if (!id) {
     const type = startType.value;
@@ -914,15 +1150,17 @@ async function onSend(text: string, restore?: () => void) {
       toast.info(t.value.conversations.categoryDisabled, "");
       return;
     }
+    if (!stageHumanSend(text, attachmentId, attempts, restore)) { humanCreateRecovery.finish(); return; }
     try {
-      const createdId = await convStore.startConversation(type, text);
+      const createdId = await convStore.startConversation(type, text, attachmentId);
       if (!humanCreateRecovery.isCurrent(creation)) return;
       humanCreateRecovery.complete(createdId, creation);
+      if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
+      convStore.saveComposer(`start:${type}`, { text: draftText.value, imageDraft: null, failedSend: null, recoveredId: createdId });
       restoreCompletedHumanCreate(true);
-    } catch {
-      if (!humanCreateRecovery.isCurrent(creation) || !novaPageVisible) return;
-      restore?.();
-      toast.error(t.value.conversations.convertTicketFailed, "");
+    } catch (cause) {
+      if (!humanCreateRecovery.isCurrent(creation)) return;
+      humanSendFailed(text, attachmentId, cause, attempts);
     } finally {
       humanCreateRecovery.finish();
     }
@@ -934,10 +1172,43 @@ async function onSend(text: string, restore?: () => void) {
     return;
   }
   const replyBinding = app.accountBindingEpoch;
-  try { await convStore.sendUser(id, text); } catch {
-    if (replyBinding !== app.accountBindingEpoch || !novaPageVisible || cid.value !== id) return;
-    restore?.(); toast.error(t.value.conversations.convertTicketFailed, "");
+  if (!stageHumanSend(text, attachmentId, attempts, restore)) return;
+  try {
+    await convStore.sendUser(id, text, attachmentId);
+    if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
+    if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
+  } catch (cause) {
+    if (replyBinding !== app.accountBindingEpoch || cid.value !== id) return;
+    humanSendFailed(text, attachmentId, cause, attempts);
   }
+}
+
+function stageHumanSend(text: string, attachmentId: string | undefined, attempts: number, restore?: () => void): boolean {
+  if (!remoteApiEnabled || !humanComposerKey.value) return true;
+  try {
+    convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value,
+      failedSend: { text, attachmentId, settled: false, retryable: true, attempts, kind: "unknown" } }, true);
+    return true;
+  } catch {
+    convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
+    restore?.();
+    toast.error(t.value.conversations.image.sendFailed, "");
+    return false;
+  }
+}
+
+function humanSendFailed(text: string, attachmentId: string | undefined, cause: unknown, attempts: number) {
+  const expired = isSupportAttachmentNotReady(cause);
+  const settled = expired || isSettledRejection(cause);
+  const draft = imageDraft.value;
+  if (expired && draft && draft.attachmentId === attachmentId) {
+    draft.state = "failed";
+    draft.error = "expired";
+    draft.replaceOnly = true;
+  }
+  failedHumanSend.value = { text, attachmentId, settled, retryable: !expired, attempts,
+    kind: expired ? "expired" : settled ? "failed" : "unknown" };
+  if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: failedHumanSend.value });
 }
 
 async function drainNovaQueue() {

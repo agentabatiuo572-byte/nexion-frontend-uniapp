@@ -3196,6 +3196,15 @@ export const vi: Messages = {
   },
   conversations: {
     send: "Gửi",
+    image: {
+      view: "Xem ảnh", message: "Ảnh", loading: "Đang tải ảnh…", failed: "Không xem được ảnh. Chọn để thử lại.", attach: "Thêm ảnh",
+      retryUpload: "Tải lại ảnh", replace: "Chọn ảnh khác", cancel: "Bỏ tệp đính kèm", retrySend: "Gửi lại", editSend: "Sửa tin nhắn", discard: "Bỏ bản nháp", retryPolicy: "Thử lại", checkingPolicy: "Đang kiểm tra tính năng ảnh…", close: "Đóng ảnh",
+      uploading: "Đang tải ảnh lên. Tin nhắn chưa được gửi.", ready: "Ảnh đã tải lên. Hãy nhấn Gửi để chia sẻ với cố vấn.", uploadFailed: "Tải ảnh lên thất bại. Hãy thử lại.",
+      unavailable: "Chưa thể gửi ảnh. Bạn vẫn có thể gửi tin nhắn chữ.", tooLarge: "Ảnh vượt giới hạn dung lượng. Hãy chọn ảnh khác.", unsupported: "Hãy chọn ảnh PNG hoặc JPEG.",
+      cancelFailed: "Chưa bỏ được tệp đính kèm. Hãy thử lại.", sendFailed: "Tin nhắn chưa được gửi. Hãy gửi lại hoặc bỏ bản nháp.", sendUnknown: "Chưa xác nhận được kết quả gửi. Hãy gửi lại đúng tin nhắn này.", expired: "Ảnh đã hết hạn trước khi gửi. Hãy chọn ảnh khác hoặc sửa tin nhắn.", attempts: "Số lần thử",
+      unassigned: "Chưa được phân công cố vấn", unassignedHint: "Bạn có thể để lại lời nhắn. Cố vấn riêng sẽ tiếp tục sau khi được phân công.", unassignedReceived: "Tin nhắn đã được nhận. Cố vấn riêng sẽ tiếp tục sau khi được phân công.", you: "Tôi",
+      loadingAdvisor: "Đang tải cố vấn của bạn", advisorUnavailable: "Chưa xác nhận được cố vấn hiện tại. Hãy tải lại.", disabledAdvisor: "Cố vấn hiện chưa thể hỗ trợ. Tin nhắn của bạn vẫn được lưu.", busyAdvisor: "Cố vấn đang bận. Bạn có thể để lại lời nhắn.",
+    },
     categoryDisabled: "Kênh hỗ trợ này hiện đã bị vận hành tạm dừng. Vui lòng chọn kênh khác.",
     historyTruncated: "Chỉ hiển thị 100 tin nhắn gần nhất. Các tin nhắn cũ hơn vẫn được lưu trên máy chủ.",
     loadEarlier: "Tải tin nhắn cũ hơn",

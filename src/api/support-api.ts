@@ -9,12 +9,25 @@ export interface SupportFaqPage extends Page<SupportFaq> { pageNum: number; page
 interface TicketInput { category: TicketCategory; subject: string; body: string }
 interface ConversationTicketResult { conversation: Conversation; ticket: Ticket }
 export interface ConversationDismissal { conversationNo: string; throughMessageId: number }
+export interface SupportAttachmentPolicy { available: boolean; allowedMimeTypes: string[]; maxBytes: number | null; maxPixels: number | null; ttlSeconds: number | null; unavailableReason?: string | null }
+export interface SupportAttachment { id: string; mime: string; bytes: number; width: number; height: number; state: "READY" | "ATTACHED" | "REJECTED" | "EXPIRED"; expiresAt?: string | null }
+export function isSupportAttachmentNotReady(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.message === "ATTACHMENT_NOT_READY" && (cause.status === 409 || cause.code === 409);
+}
+export interface CurrentAdvisor {
+  assignmentId: number | null;
+  currentAdvisorId: number | null;
+  currentAdvisorName: string | null;
+  assignmentState: "UNBOUND" | "ASSIGNED" | "ADVISOR_DISABLED";
+  availability: "UNBOUND" | "DISABLED" | "BUSY" | "UNKNOWN";
+}
 export type SupportCommandResult =
   | { kind: "ticket"; ticket: Ticket }
   | { kind: "conversation"; conversation: Conversation }
   | { kind: "conversation-ticket"; conversation: Conversation; ticket: Ticket };
 export interface SupportApi {
   authorityRevision(): Promise<string>;
+  advisor(): Promise<CurrentAdvisor>;
   tickets(): Promise<Page<Ticket>>;
   ticket(id: string, beforeMessageId?: number): Promise<Ticket>;
   markTicketRead(ticket: Ticket): Promise<Ticket>;
@@ -28,8 +41,12 @@ export interface SupportApi {
   conversationCategories(): Promise<ConversationCategoryAvailability>;
   conversation(id: string, beforeMessageId?: number): Promise<Conversation>;
   markConversationRead(conversation: Conversation, lastSeenMessageId: number): Promise<Conversation>;
-  startConversation(type: Exclude<Conversation["type"], "ai">, openingText: string, key: string): Promise<Conversation>;
-  replyConversation(conversation: Conversation, body: string, key: string): Promise<Conversation>;
+  startConversation(type: Exclude<Conversation["type"], "ai">, openingText: string, key: string, attachmentId?: string): Promise<Conversation>;
+  replyConversation(conversation: Conversation, body: string, key: string, attachmentId?: string): Promise<Conversation>;
+  attachmentPolicy(): Promise<SupportAttachmentPolicy>;
+  uploadAttachment(filePath: string, clientUploadId: string, key: string): Promise<SupportAttachment>;
+  attachmentContent(id: string, signal?: AbortSignal): Promise<string>;
+  cancelAttachment(id: string, key: string): Promise<void>;
   convertConversationToTicket(conversation: Conversation, category: TicketCategory, title: string, key: string): Promise<ConversationTicketResult>;
   commandResult(key: string): Promise<SupportCommandResult | null>;
   slaTargets(): Promise<SupportSlaTarget[]>;
@@ -104,11 +121,14 @@ function parseConversationHeader(value: unknown): Conversation {
   return { id, type, status, version, agentName: agentName || "Unassigned", roleKey: type === "advisor" ? "roleAdvisor" : "roleSupport", avatarTint: type === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)", messages: [], unread, lastTs, lastMessage, lastPublicMessageId, lastMessageKind, sessionStatus: status === "open" || status === "resolved" ? "active" : "closed", historyTruncated: false, historyNextCursor: null };
 }
 function parseConversationMessage(value: unknown): ConvMessage {
-  const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt); const body = text(v?.content);
+  const v = row(value); const id = integer(v?.id, 1); const ts = time(v?.createdAt);
   const raw = text(v?.senderType)?.toLowerCase(); const sender = raw === "user" ? "user" : raw === "agent" ? "agent" : raw === "system" ? "system" : null;
   const receipt = v?.receiptStatus == null ? null : text(v.receiptStatus)?.toLowerCase(); const status = receipt === "read" ? "read" : receipt === "sent" ? "sent" : undefined;
-  if (!v || id === null || ts === null || !body || !sender || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender === "system" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { id: String(id), sender, text: body, ts, status: sender === "system" ? undefined : status };
+  const kind = v?.kind == null ? "TEXT" : text(v.kind)?.toUpperCase();
+  const body = kind === "IMAGE" && v?.content == null ? "" : text(v?.content, true);
+  const attachmentId = kind === "IMAGE" ? text(v?.attachmentId) : null;
+  if (!v || id === null || ts === null || body === null || !sender || (kind !== "TEXT" && kind !== "IMAGE") || (kind === "TEXT" && !body) || (kind === "IMAGE" && !attachmentId) || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender === "system" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+  return { id: String(id), sender, text: body, ts, kind, attachmentId: attachmentId ?? undefined, authorName: text(v.senderName) ?? undefined, status: sender === "system" ? undefined : status };
 }
 function parseConversationDetail(value: unknown): Conversation {
   const v = row(value); const nextCursor = cursor(v?.nextCursor); if (!v || !Array.isArray(v.messages) || typeof v.historyTruncated !== "boolean" || (v.nextCursor !== null && v.nextCursor !== undefined && nextCursor === null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
@@ -135,6 +155,39 @@ function parseConversationCategories(value: unknown): ConversationCategoryAvaila
   }
   if (seen.size !== 3) invalid("SUPPORT_CATEGORY_RESPONSE_INVALID");
   return result;
+}
+function parseAttachment(value: unknown): SupportAttachment {
+  const v = row(value); const id = text(v?.id); const mime = text(v?.mime);
+  const bytes = integer(v?.bytes, 1); const width = integer(v?.width, 1); const height = integer(v?.height, 1);
+  const state = text(v?.state)?.toUpperCase();
+  if (!v || !id || !mime || bytes === null || width === null || height === null || !["READY", "ATTACHED", "REJECTED", "EXPIRED"].includes(String(state))) invalid("SUPPORT_ATTACHMENT_RESPONSE_INVALID");
+  return { id, mime, bytes, width, height, state: state as SupportAttachment["state"], expiresAt: text(v.expiresAt, true) };
+}
+function parseAttachmentPolicy(value: unknown): SupportAttachmentPolicy {
+  const v = row(value);
+  if (!v || typeof v.available !== "boolean" || !Array.isArray(v.allowedMimeTypes)
+      || v.allowedMimeTypes.some(mime => typeof mime !== "string")) invalid("SUPPORT_ATTACHMENT_POLICY_INVALID");
+  const maxBytes = v.maxBytes == null ? null : integer(v.maxBytes, 1);
+  const maxPixels = v.maxPixels == null ? null : integer(v.maxPixels, 1);
+  const ttlSeconds = v.ttlSeconds == null ? null : integer(v.ttlSeconds, 1);
+  if (v.available && (maxBytes === null || maxPixels === null || ttlSeconds === null || !v.allowedMimeTypes.length)) invalid("SUPPORT_ATTACHMENT_POLICY_INVALID");
+  return { available: v.available, allowedMimeTypes: v.allowedMimeTypes as string[], maxBytes, maxPixels, ttlSeconds,
+    unavailableReason: text(v.unavailableReason, true) };
+}
+function parseCurrentAdvisor(value: unknown): CurrentAdvisor {
+  const v = row(value);
+  const assignmentId = v?.assignmentId == null ? null : integer(v.assignmentId, 1);
+  const currentAdvisorId = v?.currentAdvisorId == null ? null : integer(v.currentAdvisorId, 1);
+  const currentAdvisorName = v?.currentAdvisorName == null ? null : text(v.currentAdvisorName);
+  const assignmentState = v?.assignmentState;
+  const availability = v?.availability;
+  if (!v || (v.assignmentId != null && assignmentId === null) || (v.currentAdvisorId != null && currentAdvisorId === null)
+      || !["UNBOUND", "ASSIGNED", "ADVISOR_DISABLED"].includes(String(assignmentState))
+      || !["UNBOUND", "DISABLED", "BUSY", "UNKNOWN"].includes(String(availability))
+      || (assignmentState === "UNBOUND" && (assignmentId !== null || currentAdvisorId !== null || currentAdvisorName !== null || availability !== "UNBOUND"))
+      || (assignmentState !== "UNBOUND" && (!assignmentId || !currentAdvisorId || !currentAdvisorName))) invalid("SUPPORT_ADVISOR_RESPONSE_INVALID");
+  return { assignmentId, currentAdvisorId, currentAdvisorName,
+    assignmentState: assignmentState as CurrentAdvisor["assignmentState"], availability: availability as CurrentAdvisor["availability"] };
 }
   function parseFaq(value: unknown): SupportFaq {
   const v = row(value); const id = text(v?.id); const category = text(v?.category); const question = text(v?.question); const answer = text(v?.answer);
@@ -210,6 +263,7 @@ export function createSupportApi(client: ApiClient): SupportApi {
   }
   return {
     authorityRevision: async () => "canonical-v1",
+    advisor: async () => parseCurrentAdvisor(await client.request({ method: "GET", path: `${supportRoot}/advisor` })),
     tickets: allTickets,
     ticket: async (id, beforeMessageId) => parseTicketDetail(await client.request({ method: "GET", path: `${await supportPath(`/tickets/${pathId(id)}`)}${pathCursor(beforeMessageId)}` })),
     markTicketRead: async ticket => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/read`), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version } })),
@@ -243,8 +297,18 @@ export function createSupportApi(client: ApiClient): SupportApi {
       method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/read`),
       body: { lastSeenMessageId, expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version },
     })),
-    startConversation: async (conversationType, openingText, key) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath("/conversations"), idempotencyKey: requiredKey(key), body: { conversationType: conversationType.toUpperCase(), openingText: openingText.trim(), clientMessageId: key } })),
-    replyConversation: async (conversation, body, key) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key } })),
+    startConversation: async (conversationType, openingText, key, attachmentId) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath("/conversations"), idempotencyKey: requiredKey(key), body: { conversationType: conversationType.toUpperCase(), openingText: openingText.trim(), clientMessageId: key, ...(attachmentId ? { kind: "IMAGE", attachmentId } : {}) } })),
+    replyConversation: async (conversation, body, key, attachmentId) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key, ...(attachmentId ? { kind: "IMAGE", attachmentId } : {}) } })),
+    attachmentPolicy: async () => parseAttachmentPolicy(await client.request({ path: `${supportRoot}/attachments/policy` })),
+    uploadAttachment: async (filePath, clientUploadId, key) => parseAttachment(await client.upload({
+      path: `${supportRoot}/attachments`, filePath, name: "file", idempotencyKey: requiredKey(key),
+      formData: { clientUploadId: requiredKey(clientUploadId) },
+    })),
+    attachmentContent: async (id, signal) => {
+      if (!client.download) invalid("SUPPORT_PRIVATE_DOWNLOAD_UNAVAILABLE");
+      return client.download({ path: `${supportRoot}/attachments/${pathId(id)}/content`, signal });
+    },
+    cancelAttachment: async (id, key) => { parseAttachment(await client.request({ method: "DELETE", path: `${supportRoot}/attachments/${pathId(id)}`, idempotencyKey: requiredKey(key) })); },
     convertConversationToTicket: async (conversation, category, title, key) => {
       const v = row(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/ticket`), idempotencyKey: requiredKey(key), body: { category, title: title.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key } }));
       if (!v) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID"); return { conversation: parseConversationHeader(v.conversation), ticket: parseTicketDetail(v.ticket) };

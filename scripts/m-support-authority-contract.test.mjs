@@ -159,10 +159,12 @@ test("unknown 409, network, protocol, and 5xx support commands read back a stabl
     read("src/store/conversations.ts"),
   ]);
   for (const source of [tickets, conversations]) {
-    assert.match(source, /\(error\.status \?\? 0\) >= 500/);
     assert.match(source, /supportApi\.commandResult\(key\)/);
     assert.match(source, /scope\.pending\.delete\(fingerprint\)/);
   }
+  assert.match(tickets, /\(error\.status \?\? 0\) >= 500/);
+  assert.match(conversations, /error\.status === 409/);
+  assert.match(conversations, /!isSupportAttachmentNotReady\(cause\)/);
 });
 
 test("ticket list projects the authoritative message count and opens its detail before rendering a timeline", async () => {
@@ -190,7 +192,7 @@ test("an empty human conversation lane gives the user an authoritative start pat
   assert.match(messages, /navTo\("\/pages\/support\/chat\?start="/);
   assert.match(chat, /q\?\.start/);
   assert.match(chat, /convStore\.startConversation\(/);
-  assert.match(conversations, /async function startConversation\(type: Exclude<ConversationType, "ai">, openingText: string\)/);
+  assert.match(conversations, /async function startConversation\(type: Exclude<ConversationType, "ai">, openingText: string, attachmentId\?: string\)/);
 });
 
 test("ticket list and detail render refreshed server metadata through the active locale", async () => {
