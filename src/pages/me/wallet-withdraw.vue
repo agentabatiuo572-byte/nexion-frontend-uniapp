@@ -207,6 +207,9 @@
           <view :style="feeSkeletonValueStyle" />
         </view>
       </view>
+      <view v-else-if="withdrawalPolicyCurrent && NETWORKS.length === 0" class="mx-4 mt-4" style="padding: 0 2px">
+        <text style="font-size: 12px; color: var(--v5-warning)">{{ t.wallet.withdrawalChannelsClosed }}</text>
+      </view>
       <view v-else-if="!feeConfigUsable" class="mx-4 mt-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-warning)">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
@@ -733,7 +736,7 @@ const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
 const withdrawalChannelStatusText = computed(() => {
   const policy = withdrawalPolicy.value;
   if (!policy) return "";
-  if (!policy.withdrawalEnabled) return t.value.wallet.withdrawalChannelsClosed;
+  if (!policy.withdrawalEnabled || policy.enabledNetworks.length === 0) return t.value.wallet.withdrawalChannelsClosed;
   const channels = policy.enabledNetworks.map((item) => item.replace("USDT-", "")).join(" · ");
   return fmt(t.value.wallet.withdrawalChannelsAvailable, { channels });
 });
@@ -836,7 +839,7 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawal
   remoteEligibility.value = null;
   remoteEligibilityFailed.value = false;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!policyVersion || !shouldRequestWithdrawalEligibility({
+  if (!policyVersion || NETWORKS.value.length === 0 || !shouldRequestWithdrawalEligibility({
     remote: remoteApiEnabled,
     factsFresh: withdrawalActionsFresh.value,
     policyVersion,
@@ -1125,7 +1128,7 @@ watch([smallAmountLine, network, boundAddress, maxWithdrawable, dailyFacts, with
   const runScope = captureRuntimeRevision();
   remoteSmallLineEligibility.value = null;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!policyVersion || !shouldRequestWithdrawalEligibility({
+  if (!policyVersion || NETWORKS.value.length === 0 || !shouldRequestWithdrawalEligibility({
     remote: remoteApiEnabled,
     factsFresh: withdrawalActionsFresh.value,
     policyVersion,
@@ -1278,6 +1281,7 @@ const riskNoticeBody = computed(() => {
 function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string {
   if (!withdrawalActionsFresh.value) return withdrawalActionStatusText.value;
   if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
+  if (NETWORKS.value.length === 0) return t.value.wallet.withdrawalChannelsClosed;
   // 费率可读与通道开放是两个独立事实。总开关关闭时仍展示服务端报价，
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
   if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
