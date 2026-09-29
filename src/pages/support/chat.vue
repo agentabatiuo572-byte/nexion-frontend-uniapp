@@ -988,6 +988,7 @@ function cancelNovaThinking() {
 
 function cleanup() {
   novaPageVisible = false;
+  clearPrivateImages();
   categoryGate = null;
   novaStatusEpoch += 1;
   novaHistoryEpoch += 1;
