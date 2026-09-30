@@ -11,7 +11,7 @@ export function mergeConversationMessages(prior:Conversation|undefined,next:Conv
 }
 export async function catchUpConversation(next:Conversation,prior:Conversation|undefined,
   fetchPage:(id:string,before:number)=>Promise<Conversation>,active:()=>boolean):Promise<Conversation> {
-  const last=Number(prior?.messages.at(-1)?.id??0);
+  const last=Number(prior?.messages[prior.messages.length-1]?.id??0);
   if(!last)return next;
   // Invalidation events carry no read watermark. Re-read loaded, unconfirmed
   // receipts even when there is no message gap beyond the latest window.

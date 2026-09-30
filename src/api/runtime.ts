@@ -39,7 +39,7 @@ import { createEarningsReleaseApi } from "./earnings-release-api";
 import { createTaskAssignmentApi } from "./task-assignment-api";
 import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
-import { withConversationRealtime } from "./app-conversation-realtime";
+import { renewAppConversationRealtime, withConversationRealtime } from "./app-conversation-realtime";
 import { createProfileApi } from "./profile-api";
 import { createNovaAiApi } from "./nova-ai-api";
 import { createComputeShareApi } from "./compute-share-api";
@@ -106,6 +106,7 @@ export const apiClient = createRuntimeApiClient({
   development: import.meta.env.DEV,
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
   onUnauthorized: () => unauthorizedHandler?.(),
+  onSessionRefreshed: renewAppConversationRealtime,
   refreshCredentialMode,
 });
 // Authentication is server-backed in both dev and prod; Java active profile

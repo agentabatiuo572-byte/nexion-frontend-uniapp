@@ -18,13 +18,15 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 const t = useT();
 const profile = useProfile();
 
-// Time-of-day greeting depends on the client's local hour → compute on mount
-// (SPA, no SSR hydration concern; mirrors the source's mount-effect).
-const greeting = ref("");
+// Capture the client's local hour on mount, but keep locale and copy reactive.
+const hour = ref<number | null>(null);
 onMounted(() => {
-  const h = new Date().getHours();
-  greeting.value =
-    h < 5
+  hour.value = new Date().getHours();
+});
+const greeting = computed(() => {
+  const h = hour.value;
+  if (h === null) return "";
+  return h < 5
       ? t.value.home.greetingLateNight
       : h < 12
         ? t.value.home.greetingMorning

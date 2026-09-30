@@ -75,6 +75,7 @@ interface ApiClientOptions {
   transport: HttpTransport;
   vault: SessionVault;
   onUnauthorized?: () => void | Promise<void>;
+  onSessionRefreshed?: () => void;
   allowInsecureHttp?: boolean;
   refreshCredentialMode?: RefreshCredentialMode;
 }
@@ -261,8 +262,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (commitRevision !== revision && !options.vault.isRefreshContinuation(revision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
       }
+      const previousAccessToken = options.vault.read()?.accessToken;
       if (!options.vault.refreshIfUnchanged(next, commitRevision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
+      }
+      if (current && next.accessToken !== previousAccessToken) {
+        try { options.onSessionRefreshed?.(); } catch { /* The accepted session remains committed. */ }
       }
       return next;
     } catch (error) {
