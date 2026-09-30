@@ -91,6 +91,21 @@ describe("conversation realtime lifecycle", () => {
     expect(store.composer("conversation:CV-1").text).toBe("");
     expect(store.scopeInvalidated).toBe(1);
   });
+  it("retires unresolved command keys as well as drafts when the customer scope is invalidated", async () => {
+    const store = useConversations(); store.bindAccount("user:1");
+    await store.open("CV-1");
+    runtime.supportApi.replyConversation.mockRejectedValueOnce(new Error("lost response"));
+    await store.sendUser("CV-1", "unknown reply").catch(() => undefined);
+    const pendingKey = "support-pending-commands:user:1:run-1:conversations";
+    const wireKey = runtime.supportApi.replyConversation.mock.calls.at(-1)![2];
+    expect(localStorage.getItem(pendingKey)).toContain(wireKey);
+    store.saveComposer("conversation:CV-1", { text: "next private draft", imageDraft: null,
+      failedSend: { text: "unknown reply", kind: "unknown", settled: false, retryable: true, attempts: 1 } }, true);
+    store.startRealtime(); harness.instances.at(-1)!.options.scopeInvalidated(1);
+    expect(store.humanComposers).toEqual({}); expect(localStorage.getItem(pendingKey) ?? "").not.toContain(wireKey);
+    setActivePinia(createPinia()); const restored = useConversations(); restored.bindAccount("user:1");
+    expect(restored.humanComposers).toEqual({});
+  });
   it("singleflights the user transport and fences callbacks from a stopped same-account instance", async () => {
     const store = useConversations();
     store.bindAccount("user:1");

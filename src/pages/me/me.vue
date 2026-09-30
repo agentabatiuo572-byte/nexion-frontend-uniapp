@@ -553,6 +553,7 @@ async function handleSignOut() {
     confirmLabel: t.value.me.signOutConfirmLabel,
   });
   if (ok) {
+    conversations.discardHumanOutbox();
     // Self sign-out: void in-flight tasks (rollback) + release the shared
     // session record (other tabs see "logged-out") before clearing auth.
     app.interruptAllTasks("logged-out");

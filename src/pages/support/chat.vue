@@ -194,6 +194,7 @@ const attachmentPolicyError = ref(false);
 const imageSources = ref<Record<string, string>>({});
 const imageFailures = ref<Record<string, boolean>>({});
 let imageEpoch = 0;
+let humanComposerResetting = false;
 let imageLoads = new Set<string>();
 function clearPrivateImages() {
   imageEpoch += 1;
@@ -202,7 +203,10 @@ function clearPrivateImages() {
   imageSources.value = {}; imageFailures.value = {};
 }
 watch(() => [app.accountBindingEpoch, convStore.scopeInvalidated], () => {
-  clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
+  humanComposerResetting = true;
+  try {
+    clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
+  } finally { humanComposerResetting = false; }
   if (novaPageVisible && !isAi.value && remoteApiEnabled) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
 }, { flush: "sync" });
 async function loadPrivateImages() {
@@ -305,14 +309,20 @@ function retryPrivateImage(id: string) {
 async function retryHumanSend() {
   const failed = failedHumanSend.value;
   if (!failed?.retryable || humanSendBusy.value) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
+  const current = () => binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated
+    && key === humanComposerKey.value && failedHumanSend.value === failed;
   if (!failed.settled) {
     try {
-      if (!await convStore.hasPendingHumanSend(humanComposerKey.value, failed)) {
+      const pending = await convStore.hasPendingHumanSend(key, failed);
+      if (!current()) return;
+      if (!pending) {
         failedHumanSend.value = { ...failed, settled: true, retryable: false, kind: "failed" };
         return;
       }
     } catch { return; }
   }
+  if (!current()) return;
   failedHumanSend.value = null;
   humanSendBusy.value = true;
   try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1); }
@@ -364,8 +374,11 @@ let recoveredNavigation = "";
 function restoreRecoveredComposer(saved: HumanComposer | null | undefined, key: string) {
   if (!saved?.recoveredId || !startType.value || cid.value || !novaPageVisible || recoveredNavigation === saved.recoveredId) return;
   const id = saved.recoveredId;
+  const binding = app.accountBindingEpoch;
+  const scope = convStore.scopeInvalidated;
   recoveredNavigation = id;
   void navReplace(`/pages/support/chat?cid=${encodeURIComponent(id)}`).then(ok => {
+    if (binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated) return;
     if (ok) convStore.clearComposer(key);
     else recoveredNavigation = "";
   });
@@ -380,12 +393,18 @@ watch(humanComposerKey, (key, previous) => {
   restoreRecoveredComposer(saved, key);
 }, { flush: "sync" });
 watch([draftText, imageDraft, failedHumanSend], () => {
+  if (humanComposerResetting) return;
   if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value,
     failedSend: failedHumanSend.value ?? (humanSendBusy.value ? convStore.composer(humanComposerKey.value).failedSend : null) });
 }, { deep: true, flush: "sync" });
 watch(() => convStore.humanComposers[humanComposerKey.value], saved => {
   if (!saved) return;
-  if (failedHumanSend.value && !saved.failedSend) failedHumanSend.value = null;
+  humanComposerResetting = true;
+  try {
+    if (!draftText.value && saved.text && (saved.retainDraft || saved.failedSend)) draftText.value = saved.text;
+    if (!failedHumanSend.value && saved.failedSend) failedHumanSend.value = saved.failedSend;
+    if (failedHumanSend.value && !saved.failedSend) failedHumanSend.value = null;
+  } finally { humanComposerResetting = false; }
   restoreRecoveredComposer(saved, humanComposerKey.value);
 });
 const humanRealtime = createHumanThreadRealtimeLifecycle({
@@ -413,8 +432,11 @@ function restoreCompletedHumanCreate(activateRealtime = false) {
   if (restoredId && activateRealtime) humanRealtime.activateIfCurrent(restoredId);
   if (restoredId && novaPageVisible && type) {
     const key = `start:${type}`;
+    const binding = app.accountBindingEpoch;
+    const scope = convStore.scopeInvalidated;
     recoveredNavigation = restoredId;
     void navReplace(`/pages/support/chat?cid=${encodeURIComponent(restoredId)}`).then(ok => {
+      if (binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated) return;
       if (ok) convStore.clearComposer(key);
       else recoveredNavigation = "";
     });
@@ -1106,10 +1128,10 @@ async function onSend(text: string, restore?: () => void) {
   // Do not supersede an in-flight page read; preserve the draft for its result.
   if (!isAi.value && humanOpenRequest !== null) { restore?.(); return; }
   if (!isAi.value && !cid.value && startType.value && remoteApiEnabled) {
-    const binding = app.accountBindingEpoch, type = startType.value;
+    const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, type = startType.value;
     if (convStore.categoryAvailabilityStatus !== "ready") {
       const outcome = await convStore.refreshCategories();
-      if (binding !== app.accountBindingEpoch || !novaPageVisible || startType.value !== type || cid.value) return;
+      if (binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated || !novaPageVisible || startType.value !== type || cid.value) return;
       if (outcome !== "applied") { restore?.(); return; }
     }
     if (!convStore.categoryEnabled(type)) { restore?.(); toast.info(t.value.conversations.categoryDisabled, ""); return; }
@@ -1133,6 +1155,7 @@ async function onSend(text: string, restore?: () => void) {
 }
 
 async function sendHumanMessage(text: string, attachmentId?: string, restore?: () => void, attempts = 1) {
+  const supportScope = convStore.scopeInvalidated;
   const id = cid.value;
   if (!id) {
     const type = startType.value;
@@ -1154,13 +1177,13 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
     if (!stageHumanSend(text, attachmentId, attempts, restore)) { humanCreateRecovery.finish(); return; }
     try {
       const createdId = await convStore.startConversation(type, text, attachmentId);
-      if (!humanCreateRecovery.isCurrent(creation)) return;
+      if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
       humanCreateRecovery.complete(createdId, creation);
       if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
       convStore.saveComposer(`start:${type}`, { text: draftText.value, imageDraft: null, failedSend: null, recoveredId: createdId });
       restoreCompletedHumanCreate(true);
     } catch (cause) {
-      if (!humanCreateRecovery.isCurrent(creation)) return;
+      if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
       humanSendFailed(text, attachmentId, cause, attempts);
     } finally {
       humanCreateRecovery.finish();
@@ -1176,10 +1199,11 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
   if (!stageHumanSend(text, attachmentId, attempts, restore)) return;
   try {
     await convStore.sendUser(id, text, attachmentId);
+    if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated) return;
     if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
     if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
   } catch (cause) {
-    if (replyBinding !== app.accountBindingEpoch || cid.value !== id) return;
+    if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated) return;
     humanSendFailed(text, attachmentId, cause, attempts);
   }
 }

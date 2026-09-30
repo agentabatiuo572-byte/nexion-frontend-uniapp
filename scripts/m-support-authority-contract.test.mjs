@@ -266,7 +266,9 @@ test("unknown support commands persist opaque account-scoped slots and reconcile
   assert.match(pendingStorage, /uni\.getStorageSync/);
   assert.match(pendingStorage, /uni\.setStorageSync/);
   assert.match(pendingStorage, /stored !== value/);
-  assert.doesNotMatch(pendingStorage, /removeItem/);
+  const retirementStart = pendingStorage.indexOf("export function clearSupportPending");
+  assert.ok(retirementStart >= 0, "explicit account retirement must remain separately bounded");
+  assert.doesNotMatch(pendingStorage.slice(0, retirementStart), /removeItem|removeStorageSync|clearSupportPending/);
   assert.match(scope, /useTickets\(\)\.bindAccount\(accountKey\)/);
   assert.match(scope, /useConversations\(\)\.bindAccount\(accountKey\)/);
 });
