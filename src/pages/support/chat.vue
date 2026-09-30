@@ -397,12 +397,12 @@ watch([draftText, imageDraft, failedHumanSend], () => {
   if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value,
     failedSend: failedHumanSend.value ?? (humanSendBusy.value ? convStore.composer(humanComposerKey.value).failedSend : null) });
 }, { deep: true, flush: "sync" });
-watch(() => convStore.humanComposers[humanComposerKey.value], saved => {
+watch([() => convStore.humanComposers[humanComposerKey.value], humanSendBusy], ([saved]) => {
   if (!saved) return;
   humanComposerResetting = true;
   try {
     if (!draftText.value && saved.text && (saved.retainDraft || saved.failedSend)) draftText.value = saved.text;
-    if (!failedHumanSend.value && saved.failedSend) failedHumanSend.value = saved.failedSend;
+    if (!humanSendBusy.value && !failedHumanSend.value && saved.failedSend) failedHumanSend.value = saved.failedSend;
     if (failedHumanSend.value && !saved.failedSend) failedHumanSend.value = null;
   } finally { humanComposerResetting = false; }
   restoreRecoveredComposer(saved, humanComposerKey.value);
