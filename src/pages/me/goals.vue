@@ -336,8 +336,8 @@ async function onSave() {
     const outcome = await goalsStore.setGoal(intent);
     if (!isCurrentSave() || outcome === "stale") return;
     retryableSaveIntents.delete(intentKey);
-    restoreEditorFromGoal(goalsStore.goals.at(-1));
-    void goalsStore.refreshRecommendation(target.value, goalsStore.goals.at(-1)?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
+    restoreEditorFromGoal(goalsStore.goals[goalsStore.goals.length - 1]);
+    void goalsStore.refreshRecommendation(target.value, goalsStore.goals[goalsStore.goals.length - 1]?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
     ui.pushToast({ kind: "success", title: fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }) });
   } catch (error) {
     if (!isCurrentSave()) return;
