@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+// @ts-expect-error App TypeScript excludes Node declarations; this runs in Vitest's Node process.
+import { spawnSync } from "node:child_process";
 import { buildCommissionsHowContent, createCommissionsHowResource, COMMISSIONS_HOW_SLOTS, type CommissionsHowSnapshot } from "./commissions-how-content";
 
 const snapshot = (): CommissionsHowSnapshot => ({
@@ -18,6 +20,84 @@ const snapshot = (): CommissionsHowSnapshot => ({
   ranks: [{ v: 4, title: "Live", cnTitle: "Live", directBonus: .123456, unilevelDepth: 7, peerBonus: .0375, leadershipVotes: 9, cultivationBonus: 321.123456, rewards: [], visible: true }],
 });
 describe("commissions-how presentation", () => {
+  it.each([
+    ["zh", "6,789", "876.123456", "12.3456%"],
+    ["en", "6,789", "876.123456", "12.3456%"],
+    ["vi", "6.789", "876,123456", "12,3456%"],
+  ])("preserves localized server values with Intl available in %s", (locale, cap, threshold, rate) => {
+    expect(typeof Intl.NumberFormat).toBe("function");
+    const view = buildCommissionsHowContent(snapshot(), locale);
+    expect(view.section("binary").body).toContain(`${cap} USDT`);
+    expect(view.section("binary").body).toContain(`${threshold} USDT`);
+    expect(view.section("network").body).toContain(rate);
+    expect(view.incomplete).toBe(false);
+  });
+  it.each([
+    ["zh", "6,789", "876.123456", "12.3456%", "16.666667 NEX"],
+    ["en", "6,789", "876.123456", "12.3456%", "16.666667 NEX"],
+    ["vi", "6.789", "876,123456", "12,3456%", "16,666667 NEX"],
+  ])("renders rules and recovers in a native process with Intl deleted in %s", (locale, cap, threshold, rate, rounded) => {
+    const moduleUrl = new URL("./commissions-how-content.ts", import.meta.url).href;
+    const loader = new URL("../../scripts/lib/ts-ext-resolve.mjs", import.meta.url).href;
+    const script = `
+      import assert from "node:assert/strict";
+      delete globalThis.Intl;
+      assert.equal("Intl" in globalThis, false);
+      Number.prototype.toLocaleString = () => { throw new Error("Native localized numbers unavailable"); };
+      const { buildCommissionsHowContent: build, createCommissionsHowResource: resource } = await import(${JSON.stringify(moduleUrl)});
+      const facts = ${JSON.stringify(snapshot())};
+      const locale = ${JSON.stringify(locale)};
+      const view = build(facts, locale);
+      assert.equal(view.incomplete, false);
+      assert.ok(view.section("binary").body.includes(${JSON.stringify(`${cap} USDT`)}));
+      assert.ok(view.section("binary").body.includes(${JSON.stringify(`${threshold} USDT`)}));
+      assert.ok(view.section("network").body.includes(${JSON.stringify(rate)}));
+      facts.rates.unilevelUsdt[1] = .11111111;
+      facts.rates.unilevelNex[1] = 1.5;
+      assert.ok(build(facts, locale).amounts.network.endsWith(${JSON.stringify(rounded)}));
+      facts.guide.coolingDays = 0;
+      facts.guide.binary.threshold = 0;
+      facts.guide.binary.dailyCap = 0;
+      facts.guide.binary.matchRate = 0;
+      facts.rates.unilevelUsdt[1] = 0;
+      facts.rates.unilevelNex[1] = 0;
+      const zero = build(facts, locale);
+      assert.ok(zero.section("cooling").body.includes("0"));
+      assert.ok(zero.section("binary").body.includes("0 USDT"));
+      assert.ok(zero.section("binary").body.includes("0%"));
+      assert.equal(zero.amounts.network, "0 USDT + 0 NEX");
+      facts.guide.coolingDays = null;
+      facts.guide.binary = null;
+      const missing = build(facts, locale);
+      assert.ok(missing.section("cooling").body.includes(missing.copy.missing));
+      assert.ok(missing.section("binary").body.includes(missing.copy.missing));
+      assert.ok(missing.section("leadership").body.includes(missing.copy.hold));
+      const unavailable = build(null, locale);
+      assert.equal(unavailable.incomplete, true);
+      assert.deepEqual(Object.values(unavailable.amounts), ["—", "—", "—", "—"]);
+      facts.document.blocks[0].body = "{unpublishedToken}";
+      assert.equal(build(facts, locale).section("network").available, false);
+      facts.document.blocks[0].body = "{networkRates}";
+      let attempts = 0;
+      const states = [];
+      const reader = resource({
+        async read() { if (++attempts === 1) throw new Error("503"); return facts; },
+        apply(state) { states.push({ state, view: build(state.snapshot, locale) }); },
+      });
+      await reader.load(locale);
+      assert.equal(states.at(-1).state.error, true);
+      assert.equal(states.at(-1).view.incomplete, true);
+      await reader.load(locale);
+      assert.equal(states.at(-1).state.error, false);
+      assert.equal(states.at(-1).view.incomplete, false);
+      reader.dispose();
+      console.log("native commissions rules, zero, missing and retry verified: " + locale);
+    `;
+    const nodeProcess = (globalThis as unknown as { process: { execPath: string } }).process;
+    const child = spawnSync(nodeProcess.execPath, ["--experimental-strip-types", "--import", loader, "--input-type=module", "--eval", script], { encoding: "utf8" });
+    expect(child.status, child.stderr || child.stdout).toBe(0);
+    expect(child.stdout).toContain(`retry verified: ${locale}`);
+  });
   it("uses changed canonical rates, cooldown and eligibility rather than prototype constants", () => {
     const view = buildCommissionsHowContent(snapshot(), "zh");
     expect(view.section("network").body).toContain("12.3456%");
