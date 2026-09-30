@@ -7,10 +7,10 @@ import { createUniRealtimeSocket,setAppConversationRealtime } from '@/api/app-co
 import { catchUpConversation,mergeConversationMessages } from '@/api/conversation-history';
 import { remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
-import type { ConversationDismissal } from "@/api/support-api";
+import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
-import { restoreSupportPending, persistSupportPending } from "@/lib/support-pending-storage";
+import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
 
 function mutationKey(scope: string): string {
   const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
@@ -23,6 +23,63 @@ type SnapshotScope = { accountKey: string; epoch: number; runId: string };
 type AccountScope = Pick<SnapshotScope, "accountKey" | "epoch">;
 export type CategoryRefreshOutcome = "applied" | "stale" | "failed";
 export type CategoryAvailabilityStatus = "loading" | "ready" | "failed";
+export type HumanComposer = {
+  text: string;
+  imageDraft: { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean } | null;
+  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number } | null;
+  recoveredId?: string;
+  retainDraft?: boolean;
+};
+
+const HUMAN_REAUTH_ACCOUNT = "support-human-reauth-account";
+
+function humanOutboxStorage() {
+  try {
+    if (typeof plus === "undefined") return sessionStorage;
+    return { getItem: (key: string) => uni.getStorageSync(key) as string,
+      setItem: (key: string, value: string) => uni.setStorageSync(key, value),
+      removeItem: (key: string) => uni.removeStorageSync(key) };
+  } catch { return null; }
+}
+function humanOutboxKey(account: string) { return `support-human-outbox:${account}`; }
+function removeHumanCache(key: string) {
+  try { humanOutboxStorage()?.removeItem(key); }
+  catch { try { humanOutboxStorage()?.setItem(key, "{}"); } catch { /* Denied storage must not keep private UI authenticated. */ } }
+}
+function reauthAccount(): string | null {
+  try {
+    const value = humanOutboxStorage()?.getItem(HUMAN_REAUTH_ACCOUNT);
+    return value?.startsWith("user:") ? value : null;
+  } catch { return null; }
+}
+function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
+  if (!account.startsWith("user:")) return {};
+  try {
+    const raw = humanOutboxStorage()?.getItem(humanOutboxKey(account));
+    if (!raw) return {};
+    const rows: unknown = JSON.parse(raw);
+    if (!rows || typeof rows !== "object" || Array.isArray(rows)) return {};
+    const restored: Record<string, HumanComposer> = {};
+    for (const [key, value] of Object.entries(rows)) {
+      if (!/^(start:(advisor|support)|conversation:[A-Za-z0-9_-]{1,80})$/.test(key) || !value || typeof value !== "object") continue;
+      const saved = value as { text?: unknown; failedSend?: HumanComposer["failedSend"] };
+      const failed = saved.failedSend;
+      const recoveredId = (value as { recoveredId?: unknown }).recoveredId;
+      if (typeof recoveredId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(recoveredId) && key.startsWith("start:")) {
+        restored[key] = { text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: null, recoveredId, retainDraft: true };
+        continue;
+      }
+      if ((value as { retainDraft?: unknown }).retainDraft === true && typeof saved.text === "string" && saved.text && !failed) {
+        restored[key] = { text: saved.text.slice(0, 140), imageDraft: null, failedSend: null, retainDraft: true };
+        continue;
+      }
+      if (!failed || failed.settled || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
+        || (failed.attachmentId !== undefined && typeof failed.attachmentId !== "string")) continue;
+      restored[key] = { text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: failed };
+    }
+    return restored;
+  } catch { return {}; }
+}
 
 export const useConversations = defineStore("conversations", () => {
   const conversations = ref<Conversation[]>([]);
@@ -63,6 +120,83 @@ export const useConversations = defineStore("conversations", () => {
   const onlineIds = ref<Record<string, boolean>>({});
   const realtimeReady = ref(false);
   const realtimeFallback = ref(false);
+  const scopeInvalidated = ref(0);
+  const advisor = ref<CurrentAdvisor | null>(null);
+  const advisorLoading = ref(false);
+  const advisorError = ref(false);
+  let advisorRequestGeneration = 0;
+  const humanComposers = ref<Record<string, HumanComposer>>({});
+  let humanWritesBlocked = false;
+  let suspendedHumanAccount = reauthAccount();
+  const discardedHumanAccounts = new Set<string>();
+  function persistHumanOutbox(required = false) {
+    if (!accountKeyValue.startsWith("user:")) return;
+    const rows = Object.fromEntries(Object.entries(humanComposers.value)
+      .filter(([key, composer]) => (composer.failedSend && !composer.failedSend.settled) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
+      .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId, retainDraft: composer.retainDraft }]));
+    try {
+      const storage = humanOutboxStorage();
+      if (Object.keys(rows).length) {
+        const encoded = JSON.stringify(rows);
+        storage?.setItem(humanOutboxKey(accountKeyValue), encoded);
+        if (storage?.getItem(humanOutboxKey(accountKeyValue)) !== encoded) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+        discardedHumanAccounts.delete(accountKeyValue);
+        // Record the owner before sending; a reload may expire before this store is bound.
+        storage?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue);
+        if (storage?.getItem(HUMAN_REAUTH_ACCOUNT) !== accountKeyValue) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+        suspendedHumanAccount = accountKeyValue;
+      } else storage?.removeItem(humanOutboxKey(accountKeyValue));
+    } catch {
+      if (required) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+    }
+  }
+  function composer(key: string): HumanComposer {
+    return humanComposers.value[key] ?? { text: "", imageDraft: null, failedSend: null };
+  }
+  function saveComposer(key: string, value: HumanComposer, required = false) {
+    if (remoteApiEnabled && (humanWritesBlocked || !accountKeyValue.startsWith("user:"))) return;
+    const previous = humanComposers.value[key];
+    // Keep the next unsent draft after readback retires the preceding intent.
+    const retainDraft = !!value.text && !!(value.retainDraft || previous?.retainDraft || (previous?.failedSend && !value.failedSend));
+    humanComposers.value[key] = { ...value, retainDraft };
+    if (key.startsWith("start:") && value.recoveredId && value.text) {
+      humanComposers.value[`conversation:${value.recoveredId}`] = { ...value, recoveredId: undefined, retainDraft: true };
+    }
+    persistHumanOutbox(required);
+  }
+  function clearComposer(key: string) {
+    if (humanWritesBlocked) return;
+    delete humanComposers.value[key]; persistHumanOutbox();
+  }
+  function suspendForReauthentication() {
+    if (!remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
+    // Arm before app's epoch watch clears private UI and tries to save empty refs.
+    humanWritesBlocked = true;
+    suspendedHumanAccount = accountKeyValue;
+    try { humanOutboxStorage()?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue); }
+    catch { /* A denied cache write must never prevent clearing invalid authentication. */ }
+  }
+  function discardAccountOutbox(account: string) {
+    discardedHumanAccounts.add(account);
+    removeHumanCache(humanOutboxKey(account));
+    clearSupportPending(account, "conversations");
+  }
+  function discardHumanOutbox() {
+    humanWritesBlocked = true;
+    const suspended = suspendedHumanAccount;
+    if (accountKeyValue.startsWith("user:")) discardAccountOutbox(accountKeyValue);
+    if (suspended && suspended !== accountKeyValue) discardAccountOutbox(suspended);
+    removeHumanCache(HUMAN_REAUTH_ACCOUNT);
+    suspendedHumanAccount = null;
+    reset();
+  }
+  async function hasPendingHumanSend(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<boolean> {
+    await preparePendingRun();
+    const intent = key.startsWith("start:")
+      ? `conversation-create:${key.slice(6)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`
+      : `conversation-reply:${key.slice(13)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`;
+    return pendingKeys.has(opaqueSupportIntentSlot(intent));
+  }
   let realtime: ConversationRealtime | null = null;
   let watchedId: string | null = null;
   let typingExpiry: ReturnType<typeof setTimeout> | undefined;
@@ -76,12 +210,38 @@ export const useConversations = defineStore("conversations", () => {
       reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
       state: (ready) => { if (current()) { realtimeReady.value = ready; realtimeFallback.value = !ready; } },
       presence: value => { if (!current()) return; clearTimeout(typingExpiry); if (!value) { typingIds.value={}; onlineIds.value={}; return; } onlineIds.value[value.conversationNo]=value.online; typingIds.value[value.conversationNo]=value.typing; typingExpiry=setTimeout(()=>{if(current())typingIds.value[value.conversationNo]=false;},value.expiresIn??5000); },
+      scopeInvalidated: customerId => {
+        if (!current() || accountKeyValue !== `user:${customerId}`) return;
+        const account = accountKeyValue;
+        const watched = watchedId;
+        discardAccountOutbox(account);
+        bindAccount(account);
+        scopeInvalidated.value += 1;
+        startRealtime();
+        if (watched) watchRealtime(watched);
+        void Promise.allSettled([refreshAdvisor(), refresh().then(() => watched ? open(watched) : undefined)]);
+      },
     });
     realtime=instance; setAppConversationRealtime(instance); instance.watch(watchedId); instance.start();
   }
   function stopRealtime() { const instance=realtime; realtime=null; setAppConversationRealtime(null); clearTimeout(typingExpiry); realtimeReady.value=false; realtimeFallback.value=false; typingIds.value={}; onlineIds.value={}; instance?.stop(); }
   function watchRealtime(id: string | null) { watchedId=id; realtime?.watch(id); if (!id) { typingIds.value={}; onlineIds.value={}; } }
   function setTyping(active: boolean) { realtime?.typing(active); }
+  async function refreshAdvisor(): Promise<void> {
+    if (!remoteApiEnabled) return;
+    const scope = { accountKey: accountKeyValue, epoch: accountEpoch };
+    const requestGeneration = ++advisorRequestGeneration;
+    advisorLoading.value = true;
+    advisorError.value = false;
+    try {
+      const result = await supportApi.advisor();
+      if (accountScopeIsCurrent(scope) && requestGeneration === advisorRequestGeneration) advisor.value = result;
+    } catch {
+      if (accountScopeIsCurrent(scope) && requestGeneration === advisorRequestGeneration) { advisor.value = null; advisorError.value = true; }
+    } finally {
+      if (accountScopeIsCurrent(scope) && requestGeneration === advisorRequestGeneration) advisorLoading.value = false;
+    }
+  }
 
   const categoryAvailability = ref<ConversationCategoryAvailability>(remoteApiEnabled
     ? { advisor: false, support: false, ai: false }
@@ -142,7 +302,8 @@ export const useConversations = defineStore("conversations", () => {
 
   function mustReadBack(cause: unknown): boolean {
     const error = asApiError(cause);
-    return error.status === 409 || (error.status ?? 0) >= 500 || error.kind === "network" || error.kind === "protocol";
+    return !isSupportAttachmentNotReady(cause)
+      && (error.status === 409 || (error.status ?? 0) >= 500 || error.kind === "network" || error.kind === "protocol");
   }
 
   function completePending(scope: CommandScope, fingerprint: string): void {
@@ -183,6 +344,7 @@ export const useConversations = defineStore("conversations", () => {
             return adopted;
           }
         }
+        if (!mustReadBack(cause) && scopeIsCurrent(scope)) completePending(scope, fingerprint);
         throw cause;
       } finally {
         scope.inFlight.delete(fingerprint);
@@ -369,17 +531,26 @@ export const useConversations = defineStore("conversations", () => {
         if (scopeIsCurrent(scope) && result.kind === "conversation-ticket") replace(result.conversation);
         if (result.kind !== "conversation" && result.kind !== "conversation-ticket") continue;
         completePending(scope, fingerprint);
+        for (const [composerKey, saved] of Object.entries(humanComposers.value)) {
+          const failed = saved.failedSend;
+          if (!failed || failed.settled) continue;
+          const intent = composerKey.startsWith("start:")
+            ? `conversation-create:${composerKey.slice(6)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`
+            : `conversation-reply:${composerKey.slice(13)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`;
+          if (opaqueSupportIntentSlot(intent) === fingerprint)
+            saveComposer(composerKey, { ...saved, failedSend: null, recoveredId: composerKey.startsWith("start:") ? result.conversation.id : undefined });
+        }
       } catch { /* unknown remains durable until the authoritative readback succeeds */ }
     }
   }
 
-  async function startConversation(type: Exclude<ConversationType, "ai">, openingText: string): Promise<string> {
+  async function startConversation(type: Exclude<ConversationType, "ai">, openingText: string, attachmentId?: string): Promise<string> {
     if (remoteApiEnabled && !categoryEnabled(type)) throw new Error("SUPPORT_CATEGORY_UNAVAILABLE");
     const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     let conversation: Conversation;
     try {
-      conversation = await command(`conversation-create:${type}:${openingText.trim()}`,
-        key => supportApi.startConversation(type, openingText, key), async key => {
+      conversation = await command(`conversation-create:${type}:${attachmentId ?? "text"}:${openingText.trim()}`,
+        key => supportApi.startConversation(type, openingText, key, attachmentId), async key => {
           const result = await supportApi.commandResult(key);
           return result?.kind === "conversation" ? result.conversation : null;
         }, account);
@@ -395,15 +566,15 @@ export const useConversations = defineStore("conversations", () => {
     return startConversation("support", openingText);
   }
 
-  async function sendUser(id: string, text: string): Promise<boolean> {
+  async function sendUser(id: string, text: string, attachmentId?: string): Promise<boolean> {
     const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const current = get(id) ?? await open(id);
     if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const epoch = accountEpoch;
     let conversation: Conversation;
     try {
-      conversation = await command(`conversation-reply:${id}:${text.trim()}`,
-        key => supportApi.replyConversation(current, text, key), async key => {
+      conversation = await command(`conversation-reply:${id}:${attachmentId ?? "text"}:${text.trim()}`,
+        key => supportApi.replyConversation(current, text, key, attachmentId), async key => {
           const result = await supportApi.commandResult(key);
           return result?.kind === "conversation" ? result.conversation : null;
         }, account);
@@ -439,7 +610,10 @@ export const useConversations = defineStore("conversations", () => {
 
   function reset() {
     stopRealtime();watchedId=null;
+    advisorRequestGeneration += 1;
     accountEpoch += 1; conversations.value = []; error.value = null; loading.value = false; typingIds.value = {};
+    advisor.value = null; advisorLoading.value = false; advisorError.value = false;
+    humanComposers.value = {};
     dismissedThrough.value = {}; dismissingIds.value = {};
     dismissalAvailable.value = false;
     openGeneration.clear(); listRequestGeneration += 1; categoryRequestGeneration += 1;
@@ -453,8 +627,18 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   function bindAccount(accountKey: string) {
+    const suspended = suspendedHumanAccount;
+    if (accountKeyValue !== accountKey && accountKeyValue.startsWith("user:") && suspended !== accountKeyValue)
+      discardAccountOutbox(accountKeyValue);
+    if (accountKey.startsWith("user:") && suspended && suspended !== accountKey) {
+      discardAccountOutbox(suspended);
+      removeHumanCache(HUMAN_REAUTH_ACCOUNT);
+      suspendedHumanAccount = null;
+    }
     reset();
     accountKeyValue = accountKey;
+    humanWritesBlocked = false;
+    humanComposers.value = discardedHumanAccounts.has(accountKey) ? {} : restoreHumanOutbox(accountKey);
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
     // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
     // "unverified",首次 refresh() 重走 preparePendingRun 并把失败落 error 态;
@@ -462,5 +646,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
+  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,advisor,advisorLoading,advisorError,humanComposers,composer,saveComposer,clearComposer,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
 });

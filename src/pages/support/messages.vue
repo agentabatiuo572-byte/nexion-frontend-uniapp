@@ -186,6 +186,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], () => {
 async function refreshInbox(): Promise<void> {
   if (!inboxVisible) return;
   const tasks: Promise<unknown>[] = [convStore.refresh(), convStore.refreshCategories()];
+  if (remoteApiEnabled) tasks.push(convStore.refreshAdvisor());
   if (NOVA_SUPPORT_VISIBLE && remoteApiEnabled) {
     tasks.push(nova.ensureRemoteHistory(app.accountKey, () => novaAiApi.history()));
   }
@@ -301,6 +302,7 @@ function cleanPreview(s: string): string {
 }
 
 function msgText(m: ConvMessage, c: Conversation): string {
+  if (m.kind === "IMAGE" && !m.text) return t.value.conversations.image.message;
   return m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
     ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text;
 }
@@ -352,7 +354,12 @@ const rows = computed<Row[]>(() => {
     const latestText = idleClose ?? (last && last.ts >= c.lastTs ? msgText(last, c) : c.lastMessage);
     return {
       id: c.id,
-      name: displayAgentName(c.agentName),
+      name: remoteApiEnabled
+        ? convStore.advisorLoading ? t.value.conversations.image.loadingAdvisor
+          : convStore.advisorError || !convStore.advisor ? t.value.conversations.image.advisorUnavailable
+            : convStore.advisor.assignmentState === "UNBOUND" ? t.value.conversations.image.unassigned
+              : convStore.advisor.currentAdvisorName ?? t.value.conversations.image.advisorUnavailable
+        : displayAgentName(c.agentName),
       preview: typing ? t.value.conversations.agentTyping : cleanPreview(latestText) || t.value.conversations[c.roleKey],
       time: relTime(c.lastTs),
       unread: c.unread,
@@ -365,6 +372,9 @@ const rows = computed<Row[]>(() => {
 });
 
 const emptyHint = computed(() =>
+  convStore.advisor?.assignmentState === "UNBOUND" && selectedType.value !== "ai"
+    ? t.value.conversations.image.unassignedHint
+    :
   selectedType.value === "support"
     ? t.value.conversations.listEmptySupport
     : t.value.conversations.listEmptyAdvisor,

@@ -713,6 +713,7 @@ function checkAuthGuard(): boolean {
  * Server task and settlement state stays untouched and is read after sign-in.
  */
 function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
+  useConversations().suspendForReauthentication();
   sessionVault.clear();
   useSession().signOutSession();
   auth.signOut();

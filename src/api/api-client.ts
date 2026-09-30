@@ -25,12 +25,21 @@ export interface HttpResponse {
 export interface HttpTransport {
   request(request: HttpRequest): Promise<HttpResponse>;
   upload?(request: HttpUploadRequest): Promise<HttpResponse>;
+  download?(request: HttpDownloadRequest): Promise<{ status: number; filePath?: string; blob?: Blob }>;
 }
 
 export interface HttpUploadRequest {
   url: string;
   filePath: string;
   name: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  signal?: AbortSignal;
+  formData?: Record<string, string>;
+}
+
+export interface HttpDownloadRequest {
+  url: string;
   headers: Record<string, string>;
   timeoutMs: number;
   signal?: AbortSignal;
@@ -57,6 +66,7 @@ export interface ApiClient {
   captureSessionGuard?(): () => void;
   request<T>(request: ApiRequest): Promise<T>;
   upload<T>(request: ApiUploadRequest): Promise<T>;
+  download?(request: { path: string; signal?: AbortSignal }): Promise<string>;
   refreshSession(): Promise<SessionSnapshot>;
 }
 
@@ -68,6 +78,7 @@ export interface ApiUploadRequest {
   idempotencyKey?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  formData?: Record<string, string>;
 }
 
 interface ApiClientOptions {
@@ -417,6 +428,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       headers,
       timeoutMs: apiRequest.timeoutMs ?? 30_000,
       signal: apiRequest.signal,
+      formData: apiRequest.formData,
     };
     const executeUpload = () => options.transport.upload!(uploadRequest)
       .then((response) => executeResponse<T>(response));
@@ -452,6 +464,37 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
   }
 
+  async function download(apiRequest: { path: string; signal?: AbortSignal }): Promise<string> {
+    if (!options.transport.download) throw new ApiError({ kind: "configuration", message: "FILE_DOWNLOAD_TRANSPORT_UNAVAILABLE" });
+    const session = options.vault.read();
+    if (!session?.accessToken) throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
+    const sessionRevision = options.vault.revision();
+    const run = (token: string) => options.transport.download!({
+      url: `${baseUrl}/${apiRequest.path.replace(/^\/+/, "")}`,
+      headers: { Authorization: `${session.tokenType || "Bearer"} ${token}`, "Cache-Control": "no-store" },
+      timeoutMs: 30_000,
+      signal: apiRequest.signal,
+    });
+    let expectedRevision = sessionRevision;
+    let result = await run(session.accessToken);
+    if (result.status === 401 && options.vault.revision() === sessionRevision) {
+      const renewed = await refreshSession();
+      if (!renewed?.accessToken || renewed.user.userId !== session.user.userId) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      expectedRevision = options.vault.revision();
+      result = await run(renewed.accessToken);
+    }
+    if (apiRequest.signal?.aborted) throw new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false });
+    captureSessionGuardForDownload(session.user.userId, expectedRevision);
+    if (result.status < 200 || result.status >= 300) throw new ApiError({ kind: result.status === 401 ? "auth" : "http", message: `HTTP_${result.status}`, status: result.status });
+    if (result.blob) return URL.createObjectURL(result.blob);
+    if (result.filePath) return result.filePath;
+    throw new ApiError({ kind: "protocol", message: "FILE_DOWNLOAD_INVALID" });
+  }
+
+  function captureSessionGuardForDownload(userId: number, revision: number): void {
+    if (options.vault.revision() !== revision || options.vault.read()?.user.userId !== userId) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+  }
+
   async function executeResponse<T>(response: HttpResponse): Promise<T> {
     const responseData = decodeTransportData(response.data);
     const envelope = isEnvelope(responseData) ? responseData : null;
@@ -485,7 +528,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       }
     };
   }
-  return { request, upload, refreshSession, captureSessionGuard };
+  return { request, upload, download, refreshSession, captureSessionGuard };
 }
 
 export function createUniHttpTransport(): HttpTransport {
@@ -563,6 +606,7 @@ export function createUniHttpTransport(): HttpTransport {
           url: request.url,
           filePath: request.filePath,
           name: request.name,
+          formData: request.formData,
           header: request.headers,
           timeout: request.timeoutMs,
           success: (response) => finish(() => resolve({
@@ -575,6 +619,49 @@ export function createUniHttpTransport(): HttpTransport {
             : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }))),
         });
       });
+    },
+    download(request) {
+      // #ifdef H5
+      return (async () => {
+        if (request.signal?.aborted) throw new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false });
+        const controller = new AbortController();
+        let timedOut = false;
+        const onAbort = () => controller.abort();
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, request.timeoutMs);
+        try {
+          const response = await fetch(request.url, {
+            method: "GET", headers: request.headers, cache: "no-store", signal: controller.signal,
+          });
+          if (!response.ok) return { status: response.status };
+          const blob = await response.blob();
+          if (request.signal?.aborted || timedOut) throw new ApiError({ kind: "network", message: request.signal?.aborted ? "REQUEST_ABORTED" : "REQUEST_TIMEOUT", retryable: !request.signal?.aborted });
+          return { status: response.status, blob };
+        } catch (cause) {
+          if (cause instanceof ApiError) throw cause;
+          throw new ApiError({ kind: "network", message: request.signal?.aborted ? "REQUEST_ABORTED" : timedOut ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE", retryable: !request.signal?.aborted });
+        } finally {
+          clearTimeout(timer);
+          request.signal?.removeEventListener("abort", onAbort);
+        }
+      })();
+      // #endif
+      // #ifndef H5
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let task: { abort?: () => void } | undefined;
+        const cleanup = () => request.signal?.removeEventListener("abort", onAbort);
+        const finish = (action: () => void) => { if (!settled) { settled = true; cleanup(); action(); } };
+        const onAbort = () => { task?.abort?.(); finish(() => reject(new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false }))); };
+        if (request.signal?.aborted) { onAbort(); return; }
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        task = uni.downloadFile({
+          url: request.url, header: request.headers, timeout: request.timeoutMs,
+          success: response => finish(() => resolve({ status: response.statusCode, filePath: response.tempFilePath })),
+          fail: () => finish(() => reject(new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }))),
+        });
+      });
+      // #endif
     },
   };
 }

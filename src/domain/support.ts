@@ -56,6 +56,9 @@ export interface ConvMessage {
   status?: "sent" | "read";
   text: string;
   ts: number;
+  kind?: "TEXT" | "IMAGE";
+  attachmentId?: string;
+  authorName?: string;
 }
 export interface Conversation {
   id: string;

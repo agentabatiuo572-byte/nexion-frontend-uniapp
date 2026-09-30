@@ -70,4 +70,27 @@ describe("conversation message parser compatibility", () => {
     const api = createSupportApi({ request: async () => detail("support", sender!, receipt) } as never);
     await expect(api.conversation("CV-ended")).rejects.toThrow("SUPPORT_CONVERSATION_RESPONSE_INVALID");
   });
+  it("keeps a private image message with no text and sends the same attachment intent", async () => {
+    const response = detail("support");
+    response.conversation.status = "OPEN";
+    response.messages = [{ id: 1, senderType: "user", content: null, kind: "IMAGE", attachmentId: "private-1",
+      createdAt: "2026-09-01T00:00:00Z", receiptStatus: null }] as unknown as typeof response.messages;
+    const request = vi.fn(async () => response);
+    const api = createSupportApi({ request } as never);
+    const conversation = await api.startConversation("support", "", "create-image-key", "private-1");
+    expect(conversation.messages[0]).toMatchObject({ kind: "IMAGE", attachmentId: "private-1", text: "" });
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      body: { conversationType: "SUPPORT", openingText: "", clientMessageId: "create-image-key", kind: "IMAGE", attachmentId: "private-1" },
+    }));
+  });
+  it("requires an explicit unbound advisor state with no identity", async () => {
+    const request = vi.fn(async (): Promise<unknown> => ({ assignmentId: null, currentAdvisorId: null, currentAdvisorName: null,
+      assignmentState: "UNBOUND", availability: "UNBOUND" }));
+    const api = createSupportApi({ request } as never);
+    expect((await api.advisor()).assignmentState).toBe("UNBOUND");
+    expect(request).toHaveBeenCalledWith({ method: "GET", path: "/api/app/support/advisor" });
+    request.mockResolvedValueOnce({ assignmentId: null, currentAdvisorId: 9, currentAdvisorName: "Wrong",
+      assignmentState: "UNBOUND", availability: "UNKNOWN" });
+    await expect(api.advisor()).rejects.toThrow("SUPPORT_ADVISOR_RESPONSE_INVALID");
+  });
 });

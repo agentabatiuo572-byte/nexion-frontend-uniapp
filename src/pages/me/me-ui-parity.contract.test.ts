@@ -143,7 +143,9 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // roving tabindex (they were unnamed toggle buttons with no selected state), and
   // the subject/description fields carry accessible names plus required and
   // length hints; the empty-submit error is associated to its field. Styles unchanged.
-  "support-tickets.vue": "0496f1d848ab357d929f7c72f9b89e65478dbb19728a07da5d6cdecb1fc715da",
+  // Cold restore and pending reads show connection copy; mutations wait for binding.
+  // An unread list cannot claim an empty result before the verified binding.
+  "support-tickets.vue": "3aa3d0349abd09c2944401c88ee9ff0ec1599c18d7c868b9eaa61a3bf861829b",
   "support.vue": "c3592d6ff3f3c88a9e8def9171378f62f7f56f6927a30baa750a3d38cdc71020",
   // Production EXTENDED retains its purchase deadline and explicitly frozen credit copy.
   "trial.vue": "03a78f5ddadde8693fe0ef11c8f5ed0306d52a73334d8a5bb3c6c840da9ec1bc",

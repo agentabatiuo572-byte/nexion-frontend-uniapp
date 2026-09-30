@@ -28,6 +28,13 @@
         <view v-else class="nx-conv-bubble-row" :class="m.side === 'right' ? 'nx-conv-right' : 'nx-conv-left'">
           <view class="nx-conv-bubble" :style="bubbleStyle(m)">
             <view class="nx-conv-bubble-body">
+              <view v-if="m.imageSrc" class="nx-conv-image-open" role="button" tabindex="0" :aria-label="imageLabels?.view"
+                @click="openPreview(m.imageSrc)" @keydown.enter.prevent="openPreview(m.imageSrc)" @keydown.space.prevent="openPreview(m.imageSrc)">
+                <image class="nx-conv-image" :src="m.imageSrc" mode="widthFix" />
+                <text class="nx-conv-image-caption">{{ imageLabels?.view }}</text>
+              </view>
+              <text v-else-if="m.imageLoading" class="nx-conv-image-caption">{{ imageLabels?.loading }}</text>
+              <view v-else-if="m.imageError" class="nx-conv-image-open" role="button" tabindex="0" @click="m.imageAttachmentId && emit('retry-image', m.imageAttachmentId)" @keydown.enter.prevent="m.imageAttachmentId && emit('retry-image', m.imageAttachmentId)" @keydown.space.prevent="m.imageAttachmentId && emit('retry-image', m.imageAttachmentId)"><text class="nx-conv-image-caption">{{ imageLabels?.failed }}</text></view>
               <view v-for="(line, li) in formatLines(m.text)" :key="li" class="nx-conv-line">
                 <text
                   v-for="(seg, si) in line"
@@ -44,6 +51,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
             </view>
           </view>
+          <text v-if="m.meta" class="nx-conv-message-meta">{{ m.meta }}</text>
         </view>
         <!-- delivery receipt (user messages only, pre-localised by the page) -->
         <view v-if="m.receipt && !m.queue" class="nx-conv-receipt" :class="m.side === 'left' ? 'nx-conv-receipt--left' : ''">
@@ -102,8 +110,26 @@
       </view>
     </view>
 
+    <view v-if="!closed && attachmentDraft" class="nx-conv-attachment" role="status" aria-live="polite">
+      <view v-if="attachmentPreviewSrc" class="nx-conv-image-open" role="button" tabindex="0" :aria-label="imageLabels?.view" @click="openPreview(attachmentPreviewSrc)" @keydown.enter.prevent="openPreview(attachmentPreviewSrc)" @keydown.space.prevent="openPreview(attachmentPreviewSrc)"><image class="nx-conv-image" :src="attachmentPreviewSrc" mode="aspectFill" /></view>
+      <text>{{ attachmentDraft.label }}</text>
+      <view class="nx-conv-attachment-actions">
+        <view v-if="attachmentDraft.state === 'failed' && !attachmentDraft.replaceOnly" role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('retry-upload')" @keydown.enter.prevent="emit('retry-upload')" @keydown.space.prevent="emit('retry-upload')"><text>{{ imageLabels?.retryUpload }}</text></view>
+        <view v-if="attachmentDraft.state !== 'uploading'" role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('replace-attachment')" @keydown.enter.prevent="emit('replace-attachment')" @keydown.space.prevent="emit('replace-attachment')"><text>{{ imageLabels?.replace }}</text></view>
+        <view role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('cancel-attachment')" @keydown.enter.prevent="emit('cancel-attachment')" @keydown.space.prevent="emit('cancel-attachment')"><text>{{ imageLabels?.cancel }}</text></view>
+      </view>
+    </view>
+    <view v-if="!closed && failedSendLabel" class="nx-conv-attachment" role="alert">
+      <text>{{ failedSendLabel }}</text>
+      <view class="nx-conv-attachment-actions">
+        <view v-if="canRetrySend" role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('retry-message')" @keydown.enter.prevent="emit('retry-message')" @keydown.space.prevent="emit('retry-message')"><text>{{ imageLabels?.retrySend }}</text></view>
+        <view v-if="canDiscardSend" role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('edit-message')" @keydown.enter.prevent="emit('edit-message')" @keydown.space.prevent="emit('edit-message')"><text>{{ imageLabels?.editSend }}</text></view>
+        <view v-if="canDiscardSend" role="button" tabindex="0" class="nx-conv-attachment-action" @click="emit('discard-message')" @keydown.enter.prevent="emit('discard-message')" @keydown.space.prevent="emit('discard-message')"><text>{{ imageLabels?.discard }}</text></view>
+      </view>
+    </view>
     <!-- Input row -->
-    <view v-else class="nx-conv-input-row">
+    <view v-else-if="!closed" class="nx-conv-input-row">
+      <view v-if="imageLabels" class="nx-conv-attach-trigger" role="button" tabindex="0" :aria-label="imageLabels.attach" :aria-disabled="attachDisabled ? 'true' : 'false'" :style="attachDisabled ? { opacity: 0.45 } : undefined" @click="!attachDisabled && emit('attach')" @keydown.enter.prevent="!attachDisabled && emit('attach')" @keydown.space.prevent="!attachDisabled && emit('attach')"><text>▧</text></view>
       <input
         class="nx-conv-input"
         :value="draft"
@@ -116,9 +142,14 @@
         @blur="emit('typing', false)"
         @confirm="onSend"
       />
-	      <view class="nx-conv-send" :style="sendStyle" role="button" tabindex="0" :aria-label="sendLabel" :aria-disabled="!draft.trim()" @click="onSend" @keydown.enter.prevent="onKeyboardActivate($event, onSend)" @keydown.space.prevent="onKeyboardActivate($event, onSend)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="draft.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg>
+	      <view class="nx-conv-send" :style="sendStyle" role="button" tabindex="0" :aria-label="sendLabel" :aria-disabled="!canSend" @click="onSend" @keydown.enter.prevent="onKeyboardActivate($event, onSend)" @keydown.space.prevent="onKeyboardActivate($event, onSend)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSend ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg>
       </view>
+    </view>
+    <view v-if="!closed && attachUnavailable" class="nx-conv-image-caption" role="status"><text>{{ attachUnavailable }}</text><view v-if="attachRetry" role="button" tabindex="0" @click="emit('retry-policy')" @keydown.enter.prevent="emit('retry-policy')" @keydown.space.prevent="emit('retry-policy')"><text>{{ imageLabels?.retryPolicy }}</text></view></view>
+    <view v-if="previewImage" class="nx-conv-image-overlay" role="dialog" aria-modal="true" :aria-label="imageLabels?.view">
+      <view role="button" tabindex="0" class="nx-conv-image-close" @click="closePreview" @keydown.enter.prevent="closePreview" @keydown.space.prevent="closePreview"><text>{{ imageLabels?.close }}</text></view>
+      <image :src="previewImage" class="nx-conv-image-full" mode="widthFix" />
     </view>
   </view>
 </template>
@@ -126,6 +157,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, type CSSProperties } from "vue";
 import type { ThreadMsg, QuickChip } from "./thread-types";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{
   messages: ThreadMsg[];
@@ -147,7 +179,18 @@ const props = defineProps<{
   restartLabel?: string;
   queueLabels?: { edit: string; cancel: string; retry: string; save: string; cancelEdit: string };
   composerKey?: string;
+  initialDraft?: string;
   maxInputLength?: number;
+  imageLabels?: { view: string; loading: string; failed: string; attach: string; retryUpload: string; replace: string; cancel: string; retrySend: string; editSend: string; discard: string; retryPolicy: string; expired: string; close: string };
+  attachDisabled?: boolean;
+  attachUnavailable?: string;
+  attachRetry?: boolean;
+  attachmentDraft?: { state: "uploading" | "ready" | "failed"; label: string; replaceOnly?: boolean } | null;
+  attachmentPreviewSrc?: string;
+  failedSendLabel?: string;
+  canDiscardSend?: boolean;
+  canRetrySend?: boolean;
+  sendBlocked?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -155,16 +198,32 @@ const emit = defineEmits<{
       (e.g. rate-limited) so the user's typed message isn't silently swallowed. */
   (e: "send", text: string, restore: () => void): void;
   (e: "typing", active: boolean): void;
+  (e: "draft-change", text: string): void;
+  (e: "retry-image", attachmentId: string): void;
   (e: "chip", key: string): void;
   (e: "cta", href: string, label: string): void;
   (e: "restart"): void;
   (e: "queue-action", turnId: string, action: "edit" | "cancel" | "retry" | "cancel-edit"): void;
   (e: "queue-save", turnId: string, text: string): void;
+  (e: "attach" | "retry-upload" | "replace-attachment" | "cancel-attachment" | "retry-message" | "edit-message" | "discard-message" | "retry-policy"): void;
 }>();
 
-const draft = ref("");
+const draft = ref(props.initialDraft ?? "");
+const previewImage = ref("");
+function openPreview(src: string) {
+  // #ifdef APP-PLUS
+  uni.previewImage({ current: src, urls: [src], fail: () => { previewImage.value = src; } });
+  return;
+  // #endif
+  previewImage.value = src;
+}
+function closePreview() { previewImage.value = ""; }
+useDialogA11y(computed(() => !!previewImage.value), ".nx-conv-image-overlay", closePreview);
+const canSend = computed(() => !props.sendBlocked && (Boolean(draft.value.trim()) || props.attachmentDraft?.state === "ready") && props.attachmentDraft?.state !== "failed" && props.attachmentDraft?.state !== "uploading");
 const edits = ref<Record<string, string>>({});
-watch(() => props.composerKey, () => { draft.value = ""; edits.value = {}; });
+watch(() => props.composerKey, () => { draft.value = props.initialDraft ?? ""; edits.value = {}; previewImage.value = ""; });
+watch(() => props.revealTick, () => { previewImage.value = ""; });
+watch(() => props.initialDraft, value => { if (value !== undefined && value !== draft.value) draft.value = value; });
 watch(() => props.messages, () => {
   for (const id of Object.keys(edits.value)) {
     if (!props.messages.some(m => m.queue?.turnId === id && m.queue.state === "editing")) delete edits.value[id];
@@ -193,16 +252,19 @@ function onEditInput(turnId: string, e: Event) {
 
 function onDraft(e: Event) {
   draft.value = (e as unknown as { detail: { value: string } }).detail.value;
+  emit("draft-change", draft.value);
   emit("typing", Boolean(draft.value.trim()));
 }
 
 function onSend() {
+  if (!canSend.value) return;
   const text = draft.value.trim();
-  if (!text) return;
   draft.value = "";
+  emit("draft-change", "");
   emit("typing", false);
   emit("send", text, () => {
     draft.value = text;
+    emit("draft-change", text);
   });
 }
 
@@ -280,7 +342,7 @@ function formatLines(text: string): { text: string; bold: boolean }[][] {
 }
 
 const sendStyle = computed<CSSProperties>(() => ({
-  background: draft.value.trim() ? "var(--v5-brand)" : "var(--v5-surface)", // 输入条自身无底色,按钮贴页面底:原 surface-2 与页面底同色不可辨,改 L1
+  background: canSend.value ? "var(--v5-brand)" : "var(--v5-surface)",
 }));
 
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
@@ -326,6 +388,18 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-msg-row {
   margin-bottom: 12px;
 }
+.nx-conv-image-open { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.nx-conv-image { width: min(220px, 58vw); max-height: 280px; border-radius: 10px; }
+.nx-conv-image-caption { color: var(--v5-ink-3); font-size: 12px; line-height: 1.5; }
+.nx-conv-right .nx-conv-image-caption { color: var(--v5-on-brand); }
+.nx-conv-message-meta { display: block; color: var(--v5-ink-3); font-size: 12px; padding: 4px 3px 0; }
+.nx-conv-attachment { margin: 6px 14px; padding: 10px 12px; border: 1px solid var(--v5-border); border-radius: 12px; color: var(--v5-ink); background: var(--v5-surface); font-size: 13px; }
+.nx-conv-attachment-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.nx-conv-attachment-action { display: flex; align-items: center; min-height: 44px; color: var(--v5-brand); }
+.nx-conv-attach-trigger { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--v5-ink-2); font-size: 20px; }
+.nx-conv-image-overlay { position: fixed; inset: 0; z-index: 800; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; padding: 24px; background: var(--v5-bg); }
+.nx-conv-image-close { align-self: flex-end; display: flex; align-items: center; min-height: 44px; color: var(--v5-ink); }
+.nx-conv-image-full { max-width: 100%; max-height: 78vh; }
 
 .nx-conv-queue { margin: 6px 0 0 auto; max-width: 90%; text-align: right; }
 .nx-conv-queue-status { display: block; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
@@ -343,12 +417,13 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 }
 .nx-conv-bubble-row {
   display: flex;
+  flex-direction: column;
 }
 .nx-conv-left {
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 .nx-conv-right {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 .nx-conv-bubble {
   max-width: 82%;

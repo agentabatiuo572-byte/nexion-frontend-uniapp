@@ -9,6 +9,7 @@
   <AppChassis active="me">
     <view style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/support" />
+      <text v-if="!supportSessionReady || ticketsStore.loading || (mode.kind === 'detail' && !detailTicket)" class="block px-4" role="status" aria-live="polite">{{ t.conversations.connecting }}</text>
       <view v-if="mode.kind !== 'list'" class="px-4" style="padding-bottom: 8px">
         <view class="flex items-center active:opacity-50" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="setMode({ kind: 'list' })">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -39,7 +40,7 @@
         <text v-if="filterFeedback" class="block text-center" :style="filterFeedbackStyle">{{ filterFeedback }}</text>
 
         <EmptyState v-if="ticketsStore.error" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="reloadTickets" />
-        <EmptyState v-else-if="filtered.length === 0" :kind="tab === 'all' ? 'empty-list' : 'no-filter-results'" :title="tab === 'all' ? t.empty.listTitle : t.empty.filterTitle" :desc="tab === 'all' ? t.empty.listDesc : t.empty.filterDesc" />
+        <EmptyState v-else-if="supportSessionReady && !ticketsStore.loading && filtered.length === 0" :kind="tab === 'all' ? 'empty-list' : 'no-filter-results'" :title="tab === 'all' ? t.empty.listTitle : t.empty.filterTitle" :desc="tab === 'all' ? t.empty.listDesc : t.empty.filterDesc" />
         <view v-else style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
           <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="openTicket(tk.id)" />
         </view>
@@ -98,7 +99,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.cancel }}</text>
           </view>
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="{ ...submitBtnStyle, opacity: ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="ticketsStore.mutating" :aria-label="t.tickets.create.submit" @click="submitCreate">
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="{ ...submitBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.create.submit" @click="submitCreate">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.submit }}</text>
           </view>
@@ -144,10 +145,10 @@
         <view v-if="canReply(detailTicket)" :style="replyCardStyle">
           <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" :aria-label="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
           <view class="grid grid-cols-2" style="gap: 8px; margin-top: 8px">
-            <view v-if="canClose(detailTicket)" class="flex items-center justify-center active:scale-[0.98]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
+            <view v-if="canClose(detailTicket)" class="flex items-center justify-center active:scale-[0.98]" :style="{ ...closeBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
               <text>{{ t.tickets.detail.closeBtn }}</text>
             </view>
-            <view class="flex items-center justify-center active:scale-[0.98]" :style="sendReplyStyle(!!reply.trim())" role="button" tabindex="0" :aria-label="t.tickets.detail.sendBtn" @click="sendReply">
+            <view class="flex items-center justify-center active:scale-[0.98]" :style="sendReplyStyle(supportSessionReady && !ticketsStore.mutating && !!reply.trim())" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating || !reply.trim()" :aria-label="t.tickets.detail.sendBtn" @click="sendReply">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="reply.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
               <text style="margin-left: 6px">{{ t.tickets.detail.sendBtn }}</text>
             </view>
@@ -159,8 +160,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { computed, ref, nextTick, watch, onUnmounted, type CSSProperties } from "vue";
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -171,8 +172,10 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { supportApi, remoteApiEnabled } from "@/api/runtime";
+import { supportApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { navReplace } from "@/lib/route";
 import {
@@ -191,6 +194,17 @@ type Tab = "all" | "open" | "resolved" | "closed";
 const t = useT();
 const ticketsStore = useTickets();
 const app = useApp();
+const auth = useAuth();
+const supportSessionReady = computed(() => {
+  void app.accountBindingEpoch;
+  return accountSessionReady({ remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
+    accountId: auth.accountId, appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null });
+});
+const ticketShowRevision = ref(0);
+let ticketsPageVisible = false;
+let ticketsPageEpoch = 0;
+let ticketOpenRequest = 0;
+let ticketAccountWasBound = app.accountKey !== "default";
 const locale = useLocaleStore();
 const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
@@ -227,7 +241,10 @@ const descInvalid = computed(() => submitAttempted.value && !desc.value.trim());
 // An account switch must drop the previous account's draft, but it must not
 // discard the intent the address carries: a reload of ?mode=create has to keep
 // showing the create form rather than silently falling back to the list.
-watch(() => app.accountKey, () => {
+watch(() => app.accountKey, (next, previous) => {
+  if (previous === "default" && !ticketAccountWasBound && next !== "default") { ticketAccountWasBound = true; return; }
+  if (next !== "default") ticketAccountWasBound = true;
+  ticketSuggestionGeneration++;
   subject.value = "";
   desc.value = "";
   reply.value = "";
@@ -268,7 +285,20 @@ onLoad((query) => {
   if (typeof query?.ticket === "string") mode.value = { kind: "detail", id: query.ticket };
 });
 
-onShow(async () => {
+onShow(() => { ticketsPageVisible = true; ticketShowRevision.value++; });
+function hideTicketPage() { ticketsPageVisible = false; ticketsPageEpoch++; ticketSuggestionGeneration++; ticketSuggestionLoading.value = false; }
+onHide(hideTicketPage);
+onUnload(hideTicketPage);
+onUnmounted(hideTicketPage);
+watch([() => app.accountBindingEpoch, supportSessionReady, ticketShowRevision], () => {
+  if (ticketsPageVisible && supportSessionReady.value) void activateTicketPage();
+}, { flush: "post" });
+
+async function activateTicketPage() {
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
+  const epoch = ++ticketsPageEpoch, scope = captureAccountScope(), requestedMode = mode.value;
+  const current = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
+    && isCurrentAccountScope(scope) && requestedMode === mode.value;
   // The create form renders from its own sources (categories, FAQ suggestions,
   // SLA targets). The ticket list only feeds the list view, so a list read that
   // fails while the user is composing a ticket must not surface as a blocking
@@ -277,15 +307,19 @@ onShow(async () => {
   const listIsVisible = mode.value.kind === "list";
   try {
     const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets(), loadTicketSuggestions()]);
+    if (!current()) return;
     if (tickets.status === "rejected" && listIsVisible) throw tickets.reason;
     if (mode.value.kind === "detail") await openTicket(mode.value.id);
   } catch {
-    toast.warn(t.value.security.opFailed);
+    if (current()) toast.warn(t.value.security.opFailed);
   }
-});
+}
 
 async function loadSlaTargets() {
-  slaTargets.value = await supportApi.slaTargets();
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
+  const epoch = ticketsPageEpoch, scope = captureAccountScope();
+  const result = await supportApi.slaTargets();
+  if (ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch && isCurrentAccountScope(scope)) slaTargets.value = result;
 }
 
 let ticketSuggestionGeneration = 0;
@@ -294,6 +328,7 @@ function ticketSuggestionKey(requestedLocale: string, requestedCategory: TicketC
 }
 
 async function loadTicketSuggestions() {
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
   const requestGeneration = ++ticketSuggestionGeneration;
   const requestedLocale = locale.code;
   const requestedCategory = newCat.value;
@@ -325,6 +360,7 @@ async function loadTicketSuggestions() {
 }
 
 async function loadMoreTicketSuggestions() {
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
   if (ticketSuggestionLoading.value || !canLoadMoreTicketSuggestions.value) return;
   const requestGeneration = ++ticketSuggestionGeneration;
   const requestedLocale = locale.code;
@@ -354,32 +390,38 @@ async function loadMoreTicketSuggestions() {
 watch(() => [newCat.value, locale.code] as const, () => { void loadTicketSuggestions(); });
 
 async function reloadTickets() {
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
   try { await ticketsStore.refresh(); }
   catch { toast.warn(t.value.security.opFailed); }
 }
 
 async function openTicket(id: string) {
-  if (ticketsStore.mutating) return;
-  const scope = captureAccountScope();
+  if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
+  const scope = captureAccountScope(), epoch = ticketsPageEpoch, request = ++ticketOpenRequest;
+  let requestedMode = mode.value;
+  const current = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
+    && request === ticketOpenRequest && isCurrentAccountScope(scope) && requestedMode === mode.value;
   try {
     const ticket = await ticketsStore.load(id);
-    if (!isCurrentAccountScope(scope)) return;
+    if (!current()) return;
     mode.value = { kind: "detail", id };
+    requestedMode = mode.value;
     await nextTick();
-    if (isCurrentAccountScope(scope) && mode.value.kind === "detail" && mode.value.id === id) {
+    if (current() && mode.value.kind === "detail" && mode.value.id === id) {
       // The detail is already available. A stale read acknowledgement has its
       // own store-side readback and must not turn opening the ticket into an
       // erroneous user-facing failure toast.
       await ticketsStore.markRead(ticket).catch(() => undefined);
     }
   } catch {
-    if (!isCurrentAccountScope(scope)) return;
+    if (!current()) return;
     if (mode.value.kind === "detail" && !detailTicket.value) mode.value = { kind: "list" };
     toast.warn(t.value.security.opFailed);
   }
 }
 
 async function loadEarlierTicket() {
+  if (!ticketsPageVisible || !supportSessionReady.value) return;
   const current = detailTicket.value;
   if (!current?.historyNextCursor) return;
   try { await ticketsStore.loadEarlier(current.id); }
@@ -497,40 +539,52 @@ function onReply(e: Event) {
 }
 
 async function submitCreate() {
-  if (ticketsStore.mutating) return;
+  if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
   submitAttempted.value = true;
   if (!subject.value.trim() || !desc.value.trim()) {
     toast.info(t.value.tickets.create.missingFields, "");
     return;
   }
+  const scope = captureAccountScope(), epoch = ticketsPageEpoch, requestedMode = mode.value;
+  const current = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
+    && isCurrentAccountScope(scope) && requestedMode === mode.value;
   try {
     const id = await ticketsStore.createTicket({ category: newCat.value, subject: subject.value, body: desc.value });
+    if (!current()) return;
     toast.success(t.value.tickets.create.submittedToast, "");
     subject.value = "";
     desc.value = "";
     submitAttempted.value = false;
     mode.value = { kind: "detail", id };
-  } catch { toast.error(t.value.security.opFailed); }
+  } catch { if (current()) toast.error(t.value.security.opFailed); }
 }
 async function sendReply() {
-  if (ticketsStore.mutating) return;
+  if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
   const current = detailTicket.value;
   if (!current || !canReply(current) || !reply.value.trim()) return;
+  const scope = captureAccountScope(), epoch = ticketsPageEpoch, requestedMode = mode.value;
+  const active = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
+    && isCurrentAccountScope(scope) && requestedMode === mode.value;
   try {
     await ticketsStore.reply(current.id, reply.value);
+    if (!active()) return;
     reply.value = "";
     toast.success(t.value.tickets.detail.sentToast, "");
-  } catch { toast.error(t.value.security.opFailed); }
+  } catch { if (active()) toast.error(t.value.security.opFailed); }
 }
 async function closeTicket() {
-  if (ticketsStore.mutating) return;
+  if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
   const current = detailTicket.value;
   if (!current) return;
+  const scope = captureAccountScope(), epoch = ticketsPageEpoch, requestedMode = mode.value;
+  const active = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
+    && isCurrentAccountScope(scope) && requestedMode === mode.value;
   try {
     await ticketsStore.close(current.id);
+    if (!active()) return;
     toast.success(t.value.tickets.detail.closedToast, "");
     mode.value = { kind: "list" };
-  } catch { toast.error(t.value.security.opFailed); }
+  } catch { if (active()) toast.error(t.value.security.opFailed); }
 }
 
 const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };

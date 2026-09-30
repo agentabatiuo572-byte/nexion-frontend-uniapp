@@ -81,4 +81,14 @@ describe('conversation realtime recovery',()=>{
     expect(socket.sent.filter(s=>JSON.parse(s).type==='command')).toHaveLength(1);
     client.stop();socket.frame({type:'ready'});await vi.advanceTimersByTimeAsync(1000);expect(client.ready).toBe(false);
   });
+  it('accepts only a valid assignment scope invalidation',async()=>{
+    vi.useFakeTimers();const socket=new Socket();const scopeInvalidated=vi.fn();
+    const client=new ConversationRealtime({ticket:async()=>({ticket:'once'}),socket:()=>socket,url:'ws://local',reconcile:async()=>{},scopeInvalidated});
+    client.start();await vi.advanceTimersByTimeAsync(0);socket.onopen?.();
+    socket.frame({type:'scope-invalidated',reason:'ASSIGNMENT_CHANGED',customerId:42});
+    socket.frame({type:'scope-invalidated',reason:'ASSIGNMENT_CHANGED',customerId:'42'});
+    socket.frame({type:'scope-invalidated',reason:'OTHER',customerId:42});
+    expect(scopeInvalidated).toHaveBeenCalledTimes(1);expect(scopeInvalidated).toHaveBeenCalledWith(42);
+    client.stop();
+  });
 });
