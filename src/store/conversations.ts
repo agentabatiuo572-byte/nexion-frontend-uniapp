@@ -10,7 +10,7 @@ import { asApiError } from "@/api/errors";
 import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
-import { restoreSupportPending, persistSupportPending } from "@/lib/support-pending-storage";
+import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
 
 function mutationKey(scope: string): string {
   const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
@@ -28,7 +28,10 @@ export type HumanComposer = {
   imageDraft: { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean } | null;
   failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number } | null;
   recoveredId?: string;
+  retainDraft?: boolean;
 };
+
+const HUMAN_REAUTH_ACCOUNT = "support-human-reauth-account";
 
 function humanOutboxStorage() {
   try {
@@ -39,6 +42,16 @@ function humanOutboxStorage() {
   } catch { return null; }
 }
 function humanOutboxKey(account: string) { return `support-human-outbox:${account}`; }
+function removeHumanCache(key: string) {
+  try { humanOutboxStorage()?.removeItem(key); }
+  catch { try { humanOutboxStorage()?.setItem(key, "{}"); } catch { /* Denied storage must not keep private UI authenticated. */ } }
+}
+function reauthAccount(): string | null {
+  try {
+    const value = humanOutboxStorage()?.getItem(HUMAN_REAUTH_ACCOUNT);
+    return value?.startsWith("user:") ? value : null;
+  } catch { return null; }
+}
 function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
   if (!account.startsWith("user:")) return {};
   try {
@@ -53,7 +66,11 @@ function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
       const failed = saved.failedSend;
       const recoveredId = (value as { recoveredId?: unknown }).recoveredId;
       if (typeof recoveredId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(recoveredId) && key.startsWith("start:")) {
-        restored[key] = { text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: null, recoveredId };
+        restored[key] = { text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: null, recoveredId, retainDraft: true };
+        continue;
+      }
+      if ((value as { retainDraft?: unknown }).retainDraft === true && typeof saved.text === "string" && saved.text && !failed) {
+        restored[key] = { text: saved.text.slice(0, 140), imageDraft: null, failedSend: null, retainDraft: true };
         continue;
       }
       if (!failed || failed.settled || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
@@ -109,17 +126,25 @@ export const useConversations = defineStore("conversations", () => {
   const advisorError = ref(false);
   let advisorRequestGeneration = 0;
   const humanComposers = ref<Record<string, HumanComposer>>({});
+  let humanWritesBlocked = false;
+  let suspendedHumanAccount = reauthAccount();
+  const discardedHumanAccounts = new Set<string>();
   function persistHumanOutbox(required = false) {
     if (!accountKeyValue.startsWith("user:")) return;
     const rows = Object.fromEntries(Object.entries(humanComposers.value)
-      .filter(([key, composer]) => (composer.failedSend && !composer.failedSend.settled) || (key.startsWith("start:") && composer.recoveredId))
-      .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId }]));
+      .filter(([key, composer]) => (composer.failedSend && !composer.failedSend.settled) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
+      .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId, retainDraft: composer.retainDraft }]));
     try {
       const storage = humanOutboxStorage();
       if (Object.keys(rows).length) {
         const encoded = JSON.stringify(rows);
         storage?.setItem(humanOutboxKey(accountKeyValue), encoded);
         if (storage?.getItem(humanOutboxKey(accountKeyValue)) !== encoded) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+        discardedHumanAccounts.delete(accountKeyValue);
+        // Record the owner before sending; a reload may expire before this store is bound.
+        storage?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue);
+        if (storage?.getItem(HUMAN_REAUTH_ACCOUNT) !== accountKeyValue) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+        suspendedHumanAccount = accountKeyValue;
       } else storage?.removeItem(humanOutboxKey(accountKeyValue));
     } catch {
       if (required) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
@@ -129,10 +154,42 @@ export const useConversations = defineStore("conversations", () => {
     return humanComposers.value[key] ?? { text: "", imageDraft: null, failedSend: null };
   }
   function saveComposer(key: string, value: HumanComposer, required = false) {
-    humanComposers.value[key] = value;
+    if (remoteApiEnabled && (humanWritesBlocked || !accountKeyValue.startsWith("user:"))) return;
+    const previous = humanComposers.value[key];
+    // Keep the next unsent draft after readback retires the preceding intent.
+    const retainDraft = !!value.text && !!(value.retainDraft || previous?.retainDraft || (previous?.failedSend && !value.failedSend));
+    humanComposers.value[key] = { ...value, retainDraft };
+    if (key.startsWith("start:") && value.recoveredId && value.text) {
+      humanComposers.value[`conversation:${value.recoveredId}`] = { ...value, recoveredId: undefined, retainDraft: true };
+    }
     persistHumanOutbox(required);
   }
-  function clearComposer(key: string) { delete humanComposers.value[key]; persistHumanOutbox(); }
+  function clearComposer(key: string) {
+    if (humanWritesBlocked) return;
+    delete humanComposers.value[key]; persistHumanOutbox();
+  }
+  function suspendForReauthentication() {
+    if (!remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
+    // Arm before app's epoch watch clears private UI and tries to save empty refs.
+    humanWritesBlocked = true;
+    suspendedHumanAccount = accountKeyValue;
+    try { humanOutboxStorage()?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue); }
+    catch { /* A denied cache write must never prevent clearing invalid authentication. */ }
+  }
+  function discardAccountOutbox(account: string) {
+    discardedHumanAccounts.add(account);
+    removeHumanCache(humanOutboxKey(account));
+    clearSupportPending(account, "conversations");
+  }
+  function discardHumanOutbox() {
+    humanWritesBlocked = true;
+    const suspended = suspendedHumanAccount;
+    if (accountKeyValue.startsWith("user:")) discardAccountOutbox(accountKeyValue);
+    if (suspended && suspended !== accountKeyValue) discardAccountOutbox(suspended);
+    removeHumanCache(HUMAN_REAUTH_ACCOUNT);
+    suspendedHumanAccount = null;
+    reset();
+  }
   async function hasPendingHumanSend(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<boolean> {
     await preparePendingRun();
     const intent = key.startsWith("start:")
@@ -157,7 +214,7 @@ export const useConversations = defineStore("conversations", () => {
         if (!current() || accountKeyValue !== `user:${customerId}`) return;
         const account = accountKeyValue;
         const watched = watchedId;
-        humanOutboxStorage()?.removeItem(humanOutboxKey(account));
+        discardAccountOutbox(account);
         bindAccount(account);
         scopeInvalidated.value += 1;
         startRealtime();
@@ -570,11 +627,18 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   function bindAccount(accountKey: string) {
-    if (accountKeyValue !== accountKey && accountKeyValue.startsWith("user:"))
-      humanOutboxStorage()?.removeItem(humanOutboxKey(accountKeyValue));
+    const suspended = suspendedHumanAccount;
+    if (accountKeyValue !== accountKey && accountKeyValue.startsWith("user:") && suspended !== accountKeyValue)
+      discardAccountOutbox(accountKeyValue);
+    if (accountKey.startsWith("user:") && suspended && suspended !== accountKey) {
+      discardAccountOutbox(suspended);
+      removeHumanCache(HUMAN_REAUTH_ACCOUNT);
+      suspendedHumanAccount = null;
+    }
     reset();
     accountKeyValue = accountKey;
-    humanComposers.value = restoreHumanOutbox(accountKey);
+    humanWritesBlocked = false;
+    humanComposers.value = discardedHumanAccounts.has(accountKey) ? {} : restoreHumanOutbox(accountKey);
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
     // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
     // "unverified",首次 refresh() 重走 preparePendingRun 并把失败落 error 态;
@@ -582,5 +646,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,advisor,advisorLoading,advisorError,humanComposers,composer,saveComposer,clearComposer,hasPendingHumanSend,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
+  return { conversations, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,advisor,advisorLoading,advisorError,humanComposers,composer,saveComposer,clearComposer,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };
 });

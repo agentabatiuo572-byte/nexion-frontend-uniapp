@@ -38,6 +38,7 @@ function harness(request = vi.fn(), route = "pages/earn/earn") {
   const auth = { isAuthenticated: true, accountId: "user:7101", signOut: vi.fn(() => { auth.isAuthenticated = false; auth.accountId = "default"; }) };
   const app = { accountKey: "user:7101", bindAccount: vi.fn((key: string) => { app.accountKey = key; appEpoch.bind(key); }), interruptAllTasks: vi.fn() };
   const stop = vi.fn();
+  const suspendForReauthentication = vi.fn();
   const nav = vi.fn();
   const toast = { warn: vi.fn() };
   let onUnauthorized: () => void = () => {};
@@ -47,6 +48,7 @@ function harness(request = vi.fn(), route = "pages/earn/earn") {
   const deps = {
     authApi, sessionVault: vault, useAuth: () => auth, useApp: () => app,
     useSession: () => ({ signOutSession: vi.fn() }),
+    useConversations: () => ({ suspendForReauthentication }),
     rebindAccountScopedStores: (key: string) => storesEpoch.bind(key),
     stopBusinessLoops: stop, navReset: nav, completeSignIn: complete,
     hasServerAuthenticatedAccountTrace: () => auth.isAuthenticated && auth.accountId.startsWith("user:"),
@@ -67,7 +69,7 @@ function harness(request = vi.fn(), route = "pages/earn/earn") {
     return { restore: beginServerSessionRestore, guard: checkAuthGuard, cleanup: clearInvalidRemoteSessionState,
       state: () => serverSessionRestoreState };
   `)(deps) as { restore(): Promise<boolean>; guard(): boolean; cleanup(auth: unknown): void; state(): string };
-  return { ...compiled, vault, appEpoch, storesEpoch, auth, app, api, request, stop, nav, toast, complete };
+  return { ...compiled, vault, appEpoch, storesEpoch, auth, app, api, request, stop, nav, toast, complete, suspendForReauthentication };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -92,6 +94,8 @@ describe("App cookie restoration and expired account isolation", () => {
     expect(h.guard()).toBe(false);
     expect(h.auth.isAuthenticated).toBe(false);
     expect(h.vault.read()).toBeNull();
+    expect(h.suspendForReauthentication).toHaveBeenCalled();
+    expect(h.suspendForReauthentication.mock.invocationCallOrder[0]).toBeLessThan(h.auth.signOut.mock.invocationCallOrder[0]);
     expect(h.complete).not.toHaveBeenCalled();
     expect(h.nav).not.toHaveBeenCalled();
   });
