@@ -6,7 +6,6 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 // #ifdef APP-PLUS
 import NativeSvg from "./components/native-svg.vue";
-import { syncNativeTheme } from "./lib/native-theme";
 import { useTheme } from "./store/theme";
 // #endif
 // #ifdef H5
@@ -54,8 +53,11 @@ export function createApp() {
   // #ifdef APP-PLUS
   app.component("NxNativeSvg", NativeSvg);
   app.mixin({
+    onShow() {
+      useTheme(pinia).refreshSystemTheme();
+    },
     onReady() {
-      syncNativeTheme(useTheme(pinia).resolved);
+      useTheme(pinia).refreshSystemTheme();
     },
   });
   // #endif

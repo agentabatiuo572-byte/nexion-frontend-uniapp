@@ -36,4 +36,12 @@ describe("native theme view bridge", () => {
     expect(() => syncNativeTheme("dark")).not.toThrow();
     expect(alive).toHaveBeenCalledOnce();
   });
+
+  it.each(["missing", "throws"])("keeps WebView CSS synchronization when status bar API %s", failure => {
+    const alive = vi.fn();
+    vi.stubGlobal("plus", { navigator: failure === "missing" ? {} : { setStatusBarStyle: () => { throw new Error("unsupported"); } } });
+    vi.stubGlobal("getCurrentPages", () => [{ $getAppWebview: () => ({ evalJS: alive }) }]);
+    expect(() => syncNativeTheme("light")).not.toThrow();
+    expect(alive).toHaveBeenCalledWith('document.documentElement.setAttribute("data-theme", "light")');
+  });
 });

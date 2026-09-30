@@ -9,8 +9,11 @@ type AppPage = { $getAppWebview?: () => { evalJS: (script: string) => void } };
 export function syncNativeTheme(theme: ResolvedTheme): void {
   // #ifdef APP-PLUS
   // 5+ style names describe the icon color, not the selected page theme.
-  if (typeof plus !== "undefined") {
-    plus.navigator.setStatusBarStyle(theme === "dark" ? "light" : "dark");
+  try {
+    if (typeof plus !== "undefined")
+      plus.navigator?.setStatusBarStyle?.(theme === "dark" ? "light" : "dark");
+  } catch {
+    // Status-bar support must not prevent page CSS synchronization.
   }
   if (typeof getCurrentPages !== "function") return;
   const script = `document.documentElement.setAttribute("data-theme", "${theme}")`;
