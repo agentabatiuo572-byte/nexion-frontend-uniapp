@@ -103,7 +103,6 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
 import { formatBankDateTime } from "@/lib/bank-date";
-import { isAmbiguousOutcome } from "@/api/errors";
 import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "@/lib/bank-withdrawal-state";
 import { navBack, navTo } from "@/lib/route";
 
@@ -217,14 +216,8 @@ function manageBank() { if (!busy.value && !quote.value && !uncertain.value && !
 async function getQuote() {
   if (!canContinue.value || amountProblem.value || uncertain.value || quote.value) return;
   await run(async current => {
-    uncertain.value = true;
-    try {
-      const value = await api.quote(amount.value.trim().replace(",", "."));
-      if (current()) { quote.value = value; accepted.value = false; uncertain.value = false; }
-    } catch (error) {
-      if (current() && !isAmbiguousOutcome(error)) uncertain.value = false;
-      throw error;
-    }
+    const value = await api.quote(amount.value.trim().replace(",", "."));
+    if (current()) { quote.value = value; accepted.value = false; }
   });
 }
 async function submit() {
