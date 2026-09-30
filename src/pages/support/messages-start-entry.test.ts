@@ -37,7 +37,7 @@ const mounted: Vue.App<Element>[] = [];
 afterEach(() => { mounted.splice(0).forEach(app => app.unmount()); });
 const flatten = (node: Element): Element[] => [node, ...node.children.flatMap(flatten)];
 
-function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" | "failed" | "loading" = "empty", locale = zh) {
+function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" | "failed" | "loading" = "empty", locale = zh, providedStore?: ReturnType<typeof useConversations>) {
   const rows = Vue.reactive(state === "ended" || state === "active" ? [{ id: "CV-1", type, status: state === "ended" ? "closed" : "open", agentName: "Unassigned", messages: [], lastMessage: "Hello", lastTs: Date.now(), unread: 0, sessionStatus: state, roleKey: "roleAdvisor", avatarTint: "blue" }] : []);
   const store = Vue.reactive({
     categoryAvailabilityStatus: state === "loading" ? "loading" : state === "failed" ? "failed" : "ready",
@@ -59,7 +59,7 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
     "@/i18n/use-t": { useT: () => currentLocale }, "@/i18n/format": { fmt: (value: string) => value },
     "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: false },
-    "@/lib/route": { navTo }, "@/store/conversations": { useConversations: () => store },
+    "@/lib/route": { navTo }, "@/store/conversations": { useConversations: () => providedStore ?? store },
     "@/store/nova": { useNova: () => ({ messages: [], unread: 0 }) }, "@/store/app": { useApp: () => account },
     "@/api/runtime": { remoteApiEnabled: true }, "@/lib/active-page-refresh": { registerActivePageRefresh: vi.fn() },
     "@/components/app-chassis.vue": { default: { setup: (_props: unknown, { slots }: any) => () => Vue.h("main", slots.default?.()) } },
@@ -75,6 +75,51 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
 }
 
 describe("human conversation contact entry", () => {
+  it.each([
+    ["support", "ended", "click"], ["support", "ended", "Enter"], ["support", "ended", " "],
+    ["advisor", "empty", "click"], ["advisor", "empty", "Enter"], ["advisor", "empty", " "],
+  ] as const)("recovers an advisor-only failure in %s/%s using %s without starting or sending", async (type, state, activation) => {
+    setActivePinia(createPinia());
+    const store = useConversations();
+    chatTransport.advisor.mockReset().mockResolvedValue({ assignmentId: null, currentAdvisorId: null,
+      currentAdvisorName: null, assignmentState: "UNBOUND", availability: "UNBOUND" });
+    store.categoryAvailabilityStatus = "ready";
+    store.categoryAvailability[type] = true;
+    if (state === "ended") store.conversations.push({ id: "CV-existing", type, status: "closed", version: 1,
+      agentName: "Former advisor", messages: [], lastMessage: "Existing history", lastTs: 2, unread: 0,
+      sessionStatus: "closed", roleKey: "roleSupport", avatarTint: "blue", historyTruncated: false, historyNextCursor: null });
+    chatTransport.advisor.mockRejectedValueOnce(new Error("RESOURCE_NOT_FOUND"));
+    await store.refreshAdvisor();
+    expect(store.advisorError).toBe(true);
+    expect(store.error).toBeNull();
+    expect(store.realtimeFallback).toBe(false);
+    chatTransport.advisor.mockClear();
+    chatTransport.startConversation.mockClear(); chatTransport.replyConversation.mockClear();
+    const current = mount(type, state, en, store);
+    const warning = () => flatten(current.root).find(node => node.props.role === "alert"
+      && node.props.class === "nx-conv-refresh-warning");
+    expect(warning()).toBeDefined();
+    expect(flatten(warning()!).some(node => node.text === en.conversations.image.advisorUnavailable)).toBe(true);
+    const retry = flatten(warning()!).find(node => node.props.role === "button")!;
+    expect(retry.props.tabindex).toBe("0");
+    expect(retry.props["aria-label"]).toBe(en.conversations.retry);
+    if (activation === "click") retry.props.onClick();
+    else {
+      const handlers = Array.isArray(retry.props.onKeydown) ? retry.props.onKeydown : [retry.props.onKeydown];
+      handlers.forEach((handler: (event: { key: string; preventDefault: () => void }) => void) =>
+        handler({ key: activation, preventDefault: vi.fn() }));
+    }
+    await Vue.nextTick();
+    expect(chatTransport.advisor).toHaveBeenCalledTimes(1);
+    expect(store.advisorError).toBe(false);
+    expect(store.advisor?.assignmentState).toBe("UNBOUND");
+    expect(warning()).toBeUndefined();
+    expect(store.conversations).toHaveLength(state === "ended" ? 1 : 0);
+    expect(chatTransport.startConversation).not.toHaveBeenCalled();
+    expect(chatTransport.replyConversation).not.toHaveBeenCalled();
+    expect(current.navTo).not.toHaveBeenCalled();
+  });
+
   it("keeps the server idle-close preview newer than loaded history and follows the selected language", async () => {
     const current = mount("support", "ended", vietnamese);
     const row = current.rows[0] as any;
