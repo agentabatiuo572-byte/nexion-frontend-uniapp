@@ -6,7 +6,8 @@
   $el-safe).
 -->
 <template>
-  <view v-if="configAvailable && hasSellablePlan" class="relative overflow-hidden" :style="cardStyle">
+  <view v-if="configAvailable && hasSellablePlan" class="relative overflow-hidden nx-compound-calculator" :style="cardStyle">
+    <CalculatorWebviewAccessibility :amount-label="w.amountLabel" />
     <!-- aurora + grid -->
     <view aria-hidden class="gen-anim" :style="auroraStyle" />
     <view aria-hidden :style="gridStyle" />
@@ -83,6 +84,7 @@
 
 <script setup lang="ts">
 import { formatStakingPercentage } from "@/lib/staking-percentage";
+import CalculatorWebviewAccessibility from "./calculator-webview-accessibility.vue";
 import { ref, computed, onMounted, nextTick, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
