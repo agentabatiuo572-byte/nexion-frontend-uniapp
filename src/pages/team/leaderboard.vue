@@ -60,8 +60,8 @@
         <!-- My rank — transparent stat row on the page floor (was a second
              glowing hero stacked right under the prize hero). -->
         <view :style="myRankStyle">
-          <view class="flex items-center justify-between">
-            <view>
+          <view class="flex items-center justify-between" style="flex-wrap: wrap; gap: 12px">
+            <view style="flex: 1 1 200px; min-width: 0">
               <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-brand-2)')">{{ t.leaderboard.myRank.label }}</text>
               <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
                 <text class="font-display tabular-nums" :style="myRankBigStyle">#{{ myRankDisplay }}</text>
@@ -377,7 +377,11 @@ const myRankStyle: CSSProperties = { padding: "4px 2px 0" };
 const myRankBigStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const climbCtaStyle: CSSProperties = {
   gap: "6px",
-  height: "36px",
+  minHeight: "44px",
+  flexShrink: 0,
+  marginLeft: "auto",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
   padding: "0 14px",
   borderRadius: "999px",
   background: "var(--v5-brand)",

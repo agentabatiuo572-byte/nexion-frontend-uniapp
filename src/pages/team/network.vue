@@ -46,6 +46,50 @@
              it would strand the wash on the page floor → conservative keep,
              neutral token border. -->
         <view class="relative overflow-hidden rounded-2xl" :style="orbCardStyle">
+          <!-- APP-vue creates template SVG as HTML unknown elements. Keep this
+               interactive graph in supported view/text nodes with the same 360
+               coordinate system; do not broaden the small-icon SVG adapter. -->
+          <!-- #ifdef APP-PLUS -->
+          <view class="nx-net-native" style="position: relative; width: 100%; height: 0; padding-top: 100%">
+            <view class="nx-net-native-orbit" :style="nativeOrbitStyle(DIRECT_RADIUS, false)" />
+            <view class="nx-net-native-orbit" :style="nativeOrbitStyle(132, true)" />
+            <view :style="{ ...nativePosition(CENTER, CENTER), width: '28%', height: '28%', borderRadius: '50%', background: 'radial-gradient(circle, var(--v5-brand-soft), transparent)', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }" />
+            <view v-for="p in directPlotted" :key="`conn-${p.m.id}`" class="nx-net-native-connection" :style="nativeConnectionStyle(p)" />
+            <view
+              v-for="p in plotted"
+              :key="p.m.id"
+              class="nx-net-node cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-label="nodeLabel(p)"
+              :style="nativeNodeStyle(p.x, p.y)"
+              @click="selected = p.m"
+              @keydown.enter.prevent="selected = p.m"
+              @keydown.space.prevent="selected = p.m"
+            >
+              <view v-if="pulseId === p.m.id" class="nx-net-native-pulse" :style="{ borderColor: p.kind === 'direct' ? DIRECT_COLOR : EXTENDED_COLOR }" />
+              <view :style="{ width: p.kind === 'direct' ? '10px' : '7px', height: p.kind === 'direct' ? '10px' : '7px', borderRadius: '50%', background: p.m.status === 'offline' ? 'var(--v5-ink-4)' : (p.kind === 'direct' ? DIRECT_COLOR : EXTENDED_COLOR), opacity: p.m.status === 'offline' ? 0.6 : 0.95 }" />
+            </view>
+            <view
+              class="nx-net-node cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-label="selfNodeLabel"
+              :style="nativeNodeStyle(CENTER, CENTER, 44)"
+              @click="openSelf"
+              @keydown.enter.prevent="openSelf"
+              @keydown.space.prevent="openSelf"
+            >
+              <view style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--v5-brand)">
+                <text style="font-family: var(--font-v5); font-weight: 600; font-size: 12px; color: var(--v5-on-brand)">{{ t.network.diagramYou }}</text>
+              </view>
+            </view>
+            <text :style="nativeLabelStyle(158, 'var(--v5-brand)', 9)">{{ myRankText }}</text>
+            <text :style="nativeLabelStyle(118, 'var(--v5-brand)', 7)">{{ t.network.badgeDirect }}</text>
+            <text :style="nativeLabelStyle(8, 'var(--v5-nex)', 7)">{{ t.network.badgeExtended }}</text>
+          </view>
+          <!-- #endif -->
+          <!-- #ifndef APP-PLUS -->
           <svg viewBox="0 0 360 360" class="block w-full" preserveAspectRatio="xMidYMid meet" style="width: 100%">
             <defs>
               <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
@@ -127,6 +171,7 @@
             <SvgText x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-brand) 85%, transparent)" letter-spacing="1.5">{{ t.network.badgeDirect }}</SvgText>
             <SvgText x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="color-mix(in srgb, var(--v5-nex) 85%, transparent)" letter-spacing="1.5">{{ t.network.badgeExtended }}</SvgText>
           </svg>
+          <!-- #endif -->
 
           <!-- Legend -->
           <view class="flex items-center justify-center" :style="legendWrapStyle">
@@ -285,6 +330,26 @@ const plotted = computed<Plotted[]>(() => {
 });
 const directPlotted = computed(() => plotted.value.filter((p) => p.kind === "direct"));
 
+// #ifdef APP-PLUS
+function nativePosition(x: number, y: number): CSSProperties {
+  return { position: "absolute", left: `${x / VIEW * 100}%`, top: `${y / VIEW * 100}%` };
+}
+function nativeNodeStyle(x: number, y: number, size = 32): CSSProperties {
+  return { ...nativePosition(x, y), width: `${size}px`, height: `${size}px`, display: "flex", alignItems: "center", justifyContent: "center", transform: "translate(-50%, -50%)" };
+}
+function nativeOrbitStyle(radius: number, extended: boolean): CSSProperties {
+  const diameter = `${radius * 2 / VIEW * 100}%`;
+  return { ...nativePosition(CENTER, CENTER), width: diameter, height: diameter, borderRadius: "50%", border: `1px ${extended ? "dashed" : "solid"} ${extended ? EXTENDED_COLOR : DIRECT_COLOR}`, opacity: 0.18, transform: "translate(-50%, -50%)", pointerEvents: "none" };
+}
+function nativeConnectionStyle(p: Plotted): CSSProperties {
+  const dx = p.x - CENTER, dy = p.y - CENTER;
+  return { ...nativePosition(CENTER, CENTER), width: `${Math.hypot(dx, dy) / VIEW * 100}%`, height: "1px", background: p.m.status === "active" ? DIRECT_COLOR : "var(--v5-ink-4)", opacity: p.m.status === "active" ? 0.3 : 0.06, transform: `rotate(${Math.atan2(dy, dx)}rad)`, transformOrigin: "0 50%", pointerEvents: "none" };
+}
+function nativeLabelStyle(y: number, color: string, size: number): CSSProperties {
+  return { ...nativePosition(CENTER, y), transform: "translate(-50%, -100%)", color, fontSize: `${size}px`, fontFamily: "var(--font-jet-mono)", letterSpacing: "1.5px", whiteSpace: "nowrap", pointerEvents: "none" };
+}
+// #endif
+
 const directCount = computed(() => members.value.filter((m) => m.layer === 1).length);
 const activeCount = computed(() => members.value.filter((m) => m.status === "active").length);
 const idleCount = computed(() => members.value.filter((m) => m.status === "idle").length);
@@ -383,6 +448,21 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () 
 </script>
 
 <style scoped>
+/* #ifdef APP-PLUS */
+.nx-net-native-pulse {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 1px solid;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: nx-net-native-pulse 1s;
+}
+@keyframes nx-net-native-pulse {
+  0%, 100% { transform: scale(0.4); opacity: 0.6; }
+  50% { transform: scale(1.8); opacity: 0; }
+}
+/* #endif */
 .nx-net-sheet-wrap {
   position: fixed;
   inset: 0;
