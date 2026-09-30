@@ -24,6 +24,8 @@ export class ConversationRealtime {
   constructor(private readonly options:Options){}
   start(){if(!this.stopped)return;this.stopped=false;this.terminal=false;this.attempts=0;this.lifecycle++;this.fallback=createAbortController();this.connect();this.poll(this.lifecycle);}
   stop(){this.stopped=true;this.lifecycle++;this.disconnect(false);this.fallback.abort();clearTimeout(this.pollTimer);this.options.presence?.(null);}
+  /** An accepted token rotation replaces the old grant without replaying pending commands. */
+  renewCredentials(){if(this.stopped)return;this.stop();this.start();}
   watch(no:string|null){this.watched=no;if(this.authenticated)this.send({type:'watch',conversationNo:no});}
   typing(active:boolean){
     if(!this.ready||!this.watched)return;

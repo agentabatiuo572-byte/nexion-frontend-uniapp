@@ -11,6 +11,7 @@ export interface RuntimeApiClientOptions {
   /** Only the local loopback H5 preview may proxy its same-origin HTTP gateway. */
   localPreview?: boolean;
   onUnauthorized?: () => void | Promise<void>;
+  onSessionRefreshed?: () => void;
   refreshCredentialMode?: RefreshCredentialMode;
 }
 
@@ -37,6 +38,7 @@ export function createRuntimeApiClient(options: RuntimeApiClientOptions): ApiCli
     // preview gateway, which proxies to the isolated acceptance backend.
     allowInsecureHttp: options.development || (options.localPreview === true && isLoopbackHttpUrl(options.config.baseUrl)),
     onUnauthorized: options.onUnauthorized,
+    onSessionRefreshed: options.onSessionRefreshed,
     refreshCredentialMode: options.refreshCredentialMode,
   });
 }
