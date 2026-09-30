@@ -106,7 +106,7 @@ function parseTicketPage(value: unknown): CursorPage<Ticket> {
   const databaseIds = v.records.map(item => integer(row(item)?.id, 1));
   if (databaseIds.some(id => id === null) || new Set(databaseIds).size !== databaseIds.length) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
   const items = v.records.map(parseTicketHeader); if (new Set(items.map(i => i.id)).size !== items.length) invalid("SUPPORT_TICKET_RESPONSE_INVALID");
-  return { items, total, nextCursor: items.length === pageSize ? databaseIds.at(-1)! : null };
+  return { items, total, nextCursor: items.length === pageSize ? databaseIds[databaseIds.length-1]! : null };
 }
 
 function parseConversationHeader(value: unknown): Conversation {
@@ -140,7 +140,7 @@ function parseConversationPage(value: unknown): CursorPage<Conversation> {
   const databaseIds = v.records.map(item => integer(row(item)?.id, 1));
   if (databaseIds.some(id => id === null) || new Set(databaseIds).size !== databaseIds.length) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
   const items = v.records.map(parseConversationHeader); if (new Set(items.map(i => i.id)).size !== items.length) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { items, total, nextCursor: items.length === pageSize ? databaseIds.at(-1)! : null };
+  return { items, total, nextCursor: items.length === pageSize ? databaseIds[databaseIds.length-1]! : null };
 }
 function parseConversationCategories(value: unknown): ConversationCategoryAvailability {
   if (!Array.isArray(value) || value.length !== 3) invalid("SUPPORT_CATEGORY_RESPONSE_INVALID");

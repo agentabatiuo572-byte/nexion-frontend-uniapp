@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import ts from "typescript";
 import * as Vue from "vue";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
@@ -11,6 +11,11 @@ import { localizedIdleClose } from "@/lib/support-idle-message";
 import { installSupportStorage } from "@/test/storage-setup";
 
 installSupportStorage();
+beforeEach(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", { getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, String(value)); }, removeItem: (key: string) => { values.delete(key); } });
+});
 
 const source = readFileSync(new URL("./messages.vue", import.meta.url), "utf8");
 const { descriptor } = parse(source);
@@ -197,6 +202,9 @@ import * as chatSecure from "@/lib/secure-command-id";
 import * as chatFormat from "@/i18n/format";
 import * as chatApiErrors from "@/api/errors";
 import { isSupportAttachmentNotReady } from "@/api/support-api";
+import { useAuth } from "@/store/auth";
+import { createSessionVault } from "@/api/session-vault";
+import { binarySessionReady } from "@/lib/binary-session-ready";
 
 const chatTransport = vi.hoisted(() => ({
   authorityRevision: vi.fn(async () => "canonical-v1"), commandResult: vi.fn(async () => null),
@@ -226,10 +234,17 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
   chatTransport.replyConversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.startConversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.convertConversationToTicket.mockReset().mockResolvedValue({ conversation: humanSnapshot(), ticket: { id: "TK-fixture" } });
-  chatTransport.conversationCategories.mockResolvedValue({ advisor: true, support: true, ai: false });
-  const store = useConversations(); store.bindAccount("account-a");
+  chatTransport.conversationCategories.mockReset().mockResolvedValue({ advisor: true, support: true, ai: false });
+  const store = useConversations(); store.bindAccount("user:1");
   const watchRealtime = vi.spyOn(store, "watchRealtime");
-  const app = Vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
+  const app = Vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
+  const auth = useAuth(), sessionVault = createSessionVault();
+  function bindSession(key: string) {
+    auth.$patch({ isAuthenticated: true, accountId: key });
+    sessionVault.save({ accessToken: "test-access", refreshToken: "test-refresh", tokenType: "Bearer",
+      user: { userId: Number(key.slice(5)), countryCode: "+86", phone: "13800000001", nickname: "Test", onboardingComplete: true } });
+  }
+  bindSession(app.accountKey);
   const hooks: Record<string, (...args: any[]) => any> = {};
   const navigation = { navTo: vi.fn(), navBack: vi.fn(), navReplace: vi.fn(async () => true) };
   const toast = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
@@ -242,8 +257,9 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
     "@/lib/route": navigation, "@/lib/send-limiter": chatLimiter,
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 }, "@/lib/hashpower": { isDeviceOnline: () => false },
     "@/store/conversations": { useConversations: () => store }, "@/store/nova": { useNova }, "@/store/app": { useApp: () => app },
+    "@/store/auth": { useAuth: () => auth }, "@/lib/binary-session-ready": { binarySessionReady },
     "@/store/ui": { toast, confirm: vi.fn(), useUI: () => ({ clearConfirmsBy: vi.fn() }) },
-    "@/mock/nova-templates": {}, "@/api/runtime": { novaAiApi: {}, remoteApiEnabled: true },
+    "@/mock/nova-templates": {}, "@/api/runtime": { novaAiApi: {}, remoteApiEnabled: true, sessionVault },
     "@/api/errors": chatApiErrors,
     "@/api/support-api": { isSupportAttachmentNotReady },
     "@/lib/nova-failure": chatFailure, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
@@ -254,19 +270,26 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
     if (name.endsWith(".vue")) return {}; if (!(name in modules)) throw new Error(`Unexpected chat dependency: ${name}`); return modules[name];
   }, {}));
   hooks.onLoad(query); chatCleanups.push(() => { page.cleanup(); scope.stop(); });
-  function rebind(key = app.accountKey) { store.bindAccount(key); app.accountKey = key; app.accountBindingEpoch += 1; }
-  return { page, hooks, store, app, navigation, rebind, watchRealtime, toast };
+  function rebind(key = app.accountKey) { bindSession(key); store.bindAccount(key); app.accountKey = key; app.accountBindingEpoch += 1; }
+  const waitForHistory = () => vi.waitFor(() => expect(watchRealtime).toHaveBeenLastCalledWith(query.cid));
+  async function show() {
+    await hooks.onShow(); await Vue.nextTick();
+    // onShow now schedules the real post-flush watcher; observe its result.
+    if (query.cid) await waitForHistory();
+    else if (query.start) await vi.waitFor(() => expect(store.categoryAvailabilityStatus).toBe("ready"));
+  }
+  return { page, hooks, show, waitForHistory, store, app, navigation, rebind, watchRealtime, toast };
 }
 
 describe("real chat and store account recovery", () => {
   it("redirects an old AI link before opening a category or sending a request", async () => {
     const current = mountRealHumanChat({ type: "ai" });
     expect(current.navigation.navReplace).toHaveBeenCalledExactlyOnceWith("/pages/support/messages");
-    await current.hooks.onShow();
+    await current.show();
     expect(chatTransport.conversationCategories).not.toHaveBeenCalled();
   });
   it("navigates once when the ticket conversion is clicked twice before completion", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow(); const gate = chatDeferred();
+    const current = mountRealHumanChat(); await current.show(); const gate = chatDeferred();
     chatTransport.convertConversationToTicket.mockReturnValueOnce(gate.promise);
     const first = current.page.onConvertToTicket();
     await vi.waitFor(() => expect(chatTransport.convertConversationToTicket).toHaveBeenCalledTimes(1));
@@ -279,17 +302,19 @@ describe("real chat and store account recovery", () => {
     const current = mountRealHumanChat({ start: "support" });
     let resolve!: (value: any) => void, reject!: (error: Error) => void;
     chatTransport.conversationCategories.mockReturnValueOnce(new Promise((done, fail) => { resolve = done; reject = fail; }));
-    const showing = current.hooks.onShow(); current.hooks.onHide();
+    const showing = current.hooks.onShow();
+    await vi.waitFor(() => expect(chatTransport.conversationCategories).toHaveBeenCalledTimes(1));
+    current.hooks.onHide();
     if (outcome === "failed") reject(new Error("unavailable"));
     else resolve({ advisor: true, support: false, ai: false });
     await showing;
     expect(current.navigation.navBack).not.toHaveBeenCalled(); expect(current.toast.info).not.toHaveBeenCalled();
-    await current.hooks.onShow();
+    await current.show();
     expect(chatTransport.conversationCategories).toHaveBeenCalledTimes(2);
     expect(current.navigation.navBack).not.toHaveBeenCalled();
   });
   it.each(["reply failure", "convert failure", "convert success"])("does not let an old %s interrupt the new account history read", async operation => {
-    const current = mountRealHumanChat(); await current.hooks.onShow();
+    const current = mountRealHumanChat(); await current.show();
     let resolve!: (value: any) => void, reject!: (error: Error) => void;
     const old = new Promise((done, fail) => { resolve = done; reject = fail; });
     const transport = operation.startsWith("reply") ? chatTransport.replyConversation : chatTransport.convertConversationToTicket;
@@ -308,7 +333,7 @@ describe("real chat and store account recovery", () => {
     expect(current.navigation.navTo).not.toHaveBeenCalled(); expect(current.toast.error).not.toHaveBeenCalled();
   });
   it("does not refresh the new account inbox after an old create fails", async () => {
-    const current = mountRealHumanChat({ start: "support" }); await current.hooks.onShow();
+    const current = mountRealHumanChat({ start: "support" }); await current.show();
     let reject!: (error: Error) => void;
     chatTransport.startConversation.mockReturnValueOnce(new Promise((_done, fail) => { reject = fail; }));
     const pending = current.page.onSend("Old new conversation", vi.fn());
@@ -323,23 +348,29 @@ describe("real chat and store account recovery", () => {
     const current = mountRealHumanChat({ start: "support" }), old = chatDeferred();
     chatTransport.conversationCategories.mockReturnValueOnce(old.promise);
     const showing = current.hooks.onShow();
-    current.rebind(scenario === "same account" ? "account-a" : "account-b"); await Vue.nextTick();
-    if (scenario !== "same account") { current.rebind("account-a"); await Vue.nextTick(); }
+    await vi.waitFor(() => expect(chatTransport.conversationCategories).toHaveBeenCalledTimes(1));
+    current.rebind(scenario === "same account" ? "user:1" : "user:2"); await Vue.nextTick();
+    if (scenario !== "same account") { current.rebind("user:1"); await Vue.nextTick(); }
     const restore = vi.fn(); await current.page.onSend("New request", restore);
     old.resolve({ advisor: true, support: true, ai: false }); await showing;
     expect(chatTransport.startConversation).toHaveBeenCalledTimes(1); expect(restore).not.toHaveBeenCalled();
     expect(current.navigation.navBack).not.toHaveBeenCalled();
   });
   it("retries a failed new-entry category read after rebinding without consuming the send limiter", async () => {
-    const current = mountRealHumanChat({ start: "support" }); await current.hooks.onShow();
-    current.rebind(); await Vue.nextTick(); chatTransport.conversationCategories.mockRejectedValueOnce(new Error("503"));
+    const current = mountRealHumanChat({ start: "support" }); await current.show();
+    chatTransport.conversationCategories.mockRejectedValue(new Error("503"));
+    current.rebind(); await Vue.nextTick();
+    await vi.waitFor(() => expect(current.store.categoryAvailabilityStatus).toBe("failed"));
     const restore = vi.fn(); await current.page.onSend("New request", restore);
     expect(restore).toHaveBeenCalledTimes(1); expect(chatTransport.startConversation).not.toHaveBeenCalled();
+    chatTransport.conversationCategories.mockResolvedValue({ advisor: true, support: true, ai: false });
     await current.page.onSend("New request", restore); expect(chatTransport.startConversation).toHaveBeenCalledTimes(1);
   });
   it("keeps a rebound new-entry draft when PC confirms that category disabled", async () => {
-    const current = mountRealHumanChat({ start: "support" }); await current.hooks.onShow(); current.rebind(); await Vue.nextTick();
-    chatTransport.conversationCategories.mockResolvedValueOnce({ advisor: true, support: false, ai: false });
+    const current = mountRealHumanChat({ start: "support" }); await current.show();
+    chatTransport.conversationCategories.mockResolvedValue({ advisor: true, support: false, ai: false });
+    current.rebind(); await Vue.nextTick();
+    await vi.waitFor(() => expect(current.store.categoryEnabled("support")).toBe(false));
     const restore = vi.fn(); await current.page.onSend("New request", restore);
     expect(restore).toHaveBeenCalledTimes(1); expect(chatTransport.startConversation).not.toHaveBeenCalled();
   });
@@ -348,21 +379,23 @@ describe("real chat and store account recovery", () => {
     const showing = current.hooks.onShow(); await vi.waitFor(() => expect(chatTransport.conversation).toHaveBeenCalledTimes(1));
     const restore = vi.fn(); await current.page.onSend("Hello", restore);
     expect(restore).toHaveBeenCalledTimes(1); expect(chatTransport.replyConversation).not.toHaveBeenCalled();
-    gate.resolve(humanSnapshot()); await showing; await current.page.onSend("Hello", restore);
+    gate.resolve(humanSnapshot()); await showing; await current.waitForHistory(); await current.page.onSend("Hello", restore);
     expect(chatTransport.conversation).toHaveBeenCalledTimes(1); expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
     expect(current.navigation.navBack).not.toHaveBeenCalled();
   });
   it("reloads a visible human conversation and can reply after same-account rebinding", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow(); current.rebind(); await Vue.nextTick();
+    const current = mountRealHumanChat(); await current.show(); current.rebind(); await Vue.nextTick();
     await vi.waitFor(() => expect(current.store.get("CV-cold")).toBeDefined());
+    await current.waitForHistory();
     await current.page.onSend("Hello", vi.fn()); expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
     expect(chatTransport.conversation).toHaveBeenCalledTimes(2); expect(current.navigation.navBack).not.toHaveBeenCalled();
   });
   it("ignores an overtaken account response when A to B to A reopens the same route", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow(); const old = chatDeferred();
-    chatTransport.conversation.mockReturnValueOnce(old.promise); current.rebind("account-b"); await Vue.nextTick();
+    const current = mountRealHumanChat(); await current.show(); const old = chatDeferred();
+    chatTransport.conversation.mockReturnValueOnce(old.promise); current.rebind("user:2"); await Vue.nextTick();
     await vi.waitFor(() => expect(chatTransport.conversation).toHaveBeenCalledTimes(2));
-    current.rebind("account-a"); await Vue.nextTick(); await vi.waitFor(() => expect(current.store.get("CV-cold")).toBeDefined());
+    current.rebind("user:1"); await Vue.nextTick(); await vi.waitFor(() => expect(current.store.get("CV-cold")).toBeDefined());
+    await current.waitForHistory();
     const watchCount = current.watchRealtime.mock.calls.length;
     old.resolve({ ...humanSnapshot(), agentName: "Old account" }); await Vue.nextTick(); await Vue.nextTick();
     expect(current.store.get("CV-cold")?.agentName).toBe("Fixture"); expect(current.navigation.navBack).not.toHaveBeenCalled();
@@ -370,20 +403,21 @@ describe("real chat and store account recovery", () => {
     await current.page.onSend("Hello", vi.fn()); expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
   });
   it("does not reload hidden human pages until they are shown again", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow(); current.hooks.onHide(); current.rebind(); await Vue.nextTick();
-    expect(chatTransport.conversation).toHaveBeenCalledTimes(1); await current.hooks.onShow();
+    const current = mountRealHumanChat(); await current.show(); current.hooks.onHide(); current.rebind(); await Vue.nextTick();
+    expect(chatTransport.conversation).toHaveBeenCalledTimes(1); await current.show();
     expect(chatTransport.conversation).toHaveBeenCalledTimes(2); expect(current.store.get("CV-cold")).toBeDefined();
   });
   it("cannot let the initial old-account read navigate away after a same-account rebind", async () => {
     const current = mountRealHumanChat(), old = chatDeferred(); chatTransport.conversation.mockReturnValueOnce(old.promise);
     const showing = current.hooks.onShow(); await vi.waitFor(() => expect(chatTransport.conversation).toHaveBeenCalledTimes(1));
     current.rebind(); await Vue.nextTick(); await vi.waitFor(() => expect(current.store.get("CV-cold")).toBeDefined());
-    old.resolve(humanSnapshot()); await showing; expect(current.navigation.navBack).not.toHaveBeenCalled();
+    old.resolve(humanSnapshot()); await showing; await current.waitForHistory(); expect(current.navigation.navBack).not.toHaveBeenCalled();
     await current.page.onSend("Hello", vi.fn()); expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
   });
   it("keeps replying after rebinding independent of the new-entry category read", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow(); current.rebind(); await Vue.nextTick();
+    const current = mountRealHumanChat(); await current.show(); current.rebind(); await Vue.nextTick();
     await vi.waitFor(() => expect(current.store.get("CV-cold")).toBeDefined());
+    await current.waitForHistory();
     chatTransport.conversationCategories.mockRejectedValueOnce(new Error("category unavailable"));
     const restore = vi.fn(); await current.page.onSend("Hello", restore);
     expect(restore).not.toHaveBeenCalled(); expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
@@ -391,7 +425,7 @@ describe("real chat and store account recovery", () => {
     expect(current.navigation.navBack).not.toHaveBeenCalled();
   });
   it("does not restore an old reply draft into a newly bound account", async () => {
-    const current = mountRealHumanChat(); await current.hooks.onShow();
+    const current = mountRealHumanChat(); await current.show();
     let reject!: (error: Error) => void;
     chatTransport.replyConversation.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
     const restore = vi.fn(), pending = current.page.onSend("Old reply", restore);

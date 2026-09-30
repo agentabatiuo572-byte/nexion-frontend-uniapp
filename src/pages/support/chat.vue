@@ -89,15 +89,15 @@
       :initial-draft="!isAi ? draftText : undefined"
       :max-input-length="isAi && remoteApiEnabled ? 2000 : undefined"
       :image-labels="!isAi ? t.conversations.image : undefined"
-      :attach-disabled="!isAi && attachmentPolicy?.available !== true"
+      :attach-disabled="!isAi && (!supportSessionReady || attachmentPolicy?.available !== true)"
       :attach-unavailable="!isAi && attachmentPolicy?.available !== true ? (!remoteApiEnabled || attachmentPolicyError || attachmentPolicy?.available === false ? t.conversations.image.unavailable : t.conversations.image.checkingPolicy) : undefined"
       :attach-retry="remoteApiEnabled && attachmentPolicyError"
       :attachment-draft="attachmentDisplay"
       :attachment-preview-src="!isAi ? imageDraft?.filePath : undefined"
       :failed-send-label="failedHumanLabel"
       :can-discard-send="failedHumanSend?.settled"
-      :can-retry-send="failedHumanSend?.retryable !== false && !humanSendBusy"
-      :send-blocked="!!failedHumanSend || humanSendBusy"
+      :can-retry-send="supportSessionReady && failedHumanSend?.retryable !== false && !humanSendBusy"
+      :send-blocked="(!isAi && !supportSessionReady) || !!failedHumanSend || humanSendBusy"
       @send="onSend"
       @draft-change="draftText = $event"
       @attach="chooseSupportImage"
@@ -156,11 +156,14 @@ import { isDeviceOnline } from "@/lib/hashpower";
 import { useConversations, type CategoryRefreshOutcome, type HumanComposer } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { sessionVault } from "@/api/runtime";
+import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 import { toast, confirm, useUI } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
 import type { ConversationType } from "@/domain/support";
 import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
-import { isSettledRejection, asApiError } from "@/api/errors";
+import { ApiError, isSettledRejection, asApiError } from "@/api/errors";
 import { isSupportAttachmentNotReady, type SupportAttachmentPolicy } from "@/api/support-api";
 import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
@@ -182,6 +185,15 @@ const t = useT();
 const convStore = useConversations();
 const nova = useNova();
 const app = useApp();
+const auth = useAuth();
+const supportSessionReady = computed(() => {
+  // The vault is not reactive; a same-account restore still advances binding.
+  void app.accountBindingEpoch;
+  return accountSessionReady({ remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
+    accountId: auth.accountId, appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null });
+});
+const humanShowRevision = ref(0);
+let chatDisposed = false;
 const locale = useLocaleStore();
 type ImageDraft = { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean };
 type FailedHumanSend = { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number };
@@ -207,9 +219,10 @@ watch(() => [app.accountBindingEpoch, convStore.scopeInvalidated], () => {
   try {
     clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
   } finally { humanComposerResetting = false; }
-  if (novaPageVisible && !isAi.value && remoteApiEnabled) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
+  if (novaPageVisible && !isAi.value && remoteApiEnabled && supportSessionReady.value) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
 }, { flush: "sync" });
 async function loadPrivateImages() {
+  if (!supportSessionReady.value) return;
   const epoch = imageEpoch, binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
   for (const message of conv.value?.messages ?? []) {
     const id = message.attachmentId;
@@ -240,13 +253,19 @@ const failedHumanLabel = computed(() => failedHumanSend.value
   : undefined);
 
 async function chooseSupportImage() {
+  if (chatDisposed || !supportSessionReady.value) return;
   if (isAi.value || imageDraft.value || failedHumanSend.value) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
+  const current = () => !chatDisposed && supportSessionReady.value && binding === app.accountBindingEpoch
+    && scope === convStore.scopeInvalidated && key === humanComposerKey.value;
   try {
     const policy = attachmentPolicy.value ?? await supportApi.attachmentPolicy();
+    if (!current()) return;
     attachmentPolicy.value = policy;
     if (!policy.available) { toast.info(t.value.conversations.image.unavailable, ""); return; }
     const selected = await new Promise<UniNamespace.ChooseImageSuccessCallbackResult>((resolve, reject) =>
       uni.chooseImage({ count: 1, sizeType: ["original"], sourceType: ["album", "camera"], success: resolve, fail: reject }));
+    if (!current()) return;
     const path = selected.tempFilePaths[0];
     if (!path) return;
     const selectedFile = Array.isArray(selected.tempFiles) ? selected.tempFiles[0] : selected.tempFiles;
@@ -255,11 +274,13 @@ async function chooseSupportImage() {
     imageDraft.value = { filePath: path, clientUploadId: id, key: `support-upload-${id}`, state: "uploading" };
     await retrySupportUpload();
   } catch (cause) {
+    if (!current()) return;
     const message = typeof cause === "object" && cause !== null && "errMsg" in cause ? String(cause.errMsg) : "";
     if (!/cancel/i.test(message)) toast.error(t.value.conversations.image.uploadFailed, "");
   }
 }
 async function loadAttachmentPolicy() {
+  if (!supportSessionReady.value) return;
   if (!remoteApiEnabled) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
   attachmentPolicyError.value = false;
@@ -271,21 +292,26 @@ async function loadAttachmentPolicy() {
   }
 }
 async function retrySupportUpload() {
+  if (chatDisposed || !supportSessionReady.value) return;
   const draft = imageDraft.value;
   if (!draft || draft.state === "ready" || draft.replaceOnly || !draft.filePath) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
+  const current = () => !chatDisposed && supportSessionReady.value && binding === app.accountBindingEpoch
+    && scope === convStore.scopeInvalidated && key === humanComposerKey.value && imageDraft.value === draft;
   draft.state = "uploading";
   try {
     const result = await supportApi.uploadAttachment(draft.filePath, draft.clientUploadId, draft.key);
-    if (imageDraft.value !== draft) return;
+    if (!current()) return;
     draft.attachmentId = result.id; draft.state = "ready"; draft.error = undefined;
   } catch (cause) {
-    if (imageDraft.value !== draft) return;
+    if (!current()) return;
     draft.state = "failed";
     const error = asApiError(cause);
     draft.error = error.status === 413 ? "tooLarge" : error.status === 415 ? "unsupported" : "uploadFailed";
   }
 }
 async function cancelSupportAttachment() {
+  if (!supportSessionReady.value) return;
   const draft = imageDraft.value;
   if (!draft) return;
   if (draft.attachmentId && !draft.replaceOnly) {
@@ -297,8 +323,12 @@ async function cancelSupportAttachment() {
   if (imageDraft.value === draft) imageDraft.value = null;
 }
 async function replaceSupportAttachment() {
+  if (!supportSessionReady.value) return;
   if (failedHumanSend.value || humanSendBusy.value) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
   await cancelSupportAttachment();
+  if (chatDisposed || !supportSessionReady.value || binding !== app.accountBindingEpoch
+      || scope !== convStore.scopeInvalidated || key !== humanComposerKey.value) return;
   if (!imageDraft.value) await chooseSupportImage();
 }
 function retryPrivateImage(id: string) {
@@ -307,6 +337,7 @@ function retryPrivateImage(id: string) {
   void loadPrivateImages();
 }
 async function retryHumanSend() {
+  if (!supportSessionReady.value) return;
   const failed = failedHumanSend.value;
   if (!failed?.retryable || humanSendBusy.value) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
@@ -452,27 +483,56 @@ function startHumanThreadPolling(openEpoch: number, openId: string) {
   humanRealtime.watchIfCurrent(openEpoch, openId);
 }
 
-let humanOpenRequest: { epoch: number; id: string; binding: number } | null = null;
+let humanOpenRequest: { epoch: number; id: string; binding: number; scope: number } | null = null;
 async function openHumanConversation(epoch: number, id: string) {
-  const request = { epoch, id, binding: app.accountBindingEpoch };
+  if (!supportSessionReady.value) return;
+  const request = { epoch, id, binding: app.accountBindingEpoch, scope: convStore.scopeInvalidated };
   humanOpenRequest = request;
   const current = () => humanOpenRequest === request && request.binding === app.accountBindingEpoch
     && humanRealtime.isCurrent(request.epoch, request.id);
   try {
     await convStore.open(id, current);
     if (current()) startHumanThreadPolling(epoch, id);
-  } catch {
+  } catch (cause) {
+    if (cause instanceof Error && !(cause instanceof ApiError) && cause.message === "SUPPORT_ACCOUNT_SCOPE_CHANGED"
+        && request.scope === convStore.scopeInvalidated) {
+      if (current()) startHumanThreadPolling(epoch, id);
+      return;
+    }
     if (current()) navBack("/pages/support/messages");
   } finally {
     if (humanOpenRequest === request) humanOpenRequest = null;
   }
 }
 
-watch(() => app.accountBindingEpoch, () => {
+watch([() => app.accountBindingEpoch, supportSessionReady, humanShowRevision], () => {
   if (isAi.value) return;
+  if (!supportSessionReady.value) { stopHumanThreadPolling(); return; }
+  if (novaPageVisible) void activateHumanPage();
+}, { flush: "post" });
+
+async function activateHumanPage() {
+  if (!novaPageVisible || isAi.value || !supportSessionReady.value) return;
   stopHumanThreadPolling();
-  if (novaPageVisible && cid.value) void openHumanConversation(humanRealtime.show(), cid.value);
-});
+  const epoch = humanRealtime.show(), binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
+  void convStore.refreshAdvisor(); void loadAttachmentPolicy();
+  restoreCompletedHumanCreate();
+  restoreRecoveredComposer(convStore.composer(humanComposerKey.value), humanComposerKey.value);
+  const id = cid.value, type = startType.value;
+  const current = () => novaPageVisible && supportSessionReady.value && binding === app.accountBindingEpoch
+    && scope === convStore.scopeInvalidated && id === cid.value && type === startType.value;
+  revealTick.value += 1;
+  if (type && !id && remoteApiEnabled) {
+    const gate: NonNullable<typeof categoryGate> = { category: type, promise: convStore.refreshCategories() };
+    categoryGate = gate;
+    const outcome = await gate.promise;
+    if (!current() || categoryGate !== gate || outcome === "stale") return;
+    if (outcome === "failed" || !convStore.categoryEnabled(type)) {
+      toast.info(t.value.conversations.categoryDisabled, ""); navBack("/pages/support/messages"); return;
+    }
+  }
+  if (current() && id) { await openHumanConversation(epoch, id); if (current()) void loadPrivateImages(); }
+}
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
 // space itself. Match the chassis source (real device height, else the H5
@@ -523,15 +583,7 @@ onLoad((q) => {
 onShow(async () => {
   if (hiddenAiRoute.value) return;
   novaPageVisible = true;
-  if (!isAi.value && remoteApiEnabled) {
-    void convStore.refreshAdvisor();
-    void loadAttachmentPolicy();
-  }
-  // Mark the human route visible before any category await. If this page hides,
-  // stop() invalidates the captured epoch, so an older onShow cannot revive it.
-  const humanOpenEpoch = isAi.value ? null : humanRealtime.show();
-  restoreCompletedHumanCreate();
-  restoreRecoveredComposer(convStore.composer(humanComposerKey.value), humanComposerKey.value);
+  if (!isAi.value) { humanShowRevision.value += 1; return; }
   novaHistoryLoading.value = false;
   revealTick.value += 1;
   const requestedCategory = isAi.value ? "ai" : startType.value;
@@ -567,10 +619,6 @@ onShow(async () => {
       await Promise.allSettled([refreshNovaAvailability(), refreshNovaHistory()]);
       void drainNovaQueue();
     }
-  }
-  else if (cid.value && humanOpenEpoch !== null) {
-    await openHumanConversation(humanOpenEpoch, cid.value);
-    void loadPrivateImages();
   }
 });
 onHide(() => {
@@ -681,6 +729,7 @@ const headerRole = computed(() => {
     if (novaProviderHold.value) return t.value.nova.localUnavailable;
     return remoteApiEnabled ? t.value.nova.localRole : t.value.conversations.roleAi;
   }
+  if (!supportSessionReady.value) return t.value.conversations.connecting;
   if (convStore.advisorError) return t.value.conversations.image.advisorUnavailable;
   if (startType.value && convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.waitingAgent;
   if (startType.value && convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;
@@ -736,6 +785,7 @@ const emptyHint = computed(() => {
   if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
   if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
   if (isAi.value) return remoteApiEnabled ? t.value.nova.localEmptyHint : t.value.nova.emptyHint;
+  if (!supportSessionReady.value) return t.value.conversations.connecting;
   if (convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.image.unassignedHint;
   return humanType.value === "advisor" ? t.value.conversations.listEmptyAdvisor : t.value.conversations.listEmptySupport;
 });
@@ -810,6 +860,7 @@ const threadMessages = computed<ThreadMsg[]>(() => {
 });
 
 async function loadEarlierHumanHistory() {
+  if (!supportSessionReady.value) return;
   const activeId = cid.value;
   const scope = activeId ? humanRealtime.capture(activeId) : null;
   if (!scope) return;
@@ -1009,6 +1060,7 @@ function cancelNovaThinking() {
 }
 
 function cleanup() {
+  chatDisposed = true;
   novaPageVisible = false;
   clearPrivateImages();
   categoryGate = null;
@@ -1071,6 +1123,7 @@ async function waitForNovaReply<T>(reply: Promise<T>, abort: () => void, remaini
 }
 
 async function onSend(text: string, restore?: () => void) {
+  if (!isAi.value && !supportSessionReady.value) { restore?.(); return; }
   if (isAi.value && remoteApiEnabled) {
     const accountKey = app.accountKey;
     const conversationBoundary = nova.conversationBoundary;
@@ -1155,6 +1208,7 @@ async function onSend(text: string, restore?: () => void) {
 }
 
 async function sendHumanMessage(text: string, attachmentId?: string, restore?: () => void, attempts = 1) {
+  if (!supportSessionReady.value) { restore?.(); return; }
   const supportScope = convStore.scopeInvalidated;
   const id = cid.value;
   if (!id) {
@@ -1331,6 +1385,7 @@ function onQueueSave(turnId: string, text: string) {
 
 let humanConvertRequest: { binding: number; id: string } | null = null;
 async function onConvertToTicket() {
+  if (!supportSessionReady.value) return;
   const current = conv.value;
   if (!current) return;
   const binding = app.accountBindingEpoch;
