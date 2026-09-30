@@ -172,9 +172,9 @@ it.each(["reply", "opening"] as const)("fences both held success and failure aft
     const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
     const recovery = { begin: vi.fn(() => ({})), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() };
     const send = new Function("convStore", "app", "cid", "startType", "humanCreateRecovery", "remoteApiEnabled", "imageDraft", "humanComposerKey", "draftText", "failedHumanSend",
-      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection",
+      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection", "supportSessionReady",
       code + "\nreturn sendHumanMessage;")(store, { accountBindingEpoch: 1 }, ref(mode === "reply" ? "CV-1" : ""), ref("support"), recovery, true,
-      image, ref(key), draft, failed, ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection);
+      image, ref(key), draft, failed, ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection, ref(true));
     const pending = send("old scope intent");
     store.discardHumanOutbox(); store.bindAccount("user:1"); store.scopeInvalidated++;
     draft.value = "new scope draft"; failed.value = null;
@@ -205,10 +205,10 @@ it.each(["reply", "opening"] as const)("keeps the next draft visible while a rea
     const functions = ["sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name => ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === name)!.getText(ast)).join("\n");
     const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
     const send = new Function("convStore", "app", "cid", "startType", "humanCreateRecovery", "remoteApiEnabled", "imageDraft", "humanComposerKey", "draftText", "failedHumanSend",
-      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection",
+      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection", "supportSessionReady",
       code + "\nreturn sendHumanMessage;")(store, { accountBindingEpoch: 1 }, ref(mode === "reply" ? "CV-1" : ""), ref("support"),
       { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() }, true, image, key, draft, failed,
-      ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection);
+      ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection, ref(true));
     try {
       const work = send("original"); await nextTick();
       expect(failed.value).toBeNull();
@@ -272,8 +272,8 @@ it.each([false, true])("retires held retry admission after same-account transfer
   const store = { scopeInvalidated: 0, hasPendingHumanSend: vi.fn(() => held) };
   const failed = ref<any>({ text: "old intent", retryable: true, settled: false, attempts: 1 });
   const busy = ref(false), send = vi.fn();
-  const retry = new Function("convStore", "app", "humanComposerKey", "failedHumanSend", "humanSendBusy", "sendHumanMessage",
-    code + "\nreturn retryHumanSend;")(store, { accountBindingEpoch: 1 }, ref("start:support"), failed, busy, send);
+  const retry = new Function("convStore", "app", "humanComposerKey", "failedHumanSend", "humanSendBusy", "sendHumanMessage", "supportSessionReady",
+    code + "\nreturn retryHumanSend;")(store, { accountBindingEpoch: 1 }, ref("start:support"), failed, busy, send, ref(true));
   const work = retry(); store.scopeInvalidated++; failed.value = null;
   release(pendingResult); await work;
   expect(failed.value).toBeNull(); expect(send).not.toHaveBeenCalled(); expect(busy.value).toBe(false);
@@ -288,11 +288,42 @@ it("retires an opening send waiting for category admission after support transfe
   const held = new Promise<string>(resolve => { release = resolve; });
   const store = { scopeInvalidated: 0, categoryAvailabilityStatus: "loading", refreshCategories: () => held, categoryEnabled: () => true };
   const send = vi.fn(), busy = ref(false);
-  const onSend = new Function("isAi", "remoteApiEnabled", "humanSendBusy", "humanOpenRequest", "cid", "startType", "app", "convStore", "novaPageVisible", "acquireSendSlot", "imageDraft", "sendHumanMessage",
-    code + "\nreturn onSend;")(ref(false), true, busy, null, ref(""), ref("support"), { accountBindingEpoch: 1 }, store, true, () => true, ref(null), send);
+  const onSend = new Function("isAi", "remoteApiEnabled", "humanSendBusy", "humanOpenRequest", "cid", "startType", "app", "convStore", "novaPageVisible", "acquireSendSlot", "imageDraft", "sendHumanMessage", "supportSessionReady",
+    code + "\nreturn onSend;")(ref(false), true, busy, null, ref(""), ref("support"), { accountBindingEpoch: 1 }, store, true, () => true, ref(null), send, ref(true));
   const work = onSend("old opening intent"); store.scopeInvalidated++;
   release("applied"); await work;
   expect(send).not.toHaveBeenCalled(); expect(busy.value).toBe(false);
+});
+
+it("preserves the original draft/key before auth readiness and admits only one opening send afterward", async () => {
+  const store = useConversations(); store.bindAccount("user:1"); store.categoryAvailabilityStatus = "ready";
+  vi.spyOn(store, "categoryEnabled").mockReturnValue(true);
+  const original = { text: "original", kind: "unknown" as const, settled: false, retryable: true, attempts: 1 };
+  store.saveComposer("start:support", { text: "next draft", imageDraft: null, failedSend: original }, true);
+  const before = sessionStorage.getItem("support-human-outbox:user:1"), writes = vi.spyOn(store, "saveComposer"); writes.mockClear();
+  const pending = vi.spyOn(store, "hasPendingHumanSend"), busy = ref(false), failed = ref<any>(original), ready = ref(false);
+  let release!: (id: string) => void;
+  const start = vi.spyOn(store, "startConversation").mockImplementation(() => new Promise(resolve => { release = resolve; }));
+  const script = chatSource.split('<script setup lang="ts">')[1].split("</script>")[0];
+  const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
+  const code = ts.transpileModule(["onSend", "retryHumanSend", "sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name =>
+    ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)!.getText(ast)).join("\n"),
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const deps = { convStore: store, app: { accountBindingEpoch: 1 }, isAi: ref(false), remoteApiEnabled: true,
+    cid: ref(""), startType: ref("support"), humanOpenRequest: null, novaPageVisible: true, supportSessionReady: ready,
+    humanSendBusy: busy, failedHumanSend: failed, draftText: ref("next draft"), imageDraft: ref(null), humanComposerKey: ref("start:support"),
+    acquireSendSlot: () => true, humanCreateRecovery: { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() },
+    restoreCompletedHumanCreate: vi.fn(), toast: { info: vi.fn(), error: vi.fn() }, t: ref({}), isSupportAttachmentNotReady, isSettledRejection };
+  const ops = new Function("deps", `const {${Object.keys(deps).join(",")}} = deps; ${code}\nreturn { onSend, retryHumanSend, sendHumanMessage };`)(deps);
+  await ops.onSend("early"); await ops.sendHumanMessage("early"); await ops.retryHumanSend();
+  expect(writes).not.toHaveBeenCalled(); expect(pending).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled();
+  expect(failed.value).toMatchObject(original); expect(busy.value).toBe(false);
+  expect(sessionStorage.getItem("support-human-outbox:user:1")).toBe(before);
+  ready.value = true; failed.value = null;
+  const first = ops.onSend("fresh"), second = ops.onSend("fresh");
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+  release("CV-new"); await Promise.all([first, second]);
+  expect(busy.value).toBe(false); expect(store.composer("start:support").text).toBe("next draft");
 });
 
 it("allows new uncertain sends after voluntary logout to recover on later expiry", async () => {

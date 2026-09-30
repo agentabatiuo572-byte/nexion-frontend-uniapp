@@ -17,6 +17,9 @@ import { ApiError } from "@/api/errors";
 import * as apiErrors from "@/api/errors";
 import * as realtimePage from "./conversation-realtime-page";
 import { createSupportApi } from "@/api/support-api";
+import { useAuth } from "@/store/auth";
+import { createSessionVault } from "@/api/session-vault";
+import { binarySessionReady } from "@/lib/binary-session-ready";
 
 // Execute the actual SFC script with transport/lifecycle boundaries substituted.
 // This tests the page worker, not a second implementation of its algorithm.
@@ -38,7 +41,15 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
   roleKey?: string;
 }, enabled = ["ai", "advisor", "support"], realtime: { ready?: boolean; online?: boolean; typing?: boolean; remote?: boolean } = {}) {
   const hooks: Record<string, (...args: any[]) => any> = {};
-  const app = vue.reactive({ accountKey: "account-a", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
+  const app = vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1, visibleDevices: [], earnings: { today: 0 } });
+  const auth = useAuth(), sessionVault = createSessionVault();
+  function rebind(key: string) {
+    auth.$patch({ isAuthenticated: true, accountId: key });
+    sessionVault.save({ accessToken: "test-access", refreshToken: "test-refresh", tokenType: "Bearer",
+      user: { userId: Number(key.slice(5)), countryCode: "+86", phone: "13800000001", nickname: "Test", onboardingComplete: true } });
+    app.accountKey = key;
+  }
+  rebind(app.accountKey);
   const currentLocale = vue.ref(zh);
   const api = { status: vi.fn(async () => ({ available: true })),
     history: vi.fn(async () => ({ conversationId: null, messages: [] })), chat: vi.fn() };
@@ -81,11 +92,13 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
       startConversation,
     }) },
     "@/store/nova": { useNova },
+    "@/store/auth": { useAuth: () => auth },
+    "@/lib/binary-session-ready": { binarySessionReady },
     "@/store/app": { useApp: () => app },
     "@/store/ui": { toast: { warn: vi.fn(), info: vi.fn(), error: vi.fn() }, confirm: async () => true,
       useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/mock/nova-templates": {},
-    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: realtime.remote ?? true,
+    "@/api/runtime": { novaAiApi: api, remoteApiEnabled: realtime.remote ?? true, sessionVault,
       supportApi: { attachmentPolicy: vi.fn(async () => ({ available: false })) } },
     "@/api/errors": apiErrors,
     "@/api/support-api": { isSupportAttachmentNotReady: () => false },
@@ -103,7 +116,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
     }, {},
   );
   hooks.onLoad(query);
-  return { page, hooks, app, api, startConversation, openConversation,watchRealtime, nova: useNova(), currentLocale, navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
+  return { page, hooks, app, rebind, api, startConversation, openConversation,watchRealtime, nova: useNova(), currentLocale, navigation: modules["@/lib/route"] as { navTo: ReturnType<typeof vi.fn>; navBack: ReturnType<typeof vi.fn> } };
 }
 
 beforeEach(() => { setActivePinia(createPinia()); vi.useFakeTimers(); });
@@ -152,7 +165,7 @@ describe("human conversation restart", () => {
     if(responseBeforeShow){pending.resolve('same-conversation');await sending;await current.hooks.onShow();}
     else {await current.hooks.onShow();pending.resolve('same-conversation');await sending;}
     expect(current.startConversation).toHaveBeenCalledTimes(1);
-    expect(current.watchRealtime).toHaveBeenCalledWith('same-conversation');current.page.cleanup();
+    await vi.waitFor(() => expect(current.watchRealtime).toHaveBeenCalledWith('same-conversation'));current.page.cleanup();
   });
   it("preserves a second draft while the first conversation is being created", async () => {
     const current = mount({ start: "advisor" });
@@ -192,7 +205,7 @@ describe("human conversation restart", () => {
     await current.hooks.onShow();
     const sending = current.page.onSend("Hello");
     if (boundary === "leave") current.hooks.onHide();
-    else if (boundary === "switch-account") current.app.accountKey = "account-b";
+    else if (boundary === "switch-account") current.rebind("user:2");
     else current.app.accountBindingEpoch += 1;
     pending.resolve("old-account-conversation");
     await sending;
@@ -392,7 +405,7 @@ describe("real Nova page queue worker", () => {
   });
 
   it("limits actual dispatch while keeping input, and does not inherit another account's quota", async () => {
-    const { page, hooks, api, nova, app } = mount();
+    const { page, hooks, api, nova, rebind } = mount();
     await hooks.onShow(); api.chat.mockResolvedValue({ reply: "answer" });
     for (let n = 0; n < 5; n++) {
       await page.onSend(`question-${n}`);
@@ -401,7 +414,7 @@ describe("real Nova page queue worker", () => {
     await page.onSend("sixth");
     expect(api.chat).toHaveBeenCalledTimes(5);
     expect(nova.pendingRemote[0].delivery).toBe("queued");
-    app.accountKey = "account-b";
+    rebind("user:2");
     await vi.advanceTimersByTimeAsync(0);
     await page.onSend("first-b");
     expect(api.chat).toHaveBeenCalledTimes(6);
@@ -596,10 +609,10 @@ describe("real Nova page queue worker", () => {
   });
 
   it("discards old responses and pending text across account and new-conversation boundaries", async () => {
-    const { page, hooks, api, nova, app } = mount();
+    const { page, hooks, api, nova, rebind } = mount();
     await hooks.onShow(); const old = deferred(); api.chat.mockReturnValue(old.promise);
     await page.onSend("account-a-question");
-    app.accountKey = "account-b";
+    rebind("user:2");
     await vi.advanceTimersByTimeAsync(0);
     old.resolve({ reply: "account-a-reply" });
     await vi.advanceTimersByTimeAsync(2000);

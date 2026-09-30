@@ -3,6 +3,7 @@ import { ApiError } from './errors';
 import type { ConversationRealtime, RealtimeSocket } from './conversation-realtime';
 let current:ConversationRealtime|null=null;
 export function setAppConversationRealtime(value:ConversationRealtime|null){current=value;}
+export function renewAppConversationRealtime(){current?.renewCredentials();}
 export function withConversationRealtime(client:ApiClient):ApiClient {
   return { ...client, async request<T>(input:Parameters<ApiClient['request']>[0]):Promise<T>{
     const match=input.method==='POST' && /^\/api\/app\/support\/conversations(?:\/([^/?]+)\/(replies|read))?$/.exec(input.path);
