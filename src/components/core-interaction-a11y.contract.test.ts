@@ -51,7 +51,7 @@ describe("core interaction accessibility contracts", () => {
     }
     expect(source).toContain(':aria-label="sendLabel"');
     expect(source).toContain('sendLabel: string;');
-    expect(clickableTag(source, '@click="onSend"')).toContain(':aria-disabled="!draft.trim()"');
+    expect(clickableTag(source, '@click="onSend"')).toContain(':aria-disabled="!canSend"');
     for (const click of [
       '@click="saveQueueEdit(m)"',
       "@click=\"runQueueAction(m, 'cancel-edit')\"",

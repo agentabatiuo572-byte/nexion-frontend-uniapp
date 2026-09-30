@@ -10,6 +10,12 @@ export interface ThreadMsg {
   tone: "agent" | "user" | "system";
   /** Pre-formatted text (supports **bold** + \n line breaks). */
   text: string;
+  imageSrc?: string;
+  imageLabel?: string;
+  imageLoading?: boolean;
+  imageError?: boolean;
+  imageAttachmentId?: string;
+  meta?: string;
   /** Pre-localised delivery receipt shown under the bubble (user messages only). */
   receipt?: string;
   ctaLabel?: string;

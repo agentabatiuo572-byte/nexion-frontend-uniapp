@@ -3319,6 +3319,15 @@ export const en = {
   },
   conversations: {
     send: "Send",
+    image: {
+      view: "View image", message: "Image", loading: "Loading image…", failed: "Image unavailable. Select to retry.", attach: "Add image",
+      retryUpload: "Retry upload", replace: "Choose another", cancel: "Remove attachment", retrySend: "Retry sending", editSend: "Edit message", discard: "Discard draft", retryPolicy: "Retry", checkingPolicy: "Checking image availability…", close: "Close image",
+      uploading: "Uploading image. The message has not been sent.", ready: "Image uploaded. Send the message to share it with your advisor.", uploadFailed: "Image upload failed. Please retry.",
+      unavailable: "Images are unavailable. You can send a text message.", tooLarge: "This image is too large. Choose another.", unsupported: "Choose a PNG or JPEG image.",
+      cancelFailed: "Could not remove the attachment. Please retry.", sendFailed: "Message was not sent. Retry or discard the draft.", sendUnknown: "Delivery is unconfirmed. Retry the same message.", expired: "This image expired before sending. Choose another image or edit the message.", attempts: "Attempts",
+      unassigned: "Advisor not assigned", unassignedHint: "No advisor is assigned yet. You can leave a message for your dedicated advisor to continue after assignment.", unassignedReceived: "Your message was received. Your dedicated advisor will continue after assignment.", you: "You",
+      loadingAdvisor: "Loading your advisor", advisorUnavailable: "Could not confirm your advisor. Retry to refresh.", disabledAdvisor: "Your advisor is temporarily unavailable. Your message will be kept.", busyAdvisor: "Your advisor is busy. You can leave a message.",
+    },
     categoryDisabled: "This support channel is currently disabled by operations. Please choose another channel.",
     historyTruncated: "Only the most recent 100 messages are shown. Earlier messages remain on the server.",
     loadEarlier: "Load earlier messages",

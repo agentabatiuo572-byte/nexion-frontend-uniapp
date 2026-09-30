@@ -160,6 +160,7 @@ import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
 import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
 import { useAuth } from "@/store/auth";
+import { useConversations } from "@/store/conversations";
 import { useApp } from "@/store/app";
 // ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
 import { useStaking } from "@/store/staking";
@@ -777,6 +778,7 @@ async function handleDeleteAccount() {
         try {
           const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+          useConversations().discardHumanOutbox();
           releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
           toast.success(t.value.security.deleteAccountToast, request.requestNo);
           deletionCommandKey.value = "";
@@ -799,6 +801,7 @@ async function handleDeleteAccount() {
       }
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       if (!remoteApiEnabled) app.interruptAllTasks("logged-out");
+      if (!remoteApiEnabled) useConversations().discardHumanOutbox();
       session.signOutSession();
       auth.signOut();
       // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。

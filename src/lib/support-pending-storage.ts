@@ -54,3 +54,24 @@ export function restoreSupportPending(accountKey: string, runId: string, kind: "
 export function persistSupportPending(accountKey: string, runId: string, kind: "tickets" | "conversations", values: Map<string, string>): void {
   write(storageKey(accountKey, runId, kind), JSON.stringify(Object.fromEntries(values)));
 }
+
+/** Retire only this account's commands when it voluntarily leaves this carrier. */
+export function clearSupportPending(accountKey: string, kind: "tickets" | "conversations"): void {
+  const matches = (key: string) => key.startsWith(`${PREFIX}:${accountKey}:`) && key.endsWith(`:${kind}`);
+  if (typeof plus !== "undefined") {
+    try {
+      for (const key of uni.getStorageInfoSync().keys) if (matches(key)) {
+        try { uni.removeStorageSync(key); }
+        catch { try { uni.setStorageSync(key, "{}"); } catch { /* Storage denied; authentication must still close. */ } }
+      }
+    } catch { /* Storage enumeration must not prevent clearing private memory. */ }
+  }
+  // Also retire a legacy App WebView copy so it cannot be migrated back later.
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+    for (const key of keys) if (key && matches(key)) {
+      try { localStorage.removeItem(key); }
+      catch { try { localStorage.setItem(key, "{}"); } catch { /* Storage denied. */ } }
+    }
+  } catch { /* App service has no WebView localStorage. */ }
+}

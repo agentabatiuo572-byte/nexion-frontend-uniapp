@@ -144,7 +144,7 @@ test("canonical support uses the development authority and late lifecycle work c
   assert.match(api, /authorityRevision: async \(\) => "canonical-v1"/);
   assert.doesNotMatch(api, /support\/acceptance|sourceEnvironment !== "SANDBOX"/);
   assert.match(api, /supportPath\(`\/commands\//);
-  assert.match(chat, /const humanOpenEpoch = isAi\.value \? null : humanRealtime\.show\(\);/);
+  assert.match(chat, /async function activateHumanPage\(\) \{\s*if \(!novaPageVisible \|\| isAi\.value \|\| !supportSessionReady\.value\) return;\s*stopHumanThreadPolling\(\);\s*const epoch = humanRealtime\.show\(\)/);
   assert.match(chat, /humanOpenRequest === request && request\.binding === app\.accountBindingEpoch/);
   assert.match(chat, /humanRealtime\.isCurrent\(request\.epoch, request\.id\)/);
   assert.match(chat, /if \(current\(\)\) startHumanThreadPolling\(epoch, id\);/);
@@ -159,10 +159,12 @@ test("unknown 409, network, protocol, and 5xx support commands read back a stabl
     read("src/store/conversations.ts"),
   ]);
   for (const source of [tickets, conversations]) {
-    assert.match(source, /\(error\.status \?\? 0\) >= 500/);
     assert.match(source, /supportApi\.commandResult\(key\)/);
     assert.match(source, /scope\.pending\.delete\(fingerprint\)/);
   }
+  assert.match(tickets, /\(error\.status \?\? 0\) >= 500/);
+  assert.match(conversations, /error\.status === 409/);
+  assert.match(conversations, /!isSupportAttachmentNotReady\(cause\)/);
 });
 
 test("ticket list projects the authoritative message count and opens its detail before rendering a timeline", async () => {
@@ -190,7 +192,7 @@ test("an empty human conversation lane gives the user an authoritative start pat
   assert.match(messages, /navTo\("\/pages\/support\/chat\?start="/);
   assert.match(chat, /q\?\.start/);
   assert.match(chat, /convStore\.startConversation\(/);
-  assert.match(conversations, /async function startConversation\(type: Exclude<ConversationType, "ai">, openingText: string\)/);
+  assert.match(conversations, /async function startConversation\(type: Exclude<ConversationType, "ai">, openingText: string, attachmentId\?: string\)/);
 });
 
 test("ticket list and detail render refreshed server metadata through the active locale", async () => {
@@ -264,7 +266,9 @@ test("unknown support commands persist opaque account-scoped slots and reconcile
   assert.match(pendingStorage, /uni\.getStorageSync/);
   assert.match(pendingStorage, /uni\.setStorageSync/);
   assert.match(pendingStorage, /stored !== value/);
-  assert.doesNotMatch(pendingStorage, /removeItem/);
+  const retirementStart = pendingStorage.indexOf("export function clearSupportPending");
+  assert.ok(retirementStart >= 0, "explicit account retirement must remain separately bounded");
+  assert.doesNotMatch(pendingStorage.slice(0, retirementStart), /removeItem|removeStorageSync|clearSupportPending/);
   assert.match(scope, /useTickets\(\)\.bindAccount\(accountKey\)/);
   assert.match(scope, /useConversations\(\)\.bindAccount\(accountKey\)/);
 });

@@ -3224,6 +3224,15 @@ export const zh: Messages = {
   },
   conversations: {
     send: "发送",
+    image: {
+      view: "查看图片", message: "图片", loading: "正在加载图片…", failed: "图片暂时无法查看，点击重试", attach: "添加图片",
+      retryUpload: "重试上传", replace: "重新选图", cancel: "取消附件", retrySend: "重试发送", editSend: "编辑消息", discard: "放弃草稿", retryPolicy: "重试", checkingPolicy: "正在检查图片功能…", close: "关闭图片",
+      uploading: "正在上传图片，尚未发送消息", ready: "图片已上传，点击发送后才会发给顾问", uploadFailed: "图片上传失败，请重试",
+      unavailable: "图片暂不可用，请先发送文字", tooLarge: "图片超过允许大小，请重选", unsupported: "当前图片格式不支持，请选 PNG 或 JPEG",
+      cancelFailed: "取消附件失败，请重试", sendFailed: "消息未发送，可重试或放弃草稿", sendUnknown: "发送结果尚未确认，请用原消息重试", expired: "图片已过期，重新选图或编辑消息后再发送", attempts: "尝试次数",
+      unassigned: "尚未分配顾问", unassignedHint: "暂未分配顾问，可以先留言。留言已收到后，将由专属顾问接续。", unassignedReceived: "留言已收到，等待分配后由专属顾问接续", you: "我",
+      loadingAdvisor: "正在读取专属顾问", advisorUnavailable: "暂无法确认当前顾问，请重试刷新", disabledAdvisor: "当前顾问暂不可服务，留言会保留", busyAdvisor: "当前顾问忙碌，可留言等待回复",
+    },
     categoryDisabled: "该客服入口当前已由运营停用，请选择其他服务渠道。",
     historyTruncated: "这里只显示最近 100 条消息，更早的消息仍保存在服务器。",
     loadEarlier: "加载更早的消息",
