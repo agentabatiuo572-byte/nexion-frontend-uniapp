@@ -434,9 +434,18 @@ async function handleRegen() {
   if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
   if (remoteApiEnabled) {
     try {
-      const chosen = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) => {
-        uni.chooseImage({ count: 1, sizeType: ["compressed"], sourceType: ["album", "camera"], success: resolve, fail: reject });
+      const chosen = await new Promise<UniApp.ChooseImageSuccessCallbackResult | null>((resolve, reject) => {
+        uni.chooseImage({ count: 1, sizeType: ["compressed"], sourceType: ["album", "camera"], success: resolve, fail: (cause) => {
+          let cancelled = /^(?:chooseImage:fail\s+)?cancel(?:led|ed)?$/i.test(cause instanceof Error ? cause.message : cause.errMsg);
+          // #ifdef APP-PLUS
+          // Uni's native source actionSheet reports cancellation without a message.
+          cancelled = cancelled || cause.errMsg === "chooseImage:fail" && (cause as { code?: unknown }).code === 0
+            && Object.getOwnPropertyNames(cause).every(key => key === "errMsg" || key === "code");
+          // #endif
+          if (cancelled) resolve(null); else reject(cause);
+        } });
       });
+      if (!chosen) return;
       const filePath = chosen.tempFilePaths[0];
       if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
       if (!filePath) return;
@@ -460,7 +469,6 @@ async function handleRegen() {
       }
     } catch (cause) {
       if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
-      if (cause instanceof Error && /cancel/i.test(cause.message)) return;
       toast.error(t.value.profile.serverMutationFailed);
     } finally {
       if (isCurrentProfileRequest(pageScope, scope, accountKey)) avatarUploading.value = false;
