@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
+// @ts-expect-error The isolated legacy-JS realm is used only by the Node test runner.
+import { createContext, runInContext } from "node:vm";
+import { compileScript, parse } from "@vue/compiler-sfc";
+import * as Vue from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import ts from "typescript";
 import { fmt } from "@/i18n/format";
@@ -8,6 +12,99 @@ import { zh } from "@/i18n/messages/zh";
 import { useUI } from "@/store/ui";
 
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
+
+function legacyNativePage() {
+  const context = createContext({ module: { exports: {} } });
+  runInContext(`
+    delete Array.prototype.at;
+    this.goalsStore = {
+      accountEpoch: 1, status: "ready", goals: [], lifetimeEarningsUsdt: 0,
+      recommendationStatus: "ready", recommendation: null,
+      saves: [], recommendations: [], failNextSave: false,
+      async setGoal(intent) {
+        this.saves.push({ ...intent });
+        if (this.failNextSave) {
+          this.failNextSave = false;
+          throw new Error("GOAL_SAVE_FAILED");
+        }
+        this.goals.push({ id: "saved-goal", targetUSDT: intent.targetUSDT,
+          deadlineMs: intent.deadlineMs, createdAt: Date.now(), achieved: false });
+        return "saved";
+      },
+      async refreshRecommendation(target, deadline) {
+        this.recommendations.push({ target, deadline });
+      },
+    };
+    this.ui = { toasts: [], pushToast(toast) { this.toasts.push(toast); } };
+    this.exports = this.module.exports;
+  `, context);
+  context.require = (id: string) => {
+    if (id === "vue") return { ...Vue, onMounted: () => {} };
+    if (id === "@dcloudio/uni-app") return { onShow: () => {} };
+    if (id === "@/store/goals") return { useGoals: () => context.goalsStore };
+    if (id === "@/store/ui") return { useUI: () => context.ui };
+    if (id === "@/store/app") return { useApp: () => ({ accountKey: "user:3778", accountBindingEpoch: 1 }) };
+    if (id === "@/i18n/use-t") return { useT: () => ({ value: { goals: zh.goals } }) };
+    if (id === "@/i18n/format") return { fmt };
+    if (id === "@/api/runtime") return { remoteApiEnabled: true };
+    if (id === "@/lib/brand-copy") return { nexGridBrandText: (value: string) => value };
+    if (id === "@/lib/route") return { navReset: () => {} };
+    if (id.endsWith(".vue")) return { __esModule: true, default: {} };
+    throw new Error(`Unexpected goals script import: ${id}`);
+  };
+  const { descriptor } = parse(source, { filename: "goals.vue" });
+  const script = compileScript(descriptor, { id: "goals-native-save" });
+  const implementation = ts.transpileModule(script.content, {
+    compilerOptions: { target: ts.ScriptTarget.ES2018, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+  }).outputText;
+  runInContext(implementation, context);
+  const scope = Vue.effectScope();
+  const page = scope.run(() => context.module.exports.default.setup({}, { expose() {} }));
+  return { context, page, scope };
+}
+
+describe("native goal save without Array.at", () => {
+  it("confirms one saved goal, restores its term and shows success in the actual page script", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      expect(runInContext("typeof [].at", context)).toBe("undefined");
+      expect(context.goalsStore.goals.at).toBeUndefined();
+      page.selectTarget(500);
+      page.selectDays(30);
+      context.goalsStore.recommendations.length = 0;
+      await page.onSave();
+      expect(context.goalsStore.saves).toHaveLength(1);
+      expect(context.goalsStore.goals).toHaveLength(1);
+      expect(context.ui.toasts).toEqual([{ kind: "success", title: "目标已保存 · 30 天达成 $500" }]);
+      expect(page.restoredGoal.value).toEqual({ targetUSDT: 500, days: 30 });
+      expect(page.savePending.value).toBe(false);
+      expect(page.saveBlocked.value).toBe(true);
+      expect(context.goalsStore.recommendations).toEqual([{
+        target: 500, deadline: context.goalsStore.goals[0].deadlineMs,
+      }]);
+      await page.onSave();
+      expect(context.goalsStore.saves).toHaveLength(1);
+    } finally { scope.stop(); }
+  });
+
+  it("preserves a failed save intent for retry and then confirms success without duplicating the goal", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      page.selectTarget(500);
+      page.selectDays(30);
+      context.goalsStore.failNextSave = true;
+      await page.onSave();
+      expect(context.goalsStore.goals).toHaveLength(0);
+      expect(context.ui.toasts).toEqual([{ kind: "warn", title: "GOAL_SAVE_FAILED" }]);
+      expect(page.savePending.value).toBe(false);
+      await page.onSave();
+      expect(context.goalsStore.saves).toHaveLength(2);
+      expect(context.goalsStore.saves[1]).toEqual(context.goalsStore.saves[0]);
+      expect(context.goalsStore.goals).toHaveLength(1);
+      expect(context.ui.toasts[1]).toEqual({ kind: "success", title: "目标已保存 · 30 天达成 $500" });
+    } finally { scope.stop(); }
+  });
+});
 
 describe("earning-goal save account fence", () => {
   it("keeps the submitted retry payload and fences success handling by account epoch", () => {

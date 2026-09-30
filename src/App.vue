@@ -1240,6 +1240,9 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
+  // #ifdef APP-PLUS
+  useTheme().refreshSystemTheme();
+  // #endif
   attachSessionWatch();
   if (remoteApiEnabled) {
     useApp().setRemoteTaskForeground(true);
