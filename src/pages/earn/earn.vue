@@ -253,6 +253,8 @@ const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetO
 
 // ── HERO total earned ──
 const serverPeriod = computed(() => {
+  // Keep a confirmed snapshot during loading, but hide figures after a failed read.
+  if (remoteApiEnabled && app.homeTruthStatus !== "ready" && app.homeTruthStatus !== "loading") return null;
   const e = app.homeTruth?.earnings;
   if (!e) return null;
   return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;
