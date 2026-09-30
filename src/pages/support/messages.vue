@@ -58,6 +58,13 @@
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
+          <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.advisorError" class="nx-conv-refresh-warning" role="alert">
+            <text class="nx-conv-refresh-warning__text">{{ t.conversations.image.advisorUnavailable }}</text>
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" :aria-label="t.conversations.retry"
+              @click="convStore.refreshAdvisor()" @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()">
+              <text>{{ t.conversations.retry }}</text>
+            </view>
+          </view>
           <!-- A new turn opens a composer first. The authenticated user's text is the
                first durable timeline entry; this surface never invents an opening. -->
           <view
