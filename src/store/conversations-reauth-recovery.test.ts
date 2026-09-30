@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import ts from "typescript";
-import { effectScope, nextTick, reactive, ref, watch } from "vue";
+import { computed, effectScope, nextTick, reactive, ref, watch, type Ref } from "vue";
 import { ApiError } from "@/api/errors";
 import { isSettledRejection } from "@/api/errors";
 import { isSupportAttachmentNotReady } from "@/api/support-api";
@@ -48,6 +48,16 @@ async function uncertainReply() {
   store.saveComposer("conversation:CV-1", { text: "next draft", imageDraft: null,
     failedSend: { text: "original", kind: "unknown", settled: false, retryable: true, attempts: 1 } }, true);
   return { store, key: runtime.supportApi.replyConversation.mock.calls[0][2] };
+}
+
+function installComposerWatches(store: ReturnType<typeof useConversations>, key: Ref<string>, draft: Ref<string>, failed: Ref<any>, image: Ref<any>, busy: Ref<boolean>) {
+  const start = chatSource.indexOf("watch(humanComposerKey");
+  const code = ts.transpileModule("let humanComposerResetting = false;\n" + chatSource.slice(start, chatSource.indexOf("const humanRealtime =", start)),
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const scope = effectScope();
+  scope.run(() => new Function("watch", "convStore", "humanComposerKey", "draftText", "failedHumanSend", "imageDraft", "humanSendBusy", "restoreRecoveredComposer",
+    code)(watch, store, key, draft, failed, image, busy, vi.fn()));
+  return scope;
 }
 
 it.each(["h5", "app"])("keeps same-account intent/key/draft through expiry and reload (%s)", async platform => {
@@ -177,6 +187,79 @@ it.each(["reply", "opening"] as const)("fences both held success and failure aft
     expect(store.composer(key)).toMatchObject({ text: "new scope draft", failedSend: null });
     expect(recovery.complete).not.toHaveBeenCalled();
   }
+});
+
+it.each(["reply", "opening"] as const)("keeps the next draft visible while a real send is held (%s)", async mode => {
+  for (const outcome of ["success", "failure"] as const) {
+    setActivePinia(createPinia()); const store = useConversations(); store.bindAccount("user:1");
+    let resolve!: (value: any) => void, reject!: (cause: unknown) => void;
+    const held = new Promise((done, fail) => { resolve = done; reject = fail; });
+    vi.spyOn(store, "sendUser").mockReturnValue(held as Promise<boolean>);
+    vi.spyOn(store, "startConversation").mockReturnValue(held as Promise<string>);
+    vi.spyOn(store, "categoryEnabled").mockReturnValue(true);
+    const key = ref(mode === "reply" ? "conversation:CV-1" : "start:support");
+    const draft = ref(""), failed = ref<any>(null), image = ref(null), busy = ref(true);
+    const scope = installComposerWatches(store, key, draft, failed, image, busy);
+    const script = chatSource.slice(chatSource.indexOf('<script setup lang="ts">') + '<script setup lang="ts">'.length, chatSource.indexOf("</script>"));
+    const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
+    const functions = ["sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name => ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === name)!.getText(ast)).join("\n");
+    const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+    const send = new Function("convStore", "app", "cid", "startType", "humanCreateRecovery", "remoteApiEnabled", "imageDraft", "humanComposerKey", "draftText", "failedHumanSend",
+      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection",
+      code + "\nreturn sendHumanMessage;")(store, { accountBindingEpoch: 1 }, ref(mode === "reply" ? "CV-1" : ""), ref("support"),
+      { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() }, true, image, key, draft, failed,
+      ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection);
+    try {
+      const work = send("original"); await nextTick();
+      expect(failed.value).toBeNull();
+      draft.value = "next draft"; await nextTick(); draft.value = "next draft continued"; await nextTick();
+      expect(failed.value).toBeNull();
+      expect(store.composer(key.value)).toMatchObject({ text: "next draft continued", failedSend: { text: "original", kind: "unknown" } });
+      expect(sessionStorage.getItem("support-human-outbox:user:1")).toContain("next draft continued");
+      if (outcome === "success") resolve(mode === "reply" ? true : "CV-new");
+      else reject(new ApiError({ kind: "network", message: "lost response" }));
+      await work; busy.value = false; await nextTick();
+      expect(draft.value).toBe("next draft continued");
+      if (outcome === "success") expect(failed.value).toBeNull();
+      else expect(failed.value).toMatchObject({ text: "original", kind: "unknown" });
+    } finally { scope.stop(); }
+  }
+});
+
+it("recovers a saved unknown send when its old busy request finishes without another store write", async () => {
+  const { store } = await uncertainReply();
+  const draft = ref(""), failed = ref<any>(null), image = ref(null), busy = ref(true), key = ref("conversation:CV-1");
+  const scope = installComposerWatches(store, key, draft, failed, image, busy);
+  try {
+    store.saveComposer(key.value, { ...store.composer(key.value) }); await nextTick();
+    expect(failed.value).toBeNull(); expect(draft.value).toBe("next draft");
+    busy.value = false; await nextTick();
+    expect(failed.value).toMatchObject({ text: "original", kind: "unknown" });
+    store.saveComposer(key.value, { ...store.composer(key.value), failedSend: null }); await nextTick();
+    expect(failed.value).toBeNull(); expect(draft.value).toBe("next draft");
+  } finally { scope.stop(); }
+});
+
+it("the actual opening recovery key switch keeps the next draft without promoting a failed send", async () => {
+  const store = useConversations(); store.bindAccount("user:1");
+  const cid = ref(""), startType = ref<string | null>("support");
+  const key = computed(() => cid.value ? `conversation:${cid.value}` : `start:${startType.value}`);
+  const draft = ref("next draft"), failed = ref<any>(null), image = ref(null), busy = ref(true);
+  const scope = installComposerWatches(store, key, draft, failed, image, busy);
+  try {
+    store.saveComposer(key.value, { text: draft.value, imageDraft: null, failedSend: { text: "original", settled: false, retryable: true, attempts: 1, kind: "unknown" } });
+    await nextTick();
+    store.saveComposer(key.value, { text: draft.value, imageDraft: null, failedSend: null, recoveredId: "CV-new" });
+    const start = chatSource.indexOf("restore: id => {");
+    const tail = chatSource.slice(start + "restore: ".length);
+    const arrow = tail.slice(0, tail.search(/},\r?\n\}\);/) + 1);
+    const code = ts.transpileModule("const restore = " + arrow, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+    const restore = new Function("cid", "startType", "revealTick", code + "\nreturn restore;")(cid, startType, ref(0));
+    restore("CV-new"); await nextTick();
+    expect(key.value).toBe("conversation:CV-new"); expect(draft.value).toBe("next draft"); expect(failed.value).toBeNull();
+    busy.value = false; await nextTick();
+    expect(store.composer(key.value)).toMatchObject({ text: "next draft", failedSend: null });
+  } finally { scope.stop(); }
 });
 
 it.each([false, true])("retires held retry admission after same-account transfer (pending=%s)", async pendingResult => {
