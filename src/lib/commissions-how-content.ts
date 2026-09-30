@@ -1,6 +1,7 @@
 import type { HowContentDocument } from "@/api/how-content-api";
 import type { CommissionGuideRates, CommissionGuideRules } from "@/api/commission-guide-api";
 import type { CanonicalVRankRow } from "@/api/v-rank-api";
+import { formatHowNumber } from "./rank-how-content";
 
 export interface CommissionsHowSnapshot { document: HowContentDocument; rates: CommissionGuideRates; guide: CommissionGuideRules; ranks: CanonicalVRankRow[] }
 // UI/status vocabulary only. Business explanations are published by the server.
@@ -51,7 +52,7 @@ function exampleMultiply(a: number, b: number): number | null {
 export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string) {
   const language = locale.split("-")[0] as keyof typeof COPY;
   const copy = COPY[language] ?? COPY.en;
-  const number = (value: number) => new Intl.NumberFormat(language in COPY ? language : "en", { maximumFractionDigits: 6 }).format(value);
+  const number = (value: number) => formatHowNumber(value, locale);
   const pct = (value: number) => `${number(value * 100)}%`;
   const money = (value: number, currency = "USDT") => `${number(value)} ${currency}`;
   const tokens: Record<string, string> = {};
