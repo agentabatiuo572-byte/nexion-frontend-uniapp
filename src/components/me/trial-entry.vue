@@ -38,7 +38,9 @@ const isActive = computed(() => status.value === "active" || status.value === "g
 const stateLabel = computed(() =>
   status.value === "grace" ? t.value.trial.activeStateGrace : t.value.trial.activeStateActive,
 );
-const activeTitle = computed(() => fmt(t.value.trial.activeTitle, { state: stateLabel.value }));
+const activeTitle = computed(() => status.value === "grace"
+  ? `${t.value.trial.endedTitle} · ${stateLabel.value}`
+  : fmt(t.value.trial.activeTitle, { state: stateLabel.value }));
 
 function goTrial() {
   navTo("/pages/me/trial");
