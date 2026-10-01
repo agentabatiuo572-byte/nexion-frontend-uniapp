@@ -4,13 +4,14 @@
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader :title="t.headerTitles.teamCommissions + t.headerTitles.howItWorksSuffix" back="/pages/team/commissions" />
 
-      <HowHero :label="w.heroLabel" :title="s(sectionId.hero).title" :sub="s(sectionId.hero).body" accent="lemon" />
+      <HowHero v-if="!state.loading && !state.error" :label="w.heroLabel" :title="s(sectionId.hero).title" :sub="s(sectionId.hero).body" accent="lemon" />
 
       <view v-if="state.loading || state.error || content.incomplete" class="mx-4 rounded-xl" style="padding: 14px; background: var(--v5-surface-2)" aria-live="polite">
         <text class="block" :style="paraStyle">{{ state.loading ? content.copy.loading : content.copy.unavailable }}</text>
         <view v-if="!state.loading" role="button" tabindex="0" style="margin-top: 10px; color: var(--v5-brand); cursor: pointer" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
       </view>
 
+      <template v-if="!state.loading && !state.error">
       <HowSection :title="s(sectionId.overview).title" accent="lemon">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
@@ -107,6 +108,8 @@
           <HowFaqRow :q="s(sectionId.faqCultivation).title" :a="s(sectionId.faqCultivation).body" />
         </view>
       </HowSection>
+
+      </template>
 
       <view class="mx-4 mt-6">
         <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
