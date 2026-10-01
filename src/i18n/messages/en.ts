@@ -3673,7 +3673,7 @@ export const en = {
     // List view merges payment_failed / provisioning_failed into one label; the detail view keeps them apart
     statusFailedShort: "Failed",
     provisioningHint: "Allocating a rack slot in {dc}…",
-    activatedHint: "Live in {dc} · earnings have started",
+    activatedHint: "Activated in {dc} · earnings depend on completed tasks and settlement",
     dataCenter: "Data center",
     eta: "ETA",
     // legacy keys (kept for type compatibility — no longer surfaced):

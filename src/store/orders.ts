@@ -71,8 +71,8 @@ export interface Order {
   refundBillNo?: string;
   timeline: OrderTimelineEvent[];
   deviceId?: string;        // the spawned device id once activated
-  // Data-center the unit was provisioned in (Singapore / Frankfurt)
-  dataCenter: "Singapore DC" | "Frankfurt DC";
+  /** Canonical server data-center; null means the location is not known. */
+  dataCenter: string | null;
 }
 
 export interface CreateOrderInput {
@@ -205,8 +205,6 @@ export const useOrders = defineStore("orders", () => {
 
   function fromCanonical(row: CanonicalOrder): Order {
     const status: OrderStatus = row.canonicalStatus;
-    const dataCenter = row.dataCenter?.toLowerCase().includes("frankfurt")
-      ? "Frankfurt DC" as const : "Singapore DC" as const;
     const timeline: OrderTimelineEvent[] = [{ status: "placed", ts: row.placedAt }];
     if (row.paidAt != null) timeline.push({ status: "paid", ts: row.paidAt });
     if (status === "provisioning") timeline.push({ status, ts: row.paidAt ?? row.placedAt });
@@ -238,7 +236,7 @@ export const useOrders = defineStore("orders", () => {
       ...(row.refundBillNo != null && { refundBillNo: row.refundBillNo }),
       ...(row.targetDeviceId != null && { deviceId: String(row.targetDeviceId) }),
       timeline,
-      dataCenter,
+      dataCenter: row.dataCenter,
     };
   }
 
