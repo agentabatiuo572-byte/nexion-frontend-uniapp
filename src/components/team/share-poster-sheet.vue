@@ -93,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onUnmounted, ref, watch } from "vue";
 import qrcode from "qrcode-generator";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -151,12 +151,17 @@ const yieldTodayUsdt = computed(() => {
   if (period.usdt === null && period.nex === null && period.jobCount === null) return 0;
   return period.usdt ?? app.remoteRealizedToday?.usdt ?? null;
 });
+const yieldAuthorityReady = computed(() => fleetReady.value
+  && (!remoteApiEnabled || app.homeTruthStatus === "ready"));
+const yieldExportReady = computed(() => yieldAuthorityReady.value
+  && runningDevices.value > 0 && yieldTodayUsdt.value !== null);
 
 // yield 模板依赖用户真设备数据；gift 模板仅在 H8 奖励开启时可用。
 const availableTpls = computed(() => {
   const list: { key: TplKey; label: string; tint: string }[] = [];
   if (rewardEnabled.value) list.push({ key: "gift", label: t.value.share.tplGift, tint: "var(--v5-brand)" });
-  if (runningDevices.value > 0 && yieldTodayUsdt.value !== null) list.push({ key: "yield", label: t.value.share.tplYield, tint: "var(--v5-tech-cyan)" });
+  // A refresh can suspend the facts without revoking this account's selection.
+  if (yieldExportReady.value || (tpl.value === "yield" && !yieldAuthorityReady.value)) list.push({ key: "yield", label: t.value.share.tplYield, tint: "var(--v5-tech-cyan)" });
   list.push({ key: "brand", label: t.value.share.tplBrand, tint: "var(--v5-warning)" });
   return list;
 });
@@ -455,7 +460,8 @@ function paint(link: string, myToken: number) {
         destHeight: 1000,
         fileType: "png",
         success: (res) => {
-          if (myToken !== genToken || link !== buildShareLink()) return;
+          if (myToken !== genToken || !props.open || link !== buildShareLink()
+              || (tpl.value === "yield" && !yieldExportReady.value)) return;
           imgSrc.value = res.tempFilePath;
           generatedLink.value = link;
           genState.value = "ready";
@@ -482,7 +488,12 @@ function regenerate() {
   }
   const myToken = ++genToken;
   genState.value = "generating";
+  imgSrc.value = "";
   generatedLink.value = "";
+  if (tpl.value === "yield" && !yieldExportReady.value) {
+    if (app.remoteFleetStatus === "error" || app.homeTruthStatus === "error") genState.value = "failed";
+    return;
+  }
   void nextTick(() => {
     // canvas 挂载/尺寸就绪缓冲;绘制异常一律落 failed(异常1,不白屏)。
     setTimeout(() => {
@@ -502,7 +513,8 @@ function regenerate() {
 }
 
 watch(
-  () => [props.open, tpl.value, showUsername.value, buildShareLink(), runningDevices.value, yieldTodayUsdt.value] as const,
+  () => [props.open, tpl.value, showUsername.value, buildShareLink(), runningDevices.value, yieldTodayUsdt.value,
+    app.remoteFleetStatus, app.homeTruthStatus] as const,
   ([open]) => {
     if (open) {
       regenerate();
@@ -523,10 +535,23 @@ watch(() => props.open, (open) => {
 watch(availableTpls, (list) => {
   if (!list.some((x) => x.key === tpl.value)) tpl.value = list[0]?.key ?? "brand";
 });
+function invalidatePoster() {
+  genToken++;
+  genState.value = "idle";
+  imgSrc.value = "";
+  generatedLink.value = "";
+}
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+  invalidatePoster();
+  tpl.value = "brand";
+  if (props.open) emit("close");
+}, { flush: "sync" });
+onUnmounted(invalidatePoster);
 
 // ── 动作 ────────────────────────────────────────────────────────────────
 function posterLinkReady(): boolean {
-  if (genState.value !== "ready") return false;
+  if (!props.open || genState.value !== "ready"
+      || (tpl.value === "yield" && !yieldExportReady.value)) return false;
   const link = buildShareLink();
   if (!link) {
     notifyUnavailableShareLink();
@@ -541,13 +566,18 @@ function posterLinkReady(): boolean {
 let saving = false;
 function saveImage() {
   if (!posterLinkReady() || saving) return;
+  const operation = { token: genToken, accountKey: app.accountKey, epoch: app.accountBindingEpoch,
+    link: generatedLink.value, image: imgSrc.value };
+  const isCurrentSave = () => operation.token === genToken && operation.accountKey === app.accountKey
+    && operation.epoch === app.accountBindingEpoch && operation.link === generatedLink.value
+    && operation.image === imgSrc.value && posterLinkReady();
   saving = true;
   setTimeout(() => (saving = false), 900);
   // #ifdef H5
   void (async () => {
     try {
-      const blob = await (await fetch(imgSrc.value)).blob();
-      if (!posterLinkReady()) return;
+      const blob = await (await fetch(operation.image)).blob();
+      if (!isCurrentSave()) return;
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u;
@@ -559,17 +589,17 @@ function saveImage() {
       toast.success(t.value.share.saved);
     } catch {
       // 异常2:下载受限 → 长按引导
-      toast.info(t.value.share.saveLongPress);
+      if (isCurrentSave()) toast.info(t.value.share.saveLongPress);
     }
   })();
   // #endif
   // #ifndef H5
   uni.saveImageToPhotosAlbum({
-    filePath: imgSrc.value,
+    filePath: operation.image,
     success: () => {
-      toast.success(t.value.share.saved);
+      if (isCurrentSave()) toast.success(t.value.share.saved);
     },
-    fail: () => toast.info(t.value.share.saveLongPress),
+    fail: () => { if (isCurrentSave()) toast.info(t.value.share.saveLongPress); },
   });
   // #endif
 }

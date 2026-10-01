@@ -506,6 +506,8 @@ async function handleCheckIn() {
   }
   if (lastSignedToday.value || remoteRefreshing.value || checkInSubmitting.value) return;
   if (remoteApiEnabled) {
+    const walletAccountKey = app.accountKey;
+    const walletAccountEpoch = app.accountBindingEpoch;
     checkInSubmitting.value = true;
     try {
       const remote = await faucet.checkInRemote();
@@ -516,6 +518,9 @@ async function handleCheckIn() {
       const successCopy = dailyCheckInSuccessCopy(remote, t.value.daily);
       toast.success(successCopy.title, successCopy.body);
       void refreshLedger(true);
+      if (app.accountKey === walletAccountKey && app.accountBindingEpoch === walletAccountEpoch) {
+        void refreshBalance(false);
+      }
     } finally {
       checkInSubmitting.value = false;
     }
