@@ -18,7 +18,9 @@
       <TrialGhostSlot />
       <view v-if="phoneNeedsBinding" class="phone-policy-notice nx-home-glass-item" role="status">
         <view class="nx-home-glass-panel" aria-hidden="true" />
-        <svg class="phone-policy-icon" width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="4" y="2" width="16" height="28" rx="4" /><path d="M10 5h4m-4 22h4" /></svg>
+        <view class="phone-policy-icon" aria-hidden="true">
+          <svg width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="2" width="16" height="28" rx="4" /><path d="M10 5h4m-4 22h4" /></svg>
+        </view>
         <text class="phone-policy-copy">{{ t.myDevices.phoneActivationBody }}</text>
         <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" data-home-action="phone-binding" @click="goPhoneBinding"  @keydown.enter.prevent="goPhoneBinding" @keydown.space.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }}</text></view>
       </view>
@@ -437,7 +439,7 @@ onLoad(() => {
 </style>
 <style scoped>
 .phone-policy-notice { min-height: 176px; padding: 18px; border-radius: var(--v5-radius-2xl); color: var(--v5-ink-2); font: 400 13px/1.6 var(--font-v5); text-align: center; cursor: default; }
-.phone-policy-icon { position: relative; display: block; margin: 0 auto 10px; color: var(--v5-ink); }
+.phone-policy-icon { position: relative; display: block; width: 24px; height: 32px; margin: 0 auto 10px; color: var(--v5-ink); }
 .phone-policy-copy { position: relative; display: block; max-width: 24em; margin: 0 auto; text-wrap: balance; }
 .phone-policy-action { margin-top: 14px; width: 100%; padding: 10px 16px; font-size: 15px; line-height: 24px; }
 .phone-policy-action:focus-visible { outline: 2px solid var(--v5-ink); outline-offset: 3px; }

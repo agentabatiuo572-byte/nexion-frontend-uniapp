@@ -4,7 +4,7 @@
     <view class="nx-glass-card nx-glass-hero nx-wallet-summary">
       <view class="nx-wallet-arc" aria-hidden="true" />
       <view class="nx-wallet-heading" data-me-action="wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" >
-        <svg class="nx-wallet-symbol" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-5v5h5" /></svg>
+        <view class="nx-wallet-symbol" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-5v5h5" /></svg></view>
         <text class="nx-wallet-title">{{ t.me.myWallet }}</text>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
       </view>
@@ -39,7 +39,7 @@
         </view>
 
         <!-- Empty-slot conversion hook -->
-        <view v-if="emptySlots > 0" class="grid items-center" :style="slotBlockStyle">
+        <view v-if="emptySlots > 0" class="grid items-center nx-wallet-slot-block" :style="slotBlockStyle">
           <view style="min-width: 0">
             <view class="flex items-center" style="gap: 6px">
               <view aria-hidden :style="pulseDotStyle" />
@@ -99,9 +99,9 @@ const nexChangeLabel = computed(() => {
   return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
 });
 const nexMarketLabel = computed(() => {
-  if (!marketReady.value) return "≈ — · 1 NEX = —";
+  if (!marketReady.value) return "≈ — USDT · 1 NEX = — USDT";
   const price = market.nexPriceUSDT;
-  return `≈ ${(nex.value * price).toFixed(2)} · 1 NEX = ${price.toFixed(3)}`;
+  return `≈ ${(nex.value * price).toFixed(2)} USDT · 1 NEX = ${price.toFixed(3)} USDT`;
 });
 
 const activeCount = computed(() => app.activeSlotCount);
@@ -223,7 +223,6 @@ const actionsBlockStyle: CSSProperties = {
 };
 const slotBlockStyle: CSSProperties = {
   marginTop: "28px",
-  gridTemplateColumns: "minmax(0,1fr) auto",
   gap: "12px",
 };
 const pulseDotStyle: CSSProperties = {
@@ -253,7 +252,7 @@ const usdtLabel = computed(() => usdt.value.toLocaleString(undefined, { minimumF
 <style scoped>
 .nx-wallet-summary { position: relative; overflow: hidden; padding: 20px; isolation: isolate; }
 .nx-wallet-heading { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--v5-ink); }
-.nx-wallet-symbol { color: var(--v5-nex); flex-shrink: 0; }
+.nx-wallet-symbol { display: grid; place-items: center; width: 30px; height: 30px; color: var(--v5-nex); flex-shrink: 0; }
 .nx-wallet-title { flex: 1; min-width: 0; font: 600 20px/1.3 var(--font-v5); }
 .nx-wallet-total { position: relative; display: flex; align-items: baseline; margin: 28px 0 26px; gap: 3px; color: var(--v5-ink); font-family: var(--font-v5); font-weight: 650; letter-spacing: -.035em; line-height: 1.1; }
 .nx-wallet-currency { font-size: clamp(28px, 8vw, 38px); }

@@ -48,9 +48,12 @@ LOGO 无玻璃背景；内容离开顶部 16px 后淡出，回到顶部 8px 内�
 
 ## 验证入口
 
-- npm run type-check
-- npm run test:tabbar-glass（核心行为、60 组主导航矩阵、双浏览器材质/恢复、逐帧运动/拖动/LOGO、分类/辅助入口与 91 路由）
-- node node_modules/@dcloudio/vite-plugin-uni/bin/uni.js build -p app
-- npm run verify（最终提交的全量门）
+- `npm run type-check`：Vue / TypeScript 静态类型检查。
+- `npm exec -- vitest run src/components/glass-segments.behavior.test.ts src/lib/chassis-scroll.test.ts`：分段选择的语义、键盘选择、disabled 跳过、焦点定位与当前 tab 回顶逻辑；App 的序列化事件和 WebView 调用使用模拟对象验证。
+- `node --test scripts/how-entry-navigation.contract.test.mjs scripts/native-svg-icons.test.mjs`：导航出口、返回时关闭瞬时弹层与原生 SVG 构建转换契约。
+- `node node_modules/@dcloudio/vite-plugin-uni/bin/uni.js build -p app`：App 编译检查；设备上的触摸、渲染与辅助技术另行验收。
+- `npm run verify`：执行 `verify-chain.mjs --full` 全量门；提交前及最终干净提交的验证要求以当前工作区规则与 hooks 为准。
 
-浏览器依赖：npx playwright install chromium webkit。测试产物保存在忽略目录 .codex-runtime/liquid-glass/。真实折射用开启/关闭位移的像素差证明；移除装饰遮盖后独立检测光学细节，避免把过度透明误当成好材质。最终合成图在黑白交错背景上测量导航文字对比度（至少 4.5:1），覆盖 DPR 1/2/2.625/3、明暗主题与 Chromium/WebKit，保存圆角实景供独立审查。运动验收记录选中块和整块背景的拉伸、回弹、跨页接续与快速反向轨迹，检查文字/触控区不变、真实触摸只提交一次、取消不提交、滚动不误选；策略标记或最终对齐本身不作为动效证据。
+本仓现有定向测试覆盖上述逻辑和契约，尚无 `test:tabbar-glass` 专用脚本；60 组主导航矩阵、91 路由、双浏览器材质/恢复和逐帧运动不属于这些定向测试的已覆盖范围。Prototype 的测试与截图只能作为参考，正式 App 的验收记录须标明本次提交、运行入口、页面和设备。
+
+现场操作五个主导航、等宽/横向滚动/换行/纵向分类、搜索返回、消息抽屉和主题弹层，检查快速反向切换、重复点当前 tab 回顶、真实触摸只提交一次、取消不提交、纵向滚动不误选、键盘焦点、LOGO 隐藏恢复、横竖屏及后台恢复。运动验收记录选中块与背景的拉伸、回弹和跨页接续，确认文字与触控区稳定。需要证明折射、文字对比度或 DPR 兼容时，另保存开启/关闭位移的像素差、至少 4.5:1 的对比度测量，以及 DPR 1/2/2.625/3、明暗主题、Chromium/WebKit 的实际结果；策略标记和最终对齐本身不构成这些证据。

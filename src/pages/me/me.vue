@@ -43,7 +43,7 @@
       <view v-for="section in quickSections" :key="section.key">
         <SectionHeader :title="section.title" :count="section.count" />
         <view class="nx-glass-card" :style="quickGridCardStyle">
-          <view :style="quickGridStyle">
+          <view class="nx-quick-grid" :style="quickGridStyle">
             <view
               v-for="item in section.items"
               :key="item.key"
@@ -464,7 +464,6 @@ const quickGridCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
 };
 const quickGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   columnGap: "4px",
   rowGap: "18px",
 };

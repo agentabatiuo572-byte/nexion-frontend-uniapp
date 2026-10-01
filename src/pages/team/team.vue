@@ -323,9 +323,9 @@ const binary = computed(() => {
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
 });
-const binaryMatchText = computed(() => binary.value === null ? "—" : `+${binary.value.binaryMatch.toFixed(2)}`);
-const leftVolText = computed(() => binary.value === null ? "—" : `${binary.value.leftVol.toFixed(0)}`);
-const rightVolText = computed(() => binary.value === null ? "—" : `${binary.value.rightVol.toFixed(0)}`);
+const binaryMatchText = computed(() => binary.value === null ? "—" : `+${binary.value.binaryMatch.toFixed(2)} USDT`);
+const leftVolText = computed(() => binary.value === null ? "—" : `${binary.value.leftVol.toFixed(0)} USDT`);
+const rightVolText = computed(() => binary.value === null ? "—" : `${binary.value.rightVol.toFixed(0)} USDT`);
 
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vrank.myRank));
 const leadershipUnlockRank = computed(() => remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3);
@@ -334,7 +334,7 @@ const projectedPayout = computed(() => remoteApiEnabled ? remotePool.value?.proj
 const leadershipPoolUnlocked = computed(() => myVotes.value > 0);
 const leadershipPoolKText = computed(() => (remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT) / 1000);
 const leadershipPoolPrimary = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+${projectedPayout.value.toFixed(2)}` : `${leadershipPoolKText.value.toFixed(1)}K`,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+${projectedPayout.value.toFixed(2)} USDT` : `${leadershipPoolKText.value.toFixed(1)}K USDT`,
 );
 const leadershipPoolLineA = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,

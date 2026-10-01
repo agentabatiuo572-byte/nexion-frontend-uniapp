@@ -178,7 +178,7 @@ const progressPct = computed(() => {
 const discount = computed(() => computeDiscountedPrice(trialCfg.config).discount);
 
 const etaText = computed(() => fmt(trialLabels.value.etaTemplate, { eta: etaLabel.value }));
-const discountText = computed(() => fmt(t.value.trial.ghostDiscount, { amount: `${discount.value}` }));
+const discountText = computed(() => fmt(t.value.trial.ghostDiscount, { amount: `$${discount.value}` }));
 const shadowNexText = computed(() => `+ ${shadowNEX.value.toLocaleString()} NEX`);
 
 function goTrial() {

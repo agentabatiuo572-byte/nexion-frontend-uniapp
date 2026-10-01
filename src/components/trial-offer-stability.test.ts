@@ -5,6 +5,11 @@ import ts from "typescript";
 import type { TrialAuthorityState } from "@/api/trial-api";
 import hero from "@/components/trial-hero-banner.vue?raw";
 import banner from "@/components/trial-promo-banner.vue?raw";
+import ghost from "@/components/trial-ghost-slot.vue?raw";
+import { en } from "@/i18n/messages/en";
+import { zh } from "@/i18n/messages/zh";
+import { vi as vietnamese } from "@/i18n/messages/vi";
+import { fmt } from "@/i18n/format";
 
 const remote = vi.hoisted(() => ({ state: vi.fn(), eligibility: vi.fn(), start: vi.fn() }));
 vi.mock("@/api/runtime", () => ({
@@ -16,7 +21,7 @@ vi.mock("@/mock/products", () => ({ clearProductCatalog: vi.fn(), replaceProduct
 
 // The store must be imported after the api mock is registered (vi.mock hoists).
 const { useFreeTrial } = await import("@/store/free-trial");
-const { computeTrialOffset, useTrialConfig } = await import("@/store/trial-config");
+const { computeTrialOffset, computeDiscountedPrice, useTrialConfig } = await import("@/store/trial-config");
 
 interface PolicyConfig {
   trialDays: number;
@@ -69,6 +74,16 @@ function heroCredit(config: PolicyConfig) {
 }
 
 beforeEach(() => { setActivePinia(createPinia()); vi.resetAllMocks(); });
+
+it.each([en, zh, vietnamese])("active trial savings retain the monetary unit of the authoritative discount", (copy) => {
+  const trialCfg = useTrialConfig();
+  trialCfg.applyAuthoritative({ ...authority().config, discountCapUSD: "50" });
+  const { discountText } = actual(ghost, ["discount", "discountText"], {
+    computed, trialCfg, computeDiscountedPrice, t: computed(() => copy), fmt,
+  });
+  expect(discountText.value).toBe(fmt(copy.trial.ghostDiscount, { amount: "$50" }));
+  expect(discountText.value).toContain("$50");
+});
 
 describe("earn hero quotes the creditable trial offset, not the raw accrual", () => {
   it("caps the quoted 3-day credit at the offset cap", () => {
