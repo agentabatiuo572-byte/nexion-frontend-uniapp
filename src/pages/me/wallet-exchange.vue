@@ -673,7 +673,7 @@ const remoteQuote = computed(() => {
 });
 const feeInvalid = computed(() => remoteApiEnabled && fromAmount.value > 0 && remoteState.value !== null && !remoteQuote.value);
 const toAmount = computed(() => remoteApiEnabled ? (remoteQuote.value?.toAmount ?? 0) : quoteTo(direction.value, fromAmount.value, rate.value));
-const overBalance = computed(() => fromAmount.value > fromBal.value);
+const overBalance = computed(() => exchangeSnapshotReady.value && fromAmount.value > fromBal.value);
 const underMin = computed(() => fromAmount.value > 0 && minFrom.value !== null && fromAmount.value < minFrom.value);
 const valid = computed(() => exchangeSubmissionAllowed.value
   && remoteMinimumReady.value && fromAmount.value > 0 && !overBalance.value && !underMin.value && !feeInvalid.value);
