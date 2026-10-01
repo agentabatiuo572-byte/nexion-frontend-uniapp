@@ -15,7 +15,7 @@
         <EmptyState
           v-if="remoteApiEnabled && commission.eventsStatus !== 'ready'"
           :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
-          :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
+          :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionLoadingTitle"
           :desc="commission.eventsStatus === 'error' ? t.network.projectionErrorDesc : undefined"
           :cta-label="commission.eventsStatus === 'error' ? t.network.retry : undefined"
           compact
