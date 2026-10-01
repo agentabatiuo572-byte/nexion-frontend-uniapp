@@ -143,7 +143,7 @@ export function navBack(fallbackHref?: string): void {
     // Real history: pop (restores the previous page + its scroll position).
     uni.navigateBack({
       fail: () => {
-        if (fallbackHref) navTo(fallbackHref);
+        if (fallbackHref) void navReplace(fallbackHref);
         else reportNavigationFailure();
       },
     });
@@ -157,7 +157,7 @@ export function navBack(fallbackHref?: string): void {
   }
   if (fallbackHref) {
     const { url } = toUniRoute(fallbackHref);
-    uni.reLaunch({ url, fail: () => navTo(fallbackHref) });
+    uni.reLaunch({ url, fail: () => void navReplace(fallbackHref) });
     return;
   }
   // No declared back target on a singleton stack — never leave the back button a

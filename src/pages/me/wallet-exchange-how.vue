@@ -97,7 +97,7 @@
 
 <script setup lang="ts">
 import { onShow } from "@dcloudio/uni-app";
-import { navTo } from "@/lib/route";
+import { navBack } from "@/lib/route";
 import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
@@ -135,7 +135,7 @@ onShow(() => { void loadExchangeCaps(); });
 onUnmounted(() => { capsRequest += 1; });
 
 function goBack() {
-  navTo("/pages/me/wallet-exchange");
+  navBack("/pages/me/wallet-exchange");
 }
 
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
