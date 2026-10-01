@@ -56,7 +56,7 @@
           <view v-if="order.status !== 'cancelled'" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v5-border)">
             <view class="flex items-center justify-between" style="font-size: 12px">
               <text style="color: var(--v5-ink-3)">{{ t.orders.dataCenter }}</text>
-              <text class="tabular-nums" style="color: var(--v5-ink)">{{ order.dataCenter }}</text>
+              <text class="tabular-nums" style="color: var(--v5-ink)">{{ dataCenterLabel }}</text>
             </view>
             <text v-if="order.status === 'provisioning'" class="block" :style="{ fontSize: '12px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
           </view>
@@ -410,14 +410,22 @@ function statusLabel(s: OrderStatus): string {
   }
 }
 
+const dataCenterLabel = computed(() => {
+  const dc = order.value?.dataCenter?.trim();
+  if (!dc) return "—";
+  const name = dc.toLowerCase();
+  if (name === "frankfurt" || name === "frankfurt dc") return t.value.store.coDcFrankfurt;
+  if (name === "singapore" || name === "singapore dc") return t.value.store.coDcSingapore;
+  return dc;
+});
 const dynamicHint = computed(() => {
   const o = order.value;
   if (!o) return "";
   const tmpl = o.status === "provisioning" ? t.value.orders.provisioningHint : t.value.orders.activatedHint;
-  return tmpl.replace("{dc}", o.dataCenter);
+  return tmpl.replace("{dc}", () => dataCenterLabel.value);
 });
 const activatedHint = computed(() =>
-  order.value ? t.value.orders.activatedHint.replace("{dc}", order.value.dataCenter) : "",
+  order.value ? t.value.orders.activatedHint.replace("{dc}", () => dataCenterLabel.value) : "",
 );
 
 function eventFor(stage: OrderStatus) {

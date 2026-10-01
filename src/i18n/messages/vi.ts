@@ -3546,7 +3546,7 @@ export const vi: Messages = {
     // Trang danh sách gộp payment_failed / provisioning_failed thành một nhãn; trang chi tiết vẫn tách
     statusFailedShort: "Thất bại",
     provisioningHint: "Đang phân bổ vị trí rack tại {dc}…",
-    activatedHint: "Đã chạy tại {dc} · thu nhập đã bắt đầu",
+    activatedHint: "Đã kích hoạt tại {dc} · thu nhập phụ thuộc vào nhiệm vụ hoàn tất và quyết toán",
     dataCenter: "Trung tâm dữ liệu",
     eta: "Dự kiến",
     statusProcurement: "Đang nhập hàng",
