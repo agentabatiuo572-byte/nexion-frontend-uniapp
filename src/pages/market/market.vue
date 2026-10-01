@@ -36,23 +36,7 @@
           </view>
 
           <!-- Timeframe — SegmentedControl (HIG 44pt, brand indicator) -->
-          <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.marketPage.nexHero.timeframeLabel">
-            <view
-              v-for="f in TIMEFRAMES"
-              :key="f"
-              class="grid place-items-center active:opacity-70 nx-timeframe-tab"
-              :style="segItemStyle(f === tf)"
-              role="tab"
-              :tabindex="f === tf ? 0 : -1"
-              :aria-label="fmt(t.marketPage.nexHero.timeframeOption, { range: f })"
-              :aria-selected="f === tf ? 'true' : 'false'"
-              @click="tf = f"
-              @keydown.left.prevent="cycleTimeframe(-1)"
-              @keydown.right.prevent="cycleTimeframe(1)"
-            >
-              <text :style="segLabelStyle(f === tf)">{{ f }}</text>
-            </view>
-          </view>
+          <GlassSegments :label="t.marketPage.nexHero.timeframeLabel" v-model="tf" :options="timeframeOptions" style="margin-top: 12px"  />
 
           <!-- chart -->
           <view v-if="nexChartData.length >= 2" class="rounded-xl overflow-hidden" :style="chartBoxStyle">
@@ -76,7 +60,7 @@
         </view>
 
         <!-- ───────── STATS GRID ───────── -->
-        <view class="rounded-2xl" :style="cardStyle">
+        <view class="nx-glass-card rounded-2xl" :style="cardStyle">
           <view class="grid grid-cols-3" style="row-gap: 12px; column-gap: 8px">
             <view v-for="cell in statCells" :key="cell.label">
               <text class="block" :style="statLabelStyle">{{ cell.label }}</text>
@@ -166,17 +150,17 @@ const nexDirection = computed(() => nex.value.change24h > 0 ? "▲" : nex.value.
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
-  if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  if (n >= 1) return `$${n.toFixed(2)}`;
-  if (n >= 0.01) return `$${n.toFixed(3)}`;
-  return `$${n.toFixed(4)}`;
+  if (n >= 1000) return `${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (n >= 1) return `${n.toFixed(2)}`;
+  if (n >= 0.01) return `${n.toFixed(3)}`;
+  return `${n.toFixed(4)}`;
 }
 function fmtBig(n: number): string {
   if (n <= 0) return "—";
-  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${n.toFixed(0)}`;
 }
 function fmtNumber(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
@@ -266,9 +250,9 @@ const sellBtnStyle: CSSProperties = {
 const sellTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 
 // De-carded form-b stats container (single surface, no border).
-const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
 };
 const statLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
@@ -285,6 +269,9 @@ const athRowStyle: CSSProperties = {
   fontSize: "12px",
 };
 const marketHoldBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", lineHeight: "18px", color: "var(--v5-ink-3)" };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const timeframeOptions = TIMEFRAMES.map(value => ({ value, label: value }));
 </script>
 
 <style scoped>

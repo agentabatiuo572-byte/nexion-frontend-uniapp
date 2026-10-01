@@ -12,7 +12,7 @@
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
     </view>
 
-    <view class="relative overflow-hidden" style="background: var(--v5-surface); border-radius: 16px; padding: 16px">
+    <view class="nx-glass-card relative overflow-hidden" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); padding: 16px">
       <view :style="gridBgStyle" />
       <view class="relative">
         <view style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.018em; line-height: 1.35">
@@ -52,7 +52,9 @@
           </view>
         </view>
 
-        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity" style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" role="link" tabindex="0" @click="goStore" @keydown.enter.stop.prevent="goStore">
+        <text class="block mt-3" style="font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.earn.estimateDisclaimer }}</text>
+
+        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity"   style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" role="link" tabindex="0" @click="goStore" @keydown.enter.stop.prevent="goStore">
           <text style="color: var(--v5-brand)">{{ t.home.doMathSeeCta }}</text>
           <text class="font-mono-tabular" style="opacity: 0.8; font-size: 12px; color: var(--v5-brand)">→</text>
         </view>
@@ -84,8 +86,8 @@ const targetLabel = computed(() => nexGridBrandText(calculator.value?.target.nam
 const baseWidthPct = computed(() => calculator.value
   ? Math.max(0.4, (calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt) * 100)
   : 0.4);
-const baseRate = computed(() => calculator.value ? `$${calculator.value.base.dailyUsdt.toFixed(2)} /d` : "—");
-const targetRate = computed(() => calculator.value ? `$${calculator.value.target.dailyUsdt.toFixed(2)} /d` : "—");
+const baseRate = computed(() => calculator.value ? `${calculator.value.base.dailyUsdt.toFixed(2)} /d` : "—");
+const targetRate = computed(() => calculator.value ? `${calculator.value.target.dailyUsdt.toFixed(2)} /d` : "—");
 
 // Render the headline by splitting the i18n template around {target}/{mult}/{base}
 // placeholders → colored segments. Works regardless of per-locale word order.
@@ -111,7 +113,7 @@ const headlineSegs = computed(() => {
 });
 
 const stats = computed(() => calculator.value ? [
-  { k: t.value.home.doMathDaily, v: `$${calculator.value.target.dailyUsdt.toFixed(2)}`, tone: "var(--v5-ink)" },
+  { k: t.value.home.doMathDaily, v: `${calculator.value.target.dailyUsdt.toFixed(2)}`, tone: "var(--v5-ink)" },
   { k: fmt(t.value.home.doMathVs, { base: baseShort.value }), v: `${calculator.value.multiplier}×`, tone: "var(--v5-success)" },
 ] : []);
 
@@ -130,4 +132,6 @@ function goStore() {
   if (!productNo) return;
   navTo(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
 }
+
+
 </script>

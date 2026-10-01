@@ -11,7 +11,7 @@
       <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="on-grid-map" @click="goGlobe" @keydown.enter.stop.prevent="goGlobe">{{ t.home.onGridMap }} →</text>
     </view>
 
-    <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
+    <view class="nx-glass-card" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); overflow: hidden">
       <view
         v-for="(c, i) in gridClients"
         :key="c.id"
@@ -33,18 +33,18 @@
            上方客户内容只来自 Home canonical 投影。 -->
       <view
         v-if="devicesBad && fleetBad"
-        class="px-4 py-2 flex items-center justify-center font-mono-tabular active:opacity-70"
-        style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3); min-height: 44px"
+        class="nx-glass-inset px-4 py-2 flex items-center justify-center font-mono-tabular active:opacity-70"
+        style="border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3); min-height: 44px"
         :role="app.homeTruthStatus === 'error' ? 'button' : undefined"
         :tabindex="app.homeTruthStatus === 'error' ? 0 : undefined"
         data-home-action="on-grid-status"
         @click="app.homeTruthStatus === 'error' && retryConfig()"
-        @keydown.enter.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()"
-        @keydown.space.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()"
+
+        @keydown.enter.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()" @keydown.space.stop.prevent="app.homeTruthStatus === 'error' && retryConfig()"
       >
         <text>{{ gridStatusText }}<text v-if="app.homeTruthStatus === 'error'"> · <text style="color: var(--v5-tech-cyan-ink)">{{ t.home.networkStatRetry }}</text></text></text>
       </view>
-      <view v-else class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
+      <view v-else class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="devicesBad">{{ t.home.networkStatUpdating }}</text>
         <text v-else><text style="color: var(--v5-ink); font-weight: 500">{{ activeDevicesText }}</text> {{ t.home.onGridOnline }}</text>
         <text v-if="fleetBad">{{ t.home.networkStatUpdating }}</text>
@@ -72,7 +72,7 @@ const perSecText = computed(() => {
   const value = app.homeTruth?.onGrid.perSecUsdt;
   if (value == null) return "";
   const digits = value < 0.1 ? 4 : 1;
-  return `+$${value.toFixed(digits)}/sec`;
+  return `+${value.toFixed(digits)}/sec`;
 });
 function retryConfig() {
   void app.refreshHomeTruth();
@@ -95,4 +95,6 @@ function companyInitial(value: string | null) {
 function goGlobe() {
   navTo("/pages/globe/globe");
 }
+
+
 </script>

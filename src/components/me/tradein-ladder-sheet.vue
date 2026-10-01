@@ -1,7 +1,7 @@
 <template>
   <view v-if="device" class="nx-tradein-ladder-root fixed inset-0" style="z-index: 900" role="dialog" aria-modal="true" :aria-label="t.tradein.ladderTitle" @click.stop>
     <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="emit('close')" />
-    <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
+    <view class="nx-glass-sheet absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.tradein.ladderTitle }}</text>
         <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click.stop="emit('close')">
@@ -28,11 +28,13 @@ const t = useT();
 useDialogA11y(computed(() => props.device !== null), ".nx-tradein-ladder-root", () => emit("close"));
 
 const sheetStyle: CSSProperties = {
-  background: "var(--v5-surface)", borderRadius: "24px 24px 0 0",
-  padding: "18px 18px 30px", boxShadow: "var(--v5-card-shadow-lift-strong)",
+  background: "var(--nx-glass-fill)", borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
+  padding: "18px 18px 30px", boxShadow: "var(--nx-glass-edge)",
 };
 const closeBtnStyle: CSSProperties = {
   width: "44px", height: "44px", borderRadius: "12px",
   background: "var(--v5-surface-2)", border: "1px solid var(--v5-border)",
 };
+
+
 </script>

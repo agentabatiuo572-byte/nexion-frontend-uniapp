@@ -316,7 +316,9 @@ export const vi: Messages = {
     errorOtpNotFound: "Hãy lấy mã xác minh trước đã",
     errorOtpSendUnavailable: "Mã xác minh chưa gửi được — bạn có thể đăng nhập bằng Google / Apple / Telegram bên dưới, hoặc thử lại sau ít phút.",
     errorServiceUnavailable: "Hiện chưa xác minh được tài khoản. Vui lòng thử lại.",
-  },
+
+sandboxCodeHint: "Mã trải nghiệm: {code}. Không gửi SMS.",
+},
   geoPolicy: {
     blocked: "UVEL hiện chưa khả dụng ở khu vực của bạn. Liên hệ hỗ trợ nếu bạn cần trợ giúp.",
     limited: "Một số tính năng chưa khả dụng ở khu vực của bạn. Liên hệ hỗ trợ để biết thêm.",
@@ -475,7 +477,10 @@ export const vi: Messages = {
     giftPendingBillMemo: "Quà chào mừng - đang xác nhận",
     back: "Quay lại",
     stepOf: "Bước {n} / 3",
-  },
+
+subtitleNoBonus: "Tạo tài khoản để tiếp tục. Nếu có quà chào mừng, hãy xem trạng thái sau khi đăng ký.",
+sandboxSponsorEnvironmentMismatch: "Mã mời này không dùng được. Kiểm tra lại rồi thử nhé.",
+},
   home: {
     // Sprint A-1: LiveActivityFeed
     quickStake: "Stake",
@@ -692,7 +697,12 @@ export const vi: Messages = {
     ledgerEmpty: "Chưa có thu nhập từ nhiệm vụ hoàn thành.",
     liveFeedTitle: "Phân bổ nhiệm vụ",
     liveFeedEmpty: "Chưa có hoạt động nhiệm vụ.",
-  },
+
+quickMissionsActive: "5 mở",
+sandboxQuoteLedgerTitle: "Báo giá tác vụ minh họa",
+sandboxQuoteNoCredit: "Dữ liệu minh họa · Không cộng vào số dư",
+trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
+},
   earn: {
     title: "Sinh lời",
     subtitle: "Thiết bị, thu nhập, nhiệm vụ của bạn — trực tiếp.",
@@ -859,7 +869,12 @@ export const vi: Messages = {
     jobsCount: "{n} tác vụ",
     taskLockTitle: "Khóa nhiệm vụ",
     taskLockRemaining: "{n} phút",
-  },
+
+estimateDisclaimer: "Ước tính từ chênh lệch sản lượng ngày hiện tại, chưa trừ chi phí mua. Không ảnh hưởng số dư thực tế.",
+phonePausedLowBattery: "Tạm dừng · pin yếu",
+phonePausedLowBatteryHint: "Tự tiếp tục khi pin đạt 20%.",
+lockedMissedDaily: "mất mỗi ngày",
+},
   market: {
     title: "Tổng quan thị trường",
     liveLabel: "Cập nhật 2 phút trước",
@@ -955,7 +970,9 @@ export const vi: Messages = {
       sell: "Bán trên thị trường",
     },
     disclosureNote: "Số lượng Genesis và quyền lợi theo hồ sơ tài khoản. Xem thông tin công bố tại Trung tâm tin cậy.",
-  },
+
+identityLabel: "Chủ sở hữu Genesis",
+},
 
   preferences: {
     loading: "Đang tải tùy chọn thông báo…",
@@ -1533,7 +1550,111 @@ export const vi: Messages = {
       claimedTitle: "Đã cộng +{n} NEX",
       discountClaimedTitle: "Đã nhận ưu đãi",
     },
-  },
+
+progressLabel: "Tiến độ",
+catalog: {
+      "evt-pro-upgrade-7d": {
+        "title": "UVELBox Pro · Nâng cấp có thời hạn",
+        "subtitle": "Nâng cấp Pro trong 7 ngày · giảm $500 + vé Genesis ×2.",
+        "ribbon": "GIỚI HẠN · CÒN 3 NGÀY 12 GIỜ",
+        "reward": "Giảm $500 + vé ×2",
+        "progressLabel": "đã nhận",
+        "ctaLabel": "Nhận ưu đãi",
+        "countdown": "3 ngày 12 giờ 04 phút",
+        "startsIn": ""
+      },
+      "evt-refer-5-get-pro": {
+        "title": "Mời 5 người · Nhận Pro",
+        "subtitle": "Mời trực tiếp 5 bạn trong 7 ngày · nhận UVELBox Pro ($899).",
+        "ribbon": "THỬ THÁCH NHÓM",
+        "reward": "UVELBox Pro miễn phí",
+        "progressLabel": "bạn đã mời",
+        "ctaLabel": "Xem tiến độ",
+        "countdown": "6 ngày 02 giờ",
+        "startsIn": ""
+      },
+      "evt-weekend-double-nex": {
+        "title": "NEX gấp đôi cuối tuần",
+        "subtitle": "Điểm danh thứ Bảy–Chủ nhật tự động nhận NEX ×2.",
+        "ribbon": "ĐANG DIỄN RA",
+        "reward": "NEX ×2",
+        "progressLabel": "",
+        "ctaLabel": "Điểm danh",
+        "countdown": "1 ngày 18 giờ",
+        "startsIn": ""
+      },
+      "evt-regional-pk": {
+        "title": "Thi đua khu vực · Quỹ $20.000",
+        "subtitle": "Mỹ Latinh, Đông Nam Á và châu Âu thi đua doanh số tuần. Khu vực dẫn đầu chia $20.000.",
+        "ribbon": "TUẦN 21",
+        "reward": "Chia quỹ $20.000",
+        "progressLabel": "doanh số khu vực ($)",
+        "ctaLabel": "Tham gia thi đua",
+        "countdown": "2 ngày 09 giờ",
+        "startsIn": ""
+      },
+      "evt-spring-spin": {
+        "title": "Vòng quay mùa xuân",
+        "subtitle": "1 lượt miễn phí mỗi ngày · nhận NEX, USDT và phiếu giảm giá thiết bị.",
+        "ribbon": "HẰNG NGÀY · ĐẶT LẠI 00:00 UTC",
+        "reward": "Tối đa $500 USDT",
+        "progressLabel": "lượt còn lại hôm nay",
+        "ctaLabel": "Quay ngay",
+        "countdown": "Đặt lại sau 08:42:11",
+        "startsIn": ""
+      },
+      "evt-reinvest-bonus": {
+        "title": "Tuần thưởng tái đầu tư",
+        "subtitle": "Cả tuần, tái đầu tư $100 nhận 2 vé Genesis (thường là 1).",
+        "ribbon": "GẤP ĐÔI",
+        "reward": "Vé Genesis ×2",
+        "progressLabel": "",
+        "ctaLabel": "Tái đầu tư",
+        "countdown": "4 ngày 03 giờ",
+        "startsIn": ""
+      },
+      "evt-onboarding-7d": {
+        "title": "Thành viên mới · Nhiệm vụ 7 ngày",
+        "subtitle": "Đạt V2 trong 7 ngày từ khi tham gia · nhận 200 NEX và 1 thẻ bù điểm danh.",
+        "ribbon": "TUẦN ĐẦU",
+        "reward": "+200 NEX + 1 thẻ bù",
+        "progressLabel": "mục tiêu đã xong",
+        "ctaLabel": "Xem nhiệm vụ",
+        "countdown": "5 ngày 11 giờ",
+        "startsIn": ""
+      },
+      "evt-black-friday": {
+        "title": "Black Friday · Giảm 20% toàn bộ",
+        "subtitle": "Phần cứng giảm từ $300 · mã BF20 cộng dồn với ưu đãi nâng cấp Pro.",
+        "ribbon": "SẮP BẮT ĐẦU",
+        "reward": "Giảm 20% + cộng dồn mã",
+        "progressLabel": "",
+        "ctaLabel": "Nhắc tôi",
+        "countdown": "",
+        "startsIn": "Bắt đầu sau 12 ngày 04 giờ"
+      },
+      "evt-nex-holders-share": {
+        "title": "Thưởng giữ NEX · Quỹ $5.000",
+        "subtitle": "Giữ ít nhất 1.000 NEX trong 7 ngày · tự động chia quỹ $5.000 USDT.",
+        "ribbon": "TỰ ĐỘNG",
+        "reward": "Chia $5.000 USDT",
+        "progressLabel": "NEX đang giữ",
+        "ctaLabel": "Xem chi tiết",
+        "countdown": "4 ngày 17 giờ",
+        "startsIn": ""
+      },
+      "evt-anniversary-spin": {
+        "title": "Vòng quay kỷ niệm",
+        "subtitle": "Kỷ niệm 1 năm nền tảng · 10.000 người thắng chia $250.000 USDT.",
+        "ribbon": "ĐÃ KẾT THÚC",
+        "reward": "Đã phân phối $250.000",
+        "progressLabel": "",
+        "ctaLabel": "Xem kết quả",
+        "countdown": "",
+        "startsIn": ""
+      }
+    },
+},
 
   marketPage: {
     pageTitle: "Thị trường",
@@ -1761,7 +1882,9 @@ export const vi: Messages = {
     phoneActivationCta: "Hiệu chuẩn và liên kết điện thoại này",
     phoneActivationAppOnlyTitle: "Kích hoạt tác vụ điện thoại trong ứng dụng Android",
     phoneActivationAppOnlyBody: "Trình duyệt không thể đọc pin hoặc gửi nhịp tim tác vụ của điện thoại. Hãy đăng nhập ứng dụng Android để hiệu chuẩn và kích hoạt.",
-  },
+
+onlineLabel: "{n} đang online",
+},
   deactivateSheet: {
     title: "Thiết bị đang chạy nhiệm vụ",
     desc: "{name} đang chạy một nhiệm vụ suy luận AI — chọn cách tắt",
@@ -1781,7 +1904,11 @@ export const vi: Messages = {
     activateRow: "Kích hoạt thiết bị có sẵn ({n})",
     toastSlotsFull: "Đã đầy khe {max}/{max}",
     toastActivated: "Đã kích hoạt {name}",
-  },
+
+chooseMethod: "Chọn cách kết nối mạng UVEL",
+inventoryHint: "Sử dụng thiết bị UVEL hiện có",
+storeHint: "Chọn mua thiết bị tại cửa hàng",
+},
   computeShare: {
     entryEyebrow: "Chia sẻ sức mạnh máy tính",
     entryTitle: "Kết nối sức mạnh GPU máy tính",
@@ -1832,7 +1959,10 @@ export const vi: Messages = {
     configUnavailableTitle: "Tạm thời không thể xác nhận trạng thái Chia sẻ điện toán",
     configUnavailableBody: "Hãy kiểm tra kết nối mạng rồi thử lại.",
     configRetryCta: "Tải lại",
-  },
+
+sandboxHoldCta: "Chưa thể kết nối",
+sandboxHoldBody: "Chế độ trải nghiệm chưa hỗ trợ kết nối máy tính thật. Có thể xem hướng dẫn tải và kết nối.",
+},
   voucher: {
     popupCap: "Ưu đãi có hạn",
     popupTitle: "Nhận voucher của bạn",
@@ -1856,7 +1986,10 @@ export const vi: Messages = {
     checkoutRowLabel: "Voucher",
     expiredNote: "Một voucher đã nhận cho thiết bị này đã hết hạn",
     quoteChanged: "Ưu đãi voucher đã thay đổi — vui lòng xem lại tổng mới trước khi thanh toán",
-  },
+
+newUserGiftName: "Quà người mới",
+summerActivityName: "Ưu đãi mùa hè",
+},
   rewards: {
     title: "Phần thưởng của tôi",
     entry: "Phần thưởng của tôi",
@@ -2291,7 +2424,11 @@ export const vi: Messages = {
     comingSoonNote: "các giai đoạn nền tảng tiếp theo",
     ordersChip: "Đơn hàng",
     pageFooter: "Vận hành trọn gói · không phí ship",
-  },
+
+specUptimeValue: "99.9%",
+coSandboxWallet: "Ví trải nghiệm",
+coHintSandboxWallet: "Thanh toán trải nghiệm · Không dùng tiền thật",
+},
   team: {
     title: "Đội nhóm của tôi",
     subtitle: "Nhận 10% hoa hồng từ mỗi đơn hàng của bạn bè, mãi mãi.",
@@ -2345,7 +2482,23 @@ export const vi: Messages = {
     inviteCopyCodeAria: "Sao chép mã mời",
     inviteCopyLinkAria: "Sao chép liên kết mời",
     orShareVia: "hoặc chia sẻ qua",
-  },
+
+inviteTitle: "Mời bạn bè",
+inviteTagline: "Cùng bạn bè xây dựng tương lai rộng mở",
+shareInvite: "Chia sẻ lời mời",
+rewardLoading: "Đang tải thưởng giới thiệu…",
+rewardRules: "Xem quy tắc thưởng",
+summaryTitle: "Đội của tôi",
+summaryMembers: "Thành viên",
+summaryDirect: "Bạn trực tiếp",
+summaryEmpty: "Chưa có thành viên",
+summaryInvite: "Mời ngay",
+summaryView: "Xem đội",
+summaryLoading: "Đang tải thành viên…",
+summaryUnavailable: "Chưa thể tải thành viên. Vui lòng thử lại.",
+rankBenefits: "Xem quyền lợi cấp bậc",
+sandboxBanner: "Chế độ trải nghiệm · Phần thưởng minh họa",
+},
   wallet: {
     loadingTransactions: "Đang tải lịch sử giao dịch…",
     title: "Ví",
@@ -2541,7 +2694,12 @@ export const vi: Messages = {
     ffZip: "Mã bưu chính",
     cardNamePlaceholder: "TÊN TRÊN THẺ",
     withdrawInsufficient: "Số dư không đủ để rút",
-  },
+
+nexBoostActive: "NEX Boost đang bật",
+nexBoostPrefix: "{nex} NEX của bạn mở khóa ",
+nexBoostHighlight: "+10% thu nhập",
+nexBoostSuffix: ". Đạt 5,000 NEX để được giảm phí.",
+},
   cards: {
     bindingEntryNote: "Nhập thông tin thẻ ngân hàng",
     bindingEntryDisclaimer: "Thông tin chỉ được giữ trên trang này và sẽ xóa khi bạn rời đi. Chưa gửi hoặc lưu dữ liệu trước khi kết nối dịch vụ liên kết thẻ.",
@@ -2675,7 +2833,14 @@ export const vi: Messages = {
     installHint: "Cài một chạm · chạy âm thầm ở chế độ nền",
     connectGpu: "Kết nối GPU của bạn",
     connectHint: "Tự động phát hiện · bắt đầu sinh lời ngay",
-  },
+
+calibrationPending: "Chưa hiệu chuẩn",
+calibrationDone: "Đã hiệu chuẩn",
+estimatorScore: "Điểm năng lực",
+estimatorYield: "Thu nhập ước tính",
+estimatorPendingValue: "Hiển thị sau hiệu chuẩn",
+scoreLabel: "Điểm ước tính",
+},
   session: {
     restoreRetryNotice: "Tạm thời chưa thể khôi phục phiên đăng nhập. Đang tự động thử lại.",
     secureBrowserUnsupported: "Trình duyệt này không hỗ trợ đăng nhập hoặc khôi phục phiên an toàn. Vui lòng cập nhật trình duyệt rồi thử lại.",
@@ -3003,7 +3168,9 @@ export const vi: Messages = {
     intro: "Chọn ngôn ngữ giao diện cho ứng dụng này.",
     backToAccount: "Về Tài khoản",
     countLine: "Có {n} ngôn ngữ giao diện",
-  },
+
+autoDetect: "tự động nhận diện sắp ra mắt",
+},
   ui: {
     confirm: "Xác nhận",
     cancel: "Hủy",
@@ -3476,7 +3643,9 @@ export const vi: Messages = {
       unstake: "Mở khóa",
       achievement: "Thưởng thành tựu",
       other: "Mục sổ cái khác",
-    },
+
+earningsMilestone: "Mốc thu nhập ${threshold}",
+},
     title: "Sao kê",
     back: "Quay lại",
     subtitle: "Đối soát mọi khoản thu và chi trên ví UVEL của bạn.",
@@ -3592,7 +3761,11 @@ export const vi: Messages = {
     refreshing: "Đang tải đơn hàng mới nhất từ máy chủ…",
     loadMore: "Tải thêm",
     retry: "Thử lại",
-  },
+
+sandboxPayCta: "Tiếp tục thanh toán trải nghiệm",
+sandboxPayBusy: "Đang xác nhận thanh toán trải nghiệm…",
+sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem trạng thái đơn hàng sau khi hoàn tất.",
+},
   staking: {
     title: "Staking",
     back: "Quay lại",
@@ -3865,7 +4038,12 @@ export const vi: Messages = {
     },
     downloadToast: "Đã lưu thẻ vào máy · chia sẻ ở bất cứ đâu",
     downloadErrorToast: "Không thể tạo hoặc lưu PNG. Vui lòng thử lại.",
-  },
+
+shareStreak: "Chuỗi điểm danh UVEL của tôi là {n} ngày. {link}",
+shareNetwork: "Mạng UVEL của tôi có {n} thành viên. {link}",
+shareEarnings: "Lịch sử UVEL ghi nhận ${amount} thu nhập trong {days} ngày. {link}",
+shareDemo: "Chỉ là dữ liệu trải nghiệm, không phải thu nhập thực tế.",
+},
   taskHistory: {
     loading: "Đang tải lịch sử tác vụ…",
     tabHistory: "Lịch sử",
@@ -3874,7 +4052,11 @@ export const vi: Messages = {
     historyEmpty: "Chưa có tác vụ nào hoàn thành — tác vụ đầu tiên sẽ sớm xuất hiện.",
     historyHint:
       "{n} tác vụ gần nhất · Chạm vào một dòng để mở biên nhận Proof-of-Compute.",
-  },
+
+timeJustNow: "vừa xong",
+timeMinutesAgo: "{n} phút",
+timeHoursAgo: "{n} giờ",
+},
   errors: {
     deviceCapTitle: "Đã đạt giới hạn thiết bị",
     deviceCapMsg:
@@ -4182,7 +4364,8 @@ export const vi: Messages = {
     faqA5:
       "Không. Staking là sản phẩm tài chính cá nhân — nó không ảnh hưởng đến cấp V, doanh số nhóm hay điều kiện nhận hoa hồng của bạn. Nó chỉ đơn thuần giúp USDT nhàn rỗi sinh lãi.",
     ctaBack: "Đã hiểu · xem các gói staking",
-  },
+
+},
 
   trust: {
     title: "Trung tâm Tin cậy",
@@ -4360,7 +4543,12 @@ export const vi: Messages = {
       a3: "Phát hành mở khi $NEX niêm yết. Trước đó bạn nắm một suất phân bổ đã giữ chỗ, không phải khoản chi trả hàng ngày.",
     },
     royaltyUnavailable: "Chưa xác nhận được mức phí bản quyền hiện tại. Hãy làm mới và thử lại.",
-  },
+
+purchaseSuccessTitle: "Chúc mừng, mua thành công",
+purchaseSuccessBody: "Nút Genesis đã được thêm vào danh sách sở hữu.",
+viewMyNodes: "Xem nút Genesis của tôi",
+openseaLine: "Xem trên OpenSea · giá sàn",
+},
 
   walletV3: {
     needMoreNexToast: "Không đủ NEX để bù phí",
@@ -4961,7 +5149,10 @@ export const vi: Messages = {
       genesis: "Genesis",
     },
     howItWorksEntry: "Quy tắc",
-  },
+
+mockDailyBinaryMatch: "Ghép cân bằng hằng ngày",
+mockWeek42Pool: "Quỹ thưởng tuần 42",
+},
 
   commissionsHowItWorks: {
     navTitle: "Cách Hoa hồng hoạt động",
@@ -5272,7 +5463,9 @@ export const vi: Messages = {
     toastRemoteFailed: "Chưa xác nhận được trạng thái đơn",
     serverApplication: "Đơn trên máy chủ của tôi",
     applicationStatuses: { NONE: "Chưa có", PENDING: "Đang xử lý", APPROVED: "Đã thông qua", REJECTED: "Từ chối" },
-  },
+
+annualBudget: "Hạn mức ngân sách năm: $40,000 USDT",
+},
 
   daily: {
     checkInAction: "Điểm danh",
@@ -5495,7 +5688,25 @@ export const vi: Messages = {
     insufficientUsdtSub: "Cần ${need} · số dư ${bal}",
     listToastTitle: "Đã rao Genesis #{id}",
     listToastSub: "Rao ${price} · đã đăng trên thị trường nội bộ UVEL",
-  },
+
+verifiedTag: "✓",
+verifiedCollection: "Bộ sưu tập đã xác minh",
+viewOpenSea: "Xem trên OpenSea",
+openSeaTitle: "OpenSea",
+openSeaLoading: "Đang kết nối OpenSea…",
+openSeaErrorTitle: "Chưa kết nối được OpenSea lúc này",
+openSeaErrorSub: "Quay lại thị trường UVEL để xem trạng thái niêm yết hiện tại.",
+openSeaErrorHint: "Đa số người giữ chọn giao dịch P2P ngay trong UVEL · nhanh hơn + không mất gas.",
+openSeaRetry: "Thử kết nối lại",
+openSeaBack: "Về sàn UVEL",
+openSeaErrorPool: {
+      rateLimit: "Thị trường tạm không khả dụng. Vui lòng thử lại sau.",
+      syncPending: "Bộ sưu tập đang đồng bộ — OpenSea thường mất 24–48h sau khi rao.",
+      bridge: "Cầu nối chuỗi chéo đang bảo trì. Dự kiến: 24h.",
+      verifyPending: "Bộ sưu tập đang chờ dấu ✓ Verified của OpenSea. Rao xong sẽ hiển thị sau đó.",
+      cf: "Chợ bên thứ ba tạm thời không kết nối được — tin rao của bạn trên UVEL vẫn an toàn. Thử lại sau nhé.",
+    },
+},
 
   genesisHowItWorks: {
     navTitle: "Giới thiệu suất Genesis",
@@ -6241,7 +6452,9 @@ export const vi: Messages = {
     cancelCta: "Hủy",
     reasonNewAddressAge: "Địa chỉ nhận vừa đổi chưa đủ 7 ngày — lệnh rút lớn sẽ được xác nhận trước",
     startFailed: "Có lỗi xảy ra, vui lòng thử lại sau",
-  },
+
+sandboxMockNotice: "Chế độ trải nghiệm · Không thực hiện chuyển tiền thật",
+},
   learning: {
     centerTitle: "Trung tâm hướng dẫn",
     featuredLabel: "Khóa học đề xuất",
@@ -6273,5 +6486,56 @@ export const vi: Messages = {
     submissionResultUnknown: "Kết quả lần nộp trước vẫn chưa xác định. Lượt gốc được giữ lại để tránh tính trùng; nhấn vào đây để làm mới.",
     courseUpdated: "Bài học đã được cập nhật. Hãy tải lại trước khi trả lời.",
     submitUnconfirmed: "Kết quả nộp bài chưa được xác nhận; tiến độ bài học đã được đọc lại từ máy chủ, phần thưởng sẽ không hiển thị theo trạng thái cục bộ.",
+  },
+
+phonePolicy: {
+  "webNotice": "Bản web không thể chạy tác vụ tính toán trên điện thoại. Tác vụ tiếp tục khi app đã liên kết còn trực tuyến và dừng khi ngoại tuyến. Thiết bị đã mua không bị ảnh hưởng.",
+  "appNotice": "Liên kết và kích hoạt điện thoại này trong app để chạy tác vụ tính toán.",
+  "download": "Tải app",
+  "manage": "Thiết lập tính toán điện thoại",
+  "retry": "Kiểm tra lại",
+  "login": "Đăng nhập lại",
+  "continueWeb": "Tiếp tục dùng bản web",
+  "continueApp": "Tiếp tục trong app",
+  "confirmReplacement": "Xác nhận thay thế và kích hoạt",
+  "replaceNotice": "Thao tác thay điện thoại đã liên kết. Nếu đã bật, suất chạy chuyển sang điện thoại hiện tại; không thể kích hoạt lại điện thoại cũ từ thiết bị này. Thiết bị đã mua không bị ảnh hưởng.",
+  "errors": {
+    "config-unavailable": "Chưa thể đọc cài đặt đổi điện thoại. Hãy kiểm tra lại trước khi thay thế.",
+    "web-only": "Cài đặt và mở UVEL trên điện thoại để bật tính toán.",
+    "replacement-disabled": "Tài khoản đã liên kết với điện thoại khác và không được phép đổi thiết bị. Tác vụ điện thoại tạm dừng; thiết bị đã mua không bị ảnh hưởng.",
+    "cooldown": "Chưa hết thời gian chờ đổi điện thoại. Có thể đổi từ: {date}.",
+    "device-mismatch": "Điện thoại hiện tại không khớp với thiết bị đã đăng ký. Hãy đánh giá lại trước khi thay thế và kích hoạt.",
+    "slots-full": "Đã đạt giới hạn thiết bị. Hãy tắt một thiết bị trước khi bật tính toán điện thoại.",
+    "storage-failed": "Chưa lưu được kết quả kích hoạt. Kiểm tra kết nối và thử lại.",
+    "reauth-required": "Đăng nhập lại trên điện thoại đã liên kết để tiếp tục tác vụ."
+  }
+},
+publicCopy: {
+    // Phone policy uses the same keys on APP and H5.
+    memberIdle: "Chưa hoạt động",
+    experienceDepositCredited: "Đã ghi có tiền nạp trải nghiệm: {amount} USDT",
+    orderWaitingSlot: "Chờ có suất thiết bị chạy để kích hoạt",
+    experienceMode: "Chế độ trải nghiệm · Không dùng tiền thật",
+    operationUnconfirmed: "Chưa thể xác nhận kết quả. Tải lại để kiểm tra trước khi thử lại.",
+    accountDeletionBlocked: "Hiện chưa thể xóa tài khoản. Liên hệ hỗ trợ để kiểm tra.",
+    helpTitle: "Hướng dẫn",
+    statusHelp: "Xem trạng thái hiện tại trên trang tương ứng. Liên hệ hỗ trợ nếu cần trợ giúp.",
+    earningsHelp: "Xem lịch sử thu nhập để biết số tiền thực nhận và trạng thái xử lý.",
+    quotaUnavailable: "Hiện chưa thể mua",
+    contactSupport: "Liên hệ hỗ trợ",
+    rewardSpin: "Lượt quay ×{n}",
+    rewardBadge: "Huy hiệu ×{n}",
+    rewardOther: "Phần thưởng ×{n}",
+    benefitAvailable: "Có thể kích hoạt quyền lợi",
+    benefitAmount: "Giá trị quyền lợi: {value}",
+    dailyMilestone: "Phần thưởng ngày {n}",
+    dailyHistory: "Phần thưởng điểm danh",
+    rankHelp: "Xem cấp hiện tại và danh hiệu đã đạt trên trang Cấp bậc.",
+    refundHelp: "Phần thưởng có thể thay đổi nếu đơn hàng được hoàn tiền hoặc tranh chấp. Xem lịch sử ghi nhận.",
+    pendingHelp: "Phần thưởng đang chờ xác nhận chưa thể rút. Trạng thái sẽ cập nhật sau khi xác nhận.",
+    participationUnavailable: "Chưa tham gia",
+    applicationUnknown: "Chưa thể xác nhận kết quả đăng ký. Vui lòng xem lịch sử đăng ký sau.",
+    nextSettlement: "Kỳ quyết toán tiếp theo sau {n}",
+    settlementPeriod: "Quyết toán {freq}",
   },
 };

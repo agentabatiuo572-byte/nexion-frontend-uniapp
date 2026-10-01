@@ -18,7 +18,7 @@
   <view v-if="spin.open" class="lss-root" role="dialog" aria-modal="true">
     <view class="lss-backdrop nx-sheet-fade-in" @click="onBackdrop" />
 
-    <view class="lss-panel nx-sheet-slide-up" @click.stop>
+    <view class="nx-glass-sheet lss-panel nx-sheet-slide-up" @click.stop>
       <!-- header -->
       <view class="lss-head">
         <view class="lss-head-l">
@@ -146,13 +146,9 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, ref, onUnmounted, watch } from "vue";
-import type { CSSProperties } from "vue";
-import {
-  useLuckySpin,
-  SPIN_PRIZES,
-  type SpinPrize,
-} from "@/store/lucky-spin";
+import { computed, ref, onUnmounted, watch, type CSSProperties } from "vue";
+
+import { useLuckySpin, SPIN_PRIZES, type SpinPrize } from "@/store/lucky-spin";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { mockServerNow } from "@/store/server-time";
 import { toast, confirm, netError } from "@/store/ui";
@@ -493,6 +489,8 @@ onUnmounted(() => clearSettleTimer());
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
+
+
 </script>
 
 <style scoped>
@@ -508,7 +506,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   backdrop-filter: blur(10px) saturate(150%);
   -webkit-backdrop-filter: blur(10px) saturate(150%);
 }
-.lss-panel {
+.lss-panel { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge);
   position: absolute;
   left: 0;
   right: 0;
@@ -516,10 +514,10 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   z-index: 800;
   max-height: calc(100% - 24px);
   overflow-y: auto;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  background: var(--v5-surface);
-  border-top: 1px solid var(--v5-border);
+
+
+  background: var(--nx-glass-fill);
+  border: none;
   padding: 18px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
 }

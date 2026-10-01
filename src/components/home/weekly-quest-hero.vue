@@ -1,7 +1,7 @@
 <!-- Weekly Tier 1 is rendered and claimed only from the authenticated server projection. -->
 <template>
   <view v-if="visible" class="mt-3">
-    <view class="relative overflow-hidden" :style="cardStyle">
+    <view class="nx-glass-card relative overflow-hidden" :style="cardStyle">
       <!-- top edge accent line — warning amber sweep -->
       <view aria-hidden :style="accentLineStyle" />
       <!-- soft top-right radial wash -->
@@ -72,12 +72,7 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import {
-  questTargetBusiness,
-  unclaimableBusinessQuests,
-  questBusinessContractViolation,
-  type QuestTargetAvailability,
-} from "@/lib/quest-business-availability";
+import { questTargetBusiness, unclaimableBusinessQuests, questBusinessContractViolation, type QuestTargetAvailability } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -194,11 +189,11 @@ async function onClaim() {
 }
 
 // ── styles ──
-const cardStyle: CSSProperties = {
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   position: "relative",
   padding: "18px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
 };
 const accentLineStyle: CSSProperties = {
   position: "absolute",
@@ -321,4 +316,6 @@ const claimStyle: CSSProperties = {
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
 };
+
+
 </script>

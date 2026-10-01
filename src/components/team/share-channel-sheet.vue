@@ -9,11 +9,11 @@
 <template>
   <view v-if="open" class="ss-root" role="dialog" aria-modal="true" :aria-label="t.share.channelTitle">
     <view class="ss-mask" @click="emit('close')" />
-    <view class="ss-sheet">
+    <view class="nx-glass-sheet ss-sheet" role="dialog" aria-modal="true" :aria-label="t.share.channelTitle">
       <view class="ss-grab" />
       <view class="ss-head">
         <text class="ss-head__t">{{ t.share.channelTitle }}</text>
-        <view class="ss-head__x active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
+        <view class="ss-head__x active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')"  @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -21,12 +21,12 @@
         <text class="ss-reward__t">{{ rewardLineText }}</text>
       </view>
       <view class="ss-grid">
-        <view v-for="c in channels" :key="c.key" class="ss-ch active:scale-95" role="button" :tabindex="channelBusy ? -1 : 0" :aria-busy="channelBusy" :aria-disabled="channelBusy" @click="onChannel(c)" @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)">
+        <view v-for="c in channels" :key="c.key" class="ss-ch active:scale-95" role="button" :tabindex="channelBusy ? -1 : 0" :aria-busy="channelBusy" :aria-disabled="channelBusy" @click="onChannel(c)"  @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)">
           <view class="ss-ch__ic" :class="{ 'ss-ch__ic--hl': c.intentType === 'copy' || c.intentType === 'poster' }" v-html="channelMeta(c.key).svg" />
           <text class="ss-ch__lb">{{ channelMeta(c.key).label }}</text>
         </view>
       </view>
-      <view class="ss-cancel active:opacity-70" role="button" tabindex="0" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
+      <view class="ss-cancel active:opacity-70" role="button" tabindex="0" @click="emit('close')"  @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
         <text class="ss-cancel__t">{{ t.share.cancel }}</text>
       </view>
     </view>
@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, nextTick } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -120,11 +120,13 @@ async function onChannel(c: ShareChannelDef) {
 }
 
 useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
+
+
 </script>
 
 <style scoped>
 .ss-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
-.ss-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--v5-surface); border-top: 1px solid var(--v5-border-strong); border-radius: 22px 22px 0 0; max-height: 80vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ss-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.ss-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none;  max-height: 80vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ss-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ss-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .ss-grab { width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: 10px auto 0; }
 .ss-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 0; }
@@ -141,4 +143,6 @@ useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 /* 转化场景 cancel 必须弱于主操作:ghost、font-normal、ink-3。 */
 .ss-cancel { margin: 8px 16px 16px; min-height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .ss-cancel__t { font-size: 13px; font-weight: 400; color: var(--v5-ink-3); }
+.ss-sheet [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .ss-sheet { animation: none; } }
 </style>

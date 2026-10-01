@@ -16,28 +16,8 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.bills.title" />
 
-      <!-- 类型是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被浏览器当成
-           toggle button,读屏按复选框朗读 —— 用户会以为能同时选多个类型。改 radiogroup/radio。
-           🔴 补 roving tabindex + 左右方向键:只加 role=radio 而每个成员都 tabindex="0",
-           键盘上仍是三个独立 Tab 停靠点、组内方向键无效,不满足单选组契约(zentao #94)。 -->
-      <view class="flex" :style="segWrapStyle" role="radiogroup" :aria-label="t.bills.tabGroupLabel">
-        <view
-          v-for="(tb, i) in TABS"
-          :key="tb"
-          role="radio"
-          :tabindex="tab === tb ? 0 : -1"
-          :aria-checked="tab === tb ? 'true' : 'false'"
-          :aria-label="tabLabel(tb)"
-          class="nx-bills-type-radio flex-1 grid place-items-center active:opacity-70"
-          :style="pillStyle(tb)"
-          @click="tab = tb"
-          @keydown.enter.prevent="tab = tb"
-          @keydown.space.prevent="tab = tb"
-          @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)"
-        >
-          <text :style="pillLabelStyle(tb)">{{ tabLabel(tb) }}</text>
-        </view>
-      </view>
+      <!-- Tabs -->
+      <GlassSegments :label="t.bills.tabGroupLabel" semantics="radio" v-model="tab" :options="tabOptions" style="margin: 0 16px 12px"  />
 
       <view v-if="initialError" :style="ledgerErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
@@ -82,7 +62,7 @@
                 <text v-if="b.ref && b.memoKey !== 'learningReward'" style="color: var(--v5-ink-4); margin: 0 4px">·</text>
                 <text v-if="b.ref && b.memoKey !== 'learningReward'" class="font-mono-tabular">{{ b.ref }}</text>
               </view>
-              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)" @keydown.enter.prevent="toggleSourceRef(b.id)" @keydown.space.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
+              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)"  @keydown.enter.prevent="toggleSourceRef(b.id)" @keydown.space.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
               <text class="block" :style="timeStyle">{{ fmtTime(b.ts) }}</text>
             </view>
@@ -274,7 +254,7 @@ function billMemo(b: Bill): string {
 }
 function toggleSourceRef(id: string) { sourceRefOpen.value = sourceRefOpen.value === id ? "" : id; }
 function runningBalanceLabel(bal: number): string {
-  return `${t.value.bills.runningBalance}: $${bal.toFixed(2)}`;
+  return `${t.value.bills.runningBalance}: ${bal.toFixed(2)}`;
 }
 function fmtAmount(b: Bill): string {
   const abs = Math.abs(b.amount);
@@ -509,4 +489,7 @@ const footerStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const tabOptions = computed(() => TABS.map(value => ({ value, label: tabLabel(value) })));
 </script>

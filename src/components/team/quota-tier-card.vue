@@ -12,7 +12,7 @@
   locked-state rgba-white fills → surface-2 token.
 -->
 <template>
-  <view class="rounded-2xl" :style="cardStyle">
+  <view class="nx-glass-card rounded-2xl" :style="cardStyle">
     <!-- header -->
     <view class="flex items-start justify-between">
       <view class="flex items-center" style="gap: 8px">
@@ -106,11 +106,9 @@ const priceLineText = computed(() =>
 // ─── styles ───
 // Whitelist tier card: fill only, no border — unlocked keeps the tint-wash
 // gradient as the single visual difference vs the locked plain surface.
-const cardStyle = computed<CSSProperties>(() => ({
+const cardStyle = computed<CSSProperties>(() => ({ borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
-  background: unlocked.value
-    ? `linear-gradient(180deg, color-mix(in srgb, ${props.tier.tint} 10%, transparent) 0%, var(--v5-surface) 100%)`
-    : "var(--v5-surface)",
+  background: "var(--nx-glass-fill)",
 }));
 const iconBoxStyle = computed<CSSProperties>(() => ({
   width: "40px",
@@ -178,4 +176,6 @@ const lockedCtaStyle: CSSProperties = {
   gap: "6px",
   background: "var(--v5-surface-2)",
 };
+
+
 </script>

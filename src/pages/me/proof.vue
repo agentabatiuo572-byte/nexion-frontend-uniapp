@@ -18,39 +18,19 @@
         <view v-if="remoteApiEnabled && remoteError" :style="remoteErrorStyle">
           <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof" @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
+          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof"  @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
         </view>
 
       <view :style="bodyStyle">
         <!-- Variant tabs -->
         <view>
           <text class="block font-mono-tabular" :style="variantLabelStyle">{{ t.proof.variantLabel }}</text>
-          <!-- 三种视图是互斥单选(选一个,其余取消)。原先 role="button" + aria-pressed 被
-               浏览器当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio +
-               aria-checked + roving tabindex + 左右方向键。 -->
-          <view class="grid grid-cols-3" :style="variantTabsStyle" role="radiogroup" :aria-label="t.proof.variantLabel">
-            <view
-              v-for="(v, vi) in VARIANTS"
-              :key="v"
-              class="grid place-items-center active:scale-[0.97]"
-              :style="variantPillStyle(v)"
-              role="radio"
-              :tabindex="variant === v ? 0 : -1"
-              :aria-label="t.proof.variants[v]"
-              :aria-checked="variant === v ? 'true' : 'false'"
-              @click="variant = v"
-              @keydown.enter.stop.prevent="variant = v"
-              @keydown.space.stop.prevent="variant = v"
-              @keydown.left.prevent="moveVariant(vi, -1)"
-              @keydown.right.prevent="moveVariant(vi, 1)"
-            >
-              <text :style="variantPillTextStyle(v)" style="pointer-events: none">{{ t.proof.variants[v] }}</text>
-            </view>
-          </view>
+          <GlassSegments semantics="radio" v-model="variant" :options="variantOptions" :label="t.proof.variantLabel" style="margin-top: 8px" />
         </view>
 
         <!-- Share card -->
-        <view v-if="!remoteApiEnabled || remoteSnapshot" class="relative overflow-hidden" :style="shareCardStyle">
+        <view v-if="!remoteApiEnabled || remoteSnapshot" class="nx-glass-card relative overflow-hidden" :style="shareCardStyle">
+          <text v-if="!remoteApiEnabled || remoteSnapshot?.sourceEnvironment === 'SANDBOX'" class="block" style="margin-bottom: 12px; font-size: 12px; color: var(--v5-ink-3)">{{ t.proof.shareDemo }}</text>
           <!-- brand -->
           <view class="flex items-center" style="gap: 8px">
             <BrandLockup :height="40" />
@@ -129,8 +109,8 @@
                 tabindex="0"
                 :aria-label="t.proof.shareDestinations.copy"
                 @click="copyLink"
-                @keydown.enter.stop.prevent="copyLink"
-                @keydown.space.stop.prevent="copyLink"
+
+                @keydown.enter.stop.prevent="copyLink" @keydown.space.stop.prevent="copyLink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                 <text style="margin-left: 4px; pointer-events: none">{{ referralLink }}</text>
@@ -153,8 +133,8 @@
             tabindex="0"
             :aria-label="t.proof.shareNative"
             @click="nativeShare"
-            @keydown.enter.stop.prevent="nativeShare"
-            @keydown.space.stop.prevent="nativeShare"
+
+            @keydown.enter.stop.prevent="nativeShare" @keydown.space.stop.prevent="nativeShare"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
             <text style="margin-left: 8px; pointer-events: none" :style="nativeBtnTextStyle">{{ t.proof.shareNative }}</text>
@@ -173,8 +153,8 @@
             tabindex="0"
             :aria-label="d.label"
             @click="d.onClick"
-            @keydown.enter.stop.prevent="d.onClick"
-            @keydown.space.stop.prevent="d.onClick"
+
+            @keydown.enter.stop.prevent="d.onClick" @keydown.space.stop.prevent="d.onClick"
           >
             <view class="grid place-items-center" :style="destIconStyle(d.color)" style="pointer-events: none">
               <view v-html="d.icon" />
@@ -228,11 +208,7 @@ import type { ProofSnapshot } from "@/api/proof-api";
 import { proofStreakFacts } from "@/lib/proof-streak";
 import { proofPosterText } from "@/lib/proof-poster-values";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import {
-  captureRuntimeRevision,
-  isCurrentRuntimeRevision,
-  subscribeRuntimeRevision,
-} from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 type Variant = "earnings" | "streak" | "network";
 const VARIANTS: Variant[] = ["earnings", "streak", "network"];
@@ -361,7 +337,7 @@ const shareText = computed(() => {
       : `🔥 ${longestOrCurrent.value}-day streak on UVEL. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
     return `🌐 My UVEL network has ${totalMembers.value ?? "—"} members. Explore UVEL: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotalText.value} on UVEL in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
+  return `💸 Earned ${earningsTotalText.value} on UVEL in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
@@ -502,7 +478,7 @@ function posterMetricValue(): string {
     ? t.value.proof.valueUnavailable
     : `${proofPosterText(longestOrCurrent.value)} ${t.value.proof.daysShort}`;
   if (variant.value === "network") return proofPosterText(totalMembers.value);
-  return `$${earningsTotalText.value}`;
+  return `${earningsTotalText.value}`;
 }
 
 function drawPosterQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number) {
@@ -608,21 +584,7 @@ function variantPillTextStyle(v: Variant): CSSProperties {
   const on = variant.value === v;
   return { fontSize: "12px", fontWeight: 600, color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
 }
-const shareCardStyle = computed<CSSProperties>(() => {
-  // Proof "certificate" — single container (form b): the gradient fill is the
-  // poster look; the accent border is dropped (filled = no border). Gradient
-  // literals → token color-mix (lemon brand / tech-cyan / brand-2 / warning over
-  // a near-black surface; matches source intent, token-disciplined).
-  const grad: Record<Variant, string> = {
-    earnings:
-      "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 18%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent) 100%)",
-    streak:
-      "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-warning) 18%, transparent) 100%)",
-    network:
-      "linear-gradient(135deg, color-mix(in srgb, var(--v5-tech-cyan) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-brand) 16%, transparent) 100%)",
-  };
-  return { marginTop: "12px", borderRadius: "16px", padding: "20px", background: grad[variant.value] };
-});
+const shareCardStyle: CSSProperties = { marginTop: "12px", padding: "20px" };
 const profileNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)" };
 const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function heroKickerStyle(color: string): CSSProperties {
@@ -737,4 +699,7 @@ const tipBodyStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-warning) 85%, transparent)",
   lineHeight: 1.625,
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const variantOptions = computed(() => VARIANTS.map(value => ({ value, label: t.value.proof.variants[value] })));
 </script>

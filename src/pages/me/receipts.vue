@@ -30,10 +30,10 @@
             :aria-label="remoteReceiptKindLabel(kind)"
             :aria-selected="remoteReceiptKind === kind ? 'true' : 'false'"
             @click="selectRemoteReceiptKind(kind)"
-            @keydown.enter.prevent="selectRemoteReceiptKind(kind)"
-            @keydown.space.prevent="selectRemoteReceiptKind(kind)"
-            @keydown.left.prevent="moveRemoteReceiptKind(kindIndex, -1)"
-            @keydown.right.prevent="moveRemoteReceiptKind(kindIndex, 1)"
+
+
+
+            @keydown.enter.prevent="selectRemoteReceiptKind(kind)" @keydown.space.prevent="selectRemoteReceiptKind(kind)" @keydown.left.prevent="moveRemoteReceiptKind(kindIndex, -1)" @keydown.right.prevent="moveRemoteReceiptKind(kindIndex, 1)"
           >
             <text :style="remoteTabLabelStyle(kind)">{{ remoteReceiptKindLabel(kind) }}</text>
           </view>
@@ -58,8 +58,8 @@
               role="button"
               tabindex="0"
               @click.stop="openRemoteComputeReceipt(r)"
-              @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)"
-              @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
+
+              @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
@@ -92,8 +92,8 @@
           tabindex="0"
           :aria-label="t.empty.errorCta"
           @click="retryRemoteReceipts"
-          @keydown.enter.stop.prevent="retryRemoteReceipts"
-          @keydown.space.stop.prevent="retryRemoteReceipts"
+
+          @keydown.enter.stop.prevent="retryRemoteReceipts" @keydown.space.stop.prevent="retryRemoteReceipts"
         >
           <text :style="rowSubStyle">{{ t.empty.errorDesc }} · {{ t.empty.errorCta }}</text>
         </view>
@@ -105,8 +105,8 @@
           tabindex="0"
           :aria-disabled="remoteMoreLoading"
           @click="loadSelectedMoreRemoteReceipts"
-          @keydown.enter.stop.prevent="loadSelectedMoreRemoteReceipts"
-          @keydown.space.stop.prevent="loadSelectedMoreRemoteReceipts"
+
+          @keydown.enter.stop.prevent="loadSelectedMoreRemoteReceipts" @keydown.space.stop.prevent="loadSelectedMoreRemoteReceipts"
         >
           <text :style="rowSubStyle">{{ remoteMoreLoading ? "…" : t.receipt.loadMore }}</text>
         </view>
@@ -114,28 +114,7 @@
 
       <!-- Tabs + clear-all -->
       <view v-if="!remoteReceiptsMode" class="flex items-center" :style="tabsRowStyle">
-        <scroll-view scroll-x class="flex-1 min-w-0" :show-scrollbar="false" style="white-space: nowrap">
-          <view class="inline-flex" style="gap: 6px; padding: 0 1px 4px" role="tablist" :aria-label="t.receipt.categoryGroupLabel">
-            <view
-              v-for="(c, cIndex) in TAB_ORDER"
-              :key="c"
-              class="inline-flex items-center shrink-0 active:opacity-70"
-              :style="tabPillStyle(c)"
-              role="tab"
-              :tabindex="tab === c ? 0 : -1"
-              :aria-label="tabLabel(c)"
-              :aria-selected="tab === c ? 'true' : 'false'"
-              @click="tab = c"
-              @keydown.enter.prevent="tab = c"
-              @keydown.space.prevent="tab = c"
-              @keydown.left.prevent="moveCategoryTab(cIndex, -1)"
-              @keydown.right.prevent="moveCategoryTab(cIndex, 1)"
-            >
-              <text :style="tabLabelStyle(c)">{{ tabLabel(c) }}</text>
-              <text v-if="counts[c] > 0" class="font-mono-tabular tabular-nums" :style="tabCountStyle">{{ counts[c] }}</text>
-            </view>
-          </view>
-        </scroll-view>
+        <GlassSegments :label="t.receipt.categoryGroupLabel" v-model="tab" :options="categoryOptions" layout="scroll" class="flex-1 min-w-0"  />
         <view v-if="receipts.length > 0" class="grid place-items-center shrink-0 active:opacity-70" :style="clearBtnStyle" role="button" tabindex="0" :aria-label="t.receipt.clearAll" @click="handleClearAll" @keydown.enter.prevent="handleClearAll" @keydown.space.prevent="handleClearAll">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
         </view>
@@ -155,8 +134,8 @@
           tabindex="0"
           :aria-label="`${r.model} ${typeLabel(r)}`"
           @click="open = r"
-          @keydown.enter.prevent="open = r"
-          @keydown.space.prevent="open = r"
+
+          @keydown.enter.prevent="open = r" @keydown.space.prevent="open = r"
           @longpress="copySig(r)"
         >
           <view class="grid place-items-center shrink-0" :style="rowIconStyle(r)">
@@ -209,9 +188,9 @@ import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
-import { useDeposits } from "@/store/deposits";
+import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
-import type { ServerReceiptListItem } from "@/store/deposits";
+
 import { presentVietQrReceipt } from "@/lib/vietqr-receipt-presentation";
 import { createReceiptsPageRequestFence } from "./receipts-page-request-fence";
 import { canLoadRemoteComputeMore } from "./receipts-page-pagination";
@@ -590,7 +569,7 @@ function copySig(r: Receipt) {
 }
 
 function rowAmount(r: Receipt): string {
-  return r.category === "KY" ? `✓ $${r.netPaid.toFixed(2)}` : `+$${r.netPaid.toFixed(4)}`;
+  return r.category === "KY" ? `✓ ${r.netPaid.toFixed(2)}` : `+${r.netPaid.toFixed(4)}`;
 }
 function shortDate(ts: number): string {
   const d = new Date(ts);
@@ -705,4 +684,7 @@ const footerStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const categoryOptions = computed(() => TAB_ORDER.map(value => ({ value, label: tabLabel(value), count: counts.value[value] || undefined })));
 </script>

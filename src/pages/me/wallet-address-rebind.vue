@@ -25,10 +25,10 @@
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
-            @keydown.enter.prevent="switchNetwork(nw.id)"
-            @keydown.space.prevent="switchNetwork(nw.id)"
-            @keydown.left.prevent="moveNetwork(-1)"
-            @keydown.right.prevent="moveNetwork(1)"
+
+
+
+            @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
             <text v-if="nw.id === 'usdt-trc20'" :style="netChipTagStyle">{{ t.topupChrome.netRecommended }}</text>
@@ -161,7 +161,7 @@
         </view>
 
         <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.currentLabel }}</text></view>
-        <view class="mt-2" :style="currentCardStyle">
+        <view class="nx-glass-card mt-2" :style="currentCardStyle">
           <view class="flex items-center" style="gap: 8px">
             <text class="font-mono flex-1 min-w-0" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ maskAddressMid(current?.address ?? '') }}</text>
             <view v-if="current?.source === 'migrated'" class="shrink-0 grid place-items-center" :style="migratedBadgeStyle">
@@ -200,8 +200,8 @@
               role="button" tabindex="0"
               :aria-disabled="remoteRefreshPending ? 'true' : 'false'"
               @click="retryRemoteSnapshot"
-              @keydown.enter.prevent="retryRemoteSnapshot"
-              @keydown.space.prevent="retryRemoteSnapshot"
+
+              @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"
             >
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ remoteRefreshPending ? t.addrRebind.refreshingStatus : t.addrRebind.refreshTimeStatusCta }}</text>
             </view>
@@ -257,17 +257,8 @@ import { useConfig } from "@/store/config";
 import { usePayoutAddress } from "@/store/payout-address";
 import { mockServerNow } from "@/store/server-time";
 import { otpSend, otpVerify } from "@/store/auth-otp";
-import {
-  formatClock,
-  isChainAddressValid,
-  maskAddressMid,
-} from "@/store/payout-address-core";
-import {
-  advanceMonotonicHighWater,
-  deadlineRemainingMs,
-  projectServerNow,
-  readTrustedMonotonicNowMs,
-} from "@/lib/server-deadline-clock";
+import { formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
+import { advanceMonotonicHighWater, deadlineRemainingMs, projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import type { ChainDepositChannel } from "@/store/types";
 
 const t = useT();
@@ -760,10 +751,10 @@ const blockBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
   gap: "8px",
 };
-const currentCardStyle: CSSProperties = {
+const currentCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
 };
 const migratedBadgeStyle: CSSProperties = {
   padding: "3px 8px",
@@ -855,6 +846,8 @@ const successRowValStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink)",
 };
+
+
 </script>
 
 <style scoped>

@@ -1,12 +1,12 @@
 <!-- Weekly Tier 2 is server-authoritative; pending rows use PC-configured routes. -->
 <template>
-  <view v-if="mounted && wq.error && !wq.snapshot" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
+  <view v-if="mounted && wq.error && !wq.snapshot" class="nx-glass-card mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
     <text :style="pendingLabelStyle">{{ w.loadError }}</text>
   </view>
-  <view v-else-if="mounted && !wq.snapshot" class="mx-4 mt-3 px-4 py-3" :style="cardStyle">
+  <view v-else-if="mounted && !wq.snapshot" class="nx-glass-card mx-4 mt-3 px-4 py-3" :style="cardStyle">
     <text :style="pendingLabelStyle">{{ w.loading }}</text>
   </view>
-  <view v-else-if="mounted" class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
+  <view v-else-if="mounted" class="nx-glass-card mx-4 mt-3 overflow-hidden" :style="cardStyle">
     <!-- Header -->
     <view class="px-4 py-3 flex items-center justify-between" :style="headerStyle">
       <text :style="tier2LabelStyle">{{ w.tier2Label }}</text>
@@ -87,11 +87,7 @@ import { toast } from "@/store/ui";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import {
-  questTargetBusiness,
-  unclaimableBusinessQuests,
-  type QuestTargetAvailability,
-} from "@/lib/quest-business-availability";
+import { questTargetBusiness, unclaimableBusinessQuests, type QuestTargetAvailability } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
@@ -209,9 +205,9 @@ async function onClaimRow(q: CanonicalQuest) {
 // ── styles ──
 // Form-b: filled container, no border — quest rows keep their hairline dividers,
 // tinted claim states, and champion bonus row inside.
-const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const headerStyle: CSSProperties = { borderBottom: "1px solid var(--v5-border)" };
 const tier2LabelStyle: CSSProperties = {
@@ -326,4 +322,6 @@ const bonusDoneTextStyle: CSSProperties = {
   color: "var(--v5-success)",
   fontWeight: 500,
 };
+
+
 </script>

@@ -13,7 +13,7 @@
       <SubPageHeader :back="returnTo" />
 
       <!-- Hero -->
-      <view class="mx-4" :style="heroStyle">
+      <view class="nx-glass-card mx-4" :style="heroStyle">
         <view class="flex items-center" style="gap: 8px; margin-bottom: 6px">
           <view class="grid place-items-center" :style="heroIconBoxStyle">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
@@ -30,7 +30,7 @@
         </view>
         <view v-else-if="loadError" :style="hintStyle">
           <text :style="hintTextStyle">{{ loadError }}</text>
-          <text v-if="canRetryLoad" class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ w.reloadRegionCta }}</text>
+          <text v-if="canRetryLoad" class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="reload"  @keydown.enter.prevent="reload" @keydown.space.prevent="reload">{{ w.reloadRegionCta }}</text>
         </view>
       </view>
 
@@ -80,8 +80,8 @@
           :aria-disabled="!scrolledToBottom || accepted"
           :aria-label="w.checkboxLabel"
           @click="toggleCheck"
-          @keydown.enter.prevent="toggleCheck"
-          @keydown.space.prevent="toggleCheck"
+
+          @keydown.enter.prevent="toggleCheck" @keydown.space.prevent="toggleCheck"
         >
           <view class="grid place-items-center shrink-0" :style="checkboxStyle">
             <svg v-if="checked || accepted" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -96,8 +96,8 @@
           tabindex="0"
           :aria-disabled="!canAccept && !accepted"
           @click="onAccept"
-          @keydown.enter.prevent="onAccept"
-          @keydown.space.prevent="onAccept"
+
+          @keydown.enter.prevent="onAccept" @keydown.space.prevent="onAccept"
         >
           <template v-if="accepted">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
@@ -122,13 +122,7 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { resolveRiskDisclosureDisplayLanguage, riskDisclosureChapterCopy } from "@/lib/risk-disclosure-language";
-import {
-  canAcknowledgeRiskDisclosure,
-  canCompleteRiskDisclosureReadingFromScrollEvent,
-  EMPTY_RISK_DISCLOSURE_READING_STATE,
-  riskDisclosureDocumentIdentity,
-  updateRiskDisclosureReadingState,
-} from "@/lib/risk-disclosure-reading-gate";
+import { canAcknowledgeRiskDisclosure, canCompleteRiskDisclosureReadingFromScrollEvent, EMPTY_RISK_DISCLOSURE_READING_STATE, riskDisclosureDocumentIdentity, updateRiskDisclosureReadingState } from "@/lib/risk-disclosure-reading-gate";
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
@@ -369,10 +363,10 @@ async function reload() {
 // Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——
 // 边界靠 surface 与页面地板的微差色;the brand-2 mood lives in the icon + label.
 // Header provides the 24px top breathing, so no top margin here.
-const heroStyle: CSSProperties = {
-  borderRadius: "16px",
+const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--nx-glass-fill)",
 };
 const heroIconBoxStyle: CSSProperties = {
   width: "36px",
@@ -459,4 +453,6 @@ const acceptBtnStyle = computed<CSSProperties>(() => ({
   fontWeight: 600,
 }));
 const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
+
+
 </script>

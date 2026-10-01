@@ -74,9 +74,9 @@
             :aria-label="kindCardLabel(k)"
             :aria-checked="filter === k ? 'true' : 'false'"
             @click="filter = k"
-            @keydown.enter.prevent="filter = k"
-            @keydown.space.prevent="filter = k"
-            @keydown.left.prevent="moveKindCard(i, -1)" @keydown.right.prevent="moveKindCard(i, 1)"
+
+
+             @keydown.enter.prevent="filter = k" @keydown.space.prevent="filter = k" @keydown.left.prevent="moveKindCard(i, -1)" @keydown.right.prevent="moveKindCard(i, 1)"
           >
             <text :style="{ color: KIND[k].color }">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>
@@ -90,28 +90,7 @@
         <text v-if="remoteApiEnabled" class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.commissions.recentEventsHint, { n: events.length }) }}</text>
 
         <!-- filter pills -->
-        <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%">
-          <view class="inline-flex" style="gap: 6px" role="tablist" :aria-label="t.commissions.pageTitle">
-            <view class="nx-commissions-pill shrink-0 rounded-full grid place-items-center active:opacity-70" :style="pillStyle(filter === 'all', 'var(--v5-brand)')" role="tab" :tabindex="filter === 'all' ? 0 : -1" :aria-selected="filter === 'all' ? 'true' : 'false'" :aria-label="`${t.commissions.all} (${commission.events.length})`" @click="filter = 'all'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
-              <text :style="pillTextStyle(filter === 'all', 'var(--v5-brand)')">{{ t.commissions.all }} ({{ commission.events.length }})</text>
-            </view>
-            <view
-              v-for="k in KIND_ORDER"
-              :key="k"
-              class="nx-commissions-pill shrink-0 rounded-full grid place-items-center active:opacity-70"
-              :style="pillStyle(filter === k, KIND[k].color)"
-              role="tab"
-              :tabindex="filter === k ? 0 : -1"
-              :aria-selected="filter === k ? 'true' : 'false'"
-              :aria-label="`${t.commissions.kind[k]} (${events.filter(e => e.kind === k).length})`"
-              @click="filter = k"
-              @keydown.left.prevent="moveFilter(-1)"
-              @keydown.right.prevent="moveFilter(1)"
-            >
-              <text :style="pillTextStyle(filter === k, KIND[k].color)">{{ t.commissions.kind[k] }} ({{ events.filter(e => e.kind === k).length }})</text>
-            </view>
-          </view>
-        </scroll-view>
+        <GlassSegments :label="t.commissions.pageTitle" v-model="filter" :options="filterOptions" layout="scroll"  />
 
         <!-- event list — transparent hairline group on the page floor -->
         <EmptyState v-if="filtered.length === 0" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
@@ -171,11 +150,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
-import {
-  useCommission,
-  type CommissionEvent,
-  type CommissionKind,
-} from "@/store/commission";
+import { useCommission, type CommissionEvent, type CommissionKind } from "@/store/commission";
 import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
@@ -239,7 +214,7 @@ function coolingTag(e: CommissionEvent): string {
 }
 
 function commissionAmountLabel(e: CommissionEvent): string {
-  const amount = `$${e.amountUSDT.toFixed(2)}`;
+  const amount = `${e.amountUSDT.toFixed(2)}`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected") return amount;
   return `+${amount}`;
@@ -270,7 +245,7 @@ function go(url: string) {
 // 6-kind summary cards double as filter controls: name them with the kind label
 // + current amount/count so a screen reader hears what the tile selects.
 function kindCardLabel(k: CommissionKind): string {
-  return `${t.value.commissions.kind[k]} · $${byKind.value[k].usdt.toFixed(0)} · ${byKind.value[k].count} ${t.value.commissions.events}`;
+  return `${t.value.commissions.kind[k]} · ${byKind.value[k].usdt.toFixed(0)} · ${byKind.value[k].count} ${t.value.commissions.events}`;
 }
 
 // Filter pills are one roving-tabindex tablist (same idiom as leaderboard/unilevel):
@@ -433,6 +408,12 @@ const extendedBadgeStyle: CSSProperties = {
   borderRadius: "4px",
 };
 const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const filterOptions = computed(() => [
+  { value: "all", label: t.value.commissions.all, count: commission.events.length },
+  ...KIND_ORDER.map(value => ({ value, label: t.value.commissions.kind[value], count: byKind.value[value].count })),
+]);
 </script>
 
 <style scoped>

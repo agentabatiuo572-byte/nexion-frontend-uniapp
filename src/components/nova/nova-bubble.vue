@@ -18,10 +18,10 @@
 -->
 <template>
   <view>
-    <view v-if="visible" class="nx-nova-bubble nova-float" :class="{ 'nx-nova-bubble--dimmed': dimmed }" role="button" tabindex="0" :aria-label="t.conversations.title" @click="open" @keydown.enter.prevent="open" @keydown.space.prevent="open">
-      <view class="nx-nova-btn nova-pulse">
-        <NovaAvatar :size="36" pulse />
-        <view v-if="showUnreadBadge" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
+    <view v-if="visible" class="nx-nova-bubble"    :class="{ 'nx-nova-bubble--dimmed': dimmed }" role="button" tabindex="0" :aria-label="t.conversations.title" @click="open"  @keydown.enter.prevent="open" @keydown.space.prevent="open">
+      <view class="nx-nova-btn nx-nova-motion">
+        <NovaAvatar :size="36" :pulse="showUnreadBadge && !dimmed" class="nx-nova-avatar" />
+        <view v-if="showUnreadBadge" :key="totalUnread" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
       </view>
     </view>
   </view>
@@ -193,6 +193,8 @@ onUnmounted(() => {
   timers.forEach(clearTimeout);
   intervals.forEach(clearInterval);
 });
+
+
 </script>
 
 <style scoped>
@@ -201,7 +203,7 @@ onUnmounted(() => {
   right: 16px;
   bottom: 100px;
   z-index: 40;
-  transition: opacity 0.15s;
+  transition: opacity 150ms, transform 120ms cubic-bezier(.2,.8,.2,1);
   /* 命中区跟着视觉走。这层是 48×48 的**方框**,而看得见的球是内切圆 —— 四角那
      22% 面积是透明的却照样截走点击(实测 144 点网格:144 点全被吃,只有 112 点
      在圆内)。实付:赚取页「添加设备」按钮左上角约 1/4 面积点下去开的是 Nova。
@@ -209,11 +211,9 @@ onUnmounted(() => {
      角标都不受影响(角标是子元素,不被父级圆角裁剪)。 */
   border-radius: 999px;
 }
-/* 《08》§2 按下反馈。全站五个 tab 都能看到这个球,原先按下去毫无变化。
-   只动 opacity 不动 transform —— .nova-float 的 animation 一直在写 transform,
-   普通声明压不过 animation,写了也不会生效。 */
+/* Press belongs to the outer hit target; idle float belongs to the inner visual. */
 .nx-nova-bubble:active {
-  opacity: 0.7;
+  transform: scale(.94);
 }
 /* 滚动让路态。注意它压不过上面的 :active(带伪类,特异性更高)—— 靠的是
    pointer-events:none 让 :active 根本无从成立,不是靠选择器权重或书写顺序。
@@ -230,11 +230,15 @@ onUnmounted(() => {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: var(--v5-bg);
-  border: 1px solid color-mix(in srgb, var(--v5-brand) 45%, transparent);
+  background: var(--v5-surface);
 }
+/* Float the avatar and badge together while keeping the outer hit target stationary. */
+.nx-nova-motion { position: relative; z-index: 1; animation: nx-nova-float 3.4s ease-in-out infinite; }
+@keyframes nx-nova-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.nx-nova-bubble--dimmed .nx-nova-motion { animation-play-state: paused; }
 .nx-nova-badge {
   position: absolute;
+  z-index: 2;
   top: -4px;
   right: -4px;
   min-width: 18px;
@@ -245,12 +249,21 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   border: 1px solid var(--v5-bg);
+  animation: nx-nova-unread 420ms cubic-bezier(.2,1.5,.3,1) both;
 }
+@keyframes nx-nova-unread { from { transform: scale(.65); } to { transform: scale(1); } }
 .nx-nova-badge-t {
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-v5);
   color: var(--v5-on-brand-2);
   line-height: 1;
+}
+.nx-nova-avatar { position: relative; z-index: 1; }
+.nx-nova-bubble:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .nx-nova-bubble { transition: none; }
+  .nx-nova-bubble:active { transform: none; }
+  .nx-nova-motion, .nx-nova-badge { animation: none; }
 }
 </style>

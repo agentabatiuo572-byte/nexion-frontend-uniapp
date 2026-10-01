@@ -10,23 +10,7 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
-      <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.wallet.chooseMethod">
-        <view
-          v-for="(s, i) in segments"
-          :key="s.id"
-          :class="['nx-topup-seg flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
-          :style="segPillStyle(s.id)"
-          role="tab" :tabindex="seg === s.id ? 0 : -1"
-          :aria-label="segLabel(s.id)"
-          :aria-selected="seg === s.id"
-          @click="seg = s.id"
-          @keydown.enter.prevent="seg = s.id"
-          @keydown.space.prevent="seg = s.id"
-          @keydown.left.prevent="moveSeg(i, -1)" @keydown.right.prevent="moveSeg(i, 1)"
-        >
-          <text :style="segLabelStyle(s.id)">{{ segLabel(s.id) }}</text>
-        </view>
-      </view>
+      <GlassSegments :label="t.wallet.chooseMethod" v-model="seg" :options="segmentOptions" style="margin: 0 16px 16px"  />
 
       <DepositUsdtPane v-if="seg === 'crypto'" />
       <DepositBankPane v-else-if="seg === 'bank'" />
@@ -36,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, type CSSProperties } from "vue";
+import { ref, nextTick, type CSSProperties, computed } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
@@ -105,4 +89,10 @@ function segLabelStyle(id: Seg): CSSProperties {
     color: seg.value === id ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const segmentOptions = computed(() => segments.map(({ id }) => ({
+  value: id, label: segLabel(id), className: `nx-topup-seg-${id}`,
+  dimmed: id === "bank" && !dep.bankRailAvailable,
+})));
 </script>

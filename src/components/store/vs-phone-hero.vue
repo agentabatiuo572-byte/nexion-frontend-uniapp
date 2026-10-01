@@ -4,7 +4,7 @@
   brand-2 radial ambient. Drives the core "117× your phone" conversion hook.
 -->
 <template>
-  <view class="relative overflow-hidden" :style="rootStyle">
+  <view class="nx-glass-card relative overflow-hidden" :style="rootStyle">
     <view aria-hidden :style="auroraStyle" />
     <view class="relative grid gap-2.5 items-center" style="grid-template-columns: 1fr auto 1fr">
       <!-- Base device label resolves from DeviceKind at render time (lib/device-copy.ts):
@@ -39,13 +39,7 @@
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
-import {
-  storefrontNex,
-  storefrontNexFull,
-  storefrontUsd,
-  storefrontUsdFull,
-  type StoreYieldAuthority,
-} from "@/lib/store-yield-authority";
+import { storefrontNex, storefrontNexFull, storefrontUsd, storefrontUsdFull, type StoreYieldAuthority } from "@/lib/store-yield-authority";
 
 const t = useT();
 const props = defineProps<{ authority: StoreYieldAuthority; comparison: import("@/lib/store-upgrade").StoreUpgrade }>();
@@ -63,9 +57,9 @@ const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)} NE
 const phoneNexFullText = computed(() => `+${storefrontNexFull(authority.value.phone)}${t.value.store.vsPerDay}`);
 const entryNexFullText = computed(() => `+${storefrontNexFull(authority.value.entry)}${t.value.store.vsPerDay}`);
 
-const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "14px 16px",
 };
 
@@ -108,4 +102,6 @@ const chipStyle: CSSProperties = {
   fontSize: "13px",
   letterSpacing: "-0.005em",
 };
+
+
 </script>

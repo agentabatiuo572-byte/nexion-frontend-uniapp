@@ -61,7 +61,7 @@
       </view>
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
-      <view class="mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
+      <view class="nx-glass-card mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
         <!-- APP-vue does not paint template SVG nodes. Keep static geometry in
              NativeSvg, with supported native controls over the same 440:240 box. -->
         <!-- #ifdef APP-PLUS -->
@@ -89,7 +89,7 @@
           </view>
           <view v-for="r in regions" :key="r.id" class="nx-globe-native-node"
             :style="nativeNodeStyle(r)" role="button" tabindex="0" :aria-label="regionName(r)"
-            @click="select(r)" @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
+            @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
             <view v-if="pulseRegionId === r.id" :key="`pulse-${r.id}-${pulseTick}`" class="nx-globe-native-pulse"
               :style="{ borderColor: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
             <view class="nx-globe-native-dot" :style="{ background: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
@@ -137,7 +137,7 @@
           />
 
           <!-- Region nodes -->
-          <g v-for="r in regions" :key="r.id" class="cursor-pointer" role="button" tabindex="0" :aria-label="regionName(r)" @click="select(r)" @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
+          <g v-for="r in regions" :key="r.id" class="cursor-pointer" role="button" tabindex="0" :aria-label="regionName(r)" @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
             <circle :cx="r.cx * W" :cy="r.cy * H" r="18" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
             <circle :cx="r.cx * W" :cy="r.cy * H" r="5" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
             <!-- Pulse ring -->
@@ -180,8 +180,8 @@
           role="button"
           tabindex="0"
           @click="select(r)"
-          @keydown.enter.prevent="select(r)"
-          @keydown.space.prevent="select(r)"
+
+          @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)"
         >
           <view class="grid place-items-center shrink-0" :style="regionIconBox(r.isYou)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
@@ -200,8 +200,8 @@
       <!-- Drawer -->
       <view v-if="selected" class="nx-globe-drawer" role="dialog" aria-modal="true">
         <view class="nx-globe-scrim" @click="selected = null" />
-        <view class="relative border rounded-2xl" :style="drawerCardStyle">
-          <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="selected = null" @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
+        <view class="nx-glass-sheet relative border rounded-2xl" :style="drawerCardStyle">
+          <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="selected = null"  @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
           <view class="flex items-center" style="gap: 12px">
@@ -214,17 +214,17 @@
             </view>
           </view>
           <view class="grid grid-cols-3 gap-2 mt-4">
-            <view class="rounded-xl text-center" :style="drawerStatStyle">
+            <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
               <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.devices.toLocaleString() }}</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.globe.activeNodes }}</text>
             </view>
-            <view class="rounded-xl text-center" :style="drawerStatStyle">
+            <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
               <text class="block tabular-nums" :style="drawerStatValStyle">{{ (selected.jobsPerHour / 1000).toFixed(1) }}k/h</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.globe.jobsPerHour }}</text>
             </view>
-            <view class="rounded-xl text-center" :style="drawerStatStyle">
+            <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M12 20h.01" /><path d="M2 8.82a15 15 0 0 1 20 0" /><path d="M5 12.859a10 10 0 0 1 14 0" /><path d="M8.5 16.429a5 5 0 0 1 7 0" /></svg>
               <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.avgLatencyMs === null ? t.globe.metricUnavailable : `${selected.avgLatencyMs}ms` }}</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
@@ -532,8 +532,8 @@ const statValStyle: CSSProperties = {
   marginTop: "4px",
   color: "var(--v5-ink)",
 };
-const mapCardStyle: CSSProperties = {
-  background: "var(--v5-surface-3)",
+const mapCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
   padding: "12px",
 };
 const regionListStyle: CSSProperties = {
@@ -571,11 +571,11 @@ const regionRateStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
-const drawerCardStyle: CSSProperties = {
+const drawerCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "420px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+  background: "var(--nx-glass-fill)",
+  borderColor: "transparent",
   padding: "20px",
 };
 const drawerCloseStyle: CSSProperties = {
@@ -597,7 +597,6 @@ function drawerIconBox(isYou?: boolean): CSSProperties {
   };
 }
 const drawerStatStyle: CSSProperties = {
-  background: "var(--v5-surface-2)",
   padding: "10px",
 };
 const drawerStatValStyle: CSSProperties = {
@@ -616,6 +615,8 @@ const drawerStatLabelStyle: CSSProperties = {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () => { selected.value = null; });
+
+
 </script>
 
 <style scoped>

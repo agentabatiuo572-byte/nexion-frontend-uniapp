@@ -9,11 +9,11 @@
 <template>
   <view v-if="open" class="nx-nickname-sheet-root" role="dialog" aria-modal="true" :aria-label="t.profile.nicknameSheetTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
-      <view class="nx-sheet-fade-in" :style="panelStyle" @click.stop>
+      <view class="nx-glass-sheet nx-sheet-fade-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px">
           <text class="block" :style="titleStyle">{{ t.profile.nicknameSheetTitle }}</text>
-          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameSheetClose" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
+          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameSheetClose" @click="emit('close')"  @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -31,12 +31,12 @@
             :aria-checked="picked === c ? 'true' : 'false'"
             :aria-label="c"
             @click="picked = c"
-            @keydown.enter.prevent="picked = c"
-            @keydown.space.prevent="picked = c"
-            @keydown.up.prevent="moveCandidate(i, -1)"
-            @keydown.down.prevent="moveCandidate(i, 1)"
-            @keydown.left.prevent="moveCandidate(i, -1)"
-            @keydown.right.prevent="moveCandidate(i, 1)"
+
+
+
+
+
+            @keydown.enter.prevent="picked = c" @keydown.space.prevent="picked = c" @keydown.up.prevent="moveCandidate(i, -1)" @keydown.down.prevent="moveCandidate(i, 1)" @keydown.left.prevent="moveCandidate(i, -1)" @keydown.right.prevent="moveCandidate(i, 1)"
           >
             <text class="flex-1 truncate" :style="candidateTextStyle(c)">{{ c }}</text>
             <svg v-if="picked === c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -45,10 +45,10 @@
 
         <!-- Footer: reroll (secondary) + confirm (primary, disabled until picked) -->
         <view class="flex" style="gap: 10px; margin-top: 16px">
-          <view class="grid place-items-center active:opacity-80" :style="rerollBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameReroll" @click="reroll" @keydown.enter.prevent="reroll" @keydown.space.prevent="reroll">
+          <view class="grid place-items-center active:opacity-80" :style="rerollBtnStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameReroll" @click="reroll"  @keydown.enter.prevent="reroll" @keydown.space.prevent="reroll">
             <text :style="rerollTextStyle">{{ t.profile.nicknameReroll }}</text>
           </view>
-          <view class="grid place-items-center" :class="picked ? 'active:opacity-90' : ''" :style="confirmBtnStyle" role="button" :tabindex="picked ? 0 : -1" :aria-disabled="picked ? 'false' : 'true'" :aria-label="t.profile.nicknameConfirm" @click="confirm" @keydown.enter.prevent="confirm" @keydown.space.prevent="confirm">
+          <view class="grid place-items-center" :class="picked ? 'active:opacity-90' : ''" :style="confirmBtnStyle" role="button" :tabindex="picked ? 0 : -1" :aria-disabled="picked ? 'false' : 'true'" :aria-label="t.profile.nicknameConfirm" @click="confirm"  @keydown.enter.prevent="confirm" @keydown.space.prevent="confirm">
             <text :style="confirmTextStyle">{{ t.profile.nicknameConfirm }}</text>
           </view>
         </view>
@@ -121,13 +121,13 @@ const scrimStyle: CSSProperties = {
   justifyContent: "center",
   padding: "24px",
 };
-const panelStyle: CSSProperties = {
+const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "320px",
   zIndex: 800,
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
+  border: "none",
   padding: "18px 16px 20px",
 };
 const titleStyle: CSSProperties = {
@@ -193,4 +193,6 @@ const confirmTextStyle = computed<CSSProperties>(() => ({
   fontWeight: 600,
   color: picked.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
+
+
 </script>

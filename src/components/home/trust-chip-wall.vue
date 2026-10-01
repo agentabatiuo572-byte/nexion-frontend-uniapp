@@ -1,5 +1,5 @@
 <template>
-  <view class="block active:opacity-75" :style="cardStyle" role="link" tabindex="0" @click="goTrust" @keydown.enter.stop.prevent="goTrust">
+  <view class="nx-glass-card block active:opacity-75" :style="cardStyle" role="link" tabindex="0" @click="goTrust" @keydown.enter.stop.prevent="goTrust">
     <view class="flex items-start" style="gap: 12px">
       <view class="grid place-items-center" :style="iconStyle">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -28,4 +28,6 @@ const iconStyle: CSSProperties = { width: "32px", height: "32px", flexShrink: 0,
 const titleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-brand)" };
 const bodyStyle: CSSProperties = { marginTop: "9px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
+
+
 </script>

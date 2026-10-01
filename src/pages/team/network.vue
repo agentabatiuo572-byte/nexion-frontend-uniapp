@@ -26,15 +26,15 @@
              only show the unavailable placeholder when nothing was ever read
              (BUG 63: flipping every figure to "—" mid-refresh blanked the page). -->
         <view class="grid grid-cols-3" style="gap: 8px">
-          <view class="rounded-2xl text-center" :style="metricCardStyle">
+          <view class="nx-glass-card rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.members }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ metricsUnavailable ? '—' : members.length }}</text>
           </view>
-          <view class="rounded-2xl text-center" :style="metricCardStyle">
+          <view class="nx-glass-card rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.activeNow }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ metricsUnavailable ? '—' : activeCount }}</text>
           </view>
-          <view class="rounded-2xl text-center" :style="metricCardStyle">
+          <view class="nx-glass-card rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.direct }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ metricsUnavailable ? '—' : directCount }}</text>
           </view>
@@ -64,8 +64,8 @@
               :aria-label="nodeLabel(p)"
               :style="nativeNodeStyle(p.x, p.y)"
               @click="selected = p.m"
-              @keydown.enter.prevent="selected = p.m"
-              @keydown.space.prevent="selected = p.m"
+
+              @keydown.enter.prevent="selected = p.m" @keydown.space.prevent="selected = p.m"
             >
               <view v-if="pulseId === p.m.id" class="nx-net-native-pulse" :style="{ borderColor: p.kind === 'direct' ? DIRECT_COLOR : EXTENDED_COLOR }" />
               <view :style="{ width: p.kind === 'direct' ? '10px' : '7px', height: p.kind === 'direct' ? '10px' : '7px', borderRadius: '50%', background: p.m.status === 'offline' ? 'var(--v5-ink-4)' : (p.kind === 'direct' ? DIRECT_COLOR : EXTENDED_COLOR), opacity: p.m.status === 'offline' ? 0.6 : 0.95 }" />
@@ -77,8 +77,8 @@
               :aria-label="selfNodeLabel"
               :style="nativeNodeStyle(CENTER, CENTER, 44)"
               @click="openSelf"
-              @keydown.enter.prevent="openSelf"
-              @keydown.space.prevent="openSelf"
+
+              @keydown.enter.prevent="openSelf" @keydown.space.prevent="openSelf"
             >
               <view style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--v5-brand)">
                 <text style="font-family: var(--font-v5); font-weight: 600; font-size: 12px; color: var(--v5-on-brand)">{{ t.network.diagramYou }}</text>
@@ -131,8 +131,8 @@
               tabindex="0"
               :aria-label="nodeLabel(p)"
               @click="selected = p.m"
-              @keydown.enter.prevent="selected = p.m"
-              @keydown.space.prevent="selected = p.m"
+
+              @keydown.enter.prevent="selected = p.m" @keydown.space.prevent="selected = p.m"
             >
               <circle v-if="pulseId === p.m.id" :cx="p.x" :cy="p.y" r="10">
                 <animate attributeName="r" values="4;18;4" dur="1s" repeatCount="1" />
@@ -159,8 +159,8 @@
               tabindex="0"
               :aria-label="selfNodeLabel"
               @click="openSelf"
-              @keydown.enter.prevent="openSelf"
-              @keydown.space.prevent="openSelf"
+
+              @keydown.enter.prevent="openSelf" @keydown.space.prevent="openSelf"
             >
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
               <SvgText x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">{{ t.network.diagramYou }}</SvgText>
@@ -196,7 +196,7 @@
       <!-- Member detail bottom sheet -->
       <view v-if="selected" class="nx-net-sheet-wrap" role="dialog" aria-modal="true">
         <view class="nx-net-scrim" @click="selected = null" />
-        <view class="nx-net-sheet" :style="sheetStyle">
+        <view class="nx-glass-sheet nx-net-sheet" :style="sheetStyle">
           <view class="flex items-start justify-between">
             <view class="flex items-center" style="gap: 12px">
               <view class="rounded-full grid place-items-center" :style="sheetAvatarStyle">
@@ -211,7 +211,7 @@
                 </view>
               </view>
             </view>
-            <view class="grid place-items-center active:opacity-60" :style="sheetCloseStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="selected = null" @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
+            <view class="grid place-items-center active:opacity-60" :style="sheetCloseStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="selected = null"  @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </view>
           </view>
@@ -386,7 +386,7 @@ function statusColor(status: MemberStatus): string {
 
 // ─── styles ───
 // Filled stat tile, no border (single visual difference).
-const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px", padding: "12px" };
+const metricCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)", borderRadius: "var(--nx-glass-radius)", padding: "12px" };
 const errorStateStyle: CSSProperties = { padding: "14px", borderRadius: "14px", background: "var(--v5-warning-soft)", color: "var(--v5-ink)" };
 const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "grid", placeItems: "center", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)" };
 const metricLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
@@ -416,12 +416,12 @@ const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", 
 // SKILL leading-relaxed = 1.625 (原版 .text-[12px] leading-relaxed; was 1.6)
 const footerStyle: CSSProperties = { padding: "0 4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
-const sheetStyle: CSSProperties = {
+const sheetStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   width: "100%",
-  background: "var(--v5-surface)",
-  borderRadius: "16px 16px 0 0",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
   padding: "16px",
-  borderTop: "1px solid var(--v5-border)",
+  borderTop: "none",
 };
 const sheetAvatarStyle: CSSProperties = { width: "48px", height: "48px", background: "var(--v5-surface-2)" };
 function sheetBadgeStyle(m: NetworkMember): CSSProperties {
@@ -445,6 +445,8 @@ function sheetStatValStyle(color: string): CSSProperties {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () => { selected.value = null; });
+
+
 </script>
 
 <style scoped>

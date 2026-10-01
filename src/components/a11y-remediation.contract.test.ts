@@ -1,3 +1,4 @@
+import segments from "@/components/glass-segments.vue?raw";
 import { describe, expect, it } from "vitest";
 
 const sources = import.meta.glob([
@@ -82,8 +83,8 @@ describe("accessibility remediation contracts", () => {
     expect(wallet).toContain('role="button" tabindex="0" :aria-label="t.wallet.topUp"');
 
     const team = read("../pages/team/team.vue");
-    expect(team).toContain('class="nx-team-rank-link relative overflow-hidden rounded-2xl active:opacity-95" role="button" tabindex="0"');
-    expect(team).toContain('class="nx-team-leaderboard-link active:opacity-95" role="button" tabindex="0"');
+    expect(team).toMatch(/<view[^>]*class="[^"]*nx-team-rank-link[^"]*"[^>]*role="link" tabindex="0"[^>]*@click="go\('\/pages\/team\/rank'\)"/);
+    expect(team).toMatch(/<view[^>]*class="[^"]*nx-team-leaderboard-link[^"]*"[^>]*role="link" tabindex="0"/);
 
     const download = read("../pages/compute-share/download.vue");
     expect(download).toContain('role="button" tabindex="0" :aria-label="t.computeShare.downloadCta"');
@@ -101,13 +102,14 @@ describe("accessibility remediation contracts", () => {
     expect(course).toContain(':aria-checked="answers[index] === optionIndex ? \'true\' : \'false\'"');
 
     const developer = read("../pages/developer/developer.vue");
-    expect(developer).toContain('role="tablist"');
-    // 🔴 这里原先钉的是字面量 `role="tab" tabindex="0"` —— 那是 #94 的**半截修复**:
-    // 每个成员都能 Tab 进入、组内方向键无效,不满足 tablist 的键盘契约。判据改成
-    // roving tabindex(绑定到选中态)+ 左右方向键,与 earn.vue / marketplace.vue 同源。
-    expect(developer).toContain('role="tab" :tabindex="tab === o.value ? 0 : -1"');
-    expect(developer).toContain('@keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)"');
-    expect(developer).toContain(':aria-selected="tab === o.value ? \'true\' : \'false\'"');
+    expect(developer).toMatch(/<GlassSegments[^>]*:label="t.developer.headline"[^>]*v-model="tab"[^>]*:options="tabOptions"/);
+    expect(segments).toContain("'tablist'");
+    expect(segments).toContain(':aria-selected=');
+    expect(segments).toMatch(/:tabindex="option.disabled \? -1 : [^\"]*option.value === modelValue \? 0 : -1"/);
+    expect(segments).toContain('option.value === modelValue');
+    expect(segments).toContain('@keydown="onKeydown($event, option)"');
+    expect(segments).toContain('choose(target, "arrow")');
+    expect(segments).toContain('?.focus()');
     expect(developer).toContain('role="button" tabindex="0" :aria-label="t.developer.formSubmit"');
 
     const proof = read("../pages/me/proof.vue");

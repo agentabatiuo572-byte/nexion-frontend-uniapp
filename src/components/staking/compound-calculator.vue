@@ -6,7 +6,7 @@
   $el-safe).
 -->
 <template>
-  <view v-if="configAvailable && hasSellablePlan" class="relative overflow-hidden nx-compound-calculator" :style="cardStyle">
+  <view v-if="configAvailable && hasSellablePlan" class="nx-glass-card relative overflow-hidden nx-compound-calculator" :style="cardStyle">
     <CalculatorWebviewAccessibility :amount-label="w.amountLabel" />
     <!-- aurora + grid -->
     <view aria-hidden class="gen-anim" :style="auroraStyle" />
@@ -28,15 +28,7 @@
         <input class="flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="decimal" :value="amount" :aria-label="w.amountLabel" @input="onAmountInput" />
       </view>
 
-      <!-- Term selector (inline segmented) — 期限是互斥单选，默认 180d。
-           原先只有 role="button" + @click：读屏既不知道这是一组单选，也读不出当前选中项。
-           改 radiogroup/radio + aria-checked，并补键盘激活与左右方向键。
-           只列**当前可售**的档位：暂停售卖的档位不该被算出一个能赚的收益。 -->
-      <view class="grid" :style="segWrapStyle" role="radiogroup" :aria-label="w.termLabel">
-        <view v-for="tm in sellableTerms" :key="tm" class="nx-compound-term active:opacity-70 transition-opacity" :style="segPillStyle(tm === term)" role="radio" :tabindex="tm === term ? 0 : -1" :aria-checked="tm === term ? 'true' : 'false'" :aria-label="fmt(w.termOption, { days: String(tm) })" @click="selectTerm(tm)" @keydown.left.prevent="moveTerm(-1)" @keydown.right.prevent="moveTerm(1)">
-          <text>{{ tm }}d</text>
-        </view>
-      </view>
+<GlassSegments semantics="radio" :model-value="term" :options="termOptions" :label="w.termLabel" @select="selectTerm" style="margin-top: 14px" />
 
       <template v-if="amountNum > 0">
         <!-- Single bar -->
@@ -183,10 +175,10 @@ function moveTerm(delta: number): void {
   });
 }
 
-const cardStyle: CSSProperties = {
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "18px",
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const auroraStyle: CSSProperties = {
   position: "absolute",
@@ -328,4 +320,7 @@ const unavailableStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   fontSize: "13px",
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const termOptions = computed(() => sellableTerms.value.map(value => ({ value, label: `${value}d` })));
 </script>

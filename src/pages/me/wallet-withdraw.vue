@@ -29,7 +29,7 @@
         <view class="flex-1 min-w-0">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">{{ t.walletV3.withdrawAmbiguousExitTitle }}</text>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px; line-height: 1.4">{{ t.walletV3.withdrawAmbiguousExitBody }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="abandoningAttempt" :aria-label="t.walletV3.withdrawAbandonAttemptCta" @click="abandonPendingAttempt" @keydown.enter.prevent="abandonPendingAttempt" @keydown.space.prevent="abandonPendingAttempt">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="abandoningAttempt" :aria-label="t.walletV3.withdrawAbandonAttemptCta" @click="abandonPendingAttempt"  @keydown.enter.prevent="abandonPendingAttempt" @keydown.space.prevent="abandonPendingAttempt">
             <text style="font-size: 12px; color: var(--v5-danger); text-decoration: underline">{{ abandoningAttempt ? `${t.walletV3.withdrawAbandonAttemptCta}…` : t.walletV3.withdrawAbandonAttemptCta }}</text>
           </view>
         </view>
@@ -37,7 +37,7 @@
 
       <!-- dev-only tester reset(?dev=1):清空当前账号提现地址簿,复现空态引导 -->
       <view v-if="devMode" class="mx-4 mb-3 flex items-center justify-end">
-        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" role="button" tabindex="0" :aria-label="t.walletV3.resetAddrLabel" @click="handleResetAddresses" @keydown.enter.prevent="handleResetAddresses" @keydown.space.prevent="handleResetAddresses">
+        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" role="button" tabindex="0" :aria-label="t.walletV3.resetAddrLabel" @click="handleResetAddresses"  @keydown.enter.prevent="handleResetAddresses" @keydown.space.prevent="handleResetAddresses">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
           <text style="margin-left: 4px">{{ t.walletV3.resetAddrLabel }}</text>
         </view>
@@ -68,7 +68,7 @@
       <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
@@ -85,7 +85,7 @@
         </view>
         <text v-if="withdrawalFactsRefreshing" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalFactsStatusText }}</text>
         <text v-else-if="withdrawalFactsStale" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning)">{{ withdrawalFactsStatusText }}</text>
-        <view v-if="withdrawalFactsNeedsRetry" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts" @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
+        <view v-if="withdrawalFactsNeedsRetry" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts"  @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
           <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline">{{ t.wallet.retryFunds }}</text>
         </view>
         <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
@@ -115,7 +115,7 @@
           <!-- 🔴 反向态:说了「要审」就得给下一步。仅当降到小额线后判定真会免审时才出现,
                否则(风控闸命中,快车道免不掉)出现就是骗他白改一次金额。 -->
           <view v-if="fastLaneOverLine" class="active:opacity-70" :style="fastLaneCtaStyle" role="button" tabindex="0" :aria-label="fastLaneCta" @click.stop="useSmallAmountLine"
-            @keydown.enter.prevent="useSmallAmountLine" @keydown.space.prevent="useSmallAmountLine">
+             @keydown.enter.prevent="useSmallAmountLine" @keydown.space.prevent="useSmallAmountLine">
             <text :style="fastLaneCtaTextStyle">{{ fastLaneCta }} →</text>
           </view>
           <view
@@ -126,8 +126,8 @@
             tabindex="0"
             :aria-label="t.wallet.fastLaneUndo"
             @click.stop="undoSmallAmountLine"
-            @keydown.enter.prevent="undoSmallAmountLine"
-            @keydown.space.prevent="undoSmallAmountLine"
+
+            @keydown.enter.prevent="undoSmallAmountLine" @keydown.space.prevent="undoSmallAmountLine"
           >
             <text :style="fastLaneUndoTextStyle">{{ t.wallet.fastLaneUndo }}</text>
           </view>
@@ -146,10 +146,10 @@
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="pickNetwork(nw.id)"
-            @keydown.enter.prevent="pickNetwork(nw.id)"
-            @keydown.space.prevent="pickNetwork(nw.id)"
-            @keydown.left.prevent="moveNetwork(-1)"
-            @keydown.right.prevent="moveNetwork(1)"
+
+
+
+            @keydown.enter.prevent="pickNetwork(nw.id)" @keydown.space.prevent="pickNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
           </view>
@@ -171,8 +171,8 @@
             role="button" tabindex="0"
             :aria-label="t.addrRebind.manageCta"
             @click="goManage"
-            @keydown.enter.prevent="goManage"
-            @keydown.space.prevent="goManage"
+
+            @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage"
           >
             <text :style="manageEntryTextStyle">{{ t.addrRebind.manageCta }}</text>
           </view>
@@ -188,7 +188,7 @@
               <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.addrRebind.emptyGuideBody }}</text>
             </view>
           </view>
-          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage" @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
+          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 600">{{ t.addrRebind.addCta }}</text>
           </view>
         </view>
@@ -215,7 +215,7 @@
           <text style="font-size: 12px; color: var(--v5-warning)">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
           <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px"
             role="button" tabindex="0" :aria-label="t.walletV3.feeConfigRetry" @click="retryFeeConfig"
-            @keydown.enter.prevent="retryFeeConfig" @keydown.space.prevent="retryFeeConfig">
+             @keydown.enter.prevent="retryFeeConfig" @keydown.space.prevent="retryFeeConfig">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.walletV3.feeConfigRetry }}</text>
           </view>
         </view>
@@ -239,7 +239,7 @@
         <view class="flex items-center justify-between">
           <view class="inline-flex items-center" style="gap: 2px">
             <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feeConfirmRow }}</text>
-            <view class="grid place-items-center active:opacity-60" style="min-width: 32px; min-height: 32px; margin: -10px 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true" @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
+            <view class="grid place-items-center active:opacity-60" style="min-width: 32px; min-height: 32px; margin: -10px 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
             </view>
           </view>
@@ -317,8 +317,8 @@
             tabindex="0"
             :style="switchHitStyle"
             @click="toggleOffset"
-            @keydown.enter.prevent="toggleOffset"
-            @keydown.space.prevent="toggleOffset"
+
+            @keydown.enter.prevent="toggleOffset" @keydown.space.prevent="toggleOffset"
           >
             <view :style="switchTrackStyle">
               <view :style="switchKnobStyle" />
@@ -327,7 +327,7 @@
         </view>
         <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ offsetHintText }}</text>
         <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
-        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex" @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
+        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex"  @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.walletV3.earnNexCta }} →</text>
         </view>
       </view>
@@ -336,10 +336,10 @@
            范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
       <view v-if="feeWhyOpen" class="nx-withdraw-fee-dialog" role="dialog" aria-modal="true" :aria-label="t.walletV3.feeWhyTitle">
         <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
-        <view class="nx-sheet-slide-up" :style="feeWhySheetStyle">
+        <view class="nx-glass-sheet nx-sheet-slide-up" :style="feeWhySheetStyle">
           <view class="flex items-start justify-between" style="gap: 12px">
             <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
-            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false" @keydown.enter.prevent="feeWhyOpen = false" @keydown.space.prevent="feeWhyOpen = false">
+            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false"  @keydown.enter.prevent="feeWhyOpen = false" @keydown.space.prevent="feeWhyOpen = false">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             </view>
           </view>
@@ -353,7 +353,7 @@
       <!-- Sticky submit -->
       <view class="mx-4 mt-4" style="padding-bottom: 12px">
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
-        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="submitting" :style="submitBtnStyle" @click="handleSubmit" @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
+        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="submitting" :style="submitBtnStyle" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <template v-if="submitting">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -386,50 +386,28 @@ import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import {
-  forgetWithdrawAttempt,
-  newWithdrawKey,
-  readWithdrawAttempt,
-  rememberWithdrawAttempt,
-} from "@/lib/withdraw-attempt";
+import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { navTo } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
-import {
-  computeWithdrawalMaximum,
-  formatWithdrawalRatioPercent,
-  resolveWithdrawalUseMax,
-} from "@/lib/withdrawal-use-max";
+import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
-import {
-  financialFactState,
-  shouldRequestWithdrawalEligibility,
-  withdrawalFactsActionsFresh,
-} from "@/lib/withdrawal-facts-state";
+import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFactsActionsFresh } from "@/lib/withdrawal-facts-state";
 import { isCurrentWithdrawalFactsRequest } from "@/lib/withdrawal-facts-request-fence";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
-import {
-  earningsReleaseHasSnapshot,
-  earningsReleaseSnapshot,
-  earningsReleaseStatus,
-  refreshEarningsReleaseStatus,
-} from "@/store/earning-release";
+import { earningsReleaseHasSnapshot, earningsReleaseSnapshot, earningsReleaseStatus, refreshEarningsReleaseStatus } from "@/store/earning-release";
 // 账单不再直连 useBills:提现的钱由服务端扣,只补收据 —— 走 postReceiptForAccount
 // (postMoneyBill 会照 draft 符号再扣一次本地余额)。分录形状由 withdrawalBillDrafts 单源构造。
 import { postReceiptForAccount } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
-import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { fundsServerEnabled, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useAuth } from "@/store/auth";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
-import {
-  evaluateWithdrawal,
-  requestWithdrawalEligibility,
-  type WithdrawalEligibility,
-} from "@/store/withdrawal-eligibility";
+import { evaluateWithdrawal, requestWithdrawalEligibility, type WithdrawalEligibility } from "@/store/withdrawal-eligibility";
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -437,7 +415,7 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
-import { withdrawalApi } from "@/api/runtime";
+
 // 🔴 不再 import isAmbiguousOutcome:本页改用 isSettledRejection + isIdempotencyConflict 分诊。
 // 那行 import 曾经是**全文件唯一**的 isAmbiguousOutcome 出现处(零调用),却正好喂饱了
 // selfcheck-fastlane 的一格字符串针 —— 门以为页面在用它,实际一次没调过。
@@ -1863,16 +1841,16 @@ const feeWhyScrimStyle: CSSProperties = {
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
-const feeWhySheetStyle: CSSProperties = {
+const feeWhySheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 800,
-  borderTopLeftRadius: "16px",
-  borderTopRightRadius: "16px",
-  background: "var(--v5-surface)",
-  borderTop: "1px solid var(--v5-border)",
+  borderTopLeftRadius: "var(--nx-glass-radius)",
+  borderTopRightRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
+  borderTop: "none",
   padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
 };
 const feeWhyTitleStyle: CSSProperties = {
@@ -1927,6 +1905,8 @@ const fastLaneCtaStyle: CSSProperties = { display: "inline-flex", alignItems: "c
 const fastLaneCtaTextStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)" };
 // 撤销是次要动作:同样可点,但视觉权重明显弱于那条建议(转化场景 cancel 必须弱于主 CTA)。
 const fastLaneUndoTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
+
+
 
 
 </script>

@@ -49,8 +49,8 @@
   <view v-if="state.kind !== 'none'" class="tis-root" role="dialog" aria-modal="true" :aria-label="t.tradein.choiceTitle">
     <view class="tis-backdrop" @click="hide" />
 
-    <view class="tis-panel" @click.stop>
-      <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
+    <view class="nx-glass-sheet tis-panel" @click.stop>
+      <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -70,13 +70,13 @@
             :aria-disabled="quoteLoading"
             :aria-busy="quoteLoading"
             @click="onChooseTradein(src.id)"
-            @keydown.enter.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))"
-            @keydown.space.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))"
+
+            @keydown.enter.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))"
           >
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></svg>
             <text class="tis-opt-text">{{ src.label }}</text>
           </view>
-          <view class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onChooseFullPrice" @keydown.enter.prevent="onKeyboardActivate($event, onChooseFullPrice)" @keydown.space.prevent="onKeyboardActivate($event, onChooseFullPrice)">
+          <view class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onChooseFullPrice"  @keydown.enter.prevent="onKeyboardActivate($event, onChooseFullPrice)" @keydown.space.prevent="onKeyboardActivate($event, onChooseFullPrice)">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18 8 4A2 2 0 0 1 22 8v8a2 2 0 0 1-1.17 1.82l-8 4a2 2 0 0 1-1.66 0l-8-4A2 2 0 0 1 2 16V8a2 2 0 0 1 1.17-1.82l8-4a2 2 0 0 1 1.66 0z" /><path d="m7 4.5 10 5" /></svg>
             <text class="tis-opt-text">{{ t.tradein.choiceFullPriceOption }}</text>
           </view>
@@ -90,12 +90,12 @@
           <text class="tis-subtitle">{{ retireView.subtitle }}</text>
         </view>
         <view class="tis-opt-list">
-          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onPickTarget(p.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
+          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onPickTarget(p.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
             <text class="tis-opt-text">{{ p.label }}</text>
           </view>
         </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -133,10 +133,10 @@
 
         <text class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
 
-        <view class="tis-cta" :style="ctaHalo" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
+        <view class="tis-cta" :style="ctaHalo" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
           <text class="tis-cta-text">{{ tradeinView.ctaText }}</text>
         </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -161,8 +161,8 @@
           :aria-disabled="replaceView.insufficient || confirming"
           :aria-busy="confirming"
           @click="onReplace"
-          @keydown.enter.prevent="onReplace"
-          @keydown.space.prevent="onReplace"
+
+          @keydown.enter.prevent="onReplace" @keydown.space.prevent="onReplace"
         >
           <text class="tis-cta-text">{{ replaceView.replaceCta }}</text>
         </view>
@@ -174,12 +174,12 @@
           :aria-disabled="replaceView.insufficient || confirming"
           :aria-busy="confirming"
           @click="onKeepBuy"
-          @keydown.enter.prevent="onKeepBuy"
-          @keydown.space.prevent="onKeepBuy"
+
+          @keydown.enter.prevent="onKeepBuy" @keydown.space.prevent="onKeepBuy"
         >
           <text class="tis-secondary-text">{{ replaceView.keepCta }}</text>
         </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.replaceCancel }}</text>
         </view>
       </template>
@@ -191,7 +191,7 @@
           <text class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
           <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
         </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -208,22 +208,22 @@
 
         <!-- retire 阻断:等任务完成即可下架 → 查看任务 / 知道了(无 force,规格 DEV02A 异常2) -->
         <template v-if="state.origin === 'retire'">
-          <view class="tis-cta" role="button" tabindex="0" @click="onGoTasks" @keydown.enter.prevent="onKeyboardActivate($event, onGoTasks)" @keydown.space.prevent="onKeyboardActivate($event, onGoTasks)">
+          <view class="tis-cta" role="button" tabindex="0" @click="onGoTasks"  @keydown.enter.prevent="onKeyboardActivate($event, onGoTasks)" @keydown.space.prevent="onKeyboardActivate($event, onGoTasks)">
             <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
           </view>
-          <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+          <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
             <text class="tis-ghost-text">{{ t.tradein.retireBlockOk }}</text>
           </view>
         </template>
         <template v-else>
-          <view class="tis-cta" role="button" tabindex="0" @click="onWait" @keydown.enter.prevent="onKeyboardActivate($event, onWait)" @keydown.space.prevent="onKeyboardActivate($event, onWait)">
+          <view class="tis-cta" role="button" tabindex="0" @click="onWait"  @keydown.enter.prevent="onKeyboardActivate($event, onWait)" @keydown.space.prevent="onKeyboardActivate($event, onWait)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
             <text class="tis-cta-text">{{ t.tradein.blockWaitCta }}</text>
           </view>
-          <view class="tis-warn-ghost" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onForce" @keydown.enter.prevent="onKeyboardActivate($event, onForce)" @keydown.space.prevent="onKeyboardActivate($event, onForce)">
+          <view class="tis-warn-ghost" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onForce"  @keydown.enter.prevent="onKeyboardActivate($event, onForce)" @keydown.space.prevent="onKeyboardActivate($event, onForce)">
             <text class="tis-warn-ghost-text">{{ t.tradein.blockForceCta }}</text>
           </view>
-          <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
+          <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
             <text class="tis-ghost-text">{{ t.tradein.blockCancel }}</text>
           </view>
         </template>
@@ -241,10 +241,7 @@ import { usePendingCheckout } from "@/store/pending-checkout";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
-import {
-  DEVICE_SPECS,
-  createDevice,
-} from "@/store/device-types";
+import { DEVICE_SPECS, createDevice } from "@/store/device-types";
 import { computeTradeInCredit, ladderBandFor, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, isPhaseReached, isTradeInTargetAvailable } from "@/store/product-phase";
@@ -1118,6 +1115,8 @@ function onForce() {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => state.value.kind !== "none"), ".tis-root", hide);
+
+
 </script>
 
 <style scoped>
@@ -1134,16 +1133,16 @@ useDialogA11y(computed(() => state.value.kind !== "none"), ".tis-root", hide);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: tradein-fade 0.24s ease-out;
 }
-.tis-panel {
+.tis-panel { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge);
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 800;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  background: var(--v5-surface);
-  border-top: 1px solid var(--v5-border);
+
+
+  background: var(--nx-glass-fill);
+  border: none;
   padding: 18px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
   animation: tradein-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);

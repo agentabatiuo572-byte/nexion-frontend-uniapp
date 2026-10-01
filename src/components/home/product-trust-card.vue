@@ -1,12 +1,12 @@
 <template>
-  <view class="block" :style="cardStyle" :role="selected ? 'link' : undefined" :tabindex="selected ? 0 : undefined" @click="openProduct" @keydown.enter.stop.prevent="openProduct">
+  <view class="nx-glass-card block" :style="cardStyle" :role="selected ? 'link' : undefined" :tabindex="selected ? 0 : undefined" @click="openProduct" @keydown.enter.stop.prevent="openProduct">
     <view class="flex items-start justify-between" style="gap: 12px">
       <view>
         <text class="block" :style="titleStyle">{{ t.home.productTrustTitle }}</text>
         <text class="block" :style="subtitleStyle">{{ t.home.productTrustSubtitle }}</text>
       </view>
       <text v-if="selected" :style="linkStyle">{{ t.home.productTrustOpen }} ›</text>
-      <text v-else-if="remoteApiEnabled && productCatalogState.status === 'error'" class="active:opacity-70" :style="linkStyle" role="button" tabindex="0" @click.stop="retry" @keydown.enter.stop.prevent="retry" @keydown.space.stop.prevent="retry">
+      <text v-else-if="remoteApiEnabled && productCatalogState.status === 'error'" class="active:opacity-70" :style="linkStyle" role="button" tabindex="0" @click.stop="retry"  @keydown.enter.stop.prevent="retry" @keydown.space.stop.prevent="retry">
         {{ t.ui.retry }}
       </text>
       <text v-else-if="remoteApiEnabled && productCatalogState.status === 'loading'" :style="mutedStyle">
@@ -25,7 +25,7 @@
         </view>
       </view>
       <view class="grid grid-cols-3" style="gap: 8px; margin-top: 12px">
-        <view v-for="item in specs" :key="item.label" :style="specStyle">
+        <view class="nx-glass-inset" v-for="item in specs" :key="item.label" :style="specStyle">
           <text class="block" :style="specLabelStyle">{{ item.label }}</text>
           <text class="block" :style="specValueStyle">{{ item.value || t.home.productTrustUnavailable }}</text>
         </view>
@@ -73,7 +73,7 @@ onMounted(() => {
   if (remoteApiEnabled && productCatalogState.status !== "ready") void refreshProductCatalog();
 });
 
-const cardStyle: CSSProperties = { padding: "14px", borderRadius: "16px", background: "var(--v5-surface)" };
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", padding: "14px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)" };
 const titleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const subtitleStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const linkStyle: CSSProperties = { display: "inline-flex", alignItems: "center", minHeight: "44px", padding: "0 12px", flexShrink: 0, fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
@@ -83,7 +83,9 @@ const productNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, col
 const taglineStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const pricePillStyle: CSSProperties = { flexShrink: 0, padding: "5px 9px", borderRadius: "999px", background: "var(--v5-brand-soft)" };
 const priceStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
-const specStyle: CSSProperties = { minWidth: 0, padding: "9px", borderRadius: "10px", background: "var(--v5-surface-2)" };
+const specStyle: CSSProperties = { minWidth: 0, padding: "9px", borderRadius: "10px", };
 const specLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
 const specValueStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.35, color: "var(--v5-ink-2)", overflowWrap: "anywhere" };
+
+
 </script>

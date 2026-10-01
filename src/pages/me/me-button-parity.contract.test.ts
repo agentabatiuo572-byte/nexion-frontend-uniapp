@@ -1,3 +1,4 @@
+import segments from "@/components/glass-segments.vue?raw";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -51,7 +52,7 @@ describe("Me button click-through parity", () => {
 
   it("makes every My-home action keyboard-clickable without changing its visual layout", () => {
     expect(formalMe).toContain('data-quick-key="item.key"');
-    expect(formalMe).toContain('role="button"\n              tabindex="0"');
+    expect(formalMe).toMatch(/role="button"\s+tabindex="0"/);
     expect(formalMe).toContain('@keydown.enter.prevent="handleQuickItem(item)"');
     expect(formalMe).toContain('@keydown.space.prevent="handleQuickItem(item)"');
     expect(formalMe).toContain('data-me-action="sign-out"');
@@ -82,8 +83,12 @@ describe("Me button click-through parity", () => {
 
     const themePicker = component("theme-picker-sheet.vue");
     expect(themePicker).toContain('data-me-action="theme-close"');
-    expect(themePicker).toContain(':data-me-action="`theme:${opt.mode}`"');
-    expect(themePicker).toContain('@keydown.enter.prevent="choose(opt.mode)"');
+    expect(themePicker).toMatch(/<GlassSegments[^>]*:model-value="theme.mode"[^>]*semantics="radio"[^>]*@select="choose"/);
+    expect(segments).toMatch(/:tabindex="option.disabled \? -1 : [^\"]*option.value === modelValue \? 0 : -1"/);
+    expect(segments).toContain('option.value === modelValue');
+    expect(segments).toContain('@keydown="onKeydown($event, option)"');
+    expect(segments).toContain('choose(target, "arrow")');
+    expect(segments).toContain('?.focus()');
 
     expect(formalMe).toContain('data-me-action="retry-orders"');
     expect(formalMe).toContain('@keydown.enter.prevent="refreshRemoteOrders"');

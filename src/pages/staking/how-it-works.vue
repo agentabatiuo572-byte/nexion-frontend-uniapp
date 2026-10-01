@@ -25,7 +25,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
-        <view v-if="configAvailable" :style="tableStyle">
+        <view v-if="configAvailable" class="nx-glass-card" :style="tableStyle">
           <view class="flex" :style="tableHeadStyle">
             <text class="text-left" :style="thCellLeft">{{ w.colTerm }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colApy }}</text>
@@ -156,8 +156,8 @@ const tableRows = computed(() =>
     return {
       term: termDays,
       apyPct: `${formatStakingPercentage(apy)}%`,
-      minText: `$${pool.minAmountUsdt.toFixed(2).replace(/\.00$/, "")}`,
-      ret: `$${(STAKING_RULE_EXAMPLE_PRINCIPAL * apy * (termDays / 365)).toFixed(2)}`,
+      minText: `${pool.minAmountUsdt.toFixed(2).replace(/\.00$/, "")}`,
+      ret: `${(STAKING_RULE_EXAMPLE_PRINCIPAL * apy * (termDays / 365)).toFixed(2)}`,
     };
   }),
 );
@@ -184,9 +184,9 @@ const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
 const captionStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const retryStyle: CSSProperties = { minHeight: "44px", marginTop: "8px", color: "var(--v5-brand)", fontSize: "12px" };
 const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
-const tableStyle: CSSProperties = {
-  borderRadius: "12px",
-  background: "var(--v5-surface)",
+const tableStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
   overflow: "hidden",
 };
 const tableHeadStyle: CSSProperties = {
@@ -229,4 +229,6 @@ const ctaStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 600,
 };
+
+
 </script>

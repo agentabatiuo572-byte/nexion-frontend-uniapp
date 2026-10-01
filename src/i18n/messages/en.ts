@@ -315,7 +315,9 @@ export const en = {
     errorOtpNotFound: "Request a verification code first",
     errorOtpSendUnavailable: "The code didn't go out just now — sign in with Google / Apple / Telegram below, or retry in a moment.",
     errorServiceUnavailable: "We couldn't verify the account right now. Please try again.",
-  },
+
+sandboxCodeHint: "Demo code: {code}. No SMS will be sent.",
+},
   // Region-policy refusals. The four keys are the four GeoPolicyErrorKind values
   // declared in the geo-policy-error module — this namespace IS the GeoPolicyCopy
   // argument, so renaming or dropping a key breaks every call site of
@@ -480,7 +482,10 @@ export const en = {
     giftPendingBillMemo: "Welcome gift - confirming",
     back: "Back",
     stepOf: "Step {n} of 3",
-  },
+
+subtitleNoBonus: "Create an account to continue. Check any welcome gift status after registration.",
+sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it and try again.",
+},
   home: {
     // Sprint A-1: LiveActivityFeed
     quickStake: "Stake",
@@ -736,7 +741,12 @@ export const en = {
     ledgerEmpty: "No completed task earnings yet.",
     liveFeedTitle: "Task assignments",
     liveFeedEmpty: "No task activity available.",
-  },
+
+quickMissionsActive: "5 active",
+sandboxQuoteLedgerTitle: "Sample task quotes",
+sandboxQuoteNoCredit: "Demo data · Not credited to balance",
+trustReserve: "No verifiable reserve information available.",
+},
   earn: {
     title: "Earn",
     subtitle: "Your devices, your earnings, your tasks — live.",
@@ -903,7 +913,12 @@ export const en = {
     jobsCount: "{n} jobs",
     taskLockTitle: "Task lock",
     taskLockRemaining: "{n} min",
-  },
+
+estimateDisclaimer: "Estimated from the current daily output difference, excluding purchase costs. This does not affect your balance.",
+phonePausedLowBattery: "Paused · low battery",
+phonePausedLowBatteryHint: "Resumes automatically when battery reaches 20%.",
+lockedMissedDaily: "lost every day",
+},
   market: {
     title: "Market Overview",
     liveLabel: "Updated 2 min ago",
@@ -999,7 +1014,9 @@ export const en = {
       sell: "Sell on market",
     },
     disclosureNote: "Genesis holdings and benefits follow your account records. See the Trust Center for published disclosures.",
-  },
+
+identityLabel: "Genesis holder",
+},
 
   preferences: {
     loading: "Loading notification preferences…",
@@ -1577,7 +1594,111 @@ export const en = {
       claimedTitle: "+{n} NEX credited",
       discountClaimedTitle: "Discount claimed",
     },
-  },
+
+progressLabel: "Progress",
+catalog: {
+      "evt-pro-upgrade-7d": {
+        "title": "UVELBox Pro · Flash Upgrade",
+        "subtitle": "Upgrade to Pro within 7 days · $500 OFF + ×2 Genesis raffle tickets.",
+        "ribbon": "LIMITED · ENDS 3D 12H",
+        "reward": "$500 OFF + ×2 tickets",
+        "progressLabel": "claimed",
+        "ctaLabel": "Claim discount",
+        "countdown": "3d 12h 04m",
+        "startsIn": ""
+      },
+      "evt-refer-5-get-pro": {
+        "title": "Refer 5 · Win a Pro",
+        "subtitle": "Invite 5 direct friends within 7 days · get a free UVELBox Pro ($899).",
+        "ribbon": "TEAM CHALLENGE",
+        "reward": "Free UVELBox Pro",
+        "progressLabel": "friends invited",
+        "ctaLabel": "View progress",
+        "countdown": "6d 02h",
+        "startsIn": ""
+      },
+      "evt-weekend-double-nex": {
+        "title": "Weekend Double NEX",
+        "subtitle": "Sat–Sun check-ins earn 2× NEX automatically.",
+        "ribbon": "ACTIVE NOW",
+        "reward": "2× NEX",
+        "progressLabel": "",
+        "ctaLabel": "Check in",
+        "countdown": "1d 18h",
+        "startsIn": ""
+      },
+      "evt-regional-pk": {
+        "title": "Regional PK · Win $20K Pool",
+        "subtitle": "LatAm vs SEA vs EU · weekly volume race. Top region splits $20K.",
+        "ribbon": "WEEK 21",
+        "reward": "Share $20,000 pool",
+        "progressLabel": "your region $",
+        "ctaLabel": "Join the race",
+        "countdown": "2d 09h",
+        "startsIn": ""
+      },
+      "evt-spring-spin": {
+        "title": "Spring Lucky Spin",
+        "subtitle": "1 free spin per day · win NEX, USDT & a device coupon.",
+        "ribbon": "DAILY · RESETS 00:00 UTC",
+        "reward": "Up to $500 USDT",
+        "progressLabel": "spin left today",
+        "ctaLabel": "Spin now",
+        "countdown": "Resets in 08:42:11",
+        "startsIn": ""
+      },
+      "evt-reinvest-bonus": {
+        "title": "Re-invest Bonus Week",
+        "subtitle": "Re-invest $100 = 2 Genesis tickets (normally 1) · all week long.",
+        "ribbon": "DOUBLED",
+        "reward": "2× Genesis tickets",
+        "progressLabel": "",
+        "ctaLabel": "Re-invest now",
+        "countdown": "4d 03h",
+        "startsIn": ""
+      },
+      "evt-onboarding-7d": {
+        "title": "New Pilot · 7-Day Boost",
+        "subtitle": "Reach V2 within 7 days of joining · get +200 NEX + 1 Streak Saver.",
+        "ribbon": "FIRST WEEK",
+        "reward": "+200 NEX + 1 Saver",
+        "progressLabel": "milestones done",
+        "ctaLabel": "View checklist",
+        "countdown": "5d 11h",
+        "startsIn": ""
+      },
+      "evt-black-friday": {
+        "title": "Black Friday · 20% OFF Everything",
+        "subtitle": "All hardware $300+ off · code BF20 stacks with Pro Flash Upgrade.",
+        "ribbon": "PRE-LAUNCH",
+        "reward": "20% OFF + stack codes",
+        "progressLabel": "",
+        "ctaLabel": "Notify me",
+        "countdown": "",
+        "startsIn": "Starts in 12d 04h"
+      },
+      "evt-nex-holders-share": {
+        "title": "NEX Holders Share · $5K Pool",
+        "subtitle": "Hold ≥ 1,000 NEX for 7 days · automatically share a $5K USDT pool.",
+        "ribbon": "AUTO",
+        "reward": "Share $5,000 USDT",
+        "progressLabel": "your NEX",
+        "ctaLabel": "View details",
+        "countdown": "4d 17h",
+        "startsIn": ""
+      },
+      "evt-anniversary-spin": {
+        "title": "Anniversary Mega Spin",
+        "subtitle": "Platform 1-year anniversary · 10,000 winners shared $250K USDT.",
+        "ribbon": "CONCLUDED",
+        "reward": "$250,000 distributed",
+        "progressLabel": "",
+        "ctaLabel": "View results",
+        "countdown": "",
+        "startsIn": ""
+      }
+    },
+},
 
   marketPage: {
     pageTitle: "Markets",
@@ -1823,7 +1944,9 @@ export const en = {
     // Trade-in promo banner — surfaces when user has an eligible device for
     // an upgrade. Config-gated by DEFAULT_TRADEIN_CONFIG.promo (kill switch,
     // cooldown, max-per-session, routes).
-  },
+
+onlineLabel: "{n} online",
+},
   // DeactivateSheet — chassis overlay when deactivating a device with a running task.
   deactivateSheet: {
     title: "Device is running a task",
@@ -1845,7 +1968,11 @@ export const en = {
     activateRow: "Activate an existing device ({n})",
     toastSlotsFull: "Slots full {max}/{max}",
     toastActivated: "{name} activated",
-  },
+
+chooseMethod: "Choose how to join the UVEL network",
+inventoryHint: "Use an existing UVEL device",
+storeHint: "Browse devices in the store",
+},
   computeShare: {
     entryEyebrow: "PC compute share",
     entryTitle: "Connect computer GPU power",
@@ -1896,7 +2023,10 @@ export const en = {
     configUnavailableTitle: "Compute Share availability is temporarily unavailable",
     configUnavailableBody: "Check your network connection and try again.",
     configRetryCta: "Reload",
-  },
+
+sandboxHoldCta: "Connection unavailable",
+sandboxHoldBody: "Demo mode cannot connect a real computer. You can view download and connection instructions.",
+},
   // Voucher (代金券) — claim popup + fallback banner + checkout redemption.
   voucher: {
     popupCap: "Limited offer",
@@ -1921,7 +2051,10 @@ export const en = {
     checkoutRowLabel: "Voucher",
     expiredNote: "A claimed voucher for this device has expired",
     quoteChanged: "Voucher discount changed — review the updated total before paying",
-  },
+
+newUserGiftName: "New User Gift",
+summerActivityName: "Summer Activity",
+},
   // My Rewards (我的奖励) — vouchers (available/expired) + system rewards (USDT/NEX).
   rewards: {
     title: "My Rewards",
@@ -2372,7 +2505,11 @@ export const en = {
     comingSoonNote: "next platform phases",
     ordersChip: "Orders",
     pageFooter: "Fully managed · zero shipping",
-  },
+
+specUptimeValue: "99.9%",
+coSandboxWallet: "Demo wallet",
+coHintSandboxWallet: "Demo payment · No real funds involved",
+},
   team: {
     title: "My Team",
     subtitle: "Earn 10% royalty on every friend's order, forever.",
@@ -2428,7 +2565,23 @@ export const en = {
     inviteCopyCodeAria: "Copy invitation code",
     inviteCopyLinkAria: "Copy invite link",
     orShareVia: "or share via",
-  },
+
+inviteTitle: "Invite friends",
+inviteTagline: "Build a bigger future together",
+shareInvite: "Share invitation",
+rewardLoading: "Loading invitation rewards…",
+rewardRules: "View reward rules",
+summaryTitle: "My team",
+summaryMembers: "Members",
+summaryDirect: "Direct partners",
+summaryEmpty: "No members yet",
+summaryInvite: "Invite now",
+summaryView: "View team",
+summaryLoading: "Loading team members…",
+summaryUnavailable: "Team members are unavailable. Please retry.",
+rankBenefits: "View rank benefits",
+sandboxBanner: "Demo mode · Sample rewards",
+},
   wallet: {
     loadingTransactions: "Loading transaction history…",
     title: "Wallet",
@@ -2624,7 +2777,12 @@ export const en = {
     ffZip: "ZIP / Postal",
     cardNamePlaceholder: "NAME ON CARD",
     withdrawInsufficient: "Insufficient balance for withdrawal",
-  },
+
+nexBoostActive: "NEX Boost Active",
+nexBoostPrefix: "Your {nex} NEX unlocks ",
+nexBoostHighlight: "+10% earnings",
+nexBoostSuffix: ". Reach 5,000 NEX for fee discount.",
+},
   cards: {
     bindingEntryNote: "Enter your bank card details",
     bindingEntryDisclaimer: "Details stay on this page and are cleared when you leave. Nothing is submitted or saved until the binding service is connected.",
@@ -2768,7 +2926,14 @@ export const en = {
     installHint: "One-click install · runs silently in background",
     connectGpu: "Connect Your GPU",
     connectHint: "Auto-detected · earnings begin immediately",
-  },
+
+calibrationPending: "Not calibrated",
+calibrationDone: "Calibrated",
+estimatorScore: "Compute score",
+estimatorYield: "Estimated earnings",
+estimatorPendingValue: "Shown after calibration",
+scoreLabel: "Estimated score",
+},
   session: {
     restoreRetryNotice: "Unable to restore your session right now. Retrying automatically.",
     secureBrowserUnsupported: "This browser cannot securely sign in or restore your session. Please update your browser and try again.",
@@ -3115,7 +3280,9 @@ export const en = {
     intro: "Choose the interface language for this app.",
     backToAccount: "Back to Account",
     countLine: "Available in {n} interface languages",
-  },
+
+autoDetect: "auto-detect coming soon",
+},
   ui: {
     confirm: "Confirm",
     cancel: "Cancel",
@@ -3603,7 +3770,9 @@ export const en = {
       unstake: "Unstake",
       achievement: "Achievement reward",
       other: "Other ledger entry",
-    },
+
+earningsMilestone: "Earnings milestone ${threshold}",
+},
     title: "Bills",
     back: "Back",
     subtitle: "Reconcile every credit and debit on your UVEL wallet.",
@@ -3720,7 +3889,11 @@ export const en = {
     refreshing: "Loading your latest orders from the server…",
     loadMore: "Load more",
     retry: "Retry",
-  },
+
+sandboxPayCta: "Continue demo payment",
+sandboxPayBusy: "Confirming demo payment…",
+sandboxPayHint: "Demo payments use no real funds. Check the order status after completion.",
+},
   staking: {
     title: "Staking",
     back: "Back",
@@ -3996,7 +4169,12 @@ export const en = {
     },
     downloadToast: "Card saved to device · share anywhere",
     downloadErrorToast: "PNG generation or save failed. Please try again.",
-  },
+
+shareStreak: "My UVEL check-in streak is {n} days. {link}",
+shareNetwork: "My UVEL network has {n} members. {link}",
+shareEarnings: "My UVEL records show ${amount} earned over {days} days. {link}",
+shareDemo: "Experience data only; not actual earnings.",
+},
   taskHistory: {
     loading: "Loading task history…",
     tabHistory: "History",
@@ -4005,7 +4183,11 @@ export const en = {
     historyEmpty: "No completed tasks yet — your first one is on the way.",
     historyHint:
       "Last {n} jobs · Tap any row to open its Proof-of-Compute receipt.",
-  },
+
+timeJustNow: "just now",
+timeMinutesAgo: "{n}m ago",
+timeHoursAgo: "{n}h ago",
+},
   errors: {
     deviceCapTitle: "Device limit reached",
     deviceCapMsg:
@@ -4319,7 +4501,8 @@ export const en = {
     faqA5:
       "No. Staking is a personal financial product — it doesn't affect your V rank, team volume, or commission eligibility. It's purely about earning interest on idle USDT.",
     ctaBack: "Got it · see staking plans",
-  },
+
+},
 
   trust: {
     title: "Trust Center",
@@ -4497,7 +4680,12 @@ export const en = {
       a3: "Emissions open when $NEX lists. Until then you hold a reserved allocation, not a daily payout.",
     },
     royaltyUnavailable: "The current royalty rate is unavailable. Refresh and try again.",
-  },
+
+purchaseSuccessTitle: "Congratulations, purchase complete",
+purchaseSuccessBody: "Your Genesis nodes have been added to your holdings.",
+viewMyNodes: "View my Genesis nodes",
+openseaLine: "View on OpenSea · floor",
+},
 
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
@@ -5108,7 +5296,10 @@ export const en = {
       genesis: "Genesis",
     },
     howItWorksEntry: "Rules",
-  },
+
+mockDailyBinaryMatch: "Daily binary match",
+mockWeek42Pool: "Week 42 pool",
+},
 
   commissionsHowItWorks: {
     navTitle: "How commissions work",
@@ -5419,7 +5610,9 @@ export const en = {
     toastRemoteFailed: "Application status not confirmed",
     serverApplication: "My server application",
     applicationStatuses: { NONE: "None", PENDING: "Pending", APPROVED: "Approved", REJECTED: "Rejected" },
-  },
+
+annualBudget: "Annual budget allowance: $40,000 USDT",
+},
 
   daily: {
     checkInAction: "Check in",
@@ -5647,7 +5840,25 @@ export const en = {
     insufficientUsdtSub: "Need ${need} · balance ${bal}",
     listToastTitle: "Genesis #{id} listed",
     listToastSub: "Asking ${price} · listed in the UVEL internal market",
-  },
+
+verifiedTag: "✓",
+verifiedCollection: "Verified collection",
+viewOpenSea: "View on OpenSea",
+openSeaTitle: "OpenSea",
+openSeaLoading: "Connecting to OpenSea…",
+openSeaErrorTitle: "Couldn't reach OpenSea right now",
+openSeaErrorSub: "Return to the UVEL marketplace to check current listing status.",
+openSeaErrorHint: "Most holders trade peer-to-peer inside UVEL · faster + zero gas.",
+openSeaRetry: "Retry connection",
+openSeaBack: "Back to UVEL market",
+openSeaErrorPool: {
+      rateLimit: "The marketplace is unavailable. Please retry later.",
+      syncPending: "Collection sync pending — OpenSea typically takes 24–48h after listing.",
+      bridge: "Cross-chain bridge under maintenance. ETA: 24h.",
+      verifyPending: "Collection awaiting OpenSea Verified ✓ approval. Listing visible after.",
+      cf: "The third-party market isn't reachable right now — your listing is safe on UVEL. Retry shortly.",
+    },
+},
 
   genesisHowItWorks: {
     navTitle: "About Genesis seats",
@@ -6396,7 +6607,9 @@ export const en = {
     cancelCta: "Cancel",
     reasonNewAddressAge: "Your payout address changed less than 7 days ago — we confirm large withdrawals first",
     startFailed: "Something went wrong. Please try again.",
-  },
+
+sandboxMockNotice: "Demo mode · No real transfers will be made",
+},
   learning: {
     centerTitle: "Learning center",
     featuredLabel: "Recommended course",
@@ -6430,6 +6643,57 @@ export const en = {
     submissionResultUnknown: "The last result is still unknown. The original attempt is preserved to prevent duplicate counting; tap here to refresh.",
     courseUpdated: "This course was updated. Reload it before answering again.",
     submitUnconfirmed: "Your submission is not confirmed yet; course progress has been re-read from the server, so rewards are never shown from local state.",
+  },
+
+phonePolicy: {
+  "webNotice": "The web version cannot run phone compute tasks. Tasks continue while the bound app is online and stop when it goes offline. Purchased devices are unaffected.",
+  "appNotice": "Bind and activate this phone in the app to run phone compute tasks.",
+  "download": "Download the app",
+  "manage": "Set up phone compute",
+  "retry": "Check again",
+  "login": "Sign in again",
+  "continueWeb": "Continue on the web",
+  "continueApp": "Continue in the app",
+  "confirmReplacement": "Confirm replacement and activate",
+  "replaceNotice": "This replaces the bound phone. If enabled, its running-device place transfers to this phone; the old phone cannot be reactivated from this device. Purchased devices are unaffected.",
+  "errors": {
+    "config-unavailable": "Device replacement settings are unavailable. Check again before replacing the phone.",
+    "web-only": "Install and open UVEL on your phone to enable phone compute.",
+    "replacement-disabled": "This account is bound to another phone. Device replacement is not allowed. Phone tasks are paused; purchased devices are unaffected.",
+    "cooldown": "Device replacement is still in its waiting period. Next available: {date}.",
+    "device-mismatch": "This phone does not match the registered device. Reassess the current phone to replace it.",
+    "slots-full": "The device limit is reached. Deactivate one before enabling phone compute.",
+    "storage-failed": "Activation was not saved. Check the connection and try again.",
+    "reauth-required": "Sign in again on the bound phone to resume phone tasks."
+  }
+},
+publicCopy: {
+    // Phone policy uses the same keys on APP and H5.
+    memberIdle: "Inactive",
+    experienceDepositCredited: "Demo deposit credited: {amount} USDT",
+    orderWaitingSlot: "Waiting for an available running-device place",
+    experienceMode: "Demo mode · No real funds involved",
+    operationUnconfirmed: "Unable to confirm the result. Refresh to check before retrying.",
+    accountDeletionBlocked: "Account deletion is unavailable. Contact support for help.",
+    helpTitle: "Help",
+    statusHelp: "Check the relevant page for your current status. Contact support if you need help.",
+    earningsHelp: "Check earnings records for actual credited amounts and processing status.",
+    quotaUnavailable: "Currently unavailable",
+    contactSupport: "Contact support",
+    rewardSpin: "Spin chances ×{n}",
+    rewardBadge: "Badges ×{n}",
+    rewardOther: "Rewards ×{n}",
+    benefitAvailable: "Benefit ready to activate",
+    benefitAmount: "Benefit amount: {value}",
+    dailyMilestone: "Day {n} reward",
+    dailyHistory: "Check-in reward",
+    rankHelp: "View your current level and earned titles on the Level page.",
+    refundHelp: "Rewards may be adjusted if an order is refunded or disputed. Check your credited records.",
+    pendingHelp: "Pending rewards cannot be withdrawn yet. Their status will update after confirmation.",
+    participationUnavailable: "Not participating yet",
+    applicationUnknown: "Unable to confirm the application result. Check your application history later.",
+    nextSettlement: "Next settlement in {n}",
+    settlementPeriod: "{freq} settlement",
   },
 };
 

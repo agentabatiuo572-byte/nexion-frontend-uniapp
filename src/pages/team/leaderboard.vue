@@ -25,15 +25,14 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
           <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
-          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemote()" @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()">
+          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" role="button" tabindex="0" @click="loadRemote()"  @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()">
             <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.leaderboard.retry }}</text>
           </view>
         </view>
-        <template v-else>
         <!-- Prize pool hero — de-carded: big number sits directly on the page
              floor. No floor glow (owner call 2026-07-08: page-floor auras get
              deleted, not tuned — clip-edge class of bugs removed at the root). -->
-        <view :style="heroStyle">
+        <view v-if="!remoteApiEnabled || remoteState === 'ready'" :style="heroStyle">
           <view class="flex items-start justify-between">
             <view>
               <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-warning)')">{{ t.leaderboard.pool.label }} · {{ t.leaderboard.periods[period] }}</text>
@@ -51,11 +50,8 @@
         </view>
 
         <!-- Period tabs -->
-        <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.leaderboard.pageTitle">
-          <view v-for="p in PERIODS" :key="p" class="nx-leader-period-tab flex-1 grid place-items-center active:opacity-70" :style="pillStyle(p)" role="tab" :tabindex="p === period ? 0 : -1" :aria-selected="p === period" @click="selectPeriod(p)" @keydown.enter.prevent="selectPeriod(p)" @keydown.space.prevent="selectPeriod(p)" @keydown.left.prevent="movePeriod(-1)" @keydown.right.prevent="movePeriod(1)">
-            <text :style="pillLabelStyle(p)">{{ t.leaderboard.periods[p] }}</text>
-          </view>
-        </view>
+        <GlassSegments class="nx-leader-periods" :label="t.leaderboard.pageTitle" :model-value="period" @select="selectPeriod" :options="periodOptions" />
+        <template v-if="!remoteApiEnabled || remoteState === 'ready'">
 
         <!-- My rank — transparent stat row on the page floor (was a second
              glowing hero stacked right under the prize hero). -->
@@ -72,7 +68,7 @@
                 <text :style="{ fontSize: '12px', color: 'var(--v5-warning)' }">{{ gapText }}</text>
               </view>
             </view>
-            <view class="flex items-center active:scale-[0.97]" :style="climbCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
+            <view class="flex items-center active:scale-[0.97]" :style="climbCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')"  @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
               <text :style="{ color: 'var(--v5-on-brand)' }">{{ t.leaderboard.myRank.climb }}</text>
             </view>
@@ -136,7 +132,7 @@
         <!-- View more — explicit user click, not scroll-auto: fully
              predictable regardless of viewport size (the scroll-triggered
              IntersectionObserver version misfired on wide desktop windows). -->
-        <view v-if="hasMore" class="flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="remoteLoadingMore" @click="loadMore" @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
+        <view v-if="hasMore" class="flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="remoteLoadingMore" @click="loadMore"  @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
           <text :style="loadMoreLabelStyle">{{ remoteLoadMoreError ? t.leaderboard.loadError : t.leaderboard.cta.loadMore }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
         </view>
@@ -147,7 +143,7 @@
              escape the px-4 parent; 26px bottom offset mirrors AppChassis's
              sub-route safe-area inset (SUB_BOTTOM) so it clears the home indicator. -->
         <view :style="shareStickyStyle">
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="shareCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="shareCtaStyle" role="button" tabindex="0" @click="go('/pages/team/team')"  @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
             <text :style="{ color: 'var(--v5-on-brand)' }">{{ t.leaderboard.cta.share }}</text>
           </view>
@@ -335,7 +331,7 @@ function selectPeriod(next: LeaderPeriod) {
 let pendingPeriodFocus = false;
 function focusActivePeriodTab(): void {
   if (typeof document === "undefined") return;
-  document.querySelector<HTMLElement>('.nx-leader-period-tab[tabindex="0"]')?.focus();
+  document.querySelector<HTMLElement>('.nx-leader-periods .nx-glass-option[tabindex="0"]')?.focus();
 }
 function movePeriod(delta: -1 | 1) {
   const currentIndex = PERIODS.indexOf(period.value);
@@ -474,4 +470,7 @@ const shareCtaStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const periodOptions = computed(() => PERIODS.map(value => ({ value, label: t.value.leaderboard.periods[value] })));
 </script>

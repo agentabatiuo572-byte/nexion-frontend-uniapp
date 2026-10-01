@@ -18,7 +18,7 @@
           <text v-if="notifs.unread > 0" :style="unreadBadgeStyle">{{ notifs.unread }}</text>
         </view>
         <view class="flex items-center" style="gap: 4px">
-          <view v-if="notifs.unread > 0" class="flex items-center active:opacity-70" :style="actionBtnStyle('var(--v5-brand)')" role="button" tabindex="0" :aria-label="t.notifs.markAll" @click="notifs.markAllRead()" @keydown.enter.stop.prevent="notifs.markAllRead()" @keydown.space.stop.prevent="notifs.markAllRead()">
+          <view v-if="notifs.unread > 0" class="flex items-center active:opacity-70" :style="actionBtnStyle('var(--v5-brand)')" role="button" tabindex="0" :aria-label="t.notifs.markAll" @click="notifs.markAllRead()"  @keydown.enter.stop.prevent="notifs.markAllRead()" @keydown.space.stop.prevent="notifs.markAllRead()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></svg>
             <text style="margin-left: 4px">{{ t.notifs.markAll }}</text>
           </view>
@@ -30,8 +30,8 @@
             tabindex="0"
             :aria-label="t.notifs.clearReadAria"
             @click="confirmClearRead"
-            @keydown.enter.stop.prevent="confirmClearRead"
-            @keydown.space.stop.prevent="confirmClearRead"
+
+            @keydown.enter.stop.prevent="confirmClearRead" @keydown.space.stop.prevent="confirmClearRead"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
             <text style="margin-left: 4px">{{ t.notifs.clearReadAria }}</text>
@@ -40,31 +40,7 @@
       </view>
 
       <!-- Filter pills -->
-      <!-- 🔴 互斥分类必须暴露「唯一选中项」(zentao #94)。此前是 role=button +
-           aria-pressed:浏览器把带 aria-pressed 的按钮当 toggle button,读屏按复选框
-           朗读(「全部,已按下」),用户会以为能同时选多个分类。这里改用与 earn /
-           course 同款 radiogroup/radio + roving tabindex + 方向键。 -->
-      <scroll-view scroll-x class="px-4" style="margin-bottom: 12px; white-space: nowrap">
-        <view role="radiogroup" :aria-label="t.notifs.filterGroupLabel" class="flex items-center" style="gap: 6px">
-          <template v-for="id in visibleFilterIds" :key="id">
-            <view
-              class="active:opacity-70"
-              :style="pillStyle(filter === id)"
-              role="radio"
-              :aria-checked="filter === id ? 'true' : 'false'"
-              :tabindex="filter === id ? 0 : -1"
-              :aria-label="filterLabel(id)"
-              @click="filter = id"
-              @keydown.enter.stop.prevent="filter = id"
-              @keydown.space.stop.prevent="filter = id"
-              @keydown.left.stop.prevent="moveFilter(-1)"
-              @keydown.right.stop.prevent="moveFilter(1)"
-            >
-              <text>{{ filterLabel(id) }} ({{ countOf(id) }})</text>
-            </view>
-          </template>
-        </view>
-      </scroll-view>
+      <GlassSegments :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" style="margin: 0 16px 12px"  />
 
       <text v-if="remoteApiEnabled && notifs.items.length" class="block px-4" :style="timeStyle">{{ t.notifs.originalTextNote }}</text>
 
@@ -79,8 +55,8 @@
             tabindex="0"
             :aria-label="t.ui.retry"
             @click="notifs.retryRemote()"
-            @keydown.enter.stop.prevent="notifs.retryRemote()"
-            @keydown.space.stop.prevent="notifs.retryRemote()"
+
+            @keydown.enter.stop.prevent="notifs.retryRemote()" @keydown.space.stop.prevent="notifs.retryRemote()"
           >{{ t.ui.retry }}</text>
         </view>
         <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" role="status" :style="emptyCardStyle">
@@ -99,8 +75,8 @@
             role="button"
             tabindex="0"
             :aria-label="n.title"
-            @keydown.enter.stop.prevent="onTap(n)"
-            @keydown.space.stop.prevent="onTap(n)"
+
+            @keydown.enter.stop.prevent="onTap(n)" @keydown.space.stop.prevent="onTap(n)"
           >
             <view class="relative shrink-0">
               <view class="grid place-items-center" :style="iconBoxStyle(n.kind)">
@@ -127,8 +103,8 @@
           tabindex="0"
           :aria-label="t.notifs.loadMore"
           @click="notifs.loadMoreRemote()"
-          @keydown.enter.stop.prevent="notifs.loadMoreRemote()"
-          @keydown.space.stop.prevent="notifs.loadMoreRemote()"
+
+          @keydown.enter.stop.prevent="notifs.loadMoreRemote()" @keydown.space.stop.prevent="notifs.loadMoreRemote()"
         >{{ t.notifs.loadMore }}</text>
       </view>
     </view>
@@ -401,4 +377,7 @@ const bodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", m
 function ctaStyle(k: NotifKind): CSSProperties {
   return { fontSize: "12px", fontWeight: 600, color: KIND_META[k].tint, marginTop: "6px" };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const filterOptions = computed(() => visibleFilterIds.value.map(value => ({ value, label: filterLabel(value), count: countOf(value) })));
 </script>

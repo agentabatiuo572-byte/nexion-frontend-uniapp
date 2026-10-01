@@ -39,7 +39,6 @@ import { stripComments, templateRegion, styleRegions } from "./lib/sfc-strip-com
 // 把它们按**词**授权,`<text>Node Type</text>` / `<text>Level II</text>` 这种真文案就整句放行了
 // (独立审计实测)。所以整串授权,拆开的单词不放行。
 const TECH_PHRASES = [
-  { id: "cert-name", why: "合规认证与支付标准的注册名,证书上就是这么印的;拆词授权会让 Type / Level / Node 这类普通名词全局放行", phrases: ["SOC 2 Type II", "PCI DSS Level 1", "3DS 2.2"] },
   { id: "product-name", why: "产品全名(创世节点),`Genesis` / `Node` 单独作为词不授权", phrases: ["Genesis Node"] },
 ];
 
@@ -58,11 +57,6 @@ const TECH_TOKENS = [
     //    `audited` 是要翻译的动词,整句收进 t.ref.certikAudited 之后判定面上再没有这个词。
     // VND is the ISO currency code for bank payout amounts, identical in all shipped locales.
     tokens: ["NEX", "USDT", "VND", "UVEL", "UVELBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
-  },
-  {
-    id: "cert-acronym",
-    why: "认证机构 / 法规的缩写(ISO 27001 · GDPR · MSB):都是不翻译的专有缩写,且不与任何普通英文词同形",
-    tokens: ["ISO", "GDPR", "MSB"],
   },
   {
     id: "unit-abbrev",
@@ -112,7 +106,7 @@ const NON_COPY_ATTRS = [
     id: "style-hook",
     why: "样式挂载点:class 名与内联 CSS / CSS 变量,值来自设计系统词汇表(`flex` / `truncate` / `var(--v5-ink-4)`),不是给人读的句子",
     names: ["class", "style", "font-family", "font-size", "font-weight", "letter-spacing", "text-anchor", "dominant-baseline",
-      "placeholder-class", "placeholder-style", "input-style", "icon-bg", "tint", "accent", "previous-margin", "next-margin"],
+      "placeholder-class", "placeholder-style", "input-style", "icon-bg", "tint", "accent", "previous-margin", "next-margin", "backdrop", "layout", "semantics"],
   },
   {
     id: "svg-geometry",
@@ -131,7 +125,7 @@ const NON_COPY_ATTRS = [
       // 与上面同族的 aria-required / aria-disabled 同理。
       // aria-errormessage 的值是**指向错误元素 id 的引用**(与 aria-describedby / aria-controls
       // 同族),不是给人读的文案;文案本身仍在被引用的 <text> 里走 i18n。
-      "aria-invalid", "aria-orientation", "aria-errormessage",
+      "aria-invalid", "aria-orientation", "aria-errormessage", "aria-current",
       "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {
@@ -638,7 +632,7 @@ function selftest() {
     ["合法:提现币种代码不是英文文案", P, '<template><WalletActionBtn sub="USDT / VND" /></template>', 0],
     ["🔴 币种代码不能豁免同行普通英文文案", P, '<template><text>Withdraw VND</text></template>', 1],
     ["合法:授权单位缩写", P, "<template><text>{{ n }}GB VRAM</text></template>", 0],
-    ["合法:授权短语整串(PCI DSS Level 1 · 3DS 2.2)", P, "<template><text>PCI DSS Level 1 · 3DS 2.2</text></template>", 0],
+    ["已移除未展示认证名称的授权", P, "<template><text>PCI DSS Level 1 · 3DS 2.2</text></template>", 1],
     ["🔴 短语拆开的普通名词不放行(Type / Level / Node 单独出现照判)", P, "<template><text>Node Type</text><text>Level II</text></template>", 2],
     ["合法:单字母图示标签不算词(A/B/L/R)", P, "<template><text>L 3</text><text>R 4</text></template>", 0],
     ["合法:档位编号不算词", P, "<template><text>V3</text><text>P1</text></template>", 0],

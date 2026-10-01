@@ -17,7 +17,7 @@
       <SubPageHeader back="/pages/me/me" />
 
       <!-- Hero -->
-      <view class="mx-4 border rounded-2xl relative overflow-hidden" :style="heroStyle">
+      <view class="nx-glass-card mx-4 border rounded-2xl relative overflow-hidden" :style="heroStyle">
         <view class="absolute grid place-items-center" :style="heroIconBoxStyle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>
         </view>
@@ -32,11 +32,7 @@
 
       <!-- Tabs — SegmentedControl (HIG 44pt, accent = tech-cyan) -->
       <view class="mx-4 mt-3">
-        <view class="grid" :style="segWrapStyle" role="tablist" :aria-label="t.developer.headline">
-          <view v-for="(o, i) in tabOptions" :key="o.value" class="nx-dev-tab grid place-items-center active:opacity-70" :style="pillStyle(o.value)" role="tab" :tabindex="tab === o.value ? 0 : -1" :aria-label="o.label" :aria-selected="tab === o.value ? 'true' : 'false'" @click="tab = o.value" @keydown.enter.prevent="tab = o.value" @keydown.space.prevent="tab = o.value" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
-            <text :style="pillLabelStyle(o.value)">{{ o.label }}</text>
-          </view>
-        </view>
+        <GlassSegments :label="t.developer.headline" v-model="tab" :options="tabOptions"  />
       </view>
 
       <!-- Overview -->
@@ -59,7 +55,7 @@
         <!-- Partners -->
         <view v-if="!remoteApiEnabled" class="mx-4 mt-4">
           <text class="block" :style="partnerTitleStyle">{{ t.developer.partners }}</text>
-          <view class="rounded-2xl grid" :style="partnerGridStyle">
+          <view class="nx-glass-card rounded-2xl grid" :style="partnerGridStyle">
             <view v-for="p in PARTNERS" :key="p.id" class="grid place-items-center" :style="partnerCellStyle">
               <text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 500">{{ p.label }}</text>
             </view>
@@ -67,19 +63,19 @@
         </view>
 
         <!-- Request access form -->
-        <view class="mx-4 mt-4 mb-6 rounded-2xl" :style="formCardStyle">
+        <view class="nx-glass-card mx-4 mt-4 mb-6 rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 4px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
           </view>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
-          <view v-if="remoteApiEnabled && latestRequest" class="rounded-xl" :style="requestStatusStyle">
+          <view v-if="remoteApiEnabled && latestRequest" class="nx-glass-inset rounded-xl" :style="requestStatusStyle">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ latestRequest.requestNo }} · {{ latestRequestStatusLabel }}</text>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ new Date(latestRequest.submittedAt).toLocaleString(dateLocale()) }}</text>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ latestRequestStatusDetail }}</text>
             <text v-if="requestReviewReason" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ developerCopy[requestReviewReason] }}</text>
           </view>
-          <view v-if="remoteApiEnabled && latestLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+          <view v-if="remoteApiEnabled && latestLoadFailed" class="nx-glass-inset rounded-xl" :style="requestStatusStyle">
             <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
             <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
           </view>
@@ -106,7 +102,7 @@
 
       <!-- Docs -->
       <view v-else-if="tab === 'docs'" class="mx-4 mt-3 mb-6">
-        <view class="rounded-2xl" :style="formCardStyle">
+        <view class="nx-glass-card rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 8px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
@@ -135,7 +131,7 @@
           <view v-else>
             <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
-              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'"  @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
             </view>
             <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
@@ -161,7 +157,7 @@
           <view v-else>
             <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
-              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'" @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'"  @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
             </view>
             <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
@@ -204,7 +200,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { confirm, toast, useUI } from "@/store/ui";
-import { developerAccessApi, developerResourcesApi, remoteApiEnabled } from "@/api/runtime";
+import { developerAccessApi, developerResourcesApi, remoteApiEnabled, apiClient, expectedApiEnvironment } from "@/api/runtime";
 import type { DeveloperAccessReceipt } from "@/api/developer-access-api";
 import type { DeveloperApiKey, DeveloperWebhook, DeveloperWebhookDelivery } from "@/api/developer-resources-api";
 import { useApp } from "@/store/app";
@@ -216,7 +212,7 @@ import { isApiKeyRevoked, isWebhookDeleted, isWebhookEnabled, readDeveloperResou
 import { createDeveloperRotationJournal, developerRotationUniStorage, type DeveloperRotationRecoveryState } from "./developer-rotation-journal";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
-import { apiClient, expectedApiEnvironment } from "@/api/runtime";
+
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperWebhook, type DeveloperFormIssue } from "./developer-form-validation";
@@ -828,12 +824,10 @@ watch([company, email, useCase], () => {
 });
 
 // ── styles ──
-const heroStyle: CSSProperties = {
+const heroStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background:
-    "radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent) 0%, transparent 55%)," +
-    "radial-gradient(100% 80% at 100% 100%, color-mix(in srgb, var(--v5-brand) 10%, transparent) 0%, transparent 60%)," +
-    "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+    "var(--nx-glass-fill)",
+  borderColor: "transparent",
   padding: "20px",
 };
 const heroIconBoxStyle: CSSProperties = {
@@ -914,8 +908,8 @@ const partnerTitleStyle: CSSProperties = {
   letterSpacing: "-0.025em",
   padding: "12px 8px 4px",
 };
-const partnerGridStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+const partnerGridStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
   padding: "16px",
   gridTemplateColumns: "repeat(4, 1fr)",
   gap: "12px",
@@ -925,8 +919,8 @@ const partnerCellStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "8px",
 };
-const formCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+const formCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
   padding: "16px",
 };
 const formInputStyle: CSSProperties = {
@@ -959,7 +953,7 @@ const submitBtnStyle: CSSProperties = {
   height: "48px",
   background: "var(--v5-tech-cyan)",
 };
-const requestStatusStyle: CSSProperties = { padding: "10px 12px", marginBottom: "12px", background: "var(--v5-surface-2)" };
+const requestStatusStyle: CSSProperties = { padding: "10px 12px", marginBottom: "12px", };
 const resourceRowStyle: CSSProperties = { padding: "12px 0", gap: "10px", borderBottom: "1px solid var(--v5-border)" };
 const dangerBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-warning)", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
 const smallActionBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-tech-cyan)", background: "color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)" };
@@ -992,6 +986,8 @@ const smallBtnStyle: CSSProperties = {
   background: "var(--v5-tech-cyan)",
   alignItems: "center",
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
 </script>
 
 <style scoped>

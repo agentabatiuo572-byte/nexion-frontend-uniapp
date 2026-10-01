@@ -18,7 +18,7 @@
       <view v-if="remoteApiEnabled && (remoteRefreshError || faucet.remoteReadState === 'error')" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily" @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily"  @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
@@ -31,14 +31,14 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <template v-if="dailyFactsReady">
         <!-- Streak hero -->
-        <view class="relative overflow-hidden text-center" :style="heroStyle">
+        <view class="nx-glass-card relative overflow-hidden text-center" :style="heroStyle">
           <text aria-hidden :style="fireStyle">🔥</text>
           <view class="relative">
             <text class="block tabular-nums" :style="streakNumStyle">{{ streak }}</text>
             <text class="block" :style="streakLblStyle">{{ t.daily.activeStreak }}</text>
             <text class="block" :style="streakPointsStyle">{{ heroLineText }}</text>
             <!-- Sign-in button -->
-            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
+            <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signInBtnStyle" role="button" tabindex="0" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? 'true' : 'false'" @click="handleCheckIn"  @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
               <template v-if="lastSignedToday">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><path d="M20 6 9 17l-5-5" /></svg>
                 <text>{{ t.daily.checkedInToday }}</text>
@@ -86,7 +86,7 @@
                 </view>
                 <text class="block" v-if="!isMilestoneUnlocked(m)" :style="milestoneLeftStyle">{{ daysLeftText(m.day) }}</text>
               </view>
-              <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" role="button" tabindex="0" :aria-disabled="!isMilestoneUnlocked(m) || isMilestoneClaimed(m) ? 'true' : 'false'" @click="handleClaimMilestone(m)" @keydown.enter.prevent="handleClaimMilestone(m)" @keydown.space.prevent="handleClaimMilestone(m)">
+              <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" role="button" tabindex="0" :aria-disabled="!isMilestoneUnlocked(m) || isMilestoneClaimed(m) ? 'true' : 'false'" @click="handleClaimMilestone(m)"  @keydown.enter.prevent="handleClaimMilestone(m)" @keydown.space.prevent="handleClaimMilestone(m)">
                 <text>{{ isMilestoneClaimed(m) ? t.daily.milestones.claimed : t.daily.milestones.claim }}</text>
               </view>
             </view>
@@ -97,7 +97,7 @@
         <StreakPowerUps />
 
         <!-- Streak Saver -->
-        <view :style="saverCardStyle">
+        <view class="nx-glass-card" :style="saverCardStyle">
           <view class="flex items-start" style="gap: 12px">
             <view class="grid place-items-center shrink-0" :style="saverIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
@@ -107,14 +107,14 @@
               <text class="block" :style="saverHeadlineStyle">{{ saverHeadlineText }}</text>
               <text class="block" :style="saverCountStyle">{{ saverCountText }}</text>
             </view>
-            <view class="active:opacity-80 transition-opacity" :style="saverBtnStyle" role="button" tabindex="0" :aria-disabled="!streakBroken || remoteRefreshing || saverSubmitting ? 'true' : 'false'" @click="handleUseSaver" @keydown.enter.prevent="handleUseSaver" @keydown.space.prevent="handleUseSaver">
+            <view class="active:opacity-80 transition-opacity" :style="saverBtnStyle" role="button" tabindex="0" :aria-disabled="!streakBroken || remoteRefreshing || saverSubmitting ? 'true' : 'false'" @click="handleUseSaver"  @keydown.enter.prevent="handleUseSaver" @keydown.space.prevent="handleUseSaver">
               <text>{{ t.daily.saver.use }}</text>
             </view>
           </view>
         </view>
 
         <!-- Top Streakers -->
-        <view class="overflow-hidden" :style="leaderCardStyle">
+        <view class="nx-glass-card overflow-hidden" :style="leaderCardStyle">
           <view class="px-4 flex items-center justify-between" style="padding-top: 12px; padding-bottom: 8px">
             <text :style="leaderLabelStyle">{{ t.daily.topStreakers.label }}</text>
             <text :style="leaderBestStyle">{{ yourBestText }}</text>
@@ -156,14 +156,14 @@
         <text v-if="remoteApiEnabled" class="block" :style="statSubStyle">{{ t.daily.ledgerScope }}</text>
         <view v-if="remoteApiEnabled && app.remoteFleetStatus === 'error'" role="status">
           <text class="block" :style="statSubStyle">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : t.wallet.fundsUnavailableBody }}</text>
-          <view class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBalance(false)" @keydown.enter.prevent="refreshBalance(false)" @keydown.space.prevent="refreshBalance(false)">
+          <view class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBalance(false)"  @keydown.enter.prevent="refreshBalance(false)" @keydown.space.prevent="refreshBalance(false)">
             <text>{{ t.wallet.retryFunds }}</text>
           </view>
         </view>
         <text v-if="remoteApiEnabled && bills.summaryStatus === 'ready' && (bills.summary?.settledRewardsNex == null || bills.summary?.withdrawalOffsetNexSpent == null)" class="block" :style="statSubStyle">{{ t.home.quickFactsFailed }}</text>
 
         <!-- Withdrawal context -->
-        <view :style="withdrawCardStyle" class="active:scale-[0.98]" role="button" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw" @keydown.space.prevent="goWithdraw">
+        <view :style="withdrawCardStyle" class="nx-glass-card active:scale-[0.98]" role="button" tabindex="0" @click="goWithdraw"  @keydown.enter.prevent="goWithdraw" @keydown.space.prevent="goWithdraw">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="withdrawIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -178,10 +178,10 @@
         <!-- History -->
         <view>
           <text class="block px-1" :style="historyLabelStyle">{{ t.daily.recent }}</text>
-          <view class="overflow-hidden" :style="historyCardStyle">
+          <view class="nx-glass-card overflow-hidden" :style="historyCardStyle">
             <view v-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" class="p-4">
               <text>{{ bills.summaryStatus === 'error' ? t.home.quickFactsFailed : t.home.quickFactsLoading }}</text>
-              <view v-if="bills.summaryStatus === 'error'" class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger()" @keydown.enter.prevent="refreshLedger()" @keydown.space.prevent="refreshLedger()">
+              <view v-if="bills.summaryStatus === 'error'" class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger()"  @keydown.enter.prevent="refreshLedger()" @keydown.space.prevent="refreshLedger()">
                 <text>{{ t.store.catalogRetry }}</text>
               </view>
             </view>
@@ -659,10 +659,10 @@ function goWithdraw() {
 }
 
 // ── styles ──
-const heroStyle: CSSProperties = {
+const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "22px 20px",
-  borderRadius: "18px",
-  background: "linear-gradient(135deg, #FFCB94 0%, var(--v5-brand-2) 100%)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
   color: "var(--v5-ink)",
 };
 const fireStyle: CSSProperties = {
@@ -685,10 +685,11 @@ const streakLblStyle: CSSProperties = {
   marginTop: "6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
-  color: "rgba(255,255,255,0.82)",
+  color: "var(--v5-ink-2)",
   letterSpacing: "0.06em",
 };
-const streakPointsStyle: CSSProperties = { marginTop: "14px", fontSize: "13px", color: "rgba(255,255,255,0.92)" };
+const streakPointsStyle: CSSProperties = { marginTop: "14px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const disabledSignInColor = "var(--v5-ink-3)";
 const signInBtnStyle = computed<CSSProperties>(() => {
   // Both "already signed in" and "state not confirmed" are non-actionable, so they
   // share the dimmed treatment; the label says which one it is.
@@ -697,8 +698,8 @@ const signInBtnStyle = computed<CSSProperties>(() => {
     marginTop: "18px",
     height: "54px",
     borderRadius: "14px",
-    background: inert ? "rgba(255,255,255,0.42)" : "var(--v5-ink)",
-    color: inert ? "rgba(255,255,255,0.65)" : "var(--v5-brand-2)",
+    background: inert ? "var(--v5-surface-2)" : "var(--v5-brand)",
+    color: inert ? disabledSignInColor : "var(--v5-on-brand)",
     fontFamily: "var(--font-v5)",
     fontWeight: 600,
     fontSize: "15px",
@@ -708,7 +709,7 @@ const nextClaimStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
-  color: "rgba(255,255,255,0.85)",
+  color: "var(--v5-ink-3)",
 };
 const luckyHintStyle: CSSProperties = {
   marginTop: "-4px",
@@ -782,7 +783,7 @@ function milestoneBtnStyle(m: Milestone): CSSProperties {
     flexShrink: 0,
   };
 }
-const saverCardStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-brand-2-soft)" };
+const saverCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", padding: "16px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)" };
 const saverIconStyle: CSSProperties = {
   width: "40px",
   height: "40px",
@@ -823,9 +824,9 @@ const saverBtnStyle = computed<CSSProperties>(() => ({
   flexShrink: 0,
 }));
 // Form-b: filled container, no border — the social streak list stays grouped.
-const leaderCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const leaderCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const leaderLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -894,10 +895,10 @@ function statValStyle(tint: string): CSSProperties {
 }
 const statSubStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Soft brand-2-tinted clickable callout, no border (tap affordance = tint + active-scale).
-const withdrawCardStyle: CSSProperties = {
-  borderRadius: "16px",
+const withdrawCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "14px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
+  background: "var(--nx-glass-fill)",
 };
 const withdrawIconStyle: CSSProperties = {
   width: "40px",
@@ -916,9 +917,9 @@ const historyLabelStyle: CSSProperties = {
   letterSpacing: "0.06em",
 };
 // Form-b: filled container, no border — rows already hairline-separated.
-const historyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const historyCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const historyEmptyStyle: CSSProperties = { padding: "24px", fontSize: "13px", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
@@ -952,4 +953,6 @@ const retryBtnStyle: CSSProperties = {
   color: "var(--v5-ink)",
   fontSize: "12px",
 };
+
+
 </script>

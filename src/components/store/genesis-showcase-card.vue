@@ -14,14 +14,15 @@
 -->
 <template>
   <view>
-    <view class="relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
+    <view class="nx-glass-card relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
       <!-- Gold aurora wash（装饰,卡内合法光晕:bg+overflow-hidden）-->
       <view aria-hidden :style="auroraStyle" />
 
       <view class="relative" style="z-index: 1">
+        <GenesisArtwork style="border-radius: 12px; margin-bottom: 14px" />
         <!-- Eyebrow -->
-        <view class="flex items-center justify-between" style="gap: 10px">
-          <view class="inline-flex items-center" style="gap: 6px; color: var(--v5-genesis-gold)">
+        <view class="flex flex-wrap items-center justify-between" style="gap: 10px">
+          <view class="inline-flex items-center" style="gap: 6px; min-width: 0; color: var(--v5-genesis-gold)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
             <text class="font-mono-tabular" :style="eyebrowStyle">{{ eyebrowText }}</text>
           </view>
@@ -58,7 +59,7 @@
         </view>
 
         <!-- Locked state line（资格未达:可见不藏,克制表述）-->
-        <view v-if="locked" :style="lockRowStyle">
+        <view class="nx-glass-inset" v-if="locked" :style="lockRowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <text :style="lockTextStyle">{{ lockedLineText }}</text>
           <text v-if="lockedMetText" class="font-mono-tabular tabular-nums nowrap" :style="lockMetStyle">{{ lockedMetText }}</text>
@@ -204,9 +205,9 @@ async function onCardTap() {
 }
 
 // ── styles（金色 = genesis 域例外,见文件头;其余走 --v5-* token,零 border 卡）──
-const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "18px",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "18px 16px 16px",
 };
 const auroraStyle: CSSProperties = {
@@ -234,7 +235,7 @@ const leftChipStyle: CSSProperties = {
 const titleStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-v5)",
-  fontSize: "20px",
+  fontSize: "26px",
   fontWeight: 600,
   letterSpacing: "-0.016em",
   color: "var(--v5-ink)",
@@ -283,7 +284,6 @@ const lockRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  background: "var(--v5-surface-2)",
   borderRadius: "11px",
   padding: "9px 12px",
 };
@@ -296,4 +296,6 @@ const lockTextStyle: CSSProperties = {
   textWrap: "pretty" as CSSProperties["textWrap"],
 };
 const lockMetStyle: CSSProperties = { flexShrink: 0, fontSize: "12px", color: "var(--v5-genesis-gold)" };
+
+import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 </script>

@@ -11,7 +11,7 @@
       <!-- 轨道贴页面底:原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1。
            配套把选中 pill 从「白底+投影」换成 brand-soft 底(见 tabStyle),
            否则轨道和选中 pill 都是白的,等于修掉隐形又弄丢选中态。 -->
-      <view class="flex gap-0.5" style="padding: 3px; background: var(--v5-surface); border-radius: 9px" role="tablist" :aria-label="`${t.home.liveFeedTabActivity} / ${t.home.liveFeedTabEarnings}`">
+      <view class="flex gap-0.5" style="padding: 4px; background: var(--v5-surface-2); border-radius: 28px" role="tablist" :aria-label="`${t.home.liveFeedTabActivity} / ${t.home.liveFeedTabEarnings}`">
         <!-- 《08》§2 反馈恒定:选中态原先是空 class,按下去零反馈。
              切到自己虽然不改变什么,但用户仍需要「点到了」的确认。 -->
         <view
@@ -23,14 +23,14 @@
           aria-controls="home-live-feed-panel-activity"
           :tabindex="tab === 'activity' ? 0 : -1"
           @click="tab = 'activity'"
-          @keydown.enter.stop.prevent="tab = 'activity'"
-          @keydown.space.stop.prevent="tab = 'activity'"
-          @keydown.left.stop.prevent="activateAdjacentTab('activity', -1)"
-          @keydown.up.stop.prevent="activateAdjacentTab('activity', -1)"
-          @keydown.right.stop.prevent="activateAdjacentTab('activity', 1)"
-          @keydown.down.stop.prevent="activateAdjacentTab('activity', 1)"
-          @keydown.home.stop.prevent="activateTabFromKeyboard('activity')"
-          @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
+
+
+
+
+
+
+
+          @keydown.enter.stop.prevent="tab = 'activity'" @keydown.space.stop.prevent="tab = 'activity'" @keydown.left.stop.prevent="activateAdjacentTab('activity', -1)" @keydown.up.stop.prevent="activateAdjacentTab('activity', -1)" @keydown.right.stop.prevent="activateAdjacentTab('activity', 1)" @keydown.down.stop.prevent="activateAdjacentTab('activity', 1)" @keydown.home.stop.prevent="activateTabFromKeyboard('activity')" @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
         >
           <text :style="{ color: tab === 'activity' ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontWeight: tab === 'activity' ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ t.home.liveFeedTabActivity }}</text>
         </view>
@@ -43,14 +43,14 @@
           aria-controls="home-live-feed-panel-earnings"
           :tabindex="tab === 'earnings' ? 0 : -1"
           @click="tab = 'earnings'"
-          @keydown.enter.stop.prevent="tab = 'earnings'"
-          @keydown.space.stop.prevent="tab = 'earnings'"
-          @keydown.left.stop.prevent="activateAdjacentTab('earnings', -1)"
-          @keydown.up.stop.prevent="activateAdjacentTab('earnings', -1)"
-          @keydown.right.stop.prevent="activateAdjacentTab('earnings', 1)"
-          @keydown.down.stop.prevent="activateAdjacentTab('earnings', 1)"
-          @keydown.home.stop.prevent="activateTabFromKeyboard('activity')"
-          @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
+
+
+
+
+
+
+
+          @keydown.enter.stop.prevent="tab = 'earnings'" @keydown.space.stop.prevent="tab = 'earnings'" @keydown.left.stop.prevent="activateAdjacentTab('earnings', -1)" @keydown.up.stop.prevent="activateAdjacentTab('earnings', -1)" @keydown.right.stop.prevent="activateAdjacentTab('earnings', 1)" @keydown.down.stop.prevent="activateAdjacentTab('earnings', 1)" @keydown.home.stop.prevent="activateTabFromKeyboard('activity')" @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
         >
           <text :style="{ color: tab === 'earnings' ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontWeight: tab === 'earnings' ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ t.home.liveFeedTabEarnings }}</text>
         </view>
@@ -81,7 +81,7 @@
       </view>
       <view v-if="displayActivityRows.length === 0" class="flex items-center justify-between px-1 py-3" style="gap: 12px">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ remoteFeedStatusText }}</text>
-        <text v-if="app.homeTruthStatus === 'error'" class="font-mono-tabular active:opacity-70" role="button" tabindex="0" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
+        <text v-if="app.homeTruthStatus === 'error'" class="font-mono-tabular active:opacity-70" role="button" tabindex="0" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click="retryHome"  @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
       </view>
     </view>
 
@@ -103,7 +103,7 @@
       </view>
       <view v-else class="flex items-center justify-between px-1 py-3" style="gap: 12px">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ remoteFeedStatusText }}</text>
-        <text v-if="app.homeTruthStatus === 'error'" class="font-mono-tabular active:opacity-70" role="button" tabindex="0" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
+        <text v-if="app.homeTruthStatus === 'error'" class="font-mono-tabular active:opacity-70" role="button" tabindex="0" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click="retryHome"  @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
       </view>
     </view>
   </view>
@@ -147,7 +147,7 @@ const displayActivityRows = computed<FeedRow[]>(() => {
     lvl: "ok",
     who: "You",
     msg: `${row.model} @ ${row.client}`,
-    val: `+$${row.rewardUsdt.toFixed(5)}`,
+    val: `+${row.rewardUsdt.toFixed(5)}`,
     ts: new Date(row.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false }),
   }));
 });
@@ -218,4 +218,6 @@ function retryHome() {
 function goEarnings() {
   navTo("/pages/me/wallet-bills");
 }
+
+
 </script>

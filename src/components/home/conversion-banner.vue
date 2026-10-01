@@ -1,8 +1,8 @@
 <!-- ConversionBanner — homepage weekly task card. -->
 <template>
   <view
-    class="weekly-quest block transition-transform"
-    :class="cardInactive ? 'opacity-60' : 'active:scale-[0.98] active:opacity-90'"
+    class="nx-glass-action weekly-quest block"
+    :class="{ 'opacity-60': cardInactive }"
     :style="rootStyle"
     :role="cardInactive ? undefined : 'button'"
     :tabindex="props.active && !cardInactive ? 0 : -1"
@@ -16,18 +16,10 @@
     :data-target-device="weeklyCard.targetDevice ?? ''"
     :data-quest-category="weeklyCard.category ?? ''"
     @click="onCardAction"
-    @keydown.enter.prevent="onCardAction"
-    @keydown.space.prevent="onCardAction"
-  >
-    <image
-      class="weekly-quest__product"
-      src="/static/img/marketing/trial-hero.png"
-      mode="aspectFit"
-      :style="productStyle"
-      aria-hidden="true"
-    />
 
-    <view class="weekly-quest__content">
+    @keydown.enter.prevent="onCardAction" @keydown.space.prevent="onCardAction"
+  >
+<view class="weekly-quest__content">
       <view class="weekly-quest__header">
         <view class="weekly-quest__identity">
           <view class="weekly-quest__mark" aria-hidden="true">
@@ -93,11 +85,7 @@ import { navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import {
-  questTargetBusiness,
-  unclaimableBusinessQuests,
-  type QuestTargetAvailability,
-} from "@/lib/quest-business-availability";
+import { questTargetBusiness, unclaimableBusinessQuests, type QuestTargetAvailability } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 
 const MANAGED_POSITION = "home.conversion-banner";
@@ -219,31 +207,17 @@ const cardInactive = computed(() => !props.active
   || weeklyState.value === "loading" || weeklyState.value === "empty"
   || questTargetClosed.value);
 
-const rootStyle: CSSProperties = {
+const rootStyle: CSSProperties = { boxShadow: "none",
   position: "relative",
   boxSizing: "border-box",
   width: "100%",
   height: "var(--home-task-card-height, 184px)",
   minHeight: "var(--home-task-card-height, 184px)",
-  borderRadius: "16px",
+  borderRadius: "var(--nx-glass-radius)",
   background:
-    "radial-gradient(50% 60% at 100% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
+    "var(--nx-glass-fill)",
   overflow: "hidden",
   color: "var(--v5-ink)",
-};
-
-const PRODUCT_MASK =
-  "radial-gradient(ellipse 200px 250px at 95% 50%, #000 25%, rgba(0,0,0,0.7) 45%, rgba(0,0,0,0.35) 65%, rgba(0,0,0,0.1) 82%, transparent 100%)";
-const productStyle: CSSProperties = {
-  position: "absolute",
-  top: "-36px",
-  right: "-50px",
-  width: "220px",
-  height: "220px",
-  pointerEvents: "none",
-  zIndex: 0,
-  maskImage: PRODUCT_MASK,
-  WebkitMaskImage: PRODUCT_MASK,
 };
 
 function onCardAction() {
@@ -259,6 +233,7 @@ function onCardAction() {
   if (questTargetClosed.value) return;
   if (weeklyCard.value.actionRoute) navTo(weeklyCard.value.actionRoute);
 }
+
 </script>
 
 <style scoped>

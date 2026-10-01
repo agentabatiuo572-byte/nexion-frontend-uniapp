@@ -1,62 +1,27 @@
-<!--
-  WalletCard — ported from me/page.tsx WalletCard (+ design draft tech-money-card).
-  Dual-currency hero: USDT (48px) on top, NEX (32px) below, then a "Quick actions"
-  3-button grid (Top-up / Withdraw / Exchange), then a conditional empty-slot
-  conversion hook ("Unlock +$X/d more · Add device"). Blocks are separated by 28px
-  whitespace only — no rules (主人 2026-08-17 去线).
-  Reads useApp for balances/devices; derivePromoUpgrade for slot potential;
-  trialReservesSlotNow for the shadow-trial slot; useBills for this-month count.
-
-  Visual layers: 24px grid overlay + drifting aurora + 5 data-dots (all aria-hidden,
-  zero-interaction). framer/SVG ports use existing tokens.css keyframes
-  (v5-aurora-drift / v5-dot-drift / v5-hb-pulse).
--->
+<!-- Balances retain their existing sources; the summary follows the approved wallet design. -->
 <template>
-  <view>
-    <SectionHeader :title="t.me.myWallet" link="/pages/me/wallet-bills" :link-label="t.headerTitles.meWalletBills" />
-    <view class="relative overflow-hidden" :style="cardStyle">
-      <!-- grid-overlay 24px lattice -->
-      <view aria-hidden :style="gridOverlayStyle" />
-      <!-- aurora drift -->
-      <view aria-hidden :style="auroraStyle" />
-      <!-- 5 data-dots -->
-      <view aria-hidden style="position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0">
-        <view v-for="(d, i) in DATA_DOTS" :key="i" :style="dotStyle(d)" />
+  <view class="nx-wallet">
+    <view class="nx-glass-card nx-glass-hero nx-wallet-summary">
+      <view class="nx-wallet-arc" aria-hidden="true" />
+      <view class="nx-wallet-heading" data-me-action="wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" >
+        <svg class="nx-wallet-symbol" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-5v5h5" /></svg>
+        <text class="nx-wallet-title">{{ t.me.myWallet }}</text>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
       </view>
-
-      <view class="relative" style="z-index: 1">
-        <!-- USDT balance label -->
-        <view style="margin-bottom: 8px">
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.me.usdtBalance }}</text>
-        </view>
-        <!-- USDT hero -->
-        <view class="flex items-baseline" style="gap: 8px">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-          <text class="tabular-nums" :style="usdtNumStyle">{{ intPart }}<text style="color: var(--v5-ink-3); font-size: 36px">.{{ fracPart }}</text></text>
-        </view>
-        <text class="block tabular-nums" :style="pendingStyle">{{ pendingLine }}</text>
-
-        <!-- NEX hero — equal weight, separated by whitespace -->
-        <view :style="nexBlockStyle">
-          <view class="flex items-center justify-between" style="margin-bottom: 8px">
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.uiChrome.nexBalance }}</text>
-            <text :style="nexBadgeStyle">{{ nexChangeLabel }}</text>
-          </view>
-          <view class="flex items-baseline" style="gap: 8px">
-            <text class="tabular-nums" :style="nexNumStyle">{{ nexLabel }}</text>
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 13px; color: var(--v5-nex); font-weight: 600; letter-spacing: 0.06em">NEX</text>
-          </view>
-          <view class="flex items-center justify-between" :style="nexSubRowStyle">
-            <text style="color: var(--v5-ink-3)">{{ nexMarketLabel }}</text>
-            <!-- 《07》tap≥44:上一轮只补了按下反馈、漏了热区(实测 109.6×16,独立验收 agent 抓出)。
-                 同 section-header 的处理 —— 只向左扩,右边缘不动,不越过父容器。 -->
-            <view class="inline-flex items-center shrink-0 active:opacity-70 transition-opacity" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3); min-height: 44px; padding-left: 16px" data-me-action="wallet-bills" role="button" tabindex="0" :aria-label="t.headerTitles.meWalletBills" @click="goBills" @keydown.enter.prevent="goBills" @keydown.space.prevent="goBills">
-              <text>{{ billsThisMonth }} {{ t.me.billsThisMonth }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-            </view>
-          </view>
-        </view>
-
+      <view class="nx-wallet-total" :aria-label="t.me.usdtBalance + ': $' + usdtLabel">
+        <text class="nx-wallet-currency">$</text><text class="tabular-nums nx-wallet-amount">{{ usdtLabel }}</text>
+      </view>
+      <view class="nx-wallet-nex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' NEX'">
+        <view class="nx-wallet-coin" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" /></svg></view>
+        <text class="tabular-nums">{{ nexLabel }} NEX</text>
+      </view>
+    </view>
+    <view class="nx-wallet-details">
+      <text class="block nx-wallet-pending tabular-nums">{{ pendingLine }}</text>
+      <view class="nx-wallet-valuation">
+        <text>{{ nexMarketLabel }}</text>
+        <view class="nx-wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" ><text>{{ billsThisMonth }} {{ t.me.billsThisMonth }}</text><text aria-hidden="true"> ›</text></view>
+      </view>
         <!-- Quick actions strip -->
         <view :style="actionsBlockStyle">
           <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px">{{ t.me.quickActions }}</text>
@@ -81,11 +46,10 @@
               <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-3)">{{ slotsLine }}</text>
             </view>
           </view>
-          <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" data-me-action="add-device" role="button" tabindex="0" :aria-label="t.me.addDeviceCta" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
+          <view class="wallet-add-device shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" data-me-action="add-device" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
             <text>{{ t.me.addDeviceCta }}</text>
           </view>
         </view>
-      </view>
     </view>
   </view>
 </template>
@@ -137,7 +101,7 @@ const nexChangeLabel = computed(() => {
 const nexMarketLabel = computed(() => {
   if (!marketReady.value) return "≈ — · 1 NEX = —";
   const price = market.nexPriceUSDT;
-  return `≈ $${(nex.value * price).toFixed(2)} · 1 NEX = $${price.toFixed(3)}`;
+  return `≈ ${(nex.value * price).toFixed(2)} · 1 NEX = ${price.toFixed(3)}`;
 });
 
 const activeCount = computed(() => app.activeSlotCount);
@@ -281,4 +245,30 @@ const addDeviceBtnStyle: CSSProperties = {
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
 };
+
+import { useSlotActionSheet } from "@/store/slot-action-sheet";
+const usdtLabel = computed(() => usdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 </script>
+
+<style scoped>
+.nx-wallet-summary { position: relative; overflow: hidden; padding: 20px; isolation: isolate; }
+.nx-wallet-heading { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--v5-ink); }
+.nx-wallet-symbol { color: var(--v5-nex); flex-shrink: 0; }
+.nx-wallet-title { flex: 1; min-width: 0; font: 600 20px/1.3 var(--font-v5); }
+.nx-wallet-total { position: relative; display: flex; align-items: baseline; margin: 28px 0 26px; gap: 3px; color: var(--v5-ink); font-family: var(--font-v5); font-weight: 650; letter-spacing: -.035em; line-height: 1.1; }
+.nx-wallet-currency { font-size: clamp(28px, 8vw, 38px); }
+.nx-wallet-amount { min-width: 0; overflow-wrap: anywhere; font-size: clamp(32px, 10.5vw, 52px); }
+.nx-wallet-nex { position: relative; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; color: var(--v5-bg); background: var(--v5-nex); }
+.nx-wallet-arc { position: absolute; width: 360px; height: 300px; border-radius: 50%;  bottom: -220px; right: -190px; transform: rotate(-30deg); background: radial-gradient(ellipse at center, var(--v5-nex-soft), transparent 68%); box-shadow: 0 0 40px var(--v5-nex-soft); pointer-events: none; animation: wallet-arc-breathe 7s ease-in-out infinite alternate; }
+.nx-wallet-details { padding: 12px 4px 0; }
+.nx-wallet-pending { color: var(--v5-success-ink); font: 400 12px/1.65 var(--font-v5); }
+.nx-wallet-valuation { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-3); }
+.nx-wallet-bills { display: flex; align-items: center; min-height: 44px; }
+.nx-wallet-slot-block { grid-template-columns: minmax(0, 1fr) auto; }
+.nx-wallet-heading:focus-visible, .nx-wallet-bills:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: 12px; }
+@keyframes wallet-arc-breathe { from { opacity: .55; } to { opacity: 1; } }
+@media (max-width: 350px) { .nx-wallet-slot-block { grid-template-columns: minmax(0, 1fr); } .nx-wallet-summary { padding: 18px; } }
+@media (prefers-reduced-motion: reduce) { .nx-wallet-arc { animation: none; } }
+.nx-wallet-heading:active, .nx-wallet-bills:active { opacity: .7; }
+</style>
