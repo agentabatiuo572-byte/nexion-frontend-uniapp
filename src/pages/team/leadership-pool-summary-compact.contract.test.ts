@@ -25,6 +25,30 @@ function binding(name: string, deps: string[]) {
 }
 
 describe("team page leadership-pool summary row stays compact", () => {
+  it("names USDT in A/B volume and estimated rewards while missing binary data remains unknown", () => {
+    const names = ["leftVolText", "rightVolText", "binaryMatchText"];
+    const declarations = names.map(name => source.split("\n").find((line: string) => line.startsWith(`const ${name} = computed(`)));
+    expect(declarations.every(Boolean)).toBe(true);
+    const binary = ref<{ leftVol: number; rightVol: number; binaryMatch: number } | null>(null);
+    const text = new Function("computed", "binary", `${declarations.join("\n")}; return { ${names.join(",")} };`)(computed, binary);
+    expect(names.map(name => text[name].value)).toEqual(["—", "—", "—"]);
+    binary.value = { leftVol: 0, rightVol: 0, binaryMatch: 0 };
+    expect(names.map(name => text[name].value)).toEqual(["0 USDT", "0 USDT", "+0.00 USDT"]);
+    binary.value = { leftVol: 125, rightVol: 75, binaryMatch: 7.5 };
+    expect(names.map(name => text[name].value)).toEqual(["125 USDT", "75 USDT", "+7.50 USDT"]);
+  });
+
+  it("names USDT in the ready weekly pool or projected payout without showing unavailable money", () => {
+    const state = ref("ready"), unlocked = ref(false);
+    const primary = binding("leadershipPoolPrimary", ["computed", "remoteApiEnabled", "remotePoolState", "leadershipPoolUnlocked", "projectedPayout", "leadershipPoolKText"])
+      (computed, true, state, unlocked, ref(12.5), ref(0));
+    expect(primary.value).toBe("0.0K USDT");
+    unlocked.value = true; expect(primary.value).toBe("+12.50 USDT");
+    for (const status of ["loading", "error", "hold"]) {
+      state.value = status; expect(primary.value).toBe("—");
+    }
+  });
+
   it("uses the short hold state in the summary line, not the full explanation", () => {
     const lineA = binding("leadershipPoolLineA", ["computed", "remoteApiEnabled", "remotePoolState", "t", "leadershipPoolUnlocked", "myVotes", "leadershipUnlockRank"]);
     const state = ref("hold");

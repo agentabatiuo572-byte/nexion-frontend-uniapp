@@ -51,7 +51,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "goals.vue": "43658431af1e6739fa4a269c4758f7a432b9e74dd33fa031f8fec5cb408e0a60",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
-  "me.vue": "c883cdde7fb804a39b0a1d0c5c4f933a41950085b20b9d259ef630279295bfda",
+  // Reviewed UI regression repair: bind the existing narrow-screen quick grid.
+  "me.vue": "11d4a58ee3ea0e50c41eb3762c0f2093909867bf2d012d2eeff1670cd269d5c0",
   "notifications.vue": "68fb8d9ce340c265842e5a6798c74c162d20c7245a6599c52eab5cd9d3e89196",
   "preferences.vue": "5c7a712cb60a21c7e24cbbe85783ea66503f1298724d035f4c8520251fcea632",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",

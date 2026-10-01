@@ -9,13 +9,15 @@
     </view>
     <view class="invite-card__reward" role="status" :aria-busy="rewards.loading">
       <template v-if="rewards.snapshot && !rewards.error">
-        <view class="invite-card__reward-line"><text>{{ t.team.serverRewardPerSettlement }}</text><text class="invite-card__amount">{{ nexReward.toLocaleString() }} NEX</text></view>
-        <text class="invite-card__muted">{{ t.team.perFriendCooldown }}</text>
+        <template v-if="rewardEnabled">
+          <view class="invite-card__reward-line"><text>{{ t.team.serverRewardPerSettlement }}</text><text class="invite-card__amount">{{ nexReward.toLocaleString() }} NEX</text></view>
+          <text class="invite-card__muted">{{ t.team.perFriendCooldown }}</text>
+        </template>
         <text class="invite-card__muted">{{ settlementStatus }}</text>
+        <text v-if="!rewardEnabled" class="invite-card__muted">{{ t.team.sharingStillAvailable }}</text>
         <text v-if="lifetimeEarned > 0" class="invite-card__earned">+{{ lifetimeEarned.toLocaleString() }} NEX</text>
       </template>
       <text v-else class="invite-card__muted">{{ rewards.loading ? t.team.rewardLoading : t.team.settlementUnavailable }}</text>
-      <view class="invite-card__rules" role="link" tabindex="0" @click="openRules"><text>{{ t.team.rewardRules }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></view>
     </view>
 
     <view class="invite-card__actions" :class="{ 'invite-card__disabled': !referralCode }">
@@ -52,7 +54,6 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import PulseDot from "@/components/home/pulse-dot.vue";
 import ShareChannelSheet from "@/components/team/share-channel-sheet.vue";
@@ -274,9 +275,6 @@ const tickerWrapStyle: CSSProperties = {
 };
 const tickerAmtStyle: CSSProperties = { marginLeft: "auto", color: "var(--v5-brand)", fontWeight: 600 };
 
-function openRules() {
-  navTo("/pages/team/unilevel-how");
-}
 </script>
 
 <style scoped>
@@ -290,13 +288,12 @@ function openRules() {
 .invite-card__reward-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .invite-card__amount { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .invite-card__muted { color: var(--v5-ink-3); }
-.invite-card__rules { display: flex; gap: 10px; align-items: center; min-height: 44px; align-self: flex-start; color: var(--v5-ink); font-size: 15px; }
 .invite-card__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 20px; border-top: 1px solid var(--v5-border); }
 .invite-card__action { display: flex; min-width: 0; min-height: 50px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--v5-brand); text-align: center; }
 .invite-card__action > svg { width: 24px; height: 24px; }
 .invite-card__action text { color: var(--v5-ink-3); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .invite-card__cta { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 14px; min-height: 44px; border-radius: 999px; padding: 10px 14px; background: var(--v5-brand); color: var(--v5-on-brand); font-size: 15px; font-weight: 600; }
-.invite-card__cta:active, .invite-card__action:active, .invite-card__rules:active, .invite-card__retry:active { opacity: .75; }
+.invite-card__cta:active, .invite-card__action:active, .invite-card__retry:active { opacity: .75; }
 .invite-card__disabled { opacity: .5; }
 .invite-card [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .invite-card__history { margin-top: 10px; color: var(--v5-ink-3); font-size: 12px; line-height: 1.5; }
