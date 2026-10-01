@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { navBack, navReplace, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -202,8 +202,10 @@ const nexPriceText = computed(() => market.remoteReady && market.nexPriceUSDT > 
 function goExchange() {
   navTo("/pages/me/wallet-exchange");
 }
-function goBack() {
-  navTo("/pages/trust/trust");
+function goBack(event?: KeyboardEvent | PointerEvent) {
+  if (event && "repeat" in event && event.repeat) return;
+  try { navBack("/pages/trust/trust"); }
+  catch { void navReplace("/pages/trust/trust"); }
 }
 
 const stateCardStyle: CSSProperties = { marginTop: "16px", padding: "16px", borderRadius: "16px", background: "var(--v5-surface)" };
