@@ -208,7 +208,7 @@
 
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -363,7 +363,8 @@ function readDailyPage() {
 }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, readDailyPage);
 watch(remoteSessionReady, readDailyPage, { immediate: true, flush: 'post' });
-const unsubscribeDailyRuntime = subscribeRuntimeRevision(readDailyPage);
+// Catalog preparation publishes before the remaining account-scoped stores bind.
+const unsubscribeDailyRuntime = subscribeRuntimeRevision(() => { void nextTick(readDailyPage); });
 onShow(readDailyPage);
 onUnmounted(() => { pageActive = false; dailyRefreshRequest += 1; unsubscribeDailyRuntime(); });
 
