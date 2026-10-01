@@ -62,6 +62,42 @@
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
       <view class="mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
+        <!-- APP-vue does not paint template SVG nodes. Keep static geometry in
+             NativeSvg, with supported native controls over the same 440:240 box. -->
+        <!-- #ifdef APP-PLUS -->
+        <view class="nx-globe-native" :style="{ position: 'relative', width: '100%', height: '0', paddingTop: `${H / W * 100}%` }">
+          <view style="position: absolute; inset: 0; pointer-events: none">
+            <NativeSvg width="100%" height="100%" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <radialGradient :id="nativeGlowId" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.9" />
+                  <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.2" />
+                  <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient :id="nativeYouGlowId" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--v5-tech-cyan)" stop-opacity="1" />
+                  <stop offset="100%" stop-color="var(--v5-tech-cyan)" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <circle v-for="(d, i) in dots" :key="`dot-${i}`" :cx="d.x" :cy="d.y" :r="d.r"
+                :fill="d.bright ? 'var(--v5-brand)' : 'var(--v5-ink-4)'" :opacity="d.bright ? 0.5 : 0.25" />
+              <line v-for="r in otherRegions" :key="`line-${r.id}`" :x1="meX" :y1="meY" :x2="r.cx * W" :y2="r.cy * H"
+                stroke="var(--v5-brand)" stroke-opacity="0.08" stroke-width="0.6" stroke-dasharray="2 3" />
+              <circle v-for="r in regions" :key="`glow-${r.id}`" :cx="r.cx * W" :cy="r.cy * H" r="18"
+                :fill="`url(#${r.isYou ? nativeYouGlowId : nativeGlowId})`" />
+            </NativeSvg>
+          </view>
+          <view v-for="r in regions" :key="r.id" class="nx-globe-native-node"
+            :style="nativeNodeStyle(r)" role="button" tabindex="0" :aria-label="regionName(r)"
+            @click="select(r)" @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
+            <view v-if="pulseRegionId === r.id" :key="`pulse-${r.id}-${pulseTick}`" class="nx-globe-native-pulse"
+              :style="{ borderColor: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
+            <view class="nx-globe-native-dot" :style="{ background: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
+          </view>
+          <text v-if="me" class="nx-globe-native-you" :style="{ left: `${me.cx * 100}%`, top: `${me.cy * 100}%` }">{{ t.globe.yourNodeBadge }}</text>
+        </view>
+        <!-- #endif -->
+        <!-- #ifndef APP-PLUS -->
         <svg :viewBox="`0 0 ${W} ${H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
           <defs>
             <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
@@ -129,6 +165,7 @@
             >{{ t.globe.yourNodeBadge }}</SvgText>
           </g>
         </svg>
+        <!-- #endif -->
         <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
       </view>
 
@@ -205,6 +242,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import SvgText from "@/components/svg-text";
+// #ifdef APP-PLUS
+import NativeSvg from "@/components/native-svg.vue";
+// #endif
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -318,6 +358,17 @@ const dots = computed(() => generateDotMap(W, H));
 function select(r: GlobeRegion) {
   selected.value = r;
 }
+
+// #ifdef APP-PLUS
+const nativeGlowId = `globe-native-${Math.random().toString(36).slice(2, 8)}`;
+const nativeYouGlowId = `${nativeGlowId}-you`;
+function nativeNodeStyle(r: GlobeRegion): CSSProperties {
+  return {
+    position: "absolute", left: `${r.cx * 100}%`, top: `${r.cy * 100}%`,
+    width: "44px", height: "44px", transform: "translate(-50%, -50%)",
+  };
+}
+// #endif
 
 function regionName(r: GlobeRegion): string {
   if (r.displayName) return r.displayName;
@@ -567,6 +618,42 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
 </script>
 
 <style scoped>
+/* #ifdef APP-PLUS */
+.nx-globe-native-dot,
+.nx-globe-native-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.nx-globe-native-pulse {
+  border: 1px solid;
+  animation: nx-globe-native-pulse 1.6s;
+}
+@keyframes nx-globe-native-pulse {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(4.8); opacity: 0; }
+}
+.nx-globe-native-you {
+  position: absolute;
+  transform: translate(8px, -18px);
+  color: var(--v5-tech-cyan);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  pointer-events: none;
+}
+.nx-globe-native-node:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+/* #endif */
 .nx-globe-drawer {
   position: fixed;
   inset: 0;
