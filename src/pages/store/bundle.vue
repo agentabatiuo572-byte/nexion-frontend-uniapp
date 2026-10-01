@@ -464,7 +464,7 @@ function bundleFingerprint(list: Product[]): string {
 function acquireBundleCommand(list: Product[], accountKey: string, expectedAmountUsdt: number): PendingBundleCommand {
   const fingerprint = bundleFingerprint(list);
   const productNos = list.map((item) => item.id);
-  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
+  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey, true);
   const existing = row?.commands?.[fingerprint];
   const restored = restoreBundleCommand(existing);
   if (restored && "recoveryKey" in restored) throw new Error(BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED);
@@ -475,11 +475,11 @@ function acquireBundleCommand(list: Product[], accountKey: string, expectedAmoun
   // record the quote before issuing any request from this App version.
   const key = acquireAccountCommandKey(BUNDLE_COMMAND_KEY, accountKey, fingerprint, "bundle");
   const command = { key, expectedAmountUsdt: normalizedAmount, productNos };
-  const commands = { ...(readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey)?.commands ?? {}), [fingerprint]: command };
+  const commands = { ...(readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey, true)?.commands ?? {}), [fingerprint]: command };
   if (!writeAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey, { commands })) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
-  const committed = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey)?.commands?.[fingerprint];
+  const committed = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey, true)?.commands?.[fingerprint];
   const committedCommand = restoreBundleCommand(committed);
   if (!committedCommand || "recoveryKey" in committedCommand || committedCommand.command.key !== command.key
       || committedCommand.command.expectedAmountUsdt !== command.expectedAmountUsdt

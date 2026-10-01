@@ -1,4 +1,5 @@
 import { normalizeAccountKey } from "@/store/account-cloud";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 
 /**
  * 按账号分行的 uni storage 表(P2-8 存储作用域债修复)。
@@ -6,7 +7,7 @@ import { normalizeAccountKey } from "@/store/account-cloud";
  * 写入走「现读现改现写」,与 account-cloud 表同款语义(窄竞态,多端各写各行)。
  * 真后台:行数据即 per-user 服务端资源,accountKey 即用户主键 —— 结构 backend-replaceable。
  */
-export function readAccountRow<T>(tableKey: string, accountKey: string): T | null {
+export function readAccountRow<T>(tableKey: string, accountKey: string, throwOnReadError = false): T | null {
   try {
     const table = uni.getStorageSync(tableKey) as Record<string, T> | "";
     if (table && typeof table === "object") {
@@ -14,6 +15,7 @@ export function readAccountRow<T>(tableKey: string, accountKey: string): T | nul
       if (row && typeof row === "object") return row;
     }
   } catch {
+    if (throwOnReadError) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
     // storage unavailable
   }
   return null;
@@ -47,14 +49,15 @@ export function acquireAccountCommandKey(
   accountKey: string,
   intent: string,
   prefix: string,
-  createId: () => string = () => globalThis.crypto?.randomUUID?.() ?? "",
+  createId: () => string = requireCryptoUuid,
 ): string {
   const normalizedIntent = intent.trim();
   const normalizedPrefix = prefix.trim();
   if (!tableKey.trim() || !normalizedIntent || !normalizedPrefix) {
     throw new Error("ACCOUNT_COMMAND_SCOPE_INVALID");
   }
-  const persisted = readAccountRow<AccountCommandRow>(tableKey, accountKey);
+  // An unreadable command row is unknown, never proof that no prior key exists.
+  const persisted = readAccountRow<AccountCommandRow>(tableKey, accountKey, true);
   const commands = persisted?.commands && typeof persisted.commands === "object"
     ? persisted.commands
     : {};
@@ -71,7 +74,7 @@ export function acquireAccountCommandKey(
   }
   // Read-after-write also converges same-intent races on the key that is
   // actually recoverable after a restart.
-  const committed = readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands?.[normalizedIntent];
+  const committed = readAccountRow<AccountCommandRow>(tableKey, accountKey, true)?.commands?.[normalizedIntent];
   if (typeof committed !== "string" || !committed.trim()) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
