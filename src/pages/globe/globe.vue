@@ -449,6 +449,7 @@ onHide(() => {
 function resetProjection() {
   if (disposed) return;
   projectionRequest += 1;
+  projectionFlight = null;
   selected.value = null;
   networkProjection.value = null;
   projectionStatus.value = remoteApiEnabled ? "loading" : "ready";

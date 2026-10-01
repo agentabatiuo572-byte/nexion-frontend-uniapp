@@ -13,6 +13,7 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as viMessages } from "@/i18n/messages/vi";
 import { fmt } from "@/i18n/format";
 import type { NetworkRegionProjection } from "@/api/network-regions-api";
+import { advanceRuntimeRevision, captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 // Compile both production SFCs through the installed Uni conditional parser.
 // Reparse its output so compileScript consumes the correct template AST.
@@ -69,7 +70,14 @@ const projection = (): NetworkRegionProjection => ({
   ].map(region => ({ ...region, activeNodes: 0, activeJobs: 0, jobsPerHour: 0 })),
 });
 
-async function mount(platform: "app" | "h5" = "app", failInitially = false) {
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+
+async function mount(platform: "app" | "h5" = "app", failInitially = false, initialRead?: Promise<NetworkRegionProjection>) {
   initPreContext(platform);
   const native = compile(nativeRaw, "native-svg.vue", { vue: Vue, "@/lib/native-svg-markup": { svgMarkup } });
   const locale = Vue.ref<"en" | "zh" | "vi">("en");
@@ -78,6 +86,7 @@ async function mount(platform: "app" | "h5" = "app", failInitially = false) {
   const account = Vue.reactive({ accountKey: "user:fixture", accountBindingEpoch: 1, global: { activeDevices: 0, activeJobs: 0 } });
   const api = { list: vi.fn().mockResolvedValue(projection()) };
   if (failInitially) api.list.mockRejectedValueOnce(new Error("offline"));
+  if (initialRead) api.list.mockReturnValueOnce(initialRead);
   const shows: Array<() => void> = [];
   const slot = { setup: (_props: unknown, { slots }: any) => () => Vue.h("view", slots.default?.()) };
   const empty = { props: ["kind", "title", "desc", "ctaLabel"], emits: ["cta"],
@@ -96,7 +105,7 @@ async function mount(platform: "app" | "h5" = "app", failInitially = false) {
     "@/api/runtime": { remoteApiEnabled: true, networkRegionsApi: api },
     "@dcloudio/uni-app": { onShow: (cb: () => void) => shows.push(cb), onHide: () => {} },
     "@/lib/active-page-refresh": { registerActivePageRefresh: () => () => {} },
-    "@/api/order-api": { captureRuntimeRevision: () => ({ epoch: 1 }), subscribeRuntimeRevision: () => () => {} },
+    "@/api/order-api": { captureRuntimeRevision, subscribeRuntimeRevision },
   };
   const root = node("root");
   const app = renderer.createApp(compile(raw, "globe.vue", deps));
@@ -110,6 +119,56 @@ async function mount(platform: "app" | "h5" = "app", failInitially = false) {
 }
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); vi.useRealTimers(); });
+
+test.each(["app", "h5"] as const)("%s exits cold-start loading after account and runtime rebinding succeeds", async (platform) => {
+  const old = deferred<NetworkRegionProjection>();
+  const current = deferred<NetworkRegionProjection>();
+  const page = await mount(platform, false, old.promise);
+  page.api.list.mockReturnValue(current.promise);
+
+  // Bootstrap binds the account before synchronously notifying the runtime;
+  // Vue flushes the account watcher afterwards, in the same final scope.
+  page.account.accountKey = "user:rebound";
+  page.account.accountBindingEpoch += 1;
+  advanceRuntimeRevision("cold-start account binding");
+  await settle();
+  old.resolve({ ...projection(), regions: [{ ...projection().regions[0], displayName: "OLD ACCOUNT" }] });
+  await settle();
+  expect(text(page.root)).not.toContain("OLD ACCOUNT");
+  expect(text(page.root)).toContain(en.globe.regionProjectionLoadingTitle);
+
+  current.resolve(projection());
+  await settle();
+  expect(text(page.root)).toContain("Mobile region");
+  expect(text(page.root)).not.toContain(en.globe.regionProjectionLoadingTitle);
+  expect(text(page.root)).not.toContain(en.globe.regionProjectionErrorTitle);
+});
+
+test.each(["app", "h5"] as const)("%s exposes Retry after cold-start rebinding fails and recovers through the CTA", async (platform) => {
+  const old = deferred<NetworkRegionProjection>();
+  const current = deferred<NetworkRegionProjection>();
+  const page = await mount(platform, false, old.promise);
+  page.api.list.mockReturnValue(current.promise);
+  page.account.accountKey = "user:rebound";
+  page.account.accountBindingEpoch += 1;
+  advanceRuntimeRevision("cold-start account binding");
+  await settle();
+  old.resolve(projection());
+  await settle();
+  current.reject(new Error("current network read failed"));
+  await settle();
+  expect(text(page.root)).not.toContain(en.globe.regionProjectionLoadingTitle);
+  expect(text(page.root)).toContain(en.globe.regionProjectionErrorTitle);
+  expect(text(page.root)).not.toContain("Mobile region");
+
+  page.api.list.mockResolvedValue(projection());
+  const retry = all(page.root).find(item => item.tag === "button")!;
+  expect(retry).toBeDefined();
+  emit(retry, "onClick");
+  await settle();
+  expect(text(page.root)).toContain("Mobile region");
+  expect(text(page.root)).not.toContain(en.globe.regionProjectionErrorTitle);
+});
 
 test("APP renders the real serialized dot map and regions even with zero active nodes", async () => {
   const page = await mount();
