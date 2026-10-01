@@ -32,11 +32,7 @@
 
         <text class="block" :style="slaNoticeStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
 
-        <view class="grid grid-cols-4" :style="tabsStyle" role="tablist" :aria-label="t.tickets.pageTitle">
-          <view v-for="(id, i) in tabs" :key="id" class="nx-ticket-status-tab active:opacity-70 transition-opacity" :style="tabStyle(tab === id)" role="tab" :tabindex="tab === id ? 0 : -1" :aria-selected="tab === id ? 'true' : 'false'" :aria-label="tabLabel(id)" @click="selectTab(id)" @keydown.enter.prevent="selectTab(id)" @keydown.space.prevent="selectTab(id)" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
-            <text>{{ tabLabel(id) }}</text>
-          </view>
-        </view>
+        <GlassSegments :label="t.tickets.pageTitle" :model-value="tab" :options="tabOptions" @select="selectTab"  />
         <text v-if="filterFeedback" class="block text-center" :style="filterFeedbackStyle">{{ filterFeedback }}</text>
 
         <EmptyState v-if="ticketsStore.error" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="reloadTickets" />
@@ -59,7 +55,7 @@
                读屏念「按钮」、没有组名,也读不出当前选中哪一个(默认「提现」无任何状态)。
                改 radiogroup/radio + aria-checked,roving tabindex + 方向键(与提现网络选择器同形)。 -->
           <view class="flex" style="flex-wrap: wrap; gap: 6px" role="radiogroup" :aria-label="t.tickets.create.catLabel">
-            <view v-for="c in categoriesForNew" :key="c" class="nx-ticket-cat-radio" :style="catChipStyle(newCat === c)" role="radio" :tabindex="newCat === c ? 0 : -1" :aria-checked="newCat === c ? 'true' : 'false'" :aria-label="catLabel(c)" @click="selectCategory(c)" @keydown.left.prevent="moveCategory(-1)" @keydown.right.prevent="moveCategory(1)" @keydown.up.prevent="moveCategory(-1)" @keydown.down.prevent="moveCategory(1)">
+            <view v-for="c in categoriesForNew" :key="c" class="nx-ticket-cat-radio" :style="catChipStyle(newCat === c)" role="radio" :tabindex="newCat === c ? 0 : -1" :aria-checked="newCat === c ? 'true' : 'false'" :aria-label="catLabel(c)" @click="selectCategory(c)"    @keydown.left.prevent="moveCategory(-1)" @keydown.right.prevent="moveCategory(1)" @keydown.up.prevent="moveCategory(-1)" @keydown.down.prevent="moveCategory(1)">
               <text>{{ catLabel(c) }}</text>
             </view>
           </view>
@@ -74,7 +70,7 @@
               <text class="block" :style="suggestionQuestionStyle">{{ faq.question }}</text>
               <text class="block" :style="suggestionAnswerStyle">{{ faq.answer }}</text>
             </view>
-            <view v-if="canLoadMoreTicketSuggestions" :style="ticketSuggestionLoadMoreStyle" role="button" tabindex="0" :aria-disabled="ticketSuggestionLoading ? 'true' : 'false'" @click="loadMoreTicketSuggestions" @keydown.enter.prevent="loadMoreTicketSuggestions" @keydown.space.prevent="loadMoreTicketSuggestions">
+            <view v-if="canLoadMoreTicketSuggestions" :style="ticketSuggestionLoadMoreStyle" role="button" tabindex="0" :aria-disabled="ticketSuggestionLoading ? 'true' : 'false'" @click="loadMoreTicketSuggestions"  @keydown.enter.prevent="loadMoreTicketSuggestions" @keydown.space.prevent="loadMoreTicketSuggestions">
               <text>{{ ticketSuggestionLoading ? t.help.loadingMore : t.help.loadMore }}</text>
             </view>
           </view>
@@ -128,7 +124,7 @@
 
         <text class="block" :style="messagesLabelStyle">{{ t.tickets.detail.messagesLabel }}</text>
         <text v-if="detailTicket.historyTruncated" class="block" role="status" aria-live="polite" :style="historyTruncatedStyle">{{ t.tickets.historyTruncated }}</text>
-        <view v-if="detailTicket.historyNextCursor" class="active:opacity-70" :style="historyLoadEarlierStyle" role="button" tabindex="0" :aria-label="t.tickets.loadEarlier" @click="loadEarlierTicket" @keydown.enter.prevent="loadEarlierTicket" @keydown.space.prevent="loadEarlierTicket">
+        <view v-if="detailTicket.historyNextCursor" class="active:opacity-70" :style="historyLoadEarlierStyle" role="button" tabindex="0" :aria-label="t.tickets.loadEarlier" @click="loadEarlierTicket"  @keydown.enter.prevent="loadEarlierTicket" @keydown.space.prevent="loadEarlierTicket">
           <text>{{ t.tickets.loadEarlier }}</text>
         </view>
         <view style="display: flex; flex-direction: column; gap: 8px">
@@ -178,15 +174,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { supportApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { navReplace } from "@/lib/route";
-import {
-  STATUS_COLOR,
-  type Ticket,
-  type TicketCategory,
-  type TicketMessage,
-  type TicketStatus,
-  type SupportSlaTarget,
-  type SupportFaq,
-} from "@/domain/support";
+import { STATUS_COLOR, type Ticket, type TicketCategory, type TicketMessage, type TicketStatus, type SupportSlaTarget, type SupportFaq } from "@/domain/support";
 
 type Mode = { kind: "list" } | { kind: "create" } | { kind: "detail"; id: string };
 type Tab = "all" | "open" | "resolved" | "closed";
@@ -713,6 +701,9 @@ function sendReplyStyle(active: boolean): CSSProperties {
     fontSize: "13px",
   };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const tabOptions = computed(() => tabs.map(value => ({ value, label: tabLabel(value) })));
 </script>
 
 <style scoped>

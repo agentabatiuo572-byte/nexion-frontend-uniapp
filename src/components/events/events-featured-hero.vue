@@ -9,7 +9,7 @@
   to the page (which owns the store writes).
 -->
 <template>
-  <view class="relative overflow-hidden rounded-2xl" :style="cardStyle">
+  <view class="nx-glass-card relative overflow-hidden rounded-2xl" :style="cardStyle">
     <!-- top hairline -->
     <view aria-hidden :style="hairlineStyle" />
 
@@ -132,12 +132,10 @@ function onClaimedUse() {
   if (props.ev.useHref) navTo(props.ev.useHref);
 }
 
-const cardStyle = computed<CSSProperties>(() => ({
+const cardStyle = computed<CSSProperties>(() => ({ borderRadius: "var(--nx-glass-radius)",
   background:
-    `radial-gradient(70% 80% at 100% 0%, color-mix(in srgb, ${props.ev.tint} 20%, transparent) 0%, transparent 55%),` +
-    `radial-gradient(120% 60% at 50% 130%, color-mix(in srgb, ${props.ev.tint} 8%, transparent) 0%, transparent 70%),` +
-    `var(--v5-surface)`,
-  boxShadow: "var(--v5-card-shadow-lift-strong)",
+    "var(--nx-glass-fill)",
+  boxShadow: "var(--nx-glass-edge)",
 }));
 const hairlineStyle = computed<CSSProperties>(() => ({
   position: "absolute",
@@ -198,4 +196,6 @@ const joinBtnStyle = computed<CSSProperties>(() => ({
   background: props.ev.tint,
   boxShadow: `0 0 24px color-mix(in srgb, ${props.ev.tint} 33%, transparent)`,
 }));
+
+
 </script>

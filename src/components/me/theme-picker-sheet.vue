@@ -13,45 +13,26 @@
 <template>
   <view v-if="open" class="nx-theme-picker-root" role="dialog" aria-modal="true" :aria-label="t.me.themePickerTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
-      <view class="nx-sheet-fade-in" :style="panelStyle" @click.stop>
+      <view class="nx-glass-sheet nx-sheet-fade-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px; margin-bottom: 14px">
           <text class="block" :style="titleStyle">{{ t.me.themePickerTitle }}</text>
-          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" data-me-action="theme-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
+          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" data-me-action="theme-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
 
-        <!-- Options -->
-        <view role="radiogroup" :aria-label="t.me.themePickerTitle">
-          <view
-            v-for="(opt, i) in options"
-            :key="opt.mode"
-            class="flex items-center active:opacity-80"
-            :style="optionStyle(opt.mode)"
-            :data-me-action="`theme:${opt.mode}`"
-            role="radio"
-            :tabindex="isActive(opt.mode) ? 0 : -1"
-            :aria-checked="isActive(opt.mode) ? 'true' : 'false'"
-            :aria-label="opt.label"
-            @click="choose(opt.mode)"
-            @keydown.enter.prevent="choose(opt.mode)"
-            @keydown.space.prevent="choose(opt.mode)"
-            @keydown.left.prevent="moveTheme(i, -1)"
-            @keydown.right.prevent="moveTheme(i, 1)"
-            @keydown.up.prevent="moveTheme(i, -1)"
-            @keydown.down.prevent="moveTheme(i, 1)"
-          >
-            <view class="grid place-items-center shrink-0" :style="iconChipStyle(opt.mode)">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isActive(opt.mode) ? 'var(--v5-brand)' : 'var(--v5-ink-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path v-for="d in opt.paths" :key="d" :d="d" />
+        <GlassSegments :model-value="theme.mode" :options="glassOptions" layout="vertical" semantics="radio" class="nx-theme-options" :label="t.me.themePickerTitle" @select="choose">
+          <template #option="{ option, selected }">
+            <view class="grid place-items-center shrink-0" :style="iconChipStyle(option.value as ThemeMode)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path v-for="d in (option.paths as string[])" :key="d" :d="d" />
               </svg>
             </view>
-            <text class="flex-1" :style="labelStyle(opt.mode)">{{ opt.label }}</text>
-            <!-- Check on the active mode -->
-            <svg v-if="isActive(opt.mode)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-          </view>
-        </view>
+            <text class="flex-1" :style="labelStyle(option.value as ThemeMode)">{{ option.label }}</text>
+            <svg v-if="selected" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          </template>
+        </GlassSegments>
       </view>
     </view>
   </view>
@@ -84,9 +65,9 @@ function isActive(m: ThemeMode): boolean {
   return theme.mode === m;
 }
 
-function choose(next: ThemeMode) {
+function choose(next: ThemeMode, reason = "activation") {
   theme.setMode(next);
-  emit("close");
+  if (reason !== "arrow") emit("close");
 }
 
 function moveTheme(index: number, step: number) {
@@ -111,13 +92,13 @@ const scrimStyle: CSSProperties = {
   justifyContent: "center",
   padding: "24px",
 };
-const panelStyle: CSSProperties = {
+const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "320px",
   zIndex: 800,
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
+  border: "none",
   padding: "18px 16px 20px",
 };
 const titleStyle: CSSProperties = {
@@ -127,8 +108,8 @@ const titleStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const closeBtnStyle: CSSProperties = {
-  width: "32px",
-  height: "32px",
+  width: "44px",
+  height: "44px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
@@ -161,4 +142,11 @@ function labelStyle(m: ThemeMode): CSSProperties {
     color: on ? "var(--v5-ink)" : "var(--v5-ink-2)",
   };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const glassOptions = computed(() => options.value.map(option => ({ ...option, value: option.mode })));
 </script>
+
+<style scoped>
+.nx-theme-options :deep(.nx-glass-option) { gap: 12px; min-height: 56px; }
+</style>

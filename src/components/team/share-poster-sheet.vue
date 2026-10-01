@@ -12,11 +12,11 @@
 <template>
   <view v-if="open" class="ps-root" role="dialog" aria-modal="true" :aria-label="t.share.posterTitle">
     <view class="ps-mask" @click="emit('close')" />
-    <view class="ps-sheet">
+    <view class="nx-glass-sheet ps-sheet">
       <view class="ps-grab" />
       <view class="ps-head">
         <text class="ps-head__t">{{ t.share.posterTitle }}</text>
-        <view class="ps-head__x active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
+        <view tabindex="0" class="ps-head__x active:opacity-70" role="button"  :aria-label="t.ui.close" @click="emit('close')"  @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -30,7 +30,7 @@
         <view v-else-if="genState === 'failed'" class="ps-fail">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <text class="ps-fail__t">{{ t.share.genFailed }}</text>
-          <view class="ps-fail__btn active:opacity-80" role="button" tabindex="0" @click="regenerate" @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
+          <view tabindex="0" class="ps-fail__btn active:opacity-80" role="button"  @click="regenerate"  @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
             <text class="ps-fail__btn-t">{{ t.share.retry }}</text>
           </view>
         </view>
@@ -40,22 +40,7 @@
       </view>
 
       <!-- 模板轮播(yield 无设备自动隐藏,异常3) -->
-      <view class="ps-thumbs">
-        <view
-          v-for="tp in availableTpls"
-          :key="tp.key"
-          class="ps-thumb active:scale-95"
-          :class="{ 'ps-thumb--on': tpl === tp.key }"
-          role="button"
-          tabindex="0"
-          @click="pickTpl(tp.key)"
-          @keydown.enter.prevent="pickTpl(tp.key)"
-          @keydown.space.prevent="pickTpl(tp.key)"
-        >
-          <view class="ps-thumb__dot" :style="{ background: tp.tint }" />
-          <text class="ps-thumb__t">{{ tp.label }}</text>
-        </view>
-      </view>
+      <GlassSegments :model-value="tpl" :options="templateOptions" class="ps-thumbs" :label="t.share.posterTitle" @select="pickTpl" />
 
       <view class="ps-reward">
         <text class="ps-reward__t">{{ posterRewardLine }}</text>
@@ -64,20 +49,20 @@
 
       <view class="ps-toggle">
         <text class="ps-toggle__lb">{{ t.share.showUsername }}</text>
-        <view class="ps-sw active:opacity-70" :class="{ 'ps-sw--on': showUsername }" role="switch" tabindex="0" :aria-checked="showUsername" :aria-label="t.share.showUsername" @click="toggleUsername" @keydown.enter.prevent="toggleUsername" @keydown.space.prevent="toggleUsername">
+        <view class="ps-sw active:opacity-70" :class="{ 'ps-sw--on': showUsername }" role="switch" tabindex="0" :aria-checked="showUsername" :aria-label="t.share.showUsername" @click="toggleUsername"  @keydown.enter.prevent="toggleUsername" @keydown.space.prevent="toggleUsername">
           <view class="ps-sw__knob" />
         </view>
       </view>
 
       <!-- 渠道行:保存 / 复制 + 链接渠道(与渠道面板同一 intent 实现) -->
       <view class="ps-chrow">
-        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="saveImage" @keydown.enter.prevent="saveImage" @keydown.space.prevent="saveImage">
+        <view class="ps-ch active:scale-95"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="saveImage"  @keydown.enter.prevent="saveImage" @keydown.space.prevent="saveImage">
           <view class="ps-ch__ic ps-ch__ic--hl">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /><path d="m7 10 5 5 5-5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
           </view>
           <text class="ps-ch__lb">{{ t.share.saveImage }}</text>
         </view>
-        <view class="ps-ch active:scale-95" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="copyLinkAction" @keydown.enter.prevent="copyLinkAction" @keydown.space.prevent="copyLinkAction">
+        <view class="ps-ch active:scale-95"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="copyLinkAction"  @keydown.enter.prevent="copyLinkAction" @keydown.space.prevent="copyLinkAction">
           <view class="ps-ch__ic ps-ch__ic--hl">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
@@ -87,12 +72,15 @@
           v-for="c in linkChannels"
           :key="c.key"
           class="ps-ch active:scale-95"
+
+
+          :aria-disabled="genState !== 'ready'"
           :class="{ 'ps-ch--off': genState !== 'ready' }"
           role="button"
           :tabindex="genState === 'ready' ? 0 : -1"
           @click="onChannel(c)"
-          @keydown.enter.prevent="onChannel(c)"
-          @keydown.space.prevent="onChannel(c)"
+
+          @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)"
         >
           <view class="ps-ch__ic">
             <view v-html="channelIcon(c.key)" />
@@ -404,7 +392,7 @@ function paint(link: string, myToken: number) {
     ctx.fillText(t.value.share.posterYieldSub, 20, 184);
     ctx.setFillStyle(brand);
     ctx.setFontSize(38);
-    ctx.fillText(`+$${today.toFixed(2)}`, 20, 232);
+    ctx.fillText(`+${today.toFixed(2)}`, 20, 232);
     ctx.setFillStyle(FAINT_ON_DARK);
     ctx.setFontSize(9.5);
     ctx.fillText(t.value.share.posterYieldDevices, 20, 262);
@@ -418,7 +406,7 @@ function paint(link: string, myToken: number) {
     ctx.fillText(fmt(t.value.share.posterYieldUnit, { n: runningDevices.value }), 20, 280);
     ctx.setFillStyle(brand);
     ctx.fillText(
-      rewardEnabled.value ? `$${usd} + ${nex} NEX` : t.value.share.posterYieldInviteValueNoReward,
+      rewardEnabled.value ? `${usd} + ${nex} NEX` : t.value.share.posterYieldInviteValueNoReward,
       110,
       280,
     );
@@ -602,11 +590,14 @@ async function onChannel(c: ShareChannelDef) {
 }
 
 useDialogA11y(computed(() => props.open), ".ps-root", () => emit("close"));
+
+import GlassSegments from "@/components/glass-segments.vue";
+const templateOptions = computed(() => availableTpls.value.map(item => ({ value: item.key, label: item.label, className: "ps-thumb" })));
 </script>
 
 <style scoped>
 .ps-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
-.ps-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--v5-surface); border-top: 1px solid var(--v5-border-strong); border-radius: 22px 22px 0 0; max-height: 92vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.ps-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none;  max-height: 92vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ps-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .ps-grab { width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: 10px auto 0; }
 .ps-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 0; }
@@ -625,16 +616,12 @@ useDialogA11y(computed(() => props.open), ".ps-root", () => emit("close"));
 .ps-skeleton__t { font-size: 12px; color: var(--v5-ink-4); }
 .ps-fail { aspect-ratio: 3 / 4; border-radius: 16px; background: var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
 .ps-fail__t { font-size: 13px; color: var(--v5-ink-3); }
-.ps-fail__btn { min-height: 36px; padding: 0 18px; border-radius: 9999px; background: var(--v5-surface-3); display: flex; align-items: center; }
+.ps-fail__btn { min-height: 44px; padding: 0 18px; border-radius: 9999px; background: var(--v5-surface-3); display: flex; align-items: center; }
 .ps-fail__btn-t { font-size: 13px; color: var(--v5-ink); }
-.ps-thumbs { display: flex; justify-content: center; gap: 8px; margin-top: 12px; padding: 0 16px; }
-.ps-thumb { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 12px; border-radius: 9999px; background: var(--v5-surface-2); opacity: 0.6; }
-.ps-thumb--on { opacity: 1; outline: 2px solid var(--v5-brand); outline-offset: 1px; }
-.ps-thumb__dot { width: 8px; height: 8px; border-radius: 9999px; }
-.ps-thumb__t { font-size: 12px; color: var(--v5-ink-2); }
+.ps-thumbs { margin: 12px 16px 0; }
 .ps-reward { margin-top: 10px; text-align: center; padding: 0 16px; }
 .ps-reward__t { font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty; }
-.ps-toggle { display: flex; align-items: center; justify-content: space-between; margin: 10px 18px 0; min-height: 32px; }
+.ps-toggle { display: flex; align-items: center; justify-content: space-between; margin: 10px 18px 0; min-height: 44px; }
 .ps-toggle__lb { font-size: 13px; color: var(--v5-ink-2); }
 .ps-sw { width: 44px; height: 26px; border-radius: 9999px; background: var(--v5-surface-3); position: relative; transition: background 0.18s; }
 .ps-sw--on { background: var(--v5-brand); }
@@ -646,4 +633,5 @@ useDialogA11y(computed(() => props.open), ".ps-root", () => emit("close"));
 .ps-ch__ic { width: 48px; height: 48px; border-radius: 9999px; background: var(--v5-surface-2); color: var(--v5-ink-2); display: flex; align-items: center; justify-content: center; }
 .ps-ch__ic--hl { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); }
 .ps-ch__lb { font-size: 12px; color: var(--v5-ink-3); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-sheet []:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

@@ -24,8 +24,8 @@
         tabindex="0"
         :aria-label="t.language.pageTitle"
         @click="langOpen = true"
-        @keydown.enter.prevent="langOpen = true"
-        @keydown.space.prevent="langOpen = true"
+
+        @keydown.enter.prevent="langOpen = true" @keydown.space.prevent="langOpen = true"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -118,13 +118,13 @@
       </view>
 
       <view class="intro-cta anim-cta">
-        <view class="cta-primary active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+        <view class="cta-primary active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
           <text class="cta-primary__t">{{ t.intro.getStarted }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
           </svg>
         </view>
-        <view class="cta-secondary active:scale-[0.98]" role="button" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">
+        <view class="cta-secondary active:scale-[0.98]" role="button" tabindex="0" @click="goLogin"  @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">
           <text class="cta-secondary__t">{{ t.intro.signIn }}</text>
         </view>
         <view class="intro-terms">
@@ -139,7 +139,7 @@
     <!-- Language sheet(vcs-root 同型:dialog 角色在包裹层,遮罩是其子元素) -->
     <view v-if="langOpen" class="intro-lang-root" role="dialog" aria-modal="true" :aria-label="t.language.pageTitle">
       <view class="intro-lang-mask" role="presentation" aria-hidden="true" @click="closeLang" />
-      <view class="intro-lang-sheet">
+      <view class="nx-glass-sheet intro-lang-sheet">
       <view class="intro-lang-sheet__grab" />
       <text class="intro-lang-sheet__title">{{ t.language.pageTitle }}</text>
       <scroll-view scroll-y :show-scrollbar="false" class="intro-lang-list">
@@ -151,8 +151,8 @@
           tabindex="0"
           :aria-label="l.nativeName"
           @click="pick(l.code)"
-          @keydown.enter.prevent="pick(l.code)"
-          @keydown.space.prevent="pick(l.code)"
+
+          @keydown.enter.prevent="pick(l.code)" @keydown.space.prevent="pick(l.code)"
         >
           <text class="intro-lang-row__flag">{{ l.flag }}</text>
           <view class="intro-lang-row__names">
@@ -285,6 +285,8 @@ function goTerms() {
 function goPrivacy() {
   navTo("/pages/onboarding/privacy?return=%2Fpages%2Fonboarding%2Fintro");
 }
+
+
 </script>
 
 <style scoped>
@@ -376,14 +378,14 @@ function goPrivacy() {
   inset: 0;
   background: var(--v5-bg-color-mask);
 }
-.intro-lang-sheet {
+.intro-lang-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0;
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 800;
-  background: var(--v5-surface);
-  border-radius: 24px 24px 0 0;
+  background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge);
+
   padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 38px);
   display: flex;
   flex-direction: column;

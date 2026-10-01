@@ -2,7 +2,7 @@
 <template>
   <view
     id="home-newcomer-task-card"
-    class="newcomer-task"
+    class="nx-glass-card newcomer-task"
     :class="{ 'newcomer-task--expanded': expanded }"
     :style="rootStyle"
     :aria-hidden="!props.active"
@@ -55,8 +55,8 @@
           :tabindex="props.active && isActionable(task) ? 0 : -1"
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
-          @keydown.enter.prevent="onRowTap(task)"
-          @keydown.space.prevent="onRowTap(task)"
+
+          @keydown.enter.prevent="onRowTap(task)" @keydown.space.prevent="onRowTap(task)"
         >
           <view :style="circleStyle(task)">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
@@ -86,7 +86,7 @@
       class="newcomer-task__claim" role="button"
       :tabindex="props.active && !quest.dayOneClaiming ? 0 : -1"
       :aria-disabled="!props.active || quest.dayOneClaiming"
-      @click="onClaim" @keydown.enter.prevent="onClaim" @keydown.space.prevent="onClaim">
+      @click="onClaim"  @keydown.enter.prevent="onClaim" @keydown.space.prevent="onClaim">
       <text>{{ quest.dayOneClaiming ? t.home.dayOneClaiming : t.home.dayOneClaimReward }}</text>
     </view>
     <text v-if="remoteApiEnabled && quest.dayOneClaimError" role="status" class="newcomer-task__claim-error">
@@ -94,7 +94,7 @@
     </text>
 
     <view
-      class="newcomer-task__toggle"
+      class="nx-glass-action newcomer-task__toggle"
       :style="toggleStyle"
       role="button"
       :tabindex="props.active && (!questUnavailable || questLoadError) ? 0 : -1"
@@ -102,8 +102,8 @@
       :aria-disabled="questUnavailable && !questLoadError"
       :aria-label="toggleLabel"
       @click="toggleExpanded"
-      @keydown.enter.prevent="toggleExpanded"
-      @keydown.space.prevent="toggleExpanded"
+
+      @keydown.enter.prevent="toggleExpanded" @keydown.space.prevent="toggleExpanded"
     >
       <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink-3)">{{ toggleLabel }}</text>
       <svg v-if="!questUnavailable" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -348,13 +348,13 @@ function rewardStyle(task: QuestTask): CSSProperties {
   };
 }
 
-const rootStyle = computed<CSSProperties>(() => ({
+const rootStyle = computed<CSSProperties>(() => ({ boxShadow: "var(--nx-glass-edge)",
   position: "relative",
   boxSizing: "border-box",
   height: "auto",
   minHeight: "var(--home-task-card-height, 184px)",
-  borderRadius: "16px",
-  background: "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
   overflow: "hidden",
   color: "var(--v5-ink)",
   display: "flex",
@@ -365,13 +365,15 @@ const toggleStyle: CSSProperties = {
   margin: "14px 16px",
   width: "auto",
   minHeight: "44px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "transparent",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "5px",
 };
+
+
 </script>
 
 <style scoped>

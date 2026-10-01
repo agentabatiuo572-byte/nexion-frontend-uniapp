@@ -13,14 +13,15 @@
 -->
 <template>
   <view class="spv" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
+    <LiquidGlass :radius="rowH / 2" tone="navigation" />
     <view
       class="spv-side spv-back"
       role="button"
       tabindex="0"
       :aria-label="t.profile.back"
       @click="goBack"
-      @keydown.enter.prevent="onKeyboardActivate($event, goBack)"
-      @keydown.space.prevent="onKeyboardActivate($event, goBack)"
+
+      @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)"
     >
       <view class="spv-glass">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -36,8 +37,8 @@
       tabindex="0"
       :aria-label="t.me.notifications"
       @click="goBell"
-      @keydown.enter.prevent="onKeyboardActivate($event, goBell)"
-      @keydown.space.prevent="onKeyboardActivate($event, goBell)"
+
+      @keydown.enter.prevent="onKeyboardActivate($event, goBell)" @keydown.space.prevent="onKeyboardActivate($event, goBell)"
     >
       <view class="spv-glass">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
@@ -117,6 +118,8 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   if (event.repeat) return;
   action();
 }
+
+import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
 <style scoped>
@@ -128,18 +131,18 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 2px;
   /* Global header→content breathing (owner 2026-07-09: nav sat too close to
      content across every sub-page). One place, all ~55 sub-pages; tab pages use
      the chassis header so they're untouched. Pages must NOT add their own top
      padding on top of this — reset to 0 when de-carding. */
+  margin: 0 12px 24px;
   margin-bottom: 24px;
-  background: var(--v5-chrome-bg);
-  border-bottom: 1px solid var(--v5-chrome-border);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-radius: 28px;
 }
 .spv-side {
+  position: relative;
+  z-index: 1;
   width: 44px;
   height: 44px;
   display: grid;
@@ -153,16 +156,16 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   position: relative;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--v5-glass-bg);
-  border: 1px solid var(--v5-glass-border);
-  box-shadow: var(--v5-glass-shadow);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
+.spv-side:active .spv-glass { transform: scale(.92); }
+.spv-side:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; border-radius: 24px; }
 .spv-titlewrap {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   display: flex;

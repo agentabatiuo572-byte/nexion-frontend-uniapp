@@ -19,7 +19,7 @@
       </view>
       <view v-if="remoteApiEnabled && !remoteSecurity" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
         <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
-        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity" @keydown.enter.prevent="loadRemoteSecurity" @keydown.space.prevent="loadRemoteSecurity">
+        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity"  @keydown.enter.prevent="loadRemoteSecurity" @keydown.space.prevent="loadRemoteSecurity">
           <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -35,8 +35,8 @@
       </view>
 
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
-      <view class="mx-4" :style="cardStyle">
-        <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0" :aria-expanded="editingPwd ? 'true' : 'false'" @click="editingPwd = !editingPwd" @keydown.enter.prevent="editingPwd = !editingPwd" @keydown.space.prevent="editingPwd = !editingPwd">
+      <view class="nx-glass-card mx-4" :style="cardStyle">
+        <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0" :aria-expanded="editingPwd ? 'true' : 'false'" @click="editingPwd = !editingPwd"  @keydown.enter.prevent="editingPwd = !editingPwd" @keydown.space.prevent="editingPwd = !editingPwd">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           </view>
@@ -55,10 +55,10 @@
           <text v-else-if="err && pwdErrorField === PWD_FIELD_CONFIRM" id="security-pwd-error-confirm" class="block" :style="errStyle" role="alert">{{ err }}</text>
           <text v-else-if="err" class="block" :style="errStyle" role="alert">{{ err }}</text>
           <view class="flex" style="gap: 8px; margin-top: 4px">
-            <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd" @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
+            <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd"  @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
               <text :style="pwdCancelLabelStyle">{{ t.ui.cancel }}</text>
             </view>
-            <view class="flex-1 flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="submitPasswordChange" @keydown.enter.prevent="submitPasswordChange" @keydown.space.prevent="submitPasswordChange">
+            <view class="flex-1 flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="submitPasswordChange"  @keydown.enter.prevent="submitPasswordChange" @keydown.space.prevent="submitPasswordChange">
               <text :style="pwdSaveLabelStyle">{{ t.ui.save }}</text>
             </view>
           </view>
@@ -71,7 +71,7 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text>
           </view>
           <text v-if="twoFactorEnabled === null" :style="unavailableValueStyle">—</text>
-          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" role="switch" tabindex="0" :aria-label="t.security.twoFactorSwitchLabel" :aria-checked="twoFactorEnabled" @click="toggleTwoFactor(!twoFactorEnabled)" @keydown.enter.prevent="toggleTwoFactor(!twoFactorEnabled)" @keydown.space.prevent="toggleTwoFactor(!twoFactorEnabled)">
+          <view v-else class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" role="switch" tabindex="0" :aria-label="t.security.twoFactorSwitchLabel" :aria-checked="twoFactorEnabled" @click="toggleTwoFactor(!twoFactorEnabled)"  @keydown.enter.prevent="toggleTwoFactor(!twoFactorEnabled)" @keydown.space.prevent="toggleTwoFactor(!twoFactorEnabled)">
             <view :style="toggleThumbStyle" />
           </view>
         </view>
@@ -80,7 +80,7 @@
           <text v-if="twoFactorPasswordError" id="security-2fa-password-error" class="block" :style="errStyle" role="alert">{{ twoFactorPasswordError }}</text>
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: 8px; margin-top: 8px">
             <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
-            <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge" @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
+            <view class="flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="confirmTwoFactorChallenge"  @keydown.enter.prevent="confirmTwoFactorChallenge" @keydown.space.prevent="confirmTwoFactorChallenge">
               <text :style="pwdSaveLabelStyle">{{ t.addrRebind.otpConfirmCta }}</text>
             </view>
           </view>
@@ -92,7 +92,7 @@
 
       <!-- ───── Active sessions ───── -->
       <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
-      <view class="mx-4" :style="[cardStyle, groupGap]">
+      <view class="nx-glass-card mx-4" :style="[cardStyle, groupGap]">
         <view v-if="remoteApiEnabled && !remoteSecurity" class="flex items-center" :style="rowStyle">
           <text :style="unavailableValueStyle">—</text>
         </view>
@@ -110,24 +110,24 @@
             <text class="block truncate" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
-          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)" @keydown.enter.prevent="handleRevoke(s)" @keydown.space.prevent="handleRevoke(s)">
+          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)"  @keydown.enter.prevent="handleRevoke(s)" @keydown.space.prevent="handleRevoke(s)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
-        <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll" @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
+        <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll"  @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
       </view>
       <view v-if="remoteSecurity?.nextCursor" class="mx-4 flex justify-center" :style="revokeAllRowStyle"
         role="button" :tabindex="sessionPageLoading ? -1 : 0" :aria-disabled="sessionPageLoading"
-        @click="loadMoreSessions" @keydown.enter.prevent="loadMoreSessions" @keydown.space.prevent="loadMoreSessions">
+        @click="loadMoreSessions"  @keydown.enter.prevent="loadMoreSessions" @keydown.space.prevent="loadMoreSessions">
         <text>{{ sessionPageLoading ? t.help.loadingMore : t.notifs.loadMore }}</text>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
 
       <!-- ───── Danger zone ───── -->
-      <view class="mx-4" :style="[cardStyle, groupGap]">
-        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="handleDeleteAccount" @keydown.enter.prevent="handleDeleteAccount" @keydown.space.prevent="handleDeleteAccount">
+      <view class="nx-glass-card mx-4" :style="[cardStyle, groupGap]">
+        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="handleDeleteAccount"  @keydown.enter.prevent="handleDeleteAccount" @keydown.space.prevent="handleDeleteAccount">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
           </view>
@@ -140,7 +140,7 @@
         </view>
         <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
           :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
-          @click="handleCancelAccountDeletion" @keydown.enter.prevent="handleCancelAccountDeletion" @keydown.space.prevent="handleCancelAccountDeletion">
+          @click="handleCancelAccountDeletion"  @keydown.enter.prevent="handleCancelAccountDeletion" @keydown.space.prevent="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
@@ -752,9 +752,9 @@ async function handleDeleteAccount() {
       .reduce((s, p) => s + p.amountUSDT, 0);
     const forfeitLines = [
       t.value.security.deleteAccountForfeitLead,
-      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `$${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
       ...(forfeitPrincipal > 0
-        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `$${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
+        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
         : []),
     ];
     const ok = await uiConfirm({
@@ -868,10 +868,10 @@ function iconBox(bg: string): CSSProperties {
 
 // De-carded settings group (form b): filled surface, no border. The first group
 // sits at the global 24px header gap (no top margin); groupGap spaces the rest.
-const cardStyle: CSSProperties = {
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "0 16px",
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const groupGap: CSSProperties = { marginTop: "12px" };
 const rowStyle: CSSProperties = {
@@ -1048,4 +1048,6 @@ const dangerLabelStyle: CSSProperties = {
   fontSize: "15px",
   color: "var(--v5-danger)",
 };
+
+
 </script>

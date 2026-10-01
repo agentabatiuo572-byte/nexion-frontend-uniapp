@@ -4,27 +4,23 @@
   detail page; the footer Buy/Stake CTA taps to checkout (stops propagation).
 
   Top→bottom:
-    · Catalog hero photo or neutral placeholder, with badge ribbon, tier-code
-      chip and Legacy chip overlay.
+    · SKU-specific product artwork, including the Cloud Share resource pool,
+      with folded-corner badge ribbon + tier-code chip + Legacy chip overlay.
     · Body: name, ROI hero (daily earn / trade-in). Specs and AI throughput
       stay on the detail page.
     · Footer: price + frosted Buy CTA.
 -->
 <template>
   <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
-  <view class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :style="cardStyle" @click="goDetail">
+  <view class="nx-glass-card relative overflow-hidden block active:scale-[0.98] active:opacity-80" :style="cardStyle" @click="goDetail">
     <view v-if="featured" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
-    <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail" @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
-      <image v-if="photo" :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
+    <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
+      <image v-if="photo" :src="photo.src" mode="aspectFit" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
       <view v-else class="absolute inset-0 grid place-items-center" style="color: var(--v5-ink-3)">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
       </view>
-
-      <!-- Mid-vignette + bottom fade -->
-      <view v-if="photo" aria-hidden :style="vignetteStyle" />
-      <view aria-hidden :style="fadeStyle" />
 
       <!-- Badge ribbon -->
       <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
@@ -32,7 +28,7 @@
       </view>
 
       <!-- Tier-code chip + Legacy chip (photo) -->
-      <view v-if="photo" class="absolute flex flex-col items-start gap-1.5" style="bottom: 12px; left: 14px; pointer-events: none">
+      <view v-if="photo && !isShare" class="absolute flex flex-col items-start gap-1.5" style="bottom: 12px; left: 14px; pointer-events: none">
         <text class="font-mono-tabular" :style="tierChipStyle">{{ photo.tierCode }}</text>
         <text v-if="product.status === 'legacy'" class="font-mono-tabular" :style="legacyChipStyle">{{ t.store.cardLegacyBadge }}</text>
       </view>
@@ -73,7 +69,7 @@
         </view>
 
         <!-- Purchase gate — remote mode is server-authoritative and fail-closed. -->
-        <view v-if="gateLockedView" class="mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
+        <view v-if="gateLockedView" class="nx-glass-inset mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
           <view class="flex items-center justify-between">
             <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -89,15 +85,15 @@
         </view>
 
         <!-- Trade-in callout (legacy) -->
-        <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
+        <view v-if="showTradein" class="nx-glass-inset mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
-    <view class="grid items-center gap-3" :style="footerStyle">
+    <view class="nx-glass-inset grid items-center gap-3" :style="footerStyle">
       <view class="min-w-0">
         <text class="block font-mono-tabular" :style="priceEyebrowStyle">{{ t.store.cardPriceLabel }}</text>
         <view class="tabular-nums flex items-baseline" :style="priceRowStyle">
@@ -106,7 +102,7 @@
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy" @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy"  @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -306,9 +302,9 @@ function goDevices() {
 }
 
 // ───── styles ─────
-const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const featuredGlowStyle: CSSProperties = {
   position: "absolute",
@@ -318,13 +314,12 @@ const featuredGlowStyle: CSSProperties = {
   opacity: 0.6,
   pointerEvents: "none",
 };
-const renderWrapStyle = computed<CSSProperties>(() => ({
+const renderWrapStyle: CSSProperties = {
   width: "100%",
-  height: "180px",
-  background: photo.value
-    ? "linear-gradient(135deg, #101216 0%, #0A0B0E 60%, #000000 100%)"
-    : "var(--v5-surface-2)",
-}));
+  aspectRatio: "1",
+  borderRadius: "var(--v5-radius-m)",
+  background: "var(--v5-surface-2)",
+};
 const vignetteStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -374,7 +369,7 @@ const legacyChipStyle: CSSProperties = {
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "20px",
+  fontSize: "26px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.022em",
   lineHeight: 1.15,
@@ -387,7 +382,7 @@ const earnEyebrowStyle: CSSProperties = {
 };
 const bigEarnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontWeight: 600,
+  fontWeight: 400,
   fontSize: "26px",
   color: "var(--v5-warning-ink)",
   letterSpacing: "-0.022em",
@@ -404,15 +399,12 @@ const stockHintStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 const tradeinBoxStyle: CSSProperties = {
-  padding: "7px 10px",
-  background: "var(--v5-brand-soft)",
-  borderRadius: "8px",
+  minHeight: "44px",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const footerStyle: CSSProperties = {
   padding: "13px 16px",
-  background: "var(--v5-surface-2)",
   borderTop: "1px solid var(--v5-border)",
   gridTemplateColumns: "1fr auto",
 };
@@ -451,9 +443,11 @@ const buyBtnDynStyle = computed<CSSProperties>(() =>
     : buyBtnStyle,
 );
 const gateBoxStyle: CSSProperties = {
-  padding: "8px 10px",
-  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  borderRadius: "10px",
+  padding: "8px 0",
+  minHeight: "44px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
 };
 const gateToggleBaseStyle: CSSProperties = {
   width: "28px",
@@ -486,4 +480,6 @@ const gateMetaStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
+
+import { getProductMedia } from "@/lib/product-media";
 </script>

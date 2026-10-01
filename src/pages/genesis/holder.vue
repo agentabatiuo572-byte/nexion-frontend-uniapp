@@ -5,12 +5,12 @@
   - 上所前(!dividendsOpen)：排放优先额度 + 上所进度 + 积分榜，无 live 排放 / 无可领余额。
   - 上所后(dividendsOpen)：NEX 排放（vesting 曲线：已释放/锁定中）+ 排放明细，NEX 计价。
   myOwned === 0 → 空状态 CTA + preview（no fake holder numbers）。
-  Wrapped in <AppChassis active="me">. 排放数据源 = store emissionSnapshot()（backend-replaceable）。
+  Wrapped in <AppChassis active="me" class="gh-chassis" :class="{ 'gh-chassis--owned': hasNodes }">. 排放数据源 = store emissionSnapshot()（backend-replaceable）。
 -->
 <template>
   <AppChassis active="me">
     <view style="padding-bottom: 32px">
-      <SubPageHeader back="/pages/genesis/genesis" />
+      <SubPageHeader back="/pages/genesis/genesis" :title="t.genesisHolder.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
@@ -50,7 +50,8 @@
         <!-- ══ Holder · 上所前 ══ -->
         <template v-else-if="!dividendsOpen">
           <!-- Allocation hero -->
-          <view :style="vipCardStyle">
+          <view class="gh-hero gh-surface" :style="vipCardStyle">
+            <GenesisArtwork context="holding" class="gh-hero-art" />
             <view class="flex items-start" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="avatarStyle">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
@@ -114,7 +115,8 @@
         <!-- ══ Holder · 上所后 ══ -->
         <template v-else>
           <!-- Emission hero -->
-          <view :style="heroCardStyle">
+          <view class="gh-hero gh-surface" :style="heroCardStyle">
+            <GenesisArtwork context="holding" class="gh-hero-art" />
             <text class="block" :style="heroLabelStyle">{{ t.genesisHolder.post.emissionLabel }}</text>
             <view class="flex items-center" style="gap: 16px; margin-top: 12px">
               <view class="shrink-0 grid place-items-center" :style="ringStyle">
@@ -234,6 +236,7 @@
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -352,7 +355,7 @@ const lockedText = computed(() => remoteApiEnabled
   ? remotePendingUsdt.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) ?? "—"
   : Math.round(snap.value.lockedNEX).toLocaleString());
 const emissionUnit = computed(() => remoteApiEnabled ? "USDT" : "NEX");
-const refUsdText = computed(() => `$${Math.round(snap.value.emittedNEX * NEX_REF_USDT).toLocaleString()}`);
+const refUsdText = computed(() => `${Math.round(snap.value.emittedNEX * NEX_REF_USDT).toLocaleString()}`);
 const emissionFeed = computed(() => {
   if (remoteApiEnabled) {
     return genesis.remoteEmissions.map((entry) => ({
@@ -374,7 +377,7 @@ const emissionFeed = computed(() => {
 const holdings = computed(() => remoteApiEnabled ? genesis.remoteHoldings.slice(0, 6).map((holding) => ({
   id: holding.holdingNo,
   mintedAt: holding.acquiredAt,
-  allocText: `$${holding.acquiredPriceUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`,
+  allocText: `${holding.acquiredPriceUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`,
 })) : mockHoldings());
 
 function mockHoldings(): Array<{ id: string; mintedAt: number; allocText: string }> {
@@ -785,4 +788,82 @@ const noteStyle: CSSProperties = {
   lineHeight: 1.625,
   paddingTop: "8px",
 };
+
+
 </script>
+
+<style scoped>
+.gh-chassis--owned { background-image: url("/static/img/genesis/obsidian-light.webp") !important; background-size: cover !important; background-position: center !important; }
+:global(html[data-theme="dark"] .gh-chassis--owned) { background-image: url("/static/img/genesis/obsidian-dark.webp") !important; }
+.gh-chassis--owned :deep(.nx-top-chrome) { background: transparent; }
+.gh-page { padding-bottom: 32px; color: var(--v5-ink); font-family: var(--font-v5); }
+.gh-content { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+.gh-surface { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); border-radius: var(--v5-radius-xl); padding: 16px; }
+/* Aggregate holding artwork carries no fixed serial; account content stays live. */
+.gh-hero { --gh-logo-width: 128px; position: relative; padding: 12px 20px 16px; border-radius: 18px; background: var(--v5-surface); }
+.gh-hero-art { margin-bottom: 12px; border-radius: 12px; }
+.gh-identity, .gh-summary, .gh-stats, .gh-emissions { position: relative; z-index: 1; }
+.gh-identity { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; }
+.gh-identity :deep(.uvel-brand) { width: var(--gh-logo-width); height: 44px; }
+.gh-identity :deep(.genesis-holder-badge) { max-width: calc(100% - var(--gh-logo-width) - 12px); gap: 8px; padding: 5px 12px; min-height: 36px; border: 1px solid color-mix(in srgb, var(--v5-genesis-gold) 80%, transparent); font-size: 13px; font-weight: 600; line-height: 1.3; background: color-mix(in srgb, var(--v5-genesis-gold) 5%, transparent); }
+.gh-identity :deep(.genesis-holder-badge svg) { width: 24px; height: 24px; }
+.gh-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.gh-allocation, .gh-stats > view:last-child { position: relative; }
+.gh-allocation { transform: translateY(-4px); }
+.gh-allocation::before, .gh-stats > view:last-child::before { content: ""; position: absolute; inset-inline-start: -23px; top: 4px; bottom: 4px; width: 1px; background: linear-gradient(transparent, var(--v5-border-strong), transparent); }
+.gh-label { display: block; font-size: var(--v5-type-body-s); line-height: 1.5; color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.gh-count { display: flex; align-items: baseline; gap: 8px; font-size: var(--v5-type-hero); line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gh-unit { font-size: var(--v5-type-h3); }
+.gh-value { display: block; font-size: var(--v5-type-h3); line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.gh-brand { color: var(--v5-brand); }
+.gh-hero .gh-value { line-height: 1.2; }
+.gh-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--v5-border); }
+@media (max-width: 374px) { .gh-hero { --gh-logo-width: 104px; padding-inline: 16px; } .gh-identity :deep(.genesis-holder-badge) { gap: 6px; padding-inline: 8px; font-size: 12px; } .gh-identity :deep(.genesis-holder-badge svg) { width: 20px; height: 20px; } .gh-summary { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .gh-summary, .gh-stats { column-gap: 16px; } .gh-allocation::before, .gh-stats > view:last-child::before { inset-inline-start: -12px; } }
+.gh-disclosure { display: flex; align-items: center; gap: 12px; color: var(--v5-ink-3); font-size: var(--v5-type-body-s); line-height: 1.5; }
+.gh-disclosure svg { flex-shrink: 0; }
+.gh-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--v5-type-body-m); font-weight: 600; line-height: 1.5; }
+.gh-heading::after { content: ""; width: 40px; height: 1px; flex-shrink: 0; background: linear-gradient(90deg, var(--v5-genesis-gold), transparent); }
+.gh-title { display: block; font-size: var(--v5-type-body-m); font-weight: 600; line-height: 1.5; }
+.gh-link { color: var(--v5-brand); font-size: var(--v5-type-body-s); }
+.gh-how { display: flex; align-items: center; justify-content: center; align-self: center; min-height: 44px; padding: 0 12px; text-align: center; }
+.gh-section-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.gh-chip { padding: 4px 8px; border-radius: var(--v5-radius-full); color: var(--v5-brand); background: var(--v5-brand-soft); font-size: var(--v5-type-caption); }
+.gh-rank { display: flex; gap: 12px; align-items: center; padding: 8px; font-size: var(--v5-type-body-s); }
+.gh-rank--me { background: var(--v5-brand-soft); border-radius: var(--v5-radius-s); }
+.gh-rank-who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.gh-note { display: block; font-size: var(--v5-type-caption); line-height: 1.5; color: var(--v5-ink-3); margin-top: 4px; overflow-wrap: anywhere; }
+.gh-holding-list { padding-top: 4px; padding-bottom: 4px; }
+.gh-holding { display: flex; align-items: center; gap: 12px; padding: 16px 0; }
+.gh-holding + .gh-holding { border-top: 1px solid var(--v5-border); }
+.gh-holding-icon { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--v5-radius-s); color: var(--v5-genesis-gold); background: color-mix(in srgb, var(--v5-genesis-gold) 12%, transparent); }
+.gh-holding-body { flex: 1; min-width: 0; }
+.gh-id { font-family: var(--font-jet-mono); font-size: var(--v5-type-caption); font-weight: 500; overflow-wrap: anywhere; }
+.gh-amount { display: block; margin-top: 4px; font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
+.gh-icon-button { display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--v5-radius-full); flex-shrink: 0; color: var(--v5-ink-3); background: var(--v5-surface-2); }
+.gh-perk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 20px; padding: 20px; }
+.gh-perk { min-width: 0; }
+.gh-perk:nth-child(n + 3) { padding-top: 20px; border-top: 1px solid var(--v5-border); }
+.gh-perk-icon { display: flex; color: var(--v5-genesis-gold); margin-bottom: 10px; }
+.gh-perk-label { display: block; font-size: 13px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.gh-perk-body { display: block; margin-top: 5px; color: var(--v5-ink-3); font-size: var(--v5-type-body-s); line-height: 1.6; overflow-wrap: anywhere; }
+.gh-body { display: block; font-size: var(--v5-type-body-s); font-weight: 500; line-height: 1.5; }
+.gh-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.gh-action { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; min-height: 52px; border-radius: var(--v5-radius-full); background: var(--v5-surface); font-size: var(--v5-type-body-s); font-weight: 500; text-align: center; }
+.gh-action svg { flex-shrink: 0; }
+.gh-boost { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 20px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--v5-type-button); line-height: 1.5; font-weight: 600; text-align: center; }
+.gh-content [role="button"] { cursor: pointer; }
+.gh-content [role="button"]:active { opacity: 0.8; }
+.gh-content [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.gh-empty { display: flex; flex-direction: column; gap: 12px; color: var(--v5-ink); }
+.gh-empty > svg { color: var(--v5-genesis-gold); }
+.gh-muted { color: var(--v5-ink-3); font-size: var(--v5-type-body-s); line-height: 1.5; }
+.gh-emissions { margin-top: 16px; }
+.gh-emission-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+.gh-emission-values { min-width: 0; flex: 1; }
+.gh-emission-values > .gh-label:not(:first-child) { margin-top: 12px; }
+.gh-ring { width: 96px; height: 96px; padding: 8px; border-radius: 50%; flex-shrink: 0; }
+.gh-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.gh-ring-inner .gh-label { font-size: var(--v5-type-caption); }
+.gh-ledger-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
+.gh-ledger-row > text { min-width: 0; }
+</style>

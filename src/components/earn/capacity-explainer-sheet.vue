@@ -7,7 +7,7 @@
   <view v-if="visible" class="nx-capacity-explainer-root fixed inset-0" style="z-index: 900" role="dialog" aria-modal="true" :aria-label="t.earn.capExplainTitle" @click.stop>
     <!-- 仅 @click(uni 编译器小程序端自动映射 tap;H5 双绑会双触发) -->
     <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="close" />
-    <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
+    <view class="nx-glass-sheet absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
         <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click.stop="close">
@@ -56,10 +56,10 @@ function goStore() {
 }
 
 const sheetStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "24px 24px 0 0",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
   padding: "18px 18px 30px",
-  boxShadow: "var(--v5-card-shadow-lift-strong)",
+  boxShadow: "var(--nx-glass-edge)",
 };
 const closeBtnStyle: CSSProperties = {
   width: "30px",
@@ -89,4 +89,6 @@ const ctaLabelStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
+
+
 </script>

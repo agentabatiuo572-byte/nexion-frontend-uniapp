@@ -22,7 +22,8 @@
 
     <!-- Header -->
     <view class="cp-head" :style="{ paddingTop: statusBarHeight + 10 + 'px' }">
-      <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack" @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)">
+      <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack"  @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)">
+        <LiquidGlass :radius="22" />
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
 
@@ -38,11 +39,11 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
-      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation" @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)">
+      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)">
         <text>{{ t.conversations.restartSession }}</text>
       </view>
-      <view v-if="!isAi && convStore.advisorError" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()" @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><text>{{ t.conversations.image.retryPolicy }}</text></view>
-      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket" @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)">
+      <view v-if="!isAi && convStore.advisorError" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><text>{{ t.conversations.image.retryPolicy }}</text></view>
+      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket"  @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)">
         <text>{{ t.conversations.convertTicket }}</text>
       </view>
     </view>
@@ -58,14 +59,14 @@
       <text class="cp-ai-history-t">{{ t.nova.historyTruncated }}</text>
     </view>
     <view v-if="isAi && remoteApiEnabled && nova.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
-      :aria-label="t.nova.loadEarlier" @click="loadEarlierNovaHistory" @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)">
+      :aria-label="t.nova.loadEarlier" @click="loadEarlierNovaHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)">
       <text class="cp-ai-history-t">{{ t.nova.loadEarlier }}</text>
     </view>
     <view v-if="!isAi && conv?.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.conversations.historyTruncated }}</text>
     </view>
     <view v-if="!isAi && conv?.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
-      :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
+      :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
       <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
     </view>
     <view v-if="!isAi && convStore.advisor?.assignmentState === 'UNBOUND' && conv?.messages.some(message => message.sender === 'user')" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
@@ -129,7 +130,7 @@
     </template>
     <view v-else style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px">
       <text role="status">{{ t.conversations.categoryDisabled }}</text>
-      <view role="button" tabindex="0" @click="navReplace('/pages/support/messages')" @keydown.enter.prevent="navReplace('/pages/support/messages')" @keydown.space.prevent="navReplace('/pages/support/messages')">
+      <view role="button" tabindex="0" @click="navReplace('/pages/support/messages')"  @keydown.enter.prevent="navReplace('/pages/support/messages')" @keydown.space.prevent="navReplace('/pages/support/messages')">
         <text>{{ t.me.supportHubRow }}</text>
       </view>
     </view>
@@ -157,29 +158,19 @@ import { useConversations, type CategoryRefreshOutcome, type HumanComposer } fro
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
-import { sessionVault } from "@/api/runtime";
+import { sessionVault, novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
 import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 import { toast, confirm, useUI } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
 import type { ConversationType } from "@/domain/support";
-import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
+
 import { ApiError, isSettledRejection, asApiError } from "@/api/errors";
 import { isSupportAttachmentNotReady, type SupportAttachmentPolicy } from "@/api/support-api";
 import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
-import {
-  createHumanConversationCreationRecovery,
-  createHumanThreadRealtimeLifecycle,
-} from "./conversation-realtime-page";
-import {
-  createLatestAbortableRequest,
-  NOVA_THINKING_CHECKING_MS,
-  NOVA_THINKING_COMPOSING_MS,
-  novaThinkingNow,
-  remainingNovaThinkingMs,
-  type NovaThinkingStage,
-} from "@/lib/nova-thinking";
+import { createHumanConversationCreationRecovery, createHumanThreadRealtimeLifecycle } from "./conversation-realtime-page";
+import { createLatestAbortableRequest, NOVA_THINKING_CHECKING_MS, NOVA_THINKING_COMPOSING_MS, novaThinkingNow, remainingNovaThinkingMs, type NovaThinkingStage } from "@/lib/nova-thinking";
 
 const t = useT();
 const convStore = useConversations();
@@ -1452,6 +1443,8 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   if (event.repeat) return;
   void action();
 }
+
+import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
 <style scoped>
@@ -1556,4 +1549,6 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   z-index: 110;
   pointer-events: none;
 }
+.cp-back { position: relative; overflow: visible; }
+.cp-back > svg { position: relative; z-index: 1; }
 </style>

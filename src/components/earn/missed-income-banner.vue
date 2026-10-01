@@ -19,7 +19,7 @@
 -->
 <template>
   <view v-if="show" class="mx-4">
-    <view class="block relative overflow-hidden rounded-2xl active:opacity-90" :style="rootStyle" @click="goStore">
+    <view class="nx-glass-card block relative overflow-hidden active:opacity-90" :style="rootStyle" role="link" tabindex="0" @click="goStore">
       <!-- Subtle background glow on the right -->
       <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
@@ -210,8 +210,6 @@ function goStore() {
 }
 
 const rootStyle: CSSProperties = {
-  background:
-    "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), var(--v5-surface) 45%, var(--v5-bg))",
   padding: "16px",
 };
 const glowStyle: CSSProperties = {
@@ -235,4 +233,6 @@ const ctaLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
+
+
 </script>

@@ -73,7 +73,7 @@
         <view class="flex items-center" :style="secHeaderStyle">
           <text :style="secTitleStyle">{{ t.stakingV3.stakePlans }}</text>
         </view>
-        <view v-if="stakingConfigAvailable" :style="vaultCardStyle">
+        <view v-if="stakingConfigAvailable" class="nx-glass-card" :style="vaultCardStyle">
           <VaultRow
             v-for="(term, i) in TERMS"
             :key="term"
@@ -141,14 +141,7 @@ import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
 import { useApp } from "@/store/app";
-import {
-  useStaking,
-  STAKING_APY,
-  STAKING_PENALTY,
-  STAKING_MIN,
-  type StakingTerm,
-  type StakingPosition,
-} from "@/store/staking";
+import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm, type StakingPosition } from "@/store/staking";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { canOpenStakingPool, resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
 import { createRemoteIntentGate } from "@/lib/g-remote-intent";
@@ -354,7 +347,7 @@ async function handleEarlyWithdraw(p: StakingPosition) {
       symbol: "USDT",
       amount: r.refund,
       status: "posted",
-      memo: `Stake early withdraw · ${p.id} (penalty $${r.penalty.toFixed(2)})`,
+      memo: `Stake early withdraw · ${p.id} (penalty ${r.penalty.toFixed(2)})`,
       ref: `STAKE-EW-${p.id}`,
     }, { silentFailure: true });
     if (out === "failed") reportStuckFunds(app.captureMoney(), `STAKE-EW-${p.id}`);
@@ -399,7 +392,7 @@ async function handleClaim(p: StakingPosition) {
       symbol: "USDT",
       amount: r.principal + r.interest,
       status: "posted",
-      memo: `Stake claim · ${p.id} (interest $${r.interest.toFixed(2)})`,
+      memo: `Stake claim · ${p.id} (interest ${r.interest.toFixed(2)})`,
       ref: `STAKE-CLAIM-${p.id}`,
     }, { silentFailure: true });
     if (out === "failed") reportStuckFunds(app.captureMoney(), `STAKE-CLAIM-${p.id}`);
@@ -510,9 +503,9 @@ const countStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 // Form-b: single filled container, no border — VaultRow supplies internal hairlines.
-const vaultCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const vaultCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "0 16px",
 };
 // Empty state — dashed outline, no fill (de-card empty-state idiom).
@@ -532,4 +525,6 @@ const noticeStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   lineHeight: 1.45,
 };
+
+
 </script>

@@ -36,13 +36,7 @@
         <!-- Tabs — shared SegmentedControl spec (segmented-control.tsx): p-1 / gap
              0.5 / rounded-2xl container, h-11 rounded-[10px] segments, brand fill
              + on-brand text on active (no shadow), label v5 12.5/500/-0.005em. -->
-        <!-- 分类是互斥切换(选一个其余取消)。原先只有 @click:读屏不知道这是分类组,
-             也读不出当前选中项("全部"默认选中但没有任何状态)。改 tablist/tab + aria-selected。 -->
-        <view class="flex" :style="segWrapStyle" role="tablist" :aria-label="t.events.categoryGroupLabel">
-          <view v-for="(id, i) in TABS" :key="id" class="flex-1 relative grid place-items-center active:opacity-70" :style="pillStyle(id)" role="tab" :tabindex="tab === id ? 0 : -1" :aria-label="t.events.tabs[id]" :aria-selected="tab === id ? 'true' : 'false'" @click="tab = id" @keydown.enter.prevent="tab = id" @keydown.space.prevent="tab = id" @keydown.left.prevent="moveTab(i, -1)" @keydown.right.prevent="moveTab(i, 1)">
-            <text :style="pillLabelStyle(id)">{{ t.events.tabs[id] }}</text>
-          </view>
-        </view>
+        <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
         <EmptyState
@@ -401,4 +395,7 @@ const emptyStyle: CSSProperties = {
   border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const tabOptions = computed(() => TABS.map(value => ({ value, label: t.value.events.tabs[value] })));
 </script>

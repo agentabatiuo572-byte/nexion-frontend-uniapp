@@ -16,15 +16,15 @@
           tabindex="0"
           :aria-label="t.ui.retry"
           @click="prefs.refreshRemote()"
-          @keydown.enter.prevent="prefs.refreshRemote()"
-          @keydown.space.prevent="prefs.refreshRemote()"
+
+          @keydown.enter.prevent="prefs.refreshRemote()" @keydown.space.prevent="prefs.refreshRemote()"
         >{{ t.ui.retry }}</text>
       </view>
 
       <!-- Sound + haptics -->
       <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
-        <view :style="cardStyle">
+        <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" @toggle="prefs.toggleSound">
             <template #icon>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg>
@@ -42,7 +42,7 @@
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
         <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
-        <view v-if="prefs.remoteReady" :style="cardStyle">
+        <view v-if="prefs.remoteReady" class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
@@ -106,9 +106,9 @@ const headingStyle: CSSProperties = {
 };
 // Settings group (form b): single surface container, no border — the toggle rows
 // carry their own internal hairline dividers (PreferenceToggleRow `last` prop).
-const cardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
   overflow: "hidden",
 };
 const footerStyle: CSSProperties = {
@@ -117,4 +117,6 @@ const footerStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };
+
+
 </script>

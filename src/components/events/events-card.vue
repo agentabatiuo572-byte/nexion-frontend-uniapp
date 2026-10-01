@@ -10,7 +10,7 @@
   color-mix. Emits join/claim to the page (which owns the store writes).
 -->
 <template>
-  <view class="relative rounded-2xl overflow-hidden" :style="cardStyle">
+  <view class="nx-glass-card relative rounded-2xl overflow-hidden" :style="cardStyle">
     <!-- left tint hairline -->
     <view aria-hidden class="absolute" :style="hairlineStyle" />
 
@@ -65,11 +65,11 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
         </template>
       </view>
-      <view v-else-if="showProgressAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" role="button" tabindex="0" :aria-label="t.events.viewProgress" @click="openHref" @keydown.enter.prevent="openHref" @keydown.space.prevent="openHref">
+      <view v-else-if="showProgressAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" role="button" tabindex="0" :aria-label="t.events.viewProgress" @click="openHref"  @keydown.enter.prevent="openHref" @keydown.space.prevent="openHref">
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ t.events.viewProgress }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-else-if="showDecorativeAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" tabindex="0" :aria-label="ev.ctaLabel" @click="onDecorativeCta" @keydown.enter.prevent="onDecorativeCta" @keydown.space.prevent="onDecorativeCta">
+      <view v-else-if="showDecorativeAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" role="button" tabindex="0" :aria-label="ev.ctaLabel" @click="onDecorativeCta"  @keydown.enter.prevent="onDecorativeCta" @keydown.space.prevent="onDecorativeCta">
         <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
@@ -84,11 +84,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import type { NexEvent } from "@/mock/events";
-import {
-  eventOpenTarget,
-  shouldShowDecorativeAction,
-  shouldShowJoinedProgressAction,
-} from "./event-open-target";
+import { eventOpenTarget, shouldShowDecorativeAction, shouldShowJoinedProgressAction } from "./event-open-target";
 
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
@@ -169,8 +165,8 @@ function onDecorativeCta() {
   openHref();
 }
 
-const cardStyle = computed<CSSProperties>(() => ({
-  background: "var(--v5-surface)",
+const cardStyle = computed<CSSProperties>(() => ({ borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
   opacity: dim.value ? 0.6 : 1,
 }));
 const hairlineStyle = computed<CSSProperties>(() => ({
@@ -246,4 +242,6 @@ const claimedUseBtnStyle = computed<CSSProperties>(() => ({
   height: "44px",
   background: `color-mix(in srgb, ${props.ev.tint} 6%, transparent)`,
 }));
+
+
 </script>

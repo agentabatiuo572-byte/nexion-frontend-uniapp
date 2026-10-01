@@ -23,20 +23,20 @@
           <text class="sas-title">{{ t.slotSheet.title }}</text>
           <text class="sas-desc">{{ t.slotSheet.desc }}</text>
         </view>
-        <view class="sas-close" role="button" tabindex="0" :aria-label="closeAria" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
+        <view class="sas-close" role="button" tabindex="0" :aria-label="closeAria" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
 
       <!-- primary (recommended): buy a new device — always present -->
-      <view class="sas-store-cta" role="button" tabindex="0" @click="onGoStore" @keydown.enter.prevent="onGoStore" @keydown.space.prevent="onGoStore">
+      <view class="sas-store-cta" role="button" tabindex="0" @click="onGoStore"  @keydown.enter.prevent="onGoStore" @keydown.space.prevent="onGoStore">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
         <text class="sas-store-cta-t">{{ t.slotSheet.goStoreCta }}</text>
       </view>
 
       <!-- secondary (de-emphasized): collapsed row → tap to reveal activatable inventory -->
       <view v-if="inactiveDevices.length > 0" class="sas-activate">
-        <view class="sas-activate-toggle" :class="{ 'is-open': expanded }" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded" @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
+        <view class="sas-activate-toggle" :class="{ 'is-open': expanded }" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded"  @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
           <text class="sas-activate-toggle-t">{{ activateRowText }}</text>
           <svg class="sas-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
@@ -51,8 +51,8 @@
             :tabindex="activationInFlight.has(d.id) ? -1 : 0"
             :aria-disabled="activationInFlight.has(d.id) ? 'true' : 'false'"
             @click="onActivate(d)"
-            @keydown.enter.prevent="onActivate(d)"
-            @keydown.space.prevent="onActivate(d)"
+
+            @keydown.enter.prevent="onActivate(d)" @keydown.space.prevent="onActivate(d)"
           >
             <view class="sas-device-ico">
               <svg v-if="d.kind === 'phone'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
@@ -203,6 +203,8 @@ function onGoStore() {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
+
+
 </script>
 
 <style scoped>
@@ -226,7 +228,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--nx-glass-fill);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
@@ -359,7 +361,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: var(--v5-surface);
+  background: var(--nx-glass-fill);
   display: grid;
   place-items: center;
   flex-shrink: 0;

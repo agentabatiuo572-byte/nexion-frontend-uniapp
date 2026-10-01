@@ -32,10 +32,10 @@
 
       <!-- Real-backend milestones. Remote mode never derives rewards from mock stores. -->
       <view v-if="remoteApiEnabled" style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
-        <view v-if="remoteLoading && !remoteSnapshot" class="mx-4" :style="listStyle">
+        <view v-if="remoteLoading && !remoteSnapshot" class="nx-glass-card mx-4" :style="listStyle">
           <text class="block" style="padding: 18px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
         </view>
-        <view v-else-if="remoteError" class="mx-4" :style="listStyle">
+        <view v-else-if="remoteError" class="nx-glass-card mx-4" :style="listStyle">
           <text class="block" style="padding: 18px 18px 6px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
           <view class="active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" :aria-label="w.retry" @click="refreshRemote">
             <text>{{ w.retry }}</text>
@@ -44,7 +44,7 @@
         <template v-if="remoteSnapshot">
           <view v-for="grp in remoteGroups" :key="grp.key" class="mx-4">
             <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
-            <view :style="listStyle">
+            <view class="nx-glass-card" :style="listStyle">
               <view
                 v-for="(row, i) in grp.rows"
                 :key="row.key"
@@ -86,7 +86,7 @@
       <view v-else style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
         <view v-for="grp in groups" :key="grp.cat" class="mx-4">
           <text class="block" :style="catHeadStyle">{{ catLabel(grp.cat) }}</text>
-          <view :style="listStyle">
+          <view class="nx-glass-card" :style="listStyle">
             <view
               v-for="(a, i) in grp.list"
               :key="a.id"
@@ -143,10 +143,7 @@ import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
 import { pointsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import type { BadgeAchievementStatus, DailySnapshot, DailyMilestoneStatus, EarningMilestoneStatus } from "@/api/points-api";
-import {
-  readAchievementsForCurrentSession,
-  type AchievementRemoteReadFailure,
-} from "./achievements-remote-read";
+import { readAchievementsForCurrentSession, type AchievementRemoteReadFailure } from "./achievements-remote-read";
 
 const t = useT();
 const w = computed(() => t.value.achievements);
@@ -280,8 +277,8 @@ const remoteGroups = computed(() => {
     key: `earning:${row.milestoneId}`,
     kind: "earning",
     id: row.milestoneId,
-    label: `${w.value.earningMilestone} $${row.thresholdUsdt.toLocaleString()}`,
-    description: `${w.value.lifetimeEarnings}: $${row.lifetimeEarningsUsdt.toLocaleString()}`,
+    label: `${w.value.earningMilestone} ${row.thresholdUsdt.toLocaleString()}`,
+    description: `${w.value.lifetimeEarnings}: ${row.lifetimeEarningsUsdt.toLocaleString()}`,
     reward: `+${row.rewardNex} NEX`,
     status: row.status,
     iconId: "first_dollar",
@@ -405,7 +402,7 @@ function desc(a: AchievementDef): string {
 }
 function rewardLabel(a: AchievementDef): string {
   if (a.rewardNex) return `+${a.rewardNex} NEX`;
-  if (a.rewardUsdt) return `+$${a.rewardUsdt}`;
+  if (a.rewardUsdt) return `+${a.rewardUsdt}`;
   return "VIP badge";
 }
 function relativeWhen(ms: number): string {
@@ -482,9 +479,9 @@ function remoteIconBoxStyle(status: RemoteStatus): CSSProperties {
 }
 // Badge list keeps a filled tile identity (achievement/badge semantic, de-card
 // white-list) — the single visual difference is the fill; outer border dropped.
-const listStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const listStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   overflow: "hidden",
 };
 function rowStyle(divider: boolean): CSSProperties {
@@ -533,4 +530,6 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
     color: claimed ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
   };
 }
+
+
 </script>

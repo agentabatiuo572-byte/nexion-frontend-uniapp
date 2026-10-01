@@ -305,7 +305,9 @@ export const zh: Messages = {
     errorOtpNotFound: "请先获取验证码",
     errorOtpSendUnavailable: "验证码暂时没发出去 —— 可先用下方 Google / Apple / Telegram 直接登录,或稍等片刻再试。",
     errorServiceUnavailable: "暂时无法确认账号状态,请重试。",
-  },
+
+sandboxCodeHint: "体验验证码：{code}，不会发送短信。",
+},
   geoPolicy: {
     blocked: "我们还没在你所在的地区开放。需要帮助请联系客服。",
     limited: "有些功能在你所在的地区还没开放。详情请联系客服。",
@@ -464,7 +466,10 @@ export const zh: Messages = {
     giftPendingBillMemo: "新人奖励 - 确认中",
     back: "返回",
     stepOf: "第 {n} 步,共 3 步",
-  },
+
+subtitleNoBonus: "注册账号后即可继续使用；如有新人礼包，可在注册后查看状态。",
+sandboxSponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",
+},
   home: {
     // Sprint A-1: LiveActivityFeed
     quickStake: "质押",
@@ -679,7 +684,12 @@ export const zh: Messages = {
     ledgerEmpty: "暂无已完成任务的收益。",
     liveFeedTitle: "任务派发",
     liveFeedEmpty: "暂无任务动态。",
-  },
+
+quickMissionsActive: "5 个进行",
+sandboxQuoteLedgerTitle: "任务报价示例",
+sandboxQuoteNoCredit: "演示数据 · 不计入余额",
+trustReserve: "暂无可核验的储备资料。",
+},
   earn: {
     title: "赚取",
     subtitle: "你的设备、收益、任务,实时展示。",
@@ -845,7 +855,12 @@ export const zh: Messages = {
     jobsCount: "{n} 个任务",
     taskLockTitle: "任务锁定",
     taskLockRemaining: "{n} 分钟",
-  },
+
+estimateDisclaimer: "按当前设备预估日产出差额测算，未扣除购买成本，不影响实际余额。",
+phonePausedLowBattery: "已暂停 · 电量不足",
+phonePausedLowBatteryHint: "电量恢复至 20% 后自动继续。",
+lockedMissedDaily: "每天流失",
+},
   market: {
     title: "行情看板",
     liveLabel: "2 分钟前更新",
@@ -939,7 +954,9 @@ export const zh: Messages = {
       sell: "二级市场出售",
     },
     disclosureNote: "Genesis 持有数量与权益以账户记录为准；已发布的披露信息请查看信任中心。",
-  },
+
+identityLabel: "创世持有人",
+},
 
   preferences: {
     loading: "正在读取通知偏好…",
@@ -1517,7 +1534,111 @@ export const zh: Messages = {
       claimedTitle: "+{n} NEX 已到账",
       discountClaimedTitle: "折扣已领取",
     },
-  },
+
+progressLabel: "进度",
+catalog: {
+      "evt-pro-upgrade-7d": {
+        "title": "UVELBox Pro · 限时升级",
+        "subtitle": "7 天内升级 Pro · 立减 $500，创世抽奖券数量 ×2。",
+        "ribbon": "限时 · 剩余 3 天 12 小时",
+        "reward": "立减 $500 + 抽奖券 ×2",
+        "progressLabel": "已领取",
+        "ctaLabel": "领取优惠",
+        "countdown": "3 天 12 小时 04 分",
+        "startsIn": ""
+      },
+      "evt-refer-5-get-pro": {
+        "title": "邀请 5 人 · 赢取 Pro",
+        "subtitle": "7 天内直接邀请 5 位好友 · 获得 UVELBox Pro（$899）。",
+        "ribbon": "团队挑战",
+        "reward": "免费 UVELBox Pro",
+        "progressLabel": "已邀请好友",
+        "ctaLabel": "查看进度",
+        "countdown": "6 天 02 小时",
+        "startsIn": ""
+      },
+      "evt-weekend-double-nex": {
+        "title": "周末双倍 NEX",
+        "subtitle": "周六、周日签到自动获得 2 倍 NEX。",
+        "ribbon": "进行中",
+        "reward": "2 倍 NEX",
+        "progressLabel": "",
+        "ctaLabel": "去签到",
+        "countdown": "1 天 18 小时",
+        "startsIn": ""
+      },
+      "evt-regional-pk": {
+        "title": "地区竞赛 · $20,000 奖池",
+        "subtitle": "拉美、东南亚、欧洲每周业绩竞赛，领先地区分享 $20,000。",
+        "ribbon": "第 21 周",
+        "reward": "分享 $20,000 奖池",
+        "progressLabel": "本地区金额（$）",
+        "ctaLabel": "参加竞赛",
+        "countdown": "2 天 09 小时",
+        "startsIn": ""
+      },
+      "evt-spring-spin": {
+        "title": "春季幸运转盘",
+        "subtitle": "每天 1 次免费抽奖 · 奖励包括 NEX、USDT 和设备优惠券。",
+        "ribbon": "每日 · UTC 00:00 重置",
+        "reward": "最高 $500 USDT",
+        "progressLabel": "今日剩余次数",
+        "ctaLabel": "去抽奖",
+        "countdown": "08:42:11 后重置",
+        "startsIn": ""
+      },
+      "evt-reinvest-bonus": {
+        "title": "复投奖励周",
+        "subtitle": "全周每复投 $100 获得 2 张创世抽奖券（通常为 1 张）。",
+        "ribbon": "双倍奖励",
+        "reward": "2 倍创世抽奖券",
+        "progressLabel": "",
+        "ctaLabel": "去复投",
+        "countdown": "4 天 03 小时",
+        "startsIn": ""
+      },
+      "evt-onboarding-7d": {
+        "title": "新成员 · 7 天任务",
+        "subtitle": "加入后 7 天内达到 V2 · 获得 200 NEX 和 1 张补签卡。",
+        "ribbon": "加入首周",
+        "reward": "+200 NEX + 1 张补签卡",
+        "progressLabel": "已完成目标",
+        "ctaLabel": "查看任务",
+        "countdown": "5 天 11 小时",
+        "startsIn": ""
+      },
+      "evt-black-friday": {
+        "title": "黑色星期五 · 全场八折",
+        "subtitle": "全部硬件优惠 $300 起 · BF20 可与 Pro 限时升级叠加。",
+        "ribbon": "即将开始",
+        "reward": "八折 + 优惠码叠加",
+        "progressLabel": "",
+        "ctaLabel": "提醒我",
+        "countdown": "",
+        "startsIn": "12 天 04 小时后开始"
+      },
+      "evt-nex-holders-share": {
+        "title": "NEX 持有奖励 · $5,000 奖池",
+        "subtitle": "连续 7 天持有至少 1,000 NEX · 自动分享 $5,000 USDT 奖池。",
+        "ribbon": "自动参加",
+        "reward": "分享 $5,000 USDT",
+        "progressLabel": "持有 NEX",
+        "ctaLabel": "查看详情",
+        "countdown": "4 天 17 小时",
+        "startsIn": ""
+      },
+      "evt-anniversary-spin": {
+        "title": "周年庆幸运转盘",
+        "subtitle": "平台一周年 · 10,000 位获奖者分享 $250,000 USDT。",
+        "ribbon": "已结束",
+        "reward": "已发放 $250,000",
+        "progressLabel": "",
+        "ctaLabel": "查看结果",
+        "countdown": "",
+        "startsIn": ""
+      }
+    },
+},
 
   marketPage: {
     pageTitle: "行情",
@@ -1761,7 +1882,9 @@ export const zh: Messages = {
     phoneActivationAppOnlyBody: "浏览器无法读取本机电量并发送手机任务心跳。请在 Android App 中登录并完成校准激活。",
     // 置换促销 banner — 当用户拥有可置换设备时显示,受 DEFAULT_TRADEIN_CONFIG.promo
     // 后台 kill switch / cooldown / 单会话最大次数 / 路由白名单控制
-  },
+
+onlineLabel: "{n} 在线",
+},
   // DeactivateSheet — chassis overlay when deactivating a device with a running task.
   deactivateSheet: {
     title: "设备正在跑任务",
@@ -1783,7 +1906,11 @@ export const zh: Messages = {
     activateRow: "激活已有设备({n} 台)",
     toastSlotsFull: "槽位已满 {max}/{max}",
     toastActivated: "已激活 {name}",
-  },
+
+chooseMethod: "选择方式，开始接入 UVEL 网络",
+inventoryHint: "使用已有的 UVEL 设备",
+storeHint: "前往商店选购设备",
+},
   computeShare: {
     entryEyebrow: "电脑共享算力",
     entryTitle: "连接电脑显卡算力",
@@ -1834,7 +1961,10 @@ export const zh: Messages = {
     configUnavailableTitle: "暂时无法确认电脑共享算力状态",
     configUnavailableBody: "请检查网络连接后重试。",
     configRetryCta: "重新读取",
-  },
+
+sandboxHoldCta: "暂不可连接",
+sandboxHoldBody: "体验模式暂不支持连接真实电脑，可先查看下载和连接说明。",
+},
   // 代金券 —— 领取弹窗 + 回退 banner + 结算抵扣。
   voucher: {
     popupCap: "限时福利",
@@ -1859,7 +1989,10 @@ export const zh: Messages = {
     checkoutRowLabel: "代金券",
     expiredNote: "你领取的本设备代金券已过期",
     quoteChanged: "代金券抵扣已变化,请重新确认最新金额后再支付",
-  },
+
+newUserGiftName: "新用户礼遇",
+summerActivityName: "夏日活动",
+},
   // 我的奖励 —— 优惠券(可用/过期)+ 系统奖励(USDT/NEX)。
   rewards: {
     title: "我的奖励",
@@ -2304,7 +2437,11 @@ export const zh: Messages = {
     comingSoonNote: "后续平台阶段",
     ordersChip: "订单",
     pageFooter: "全程托管 · 零物流",
-  },
+
+specUptimeValue: "99.9%",
+coSandboxWallet: "体验钱包",
+coHintSandboxWallet: "体验支付 · 不涉及真实资金",
+},
   team: {
     title: "我的团队",
     subtitle: "好友每笔订单,你永久拿 10% 直推分成。",
@@ -2360,7 +2497,23 @@ export const zh: Messages = {
     inviteCopyCodeAria: "复制邀请码",
     inviteCopyLinkAria: "复制邀请链接",
     orShareVia: "或通过",
-  },
+
+inviteTitle: "邀请好友",
+inviteTagline: "与伙伴一起，构建更大的未来",
+shareInvite: "分享邀请",
+rewardLoading: "正在读取邀请奖励…",
+rewardRules: "查看奖励规则",
+summaryTitle: "我的团队",
+summaryMembers: "成员",
+summaryDirect: "直推伙伴",
+summaryEmpty: "暂时没有成员",
+summaryInvite: "马上去邀请",
+summaryView: "查看团队",
+summaryLoading: "正在读取团队成员…",
+summaryUnavailable: "暂时无法读取团队成员，请重试。",
+rankBenefits: "查看等级权益",
+sandboxBanner: "体验模式 · 奖励仅供演示",
+},
   wallet: {
     loadingTransactions: "正在加载交易记录…",
     title: "钱包",
@@ -2556,7 +2709,12 @@ export const zh: Messages = {
     ffZip: "邮编",
     cardNamePlaceholder: "持卡人姓名",
     withdrawInsufficient: "余额不足,无法提现",
-  },
+
+nexBoostActive: "NEX 加成已启用",
+nexBoostPrefix: "持有 {nex} NEX 可解锁 ",
+nexBoostHighlight: "+10% 收益加成",
+nexBoostSuffix: "。达到 5,000 NEX 可享手续费折扣。",
+},
   cards: {
     bindingEntryNote: "填写银行卡信息",
     bindingEntryDisclaimer: "填写内容仅保留在当前页面，离开即清除；绑定接口接入前不会提交或保存。",
@@ -2698,7 +2856,14 @@ export const zh: Messages = {
     installHint: "一键安装 · 后台静默运行",
     connectGpu: "连接你的 GPU",
     connectHint: "自动识别 · 立刻开始赚取收益",
-  },
+
+calibrationPending: "待校准",
+calibrationDone: "已校准",
+estimatorScore: "算力评分",
+estimatorYield: "收益预估",
+estimatorPendingValue: "校准后显示",
+scoreLabel: "估算评分",
+},
   session: {
     restoreRetryNotice: "暂时无法恢复登录，正在自动重试。",
     secureBrowserUnsupported: "此浏览器不支持安全登录或会话恢复。请更新浏览器后重试。",
@@ -3028,7 +3193,9 @@ export const zh: Messages = {
     intro: "选择此应用的界面语言。",
     backToAccount: "返回个人中心",
     countLine: "现可用 {n} 种界面语言",
-  },
+
+autoDetect: "自动识别即将推出",
+},
   ui: {
     confirm: "确认",
     cancel: "取消",
@@ -3504,7 +3671,9 @@ export const zh: Messages = {
       unstake: "解锁",
       achievement: "成就奖励",
       other: "其他账本流水",
-    },
+
+earningsMilestone: "收益里程碑 ${threshold}",
+},
     title: "账单流水",
     back: "返回",
     subtitle: "核对 UVEL 钱包的每一笔收支。",
@@ -3618,7 +3787,11 @@ export const zh: Messages = {
     refreshing: "正在从服务端读取最新订单…",
     loadMore: "加载更多",
     retry: "重试",
-  },
+
+sandboxPayCta: "继续体验支付",
+sandboxPayBusy: "正在确认体验支付…",
+sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状态。",
+},
   staking: {
     title: "质押",
     back: "返回",
@@ -3885,7 +4058,12 @@ export const zh: Messages = {
     },
     downloadToast: "卡片已保存到本地 · 自由分享",
     downloadErrorToast: "PNG 生成或保存失败，请重试",
-  },
+
+shareStreak: "我的 UVEL 连续签到记录为 {n} 天。{link}",
+shareNetwork: "我的 UVEL 网络已有 {n} 位成员。{link}",
+shareEarnings: "我的 UVEL 记录显示 ${amount}，统计天数为 {days} 天。{link}",
+shareDemo: "仅为体验数据，不代表实际收益。",
+},
   taskHistory: {
     loading: "正在读取任务历史…",
     tabHistory: "历史",
@@ -3893,7 +4071,11 @@ export const zh: Messages = {
     viewAllAccountReceipts: "查看全账户收据",
     historyEmpty: "暂无已完成任务 — 第一笔即将出现。",
     historyHint: "最近 {n} 笔 · 点击任意一条可打开对应的 Proof-of-Compute 收据。",
-  },
+
+timeJustNow: "刚刚",
+timeMinutesAgo: "{n}分钟前",
+timeHoursAgo: "{n}小时前",
+},
   errors: {
     deviceCapTitle: "设备数已达上限",
     deviceCapMsg: "单账号最多接入 {max} 台设备。请先移除或暂停一台。",
@@ -4192,7 +4374,8 @@ export const zh: Messages = {
     faqA5:
       "不会。质押是个人理财产品——不影响你的 V 级、团队业绩或佣金资格。它只是让闲置 USDT 生息。",
     ctaBack: "明白了 · 查看质押计划",
-  },
+
+},
 
   trust: {
     title: "信任中心",
@@ -4370,7 +4553,12 @@ export const zh: Messages = {
       a3: "NEX 上所时开阀。在那之前你持有的是预留额度,不是每日收益。",
     },
     royaltyUnavailable: "当前版税费率暂无法确认；请刷新后重试。",
-  },
+
+purchaseSuccessTitle: "恭喜，购买成功",
+purchaseSuccessBody: "创世节点已加入持有列表",
+viewMyNodes: "查看我的创世节点",
+openseaLine: "在 OpenSea 查看 · 地板价",
+},
 
   walletV3: {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
@@ -4966,7 +5154,10 @@ export const zh: Messages = {
       genesis: "创世",
     },
     howItWorksEntry: "规则介绍",
-  },
+
+mockDailyBinaryMatch: "每日平衡匹配",
+mockWeek42Pool: "第 42 周奖金池",
+},
 
   commissionsHowItWorks: {
     navTitle: "佣金说明",
@@ -5271,7 +5462,9 @@ export const zh: Messages = {
     toastRemoteFailed: "申请状态未确认",
     serverApplication: "我的服务端申请",
     applicationStatuses: { NONE: "暂无", PENDING: "处理中", APPROVED: "已通过", REJECTED: "未通过" },
-  },
+
+annualBudget: "年度预算额度:$40,000 USDT",
+},
 
   daily: {
     checkInAction: "签到",
@@ -5493,7 +5686,25 @@ export const zh: Messages = {
     insufficientUsdtSub: "需 ${need} · 余额 ${bal}",
     listToastTitle: "Genesis #{id} 已挂单",
     listToastSub: "价格 ${price} · 已在 UVEL 站内市场挂单",
-  },
+
+verifiedTag: "✓",
+verifiedCollection: "已验证合集",
+viewOpenSea: "在 OpenSea 查看",
+openSeaTitle: "OpenSea",
+openSeaLoading: "正在连接 OpenSea…",
+openSeaErrorTitle: "暂时无法连接 OpenSea",
+openSeaErrorSub: "可返回 UVEL 市场查看当前挂单状态。",
+openSeaErrorHint: "大多数持有人选择在 UVEL 站内 P2P 交易 · 更快 + 零 gas。",
+openSeaRetry: "重试连接",
+openSeaBack: "返回 UVEL 市场",
+openSeaErrorPool: {
+      rateLimit: "市场暂不可用，请稍后重试。",
+      syncPending: "Collection 同步中 — OpenSea 通常需要挂单后 24-48 小时显示。",
+      bridge: "跨链桥维护中。预计恢复:24 小时。",
+      verifyPending: "Collection 正在 OpenSea 等待 ✓ 认证,通过后可见。",
+      cf: "第三方市场暂时连不上,你的挂单在站内不受影响;请稍后重试。",
+    },
+},
 
   genesisHowItWorks: {
     navTitle: "创世席位说明",
@@ -6231,7 +6442,9 @@ export const zh: Messages = {
     cancelCta: "取消",
     reasonNewAddressAge: "收款地址刚换不到 7 天,大额提现我们会先确认一下",
     startFailed: "操作失败,请稍后重试",
-  },
+
+sandboxMockNotice: "体验模式 · 不会发起真实转账",
+},
   learning: {
     centerTitle: "教程中心",
     featuredLabel: "推荐课程",
@@ -6263,5 +6476,56 @@ export const zh: Messages = {
     submissionResultUnknown: "上次提交结果仍无法确认，已保留原提交并禁止重复计次；点击此处刷新状态。",
     courseUpdated: "课程已更新，请重新加载后再作答。",
     submitUnconfirmed: "提交结果尚未确认;已重新读取课程进度,奖励不会按本地状态显示。",
+  },
+
+phonePolicy: {
+  "webNotice": "网页版不能执行手机算力任务。绑定的 APP 在线时任务继续，离线后自动停止；已购设备不受影响。",
+  "appNotice": "在 APP 中绑定并激活当前手机后，才能执行手机算力任务。",
+  "download": "下载 APP",
+  "manage": "设置手机算力",
+  "retry": "重新检查",
+  "login": "重新登录",
+  "continueWeb": "继续使用网页版",
+  "continueApp": "继续使用 APP",
+  "confirmReplacement": "确认替换并激活",
+  "replaceNotice": "此操作将更换绑定手机。原手机如已启用，其运行资格会转给当前手机；原手机不能在当前设备上重新激活。已购设备不受影响。",
+  "errors": {
+    "config-unavailable": "暂时无法读取换机设置，请重新检查后再更换手机。",
+    "web-only": "请在手机上安装并打开 UVEL App，再启用手机算力。",
+    "replacement-disabled": "当前账号已绑定其它手机，暂不允许更换设备。手机算力任务已暂停，已购设备不受影响。",
+    "cooldown": "尚未达到允许换机的时间，下次可更换时间：{date}。",
+    "device-mismatch": "当前手机与登记设备不匹配。请重新评估当前手机后再替换激活。",
+    "slots-full": "运行设备已达上限，请先停用一台再启用手机算力。",
+    "storage-failed": "激活结果未能保存，请检查连接后重试。",
+    "reauth-required": "请在原绑定手机上重新登录，以恢复手机算力任务。"
+  }
+},
+publicCopy: {
+    // Phone policy uses the same keys on APP and H5.
+    memberIdle: "暂不活跃",
+    experienceDepositCredited: "体验充值已到账：{amount} USDT",
+    orderWaitingSlot: "待有可用运行设备名额后开通",
+    experienceMode: "体验模式 · 不涉及真实资金",
+    operationUnconfirmed: "暂时无法确认操作结果，请刷新查看后重试。",
+    accountDeletionBlocked: "暂时无法注销账号，请联系客服核实。",
+    helpTitle: "使用帮助",
+    statusHelp: "当前状态会显示在对应页面；如有疑问，请联系客服。",
+    earningsHelp: "请在收益记录中查看实际到账金额和处理状态。",
+    quotaUnavailable: "暂不可购买",
+    contactSupport: "联系客服",
+    rewardSpin: "抽奖机会 ×{n}",
+    rewardBadge: "徽章 ×{n}",
+    rewardOther: "奖励 ×{n}",
+    benefitAvailable: "权益可激活",
+    benefitAmount: "权益额度：{value}",
+    dailyMilestone: "第 {n} 天奖励",
+    dailyHistory: "签到奖励",
+    rankHelp: "在等级页面查看当前等级和已获得的头衔。",
+    refundHelp: "订单退款或发生争议时，相关奖励可能调整。请以到账记录为准。",
+    pendingHelp: "待确认的奖励暂不可提现；确认后会更新到账状态。",
+    participationUnavailable: "暂未参与",
+    applicationUnknown: "暂时无法确认申请结果，请稍后查看申请记录。",
+    nextSettlement: "距下次结算 {n}",
+    settlementPeriod: "{freq}结算",
   },
 };

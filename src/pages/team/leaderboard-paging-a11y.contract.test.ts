@@ -1,3 +1,4 @@
+import segments from "@/components/glass-segments.vue?raw";
 import { describe, expect, it } from "vitest";
 
 const source = (import.meta.glob("./leaderboard.vue", {
@@ -17,10 +18,12 @@ describe("leaderboard paging and keyboard contract", () => {
   });
 
   it("keeps tabs and click targets keyboard operable", () => {
-    expect(source).toContain('role="tablist"');
-    expect(source).toContain('role="tab"');
-    expect(source).toContain('@keydown.left.prevent="movePeriod(-1)"');
-    expect(source).toContain('@keydown.right.prevent="movePeriod(1)"');
+    expect(source).toMatch(/<GlassSegments[^>]*:model-value="period"[^>]*:options="periodOptions"/);
+    expect(segments).toMatch(/:tabindex="option.disabled \? -1 : [^\"]*option.value === modelValue \? 0 : -1"/);
+    expect(segments).toContain('option.value === modelValue');
+    expect(segments).toContain('@keydown="onKeydown($event, option)"');
+    expect(segments).toContain('choose(target, "arrow")');
+    expect(segments).toContain('?.focus()');
     expect(source).toContain('@keydown.space.prevent="loadMore"');
     expect(source).toContain('@keydown.space.prevent="loadRemote()"');
   });
@@ -35,14 +38,17 @@ describe("leaderboard paging and keyboard contract", () => {
    * 只落在选中项上,否则键盘用户会停在一个不可达的 tab 上。
    */
   it("exposes exactly one selected period and roving tabindex on it", () => {
-    expect(source).toMatch(/role="tablist"[^>]*:aria-label=/);
-    expect(source).toContain(':aria-selected="p === period"');
-    expect(source).toContain(':tabindex="p === period ? 0 : -1"');
+    expect(source).toContain(':label="t.leaderboard.pageTitle"');
+    expect(segments).toContain(':aria-selected=');
+    expect(segments).toMatch(/:tabindex="option.disabled \? -1 : [^\"]*option.value === modelValue \? 0 : -1"/);
+    expect(segments).toContain('option.value === modelValue');
+    expect(segments).toContain('@keydown="onKeydown($event, option)"');
+    expect(segments).toContain('choose(target, "arrow")');
+    expect(segments).toContain('?.focus()');
     // 四个周期都渲染自同一份 PERIODS,不存在漏标语义的那一项。
     expect(source).toMatch(/const PERIODS: LeaderPeriod\[\] = \["today", "week", "month", "all"\]/);
     // 点击与键盘都必须走同一个选中函数(否则鼠标/键盘行为会分叉)。
-    expect(source).toContain('@click="selectPeriod(p)"');
-    expect(source).toContain('@keydown.enter.prevent="selectPeriod(p)"');
-    expect(source).toContain('@keydown.space.prevent="selectPeriod(p)"');
+    expect(source).toContain('@select="selectPeriod"');
+    expect(source).toContain('PERIODS.map(value =>');
   });
 });

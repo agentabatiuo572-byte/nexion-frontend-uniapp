@@ -248,6 +248,20 @@ try {
     rt.sessionVault.save({
       accessToken: "gate-access", refreshToken: "gate-refresh", tokenType: "Bearer", user,
     });
+    // The current guard requires a parsed acknowledged legal snapshot before
+    // financial pages can render. Keep that prerequisite inside this isolated
+    // transport fixture, just like the bank-withdrawal scenarios below.
+    const requestBeforeLegalFixture = rt.apiClient.request;
+    rt.apiClient.request = async request => {
+      if (!request.path.startsWith("/api/legal/terms/current?")) return requestBeforeLegalFixture(request);
+      const locale = new URL(request.path, location.origin).searchParams.get("locale");
+      return { source: "server", sourceEnvironment: "PRODUCTION", runId: "", requestedLocale: locale, resolvedLocale: locale,
+        requestedJurisdiction: "GLOBAL", resolvedJurisdiction: "GLOBAL", provenance: "exact", version: "v1", effectiveAt: "2026-09-01T00:00:00Z",
+        title: "Fixture terms", summary: "Fixture terms", sections: [{ key: "terms", title: "Terms", body: "Isolated runtime fixture", sortOrder: 1 }],
+        acknowledged: true, acknowledgedAt: "2026-09-01T00:00:00Z" };
+    };
+    const locale = (await import("/src/store/locale.ts")).useLocaleStore().code;
+    (await import("/src/lib/legal-terms-gate-runtime.ts")).recordLegalTermsAcknowledged(await rt.legalTermsApi.current(locale, "GLOBAL", true), locale);
     auth.isAuthenticated = true;
     auth.onboardingComplete = true;
     auth.accountId = `user:${user.userId}`;

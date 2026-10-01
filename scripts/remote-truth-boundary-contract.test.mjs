@@ -39,7 +39,7 @@ test("remote trust and storefront surfaces do not expose static endorsements", (
   assert.doesNotMatch(homeTrust, /MOCK_CHIPS/);
   assert.doesNotMatch(homeTrust, /summary\?\.hero/);
   assert.doesNotMatch(homeTrust, /trustSnapshotTvl/);
-  assert.match(referral, /v-if="!remoteApiEnabled"/);
+  assert.doesNotMatch(referral.split("</template>")[0], /PARTNER_LOGOS|SOC 2 Type II|ISO 27001|certikAudited/);
   assert.match(detail, /v-if="!remoteApiEnabled"/);
   assert.match(referral, /remotePreview/);
   assert.match(referral, /remoteApiEnabled && !remotePreview/);

@@ -69,10 +69,28 @@ function matchClose(src, openEnd, tag = "view") {
 const violations = [];
 let groups = 0;
 const files = walk(SRC);
+const sharedSegments = readFileSync(join(SRC, "components", "glass-segments.vue"), "utf8");
+// The visual refresh moves these groups into one shared control. Count each
+// rendered instance and keep its keyboard contract in the same gate.
+const sharedKeyboardReady = /:tabindex="[^\"]*option\.value === modelValue/.test(sharedSegments)
+  && /@keydown="onKeydown\(\$event, option\)"/.test(sharedSegments)
+  && /"ArrowLeft", "ArrowRight"/.test(sharedSegments)
+  && /"ArrowUp", "ArrowDown"/.test(sharedSegments)
+  && /event\.preventDefault\(\)/.test(sharedSegments)
+  && /choose\(target(?:, "arrow")?\)/.test(sharedSegments)
+  && /\.focus\(\)/.test(sharedSegments);
 
 for (const file of files) {
   const src = readFileSync(file, "utf8");
   const rel = relative(ROOT, file).replace(/\\/g, "/");
+  for (const control of src.matchAll(/<GlassSegments\b[^>]*>/g)) {
+    if (/variant="navigation"/.test(control[0])) continue;
+    groups++;
+    if (!sharedKeyboardReady) violations.push({ file: rel,
+      line: src.slice(0, control.index).split("\n").length, rule: "R3",
+      detail: "共享选择器缺少 roving tabindex、方向键选择或焦点跟随",
+    });
+  }
   const re = /<view\b[^>]*\brole="(radiogroup|tablist)"/g;
   let m;
   while ((m = re.exec(src))) {

@@ -5,16 +5,12 @@
   global ui confirm/toast.
 -->
 <template>
-  <view class="overflow-hidden" :style="cardStyle">
+  <view class="nx-glass-card overflow-hidden" :style="cardStyle">
     <view class="flex items-center justify-center relative" :style="artStyle">
+      <GenesisArtwork context="holding" :serial="tokenId" style="position: absolute; inset: 0" />
       <view v-if="isListed" class="absolute inline-flex items-center" :style="listedBadgeStyle">
         <view :style="listedBadgeDotStyle" />
         <text>{{ t.marketplace.listedBadge }}</text>
-      </view>
-      <view class="text-center">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" :stroke="isListed ? 'var(--v5-warning)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-        <text class="block tabular-nums" :style="tokenIdStyle" :title="String(tokenId)" :aria-label="String(tokenId)">#{{ displayGenesisHoldingId(tokenId) }}</text>
-        <text class="block" :style="yoursStyle">{{ t.marketplace.yoursLabel }}</text>
       </view>
     </view>
 
@@ -259,16 +255,13 @@ async function handleCancel() {
 
 // Collectible tile — filled surface, no border (single visual difference); the
 // listed state is signaled by the badge + warning-tinted art + "yours" label.
-const cardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
 };
-const artStyle = computed<CSSProperties>(() => ({
+const artStyle: CSSProperties = {
   aspectRatio: "1 / 1",
-  background: isListed.value
-    ? "radial-gradient(80% 80% at 50% 30%, rgba(255,200,61,0.18) 0%, transparent 65%), linear-gradient(135deg, #1A1408 0%, var(--v5-on-brand) 100%)"
-    : "radial-gradient(80% 80% at 50% 30%, rgba(198,255,58,0.18) 0%, transparent 65%), linear-gradient(135deg, #14160F 0%, var(--v5-on-brand) 100%)",
-}));
+};
 const listedBadgeStyle: CSSProperties = {
   top: "8px",
   right: "8px",
@@ -390,4 +383,6 @@ const listBtnActiveStyle: CSSProperties = { ...listBtnBase, background: "var(--v
 // 不能渲染成看不见(独立验收 P1-1:通用 disabled 配方实测对比度 2.23,不达 AA 的 4.5)。
 const listBtnBlockedStyle: CSSProperties = { ...listBtnBase, background: "var(--v5-surface-2)", color: "var(--v5-ink-3)" };
 const listBtnStyle = computed<CSSProperties>(() => (listBlocked.value ? listBtnBlockedStyle : listBtnActiveStyle));
+
+import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 </script>

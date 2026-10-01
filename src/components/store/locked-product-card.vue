@@ -5,7 +5,7 @@
   Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
-  <view class="relative overflow-hidden" :style="rootStyle">
+  <view class="nx-glass-card relative overflow-hidden" :style="rootStyle">
     <!-- aurora drift bg -->
     <view aria-hidden :style="auroraStyle" />
     <!-- 24px grid overlay -->
@@ -18,7 +18,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <view aria-hidden :style="lockDotStyle" />
         </view>
-        <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" @click.stop="toggleDetails">
+        <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
@@ -62,10 +62,7 @@ import { productNotificationApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
-import {
-  useScrollGrowProgress,
-  PROGRESS_GROW_TRANSITION,
-} from "@/composables/use-scroll-grow-progress";
+import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
 import { nexGridBrandText } from "@/lib/brand-copy";
 
@@ -207,9 +204,9 @@ function toggleDetails() {
   detailsOpen.value = !detailsOpen.value;
 }
 
-const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 
 const auroraStyle: CSSProperties = {
@@ -278,7 +275,7 @@ const toggleStyle = computed<CSSProperties>(() => ({
 
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "20px",
+  fontSize: "26px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   letterSpacing: "-0.018em",
@@ -305,4 +302,6 @@ const notifyBtnStyle: CSSProperties = {
   fontWeight: 500,
   fontSize: "13px",
 };
+
+
 </script>

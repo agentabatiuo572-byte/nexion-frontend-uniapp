@@ -29,7 +29,7 @@
       <view
         v-for="c in cats"
         :key="c.key"
-        class="flex items-center active:opacity-80"
+        class="nx-glass-card flex items-center active:opacity-80"
         :style="cardStyle"
         role="button"
         tabindex="0"
@@ -191,12 +191,12 @@ const heroStyle: CSSProperties = {
   letterSpacing: "-0.02em",
   color: "var(--v5-ink)",
 };
-const cardStyle: CSSProperties = {
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   margin: "0 16px 12px",
   padding: "16px",
   gap: "12px",
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
 };
 const catTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -241,4 +241,6 @@ const hintStyle: CSSProperties = {
 };
 const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
 const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
+
+
 </script>

@@ -22,6 +22,7 @@
       <SubPageHeader back="/pages/me/me" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+        <GenesisArtwork style="border-radius: 18px" />
         <!-- ════ HERO — dark obsidian gold ════ -->
         <view class="relative overflow-hidden" :style="heroStyle">
           <!-- Gold dust particles -->
@@ -117,7 +118,7 @@
         <!-- ════ Live market ════ -->
         <!-- 入口可用性同源于二级市场闸:市场未开放 / 熔断 / 配置未知时禁用入口,
              而不是把用户送进一个只会说「暂未开放」的页面。 -->
-        <view class="flex items-center justify-between" :class="marketplaceEntryBlocked ? '' : 'active:opacity-80'" :style="secHeaderStyle" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry" @keydown.enter.prevent="openMarketplaceEntry" @keydown.space.prevent="openMarketplaceEntry">
+        <view class="flex items-center justify-between" :class="marketplaceEntryBlocked ? '' : 'active:opacity-80'" :style="secHeaderStyle" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry"  @keydown.enter.prevent="openMarketplaceEntry" @keydown.space.prevent="openMarketplaceEntry">
           <text :style="secTitleStyle">{{ t.genesis.secLiveMarket }}</text>
           <text :style="secLinkStyle" style="pointer-events: none">{{ marketplaceEntryLabel }}</text>
         </view>
@@ -809,6 +810,8 @@ const dockDividerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 40%, transparent)",
   margin: "0 4px",
 };
+
+import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 </script>
 
 <style scoped>

@@ -9,8 +9,8 @@
     <view
       v-for="c in chips"
       :key="c.href"
-      class="text-center active:opacity-70"
-      :style="chipStyle(c.tone)"
+      class="nx-glass-action text-center"
+      style="width: 100%; min-width: 0; aspect-ratio: 1; min-height: 76px; box-sizing: border-box; padding: 8px 4px; display: flex; flex-direction: column; justify-content: center"
       role="link"
       tabindex="0"
       :aria-label="c.label"
@@ -153,4 +153,6 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   if (event.repeat) return;
   action();
 }
+
+
 </script>

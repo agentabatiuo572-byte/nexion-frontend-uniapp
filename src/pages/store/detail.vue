@@ -10,8 +10,8 @@
 
   Phase-gated products (unlocksAtPhase not yet reached) render the shared
   <LockedProductCard> in place of the full page (mirrors ProductDetailGate).
-  Spec-sheet labels and the FAQ are i18n copy; publication and certification
-  names (Forbes / SOC 2 …) stay untranslated as proper nouns.
+  Spec-sheet labels and the FAQ are i18n copy. Trust material uses published
+  disclosures; unavailable material is shown as unavailable.
 -->
 <template>
   <AppChassis active="store">
@@ -85,7 +85,7 @@
           </view>
         </view>
         <!-- === Section 1: Hero === -->
-        <view class="mx-4 rounded-2xl border overflow-hidden relative" :style="heroCardStyle">
+        <view class="mx-4 nx-glass-card overflow-hidden relative">
           <view aria-hidden :style="auroraStyle" />
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
@@ -118,7 +118,7 @@
         </view>
 
         <!-- === Cloud Share E1 annual reference and NEX allocation === -->
-        <view v-if="isShare" class="mx-4 mt-3 rounded-2xl" style="padding: 16px 18px; background: var(--v5-surface)">
+        <view v-if="isShare" class="mx-4 mt-3 nx-glass-card" style="padding: 16px 18px">
           <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
             <text>{{ t.store.shareReferenceAnnual }}</text>
@@ -131,7 +131,7 @@
         </view>
 
         <!-- === Section 2: Vs phone strip === -->
-        <view v-if="!isShare && phoneDailyEarnValue > 0" class="mx-4 mt-3 rounded-2xl flex items-center" :style="vsStripStyle">
+        <view v-if="!isShare && phoneDailyEarnValue > 0" class="mx-4 mt-3 nx-glass-card flex items-center" :style="vsStripStyle">
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
@@ -148,7 +148,7 @@
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
         <template v-if="!isShare">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detEstReturns" :count="t.store.detEstReturnsMeta" /></view>
-          <view class="mx-4 rounded-2xl" :style="roiCardStyle">
+          <view class="mx-4 nx-glass-card" :style="roiCardStyle">
             <!-- qty stepper -->
             <view class="flex items-center justify-between">
               <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detQuantity }}</text>
@@ -192,23 +192,13 @@
         <!-- === Section 7: Trust material === -->
         <template v-if="!remoteApiEnabled">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
-          <view class="mx-4 rounded-2xl" :style="trustCardStyle">
-            <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detFeaturedIn }}</text>
-            <view class="flex flex-wrap" style="margin-top: 12px; gap: 18px">
-              <text v-for="m in featuredMedia" :key="m" :style="mediaStyle">{{ m }}</text>
-            </view>
-
-            <view style="height: 1px; background: var(--v5-border); margin: 16px 0" />
-
-            <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detCompliance }}</text>
-            <view class="flex flex-wrap" style="margin-top: 10px; gap: 8px">
-              <text v-for="c in compliance" :key="c" :style="complianceChipStyle">{{ c }}</text>
-            </view>
+          <view class="mx-4 nx-glass-card" :style="trustCardStyle">
+            <text class="block" :style="trustBodyStyle">{{ t.trust.errorUnavailable }}</text>
           </view>
         </template>
         <template v-else>
           <view style="padding: 22px 16px 4px"><SectionHeader :title="productTrustTitle" /></view>
-          <view class="mx-4 rounded-2xl" :style="trustCardStyle" data-testid="product-trust-material">
+          <view class="mx-4 nx-glass-card" :style="trustCardStyle" data-testid="product-trust-material">
             <text v-if="trustStatus === 'loading' || trustStatus === 'idle'" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
             <template v-else-if="trustStatus === 'ready' && productAuditRows.length">
               <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle"
@@ -570,7 +560,7 @@ const stockLow = computed(
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
 const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
-  ? `$${phoneDailyEarnValue.value.toFixed(2)}`
+  ? `${phoneDailyEarnValue.value.toFixed(2)}`
   : t.value.store.specValueUnavailable));
 // Same server figure the vs-phone strip shows. It used to be baked into the copy
 // as "$0.06", which contradicted the strip whenever the server said otherwise —
@@ -673,7 +663,7 @@ watch(
     if (stockUnavailable.value) {
       sticky.show({
         href: `/pages/store/detail?id=${product.value.id}`,
-        amount: `$${priceText.value}`,
+        amount: `${priceText.value}`,
         amountSubtext: t.value.store.temporarilyOutOfStock,
         buttonLabel: t.value.store.temporarilyOutOfStock,
         disabled: true,
@@ -690,7 +680,7 @@ watch(
       sticky.show({
         // A rank-only product has no quota tier; take the user to rank progression.
         href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : purchaseEligibilityUnlockHref(eligibility.value.snapshot!, product.value.id),
-        amount: `$${priceText.value}`,
+        amount: `${priceText.value}`,
         amountSubtext: quotaDepleted
           ? t.value.store.purchaseEligibilityQuotaDepleted
           : t.value.store.purchaseEligibilityIneligible,
@@ -706,7 +696,7 @@ watch(
     if (purchaseGate.value.blocked) {
       sticky.show({
         href: `/pages/team/quota?product=${encodeURIComponent(product.value.id)}`,
-        amount: `$${priceText.value}`,
+        amount: `${priceText.value}`,
         amountSubtext: purchaseGate.value.soldOut
           ? t.value.store.gateSoldOut
           : t.value.store.purchaseEligibilityIneligible,
@@ -719,8 +709,8 @@ watch(
     }
     sticky.show({
       href: `/pages/store/checkout?product=${product.value.id}`,
-      amount: `$${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `${t.value.store.detDaily}: $${dailyEarnText.value}`,
+      amount: `${priceText.value}`,
+      amountSubtext: isShare.value ? undefined : `${t.value.store.detDaily}: ${dailyEarnText.value}`,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
@@ -831,7 +821,6 @@ function codeChip(tone: "success" | "amber"): CSSProperties {
 // De-carded to a filled tile (no border) — keeps the phone-vs-device commercial
 // comparison punch without the boxed weight.
 const vsStripStyle: CSSProperties = {
-  background: "var(--v5-surface)",
   padding: "12px 14px",
   gap: "12px",
 };
@@ -847,7 +836,6 @@ const vsMultChipStyle: CSSProperties = {
   lineHeight: 1,
 };
 const roiCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
   padding: "16px",
 };
 const stepperStyle: CSSProperties = {
@@ -899,10 +887,7 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
 // textWrap pretty: the vs-phone subline now carries a server-sized figure, so it
 // can wrap in the half-width cell — keep the last line from stranding one char.
 const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", textWrap: "pretty" };
-const trustCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  padding: "16px",
-};
+const trustCardStyle: CSSProperties = { padding: "16px" };
 const mediaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
@@ -941,4 +926,6 @@ const faqQStyle: CSSProperties = {
   color: "var(--v5-ink)",
   letterSpacing: "-0.005em",
 };
+
+
 </script>

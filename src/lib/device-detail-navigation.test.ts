@@ -32,9 +32,11 @@ function loadPage(options: Record<string, string>) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("device detail return navigation", () => {
-  it("returns home for either home device card", () => {
+  it("returns home from the single device-row action", () => {
     expect(deviceDetailBackHref("home")).toBe("/pages/index/index");
-    expect(slot).toContain("&from=home");
+    expect(slot).toContain('aria-hidden="true"');
+    expect(slot).not.toContain("@click");
+    expect(row).toContain("<DeviceSlot");
     expect(row).toContain("&from=home");
   });
 

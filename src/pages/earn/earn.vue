@@ -6,7 +6,7 @@
     TrialHeroBanner / TrialGhostSlot
     → PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
     → MissedIncomeBanner
-    → "My Devices" header + slot rail + DeviceCardPC × N + add-device CTA
+    → "My Devices" header + compact DeviceCardPC rows + add-device CTA
     → MarketBoard
     → TaskCenter.
 
@@ -44,17 +44,7 @@
       </view>
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">
-        <!-- 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 已是 brand-soft,不撞色 -->
-        <!-- 四个时间范围是**互斥单选**(点「本周」会把「今天」取消),不是可多选的开关。
-             原先写 role="button" + aria-pressed:浏览器把它当 toggle button,读屏按
-             「切换按钮/复选框」朗读,用户会以为能同时选中多个。改用 radiogroup/radio
-             + aria-checked,与真实交互一致;roving tabindex + 左右方向键照
-             theme-row.vue / wallet-withdraw.vue 的既有写法。 -->
-        <view class="flex gap-0.5" style="background: var(--v5-surface); border-radius: 12px; padding: 3px" role="radiogroup" :aria-label="t.earn.rangeGroupLabel">
-          <view v-for="(r, i) in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" role="radio" :tabindex="range === r ? 0 : -1" :aria-checked="range === r" :aria-label="rangeLabel(r)" @click="range = r" @keydown.enter.prevent="range = r" @keydown.space.prevent="range = r" @keydown.left.prevent="moveRange(i, -1)" @keydown.right.prevent="moveRange(i, 1)">
-            <text :style="pillLabelStyle(r)">{{ rangeLabel(r) }}</text>
-          </view>
-        </view>
+        <GlassSegments :label="t.earn.rangeGroupLabel" semantics="radio" v-model="range" :options="rangeOptions"  />
       </view>
 
       <!-- ===== HERO: total earned card ===== -->
@@ -86,8 +76,8 @@
                 style="min-height: 44px; margin-top: 2px; color: var(--v5-brand); font-size: 12px; font-weight: 600"
                 role="button" tabindex="0"
                 @click="retrySummary"
-                @keydown.enter.prevent="retrySummary"
-                @keydown.space.prevent="retrySummary"
+
+                @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"
               >
                 <text>{{ t.tradein.errPleaseRetry }}</text>
               </view>
@@ -351,4 +341,7 @@ const usdtTagStyle: CSSProperties = {
   letterSpacing: "0.04em",
   whiteSpace: "nowrap",
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLabel(value) })));
 </script>

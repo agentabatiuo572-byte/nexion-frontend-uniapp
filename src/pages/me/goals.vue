@@ -43,10 +43,10 @@
             :aria-checked="target === p ? 'true' : 'false'"
             :aria-label="fmt(t.goals.targetPresetOption, { amount: String(p) })"
             @click="selectTarget(p)"
-            @keydown.enter.prevent="selectTarget(p)"
-            @keydown.space.prevent="selectTarget(p)"
-            @keydown.left.prevent="moveTarget(pi, -1)"
-            @keydown.right.prevent="moveTarget(pi, 1)"
+
+
+
+            @keydown.enter.prevent="selectTarget(p)" @keydown.space.prevent="selectTarget(p)" @keydown.left.prevent="moveTarget(pi, -1)" @keydown.right.prevent="moveTarget(pi, 1)"
           >
             <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${p / 1000}K` : p }}</text>
           </view>
@@ -65,10 +65,10 @@
             :aria-checked="days === d ? 'true' : 'false'"
             :aria-label="fmt(t.goals.deadlinePresetOption, { days: String(d) })"
             @click="selectDays(d)"
-            @keydown.enter.prevent="selectDays(d)"
-            @keydown.space.prevent="selectDays(d)"
-            @keydown.left.prevent="moveDays(di, -1)"
-            @keydown.right.prevent="moveDays(di, 1)"
+
+
+
+            @keydown.enter.prevent="selectDays(d)" @keydown.space.prevent="selectDays(d)" @keydown.left.prevent="moveDays(di, -1)" @keydown.right.prevent="moveDays(di, 1)"
           >
             <text :style="presetDeadlineLabelStyle(d)">{{ d }}d</text>
           </view>
@@ -76,14 +76,14 @@
       </view>
 
       <!-- Recommendation -->
-      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="mx-4" :style="recCardStyle">
+      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="nx-glass-card mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ t.goals.loading }}</text>
       </view>
       <view v-else-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
-        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
+        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
           <text :style="recCtaLabelStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -91,7 +91,7 @@
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <text :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -99,7 +99,7 @@
 
       <!-- Save -->
       <view style="padding: 0 16px; margin-top: 12px">
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, saveBlocked ? saveBtnPendingStyle : {}]" role="button" :tabindex="saveBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="saveBlocked" @click="onSave" @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, saveBlocked ? saveBtnPendingStyle : {}]" role="button" :tabindex="saveBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="saveBlocked" @click="onSave"  @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
           <text :style="saveLabelStyle" style="pointer-events: none">{{ t.goals.saveCta }}</text>
         </view>
@@ -109,11 +109,11 @@
       <view v-if="remoteApiEnabled && goalsStore.status === 'loading' && goals.length === 0" class="mx-4" :style="emptyStateStyle"><text>{{ t.goals.loading }}</text></view>
       <view v-else-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length === 0" class="mx-4" :style="emptyStateStyle">
         <text>{{ t.goals.serverUnavailable }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
       </view>
       <view v-if="remoteApiEnabled && goalsStore.status === 'error' && goals.length > 0" class="mx-4" :style="emptyStateStyle">
         <text>{{ t.goals.serverUnavailable }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
       </view>
       <view v-if="goals.length > 0">
         <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
@@ -121,7 +121,7 @@
           <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
             <view class="flex items-center justify-between">
               <text class="font-mono-tabular" :style="goalTargetStyle">${{ g.targetUSDT.toLocaleString() }}</text>
-              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: g.targetUSDT.toLocaleString() })" @click="remove(g.id)" @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
+              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: g.targetUSDT.toLocaleString() })" @click="remove(g.id)"  @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
               </view>
             </view>
@@ -455,11 +455,11 @@ const targetInputStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
-const recCardStyle: CSSProperties = {
+const recCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   marginTop: "12px",
-  borderRadius: "16px",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
-  background: "color-mix(in srgb, var(--v5-brand) 6%, transparent)",
+  background: "var(--nx-glass-fill)",
 };
 const recHeaderStyle: CSSProperties = {
   marginBottom: "6px",
@@ -571,4 +571,6 @@ const achievedLabelStyle: CSSProperties = {
 const emptyStateStyle: CSSProperties = {
   marginTop: "20px", padding: "16px", color: "var(--v5-ink-3)", textAlign: "center",
 };
+
+
 </script>

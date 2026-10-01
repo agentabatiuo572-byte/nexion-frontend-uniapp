@@ -92,7 +92,7 @@
       </view>
 
       <!-- Wallet binding — navigates to address management, so it is a link. -->
-      <view class="mx-4 flex items-center active:opacity-90" :style="walletCardStyle" role="link" tabindex="0" :aria-label="`${t.profile.walletAddress} · ${walletAction}`" @click="goWallet">
+      <view class="nx-glass-card mx-4 flex items-center active:opacity-90" :style="walletCardStyle" role="link" tabindex="0" :aria-label="`${t.profile.walletAddress} · ${walletAction}`" @click="goWallet">
         <view class="grid place-items-center shrink-0" :style="walletIconStyle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
         </view>
@@ -615,11 +615,11 @@ const tierProgressStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
 };
 // Wallet-binding nav row keeps its surface (nav-list whitelist) — border dropped.
-const walletCardStyle: CSSProperties = {
+const walletCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   marginTop: "20px",
   gap: "12px",
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
 };
 const walletIconStyle: CSSProperties = {
@@ -663,4 +663,6 @@ const saveFeedbackStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
+
+
 </script>

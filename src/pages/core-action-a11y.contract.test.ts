@@ -1,3 +1,4 @@
+import segments from "@/components/glass-segments.vue?raw";
 import { describe, expect, it } from "vitest";
 
 const pages = import.meta.glob(["./me/wallet-exchange.vue", "./team/agent.vue", "./earn/earn.vue", "./store/detail.vue", "./me/receipts.vue"], {
@@ -52,9 +53,14 @@ describe("core financial and ambassador controls", () => {
         // reads as a multi-select toggle, so they are radios/tabs with the state in
         // aria-checked/aria-selected instead. Either way the group is ONE Tab stop:
         // the selected item is 0 and the rest are -1 (roving tabindex, contract §2.3).
-        expect(tag, handler).toMatch(/role="(radio|tab)"/);
-        expect(tag, handler).toMatch(/:(aria-checked|aria-selected)="/);
-        expect(tag, handler).toMatch(/:tabindex="[^"]*\? 0 : -1"/);
+        expect(value).toMatch(new RegExp('<GlassSegments[^>]*v-model="' + (handler === 'range = r' ? 'range' : 'tab') + '"'));
+        expect(segments).toContain(':aria-selected=');
+        expect(segments).toContain(':aria-checked=');
+        expect(segments).toMatch(/:tabindex="option.disabled \? -1 : [^\"]*option.value === modelValue \? 0 : -1"/);
+    expect(segments).toContain('option.value === modelValue');
+    expect(segments).toContain('@keydown="onKeydown($event, option)"');
+    expect(segments).toContain('choose(target, "arrow")');
+    expect(segments).toContain('?.focus()');
         continue;
       }
       expect(tag, handler).toContain('role="button"');

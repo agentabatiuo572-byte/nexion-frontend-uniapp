@@ -1,7 +1,7 @@
 <template>
   <AppChassis active="me"><view class="px-4" style="padding-bottom:24px"><SubPageHeader back="/pages/me/me" />
     <view v-if="loading"><text>{{ t.learning.centerLoading }}</text></view>
-    <view v-else-if="error" role="alert" aria-live="assertive"><text class="block" style="text-wrap:pretty">{{ errorText }}</text><text class="block active:opacity-70" style="margin-top:12px;color:var(--v5-brand)" role="button" tabindex="0" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text></view>
+    <view v-else-if="error" role="alert" aria-live="assertive"><text class="block" style="text-wrap:pretty">{{ errorText }}</text><text class="block active:opacity-70" style="margin-top:12px;color:var(--v5-brand)" role="button" tabindex="0" @click="load"  @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text></view>
     <view v-else><text class="block" style="font-size:20px;font-weight:600">{{ t.learning.centerTitle }}</text><text class="block" style="margin:8px 0;color:var(--v5-ink-3)">{{ progressLine }}</text>
       <EmptyState v-if="overview?.courses.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
       <view v-if="featuredCourse" role="link" tabindex="0" style="margin:12px 0;padding:16px;border:1px solid var(--v5-brand);border-radius:12px" @click="open(featuredCourse.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => featuredCourse && open(featuredCourse.id))">
@@ -9,7 +9,7 @@
         <text class="block" style="font-weight:600">{{ featuredCourse?.title }}</text>
         <text class="block">{{ courseMeta(featuredCourse) }}</text>
       </view>
-      <view v-for="course in overview?.courses" :key="course.id" class="active:opacity-70" style="margin-top:10px;padding:14px;border-radius:12px;background:var(--v5-surface)" role="link" tabindex="0" @click="open(course.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => open(course.id))"><text class="block" style="font-weight:600">{{ course.title }}</text><text class="block" style="margin-top:5px;color:var(--v5-ink-3)">{{ courseMeta(course) }}</text></view>
+      <view v-for="course in overview?.courses" :key="course.id" class="nx-glass-card active:opacity-70" style="margin-top:10px;padding:14px" role="link" tabindex="0" @click="open(course.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => open(course.id))"><text class="block" style="font-weight:600">{{ course.title }}</text><text class="block" style="margin-top:5px;color:var(--v5-ink-3)">{{ courseMeta(course) }}</text></view>
     </view>
   </view></AppChassis>
 </template>
@@ -104,4 +104,6 @@ function refreshForScopeChange() {
 watch(() => String(app.accountKey), refreshForScopeChange);
 watch(() => app.accountBindingEpoch, refreshForScopeChange);
 watch(() => language.value, refreshForScopeChange);
+
+
 </script>

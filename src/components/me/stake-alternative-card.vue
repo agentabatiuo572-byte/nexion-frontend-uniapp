@@ -6,7 +6,7 @@
   + headline + "Stake for +$delta in {days} days" CTA → /staking.
 -->
 <template>
-  <view v-if="hasEligiblePool" class="mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
+  <view v-if="hasEligiblePool" class="nx-glass-card mx-4 mt-3 relative overflow-hidden" :style="cardStyle">
     <view aria-hidden :style="washStyle" />
     <view class="relative">
       <view class="flex items-center" :style="labelStyle">
@@ -23,7 +23,7 @@
         </view>
       </view>
 
-      <view class="flex items-center justify-between w-full active:opacity-85" :style="ctaStyle" role="button" tabindex="0" @click="goStaking" @keydown.enter.prevent="goStaking" @keydown.space.prevent="goStaking">
+      <view class="flex items-center justify-between w-full active:opacity-85" :style="ctaStyle" role="button" tabindex="0" @click="goStaking"  @keydown.enter.prevent="goStaking" @keydown.space.prevent="goStaking">
         <text>{{ ctaText }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -78,12 +78,12 @@ const peakDelta = computed(() => peakValue.value - props.amountNum);
 
 const headlineText = computed(() =>
   fmt(w.value.headline, {
-    amount: `$${props.amountNum.toFixed(2)}`,
-    peak: `$${peakValue.value.toFixed(2)}`,
+    amount: `${props.amountNum.toFixed(2)}`,
+    peak: `${peakValue.value.toFixed(2)}`,
     days: peak.value?.days ?? 180,
   }),
 );
-const ctaText = computed(() => fmt(w.value.cta, { delta: `$${peakDelta.value.toFixed(0)}`, days: peak.value?.days ?? 180 }));
+const ctaText = computed(() => fmt(w.value.cta, { delta: `${peakDelta.value.toFixed(0)}`, days: peak.value?.days ?? 180 }));
 function tierLabelText(days: number): string {
   return fmt(w.value.tierLabel, { n: days });
 }
@@ -103,11 +103,11 @@ function goStaking() {
 }
 
 // ── styles ──
-const cardStyle: CSSProperties = {
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
+  border: "none",
 };
 const washStyle: CSSProperties = {
   position: "absolute",
@@ -174,4 +174,6 @@ const ctaStyle: CSSProperties = {
   fontSize: "13px",
   letterSpacing: "-0.005em",
 };
+
+
 </script>

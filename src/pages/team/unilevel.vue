@@ -36,7 +36,7 @@
         <view v-if="!remoteApiEnabled || commission.configStatus === 'ready'" :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" :style="heroCapStyle">{{ t.unilevel.heroLabel }}</text>
-            <view class="nx-unilevel-how-link nx-unilevel-focus inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" role="button" tabindex="0" :aria-label="t.unilevel.howItWorksEntry" @click="go('/pages/team/unilevel-how')" @keydown.enter.prevent="go('/pages/team/unilevel-how')" @keydown.space.prevent="go('/pages/team/unilevel-how')">
+            <view class="nx-unilevel-how-link nx-unilevel-focus inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" role="button" tabindex="0" :aria-label="t.unilevel.howItWorksEntry" @click="go('/pages/team/unilevel-how')"  @keydown.enter.prevent="go('/pages/team/unilevel-how')" @keydown.space.prevent="go('/pages/team/unilevel-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.unilevel.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -68,7 +68,7 @@
         <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
              card each (owner 2026-07-09; chassis glass-tile tokens); colored
              badge chips + values carry the semantic identity. -->
-        <view v-if="!remoteApiEnabled" class="flex items-start" style="gap: 12px" :style="glassCardStyle">
+        <view v-if="!remoteApiEnabled" class="nx-glass-card flex items-start" style="gap: 12px" :style="glassCardStyle">
           <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
           <view class="flex-1 min-w-0">
             <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
@@ -79,7 +79,7 @@
             <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
           </view>
         </view>
-        <view v-if="!remoteApiEnabled" :style="glassCardStyle">
+        <view class="nx-glass-card" v-if="!remoteApiEnabled" :style="glassCardStyle">
           <view class="flex items-start" style="gap: 12px">
             <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
             <view class="flex-1 min-w-0">
@@ -92,27 +92,8 @@
           </view>
         </view>
 
-        <!-- Filter pills — opens the member-list section, extra top break;
-             mutually exclusive: one tablist, roving tabindex, so the group has a
-             name and exactly one selected tab (BUG 95). -->
-        <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%; margin-top: 6px">
-          <view class="inline-flex" style="gap: 6px" role="tablist" :aria-label="t.unilevel.pageTitle">
-            <view class="nx-unilevel-filter nx-unilevel-filter-all shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'all')" role="tab" :tabindex="filter === 'all' ? 0 : -1" :aria-selected="filter === 'all' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterAll} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length + extendedMembers.length : '—'}`" @click="filter = 'all'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
-              <text :style="pillTextStyle(filter === 'all')">{{ t.unilevel.filterAll }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'all')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length + extendedMembers.length : '—' }}</text>
-            </view>
-            <view class="nx-unilevel-filter nx-unilevel-filter-direct shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'direct')" role="tab" :tabindex="filter === 'direct' ? 0 : -1" :aria-selected="filter === 'direct' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterDirect} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length : '—'}`" @click="filter = 'direct'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
-              <view v-if="filter !== 'direct'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-brand)' }" />
-              <text :style="pillTextStyle(filter === 'direct')">{{ t.unilevel.filterDirect }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'direct')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? directMembers.length : '—' }}</text>
-            </view>
-            <view class="nx-unilevel-filter nx-unilevel-filter-extended shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'extended')" role="tab" :tabindex="filter === 'extended' ? 0 : -1" :aria-selected="filter === 'extended' ? 'true' : 'false'" :aria-label="`${t.unilevel.filterExtended} · ${!remoteApiEnabled || network.remoteStatus === 'ready' ? extendedMembers.length : '—'}`" @click="filter = 'extended'" @keydown.left.prevent="moveFilter(-1)" @keydown.right.prevent="moveFilter(1)">
-              <view v-if="filter !== 'extended'" class="rounded-full" :style="{ width: '6px', height: '6px', background: 'var(--v5-tech-cyan)' }" />
-              <text :style="pillTextStyle(filter === 'extended')">{{ t.unilevel.filterExtended }}</text>
-              <text class="font-mono-tabular" :style="pillCountStyle(filter === 'extended')">· {{ !remoteApiEnabled || network.remoteStatus === 'ready' ? extendedMembers.length : '—' }}</text>
-            </view>
-          </view>
-        </scroll-view>
+        <!-- Filter pills — opens the member-list section, extra top break. -->
+        <GlassSegments :label="t.unilevel.pageTitle" v-model="filter" :options="filterOptions" layout="wrap" style="margin-top: 6px"  />
 
         <!-- Member list — de-carded: transparent hairline group (leaderboard
              rest-list idiom); the surface + border shell was redundant
@@ -169,7 +150,7 @@
               </view>
             </view>
             <!-- View more — explicit user click (leaderboard idiom), 44px ghost. -->
-            <view v-if="hasMoreMembers" class="nx-unilevel-load-more flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" @click="loadMoreMembers" @keydown.enter.prevent="loadMoreMembers" @keydown.space.prevent="loadMoreMembers">
+            <view v-if="hasMoreMembers" class="nx-unilevel-load-more flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" @click="loadMoreMembers"  @keydown.enter.prevent="loadMoreMembers" @keydown.space.prevent="loadMoreMembers">
               <text :style="loadMoreLabelStyle">{{ t.unilevel.loadMore }}</text>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </view>
@@ -430,7 +411,7 @@ const rateTierProgressText = computed(() => {
 const rateTierMaxedText = computed(() => fmt(t.value.unilevel.rateTierMaxed, { tier: t.value.unilevel.rateTiers[currentTier.value.id].name }));
 
 function tierVolLabel(minVolume: number): string {
-  return minVolume >= 1000 ? `$${minVolume / 1000}K+` : `$${minVolume}`;
+  return minVolume >= 1000 ? `${minVolume / 1000}K+` : `${minVolume}`;
 }
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";
@@ -496,11 +477,11 @@ const heroTierChipStyle = computed<CSSProperties>(() => ({
 // the genesis dock glass (Vue auto-prefixes backdropFilter inline).
 // Fill only, zero border: bg-filled cards carry no border line (owner ruling
 // 2026-07-09, same day).
-const glassCardStyle: CSSProperties = {
+const glassCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
-  borderRadius: "16px",
-  background: "var(--v5-glass-bg)",
-  backdropFilter: "blur(18px) saturate(180%)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
+  backdropFilter: "none",
 };
 function compBadgeStyle(color: string): CSSProperties {
   return {
@@ -593,6 +574,13 @@ function memberBadgeStyle(kind: "direct" | "extended"): CSSProperties {
     color,
   };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const filterOptions = computed(() => [
+  { value: "all", label: t.value.unilevel.filterAll, count: !remoteApiEnabled || network.remoteStatus === "ready" ? directMembers.value.length + extendedMembers.value.length : "—", className: "nx-unilevel-filter-all" },
+  { value: "direct", label: t.value.unilevel.filterDirect, count: !remoteApiEnabled || network.remoteStatus === "ready" ? directMembers.value.length : "—", className: "nx-unilevel-filter-direct" },
+  { value: "extended", label: t.value.unilevel.filterExtended, count: !remoteApiEnabled || network.remoteStatus === "ready" ? extendedMembers.value.length : "—", className: "nx-unilevel-filter-extended" },
+]);
 </script>
 
 <style scoped>

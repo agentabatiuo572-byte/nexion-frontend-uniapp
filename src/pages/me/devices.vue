@@ -37,7 +37,7 @@
       />
       <view v-if="inventoryStale" class="mx-4" role="status" style="padding: 12px; border-radius: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
         <text class="block" style="font-size: 13px">{{ t.myDevices.inventoryStaleWarning }}</text>
-        <view class="inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory" @keydown.enter.prevent="retryInventory" @keydown.space.prevent="retryInventory">
+        <view class="inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory"  @keydown.enter.prevent="retryInventory" @keydown.space.prevent="retryInventory">
           <text>{{ t.empty.errorCta }}</text>
         </view>
       </view>
@@ -73,14 +73,14 @@
               <text class="block" :style="phoneActivationRewardStyle">{{ t.myDevices.phoneActivationRewardGate }}</text>
             </view>
           </view>
-          <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation" @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
+          <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation"  @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
             <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
           </view>
         </view>
 
         <!-- Trial device — UVELBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
-        <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
+        <view v-if="trialActive" class="nx-glass-card overflow-hidden" :style="trialCardStyle">
           <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
             <view class="grid place-items-center shrink-0" :style="trialIconBoxStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
@@ -95,7 +95,7 @@
           </view>
           <!-- Spec ④: user cancel exists on the active edge only — grace has
                nothing running to cancel (production already stopped). -->
-          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" role="button" tabindex="0" @click="handleCancelTrial" @keydown.enter.prevent="handleCancelTrial" @keydown.space.prevent="handleCancelTrial">
+          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" role="button" tabindex="0" @click="handleCancelTrial"  @keydown.enter.prevent="handleCancelTrial" @keydown.space.prevent="handleCancelTrial">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>
             <text :style="trialCancelLabelStyle">{{ t.trial.cancelCta }}</text>
           </view>
@@ -191,7 +191,7 @@
         />
 
         <!-- Add-device CTA -->
-        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
+        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text>
         </view>
@@ -638,10 +638,10 @@ const meterMaxStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 // De-carded device card (form b): filled surface, no border.
-const trialCardStyle: CSSProperties = {
+const trialCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
 };
 const trialIconBoxStyle: CSSProperties = {
   width: "40px",
@@ -785,4 +785,6 @@ const phoneActivationCtaLabelStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
+
+
 </script>

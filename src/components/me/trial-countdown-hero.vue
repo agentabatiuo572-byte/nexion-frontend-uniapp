@@ -6,7 +6,7 @@
   passed in as props.
 -->
 <template>
-  <view class="relative overflow-hidden" :style="cardStyle">
+  <view class="nx-glass-card relative overflow-hidden" :style="cardStyle">
     <view class="flex items-center justify-between">
       <text :style="ribbonStyle">{{ ribbon }}</text>
       <text :style="boxNameStyle">UVELBox S1</text>
@@ -102,7 +102,7 @@ const endDateLine = computed(() =>
   }),
 );
 
-const cardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "20px" };
+const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", borderRadius: "var(--nx-glass-radius)", border: "none", background: "var(--nx-glass-fill)", padding: "20px" };
 const ribbonStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -138,4 +138,6 @@ const barFillStyle = computed<CSSProperties>(() => ({
   transition: "width 500ms ease",
 }));
 const datesRowStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-4)" };
+
+
 </script>

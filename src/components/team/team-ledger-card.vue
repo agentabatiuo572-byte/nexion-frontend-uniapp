@@ -1,59 +1,33 @@
-<!--
-  TeamLedgerCard — aggregate "this month" commission card: main amount,
-  NEX side value, plain growth text, and open 2x2 settlement metrics.
-  View-details → /team/commissions.
-  i18n read directly via useT (parent passes numeric values as props).
-  <div>→<view>; <span>→<text>; <Link>→<view @click>.
--->
 <template>
-  <view class="relative overflow-hidden" :style="rootStyle">
-    <view aria-hidden="true" :style="ambientStyle" />
-
-    <view class="relative" style="z-index: 1">
-      <view class="flex items-start justify-between" style="gap: 16px">
-        <view class="flex-1 min-w-0">
-          <text class="block font-mono-tabular" :style="capLabelStyle">{{ t.teamV3.thisMonth }}</text>
-          <text class="block" :style="lifetimeStyle">
-            {{ t.teamV3.lifetime }} ${{ totalUSDTLifetime.toFixed(2) }} · {{ contributors }} {{ t.teamV3.contributors }}
-          </text>
-        </view>
-        <!-- BUG 172:入口此前只有 @click —— 读屏只把整张佣金摘要读成 container,
-             键盘既停不上也激活不了。跳转类 → role="link"(只吃 Enter,Space 留给滚动),
-             键盘激活由 lib/a11y-activate.ts 平台层合成;金额摘要保持只读文本不动。 -->
-        <view class="nx-team-commissions-link inline-flex items-center active:opacity-70" :style="detailsLinkStyle" role="link" tabindex="0" :aria-label="t.teamV3.viewDetails" @click="goCommissions">
-          <text :style="{ fontSize: '13px', color: 'var(--v5-ink-2)' }">{{ t.teamV3.viewDetails }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-        </view>
+  <view class="nx-glass-card team-ledger">
+    <view class="team-ledger__header">
+      <text class="team-ledger__title">{{ t.teamV3.thisMonth }}</text>
+      <view class="nx-team-commissions-link team-ledger__details" role="link" tabindex="0" @click="goCommissions">
+        <text>{{ t.teamV3.viewDetails }}</text>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
       </view>
+    </view>
+    <text class="team-ledger__amount tabular-nums">{{ '$' + monthUSDT.toFixed(2) }}</text>
+    <text class="team-ledger__nex tabular-nums">+ {{ monthNEX.toLocaleString() }} NEX</text>
+    <text class="team-ledger__lifetime">{{ t.teamV3.lifetime }} ${{ totalUSDTLifetime.toFixed(2) }} · {{ contributors }} {{ t.teamV3.contributors }}</text>
 
-      <view :style="amountRowStyle">
-        <view>
-          <view class="flex items-baseline" style="gap: 6px">
-            <text class="font-display tabular-nums" :style="dollarSignStyle">$</text>
-            <text class="font-display tabular-nums" :style="bigNumStyle">{{ intPart.toLocaleString() }}<text :style="fracStyle">.{{ fracPart }}</text></text>
-          </view>
-          <text class="block font-mono-tabular" :style="nexStyle">+ {{ monthNEX.toLocaleString() }} NEX</text>
-        </view>
+    <view class="team-ledger__bar" aria-hidden="true">
+      <view :style="{ width: directPct + '%', background: 'var(--v5-brand)' }" />
+      <view :style="{ width: extendedPct + '%', background: 'var(--v5-brand-2)' }" />
+    </view>
+    <view class="team-ledger__split">
+      <view>
+        <view class="team-ledger__label"><view class="team-ledger__dot" /><text>{{ t.teamV3.directLabel }} · {{ directPct }}%</text></view>
+        <text class="team-ledger__value tabular-nums">${{ directUSDT.toFixed(2) }}</text>
       </view>
-
-      <view class="grid" :style="metricGridStyle">
-        <view :style="metricItemStyle(0)">
-          <text class="block font-mono-tabular tabular-nums" :style="metricLabelStyle('var(--v5-brand)')">{{ t.teamV3.directLabel }} · {{ directPct }}%</text>
-          <text class="block tabular-nums font-display" :style="metricValueStyle">${{ directUSDT.toFixed(2) }}</text>
-        </view>
-        <view :style="metricItemStyle(1)">
-          <text class="block font-mono-tabular tabular-nums" :style="metricLabelStyle('var(--v5-brand-2)')">{{ t.teamV3.extendedLabel }} · {{ extendedPct }}%</text>
-          <text class="block tabular-nums font-display" :style="metricValueStyle">${{ extendedUSDT.toFixed(2) }}</text>
-        </view>
-        <view :style="metricItemStyle(2)">
-          <text class="block font-mono-tabular" :style="metricLabelStyle('var(--v5-success)')">{{ t.teamV3.settled }}</text>
-          <text class="block tabular-nums font-display" :style="metricValueStyle">${{ unlockedUSDT.toFixed(2) }}</text>
-        </view>
-        <view :style="metricItemStyle(3)">
-          <text class="block font-mono-tabular" :style="metricLabelStyle('var(--v5-brand-2)')">{{ t.teamV3.coolingDown }}</text>
-          <text class="block tabular-nums font-display" :style="metricValueStyle">${{ coolingUSDT.toFixed(2) }}</text>
-        </view>
+      <view>
+        <view class="team-ledger__label"><view class="team-ledger__dot team-ledger__dot--extended" /><text>{{ t.teamV3.extendedLabel }} · {{ extendedPct }}%</text></view>
+        <text class="team-ledger__value tabular-nums">${{ extendedUSDT.toFixed(2) }}</text>
       </view>
+    </view>
+    <view class="team-ledger__settlement">
+      <view><text>{{ t.teamV3.settled }}</text><text class="tabular-nums">${{ unlockedUSDT.toFixed(2) }}</text></view>
+      <view><text>{{ t.teamV3.coolingDown }}</text><text class="tabular-nums">${{ coolingUSDT.toFixed(2) }}</text></view>
     </view>
   </view>
 </template>
@@ -122,7 +96,7 @@ const dollarSignStyle: CSSProperties = {
 };
 const bigNumStyle: CSSProperties = {
   fontWeight: 600,
-  fontSize: "50px",
+  fontSize: "44px",
   letterSpacing: "-0.03em",
   lineHeight: 1,
   color: "var(--v5-brand)",
@@ -177,14 +151,29 @@ const metricValueStyle: CSSProperties = {
   color: "var(--v5-ink)",
   lineHeight: 1.2,
 };
+
+
 </script>
 
 <style scoped>
-/* BUG 172:「查看明细」现在进得了 Tab 序(role+tabindex),没有外环键盘用户看不出
-   焦点落在哪 —— 44px 热区的默认 outline 会被相邻网格线压掉,按仓内写法补。 */
-.nx-team-commissions-link:focus-visible {
-  outline: 2px solid var(--v5-brand);
-  outline-offset: 2px;
-  border-radius: 8px;
-}
+.team-ledger { padding: 8px 20px 16px; }
+.team-ledger__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.team-ledger__title { font-size: 15px; font-weight: 600; }
+.team-ledger__details { display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-height: 44px; color: var(--v5-ink-3); font-size: 12px; flex-shrink: 0; }
+.team-ledger__details:active { opacity: .7; }
+.team-ledger__details:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.team-ledger__amount { display: block; font-family: var(--font-v5); font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.team-ledger__nex { display: block; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--v5-tech-cyan-ink); overflow-wrap: anywhere; }
+.team-ledger__lifetime { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
+.team-ledger__bar { display: flex; height: 6px; margin-top: 8px; border-radius: 999px; overflow: hidden; background: var(--v5-surface-2); }
+.team-ledger__bar > view { height: 100%; }
+.team-ledger__split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+.team-ledger__split > view { min-width: 0; }
+.team-ledger__label { display: flex; align-items: center; gap: 7px; font-size: 12px; line-height: 1.4; color: var(--v5-ink-3); }
+.team-ledger__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--v5-brand); }
+.team-ledger__dot--extended { background: var(--v5-brand-2); }
+.team-ledger__value { display: block; margin: 2px 0 0 15px; font-size: 20px; font-weight: 600; line-height: 1.1; overflow-wrap: anywhere; }
+.team-ledger__settlement { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--v5-border); display: flex; flex-direction: column; }
+.team-ledger__settlement > view { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; line-height: 1.5; color: var(--v5-ink-3); }
+.team-ledger__settlement .tabular-nums { color: var(--v5-ink); text-align: right; overflow-wrap: anywhere; min-width: 0; }
 </style>

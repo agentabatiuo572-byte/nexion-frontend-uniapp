@@ -3,7 +3,7 @@
   P-004). Route-aware like the prototype's root layout (header.tsx + tab-bar.tsx):
     · TAB routes (home/earn/store/team/me): brand row (N badge + UVEL/title +
       search + bell-badge) + FLOATING frosted-glass pill TabBar (5 tabs, active =
-      gradient brand pill) + home indicator. Liquid-Glass faithful to v5.
+      sliding refractive lens) + home indicator.
     · SUB routes (everything else): NO brand row + NO 5-tab pill (the page carries
       its own in-page back/title row); only the status bar + home indicator. This
       keeps all ~56 sub-pages correct with zero per-page edits.
@@ -11,8 +11,8 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view class="nx-chassis" style="background: var(--v5-bg)">
-    <view class="nx-top-chrome" :style="{ height: topChromeHeight + 'px' }" />
+  <view :id="chassisHostId" class="nx-chassis" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
+    <view class="nx-top-chrome" :style="{ height: statusBarHeight + 'px' }" />
 
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
     <DeviceStatusBar />
@@ -24,10 +24,11 @@
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
-	        <view class="nx-icon-btn active:opacity-60" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch" @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
+        <LiquidGlass :radius="24" tone="control" backdrop=".nx-page-enter" />
+        <view class="nx-icon-btn" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </view>
-	        <view class="nx-icon-btn nx-bell active:opacity-60" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+	        <view class="nx-icon-btn nx-bell" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
@@ -39,7 +40,8 @@
          content behind it, mirroring the prototype Header nav row. Tab pages never
          set pageHeader, so this never shows for them (brand row stays untouched). -->
     <view v-if="!isTabRoute && navHeader" class="nx-navheader" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
-	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack" @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
+      <LiquidGlass :radius="navHeaderH / 2" tone="navigation" backdrop=".nx-page-enter" />
+      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
         <view class="nx-nav-glass">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
@@ -48,7 +50,7 @@
         <text class="nx-nav-title">{{ navHeader.title }}</text>
         <text v-if="navHeader.subtitle" class="nx-nav-sub">{{ navHeader.subtitle }}</text>
       </view>
-	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
         <view class="nx-nav-glass">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-nav-belldot" />
@@ -108,30 +110,17 @@
 
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
-      <view v-if="isTabRoute" class="nx-tabbar-pill">
-        <view aria-hidden class="nx-tab-specular" />
-        <view
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="nx-tab active:opacity-70"
-          :style="tab.key === activeTab ? activeTabStyle : { color: 'var(--v5-ink-3)' }"
-          role="tab"
-          tabindex="0"
-          :aria-selected="tab.key === activeTab ? 'true' : 'false'"
-          :aria-label="tab.label"
-          @click="go(tab)"
-	          @keydown.enter.prevent="onKeyboardActivate($event, () => go(tab))"
-	          @keydown.space.prevent="onKeyboardActivate($event, () => go(tab))"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-            :stroke="tab.key === activeTab ? 'var(--v5-brand)' : 'var(--v5-ink-3)'"
-            :stroke-width="tab.key === activeTab ? 2.4 : 2" stroke-linecap="round" stroke-linejoin="round">
+      <GlassSegments v-if="isTabRoute" class="nx-tabbar-pill" variant="navigation" :options="navigationOptions" :model-value="activeTab" :from-value="navigationFrom" @select="selectNavigation">
+        <template #option="{ option: tab, selected }">
+          <svg class="nx-tab__icon" width="22" height="22" viewBox="0 0 24 24" fill="none"
+            :stroke="selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)'"
+            :stroke-width="selected ? 2.3 : 1.8" stroke-linecap="round" stroke-linejoin="round">
             <path :d="tab.icon" />
             <template v-if="tab.icon2"><path :d="tab.icon2" /></template>
           </svg>
-          <text class="nx-tab__label" :style="{ color: tab.key === activeTab ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ tab.label }}</text>
-        </view>
-      </view>
+          <text class="nx-tab__label" :style="{ color: selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)' }">{{ tab.label }}</text>
+        </template>
+      </GlassSegments>
       <DeviceHomeIndicator />
     </view>
 
@@ -158,7 +147,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties } from "vue";
+import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties, getCurrentInstance } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
@@ -193,18 +183,9 @@ import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory"
 import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import {
-  captureRuntimeRevision,
-  isCurrentRuntimeRevision,
-  subscribeRuntimeRevision,
-  type RuntimeRevisionScope,
-} from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import {
-  isAcceptanceObservationModalOpen,
-  onAcceptanceObservationModalClosed,
-  onAcceptanceObservationModalOpened,
-} from "@/services/behavior-analytics";
+import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, onAcceptanceObservationModalOpened } from "@/services/behavior-analytics";
 
 const props = defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
@@ -679,6 +660,7 @@ function go(tab: { key: string; route: string }) {
     // #endif
     return;
   }
+  rememberGlassNavigation(activeTab.value, tab.key);
   navTo(tab.route);
 }
 function goSearch() {
@@ -689,6 +671,25 @@ function goSearch() {
 function goNotifications() {
   messageDrawer.show();
 }
+
+import LiquidGlass from "@/components/liquid-glass.vue";
+import GlassSegments from "@/components/glass-segments.vue";
+
+const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
+const chromeConfiguration = { hostId: chassisHostId };
+declare const chromeView: { update(value: { hostId: string }): void };
+const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
+const navigationFrom = consumeGlassNavigation(activeTab.value);
+function selectNavigation(value: string) {
+  const tab = tabs.value.find(item => item.key === value);
+  if (tab) go(tab);
+}
+</script>
+
+<script module="chromeView" lang="renderjs">
+import { chassisView } from "@/lib/liquid-glass-view";
+// @ts-expect-error vue-tsc 1.x treats uni renderjs as a second normal script.
+export default chassisView;
 </script>
 
 <style scoped>
@@ -718,23 +719,25 @@ function goNotifications() {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  border-bottom: 1px solid var(--v5-chrome-border);
+  gap: 12px;
 }
 /* Page nav header (sub-pages) — its OWN chrome surface so the brand row
    (.nx-header) stays byte-identical for the 5 tab pages. Mirrors the prototype
    Header nav row: 44/56 tall, back + centered title + bell, frosted. */
 .nx-navheader {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 12px;
+  right: 12px;
   z-index: 100;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--v5-chrome-border);
+  padding: 0 2px;
+  border-radius: 28px;
 }
 .nx-nav-side {
+  position: relative;
+  z-index: 1;
   width: 44px;
   height: 44px;
   display: grid;
@@ -748,16 +751,14 @@ function goNotifications() {
   position: relative;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--v5-glass-bg);
-  border: 1px solid var(--v5-glass-border);
-  box-shadow: var(--v5-glass-shadow);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .nx-nav-titlewrap {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -797,15 +798,21 @@ function goNotifications() {
   background: var(--v5-brand-2);
 }
 .nx-header__l {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   /* 品牌包给横版定的最小渲染宽度是 120px(低于它 8 个节点糊成一团),槽宽跟着它走。
      原值 104px 是旧字标 logo 的宽度,装不下新标会溢出到中间区。 */
-  width: 120px;
+  width: 132px;
+  height: 44px;
+  justify-content: center;
   flex-shrink: 0;
+  transition: transform 200ms cubic-bezier(.23,1,.32,1), opacity 200ms, visibility 0s;
 }
+.nx-header__l[data-hidden="true"] { transform: translateY(-18px); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, 200ms; }
+@media (prefers-reduced-motion: reduce) { .nx-header__l { transition: none; } .nx-header__l[data-hidden="true"] { transform: none; } }
 .nx-header__center {
   position: absolute;
   left: 50%;
@@ -836,9 +843,11 @@ function goNotifications() {
   white-space: nowrap;
 }
 .nx-header__r {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
+  padding: 0 3px;
   flex-shrink: 0;
 }
 .nx-icon-btn {
@@ -849,7 +858,10 @@ function goNotifications() {
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
+.nx-icon-btn:active, .nx-nav-side:active .nx-nav-glass { transform: scale(.92); }
+.nx-icon-btn:focus-visible, .nx-nav-side:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; border-radius: 24px; }
 .nx-badge {
   position: absolute;
   top: 4px;
@@ -946,49 +958,5 @@ function goNotifications() {
 }
 .nx-tabbar-pill {
   margin: 0 12px;
-  display: flex;
-  align-items: stretch;
-  padding: 4px;
-  border-radius: 22px;
-  overflow: hidden;
-  position: relative;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
-    var(--v5-tabbar-bg);
-  backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
-  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
-    0 10px 36px rgba(0, 0, 0, 0.4),
-    0 0 0 0.5px rgba(255, 255, 255, 0.04);
-}
-.nx-tab-specular {
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-  opacity: 0.7;
-  pointer-events: none;
-}
-.nx-tab {
-  flex: 1;
-  height: 56px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  border-radius: 16px;
-}
-.nx-tab__label {
-  font-size: 12px;
-  line-height: 14px; /* 《02》§2 tab.label 12/14/600 */
-  font-weight: 600;
-  font-family: var(--font-v5);
-  letter-spacing: -0.005em;
 }
 </style>

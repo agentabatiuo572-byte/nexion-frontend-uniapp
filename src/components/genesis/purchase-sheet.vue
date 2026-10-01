@@ -17,14 +17,14 @@
     </transition>
     <!-- Panel -->
     <transition name="nx-sheet-slide">
-      <view v-if="open" class="nx-sheet-panel" :style="panelStyle" @click.stop>
+      <view v-if="open" class="nx-glass-sheet nx-sheet-panel" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="margin-bottom: 16px">
           <view>
             <text class="block" :style="titleStyle">{{ t.genesis.confirmTitle }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose"  @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -94,8 +94,8 @@
       <text class="block" style="font-size: 26px; color: var(--v5-genesis-gold-on-dark)" aria-hidden="true">✦</text>
       <text class="block" style="margin-top: 10px; font-size: 20px; font-weight: 650; color: var(--v5-ink)">{{ successTitle }}</text>
       <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.genesis.purchaseSubtitle }}</text>
-      <view class="active:opacity-85" role="button" tabindex="0" style="margin-top: 22px; padding: 12px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font-weight: 600" @click="viewHolder" @keydown.enter.prevent="viewHolder" @keydown.space.prevent="viewHolder"><text>{{ t.genesis.purchaseViewHolder }}</text></view>
-      <view class="active:opacity-70" role="button" tabindex="0" style="margin-top: 10px; padding: 10px; color: var(--v5-ink-3)" @click="closeSuccess" @keydown.enter.prevent="closeSuccess" @keydown.space.prevent="closeSuccess"><text>{{ t.ui.close }}</text></view>
+      <view class="active:opacity-85" role="button" tabindex="0" style="margin-top: 22px; padding: 12px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font-weight: 600" @click="viewHolder"  @keydown.enter.prevent="viewHolder" @keydown.space.prevent="viewHolder"><text>{{ t.genesis.purchaseViewHolder }}</text></view>
+      <view class="active:opacity-70" role="button" tabindex="0" style="margin-top: 10px; padding: 10px; color: var(--v5-ink-3)" @click="closeSuccess"  @keydown.enter.prevent="closeSuccess" @keydown.space.prevent="closeSuccess"><text>{{ t.ui.close }}</text></view>
     </view>
   </view>
 </template>
@@ -241,7 +241,7 @@ async function handlePurchase() {
         symbol: "USDT",
         amount: -cost,
         status: "posted",
-        memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
+        memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ ${price.value}`,
         ref: billRef,
       });
       const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
@@ -326,9 +326,9 @@ async function handlePurchase() {
   }
 }
 
-const panelStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderTop: "1px solid var(--v5-border)",
+const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+  background: "var(--nx-glass-fill)",
+  borderTop: "none",
   padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
 };
 const titleStyle: CSSProperties = {
@@ -447,6 +447,8 @@ const submitStyle = computed<CSSProperties>(() => ({
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
+
+
 </script>
 
 <style scoped>

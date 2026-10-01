@@ -14,32 +14,16 @@
       <SubPageHeader back="/pages/me/me" :title="t.conversations.title" />
 
       <view class="nx-conv-center">
-        <!-- Left type rail — one mutually exclusive choice, so it is a tablist:
-             the group carries a name and exactly one tab reports aria-selected.
-             Roving tabindex keeps it a single Tab stop; arrows move between tabs. -->
-        <view class="nx-conv-rail" role="tablist" aria-orientation="vertical" :aria-label="t.conversations.typeGroupLabel">
-          <view
-            v-for="ty in TYPES"
-            :key="ty.key"
-            class="nx-conv-rail-item nx-conv-rail-tab active:opacity-80"
-            :style="railItemStyle(ty.key, ty.tint)"
-            role="tab"
-            :tabindex="selectedType === ty.key ? 0 : -1"
-            :aria-selected="selectedType === ty.key ? 'true' : 'false'"
-            :aria-label="typeLabel(ty.key)"
-            @click="selectType(ty.key)"
-            @keydown.left.prevent="moveType(-1)"
-            @keydown.right.prevent="moveType(1)"
-            @keydown.up.prevent="moveType(-1)"
-            @keydown.down.prevent="moveType(1)"
-          >
-            <view class="nx-conv-rail-ico" :style="{ color: selectedType === ty.key ? ty.tint : 'var(--v5-ink-3)' }">
-              <view v-html="ty.icon" />
-              <view v-if="typeUnread(ty.key) > 0" class="nx-conv-rail-dot" />
+        <!-- Left type rail -->
+        <GlassSegments v-model="selectedType" :options="typeOptions" layout="vertical" class="nx-conv-rail" :label="t.conversations.typeGroupLabel">
+          <template #option="{ option, selected }">
+            <view class="nx-conv-rail-ico" :style="{ color: selected ? String(option.tint) : 'var(--v5-ink-3)' }">
+              <view v-html="option.icon" />
+              <view v-if="option.count" class="nx-conv-rail-dot" />
             </view>
-            <text class="nx-conv-rail-label" :style="{ color: selectedType === ty.key ? ty.tint : 'var(--v5-ink-3)' }">{{ typeLabel(ty.key) }}</text>
-          </view>
-        </view>
+            <text class="nx-conv-rail-label">{{ option.label }}</text>
+          </template>
+        </GlassSegments>
 
         <!-- Right conversation list -->
         <view class="nx-conv-listcol">
@@ -54,14 +38,14 @@
           <template v-else>
           <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.realtimeFallback" class="nx-conv-refresh-warning" role="status" aria-live="polite">
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.realtimeFallback }}</text>
-            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations" @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations"  @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
           <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.advisorError" class="nx-conv-refresh-warning" role="alert">
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.image.advisorUnavailable }}</text>
             <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" :aria-label="t.conversations.retry"
-              @click="convStore.refreshAdvisor()" @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()">
+              @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()">
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
@@ -75,8 +59,8 @@
             tabindex="0"
             :aria-label="contactLabel"
             @click="onStartConversation()"
-            @keydown.enter.prevent="onStartConversation()"
-            @keydown.space.prevent="onStartConversation()"
+
+            @keydown.enter.prevent="onStartConversation()" @keydown.space.prevent="onStartConversation()"
           >
             <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="selectedType === 'advisor' ? ADVISOR_ICON : SUPPORT_ICON" /></view>
             <text class="nx-conv-contact-t">{{ contactLabel }}</text>
@@ -119,8 +103,8 @@
             tabindex="0"
             :aria-label="r.isAi ? t.conversations.openAiSession : r.name"
             @click="openRow(r)"
-            @keydown.enter.prevent="openRow(r)"
-            @keydown.space.prevent="openRow(r)"
+
+            @keydown.enter.prevent="openRow(r)" @keydown.space.prevent="openRow(r)"
           >
             <NovaAvatar v-if="r.isAi" :size="44" />
             <view v-else class="nx-conv-ava" :style="avaStyle(r.tint)">
@@ -140,7 +124,7 @@
           <view v-if="!r.isAi && convStore.dismissalAvailable" class="nx-conv-rowactions">
             <view role="button" tabindex="0" class="nx-conv-remove"
               :aria-label="t.conversations.removeFromList + ' · ' + r.name" :aria-disabled="convStore.dismissingIds[r.id] === true"
-              @click="removeRow(r)" @keydown.enter.prevent="removeRow(r)" @keydown.space.prevent="removeRow(r)">
+              @click="removeRow(r)"  @keydown.enter.prevent="removeRow(r)" @keydown.space.prevent="removeRow(r)">
               <text>{{ convStore.dismissingIds[r.id] ? t.conversations.removing : t.conversations.removeFromList }}</text>
             </view>
           </view>
@@ -423,6 +407,9 @@ function avaStyle(tint: string): CSSProperties {
     background: `color-mix(in srgb, ${tint} 14%, transparent)`,
   };
 }
+
+import GlassSegments from "@/components/glass-segments.vue";
+const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, label: typeLabel(type.key), icon: type.icon, tint: type.tint, count: typeUnread(type.key), className: "nx-conv-rail-item" })));
 </script>
 
 <style scoped>
@@ -437,18 +424,8 @@ function avaStyle(tint: string): CSSProperties {
   /* No top padding — the sub-page header already supplies the 24px header→content gap. */
   padding: 0;
 }
-.nx-conv-rail {
-  width: 76px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 8px 8px 10px;
-  border-right: 1px solid var(--v5-border);
-}
-.nx-conv-rail-item {
-  /* layout supplied inline (active tint bg) */
-}
+.nx-conv-rail { width: 84px; flex-shrink: 0; align-self: flex-start; margin-right: 8px; }
+.nx-conv-rail :deep(.nx-conv-rail-item) { flex-direction: column; min-height: 72px; padding: 10px 4px; }
 .nx-conv-rail-ico {
   position: relative;
   width: 30px;

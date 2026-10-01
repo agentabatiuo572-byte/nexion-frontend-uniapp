@@ -29,20 +29,20 @@
       @click="closeMenu"
       @keydown="onMenuKeydown"
     >
-      <view class="w-full rounded-t-2xl p-3" style="background: var(--v5-surface); border-top: 1px solid var(--v5-border)" @click.stop>
+      <view class="nx-glass-sheet w-full p-3" style="border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0" @click.stop>
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
         <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayName }}</text>
         <view class="space-y-1">
-          <view v-if="phoneLocalReady" class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
+          <view v-if="phoneLocalReady" class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu"  @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
             <text style="font-size: 13px; color: var(--v5-ink)">{{ t.earn.quickMenu.stats }}</text>
           </view>
-          <view v-if="degradable" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goTradeinMenu" @keydown.enter.stop.prevent="goTradeinMenu" @keydown.space.stop.prevent="goTradeinMenu">
+          <view v-if="degradable" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goTradeinMenu"  @keydown.enter.stop.prevent="goTradeinMenu" @keydown.space.stop.prevent="goTradeinMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
             <text style="font-size: 13px; color: var(--v5-ink)">{{ t.earn.quickMenu.tradein }}</text>
           </view>
         </view>
-        <view class="mt-2 w-full grid place-items-center" style="height: 40px; border-radius: 999px; background: var(--v5-surface-2)" role="button" tabindex="0" @click="closeMenu" @keydown.enter.stop.prevent="closeMenu" @keydown.space.stop.prevent="closeMenu">
+        <view class="mt-2 w-full grid place-items-center" style="height: 40px; border-radius: 999px; background: var(--v5-surface-2)" role="button" tabindex="0" @click="closeMenu"  @keydown="onMenuKeydown">
           <text style="font-size: 13px; color: var(--v5-ink-2)">{{ t.earn.quickMenu.cancel }}</text>
         </view>
       </view>
@@ -50,37 +50,32 @@
 
     <!-- Collapsed row header (always visible; tap toggles detail) -->
     <view
-      class="nx-device-card__header flex items-center justify-between active:opacity-70 transition-opacity"
-      style="padding: 14px 20px; min-height: 58px"
+      class="nx-device-card__header active:opacity-70 transition-opacity"
       role="button"
       tabindex="0"
       :aria-expanded="expanded"
       aria-haspopup="dialog"
       @click="onRowTap"
-      @keydown.enter.prevent="onRowTap"
-      @keydown.space.prevent="onRowTap"
-      @keydown.shift.f10.stop.prevent="openMenu"
+
+      @keydown.enter.prevent="onRowTap" @keydown.space.prevent="onRowTap" @keydown.shift.f10.stop.prevent="openMenu"
       @contextmenu.stop.prevent="openMenu"
     >
-      <view class="flex items-center gap-2.5 min-w-0" style="flex: 1">
-        <view class="rounded-lg grid place-items-center shrink-0" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
+      <view class="nx-device-card__main">
+        <view class="earn-device-art" aria-hidden="true">
+          <DeviceSlot :device="device" :online="false" />
         </view>
-        <view class="min-w-0" style="flex: 1">
-          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink); white-space: normal">{{ displayName }}</text>
-          <view class="flex items-center gap-1.5" style="margin-top: 3px">
-            <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
+        <view class="earn-device-meta">
+          <text class="earn-device-name">{{ displayName }}</text>
+          <view class="earn-device-status">
             <text class="nx-device-status-label" style="font-size: 12px" :style="{ color: statusColor }">{{ statusLabel }}</text>
           </view>
         </view>
       </view>
-      <view class="flex items-center gap-2.5 shrink-0">
-        <view class="text-right">
-          <!-- 《09》§3:正收益=success(warning 专属 Pending/Cooling)。本行是设备
-               今日**已实现**收益,非待结算 → success;同卡的 −$锁定日产 / 未解锁潜在
-               收益仍用 warning(语义正确,不批量改)。 -->
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 20px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.012em">{{ phoneLocalReady ? `$${device.todayEarnings.toFixed(2)}` : '—' }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
+      <view class="nx-device-card__numbers">
+        <view class="earn-device-amount">
+          <!-- Compact rows use neutral realized earnings; detailed pending/warning states retain their semantics. -->
+          <text class="earn-device-amount-label">{{ t.earn.todayEarnings }}</text>
+          <text class="earn-device-value tabular-nums">{{ phoneLocalReady ? `$${device.todayEarnings.toFixed(2)}` : '—' }}</text>
         </view>
         <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }"><path d="m6 9 6 6 6-6" /></svg>
@@ -93,15 +88,15 @@
       <view v-if="!phoneLocalReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
         <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationTitle : t.myDevices.phoneActivationAppOnlyTitle }}</text>
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationBody : t.myDevices.phoneActivationAppOnlyBody }}</text>
-        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding" @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
+        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
       </view>
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayGpu }}<text v-if="displayLocation"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ displayLocation }}</text></text>
-        <view v-if="phoneLocalReady && degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+        <view v-if="phoneLocalReady && degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
         </view>
-        <view v-else-if="phoneLocalReady && degradable && lifecycle" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+        <view v-else-if="phoneLocalReady && degradable && lifecycle" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text style="opacity: 0.9">{{ t.earn.capacityChipLabel }}</text>
           <text>{{ (lifecycle.efficiency * 100).toFixed(0) }}%</text>
           <text style="opacity: 0.65">·</text>
@@ -117,7 +112,7 @@
       </view>
 
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
-      <view v-if="phoneLocalReady && degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+      <view v-if="phoneLocalReady && degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
         <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
@@ -125,7 +120,7 @@
       <!-- FEAT-DEV01 异常1:产能触底 → 独立升级主 CTA(直达商城,权重提升;规格 ⑥ 矩阵第 6 行)。
            触底且有锁定任务清单时由下方 loss-ad 承载主 CTA(其样式随 floored 升权),此处不重复渲染 -->
       <view v-if="phoneLocalReady && capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
-        <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
+        <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
           <text :style="flooredCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
         </view>
       </view>
@@ -259,8 +254,8 @@
           role="button"
           tabindex="0"
           @click.stop="goTaskHistory"
-          @keydown.enter.stop.prevent="goTaskHistory"
-          @keydown.space.stop.prevent="goTaskHistory"
+
+          @keydown.enter.stop.prevent="goTaskHistory" @keydown.space.stop.prevent="goTaskHistory"
         >
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAllAccountReceipts }}</text>
         </view>
@@ -285,17 +280,17 @@
     <view v-if="device.kind === 'phone' && !remoteApiEnabled" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
         <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
-        <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp" @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
+        <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp"  @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
         </view>
       </view>
       <view v-if="showHelp" class="mb-2.5 rounded-lg px-3 py-2" style="background: var(--v5-surface-2)"><text style="font-size: 12px; color: var(--v5-ink-2); line-height: 1.35">{{ t.earn.phoneRequirementsHint }}</text></view>
       <view class="flex items-center gap-1.5 mb-2.5">
-        <view class="nx-device-charger-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isCharging)" role="switch" tabindex="0" :aria-checked="isCharging" :aria-label="isCharging ? t.earn.phoneCharging : t.earn.phoneOnBattery" @click="toggleCharger" @keydown.enter.stop.prevent="toggleCharger" @keydown.space.stop.prevent="toggleCharger">
+        <view class="nx-device-charger-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isCharging)" role="switch" tabindex="0" :aria-checked="isCharging" :aria-label="isCharging ? t.earn.phoneCharging : t.earn.phoneOnBattery" @click="toggleCharger"  @keydown.enter.stop.prevent="toggleCharger" @keydown.space.stop.prevent="toggleCharger">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="isCharging ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-if="isCharging" d="m11 7-3 5h4l-3 5" /><rect x="1" y="6" width="16" height="12" rx="2" /><path d="M22 11v2" /></svg>
           <text class="font-mono-tabular tabular-nums" :style="{ color: isCharging ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ device.batteryLevel ?? 0 }}%</text>
         </view>
-        <view class="nx-device-network-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isOnline)" role="switch" tabindex="0" :aria-checked="isOnline" :aria-label="isOnline ? t.earn.phoneNetOnline : t.earn.phoneNetOffline" @click="toggleNetwork" @keydown.enter.stop.prevent="toggleNetwork" @keydown.space.stop.prevent="toggleNetwork">
+        <view class="nx-device-network-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isOnline)" role="switch" tabindex="0" :aria-checked="isOnline" :aria-label="isOnline ? t.earn.phoneNetOnline : t.earn.phoneNetOffline" @click="toggleNetwork"  @keydown.enter.stop.prevent="toggleNetwork" @keydown.space.stop.prevent="toggleNetwork">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="isOnline ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-if="isOnline" d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01" /><path v-else d="M12 20h.01M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 4.17-2.65M10.66 5c4.01-.36 8.14.9 11.34 3.76M16.85 11.25a10 10 0 0 1 2.22 1.68M5 13a10 10 0 0 1 5.24-2.76M1.42 1.42l21.16 21.16" /></svg>
           <text :style="{ color: isOnline ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ isOnline ? t.earn.phoneNetOnline : t.earn.phoneNetOffline }}</text>
         </view>
@@ -321,7 +316,7 @@
           </view>
         </view>
       </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0" @click="goUnlock" @keydown.enter.stop.prevent="goUnlock" @keydown.space.stop.prevent="goUnlock">
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0" @click="goUnlock"  @keydown.enter.stop.prevent="goUnlock" @keydown.space.stop.prevent="goUnlock">
         <text :style="unlockCtaLabelStyle">{{ unlockText }}</text>
       </view>
     </view>
@@ -330,7 +325,7 @@
       <text class="block" :style="sectionLabelStyle">{{ t.earn.deviceCapabilityTitle }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.deviceCapabilityBody }}</text>
       <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0"
-        @click="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
+        @click="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
         <text :style="unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
@@ -353,7 +348,7 @@
           </view>
         </view>
       </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
         <text :style="capacityFloored ? flooredCtaLabelStyle : unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
@@ -377,13 +372,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
-import {
-  advanceMonotonicHighWater,
-  deadlineRemainingDays,
-  deadlineRemainingMs,
-  projectServerNow,
-  readMonotonicNowMs,
-} from "@/lib/server-deadline-clock";
+import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
@@ -850,8 +839,8 @@ const rowStyle = computed<CSSProperties>(() => ({
   borderTop: props.divider ? "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)" : "none",
 }));
 const chevronBtnStyle: CSSProperties = {
-  width: "30px",
-  height: "30px",
+  width: "28px",
+  height: "28px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
@@ -910,9 +899,37 @@ const unlockCtaLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
+
+import DeviceSlot from "@/components/home/device-slot.vue";
 </script>
 
 <style scoped>
+.nx-device-card__header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 88px; padding: 14px; }
+.nx-device-card__main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.earn-device-art { flex: none; width: 52px; height: 56px; overflow: hidden; }
+.earn-device-art :deep(.nx-device-slot) { width: 52px; height: 56px; }
+.earn-device-art :deep(.hf-computer) { width: 52px; height: 56px; }
+.earn-device-art :deep(.hf-computer svg) { width: 38px; height: 38px; }
+.earn-device-meta { flex: 1; min-width: 0; }
+.earn-device-name { display: block; font: 600 15px/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
+.nx-device-card__numbers { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 152px; }
+.earn-device-amount { text-align: right; min-width: 0; }
+.earn-device-amount-label { display: block; font: 400 12px/1.4 var(--font-v5); color: var(--v5-ink-3); }
+.earn-device-value { display: block; margin-top: 4px; font: 600 15px/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.nx-device-card__details { animation: earn-detail-in .2s ease-out; }
+@keyframes earn-detail-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .nx-device-card__details { animation: none; } }
+.nx-device-card__spec { flex: 1 1 160px; min-width: min(100%, 160px); line-height: 1.35; }
+.nx-device-card__hash-label { flex: 1 1 150px; min-width: min(100%, 150px); }
+.nx-device-card__cap-chip { flex: none; white-space: nowrap; }
+.nx-device-card__hash-heading { row-gap: 6px; }
+@media (max-width: 350px) {
+  .nx-device-card__header { padding: 12px; gap: 6px; }
+  .nx-device-card__main { gap: 6px; }
+  .nx-device-card__numbers { gap: 4px; max-width: 112px; }
+  .earn-device-art, .earn-device-art :deep(.nx-device-slot) { width: 44px; }
+}
 .nx-spin {
   animation: spin 1s linear infinite;
 }

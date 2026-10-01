@@ -71,11 +71,7 @@
         </view>
 
         <!-- Tabs -->
-        <view class="grid grid-cols-3" :style="tabsStyle" role="tablist">
-          <view class="nx-marketplace-tab active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" role="tab" :aria-selected="tab === 'listings'" :tabindex="tab === 'listings' ? 0 : -1" @click="selectTab('listings')" @keydown.left.prevent="cycleTab(-1)" @keydown.right.prevent="cycleTab(1)" @keydown.enter.prevent="selectTab('listings')" @keydown.space.prevent="selectTab('listings')"><text>{{ listingsTabText }}</text></view>
-          <view class="nx-marketplace-tab active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'activity')" role="tab" :aria-selected="tab === 'activity'" :tabindex="tab === 'activity' ? 0 : -1" @click="selectTab('activity')" @keydown.left.prevent="cycleTab(-1)" @keydown.right.prevent="cycleTab(1)" @keydown.enter.prevent="selectTab('activity')" @keydown.space.prevent="selectTab('activity')"><text>{{ t.marketplace.activityTab }}</text></view>
-          <view class="nx-marketplace-tab active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'mine')" role="tab" :aria-selected="tab === 'mine'" :tabindex="tab === 'mine' ? 0 : -1" @click="selectTab('mine')" @keydown.left.prevent="cycleTab(-1)" @keydown.right.prevent="cycleTab(1)" @keydown.enter.prevent="selectTab('mine')" @keydown.space.prevent="selectTab('mine')"><text>{{ mineTabText }}</text></view>
-        </view>
+        <GlassSegments v-model="tab" :options="marketTabOptions" />
 
         <!-- LISTINGS TAB -->
         <template v-if="tab === 'listings'">
@@ -94,9 +90,9 @@
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
                   <text>{{ t.marketplace.sortLabel }}</text>
                 </text>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" role="radio" :aria-checked="sortKey === 'floor'" :tabindex="sortKey === 'floor' ? 0 : -1" @click="selectSort('floor')" @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('floor')" @keydown.space.prevent="selectSort('floor')"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" role="radio" :aria-checked="sortKey === 'recent'" :tabindex="sortKey === 'recent' ? 0 : -1" @click="selectSort('recent')" @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('recent')" @keydown.space.prevent="selectSort('recent')"><text>{{ t.marketplace.sortRecent }}</text></view>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" role="radio" :aria-checked="sortKey === 'lastSale'" :tabindex="sortKey === 'lastSale' ? 0 : -1" @click="selectSort('lastSale')" @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('lastSale')" @keydown.space.prevent="selectSort('lastSale')"><text>{{ t.marketplace.sortLastSale }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" role="radio" :aria-checked="sortKey === 'floor'" :tabindex="sortKey === 'floor' ? 0 : -1" @click="selectSort('floor')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('floor')" @keydown.space.prevent="selectSort('floor')"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" role="radio" :aria-checked="sortKey === 'recent'" :tabindex="sortKey === 'recent' ? 0 : -1" @click="selectSort('recent')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('recent')" @keydown.space.prevent="selectSort('recent')"><text>{{ t.marketplace.sortRecent }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" role="radio" :aria-checked="sortKey === 'lastSale'" :tabindex="sortKey === 'lastSale' ? 0 : -1" @click="selectSort('lastSale')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('lastSale')" @keydown.space.prevent="selectSort('lastSale')"><text>{{ t.marketplace.sortLastSale }}</text></view>
               </view>
             </scroll-view>
 
@@ -127,7 +123,7 @@
           <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable' && secondaryBlock === null" kind="empty-list"
             :title="t.marketplace.marketUnavailable" :desc="t.marketplace.marketUnavailableHint"
             :cta-label="t.marketplace.retry" emphasis @cta="retryMarketplaceFacts" />
-          <view v-else-if="mergedActivity.length > 0" class="overflow-hidden" :style="listCardStyle">
+          <view v-else-if="mergedActivity.length > 0" class="nx-glass-card overflow-hidden" :style="listCardStyle">
             <ActivityRow v-for="(e, i) in mergedActivity" :key="e.id" :e="e" :is-last="i === mergedActivity.length - 1" />
           </view>
           <!-- 同上:零事件时原样渲染 listCardStyle 会留一个零高度的空 surface 盒子。 -->
@@ -194,11 +190,7 @@ import { h3ObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime"
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-observation";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
-import {
-  presentGenesisFloorDelta,
-  presentGenesisMarketplaceActivityDescription,
-  presentGenesisRoyalty,
-} from "@/lib/genesis-marketplace-presentation";
+import { presentGenesisFloorDelta, presentGenesisMarketplaceActivityDescription, presentGenesisRoyalty } from "@/lib/genesis-marketplace-presentation";
 
 const t = useT();
 const genesis = useGenesis();
@@ -573,9 +565,9 @@ function sortPillStyle(active: boolean): CSSProperties {
   };
 }
 // Activity feed — single filled surface container, no border (rows carry hairlines).
-const listCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
+const listCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
+  background: "var(--nx-glass-fill)",
 };
 // Empty state — dashed outline, no fill (whitelist empty-state idiom).
 const emptyCardStyle: CSSProperties = {
@@ -594,6 +586,18 @@ const reserveBtnStyle: CSSProperties = {
   fontWeight: 600,
   fontSize: "13px",
 };
+
+import GlassSegments from "@/components/glass-segments.vue";
+const marketTabOptions = computed(() => [
+  { value: "listings", label: listingsTabText.value },
+  { value: "activity", label: t.value.marketplace.activityTab },
+  { value: "mine", label: mineTabText.value },
+]);
+const sortOptions = computed(() => [
+  { value: "floor", label: t.value.marketplace.sortPriceAsc },
+  { value: "recent", label: t.value.marketplace.sortRecent },
+  { value: "lastSale", label: t.value.marketplace.sortLastSale },
+]);
 </script>
 
 <style scoped>

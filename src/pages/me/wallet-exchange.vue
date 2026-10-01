@@ -32,18 +32,18 @@
            it stays paired with the rate-refresh button (no de-carded hero here to
            merge into — owner 2026-07-09). -->
       <view class="flex items-center" :style="topRowStyle">
-        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks" @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
+        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks"  @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
           <text style="margin: 0 6px">{{ t.exchange.howItWorksEntry }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
-        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" role="button" tabindex="0" :aria-label="t.exchange.refreshRate" @click="onRefresh" @keydown.enter.prevent="onRefresh" @keydown.space.prevent="onRefresh">
+        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" role="button" tabindex="0" :aria-label="t.exchange.refreshRate" @click="onRefresh"  @keydown.enter.prevent="onRefresh" @keydown.space.prevent="onRefresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
         </view>
       </view>
 
       <!-- Pay card -->
-      <view :style="swapCardStyle">
+      <view class="nx-glass-card" :style="swapCardStyle">
         <text class="block" :style="cardLabelStyle">{{ t.exchange.pay }}</text>
         <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
           <input
@@ -63,7 +63,7 @@
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
-          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" role="button" tabindex="0" :aria-label="t.uiChrome.max" @click="setMax" @keydown.enter.prevent="setMax" @keydown.space.prevent="setMax">
+          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" role="button" tabindex="0" :aria-label="t.uiChrome.max" @click="setMax"  @keydown.enter.prevent="setMax" @keydown.space.prevent="setMax">
             <text style="color: var(--v5-brand)">{{ fromSym }} </text>
             <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
             <text style="color: var(--v5-brand)"> · {{ t.uiChrome.max }}</text>
@@ -73,13 +73,13 @@
 
       <!-- Flip -->
       <view class="flex justify-center" style="margin: 8px 0">
-        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" role="button" tabindex="0" :aria-label="t.exchange.flip" @click="flip" @keydown.enter.prevent="flip" @keydown.space.prevent="flip">
+        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" role="button" tabindex="0" :aria-label="t.exchange.flip" @click="flip"  @keydown.enter.prevent="flip" @keydown.space.prevent="flip">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
         </view>
       </view>
 
       <!-- Receive card -->
-      <view :style="swapCardStyle">
+      <view class="nx-glass-card" :style="swapCardStyle">
         <text class="block" :style="cardLabelStyle">{{ remoteApiEnabled ? t.exchange.netReceive : t.exchange.receive }}</text>
         <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
           <text class="flex-1 min-w-0 tabular-nums truncate" :style="receiveValueStyle">{{ toAmountLabel }}</text>
@@ -111,7 +111,7 @@
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.pendingRecoveryHint }}</text>
         <view role="button" tabindex="0" :aria-disabled="recoveringExchange ? 'true' : 'false'"
           class="grid place-items-center" style="min-height: 44px; color: var(--v5-brand)"
-          @click="recoverPendingExchange" @keydown.enter.prevent="recoverPendingExchange" @keydown.space.prevent="recoverPendingExchange">
+          @click="recoverPendingExchange"  @keydown.enter.prevent="recoverPendingExchange" @keydown.space.prevent="recoverPendingExchange">
           <text>{{ recoveringExchange ? t.exchange.recoveryChecking : t.exchange.recoverPending }}</text>
         </view>
       </view>
@@ -209,7 +209,7 @@
             </view>
           </view>
         </view>
-        <view v-if="canLoadMoreHistory" class="flex items-center justify-center active:opacity-70" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" :aria-disabled="historyLoadingMore" @click="loadMoreHistory" @keydown.enter.prevent="loadMoreHistory" @keydown.space.prevent="loadMoreHistory">
+        <view v-if="canLoadMoreHistory" class="flex items-center justify-center active:opacity-70" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" :aria-disabled="historyLoadingMore" @click="loadMoreHistory"  @keydown.enter.prevent="loadMoreHistory" @keydown.space.prevent="loadMoreHistory">
           <text>{{ historyLoadingMore ? t.exchange.loadingMore : t.exchange.loadMore }}</text>
         </view>
       </view>
@@ -232,21 +232,8 @@ import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
-import {
-  createExchangePendingMutationStore,
-  executeExchangeSwap,
-  recoverExchangeSwap,
-  ExchangeOutcomeUnknownError,
-  type ExchangeSwapIntent,
-} from "@/lib/exchange-pending-mutation";
-import {
-  acquireExchangeCancelCommand,
-  createExchangeCancelStorage,
-  exchangeOrderCanCancel,
-  finishExchangeCancelCommand,
-  isCurrentExchangeCancelScope,
-  visibleQueuedExchangeOrders,
-} from "@/lib/exchange-cancel";
+import { createExchangePendingMutationStore, executeExchangeSwap, recoverExchangeSwap, ExchangeOutcomeUnknownError, type ExchangeSwapIntent } from "@/lib/exchange-pending-mutation";
+import { acquireExchangeCancelCommand, createExchangeCancelStorage, exchangeOrderCanCancel, finishExchangeCancelCommand, isCurrentExchangeCancelScope, visibleQueuedExchangeOrders } from "@/lib/exchange-cancel";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { canShowExchangeToast } from "@/lib/exchange-scope-toast";
@@ -256,13 +243,7 @@ import { refreshWalletAfterCommittedExchange } from "@/lib/remote-commerce-refre
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
-import {
-  useExchangeV3,
-  USER_DAILY_CAP_USD,
-  PLATFORM_DAILY_CAP_USD,
-  dailyUserPctUsed,
-  dailyPlatformPctUsed,
-} from "@/store/exchange-v3";
+import { useExchangeV3, USER_DAILY_CAP_USD, PLATFORM_DAILY_CAP_USD, dailyUserPctUsed, dailyPlatformPctUsed } from "@/store/exchange-v3";
 
 const t = useT();
 // 同 staking:生产构建里 import.meta.env.DEV 恒为 false,Mock 横幅被摇掉。
@@ -1092,10 +1073,10 @@ const refreshBtnStyle: CSSProperties = {
 };
 // Recessed swap field (topup tone): surface-2 fill, no border — pay/receive read
 // as a matched field pair around the flip control, numbers stay full-ink.
-const swapCardStyle: CSSProperties = {
+const swapCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   margin: "0 16px",
-  background: "var(--v5-surface-2)",
-  borderRadius: "16px",
+  background: "var(--nx-glass-fill)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
 };
 const cardLabelStyle: CSSProperties = {
@@ -1259,4 +1240,6 @@ const historyMainStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
 const historySubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
+
+
 </script>

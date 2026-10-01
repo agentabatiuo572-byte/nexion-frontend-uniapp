@@ -9,8 +9,8 @@
       <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan-ink)">{{ t.home.networkPublished }}</text>
     </view>
 
-    <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
-      <view class="px-3.5 py-2.5 flex justify-between items-center font-mono-tabular" style="border-bottom: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
+    <view class="nx-glass-card" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); overflow: hidden">
+      <view class="nx-glass-inset px-3.5 py-2.5 flex justify-between items-center font-mono-tabular" style="border-bottom: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3)">
         <view class="inline-flex items-center gap-1.5">
           <PulseDot color="var(--v5-tech-cyan)" />
           <text>{{ cfg.config.verifiedStats && !cfg.syncFailed ? fmt(t.home.networkVerifiedScope, { at: cfg.config.verifiedStats.capturedAt.slice(0, 16).replace('T', ' ') }) : t.home.networkStatUnverifiedHint }}</text>
@@ -28,7 +28,7 @@
           :tabindex="m.tap ? 0 : undefined"
           :style="{ gridTemplateColumns: '1fr', padding: '12px', borderRight: i < metrics.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
           v-on="m.tap ? { click: m.tap } : {}"
-          @keydown.enter.stop.prevent="activate(m.tap)"
+
           @keydown.space.stop.prevent="activate(m.tap)"
         >
           <view class="min-w-0">
@@ -52,8 +52,8 @@
               tabindex="0"
               :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
               @click.stop="m.subTap()"
-              @keydown.enter.stop.prevent="activate(m.subTap)"
-              @keydown.space.stop.prevent="activate(m.subTap)"
+
+              @keydown.enter.stop.prevent="activate(m.subTap)" @keydown.space.stop.prevent="activate(m.subTap)"
             >{{ m.sub }}</text>
             <text
               v-else
@@ -316,4 +316,6 @@ const metrics = computed<Cell[]>(() => {
 
   return [members, devices, rankCell];
 });
+
+
 </script>

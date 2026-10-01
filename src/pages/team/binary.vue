@@ -37,7 +37,7 @@
         <view :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="button" tabindex="0" @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="button" tabindex="0" @click="go('/pages/team/binary-how')"  @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
               <text>{{ t.binary.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
@@ -61,7 +61,7 @@
 
         <!-- two wings -->
         <view class="grid grid-cols-2" style="gap: 10px">
-          <view v-for="wing in wings" :key="wing.key" class="rounded-2xl" :style="wingStyle(wing.isWeak)">
+          <view v-for="wing in wings" :key="wing.key" class="nx-glass-card rounded-2xl" :style="wingStyle(wing.isWeak)">
             <view class="flex items-center justify-between">
               <text class="font-display" :style="{ fontSize: '13px', fontWeight: 600, color: wing.color }">{{ wing.name }}</text>
               <text v-if="wing.isWeak" class="font-mono-tabular" :style="weakBadgeStyle">{{ t.binary.weakBadge }}</text>
@@ -83,7 +83,7 @@
 
         <view v-if="remoteApiEnabled && pageState.memberDetails === 'error'" class="rounded-xl flex items-center justify-between" :style="memberReadErrorStyle">
           <text :style="{ fontSize: '12px', color: 'var(--v5-ink-2)' }">{{ t.binary.memberDetailsUnavailable }}</text>
-          <view role="button" tabindex="0" class="active:opacity-70" :style="memberReadRetryStyle" @click="retryNetworkMembers" @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers">
+          <view role="button" tabindex="0" class="active:opacity-70" :style="memberReadRetryStyle" @click="retryNetworkMembers"  @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers">
             <text>{{ t.network.retry }}</text>
           </view>
         </view>
@@ -272,7 +272,7 @@ function go(url: string) {
 }
 
 function binaryAmountLabel(event: { amountUSDT: number; status?: string }): string {
-  const amount = `$${event.amountUSDT.toFixed(2)}`;
+  const amount = `${event.amountUSDT.toFixed(2)}`;
   if (event.status === "reversed") return `−${amount}`;
   if (event.status === "frozen" || event.status === "rejected") return amount;
   return `+${amount}`;
@@ -443,4 +443,6 @@ function recentRowStyle(isLast: boolean): CSSProperties {
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
+
+
 </script>

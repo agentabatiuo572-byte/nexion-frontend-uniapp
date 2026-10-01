@@ -15,8 +15,8 @@
     <template v-if="video || photo">
       <!-- Tilted product image layer -->
       <view :style="tiltLayerStyle">
-        <video v-if="video" :src="video" :poster="videoPoster" controls :autoplay="false" preload="metadata" playsinline style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover" @error="fallbackProductVideo" />
-        <image v-else-if="photo" :src="photo.src" mode="aspectFill" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
+        <video v-if="video" :src="video" :poster="videoPoster" controls :autoplay="false" preload="metadata" playsinline style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain" @error="fallbackProductVideo" />
+        <image v-else-if="photo" :src="photo.src" mode="aspectFit" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
       </view>
       <!-- Bottom vignette (flat) so the brand overlay reads cleanly -->
       <view aria-hidden :style="vignetteStyle" />
@@ -59,18 +59,18 @@ function fallbackProductVideo() {
 }
 
 // aspect-square hero (source render uses the aspect-square utility class)
-const rootStyle: CSSProperties = { aspectRatio: "1 / 1" };
+const rootStyle: CSSProperties = { aspectRatio: "1 / 1", borderRadius: "var(--v5-radius-2xl)" };
 const bgStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
-  background: "linear-gradient(135deg, #101216 0%, #0A0B0E 60%, #000000 100%)",
+  background: "var(--v5-surface-2)",
 };
 const tiltLayerStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
   transformOrigin: "center center",
-  animation: "v5-product-tilt 9s ease-in-out infinite alternate",
-  willChange: "transform",
+
+
 };
 const vignetteStyle: CSSProperties = {
   position: "absolute",
@@ -98,4 +98,6 @@ const tierCodeStyle: CSSProperties = {
   textTransform: "uppercase",
   lineHeight: 1,
 };
+
+
 </script>

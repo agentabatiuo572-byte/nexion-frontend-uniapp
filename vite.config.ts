@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import uniPlugin from "@dcloudio/vite-plugin-uni";
 import UnoCSS from "unocss/vite";
@@ -32,13 +33,13 @@ export default defineConfig(({ mode }) => {
     : undefined;
 
   return {
-    plugins: [nativeSvgIcons(), uni(), UnoCSS()],
+    plugins: [nativeSvgIcons(), uni(), UnoCSS(), { name: "liquid-glass-notices", generateBundle() { this.emitFile({ type: "asset", fileName: "LIQUID-GLASS-NOTICES.txt", source: readFileSync(new URL("./docs/LIQUID-GLASS-NOTICES.txt", import.meta.url), "utf8") }); } }],
     // 只被懒编译页面引用的依赖必须在这里显式预打包:uni 的按需编译让启动扫描
     // 抓不到它们,首个访客触发运行时依赖重打包 → 在途模块请求 500 + 整页 reload,
     // uni 异步页面组件等满 60s 直接弹「连接服务器超时」。入口链上的依赖
     // (vue/pinia/vue-i18n)启动即扫到,无需列出。
     optimizeDeps: {
-      include: ["qrcode-generator"], // 仅 proof.vue / share-poster-sheet.vue 引用
+      include: ["qrcode-generator", "@lollipopkit/liquid-glass", "simple-liquid-glass/webgl"], // 仅 proof.vue / share-poster-sheet.vue 引用
     },
     server: {
     // 🔴 双栈监听(2026-08-05 结构性反思第 1 步)。此前默认只绑 [::1]:

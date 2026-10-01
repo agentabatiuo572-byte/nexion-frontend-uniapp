@@ -11,7 +11,7 @@ test("native build converts tab and wallet icons while leaving large illustratio
     const tab = readFileSync(new URL("../src/components/app-chassis.vue", import.meta.url), "utf8");
     const transformed = plugin.transform(tab, "app-chassis.vue")?.code;
     assert.ok(transformed);
-    assert.match(transformed, /<NxNativeSvg width="22" height="22"/);
+    assert.match(transformed, /<NxNativeSvg[^>]*\bwidth="22" height="22"/);
     assert.match(transformed, /<path :d="tab\.icon"\s*\/>/);
     assert.equal((transformed.match(/<NxNativeSvg/g) ?? []).length, 6);
 

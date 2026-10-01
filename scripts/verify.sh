@@ -466,14 +466,21 @@ fi
 # the 2026-07-28 sweep closed) — assert id parity so the fallback stays dead code.
 if "$NODE_BIN" -e '
   const fs=require("fs");
+  const ts=require("typescript");
   const ids=[...fs.readFileSync("src/mock/products.ts","utf8").matchAll(/^\s{4}id:\s*"([^"]+)"/gm)].map(m=>m[1]);
   if(ids.length===0) throw new Error("no PRODUCTS ids parsed — sentinel is blind, fix the matcher");
   for(const loc of ["en","zh","vi"]){
     const src=fs.readFileSync(`src/i18n/messages/${loc}.ts`,"utf8");
-    const block=src.match(/catalog:\s*\{[\s\S]*?\n    \},/);
-    if(!block) throw new Error(`${loc}.ts: store.catalog block not found`);
+    const ast=ts.createSourceFile(`${loc}.ts`,src,ts.ScriptTarget.Latest,true);
+    const messages=ast.statements.filter(ts.isVariableStatement).flatMap(s=>s.declarationList.declarations)
+      .find(d=>ts.isIdentifier(d.name) && d.name.text===loc)?.initializer;
+    const field=(object,key)=>object && ts.isObjectLiteralExpression(object)
+      ? object.properties.find(p=>ts.isPropertyAssignment(p) && p.name.text===key)?.initializer : undefined;
+    const catalog=field(field(messages,"store"),"catalog");
+    if(!catalog || !ts.isObjectLiteralExpression(catalog)) throw new Error(`${loc}.ts: store.catalog block not found`);
+    const keys=new Set(catalog.properties.filter(ts.isPropertyAssignment).map(p=>p.name.text));
     for(const id of ids){
-      if(!block[0].includes(`"${id}"`)) throw new Error(`${loc}.ts: store.catalog missing SKU "${id}"`);
+      if(!keys.has(id)) throw new Error(`${loc}.ts: store.catalog missing SKU "${id}"`);
     }
   }
   console.log(`product catalog copy covers all ${ids.length} SKUs x 3 locales`);
@@ -856,7 +863,7 @@ sentinel_present "SPEC-1 R7 heartbeat freshest-wins merge" src/store/account-clo
 sentinel_present "SPEC-1 R7 settle reads device online" src/store/app.ts 'isDeviceOnline\(d, now\)'
 sentinel_present "SPEC-1 R7 App stamps heartbeat" src/store/app.ts 'onlineHeartbeatAt: now'
 sentinel_present "SPEC-1 R7 home row uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
-sentinel_present "SPEC-1 R7 home slot uses confirmed runtime display" src/components/home/device-slot.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
+sentinel_present "SPEC-1 R7 home slot uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
 sentinel_present "BUG 264 me summary uses activated device count" src/pages/me/me.vue 'activatedLabel.*n: activeCount\.value'
 sentinel_present "BUG 264 legacy me card uses activated device count" src/components/me/my-devices-entry.vue 'activatedLabel.*n: activeCount\.value'
 sentinel_present "BUG 264 wallet summary uses activated device count" src/components/me/wallet-card.vue 'walletSlotsLine.*active: activeCount\.value'
@@ -979,9 +986,9 @@ sentinel_present "device card secondary controls are keyboard-accessible" src/co
 sentinel_present "device quick menu is a modal dialog" src/components/earn/device-card-pc.vue 'aria-modal="true"'
 sentinel_present "device quick menu traps focus" src/components/earn/device-card-pc.vue 'function trapMenuFocus'
 sentinel_present "device quick menu traps native H5 keydown in capture phase" src/components/earn/device-card-pc.vue 'addEventListener\("keydown", onDocumentMenuKeydown, true\)'
-sentinel_present "home slot opens owned device id" src/components/home/device-slot.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
+sentinel_present "home slot opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
 sentinel_present "home row opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
-sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-slot.vue '@keydown\.enter\.prevent="go"'
+sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="onKeyboardActivate\(\$event, goBack\)"'
 # ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
@@ -2785,18 +2792,15 @@ home_task_carousel_contract() {
   grep -q 'event: "update:expanded"' "$newcomer" || miss="${miss}controlled-newcomer-expand "
   grep -q 'expanded: false' "$newcomer" || miss="${miss}newcomer-default-collapse "
   grep -q 'height: "var(--home-task-card-height, 184px)"' "$weekly" || miss="${miss}weekly-equal-height "
-  grep -q '/static/img/marketing/trial-hero.png' "$weekly" || miss="${miss}weekly-project-machine-asset "
-  grep -q 'PRODUCT_MASK' "$weekly" || miss="${miss}weekly-machine-mask "
-  grep -q 'radial-gradient(50% 60% at 100% 0%, var(--v5-brand-soft), transparent 70%)' "$weekly" || miss="${miss}weekly-original-background-glow "
-  grep -q 'ellipse 200px 250px at 95% 50%' "$weekly" || miss="${miss}weekly-original-machine-fade "
-  grep -q 'top: "-36px"' "$weekly" || miss="${miss}weekly-original-machine-top "
-  grep -q 'right: "-50px"' "$weekly" || miss="${miss}weekly-original-machine-right "
-  grep -q 'width: "220px"' "$weekly" || miss="${miss}weekly-original-machine-width "
-  grep -q 'height: "220px"' "$weekly" || miss="${miss}weekly-original-machine-height "
+  # 710e9ee flat-content refresh: retain the authoritative task card without a
+  # prototype-only promotion image or its fixed decorative geometry.
+  grep -q 'nx-glass-action weekly-quest block' "$weekly" || miss="${miss}weekly-current-card-surface "
+  grep -q 'class="weekly-quest__content"' "$weekly" || miss="${miss}weekly-current-content-layout "
+  grep -q ':aria-disabled="cardInactive' "$weekly" || miss="${miss}weekly-disabled-state "
+  grep -q ':tabindex="props.active && !cardInactive ? 0 : -1"' "$weekly" || miss="${miss}weekly-active-focus-state "
   grep -q 'class="weekly-quest__header"' "$weekly" || miss="${miss}weekly-redesign-header "
   grep -q 'class="weekly-quest__mark"' "$weekly" || miss="${miss}weekly-redesign-icon "
   grep -q 'class="weekly-quest__body"' "$weekly" || miss="${miss}weekly-redesign-body "
-  grep -q 'class="weekly-quest__product"' "$weekly" || miss="${miss}weekly-redesign-product-zone "
   grep -q 'weekly-quest__reward-value' "$weekly" || miss="${miss}weekly-reward-style "
   # 2026-07-23 B1:随《02》14 档迁移由 30px 升 h1 34px(主人已批映射表)。
   grep -q 'font-size: 34px' "$weekly" || miss="${miss}weekly-reward-size-drift "

@@ -12,7 +12,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- hero — rules-intro pill rides the title row (owner 2026-07-09: kill
              the empty gap above the hero). -->
-        <view :style="heroStyle">
+        <view class="nx-glass-card" :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <view class="flex items-center" style="gap: 8px">
               <view class="grid place-items-center" :style="heroIconBoxStyle">
@@ -23,7 +23,7 @@
                 <text class="block" :style="heroPtsStyle">{{ heroApy }}</text>
               </view>
             </view>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow" @keydown.enter.prevent="goHow" @keydown.space.prevent="goHow">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow"  @keydown.enter.prevent="goHow" @keydown.space.prevent="goHow">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
               <text style="margin: 0 6px">{{ w.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -54,7 +54,7 @@
         <template v-else>
         <view v-if="repurchase.historyLoading || repurchase.historyError" :style="cardStyle" role="status" aria-live="polite">
           <text>{{ repurchase.historyLoading ? w.historySyncing : w.historySyncFailed }}</text>
-          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" :style="retryCtaStyle" @click="repurchase.refreshHistory()" @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
+          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" :style="retryCtaStyle" @click="repurchase.refreshHistory()"  @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
             <text>{{ retryLabel }}</text>
           </view>
         </view>
@@ -119,15 +119,15 @@
         </template>
         <view v-if="isRemote" :style="cardStyle">
           <text class="block" :style="heroTitleStyle">{{ w.ordersTitle }}</text>
-          <view role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading" :style="retryCtaStyle" @click="refreshOrders" @keydown.enter.prevent="refreshOrders" @keydown.space.prevent="refreshOrders"><text>{{ repurchase.loading ? w.loading : w.retry }}</text></view>
+          <view role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading" :style="retryCtaStyle" @click="refreshOrders"  @keydown.enter.prevent="refreshOrders" @keydown.space.prevent="refreshOrders"><text>{{ repurchase.loading ? w.loading : w.retry }}</text></view>
           <text v-if="!repurchase.loading && !repurchase.error && !repurchase.orders.length">{{ w.ordersEmpty }}</text>
           <view v-for="order in repurchase.orders" :key="order.orderNo" style="padding: 16px 0; border-top: 1px solid var(--v5-border)">
             <text class="block" style="overflow-wrap: anywhere">{{ order.orderNo }}</text>
             <Row :label="orderStatusLabel(order.status)" :value="`${order.amountUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
             <Row :label="w.maturesAt" :value="new Date(order.unlockAt).toLocaleString(dateLocale())" />
             <Row :label="fmt(w.interestCanonical, { apy: order.apyPct, days: order.lockDays })" :value="`${order.estimatedInterestUsdt.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT`" />
-            <view v-if="order.status === 'MATURE_UNCLAIMED'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleClaim(order.orderNo)" @keydown.enter.prevent="handleClaim(order.orderNo)" @keydown.space.prevent="handleClaim(order.orderNo)"><text>{{ w.claimAction }}</text></view>
-            <view v-if="order.status === 'ACTIVE'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleEarlyWithdraw(order.orderNo)" @keydown.enter.prevent="handleEarlyWithdraw(order.orderNo)" @keydown.space.prevent="handleEarlyWithdraw(order.orderNo)"><text>{{ w.earlyAction }}</text></view>
+            <view v-if="order.status === 'MATURE_UNCLAIMED'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleClaim(order.orderNo)"  @keydown.enter.prevent="handleClaim(order.orderNo)" @keydown.space.prevent="handleClaim(order.orderNo)"><text>{{ w.claimAction }}</text></view>
+            <view v-if="order.status === 'ACTIVE'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleEarlyWithdraw(order.orderNo)"  @keydown.enter.prevent="handleEarlyWithdraw(order.orderNo)" @keydown.space.prevent="handleEarlyWithdraw(order.orderNo)"><text>{{ w.earlyAction }}</text></view>
           </view>
         </view>
       </view>
@@ -497,10 +497,10 @@ const howLinkStyle: CSSProperties = {
 // Spotlight hero kept (single per screen) but neutralised: the accent floor-adjacent
 // glow is dropped;描边已整条删除(《03》§3 零 border,C2 第二轮)。The colourful
 // benefit tiles inside carry the visual interest.
-const heroStyle: CSSProperties = {
-  borderRadius: "16px",
+const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+  borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--nx-glass-fill)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "20px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };
@@ -560,4 +560,6 @@ const insufficientNoticeStyle: CSSProperties = { padding: "12px", borderRadius: 
 const insufficientTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-warning)" };
 const insufficientBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-2)" };
 const topupCtaStyle: CSSProperties = { marginTop: "10px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
+
+
 </script>
