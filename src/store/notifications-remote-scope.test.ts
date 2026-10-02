@@ -31,7 +31,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   storage.readAccountRow.mockClear();
   storage.writeAccountRow.mockClear();
-  remote.notificationApi.page.mockClear();
+  remote.notificationApi.page.mockReset().mockResolvedValue({ items: [], unread: 0, nextCursor: null });
   remote.notificationApi.markRead.mockReset();
   remote.notificationApi.markAllRead.mockReset();
   remote.notificationApi.clearRead.mockReset();
@@ -198,6 +198,7 @@ describe("notifications remote authority", () => {
         nextCursor: null,
       })
       .mockImplementationOnce(() => new Promise((resolve) => { resolveMarkAllRefresh = resolve; }))
+      .mockResolvedValueOnce({ items: [{ id: 61, kind: "system", priority: "normal", title: "Read", body: "", ctaLabel: "", ctaHref: "", createdAt: 1, readAt: 2 }], unread: 0, nextCursor: null })
       .mockImplementationOnce(() => new Promise((resolve) => { resolveClearRefresh = resolve; }));
     remote.notificationApi.markAllRead.mockResolvedValue(undefined);
     remote.notificationApi.clearRead.mockResolvedValue(undefined);
@@ -335,5 +336,113 @@ describe("notifications remote authority", () => {
     expect(remote.notificationApi.markRead).toHaveBeenCalledWith(91);
     expect(store.items[0]?.readAt).toBe(2);
     expect(store.unread).toBe(0);
+  });
+});
+
+describe("global notification totals and head refresh", () => {
+  const row = (id: number, readAt: number | null = null) => ({ id, kind: "wallet", priority: "normal" as const,
+    title: String(id), body: "", ctaLabel: "", ctaHref: "", createdAt: id, readAt });
+
+  it("decrements a paginated global total once across duplicate reads and CTA", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1), row(2)], unread: 11, nextCursor: "older" });
+    remote.notificationApi.recordAction.mockResolvedValue({ route: "/pages/me/wallet" });
+    const store = useNotifications();
+    await store.refreshRemote();
+    expect(store.items[0].rawKind).toBe("wallet");
+    await Promise.all([store.markRead("1"), store.markRead("1")]);
+    expect(store.unread).toBe(10);
+    expect(remote.notificationApi.markRead).toHaveBeenCalledTimes(1);
+    await store.recordCta("1");
+    expect(store.unread).toBe(10);
+    await store.recordCta("2");
+    expect(store.unread).toBe(9);
+  });
+
+  it("retains loaded historical rows and the older cursor on a head refresh", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(4), row(3)], unread: 9, nextCursor: "3" })
+      .mockResolvedValueOnce({ items: [row(2), row(1)], unread: 9, nextCursor: "1" })
+      .mockResolvedValueOnce({ items: [row(5), row(4)], unread: 10, nextCursor: "4" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote(); await store.refreshRemote();
+    expect(store.items.map(item => item.id)).toEqual(["5", "4", "3", "2", "1"]);
+    expect(store.nextCursor).toBe("1");
+    expect(store.unread).toBe(10);
+  });
+
+  it("keeps an exhausted historical cursor exhausted when a new head arrives", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(2)], unread: 2, nextCursor: "2" })
+      .mockResolvedValueOnce({ items: [row(1)], unread: 2, nextCursor: null })
+      .mockResolvedValueOnce({ items: [row(3), row(2)], unread: 3, nextCursor: "2" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote(); await store.refreshRemote();
+    expect(store.items.map(item => item.id)).toEqual(["3", "2", "1"]);
+    expect(store.nextCursor).toBeNull();
+  });
+
+  it("reconciles mark-all outside the write queue and counts newly arriving unread", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(1)], unread: 11, nextCursor: "1" })
+      .mockResolvedValueOnce({ items: [row(2), row(1, 2)], unread: 1, nextCursor: null });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.markAllRead();
+    expect(store.unread).toBe(1);
+    expect(store.items[0].readAt).toBeNull();
+  });
+
+  it("fills an offline arrival gap without losing or misordering loaded history", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(4), row(3)], unread: 4, nextCursor: "3" })
+      .mockResolvedValueOnce({ items: [row(2), row(1)], unread: 4, nextCursor: null })
+      .mockResolvedValueOnce({ items: [row(8), row(7)], unread: 8, nextCursor: "7" })
+      .mockResolvedValueOnce({ items: [row(6), row(5)], unread: 8, nextCursor: "5" })
+      .mockResolvedValueOnce({ items: [row(4), row(3)], unread: 8, nextCursor: "3" })
+      .mockResolvedValueOnce({ items: [row(2), row(1)], unread: 8, nextCursor: null });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote(); await store.refreshRemote();
+    expect(store.nextCursor).toBe("7");
+    await store.loadMoreRemote(); await store.loadMoreRemote(); await store.loadMoreRemote();
+    expect(store.items.map(item => item.id)).toEqual(["8", "7", "6", "5", "4", "3", "2", "1"]);
+    expect(store.nextCursor).toBeNull();
+  });
+
+  it.each(["markAllRead", "clearRead"] as const)("does not start a late %s reconciliation after leaving the foreground", async action => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 1, nextCursor: null });
+    let resolve!: () => void;
+    remote.notificationApi[action].mockReturnValueOnce(new Promise<void>(done => { resolve = done; }));
+    const store = useNotifications();
+    await store.refreshRemote();
+    const pending = store[action]();
+    await Promise.resolve();
+    store.cancelRefresh();
+    resolve(); await pending;
+    expect(remote.notificationApi.page).toHaveBeenCalledTimes(1);
+    expect(store.loading).toBe(false);
+  });
+
+  it("keeps unread and server-retained read rows after clear-read", async () => {
+    const locked = { ...row(2, 1), priority: "critical" as const };
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(3, 1), locked, row(1)], unread: 11, nextCursor: "1" })
+      .mockResolvedValueOnce({ items: [locked, row(1)], unread: 11, nextCursor: "1" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.clearRead();
+    expect(store.unread).toBe(11);
+    expect(store.items.map(item => item.id)).toEqual(["2", "1"]);
+  });
+
+  it("rejects a foreground read after cancellation and does not reload on logout", async () => {
+    let resolve!: (value: CanonicalNotificationPage) => void;
+    remote.notificationApi.page.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const store = useNotifications();
+    const pending = store.refreshRemote();
+    store.cancelRefresh();
+    resolve({ items: [row(1)], unread: 1, nextCursor: null });
+    await pending;
+    expect(store.items).toEqual([]);
+    expect(store.loading).toBe(false);
+    store.bindAccount("default");
+    expect(remote.notificationApi.page).toHaveBeenCalledTimes(1);
   });
 });

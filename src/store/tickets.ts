@@ -123,7 +123,14 @@ export const useTickets = defineStore("tickets", () => {
   }
 
   /** A delayed page is allowed to fill gaps, never to erase or regress a newer local snapshot. */
-  function mergeTickets(items: Ticket[]) { for (const ticket of items) replace(ticket); }
+  function mergeTickets(items: Ticket[]) {
+    for (const ticket of items) {
+      const prior = tickets.value.find(row => row.id === ticket.id);
+      // List headers must not erase a detail window opened before the background refresh.
+      replace(prior ? { ...ticket, messages: prior.messages,
+        historyTruncated: prior.historyTruncated, historyNextCursor: prior.historyNextCursor } : ticket);
+    }
+  }
 
   /** Older pages only extend the visible timeline; a stale response cannot regress its header. */
   function prependHistory(current: Ticket, older: Ticket): Ticket {
@@ -134,28 +141,31 @@ export const useTickets = defineStore("tickets", () => {
       historyNextCursor: older.historyNextCursor ?? null };
   }
 
-  async function refresh(): Promise<void> {
+  async function refresh(active: () => boolean = () => true): Promise<void> {
+    if (!active()) return;
     const epoch = accountEpoch;
+    const requestGeneration = ++listRequestGeneration;
+    const current = () => epoch === accountEpoch && requestGeneration === listRequestGeneration && active();
     loading.value = true;
     error.value = null;
     try {
       await preparePendingRun();
       const scope = snapshotScope();
-      if (scope.epoch !== epoch) return;
-      const requestGeneration = ++listRequestGeneration;
-      await reconcilePending();
-      if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration) return;
+      if (!current()) return;
+      await reconcilePending(current);
+      if (!snapshotIsCurrent(scope) || !current()) return;
       const items = (await supportApi.tickets()).items;
-      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration) mergeTickets(items);
+      if (snapshotIsCurrent(scope) && current()) mergeTickets(items);
     } catch (cause) {
-      if (epoch === accountEpoch) {
+      if (current()) {
         error.value = cause instanceof Error ? cause.message : "SUPPORT_TICKETS_LOAD_FAILED";
       }
       throw cause;
     } finally {
-      if (epoch === accountEpoch) loading.value = false;
+      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
     }
   }
+  function cancelRefresh() { listRequestGeneration += 1; loading.value = false; }
 
   async function load(id: string): Promise<Ticket> {
     const epoch = accountEpoch;
@@ -292,14 +302,14 @@ export const useTickets = defineStore("tickets", () => {
     }
   }
 
-  async function reconcilePending(): Promise<void> {
+  async function reconcilePending(active: () => boolean = () => true): Promise<void> {
     const scope: CommandScope = { accountKey: accountKeyValue, epoch: accountEpoch, runId: pendingRunId, pending: pendingKeys, inFlight };
     for (const [fingerprint, key] of [...scope.pending]) {
-      if (!scopeIsCurrent(scope)) return;
+      if (!scopeIsCurrent(scope) || !active()) return;
       if (scope.inFlight.has(fingerprint)) continue;
       try {
         const result = await supportApi.commandResult(key);
-        if (!scopeIsCurrent(scope)) return;
+        if (!scopeIsCurrent(scope) || !active()) return;
         if (scope.inFlight.has(fingerprint)) continue;
         if (result?.kind !== "ticket") continue;
         replace(result.ticket);
@@ -309,7 +319,7 @@ export const useTickets = defineStore("tickets", () => {
   }
 
   function clearAccount() {
-    accountEpoch += 1; tickets.value = []; error.value = null;
+    accountEpoch += 1; tickets.value = []; error.value = null; loading.value = false;
     listRequestGeneration += 1; ticketRequestGeneration.clear();
     inFlight = new Map(); mutating.value = false;
   }
@@ -321,9 +331,9 @@ export const useTickets = defineStore("tickets", () => {
     // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
     // "unverified",首次 refresh()/load() 重走 preparePendingRun 并按各自路径报错;
     // preparePendingRun 本身保持 reject 契约(refresh/load/reconcile 靠它报错)。
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
+    if (remoteApiEnabled) void preparePendingRun().then(() => reconcilePending()).catch(() => undefined);
   }
   function reset() { clearAccount(); pendingKeys = new Map(); }
 
-  return { tickets, loading, mutating, error, refresh, load, loadEarlier, markRead, createTicket, reply, close, reset, bindAccount };
+  return { tickets, loading, mutating, error, refresh, cancelRefresh, load, loadEarlier, markRead, createTicket, reply, close, reset, bindAccount };
 });

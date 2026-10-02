@@ -15,9 +15,9 @@ test("tab navigation uses the transient-overlay-safe route gate", () => {
 });
 
 test("an empty first-user notification surface stays honest and does not invent business navigation", () => {
-  const drawer = read("src/components/message-drawer.vue");
-  assert.match(drawer, /notifs\.items\.length === 0[\s\S]*t\.value\.notifs\.emptyAllTitle/);
-  assert.doesNotMatch(drawer, /wallet-repurchase-how|goRepurchaseHow/);
+  const center = read("src/pages/me/notifications.vue");
+  assert.match(center, /notifs\.items\.length === 0[\s\S]*t\.value\.notifs\.emptyAllTitle/);
+  assert.doesNotMatch(center, /wallet-repurchase-how|goRepurchaseHow/);
 });
 
 test("team detail pages keep both How entries as direct keyboard-accessible targets", () => {

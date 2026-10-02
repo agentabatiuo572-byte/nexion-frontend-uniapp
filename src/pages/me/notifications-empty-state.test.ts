@@ -1,8 +1,9 @@
+import { notificationCategory } from "@/lib/notification-category";
+import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
 import ts from "typescript";
 import * as vue from "vue";
 import { describe, expect, it, vi } from "vitest";
 import source from "./notifications.vue?raw";
-import drawerSource from "@/components/message-drawer.vue?raw";
 import { zh } from "@/i18n/messages/zh";
 import { fmt } from "@/i18n/format";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
@@ -19,12 +20,17 @@ function mountPage() {
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
   const output = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const modules: Record<string, unknown> = {
-    vue: { ...vue, onMounted: vi.fn(), onUnmounted: vi.fn(), watch: vi.fn() },
-    "@dcloudio/uni-app": { onShow: vi.fn(), onHide: vi.fn() },
+    vue: { ...vue, inject: (_key: unknown, fallback: unknown) => fallback, onMounted: vi.fn(), onUnmounted: vi.fn(), watch: vi.fn() },
+    "@dcloudio/uni-app": { onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn() },
     "@/lib/remote-account-epoch": { remoteAccountScope: createRemoteAccountEpoch("fixture") },
+    "@/lib/notification-category": { notificationCategory },
+    "@/lib/message-header-scroll": { advanceMessageHeader, createMessageHeaderState },
+    "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
+    "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol() },
     "@/i18n/use-t": { useT: () => vue.ref(zh) },
     "@/i18n/format": { fmt },
     "@/store/notifications": { useNotifications: () => notifs },
+    "@/store/message-drawer": { useMessageDrawer: () => vue.reactive({ section: "notifications", totalUnread: 1, serviceUnread: 0, refresh: () => notifs.refreshRemote() }) },
     "@/lib/route": { navTo: vi.fn() },
     "@/api/runtime": { remoteApiEnabled: true },
     "@/lib/notification-swipe": { isLeftConversionSwipe: vi.fn() },
@@ -46,7 +52,20 @@ function evaluateBinding(expression: string, values: Record<string, unknown>) {
 }
 
 describe("notification empty-state context", () => {
-  for (const [name, template] of [["page", source], ["drawer", drawerSource]]) {
+  for (const [name, template] of [["page", source]]) {
+    it(`${name} never reports all read while the unread snapshot is unavailable`, () => {
+      const expression = template.match(/const unreadLabel = computed\(\(\) => (.+)\);/)![1];
+      const center = { totalUnread: 0, error: "offline" as string | null, loading: false };
+      const label = () => evaluateBinding(expression, { center, t: { value: zh }, fmt });
+      expect(label()).toBe(zh.notifs.unreadUnavailable);
+      center.error = null;
+      center.loading = true;
+      expect(label()).toBe(zh.help.loadingMore);
+      center.loading = false;
+      expect(label()).toBe(zh.notifs.allCaughtUp);
+    });
+  }
+  for (const [name, template] of [["page", source]]) {
     it(`${name} waits for the remaining cursor before declaring the selected category empty`, () => {
       const { page, notifs } = mountPage();
       page.filter.value = "team";
@@ -54,9 +73,7 @@ describe("notification empty-state context", () => {
       // with a first page of other kinds while the selected filter remains.
       notifs.items = [{ id: "first-page-system", kind: "system", readAt: null }];
       notifs.nextCursor = "older-page";
-      const condition = name === "page"
-        ? template.match(/<EmptyState[^>]*v-if="([^\"]+)"/)![1]
-        : template.match(/<view v-if="(!notifs.loading[^\"]+)" class="md-empty">/)![1];
+      const condition = template.match(/<EmptyState[^>]*v-if="([^\"]+)"/)![1];
       expect(evaluateBinding(condition, vue.proxyRefs(page))).toBe(false);
       const partial = template.match(/v-if="([^\"]+)"[^>]*role="status"/)![1];
       expect(Boolean(evaluateBinding(partial, vue.proxyRefs(page)))).toBe(true);

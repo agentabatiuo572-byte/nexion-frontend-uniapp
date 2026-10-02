@@ -28,7 +28,7 @@
         <view class="nx-icon-btn" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </view>
-	        <view class="nx-icon-btn nx-bell" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+	        <view class="nx-icon-btn nx-bell" role="button" tabindex="0" :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
@@ -50,7 +50,7 @@
         <text class="nx-nav-title">{{ navHeader.title }}</text>
         <text v-if="navHeader.subtitle" class="nx-nav-sub">{{ navHeader.subtitle }}</text>
       </view>
-	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
         <view class="nx-nav-glass">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-nav-belldot" />
@@ -108,6 +108,8 @@
       </view>
     </view>
 
+    <slot name="pageFixed" :top="contentTop + pendingBarInset" />
+
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
       <GlassSegments v-if="isTabRoute" class="nx-tabbar-pill" variant="navigation" :options="navigationOptions" :model-value="activeTab" :from-value="navigationFrom" @select="selectNavigation">
@@ -135,7 +137,6 @@
       <TradeinSheets />
       <LuckySpinSheet />
       <StickyCtaBar />
-      <MessageDrawer />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
            自隐藏:无在途会话 / 已过期 / 结算页正在展示它。位置见 pendingBarTop / pendingBarInset。 -->
       <PendingCheckoutBar :top="pendingBarTop" />
@@ -158,7 +159,6 @@ import StickyCtaBar from "@/components/sticky-cta-bar.vue";
 import PendingCheckoutBar from "@/components/pending-checkout-bar.vue";
 import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
-import MessageDrawer from "@/components/message-drawer.vue";
 import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
 import VoucherBanner from "@/components/voucher-banner.vue";
 import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
@@ -589,7 +589,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   action();
 }
 
-const unread = computed(() => notifications.unread);
+const unread = computed(() => messageDrawer.totalUnread);
 const unreadLabel = computed(() => (unread.value > 99 ? "99+" : String(unread.value)));
 
 // ── layout insets ──
@@ -666,8 +666,7 @@ function go(tab: { key: string; route: string }) {
 function goSearch() {
   navTo("/pages/search/search");
 }
-// Bell → in-place slide-in MessageDrawer (now ported, P-043), matching the
-// prototype. (Was routing to the full /pages/me/notifications page as a stopgap.)
+// Every bell opens the full-page center; back restores its origin page.
 function goNotifications() {
   messageDrawer.show();
 }

@@ -797,32 +797,36 @@ async function testSearchAndNova() {
 async function testMessageFunctions() {
   let frame = await returnHome();
   await frame.getByRole("button", { name: /消息|通知/ }).first().click();
-  await frame.locator(".md-root").waitFor({ state: "visible" });
-  const tabs = frame.locator(".md-tab");
-  assert(await tabs.count() >= 1, "MESSAGE_DRAWER_FILTERS_MISSING");
+  await waitUntil(() => Promise.resolve(currentAppUrl().includes("#/pages/me/notifications")), "MESSAGE_CENTER_ROUTE_FAILED");
+  frame = await waitForAppFrame(".message-page");
+  assert(await frame.locator(".md-root, .md-backdrop").count() === 0, "MESSAGE_DRAWER_MUST_NOT_RENDER");
+  await frame.locator(".message-primary [data-glass-value='notifications']").click();
+  const tabs = frame.locator(".message-filters [role='radio']");
+  assert(await tabs.count() === 6, "MESSAGE_CENTER_FILTERS_MISSING");
   for (let index = 0; index < Math.min(await tabs.count(), 4); index += 1) await tabs.nth(index).click();
   await tabs.first().click();
-  const markAll = frame.locator(".md-markall");
+  const markAll = frame.getByRole("button", { name: /通知全部已读|Mark notifications read|Đọc hết thông báo/ });
   if (await markAll.isVisible().catch(() => false)) {
     await markAll.click();
     await markAll.waitFor({ state: "detached" }).catch(() => undefined);
   }
-  const rows = frame.locator(".md-row");
+  const rows = frame.locator(".notification-row");
   if (await rows.count() > 0) {
     await rows.first().click();
     assert(await rows.first().getAttribute("aria-expanded") === "true", "MESSAGE_ROW_NOT_EXPANDED");
   }
-  await appPage.screenshot({ path: path.join(evidenceDir, "08-message-drawer.png"), fullPage: true });
-  await frame.locator(".md-close").click();
-  clickResults.push({ label: "顶部消息抽屉：筛选/展开/全部已读/关闭", expectedRoute: "same-page", actualUrl: currentAppUrl(), result: "PASS", landingProof: ".md-root + 筛选 tab + 展开状态" });
+  await appPage.screenshot({ path: path.join(evidenceDir, "08-message-fullscreen.png"), fullPage: true });
+  await frame.locator(".message-nav [role='button']").first().click();
+  await waitUntil(() => Promise.resolve(currentAppUrl().includes("#/pages/index/index")), "MESSAGE_CENTER_BACK_FAILED");
+  clickResults.push({ label: "顶部全屏消息：筛选/展开/全部已读/返回首页", expectedRoute: "/pages/index/index", actualUrl: currentAppUrl(), result: "PASS", landingProof: ".message-page + 分类筛选 + 展开状态 + 返回来源页" });
 
   await relaunch("/pages/support/messages");
   frame = await waitForAppFrame(".nx-conv-center");
   const rail = frame.locator(".nx-conv-rail-item");
-  assert(await rail.count() === 3, "MESSAGE_CENTER_CATEGORY_COUNT_INVALID");
-  for (let index = 0; index < 3; index += 1) await rail.nth(index).click();
+  assert(await rail.count() === 2, "MESSAGE_CENTER_CATEGORY_COUNT_INVALID");
+  for (let index = 0; index < 2; index += 1) await rail.nth(index).click();
   await appPage.screenshot({ path: path.join(evidenceDir, "09-message-center-5173.png"), fullPage: true });
-  clickResults.push({ label: "消息中心：顾问/客服/Nova 三分类", expectedRoute: "/pages/support/messages", actualUrl: currentAppUrl(), result: "PASS", landingProof: ".nx-conv-center + 3 个分类" });
+  clickResults.push({ label: "人工服务：顾问/客服两分类", expectedRoute: "/pages/support/messages", actualUrl: currentAppUrl(), result: "PASS", landingProof: ".nx-conv-center + 2 个人工分类" });
 }
 
 function controlledResponseContract(entry) {

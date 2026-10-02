@@ -35,7 +35,7 @@
       class="spv-side spv-bell relative"
       role="button"
       tabindex="0"
-      :aria-label="t.me.notifications"
+      :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unread : t.notifs.drawerTitle"
       @click="goBell"
 
       @keydown.enter.prevent="onKeyboardActivate($event, goBell)" @keydown.space.prevent="onKeyboardActivate($event, goBell)"
@@ -52,7 +52,6 @@
 import { computed, inject, ref, onMounted, onUnmounted } from "vue";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { useMessageDrawer } from "@/store/message-drawer";
-import { useNotifications } from "@/store/notifications";
 import { useT } from "@/i18n/use-t";
 import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
@@ -64,9 +63,8 @@ const props = defineProps<{ back: string; title?: string; subtitle?: string; bac
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
 
 const drawer = useMessageDrawer();
-const notifications = useNotifications();
 const t = useT();
-const unread = computed(() => notifications.unread);
+const unread = computed(() => drawer.totalUnread);
 const rowH = computed(() => (props.subtitle ? 56 : 44));
 
 // Current uni route — last entry in getCurrentPages() (same readRoute() pattern

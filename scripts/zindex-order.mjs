@@ -104,13 +104,12 @@ export const BUSINESS_BAND_FLOOR = 111; // 仅供文档/红测引用;判据已�
 export const SCRIM_EXEMPT = [];
 
 /**
- * 回退锚 —— 这两处仍存活的组件曾从 110/120/200 迁进业务带,必须一直**被扫描面看得见**。
+ * 回退锚 —— 仍存活的设备卡菜单必须一直**被扫描面看得见**；消息中心已改为普通全屏页面。
  * 与 SCRIM_EXEMPT 极性相反:那张是「别管这些」,这张是「这些必须在管辖内」。
  * why:光靠数值判据挡不住「把 position 改回 absolute」——形态一变判据就看不见它,
  * 于是 z 掉回 110 也全绿(这正是本轮之前的真实状态)。锚按文件断言,改名/删除同样红。
  */
 export const BAND_ANCHOR = [
-  "src/components/message-drawer.vue",
   "src/components/earn/device-card-pc.vue",
 ];
 
@@ -414,11 +413,11 @@ function selftest() {
       evaluate(files).problems.join(" / "));
   }
   {
-    // 🔴 轴「形态回退」:把抽屉改回 position:absolute —— 数值判据看不见它了,
+    // 🔴 轴「形态回退」:把设备菜单改回 position:absolute —— 数值判据看不见它了,
     //    此时 z 掉回 110 也不会红。锚必须抓住「扫描面少了成员」这件事本身。
-    const files = patch("src/components/message-drawer.vue",
-      (t) => t.replace(/(\.md-root\s*\{[^}]*?)position:\s*fixed/s, "$1position: absolute"));
-    p("红测③-锚 抽屉改回 position:absolute 必红(形态一变判据就失明)",
+    const files = patch("src/components/earn/device-card-pc.vue",
+      (t) => t.replace("position: fixed; inset: 0", "position: absolute; inset: 0"));
+    p("红测③-锚 设备菜单改回 position:absolute 必红(形态一变判据就失明)",
       evaluate(files).problems.some((x) => x.startsWith("扫描面丢了成员")),
       evaluate(files).problems.join(" / "));
   }
@@ -429,9 +428,8 @@ function selftest() {
       evaluate(files).problems.some((x) => x.startsWith("扫描面丢了成员")));
   }
   {
-    // 两处仍存活锚的数值:任一处掉回庆祝之下必红(锚管形态,这条管数值)。
+    // 存活锚的数值掉回庆祝之下必红(锚管形态,这条管数值)。
     for (const [rel, from, to] of [
-      ["src/components/message-drawer.vue", /(\.md-root\s*\{[^}]*?z-index:\s*)\d+/s, "$1110"],
       ["src/components/earn/device-card-pc.vue", /(position: fixed; inset: 0; z-index: )\d+/, "$1200"],
     ]) {
       const files = patch(rel, (t) => t.replace(from, to));

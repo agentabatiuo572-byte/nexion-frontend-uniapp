@@ -36,7 +36,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { welcomeMessage } from "@/mock/nova-templates";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
-import { navTo } from "@/lib/route";
+import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import NovaAvatar from "./nova-avatar.vue";
@@ -51,27 +51,26 @@ defineProps<{ dimmed?: boolean }>();
 const t = useT();
 const nova = useNova();
 const conversations = useConversations();
+const messageCenter = useMessageDrawer();
 const notifications = useNotifications();
 // 创世闸(P1-2):推送前判紧迫感是否被允许;声明见 stakingEventMessage 内注释。
 const genesisCfg = useGenesisConfig();
 const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
 
-// Nova is held in its own store, while advisor/support conversations come
-// from the server-backed conversation store. Sum those three categories once
-// so a waiting human reply cannot be hidden and an AI row cannot be counted
-// twice if it also appears in the unified center.
+// The floating shortcut retains only unread human advisor/support replies.
+// Notification and ticket counts belong to the unified message center.
 const humanUnread = computed(() =>
   [...conversations.byType("advisor"), ...conversations.byType("support")]
     .reduce((sum, row) => sum + row.unread, 0),
 );
-const totalUnread = computed(() => (NOVA_SUPPORT_VISIBLE ? nova.unread : 0) + humanUnread.value);
+const totalUnread = computed(() => humanUnread.value);
 const visible = computed(() => !NOVA_SUPPORT_VISIBLE || remoteApiEnabled || totalUnread.value > 0);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
 
-// 5173 and 5174 both use the conversation center as the floating entry.
+// Human support uses the same full-page center as the bell, opening Service.
 function open() {
-  navTo("/pages/support/messages");
+  messageCenter.show("service");
 }
 
 // ── focused trigger port (nova-triggers welcome + nova-triggers-v3 channels)

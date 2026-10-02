@@ -1,10 +1,9 @@
 import { expect, test } from "vitest";
 import security from "../pages/me/security.vue?raw";
 import market from "./earn/market-board.vue?raw";
-import drawer from "./message-drawer.vue?raw";
 import notifications from "../pages/me/notifications.vue?raw";
 const sources: Record<string, string> = { "../pages/me/security.vue": security, "./earn/market-board.vue": market,
-  "./message-drawer.vue": drawer, "../pages/me/notifications.vue": notifications };
+  "../pages/me/notifications.vue": notifications };
 const source = (path: string) => sources[path];
 
 test("single-session action names that session, never the all-session action", () => {
@@ -16,7 +15,7 @@ test("earnings rank is visible, absent best-for is not a placeholder row", () =>
   expect(view).toContain("#{{ d.rank }}");
   expect(view).not.toContain('d.bestFor ?? "—"');
 });
-test("drawer exposes remaining pages and server notifications respect no-navigation", () => {
-  expect(source("./message-drawer.vue")).toContain('notifs.loadMoreRemote()');
+test("full-page center exposes remaining pages and server notifications respect no-navigation", () => {
+  expect(source("../pages/me/notifications.vue")).toContain('notifs.loadMoreRemote()');
   expect(source("../pages/me/notifications.vue")).not.toContain("const href = KIND_META[n.kind].href;");
 });

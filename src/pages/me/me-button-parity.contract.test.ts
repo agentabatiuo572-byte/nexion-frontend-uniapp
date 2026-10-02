@@ -1,10 +1,16 @@
 import segments from "@/components/glass-segments.vue?raw";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { existsSync, readFileSync } from "node:fs";
+// @ts-expect-error This contract runs in Node.
+import { env } from "node:process";
+// @ts-expect-error This contract runs in Node.
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const formalRoot = new URL("../../", import.meta.url);
-const prototypeRoot = new URL("../../../../NX1.0-Prototype/src/", import.meta.url);
+const prototypeRoot = env.NEXGRID_PROTOTYPE_ROOT
+  ? pathToFileURL(`${env.NEXGRID_PROTOTYPE_ROOT}/src/`)
+  : new URL("../../../../NX1.0-Prototype/src/", import.meta.url);
 const formalMe = readFileSync(new URL("pages/me/me.vue", formalRoot), "utf8").replace(/\r\n/g, "\n");
 const prototypeMe = readFileSync(new URL("pages/me/me.vue", prototypeRoot), "utf8").replace(/\r\n/g, "\n");
 const pages = JSON.parse(readFileSync(new URL("pages.json", formalRoot), "utf8")) as { pages: Array<{ path: string }> };
@@ -40,7 +46,7 @@ describe("Me button click-through parity", () => {
   it("keeps every 5174 quick button key and target route", () => {
     const formalRoutes = quickRoutes(formalMe);
     expect(formalRoutes).toEqual(quickRoutes(prototypeMe).map(([key, href]) =>
-      [key, key === "orders" ? `${href}?from=me` : href],
+      [key, key === "orders" ? `${href}?from=me` : key === "messages" ? "/me/notifications" : href],
     ));
     expect(formalRoutes).toHaveLength(26);
 
