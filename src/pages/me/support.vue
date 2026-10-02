@@ -57,10 +57,12 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
+import { useMessageDrawer } from "@/store/message-drawer";
 import { openExternalSupportChannel, type ExternalSupportChannel } from "@/lib/external-support-channel";
 import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
+const messageCenter = useMessageDrawer();
 const w = computed(() => t.value.support);
 
 interface Channel {
@@ -80,7 +82,7 @@ const TICKET_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
 const MAIL_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>`;
 
 const internalChannels = computed<Channel[]>(() => [
-  { id: "lc", label: w.value.chLiveChat, hint: w.value.chLiveChatHint, icon: CHAT_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", href: "/pages/support/messages" },
+  { id: "lc", label: w.value.chLiveChat, hint: w.value.chLiveChatHint, icon: CHAT_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" },
   { id: "tk", label: w.value.chTicket, hint: w.value.chTicketHint, icon: TICKET_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", href: "/pages/me/support-tickets?mode=create" },
 ]);
 const externalChannels = computed<Channel[]>(() => [
@@ -95,6 +97,10 @@ const channels = computed<Channel[]>(() => {
 const pinned = computed(() => [w.value.pinnedItem1, w.value.pinnedItem2, w.value.pinnedItem3, w.value.pinnedItem4]);
 
 function onChannel(c: Channel) {
+  if (c.id === "lc") {
+    messageCenter.show("service");
+    return;
+  }
   if (c.href) {
     navTo(c.href);
     return;

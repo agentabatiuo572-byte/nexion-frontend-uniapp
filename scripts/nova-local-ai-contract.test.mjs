@@ -65,7 +65,7 @@ test("floating human support stays available while Nova remains hidden", () => {
   assert.match(bubble, /const visible = computed\(\(\) => !NOVA_SUPPORT_VISIBLE \|\| remoteApiEnabled \|\| totalUnread\.value > 0\)/);
   assert.match(bubble, /<NovaAvatar :size="36" :pulse="showUnreadBadge && !dimmed"[^>]*\/>/);
   assert.doesNotMatch(bubble, /<svg v-else[^>]*aria-hidden="true"/);
-  assert.match(bubble, /\(NOVA_SUPPORT_VISIBLE \? nova\.unread : 0\) \+ humanUnread\.value/);
+  assert.match(bubble, /const totalUnread = computed\(\(\) => humanUnread\.value\)/);
   assert.match(bubble, /if \(!NOVA_SUPPORT_VISIBLE\) return;/);
   assert.match(bubble, /v-if="showUnreadBadge"/);
   assert.match(bubble, /const showUnreadBadge = computed\(\(\) => totalUnread\.value > 0\)/);
@@ -74,7 +74,7 @@ test("floating human support stays available while Nova remains hidden", () => {
   assert.doesNotMatch(bubble, /remoteApiEnabled \? nova\.unread/);
   assert.match(
     bubble,
-    /function open\(\) \{\s*navTo\("\/pages\/support\/messages"\);\s*\}/,
+    /function open\(\) \{\s*messageCenter\.show\("service"\);\s*\}/,
   );
   assert.match(bubble, /if \(remoteApiEnabled\) \{[\s\S]{0,120}notifications\.refreshRemote\(\);[\s\S]{0,80}return;/);
 });

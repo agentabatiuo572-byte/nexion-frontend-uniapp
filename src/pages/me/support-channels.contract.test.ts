@@ -10,7 +10,8 @@ describe("support channel actions", () => {
     expect(source).toContain('externalId: "discord"');
     expect(source).toContain('externalId: "email"');
     expect(source).toContain("return remoteApiEnabled ? internalChannels.value : [...internalChannels.value, ...externalChannels.value];");
-    expect(source).toContain('href: "/pages/support/messages"');
+    expect(source).toContain('messageCenter.show("service")');
+    expect(source).not.toContain('href: "/pages/support/messages"');
     expect(source).toContain('href: "/pages/me/support-tickets?mode=create"');
   });
 

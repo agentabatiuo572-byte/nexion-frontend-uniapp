@@ -56,6 +56,32 @@ beforeEach(() => {
 });
 
 describe("ticket read acknowledgement", () => {
+  it("preserves an open detail window and older cursor when background headers refresh", async () => {
+    const store = useTickets();
+    const opened = { ...ticket("TK-A", 3, 1), messages: [{ id: "4", ts: 4, author: "agent" as const, body: "A real reply" }],
+      historyTruncated: true, historyNextCursor: 4 };
+    remote.supportApi.ticket.mockResolvedValueOnce(opened);
+    remote.supportApi.tickets.mockResolvedValueOnce({ items: [ticket("TK-A", 4, 2)], total: 1 });
+    await store.load("TK-A"); await store.refresh();
+    expect(store.tickets[0].messages).toEqual(opened.messages);
+    expect(store.tickets[0].historyNextCursor).toBe(4);
+    expect(store.tickets[0].unread).toBe(2);
+  });
+
+  it("does not let a delayed list undo a newer acknowledged ticket version", async () => {
+    const store = useTickets();
+    const older = deferred<{ items: Ticket[]; total: number }>();
+    remote.supportApi.ticket.mockResolvedValueOnce(ticket("TK-A", 3, 1));
+    remote.supportApi.tickets.mockReturnValueOnce(older.promise);
+    remote.supportApi.markTicketRead.mockResolvedValueOnce(ticket("TK-A", 4, 0));
+    await store.load("TK-A");
+    const pending = store.refresh();
+    await vi.waitFor(() => expect(remote.supportApi.tickets).toHaveBeenCalledTimes(1));
+    await store.markRead(store.tickets[0]);
+    older.resolve({ items: [ticket("TK-A", 3, 1)], total: 1 }); await pending;
+    expect(store.tickets[0].unread).toBe(0);
+  });
+
   it("creates one ticket for concurrent identical sends without Web Crypto", async () => {
     vi.stubGlobal("crypto", undefined);
     vi.stubGlobal("TextEncoder", undefined);

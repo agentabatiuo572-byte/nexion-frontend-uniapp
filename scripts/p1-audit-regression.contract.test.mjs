@@ -4,9 +4,10 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("5173 floating AI avatar opens the same conversation center as 5174", async () => {
+test("human floating shortcut opens the unified full-screen Service section", async () => {
   const bubble = await source("src/components/nova/nova-bubble.vue");
-  assert.match(bubble, /navTo\("\/pages\/support\/messages"\)/);
+  assert.match(bubble, /messageCenter\.show\("service"\)/);
+  assert.doesNotMatch(bubble, /navTo\("\/pages\/support\/messages"\)/);
   assert.doesNotMatch(bubble, /navTo\("\/pages\/support\/chat"\)/);
   assert.match(bubble, /conversations\.byType\("advisor"\)/);
   assert.match(bubble, /conversations\.byType\("support"\)/);

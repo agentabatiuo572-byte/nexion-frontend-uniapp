@@ -150,7 +150,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 | 区 | 内容 |
 |---|---|
 | Status Bar | 实时时钟 + Dynamic Island + 信号/WiFi/电量 |
-| Header App Row(仅 tab 路由) | NexGrid logo + 铃铛(打开 Nova drawer) + Locale Switcher |
+| Header App Row(仅 tab 路由) | NexGrid logo + 铃铛(进入全屏消息中心) + Locale Switcher |
 | ScrollContainer | 内容主区 |
 | TabBar(仅 tab 路由) | 5 个 tab,floating pill 样式 |
 | Home Indicator | iOS 风白条 |
@@ -3965,57 +3965,21 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 
 浮动 bubble + Drawer 聊天面板。
 
-### 11.0A Nova AI 顾问系统
+### 11.0A 自动通知与人工服务边界
 
-**目的**:chassis-level 漂浮 AI 顾问。浮动 bubble 跨页存在,负责自动 push 与未读聚合;点击进入统一会话中心(§11.8.4),Nova 作为其中「AI 顾问」会话类型,承载自动 push 通道与 AI 对话。请求人工时切换到会话中心的「普通客服」会话类型(§11.0A.3)。
+当前整合版关闭 Nova AI 会话入口。浮标只提供人工顾问/客服快捷入口；铃铛与 Me 消息中心包含通知和服务两个分区，具体契约见 §11.2、§11.8.4。
 
-**作用域**:本节(§11.0A.1 - §11.0A.3)定义 Nova 的所有 channel + 切换规则。`§11.0A` 编号作为 §11.0 Me 主页 下的子区段,与 §11.1 我的设备 在层级上同辈但范围正交(Nova 跨页 / 设备只在 /me)。
+#### 11.0A.1 自动通知
 
-**代码标识符保留**:文件路径 `app/components/stella/*` / `lib/v3/_config/stella-cadence.ts` / `lib/mock/stella-templates.ts`、zustand store `useStella`、内部状态值 `mode === "stella"`、admin endpoint `/admin/stella/*` 全部保留 `stella` 字符——重命名仅作用于 UI / 产品文案层。
+后端现有 Nova 命名的业务频道作为自动通知来源保留；只有已真实生成且可送达的通知进入通知分区。频道启停、频率、受众、账户语言和去重由后端决定，客户端不制造收益、交易或活动事实。
 
-#### 11.0A.1 5 个基础 push channels
+#### 11.0A.2 展示分类
 
-| Channel | 默认频率 | 内容 |
-|---|---|---|
-| welcome | 注册 8s 后 / 24h cd | 欢迎语 + 解释玩法 |
-| market-event | 12 min tick / 30 min cd | 全网算力波动 / AI workload 价格变动 |
-| upgrade-nudge | 15 min tick / 60 min cd | 基于用户当前 fleet 推荐升级 |
-| risk-alert | 异常事件 | 设备掉线 / 任务失败 |
-| daily-summary | 每 25 完成任务 / 25 min cd | 当日收益总结 |
+服务端原始 kind 保留，按资金、设备、团队、活动奖励、系统五组展示。频道名称不决定人工消息归属；未知通知安全归入系统。未读、保留与优先级见 §11.2。
 
-> **频率全部 server-controllable**:每条 channel 的 `{enabled, tickMs, cooldownMs}` 由 `GET /api/admin/stella/cadence-config`(§9.11c.1)拉取(endpoint 路径保留 `/stella/*` 命名作为代码契约),运营按 cohort / phase / 风险态势在线调整;`enabled=false` = 单 channel kill-switch。客户端常量(`lib/v3/_config/stella-cadence.ts`)只是真后台未接入前的默认 fallback,数值与本表保持一致。
+#### 11.0A.3 人工服务
 
-#### 11.0A.2 3 个 v3 业务 channels
-
-| Channel | 频率 | 内容示例 |
-|---|---|---|
-| team_event | 90s tick / 70s cd | "Sarah K. just bought Pro · +$89.90 USDT credited" |
-| staking_event | 4 min tick / 5 min cd | "180-day vault APY just rose from 80% → 95%" |
-| market_event | 6 min tick / 7 min cd | "$NEX broke $0.178 +20.4% in 24h" |
-
-每条 push 带 CTA chip 直跳目标路由。
-
-#### 11.0A.2a Sprint 2 / 3 / A-2 增量 channels
-
-| Channel | 默认频率 | 触发条件 / 内容 |
-|---|---|---|
-| tradein-nudge | 15 min tick / 60 min cooldown | 车队(参与递减设备)平均产能 < 65% 且持有可置换设备时触发;文案钩子 = 当前产能 / 月度差额 + 该设备实时可抵额,CTA `查看置换选项 →` 跳 /me/devices 置换入口;无 phase 分档(代际窗口叙事已删) |
-| monthly-task-lock | 30 min tick / 30 d cd(P1-P2)/ 7 d cd(P3-P4)/ 3.5 d cd(P5-P6) | Sprint 2 收尾(Gap D)— 月度任务锁定累计推送,phase-keyed 节奏。读 `getTaskLockSummary(joinedAt)` 取 thisMonthUSD,`getLockedTeasers(maxVram, 1)[0]` 取最佳 model 名。文案三 variant(early/mid/late phase bucket):early `Heads up — $N premium tasks (model) unaccepted this month. NexGridBox would clear most.` → /store;mid `Premium queue's running hot — missed $N this month (model pool). Pro v2 catches 2.5× throughput.` → /me/devices;late `**Final upgrade window.** Lost ~$N this month on model alone, plus fleet degrading. Rack P2 trade-in closes when this window does.` → /me/devices(Batch E 迁移)|
-| social-event | 20 min tick / 30 min cd | Sprint A-2 / A.5 — 5 类全网"真实事件"等概率派发:大额提现走推荐网络 30% / V 级升级 25% / Genesis 二级成交 20% / AI 客户月 NEX 消费 +18-50% 15% / 网络小时新增 10%。文案严守真实平台叙事风,无 PM 内部术语 |
-| quest-grace-reminder | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务进 grace 窗口(24-72h)且未 claim 时 push,CTA → `/` 回 Home 继续。详 §5.15.5 |
-| quest-final-expired | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务彻底过期(72h+)且未 claim 时 push,CTA → `/me/achievements` 查看 badge 状态。详 §5.15.5 |
-| weekly-quest-refresh | 进入新 ISO 周时一次 / cooldown key 基于 `weekKey` 永不重复 | Sprint Q-1 — 每周一新 Weekly Quests 上线时 push,CTA → `/missions` Mission Center。文案 `🎯 New week, new quests. 5 tasks unlocked — top reward +X NEX`。详 §11.13.9 |
-| event-claimable | 15 min tick / 60 min cd | Sprint Q-3 — 当存在 trackable + done + 未 claimed 的 event 时 push 催领。文案 `🎁 You've earned a reward. {topEventName} is done (and N more) — claim +X NEX before it expires.` CTA → `/events`。topEventName 取奖励最大的那个,total NEX 为所有 claimable 奖励之和。详 §11.10.7 |
-
-> **整体节奏 v3 收敛**:相较 v2,ambient 噪声类 channel(market / upgrade / dailySummary / tradein / social / eventClaim)cooldown 拉长 5-6× → 30 分钟主动浏览只触发 1-3 次 AI 推送。事件触发类(quest grace / expired / weekly refresh / wrapped)节奏不变 — 它们由日历滚动 / 状态机推动,不是 ambient noise。所有节奏由 §9.11c.1 `GET /api/admin/stella/cadence-config` 控制。
-
-#### 11.0A.3 人工客服切换(Handoff)
-
-用户在 Nova(AI 顾问)会话请求人工客服时,不在 Nova 会话内就地切换坐席,而是路由到统一会话中心(§11.8.4)的「普通客服」会话类型,由真人客服线程接管;Nova 会话保持 AI 语义不变。
-
-- **切换入口**:Nova 会话头部「人工客服」按钮 → 打开会话中心的普通客服会话(无可用会话时回会话中心列表)。
-- **人工客服语义**:发送 / 回复、坐席身份、回复模板见 §11.8.4。
-- **AI auto-push 与人工对话互不干扰**:team / staking / market 等自动 push 始终注入 Nova(AI)会话;人工客服是独立会话类型,无需静默 AI 通道,Nova 自身不再有「live-agent 就地模式」与无响应自动切回逻辑。
+人工顾问、普通客服与工单进入服务分区，复用服务端会话和工单。打开列表不清除未读，进入具体线程并成功确认已读后同步角标；旧 AI 链接返回现有服务入口。
 
 ### 11.0B 个人资料 `/me/profile`
 
@@ -4073,74 +4037,65 @@ flowchart LR
 
 **安全声明**:取消激活不影响硬件归属(设备仍在用户库存),不影响购买记录与 lifetime 收益历史。重新激活时 tick 在下一帧 pickRandomTask,任务恢复接取。
 
-### 11.2 通知中心 `/me/notifications`
+### 11.2 消息中心 `/me/notifications`
 
-汇总所有事件历史(Nova 推送 + 佣金 + 质押到期 + Genesis 销售 + 系统通知)。
+统一查看业务通知、人工顾问/客服会话和工单回复。通知、会话、工单各保留原数据与已读协议，中心只聚合展示，不复制人工消息为系统通知。NOVA/AI 入口关闭，AI 未读不计入。
 
 #### 11.2.1 类型
 
-| Kind | 来源 |
+一级分区为通知、服务。通知原始 `rawKind` 保留后端来源，展示使用共同映射：
+
+| 展示分组 | 来源 |
 |---|---|
-| commission | Unilevel / Binary / Peer / Cultivation / Leadership 任一类佣金 |
-| team | Sponsorship / Spillover / Rank progress |
-| staking | APY 变化 / Maturity / Lock reminder |
-| market | NEX 价 / TVL milestone / Listing 新闻 |
-| genesis | 销售 ticker / 二级市场动态 |
-| system | KYC / 维护通知 / 监管 |
+| finance 资金 | 充值、提现、支付方式、订单、佣金、锁仓和行情通知 |
+| device 设备 | 设备状态及运行收益通知 |
+| team 团队 | 团队业务事件 |
+| rewards 活动 | 活动、任务奖励、Genesis 及对应已启用业务提醒 |
+| system 系统 | 安全、维护、风险披露与未知类型 |
 
-#### 11.2.2 UI
+分组不改变旧六键通知偏好协议。未知类型必须可读、可执行原 CTA。服务分区按最近更新时间展示 advisor/support 会话及工单，可按顾问、客服、工单筛选。
 
-- iOS nav 顶部 + unread 数 badge + Mark all read + Clear read 操作
-- 6 个 filter pills(All + 5 类,只显示有内容的)
-- 时间线列表:
-  - 未读 dot + 加粗标题
-  - 已读态
-  - tap 自动 markRead + 跳 CTA href
-- 200 条 cap,LRU 滚动
+#### 11.2.2 未读与读取
+
+- 总未读 = 服务端通知全量未读 + 可见人工会话未读 + 全部工单未读；人工浮标仅显示人工会话未读。
+- 通知分页返回的 `unread` 是全量值，不能按已加载列表重新计数。单条/CTA 已读确认成功后仅减一次；清理已读不减少其他未读；批量已读后补拉服务端状态。
+- 展开通知才确认该条已读；打开中心、切换分类不读会话或工单。“通知全部已读”仅影响通知。
+- 人工与工单只在实际详情内容展示后按现有版本读确认协议更新；有新回复冲突时刷新，不能吞掉未看过的内容。
+- 加载、失败、无记录及当前页无匹配但还有下一页分别展示；失败保留已有快照并提供重试，不把失败当零未读。
+- 周期补拉保留已加载历史和游标。账户退出/重绑后清除旧快照，旧请求不得回写。
+- 浏览长列表时收起大标题与一级分区、保留末级筛选和当前分区上下文；明显回滑恢复一级切换，回到顶部恢复标题，轻微滚动不反复切换。
 
 #### 11.2.2a Swipe-to-action(conversion-tied)
 
-每行 row 由 `<SwipeRow>` 通用组件包。用户左滑暴露 conversion 路径 + 管理 actions,**第一个 action 与 NotifKind 联动**,把通知 → 直达入金页:
+通知 CTA 与既有左滑导航均由服务端确认动作后返回路由，前端不能猜测已到账、代发资金操作或改变业务权限。重复动作按原幂等键查询；主动作成功但附属读确认失败，仍保留已确认路由并允许后续读状态对账。
 
-| NotifKind | Swipe action 1(conversion)| 跳转 | Action 2 | Action 3 |
-|---|---|---|---|---|
-| commission | 复投 | `/me/wallet/repurchase` | 已读 | 删除 |
-| team | 团队 | `/team` | 已读 | 删除 |
-| staking | Stake | `/staking` | 已读 | 删除 |
-| market | 行情 | `/market` | 已读 | 删除 |
-| genesis | Genesis | `/genesis/marketplace` | 已读 | 删除 |
-| system | — | — | 已读 | 删除 |
-
-设计目的:绕过 list-tap → detail-tap → 入金-tap 三步漏斗,让用户拿到 commission 通知后**左滑直跳复投页**,把通知从被动事件流升级为主动 conversion 漏斗入口。
-
-**store action**:`useNotifications.removeOne(id)` 单条删除(swipe-to-delete),复用现有 `markRead(id)` 单条已读。
+清理已读须确认，只删除服务端允许清理的记录，保留 critical 消息。正式模式不提供客户端单条删除；通知与业务记录不是同一对象，清理通知不删除订单、资金或会话历史。
 
 #### 11.2.3 入口
 
-- Me 页 Earn extras section 第一行 row(显示 unread badge)
-- Header bell 当前打开 Nova drawer(保留独立角色)
+- 主页面和子页面右上角铃铛：直接进入 `/pages/me/notifications` 全屏消息中心，显示总未读，页内提供通知设置入口；无侧边抽屉和遮罩。`section=notifications/service` 指定初始分区，未指定时保留当前分区；已在中心时不重复压栈。返回恢复来源页面，冷启动进入时返回 Me。
+- Me「消息中心」：进入 `/pages/me/notifications`，显示相同总未读。
+- 人工浮标和客服渠道“在线会话”：进入 `/pages/me/notifications?section=service`，直接显示服务分区；浮标保留人工未读，不恢复 AI。点会话进入现有全屏聊天。
+- 会话详情 `/pages/support/chat?cid=`；工单详情 `/pages/me/support-tickets?ticket=`，复用原归属、权限和已读协议。
+- 已登录前台由一个全局循环补拉通知与工单，目标间隔15秒；人工保留 WebSocket 及既有断连轮询。回前台立即补拉，退后台/退出停止。首次加载不重放历史为新提醒。
+- 原生系统级离线推送须完成应用标识、厂商配置、设备令牌和真机验收后单独启用；前台刷新不等于后台或杀进程推送。
 
-#### 11.2.4 通知优先级队列
+#### 11.2.4 优先级、保留与送达
 
 | Priority | 适用类型 | 保留策略 |
 |---|---|---|
-| `critical` | 提现冻结 / KYC 拒绝 / 风控异常 / 合规要求 re-acknowledge / 资金账户异动 | **永不淘汰**(`CAP_CRITICAL = Infinity`)|
-| `high` | 试用即将到期 / 高质量延长资格 / staking maturity / 大额收益结算 | tier 内 LIFO,`CAP_HIGH = 50` |
-| `normal` | Nova v3 频道社交事件 / 邀请奖励到账 / 设备状态变化 | tier 内 LIFO,`CAP_NORMAL = 200` |
-| `low` | 节庆活动 / 周月任务 / 推荐已知 / 营销 promo | tier 内 LIFO,`CAP_LOW = 30`(真后台对接后改 24-48h 自动淘汰)|
+| `critical` | 服务端认定的资金冻结、安全或风险披露通知 | 不参与自动淘汰及清理已读 |
+| `high` | 重要业务进展或需要处理的通知 | 按后台配置保留最新记录，超出淘汰最旧记录 |
+| `normal` | 常规业务与设备、团队事件 | 按后台配置保留最新记录，超出淘汰最旧记录 |
+| `low` | 非关键活动提醒 | 按后台配置保留最新记录，并淘汰超过48小时的记录 |
 
-**前端实现(已完成,Round 7)**:`lib/v3/notifications.ts` 加 `priority: NotifPriority` 字段;`push()` 默认 `"normal"` 保持向后兼容;`applyPriorityRetention()` 按 tier 单独 cap,critical 永不丢失。所有 callsite 旧调用无需改动,显式优先级仅在新调用点声明(如风控类系统通知应明确传 `priority: "critical"`)。
-
-**Priority 升级路径**(MVP-D 抓到的边界):同一 notification id 后续以更高 priority 重新出现(例如 `normal` 试用提醒被升级为 `critical` 风控告警)时:
-- 客户端 mock 已实现 in-place 升级(`lib/v3/notifications.ts:push` existing-id 分支检 `priorityRank` 后 update),并清 `readAt` + bump `unread`,保证升级事件重新进入未读队列浮顶
-- 升级时 `ts` 重置为 now,触发 surface-newest-critical 排序语义
-- 真后台等价行为:server 检测 priority 变化后,在新事件上 emit 一条 canonical 记录(同 id,新 priority + 新 ts + readAt=null),client 通过 SSE / cursor refresh 重读;**client 不直接 PATCH**,改由 server 主动推送
+优先级、排序与保留由服务端决定；前端展示 critical/high 的重要标识，不自行重置已读或提升优先级。低优先级过期由服务端执行，客户端不作为权威消息仓库。资金、安全和风险披露必收规则由后端执行，不能仅靠禁用开关实现。
 
 **真后台接口契约**:
 - `GET /api/notifications?cursor=&limit=&priority=` — 分页拉取,支持按优先级过滤
 - `POST /api/notifications/:id/read` — server-side 标读
-- SSE `/api/notifications/stream`(候选)— server 主动推 priority 升级 / 新通知
-- `client.useNotifications` 改为 cursor-based fetch,LIFO cap 仅作为 UI 显示窗口,**不再是权威数据源**
+- `POST /api/notifications/read-all`、`DELETE /api/notifications/read` — 批量已读、清理已读；服务端校验账户归属与保留规则。
+- 客户端通过游标及前台补拉对账，不宣称存在未接入的通知 SSE。
 
 #### 11.2.5 支付方式生命周期推送模板(银行卡解绑 / 换绑引导)
 
@@ -4148,11 +4103,11 @@ flowchart LR
 
 | 模板 | 触发事件(server) | Kind | Priority | CTA 深链 | 文案要点 |
 |---|---|---|---|---|---|
-| 银行卡已解绑 | `card.unbound`(后台解绑 / 用户自解绑同一事件) | system | normal(风控发起的解绑,server 可按 §11.2.4 升级 critical「资金账户异动」档) | `/pages/me/wallet-cards`(§9.10 我的银行卡) | 告知「{brand} •••• {last4} 已解除绑定」;自动扣款随之失效;引导需要时重新绑卡 |
-| 请更换试用担保卡 | `card.rebind_notified`(后台 C1 发送换绑通知动作) | system | high(试用担保连带,对齐 §11.2.4 high 档) | `/pages/me/wallet-cards` | 告知当前担保卡不再适用,引导绑定新卡以保障试用结束时顺利完成购买;担保卡换绑成功前旧卡保持生效 |
+| 银行卡已解绑 | `card.unbound`(真实解绑完成) | payment_method | high | `/pages/me/wallet-cards`(§9.10 我的银行卡) | 说明解除绑定，提示查看当前支付方式 |
+| 支付卡换绑提醒 | `card.rebind_notified`(后台换绑提醒动作) | payment_method | high | `/pages/me/wallet-cards` | 说明需要查看或更新支付方式，不宣称已完成换绑 |
 
 - 触发时机与担保规则权威在后台侧(担保中的卡不可被后台静默解绑,仅可收到本换绑引导;用户自解绑担保卡经挽留流程仍可达,见 §9.11 试用担保)。
-- 文案双语走 i18n(`notifs.cardUnbound* / notifs.cardRebind*` 六键镜像);模板实现为 builder 形态(`src/mock/card-notifications.ts`),PRODUCTION 由后端事件桥调用,mock 期不自动注入静态样例(避免与实时卡状态矛盾)。
+- 文案由后端按账户语言提供中/英/越，已发消息保留原文；本地 builder 仅适用于 mock，正式模式不伪造通知。
 
 ### 11.3 信任中心 `/trust`
 
@@ -4432,7 +4387,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 
 ### 11.8.4 统一会话中心 `/support/messages` + `/support/chat`
 
-**目的**:在一个会话中心查看 Nova 和人工求助；人工消息由当前专属顾问接续，工单保持独立入口。
+**目的**:在统一消息中心“服务”分区提供人工会话入口；人工消息由当前专属顾问接续。§11.2 聚合人工与工单提醒，原会话/工单详情继续承担读取和回复，会话管理页保留新建、分类历史与移除列表功能。
 
 **会话类别(`ConversationType`,可扩展)**:
 
@@ -4440,17 +4395,18 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 |---|---|---|
 | `advisor` 专属顾问 | 当前专属顾问 | 顾问与客户的私聊；未分配时客户可留言等待分配 |
 | `support` 普通客服 | 当前专属顾问 | 用户发起求助；未分配时客户可留言等待分配 |
-| `ai` Nova | AI 算力顾问 | §11.0A Nova 作为 AI 类型并入;保留 quick-prompt + 自动 push 通道;会话头部「人工客服」入口路由到 `support` 会话(§11.0A.3) |
+| `ai` Nova | 兼容类型 | 当前入口关闭；不展示、不计入总未读，旧 AI 路由回到可用的人工入口 |
 
 **入口与路由**:
-- `/support/messages` — 会话中心:按类别分组列出会话,用户主动切换类别查看该类别会话。
-- `/support/chat?cid={id}` — 人工类别会话聊天线程;`/support/chat?type=ai` — Nova 聊天线程。
-- 入口:Nova 浮动 bubble(点击进会话中心)、客服渠道枢纽 `/me/support`「在线会话」行(§11.8.2)、Home 的 Nova 卡(进 AI 会话)。
+- `/me/notifications?section=service` — 人工服务统一入口；会话行直接进入全屏聊天。
+- `/support/messages` — 会话管理:按类别查看历史、发起新会话和移除列表；保留旧链接与聊天异常回退。
+- `/support/chat?cid={id}` — 人工类别会话聊天线程；旧 `/support/chat?type=ai` 链接按当前关闭状态返回服务入口，不创建 Nova 聊天线程。
+- 入口:人工服务浮标、客服渠道枢纽 `/me/support`「在线会话」行(§11.8.2)统一到消息中心“服务”分区；分区内“会话管理”进入管理页。
 
 **业务规则**:
 - 人工 `advisor` / `support` 均采用当前归属；客户端读取 `GET /api/app/support/advisor` 的当前顾问、归属状态和可用性。未分配、顾问停用或忙碌均可留言，界面说明实际状态；未知在线状态不显示在线。
 - 客户只可读取和发送自己的会话。归属变更后，服务端按当前归属授权，客户端清除旧会话缓存、图片和待发草稿，再取新快照；历史作者保持原身份，不以旧名称充当当前顾问。
-- `ai`(Nova)继续承载自动 push；其未读与人工未读合并展示，Nova 与人工消息互不混写。
+- 人工浮标仅显示 advisor/support 的可见未读；铃铛和 Me 消息中心将人工、工单和通知合计。AI 隐藏不影响已有后台业务通知，业务通知按来源归类。
 - 人工消息可为 TEXT 或 IMAGE。图片先按服务端策略选择 PNG/JPEG、私有上传成为 READY，再随同一条消息提交；未提交图片仅上传者可见。已发图片每次通过鉴权接口读取，不使用公开 URL。上传失败、过期、撤权可重选；页面离开或换账号清理私有图片内存 URL。
 - 草稿按账号和会话隔离；明确发送失败可编辑、重试或放弃，发送结果未知只能按原命令查询或同键重试。图片和文字随同一发送意图恢复，不因刷新或重试生成第二条消息。
 - **发送频控**:单会话发送限流,两道独立闸——滚动窗口(每 15 秒最多 5 条)+ 相邻两条最小间隔(至少隔 1 秒),防连点刷屏;两闸都放行才发出,超限提示的重试秒数取两者较长值。超限提示同一时刻只显示一条,连续触发刷新该条不叠加;被拦下的这条消息文本回填输入框,不丢失。规则覆盖三类会话的自由输入与快捷提问(chip)。真后台以 HTTP 429 + Retry-After 镜像同一策略。
@@ -4661,8 +4617,8 @@ Events 分两大类:
 #### 11.12.4 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
 
 - **目的**:音效 / 触感 / 通知 6 类偏好的统一切换中心
-- **2 组 toggle**:Feedback(sound + haptics)+ Notifications(6 种 NotifKind 各自 mute)
-- **Store**:`usePreferences` zustand persist(`nexgrid-preferences-v1`)
+- **2 组设置**:Feedback(sound + haptics)保存在本机；Notifications 保留 commission/team/staking/market/genesis/system 六键。系统必收不可关闭，资金/安全关键消息由后端强制送达。
+- **Store**:`usePreferences` 通过 `GET/PATCH /api/me/notification-preferences` 读取、保存通知偏好；服务器未成功返回前不显示假状态，失败保留错误与重试。五个通知展示分组不等于偏好协议键。
 - **i18n**:`preferences.*` namespace ~14 keys
 
 #### 11.12.5 全局搜索 `/search`(Sprint P-full / P6)
@@ -5070,6 +5026,8 @@ MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
 {
   id: string;
   kind: "commission" | "team" | "staking" | "market" | "genesis" | "system";
+  rawKind?: string; // 服务端原始类型，用于五组展示分类；kind 保留六键兼容
+  priority: "critical" | "high" | "normal" | "low";
   title: string;
   body?: string;
   ctaLabel?: string;
@@ -5081,7 +5039,7 @@ MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
 
 ### 12.9a Conversation(useConversations)
 
-统一会话中心(§11.8.4)的人工会话由 `useConversations` 管理，服务端会话、消息、归属和附件为权威数据；`ai`(Nova)独立承载。
+统一消息中心服务分区(§11.8.4)的人工会话由 `useConversations` 管理，服务端会话、消息、归属和附件为权威数据；`ai` 类型仅保留兼容，不进入当前入口与未读汇总。
 
 **ConversationType**:`"ai" | "advisor" | "support"`(可扩展)。
 

@@ -35,6 +35,19 @@ beforeEach(() => {
 });
 
 describe("notification preference remote generation", () => {
+  it("retains a confirmed legacy system value on read or patch failure", async () => {
+    remote.notificationPreferencesApi.get.mockResolvedValueOnce(canonical({ system: false })).mockRejectedValueOnce(new Error("unavailable"));
+    remote.notificationPreferencesApi.patch.mockRejectedValueOnce(new Error("unavailable"));
+    const store = usePreferences();
+    await store.refreshRemote();
+    expect(store.notifPrefs.system).toBe(false);
+    await store.refreshRemote();
+    expect(store.notifPrefs.system).toBe(false);
+    await store.toggleNotifKind("system");
+    expect(store.notifPrefs.system).toBe(false);
+    expect(store.error).not.toBeNull();
+  });
+
   it("does not resurrect a recovered mutation failure after a later successful change", async () => {
     remote.notificationPreferencesApi.get.mockResolvedValue(canonical());
     remote.notificationPreferencesApi.patch.mockRejectedValueOnce(new Error("NOTIFICATION_PREFERENCES_UPDATE_FAILED"));

@@ -120,8 +120,9 @@ test("a late full-list read merges monotonically instead of restoring an older v
   assert.match(tickets, /const ticketRequestGeneration = new Map<string, number>\(\)/);
   assert.match(tickets, /ticket\.version < prior\.version/);
   assert.match(tickets, /ticket\.version === prior\.version && ticket\.updatedAt < prior\.updatedAt/);
-  assert.match(tickets, /function mergeTickets\(items: Ticket\[\]\) \{ for \(const ticket of items\) replace\(ticket\); \}/);
-  assert.match(tickets, /requestGeneration === listRequestGeneration\) mergeTickets\(items\)/);
+  assert.match(tickets, /function mergeTickets\(items: Ticket\[\]\) \{[\s\S]*?for \(const ticket of items\)[\s\S]*?replace\(prior \? \{ \.\.\.ticket, messages: prior\.messages/);
+  assert.match(tickets, /const current = \(\) => epoch === accountEpoch && requestGeneration === listRequestGeneration && active\(\)/);
+  assert.match(tickets, /snapshotIsCurrent\(scope\) && current\(\)\) mergeTickets\(items\)/);
   assert.doesNotMatch(tickets, /tickets\.value = items/);
   assert.match(conversations, /let listRequestGeneration = 0/);
   assert.match(conversations, /function mergeConversations\(items: Conversation\[\]\) \{ for \(const conversation of items\) replace\(conversation\); \}/);
@@ -275,9 +276,8 @@ test("unknown support commands persist opaque account-scoped slots and reconcile
 
 test("account switches retain opaque unknown commands for the original account and probe failures can retry", async () => {
   const [tickets, conversations, api] = await Promise.all([read("src/store/tickets.ts"), read("src/store/conversations.ts"), read("src/api/support-api.ts")]);
-  for (const source of [tickets, conversations]) {
-    assert.match(source, /pendingKeys = new Map\(\);[\s\S]*?preparePendingRun\(\)\.then\(reconcilePending\)/);
-  }
+  assert.match(tickets, /pendingKeys = new Map\(\);[\s\S]*?preparePendingRun\(\)\.then\(\(\) => reconcilePending\(\)\)/);
+  assert.match(conversations, /pendingKeys = new Map\(\);[\s\S]*?preparePendingRun\(\)\.then\(reconcilePending\)/);
   assert.match(api, /const supportRoot = "\/api\/app\/support";/);
   assert.doesNotMatch(api, /support\/acceptance/);
 });

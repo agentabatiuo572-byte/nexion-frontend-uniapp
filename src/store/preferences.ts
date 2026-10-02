@@ -110,9 +110,11 @@ export const usePreferences = defineStore("preferences", () => {
   function applyVisibleNotifPrefs() {
     const visible = { ...canonicalNotifPrefs };
     for (const [kind, pending] of pendingNotifMutations) visible[kind] = pending.value;
-    // 简报 #214:强制类必须呈现为开启 —— 无论服务端存量值还是本地缓存曾把它关掉。
-    // 放在这个唯一出口上,读路径(远端/本地/乐观更新)就都受同一条约束。
-    for (const kind of MANDATORY_NOTIF_KINDS) visible[kind] = true;
+    // Remote mandatory delivery is enforced by the server. Retain its confirmed
+    // value on failure rather than disguising legacy false data as a successful write.
+    if (!remoteApiEnabled) {
+      for (const kind of MANDATORY_NOTIF_KINDS) visible[kind] = true;
+    }
     notifPrefs.value = visible;
   }
 

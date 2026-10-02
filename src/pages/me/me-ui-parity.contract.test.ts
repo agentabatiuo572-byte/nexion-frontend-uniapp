@@ -2,11 +2,18 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { createHash } from "node:crypto";
+// @ts-expect-error This contract runs in Node.
+import { env } from "node:process";
+// @ts-expect-error This contract runs in Node.
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./me.vue", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const formalMeDir = new URL("./", import.meta.url);
-const prototypeMeDir = new URL("../../../../NX1.0-Prototype/src/pages/me/", import.meta.url);
+const prototypeMeDir = env.NEXGRID_PROTOTYPE_ROOT
+  ? pathToFileURL(`${env.NEXGRID_PROTOTYPE_ROOT}/src/pages/me/`)
+  : new URL("../../../../NX1.0-Prototype/src/pages/me/", import.meta.url);
+if (env.NEXGRID_PROTOTYPE_ROOT && !existsSync(prototypeMeDir)) throw new Error("Configured prototype checkout is missing");
 const EXPECTED_TEMPLATE_DIFFERENCES = [
   "achievements.vue",
   "devices.vue",
@@ -53,7 +60,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
   // Reviewed UI regression repair: bind the existing narrow-screen quick grid.
   "me.vue": "11d4a58ee3ea0e50c41eb3762c0f2093909867bf2d012d2eeff1670cd269d5c0",
-  "notifications.vue": "68fb8d9ce340c265842e5a6798c74c162d20c7245a6599c52eab5cd9d3e89196",
+  "notifications.vue": "eb2b07878505154a39e4ec058c802dcd8d991f1d51e8b34fd7ae6630c49c812e",
   "preferences.vue": "5c7a712cb60a21c7e24cbbe85783ea66503f1298724d035f4c8520251fcea632",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
   "proof.vue": "956e804b2c96dced42cc10cb0dd757e7abd5c4a6a3596c56bca63490e93f3616",
@@ -80,6 +87,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet.vue": "95b9805fdebe39db2a8920a235436fca6b8d21e65101df5cb866a244122a6bd5"
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
+  // Approved unified center uses shared flat-row styles and fixed native scrolling.
+  "notifications.vue": "cf1fba4b028c3b72d09ca0ebb1e1c2063516e60718024e6add7cc5d418ec3413",
   "proof.vue": "c21851c57140a23d48746e19c798781a56bccc946028165e9f3f61323e6eb2bd",
   "wallet-repurchase.vue": "49b410e94f8d119d898b3c05f01d735af70aac979d6f8d8559341b13841d1477"
 };
@@ -96,6 +105,15 @@ function quickKeys(section: string): string[] {
 }
 
 describe("Me page 5174 normal-state UI parity", () => {
+  it("checks the message center stylesheet content", () => {
+    const css = readFileSync(new URL("../../styles/message-center.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+    const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+    const expected = "881841ea7134ecad321b85bf40890d964e7628d982d3839feae418e3605a4e9d";
+    expect(digest(css)).toBe(expected);
+    const changed = css.replace("font-size: 34px", "font-size: 44px");
+    expect(changed).not.toBe(css);
+    expect(digest(changed)).not.toBe(expected);
+  });
   it("keeps the same five large modules and quick-entry order", () => {
     expect(quickKeys("network")).toEqual(["team", "invite", "commissions", "rank"]);
     expect(quickKeys("devices")).toEqual(["inventory", "add", "slots", "goals"]);
@@ -127,12 +145,11 @@ describe("Me page 5174 normal-state UI parity", () => {
     }
   });
 
-  it("derives the Message Center badge from conversations instead of notification campaigns", () => {
-    expect(source).toContain('import { useConversations } from "@/store/conversations"');
-    expect(source).toContain('import { useNova } from "@/store/nova"');
-    expect(source).toContain("const conversationUnread = computed(() => conversations.totalUnread + (NOVA_SUPPORT_VISIBLE ? nova.unread : 0))");
-    expect(source).toContain('key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: conversationUnread.value > 0 ? String(conversationUnread.value) : undefined');
-    expect(source).not.toContain("const unreadNotifs = computed(() => notifications.unread)");
+  it("derives the unified Message Center badge from the same total as the bell", () => {
+    expect(source).toContain('import { useMessageDrawer } from "@/store/message-drawer"');
+    expect(source).toContain("const messageUnread = computed(() => messageCenter.totalUnread)");
+    expect(source).toContain('key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications"');
+    expect(source).toContain('messageUnread.value > 99 ? "99+"');
   });
 
   it("matches the checked-out 5174 Me-page visual baseline when it is available", () => {

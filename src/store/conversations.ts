@@ -391,19 +391,19 @@ export const useConversations = defineStore("conversations", () => {
     }
   }
 
-  async function refreshCategories(): Promise<CategoryRefreshOutcome> {
+  async function refreshCategories(active: () => boolean = () => true): Promise<CategoryRefreshOutcome> {
     if (!remoteApiEnabled) return "applied";
     const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const requestGeneration = ++categoryRequestGeneration;
     categoryLoading.value = true;
     try {
       const next = await supportApi.conversationCategories();
-      if (!accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration) return "stale";
+      if (!accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration || !active()) return "stale";
       categoryAvailability.value = next;
       categoryAvailabilityStatus.value = "ready";
       return "applied";
     } catch {
-      if (!accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration) return "stale";
+      if (!accountScopeIsCurrent(account) || requestGeneration !== categoryRequestGeneration || !active()) return "stale";
       categoryAvailabilityStatus.value = "failed";
       return "failed";
     } finally {

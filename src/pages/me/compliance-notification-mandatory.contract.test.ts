@@ -27,11 +27,10 @@ describe("mandatory compliance notifications cannot be disabled", () => {
     expect(store).toMatch(/if \(isMandatoryNotifKind\(k\) && notifPrefs\.value\[k\]\) return;/);
   });
 
-  it("forces mandatory categories on at the single read path", () => {
-    // 放在 applyVisibleNotifPrefs(所有读路径的唯一出口),远端存量值与本地缓存都受同一约束。
+  it("normalizes local mandatory categories while preserving server authority", () => {
     const apply = store.match(/function applyVisibleNotifPrefs\(\)[\s\S]*?\n  \}/)?.[0];
     expect(apply, "必须能取到 applyVisibleNotifPrefs").toBeTruthy();
-    expect(apply!).toMatch(/for \(const kind of MANDATORY_NOTIF_KINDS\) visible\[kind\] = true;/);
+    expect(apply!).toMatch(/if \(!remoteApiEnabled\)\s*\{\s*for \(const kind of MANDATORY_NOTIF_KINDS\) visible\[kind\] = true;/);
   });
 
   it("locks the row in the UI and explains why", () => {

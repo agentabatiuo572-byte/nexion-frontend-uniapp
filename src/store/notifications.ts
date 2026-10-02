@@ -11,6 +11,8 @@ export type NotifPriority = "critical" | "high" | "normal" | "low";
 export interface Notification {
   id: string;
   kind: NotifKind;
+  /** Original server kind; preference keys retain their existing six-key contract. */
+  rawKind?: string;
   priority: NotifPriority;
   title: string;
   body?: string;
@@ -38,10 +40,10 @@ export const useNotifications = defineStore("notifications", () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const nextCursor = ref<string | null>(null);
-  const seenIds = new Set<string>();
+  let historyLoaded = false;
   let refreshGeneration = 0;
-  let pendingRemoteMutations = 0;
-  let remoteMutationQueue: Promise<void> = Promise.resolve();
+  let cancelGeneration = 0;
+  let mutations = { pending: 0, tail: Promise.resolve() };
 
   function persist() {
     if (remoteApiEnabled) return;
@@ -49,29 +51,44 @@ export const useNotifications = defineStore("notifications", () => {
     writeAccountRow(KEY, boundKey, { items: items.value });
   }
   function recount() { unread.value = items.value.filter((item) => !item.readAt).length; }
-  function appendRemote(page: Awaited<ReturnType<typeof notificationApi.page>>, replace: boolean) {
-    if (replace) seenIds.clear();
-    const next = page.items.filter((item) => !seenIds.has(String(item.id))).map((item) => {
-      seenIds.add(String(item.id));
+  function appendRemote(page: Awaited<ReturnType<typeof notificationApi.page>>, head: boolean) {
+    const next = page.items.map((item) => {
       return {
-        id: String(item.id), kind: knownKind(item.kind), priority: item.priority, title: item.title,
+        id: String(item.id), kind: knownKind(item.kind), rawKind: item.kind, priority: item.priority, title: item.title,
         body: item.body || undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
         ts: item.createdAt, readAt: item.readAt,
       };
     });
-    items.value = replace ? next : [...items.value, ...next];
-    unread.value = page.unread;
-    nextCursor.value = page.nextCursor;
-  }
-  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
-    if (!remoteApiEnabled) return;
-    if (!remoteAccountEpoch.isCurrent(request)) return;
-    while (pendingRemoteMutations > 0) {
-      await remoteMutationQueue;
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+    const ids = new Set(next.map(item => item.id));
+    const overlaps = items.value.some(item => ids.has(item.id));
+    if (head) {
+      items.value = page.nextCursor && historyLoaded
+        ? [...next, ...items.value.filter(item => !ids.has(item.id))]
+        : next;
+    } else {
+      const rows = new Map(next.map(item => [item.id, item]));
+      const existing = new Set(items.value.map(item => item.id));
+      // A refreshed head can be separated from loaded history by an offline gap.
+      // Match the server's descending ID order while those pages are filled.
+      items.value = [...items.value.map(item => rows.get(item.id) ?? item), ...next.filter(item => !existing.has(item.id))]
+        .sort((a, b) => Number(b.id) - Number(a.id));
+      historyLoaded = true;
     }
+    unread.value = page.unread;
+    if (!head || !historyLoaded || !page.nextCursor || !overlaps) nextCursor.value = page.nextCursor;
+  }
+  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot(), active: () => boolean = () => true) {
+    if (!remoteApiEnabled) return;
+    const cancellation = cancelGeneration;
+    const stillActive = () => cancellation === cancelGeneration && active();
+    if (!remoteAccountEpoch.isCurrent(request)) return;
+    while (mutations.pending > 0) {
+      await mutations.tail;
+      if (!remoteAccountEpoch.isCurrent(request) || !stillActive()) return;
+    }
+    if (!stillActive()) return;
     const generation = ++refreshGeneration;
-    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
+    const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request) && stillActive();
     loading.value = true;
     error.value = null;
     try {
@@ -82,15 +99,16 @@ export const useNotifications = defineStore("notifications", () => {
       if (!isCurrent()) return;
       error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
     } finally {
-      if (isCurrent()) loading.value = false;
+      if (generation === refreshGeneration && remoteAccountEpoch.isCurrent(request)) loading.value = false;
     }
   }
   async function loadMoreRemote() {
     if (!remoteApiEnabled || !nextCursor.value || loading.value) return;
+    const cancellation = cancelGeneration;
     const request = remoteAccountEpoch.snapshot();
-    while (pendingRemoteMutations > 0) {
-      await remoteMutationQueue;
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+    while (mutations.pending > 0) {
+      await mutations.tail;
+      if (!remoteAccountEpoch.isCurrent(request) || cancellation !== cancelGeneration) return;
     }
     if (!nextCursor.value || loading.value) return;
     const requestedCursor = nextCursor.value;
@@ -116,32 +134,40 @@ export const useNotifications = defineStore("notifications", () => {
     }
   }
   async function retryRemote() { await refreshRemote(); }
+  function cancelRefresh() {
+    cancelGeneration += 1;
+    refreshGeneration += 1;
+    loading.value = false;
+  }
   function enqueueRemoteMutation<T>(request: RemoteAccountRequest, operation: () => Promise<T>): Promise<T | undefined> {
-    pendingRemoteMutations += 1;
+    const queue = mutations;
+    queue.pending += 1;
     // The queued command represents a newer intent than any read already in flight.
     // Later reads wait for the queue; earlier reads lose ownership immediately.
     refreshGeneration += 1;
     loading.value = false;
-    const queued = remoteMutationQueue.then(async () => {
+    const queued = queue.tail.then(async () => {
       if (!remoteAccountEpoch.isCurrent(request)) return undefined;
       return operation();
     });
-    const settled = queued.finally(() => { pendingRemoteMutations -= 1; });
-    remoteMutationQueue = settled.then(() => undefined, () => undefined);
+    const settled = queued.finally(() => { queue.pending -= 1; });
+    queue.tail = settled.then(() => undefined, () => undefined);
     return settled;
   }
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     remoteAccountEpoch.bind(boundKey);
+    cancelGeneration += 1;
     refreshGeneration += 1;
+    mutations = { pending: 0, tail: Promise.resolve() };
     if (remoteApiEnabled) {
       items.value = [];
       unread.value = 0;
       nextCursor.value = null;
-      seenIds.clear();
+      historyLoaded = false;
       loading.value = false;
       error.value = null;
-      void refreshRemote(remoteAccountEpoch.snapshot());
+      if (boundKey !== "default") void refreshRemote(remoteAccountEpoch.snapshot());
       return;
     }
     items.value = hydrate(boundKey); recount();
@@ -152,6 +178,12 @@ export const useNotifications = defineStore("notifications", () => {
     if (items.value.some((item) => item.id === id)) return;
     items.value = [{ id, kind: input.kind, priority: input.priority ?? "normal", title: input.title, body: input.body, ctaLabel: input.ctaLabel, ctaHref: input.ctaHref, ts: Date.now(), readAt: null }, ...items.value];
     recount(); persist();
+  }
+  function confirmRead(id: string) {
+    const item = items.value.find(value => value.id === id);
+    if (!item || item.readAt !== null) return;
+    items.value = items.value.map(value => value.id === id ? { ...value, readAt: Date.now() } : value);
+    unread.value = Math.max(0, unread.value - 1);
   }
   async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     if (remoteApiEnabled) {
@@ -167,8 +199,7 @@ export const useNotifications = defineStore("notifications", () => {
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
         error.value = null;
-        items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value);
-        recount();
+        confirmRead(id);
       });
     }
     const item = items.value.find((value) => value.id === id);
@@ -177,8 +208,9 @@ export const useNotifications = defineStore("notifications", () => {
   }
   async function markAllRead() {
     const request = remoteAccountEpoch.snapshot();
+    const cancellation = cancelGeneration;
     if (remoteApiEnabled) {
-      return enqueueRemoteMutation(request, async () => {
+      const changed = await enqueueRemoteMutation(request, async () => {
         try {
           await notificationApi.markAllRead();
         } catch (cause) {
@@ -189,15 +221,22 @@ export const useNotifications = defineStore("notifications", () => {
         if (!remoteAccountEpoch.isCurrent(request)) return;
         error.value = null;
         items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() });
-        recount();
+        unread.value = 0;
+        return true;
       });
+      // Reconcile only after leaving the queue: refresh waits for queued writes.
+      if (changed && remoteAccountEpoch.isCurrent(request) && cancellation === cancelGeneration) {
+        await refreshRemote(request, () => cancellation === cancelGeneration);
+      }
+      return changed;
     }
     items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() }); recount(); persist();
   }
   async function clearRead() {
     const request = remoteAccountEpoch.snapshot();
+    const cancellation = cancelGeneration;
     if (remoteApiEnabled) {
-      return enqueueRemoteMutation(request, async () => {
+      const changed = await enqueueRemoteMutation(request, async () => {
         try {
           await notificationApi.clearRead();
         } catch (cause) {
@@ -207,9 +246,14 @@ export const useNotifications = defineStore("notifications", () => {
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
         error.value = null;
-        items.value = items.value.filter((item) => !item.readAt);
-        recount();
+        // Deletion eligibility belongs to the server (critical/locked rows may remain).
+        return true;
       });
+      if (changed && remoteAccountEpoch.isCurrent(request) && cancellation === cancelGeneration) {
+        historyLoaded = false;
+        await refreshRemote(request, () => cancellation === cancelGeneration);
+      }
+      return changed;
     }
     items.value = items.value.filter((item) => !item.readAt); recount(); persist();
   }
@@ -218,6 +262,7 @@ export const useNotifications = defineStore("notifications", () => {
     const numericId = Number(id);
     if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
     const request = remoteAccountEpoch.snapshot();
+    const cancellation = cancelGeneration;
     type ActionResult =
       | { kind: "done"; route: string | null }
       | { kind: "uncertain"; cause: unknown };
@@ -237,8 +282,7 @@ export const useNotifications = defineStore("notifications", () => {
         }
         if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
         error.value = null;
-        items.value = items.value.map((value) => value.id === id ? { ...value, readAt: Date.now() } : value);
-        recount();
+        confirmRead(id);
         return { kind: "done", route: result.route };
       } catch (cause) {
         return { kind: "uncertain", cause };
@@ -246,7 +290,8 @@ export const useNotifications = defineStore("notifications", () => {
     });
     if (!queued || !remoteAccountEpoch.isCurrent(request)) return null;
     if (queued.kind === "uncertain") {
-      await refreshRemote(request);
+      if (cancellation !== cancelGeneration) return null;
+      await refreshRemote(request, () => cancellation === cancelGeneration);
       if (!remoteAccountEpoch.isCurrent(request)) return null;
       error.value = queued.cause instanceof Error ? queued.cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
       return null;
@@ -257,5 +302,5 @@ export const useNotifications = defineStore("notifications", () => {
   async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, unread, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
+  return { items, unread, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
 });
