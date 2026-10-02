@@ -441,7 +441,9 @@ const purchaseGate = computed(() => remoteApiEnabled
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
 // SetPageHeader). Getter form: title resolves once the product loads (onLoad).
 useSetPageHeader(() => ({
-  title: product.value?.name ?? t.value.store.coProductNotFound,
+  title: catalogStatus.value === "loading" ? t.value.store.catalogLoadingTitle
+    : catalogStatus.value === "error" ? t.value.store.catalogErrorTitle
+      : product.value?.name ?? t.value.store.coProductNotFound,
   backHref: "/store",
 }));
 
