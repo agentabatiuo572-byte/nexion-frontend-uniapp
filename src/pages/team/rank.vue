@@ -39,7 +39,12 @@
               </view>
             </view>
 
-             <view v-if="prog.next" :style="progressWrapStyle">
+            <view v-if="prog.next" :style="progressWrapStyle">
+              <text class="block" style="font-size: 15px; font-weight: 600">{{ t.rank.next }} {{ rankLabel(prog.next.v, locale.code, rankDefs) }}</text>
+              <view v-for="condition in nextConditions" :key="condition.key" :style="condStyle">
+                <text class="block">{{ condition.label }} · {{ t.rank.progressLabel }} {{ condition.values }}</text>
+                <text class="block" style="margin-top: 3px; color: var(--v5-ink-2)">{{ condition.gap }}</text>
+              </view>
               <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="upgradeCtaStyle" @click="go('/pages/store/store')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
                 <text>{{ t.rank.upgradeCta }}</text>
@@ -93,8 +98,9 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useVRank, nextRankProgress, type VRank, type VRankDef, type VRankReward } from "@/store/v-rank";
+import { useVRank, nextRankProgress, type VRank, type VRankDef, type VRankReward, type VRankConditions, type RankGap } from "@/store/v-rank";
 import { rankGapText, rankConditionsText, rankLabel } from "@/lib/v-rank-copy";
+import { formatHowNumber } from "@/lib/rank-how-content";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
 import { onShow } from "@dcloudio/uni-app";
@@ -116,15 +122,47 @@ const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
   v: vState.myRank, title: "", cnTitle: "", conditions: {}, directBonus: 0,
   unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [],
 });
-const prog = computed(() =>
-  nextRankProgress({
-    myRank: vState.myRank,
-    selfBuyUSD: vState.selfBuyUSD,
-    directRefs: vState.directRefs,
-    teamVolumeUSD: vState.teamVolumeUSD,
-    vDownlineCounts: vState.vDownlineCounts,
-  }, rankDefs.value),
-);
+// The API supplies exact L1 rank buckets; the engine counts members at or above
+// each required rank. This projection is only for the observed progress display.
+const previewData = computed(() => ({
+  myRank: vState.myRank,
+  selfBuyUSD: vState.selfBuyUSD,
+  directRefs: vState.directRefs,
+  teamVolumeUSD: vState.teamVolumeUSD,
+  vDownlineCounts: Object.fromEntries(rankDefs.value.map(({ v }) => [v,
+    Object.entries(vState.vDownlineCounts).reduce((sum, [level, count]) => sum + (Number(level) >= v ? count : 0), 0),
+  ])) as Partial<Record<VRank, number>>,
+}));
+const prog = computed(() => nextRankProgress(previewData.value, rankDefs.value));
+const nextConditions = computed(() => {
+  const next = prog.value.next;
+  if (!next) return [];
+  const rows: { key: string; label: string; values: string; gap: string }[] = [];
+  // The server evaluates every preceding tier, even when rank protection retains
+  // the current rank after a refund. Keep each threshold tied to its source tier.
+  for (const rank of rankDefs.value.filter((r) => r.v > 0 && r.v <= next.v)) {
+    const c = rank.conditions;
+    const preview = nextRankProgress({ ...previewData.value, myRank: (rank.v - 1) as VRank }, rankDefs.value);
+    const add = (conditions: VRankConditions, current: number, required: number, kind: RankGap["kind"], vLevel?: number) => {
+      const gap = preview.missing.find((item) => item.kind === kind
+        && (item.kind !== "vDownlines" || item.vLevel === vLevel));
+      const unit = kind === "selfBuy" || kind === "teamVolume" ? "$" : "";
+      rows.push({
+        key: `${rank.v}-${kind}-${vLevel ?? ""}`,
+        label: `V${rank.v} · ${rankConditionsText(t.value, conditions, locale.code)}`,
+        values: `${unit}${formatHowNumber(current, locale.code)} / ${unit}${formatHowNumber(required, locale.code)}`,
+        gap: gap ? rankGapText(t.value, gap, locale.code, rankDefs.value) : t.value.rank.done,
+      });
+    };
+    if (c.selfBuyUSD) add({ selfBuyUSD: c.selfBuyUSD }, vState.selfBuyUSD, c.selfBuyUSD, "selfBuy");
+    if (c.directRefs) add({ directRefs: c.directRefs }, vState.directRefs, c.directRefs, "directRefs");
+    if (c.teamVolumeUSD) add({ teamVolumeUSD: c.teamVolumeUSD }, vState.teamVolumeUSD, c.teamVolumeUSD, "teamVolume");
+    for (const [level, required] of Object.entries(c.vDownlines ?? {})) {
+      if (required) add({ vDownlines: { [level]: required } }, previewData.value.vDownlineCounts[Number(level) as VRank] ?? 0, required, "vDownlines", Number(level));
+    }
+  }
+  return rows;
+});
 
 onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.

@@ -14,6 +14,7 @@ import { publishedRankTitle } from "@/i18n/rank-titles";
 import type { RankGap, VRankDef } from "@/store/v-rank";
 import { fmt } from "@/i18n/format";
 import { HAN_SCRIPT_RE } from "@/lib/native-unicode-regex";
+import { formatHowNumber } from "./rank-how-content";
 
 /**
  * F1 正式公开等级名称。服务端目前把同一中文配置写入 title/cnTitle，
@@ -50,7 +51,7 @@ export function rankLabel(v: number, locale: LocaleCode, ladder: readonly VRankD
 export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladder: readonly VRankDef[]): string {
   switch (gap.kind) {
     case "selfBuy":
-      return fmt(t.rank.needSelfBuy, { n: gap.amount.toLocaleString() });
+      return fmt(t.rank.needSelfBuy, { n: formatHowNumber(gap.amount, locale) });
     case "directRefs":
       // 🔴 英文单复数:改成读词典时我漏了旧码的 `invite${n === 1 ? "" : "s"}`,n=1 渲染成
       //    「1 more direct invites」(独立验收抓到,我先前「en 逐字未变」那句话对 n=1 是错的)。
@@ -58,12 +59,12 @@ export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladde
       // 🔴 两个 fmt() 分开写,不把三元塞进 fmt 的实参:`selfcheck-i18n-interp` 判「带占位符的
       //    文案必须**词法上**裹在 fmt( 里」,三元穿在参数里它看不穿 —— 门的形状是对的
       //    (词法判据才抗变异),该改的是我的写法。
-      if (gap.n === 1) return fmt(t.rank.needRefsOne, { n: gap.n });
-      return fmt(t.rank.needRefs, { n: gap.n });
+      if (gap.n === 1) return fmt(t.rank.needRefsOne, { n: formatHowNumber(gap.n, locale) });
+      return fmt(t.rank.needRefs, { n: formatHowNumber(gap.n, locale) });
     case "teamVolume":
-      return fmt(t.rank.needTeam, { n: gap.amount.toLocaleString() });
+      return fmt(t.rank.needTeam, { n: formatHowNumber(gap.amount, locale) });
     case "vDownlines":
-      return fmt(t.rank.needV, { n: gap.n, title: rankTitle(gap.vLevel, locale, ladder), v: gap.vLevel });
+      return fmt(t.rank.needV, { n: formatHowNumber(gap.n, locale), title: rankTitle(gap.vLevel, locale, ladder), v: gap.vLevel });
   }
 }
 
@@ -73,13 +74,13 @@ export function rankConditionsText(t: Messages, conds: {
   directRefs?: number;
   teamVolumeUSD?: number;
   vDownlines?: Record<string, number>;
-}): string {
+}, locale: LocaleCode = "en"): string {
   const parts: string[] = [];
-  if (conds.selfBuyUSD) parts.push(fmt(t.rank.cond.selfBuy, { n: conds.selfBuyUSD.toLocaleString() }));
-  if (conds.directRefs) parts.push(fmt(t.rank.cond.directRefs, { n: conds.directRefs }));
-  if (conds.teamVolumeUSD) parts.push(fmt(t.rank.cond.teamVol, { n: conds.teamVolumeUSD.toLocaleString() }));
+  if (conds.selfBuyUSD) parts.push(fmt(t.rank.cond.selfBuy, { n: formatHowNumber(conds.selfBuyUSD, locale) }));
+  if (conds.directRefs) parts.push(fmt(t.rank.cond.directRefs, { n: formatHowNumber(conds.directRefs, locale) }));
+  if (conds.teamVolumeUSD) parts.push(fmt(t.rank.cond.teamVol, { n: formatHowNumber(conds.teamVolumeUSD, locale) }));
   if (conds.vDownlines) {
-    for (const [v, n] of Object.entries(conds.vDownlines)) parts.push(fmt(t.rank.cond.vDownlines, { n, v }));
+    for (const [v, n] of Object.entries(conds.vDownlines)) parts.push(fmt(t.rank.cond.vDownlines, { n: formatHowNumber(n, locale), v }));
   }
   return parts.length ? parts.join(" + ") : t.rank.cond.register;
 }
