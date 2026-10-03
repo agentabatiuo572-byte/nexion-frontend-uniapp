@@ -253,7 +253,8 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { publicStatsHealth } from "@/lib/platform-stats";
 import { MOCK_GLOBE_FIXTURE_ID, REGIONS, type RegionData } from "@/mock/globe-regions";
-import { dateLocale, fmt } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
 import type { NetworkRegionProjection } from "@/api/network-regions-api";
@@ -332,9 +333,12 @@ const pulseRegionId = computed<string | null>(() => {
 const uptimeText = computed(() => remoteApiEnabled
   ? t.value.globe.metricUnavailable
   : `${MOCK_GLOBE_FIXTURE_ID} · 99.20%`);
-const generatedAtText = computed(() => networkProjection.value
-  ? new Date(networkProjection.value.generatedAt).toLocaleString(dateLocale())
-  : t.value.globe.metricUnavailable);
+const generatedAtText = computed(() => {
+  const timestamp = Date.parse(networkProjection.value?.generatedAt ?? "");
+  return Number.isFinite(timestamp)
+    ? formatTrialDateTime(timestamp)
+    : t.value.globe.metricUnavailable;
+});
 const projectionStateTitle = computed(() => projectionStatus.value === "error"
   ? t.value.globe.regionProjectionErrorTitle
   : projectionStatus.value === "empty"

@@ -12,6 +12,7 @@ import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as viMessages } from "@/i18n/messages/vi";
 import { fmt } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import type { NetworkRegionProjection } from "@/api/network-regions-api";
 import { advanceRuntimeRevision, captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
@@ -101,6 +102,7 @@ async function mount(platform: "app" | "h5" = "app", failInitially = false, init
     "@/lib/platform-stats": { publicStatsHealth: () => ({ devicesOk: true }) },
     "@/mock/globe-regions": { MOCK_GLOBE_FIXTURE_ID: "unused", REGIONS: [] },
     "@/i18n/format": { fmt, dateLocale: () => "en-US" },
+    "@/lib/trial-date": { formatTrialDateTime },
     "@/composables/use-dialog-a11y": { useDialogA11y: () => {} },
     "@/api/runtime": { remoteApiEnabled: true, networkRegionsApi: api },
     "@dcloudio/uni-app": { onShow: (cb: () => void) => shows.push(cb), onHide: () => {} },
@@ -118,7 +120,52 @@ async function mount(platform: "app" | "h5" = "app", failInitially = false, init
   return { root, api, account, locale, shows, graph, controls, markup, drawer };
 }
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); vi.useRealTimers(); });
+afterEach(() => {
+  unmounts.splice(0).forEach(unmount => unmount());
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
+
+for (const [zone, expected] of [
+  ["Asia/Tokyo", "2026-10-04 00:02:46"],
+  ["Asia/Ho_Chi_Minh", "2026-10-03 22:02:46"],
+]) {
+  test.each(["english fallback", "throws"])(`BUG 415 ${zone} renders local numeric drawer dates when Android locale %s`, async (mode) => {
+    vi.stubEnv("TZ", zone);
+    const localeSpy = vi.spyOn(Date.prototype, "toLocaleString").mockImplementation(() => {
+      if (mode === "throws") throw new Error("Android locale formatter unavailable");
+      return "Sun Oct 04 2026 00:02:46 GMT+0900 (JST)";
+    });
+    for (const generatedAt of ["2026-10-03T15:02:46Z", "2026-10-04T00:02:46+09:00"]) {
+      const page = await mount("app", false, Promise.resolve({ ...projection(), generatedAt }));
+      emit(page.controls()[0], "onClick"); await settle();
+      for (const code of ["en", "vi", "zh"] as const) {
+        page.locale.value = code; await settle();
+        const copy = { en, zh, vi: viMessages }[code].globe;
+        expect(text(page.drawer()!)).toContain(fmt(copy.projectionUpdatedAt, { at: expected }));
+        expect(text(page.drawer()!)).not.toMatch(/Sun Oct|GMT\+|Invalid Date/);
+      }
+      emit(all(page.drawer()!).find(item => item.props["aria-label"] === zh.trial.sheetCloseAria)!, "onClick"); await settle();
+      const row = all(page.root).find(item => item.props.role === "button" && text(item).includes("Mobile region"))!;
+      emit(row, "onClick"); await settle();
+      expect(text(page.drawer()!)).toContain(fmt(zh.globe.projectionUpdatedAt, { at: expected }));
+      expect(page.api.list).toHaveBeenCalledOnce();
+    }
+    expect(localeSpy).not.toHaveBeenCalled();
+  });
+}
+
+test.each(["invalid", "", "+275761-01-01T00:00:00Z"])("BUG 415 renders the existing unavailable date for invalid generatedAt %s", async (generatedAt) => {
+  const page = await mount("app", false, Promise.resolve({ ...projection(), generatedAt }));
+  emit(page.controls()[0], "onClick"); await settle();
+  for (const code of ["en", "vi", "zh"] as const) {
+    page.locale.value = code; await settle();
+    const copy = { en, zh, vi: viMessages }[code].globe;
+    expect(text(page.drawer()!)).toContain(fmt(copy.projectionUpdatedAt, { at: copy.metricUnavailable }));
+    expect(text(page.drawer()!)).not.toMatch(/Invalid Date|NaN/);
+  }
+});
 
 test.each(["app", "h5"] as const)("%s exits cold-start loading after account and runtime rebinding succeeds", async (platform) => {
   const old = deferred<NetworkRegionProjection>();
