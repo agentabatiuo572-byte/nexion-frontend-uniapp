@@ -4,10 +4,11 @@
     <view class="message-center message-page" :style="{ top: top + 'px' }">
       <view class="message-nav">
         <view class="message-button message-icon-button" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="24" /><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 5-7 7 7 7" /></svg></view>
+        <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
         <view class="message-button message-icon-button" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="24" /><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 3 6 0 1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></view>
       </view>
-      <view v-if="!headerState.title" class="message-compact" role="button" tabindex="0" @click="revealSections"><LiquidGlass :radius="22" /><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
-      <view v-show="headerState.title" class="message-heading"><text class="message-title">{{ t.notifs.drawerTitle }}</text><view class="message-subtitle"><view v-if="center.totalUnread" class="message-status-dot" /><text>{{ unreadLabel }}</text></view></view>
+      <view v-if="!headerState.title" class="message-compact"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
+      <view v-show="headerState.title" class="message-heading"><view class="message-subtitle" role="status"><view class="message-unread-label"><view v-if="center.totalUnread" class="message-status-dot" /><text>{{ unreadLabel }}</text></view></view></view>
       <view v-show="headerState.primary" class="message-primary-wrap" @focusin="headerFocused = true" @focusout="headerFocused = false"><GlassSegments v-model="section" :options="sectionOptions" :label="t.notifs.drawerTitle" class="message-primary" /></view>
       <GlassSegments v-if="section === 'service'" v-model="serviceFilter" :options="serviceFilters" layout="scroll" semantics="radio" :label="t.notifs.serviceFilterLabel" class="message-filters" />
       <GlassSegments v-else :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" class="message-filters" />
@@ -32,7 +33,7 @@
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loading ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
         <view v-if="remoteApiEnabled && notifs.items.length" class="message-original"><text>{{ t.notifs.originalTextNote }}</text></view>
       </view>
-      <view :style="{ height: ((!headerState.title ? 92 : 0) + (!headerState.primary ? 64 : 0)) + 'px' }" aria-hidden="true" />
+      <view :style="{ height: ((!headerState.title ? 44 : 0) + (!headerState.primary ? 64 : 0)) + 'px' }" aria-hidden="true" />
       </scroll-view>
     </view>
     </template>
@@ -215,9 +216,19 @@ const serviceFilters = computed(() => [
   { value: "support", label: t.value.conversations.typeSupport }, { value: "ticket", label: t.value.notifs.ticketFilter },
 ]);
 function onMessageScroll(event: { detail: { scrollTop: number } }) { headerState.value = advanceMessageHeader(headerState.value, event.detail.scrollTop, headerFocused.value); }
-function revealSections() { headerState.value = { ...headerState.value, primary: true }; }
 function resetHeader() { headerState.value = createMessageHeaderState(); }
 watch(section, resetHeader);
 </script>
 
 <style src="@/styles/message-center.css"></style>
+<style scoped>
+.message-center .message-nav { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; gap: 12px; }
+.message-center .message-nav > .message-icon-button:last-child { grid-column: 3; }
+.message-center .message-nav .message-title { min-width: 0; font-size: 26px; line-height: 1.25; text-align: center; transition: opacity 180ms ease; }
+.message-center .message-nav .message-title--hidden { opacity: 0; }
+.message-center .message-compact { cursor: default; }
+.message-center .message-subtitle { justify-content: center; margin-top: 0; line-height: 20px; text-align: center; }
+.message-unread-label { position: relative; display: inline-flex; align-items: center; max-width: calc(100% - 30px); }
+.message-unread-label .message-status-dot { position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) { .message-center .message-nav .message-title { transition: none; } }
+</style>
