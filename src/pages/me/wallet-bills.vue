@@ -111,7 +111,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { walletBillMonthKey, walletBillMonthLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
@@ -243,7 +243,7 @@ function statusLabel(s: BillStatus): string {
   return t.value.bills.statusFailed;
 }
 function monthLabel(month: string, n: number): string {
-  return t.value.bills.monthLabel.replace("{month}", month).replace("{n}", String(n));
+  return fmt(n === 1 ? t.value.bills.monthLabelOne : t.value.bills.monthLabel, { month, n });
 }
 /**
  * 账单文案:有 memoKey 就**渲染时翻译**,没有才回落到写入时那句(存量 / 未迁移调用方)。
