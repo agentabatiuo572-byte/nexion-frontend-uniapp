@@ -60,7 +60,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
   // Owner requested removal of the unsolicited overview withdrawal warning.
   "me.vue": "4eb7f786750e279d7d7101415c5d4857dbbdcd20a4e2afcd4979b28f21c823e6",
-  "notifications.vue": "eb2b07878505154a39e4ec058c802dcd8d991f1d51e8b34fd7ae6630c49c812e",
+  // Reviewed centered navigation title, unread summary and noninteractive compact text.
+  "notifications.vue": "1cae817741a6fcc97485a07c30f15e6f1e5e7ebf0fc6c52945199110b2cc0c7b",
   "preferences.vue": "5c7a712cb60a21c7e24cbbe85783ea66503f1298724d035f4c8520251fcea632",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
   "proof.vue": "956e804b2c96dced42cc10cb0dd757e7abd5c4a6a3596c56bca63490e93f3616",
@@ -88,13 +89,17 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   // Approved unified center uses shared flat-row styles and fixed native scrolling.
-  "notifications.vue": "cf1fba4b028c3b72d09ca0ebb1e1c2063516e60718024e6add7cc5d418ec3413",
+  "notifications.vue": "16df2854933d30d28696ff4756ee14196c63761fa079209d69514c2df5aafc09",
   "proof.vue": "c21851c57140a23d48746e19c798781a56bccc946028165e9f3f61323e6eb2bd",
   "wallet-repurchase.vue": "49b410e94f8d119d898b3c05f01d735af70aac979d6f8d8559341b13841d1477"
 };
 
 function block(text: string, tag: "style" | "template"): string {
-  return text.replace(/\r\n/g, "\n").match(new RegExp(`<${tag}[^>]*>[\\s\\S]*?<\\/${tag}>`))?.[0] ?? "";
+  const normalized = text.replace(/\r\n/g, "\n");
+  if (tag === "style") {
+    return [...normalized.matchAll(/<style[^>]*>[\s\S]*?<\/style>/g)].map(match => match[0]).join("\n");
+  }
+  return normalized.match(/<template[^>]*>[\s\S]*?<\/template>/)?.[0] ?? "";
 }
 
 function quickKeys(section: string): string[] {
@@ -105,6 +110,12 @@ function quickKeys(section: string): string[] {
 }
 
 describe("Me page 5174 normal-state UI parity", () => {
+  it("includes every page-local style block in the visual fingerprint", () => {
+    const shared = '<style src="@/styles/message-center.css"></style>';
+    const local = '<style scoped>.message-title { text-align: center; }</style>';
+    expect(block(shared + "\n" + local, "style")).toBe(shared + "\n" + local);
+    expect(block(shared + "\n" + local.replace("center", "left"), "style")).not.toBe(block(shared + "\n" + local, "style"));
+  });
   it("checks the message center stylesheet content", () => {
     const css = readFileSync(new URL("../../styles/message-center.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     const digest = (value: string) => createHash("sha256").update(value).digest("hex");
