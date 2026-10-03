@@ -5,20 +5,13 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 24px">
+    <view class="message-family" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
       <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
         <text>{{ preferenceError }}</text>
-        <text
-          class="block"
-          style="margin-top: 6px;"
-          role="button"
-          tabindex="0"
-          :aria-label="t.ui.retry"
-          @click="prefs.refreshRemote()"
-
-          @keydown.enter.prevent="prefs.refreshRemote()" @keydown.space.prevent="prefs.refreshRemote()"
-        >{{ t.ui.retry }}</text>
+        <view class="family-control preferences-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
+          <LiquidGlass :radius="24" /><text>{{ t.ui.retry }}</text>
+        </view>
       </view>
 
       <!-- Sound + haptics -->
@@ -68,6 +61,7 @@
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
@@ -120,3 +114,9 @@ const footerStyle: CSSProperties = {
 
 
 </script>
+
+<style scoped>
+.preferences-retry { margin-top: 8px; }
+</style>
+
+<style src="@/styles/message-family.css"></style>

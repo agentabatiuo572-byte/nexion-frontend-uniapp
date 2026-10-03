@@ -7,6 +7,7 @@ import { createUniRealtimeSocket,setAppConversationRealtime } from '@/api/app-co
 import { catchUpConversation,mergeConversationMessages } from '@/api/conversation-history';
 import { remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
+import { isTicketReplyRequired } from '@/api/support-ticket-policy';
 import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
@@ -303,6 +304,7 @@ export const useConversations = defineStore("conversations", () => {
   function mustReadBack(cause: unknown): boolean {
     const error = asApiError(cause);
     return !isSupportAttachmentNotReady(cause)
+      && !isTicketReplyRequired(cause)
       && (error.status === 409 || (error.status ?? 0) >= 500 || error.kind === "network" || error.kind === "protocol");
   }
 

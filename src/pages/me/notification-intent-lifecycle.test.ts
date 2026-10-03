@@ -41,7 +41,7 @@ function mount(remote = true, realQueue = false, navigationQuery = "") {
   const confirm = vi.fn((options: Parameters<typeof ui.confirm>[0]) => realQueue ? ui.confirm(options) : confirmation.promise);
   const modules: Record<string, unknown> = {
     vue: { ...vue, inject: (_key: unknown, fallback: unknown) => fallback, onMounted: (fn: () => void) => hooks.mounted.push(fn), onUnmounted: (fn: () => void) => hooks.unmount.push(fn) },
-    "@dcloudio/uni-app": { onLoad: (fn: (...args: any[]) => void) => hooks.load.push(fn), onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
+    "@dcloudio/uni-app": { onResize: vi.fn(), onLoad: (fn: (...args: any[]) => void) => hooks.load.push(fn), onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
     "@/lib/notification-category": { notificationCategory },
     "@/lib/message-header-scroll": { advanceMessageHeader, createMessageHeaderState },
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },

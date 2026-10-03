@@ -21,4 +21,11 @@ describe("message center scroll header", () => {
     expect(advance(compact, 0, false, 1100).title).toBe(true);
     expect(advance(compact, 0, false, 1100).primary).toBe(true);
   });
+  it("honors a real reversal while a collapse is still animating", () => {
+    const compact = advance(initial(), 200, false, 1000);
+    const reversed = advance(compact, 160, false, 1040, true);
+    expect([reversed.title, reversed.primary]).toEqual([false, true]);
+    expect(advance(reversed, 210, false, 1090, true).primary).toBe(false);
+    expect(advance(reversed, 210, true, 1090, true).primary).toBe(true);
+  });
 });

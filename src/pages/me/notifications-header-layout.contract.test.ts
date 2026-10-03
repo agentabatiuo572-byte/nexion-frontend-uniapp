@@ -77,7 +77,10 @@ describe("message page header content contract", () => {
     const title = all.find(node => hasClass(node, "message-title"))!;
     expect(title.loc.source).toContain("'message-title--hidden': !headerState.title");
     expect(title.loc.source).toContain(':aria-hidden="!headerState.title"');
-    expect(source).toContain('v-if="!headerState.title" class="message-compact"');
+    const compact = all.find(node => hasClass(node, "message-compact"))!;
+    expect(compact.loc.source).toContain("'message-compact--visible': !headerState.title");
+    expect(compact.loc.source).toContain(':aria-hidden="headerState.title"');
+    expect(compact.props.some(prop => prop.type === 7 && ["if", "show"].includes(prop.name))).toBe(false);
     const html = await renderHeader(zh, 298, false);
     const titleMarkup = html.match(/<text[^>]*role="heading"[^>]*>/)?.[0];
     expect(titleMarkup).toContain("message-title--hidden");

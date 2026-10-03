@@ -4349,41 +4349,53 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 #### 11.8.3 工单系统 `/me/support/tickets`
 
-私密 1:1 客服对话系统,对标 Binance Customer Service / Coinbase Help Tickets / Crypto.com Support。
-**单页 3 view mode**(本地 React state 切换,无路由跳转):
+**目的与入口**：提供仅本人可访问的客服工单、历史消息与后续回复。UniApp 页面为 `/pages/me/support-tickets`，包含列表、创建、详情三种状态；`?mode=create&cat={category}` 可预选合法分类，`?ticket={ticketNo}` 可进入指定工单。消息中心“服务”分区聚合工单提醒，客服渠道页可直接进入创建页。
 
-**A. List mode(默认)**:
-- Subtitle + 3 stats 卡:`OPEN` / `AWAITING YOU` / `RESOLVED lifetime`
-- `+ New ticket` CTA
-- `Median first response · 12 min` chip
-- 4 tabs:All / Open / Resolved / Closed
-- 工单行:status icon + `STATUS · CATEGORY · TK-ID` chip + 未读 chip(`N new`)+ 标题 + 相对时间 + msg count
+**列表与详情**：列表支持全部、进行中、已解决、已关闭筛选，展示服务端返回的工单号、分类、状态、标题、更新时间、消息数和未读数。详情读取真实消息线程，支持加载较早消息；成功读取并提交已读回执后更新未读。仅查看服务总览不标记工单已读。响应时限读取服务端分类 SLA 目标，不将目标当作历史平均响应统计。
 
-**B. Detail mode**(点列表行):
-- Meta 卡:status / category / 标题 / Created {when} / Last update {when}
-- 消息线程:用户消息靠右,客服消息靠左,顶行带名字 + 时间
-- 回复 textarea + `Send reply` + `Mark closed` 双按钮(已 closed / resolved 状态隐藏)
+**创建输入与数据**：
 
-**C. Create mode**(点 New ticket):
-- 8 个分类 chip:Withdrawal / Deposit / KYC / Hardware / Account / Earnings / Technical / Other
-- Subject 输入 + Description textarea
-- Cancel / Submit ticket 双按钮 + 空字段校验
+| 字段 | 约束 |
+|---|---|
+| 分类 | `account` / `withdrawal` / `deposit` / `hardware` / `earnings` / `genesis` / `technical` / `other`，共 8 类 |
+| 标题 | 去除首尾空白后必填，1–160 字符 |
+| 描述 | 去除首尾空白后必填，1–2000 字符 |
+| 优先级 | 数据枚举为 `low` / `normal` / `high` / `urgent`；App 新建固定为 `normal`，不由表单自行升级 |
 
-**TicketStatus 枚举与颜色**:
-| status | label | color |
-|---|---|---|
-| open          | Open          | #FFC83D |
-| in_progress   | In progress   | #3DA9FF |
-| pending_user  | Awaiting you  | #FF6B35 |
-| resolved      | Resolved      | #C6FF3A |
-| closed        | Closed        | #5F6A7E |
+创建页按当前语言和分类读取相关 FAQ。工单包含编号、标题、分类、状态、优先级、版本、创建及更新时间、消息数、未读数；详情另含消息作者、正文、时间和历史分页游标。正式数据经 `src/api/support-api.ts` 读写，不由本地示例工单生成。
 
-**TicketCategory 枚举**:account / withdrawal / deposit / kyc / hardware / earnings / genesis / technical / other。
-**TicketPriority 枚举**:low / normal / high / urgent。
+**专属客服归属**：四类创建入口都由服务端读取当前有效的客服绑定，自动确定工单负责人；App 不选择或上送任意负责人。未绑定时仍可提交，进入既有待分配流程。首次绑定或正式转绑时，同事务同步该账号全部未删除工单（含已关闭及归档）的当前负责人，历史消息作者保持原样。客服忙碌、离线或停用不自动改派，交接沿用主管客户分配流程；工单不能独立转给其他客服。后台回复仍验证当前绑定与既有权限，工单归属变化不扩大私聊副本的阅读范围。
 
-**Mock 数据**(`lib/mock/tickets.ts`):7 个工单(2 进行中 / 1 等用户 / 1 处理中 / 2 已解决 / 1 已关闭),每个含完整消息线程(2-5 条对话)。
+**建单规则**：同一账号的 App 建单、App 会话转工单、后台建单及后台会话转工单共用服务端限制，提交时重新判定，客户端预检查不保留名额。
 
-i18n keys 在 `tickets.*` namespace,~40 keys。
+| 规则 | 默认值与判定 |
+|---|---|
+| 相邻新单冷却 | 60 秒 |
+| 滚动建单总量 | 任意连续 24 小时最多 10 单；关闭、归档或软删除不返还该窗口内的次数 |
+| 活跃工单数量 | 已有 3 张未软删除的工单处于 `open` / `in_progress` / `pending_user` 时禁止新建；仅归档不释放活跃名额 |
+| 重复内容 | 24 小时内，同账号、分类、标题与首条正文相同则不再建单，返回已有工单号供继续处理；标题和正文先做 Unicode NFC 及空白规范化，分类忽略首尾空白与大小写 |
+
+三个数量参数由服务端 `support.ticket.creation.cooldown_seconds`、`support.ticket.creation.max_per_24h`、`support.ticket.creation.max_active` 控制，App 以接口返回值为准。建单限制不阻断既有工单的合法回复或重开。
+
+**状态与动作**：
+
+| 状态 | App 可用动作 |
+|---|---|
+| `open` 待处理 | 回复、关闭 |
+| `in_progress` 处理中 | 回复后回到 `open`；可关闭 |
+| `pending_user` 待补充 | 回复后回到 `open`；可关闭 |
+| `resolved` 已解决 | 可回复，回复后重开为 `open`；页面不显示关闭按钮 |
+| `closed` 已关闭 | 只读历史，不可回复 |
+
+归档工单不可回复。回复、关闭和已读写入携带预期状态与版本；并发冲突应读取服务端最新结果，不覆盖较新状态。
+
+详情按服务端消息顺序和日期展示记录；长记录可展开与收起且保留完整原文，折叠状态按账号、工单和消息隔离，历史作者仅显示消息公开署名或通用客服称谓。
+
+**接口与异常**：`GET /api/app/support/tickets/creation-policy` 返回当前可建单状态、限制原因、重试时间和可继续处理的工单号。策略读取中、读取失败或内容不合法时禁用新建提交，保留当前表单输入并提供重试。`POST /api/app/support/tickets` 成功后进入真实工单详情；暂时拒绝保留输入，提示何时重试或查看已有工单，重复内容以 409 返回旧工单号，其他建单限制以 429 返回策略。
+
+创建和回复使用 `Idempotency-Key` 标识同一提交意图：成功重试返回原结果，不新增工单或消息；暂时拒绝可在限制解除后以原键重试。结果未知时查询原命令或同键重试，不因刷新或网络失败另建同一工单。换账号清除前一账号的页面输入与策略状态。
+
+**验收**：空白及超长输入被拒；八类均可按合法参数提交；并发建单不突破限制；关闭后不能绕过 24 小时次数限制；重复内容可定位旧单；策略失败保留当前输入并停止提交；`resolved` 回复可重开，`closed` 不可回复；详情返回消息中心后仍在服务分区。文案使用 `tickets.*`，覆盖中、英、越三种语言。
 
 ### 11.8.4 统一会话中心 `/support/messages` + `/support/chat`
 

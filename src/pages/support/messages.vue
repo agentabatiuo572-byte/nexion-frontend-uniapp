@@ -1,7 +1,6 @@
 <!--
-  Conversation center — full-screen unified support inbox. Left vertical rail
-  switches customer-service category (Advisor / Support / Nova AI); the right column
-  lists that category's conversations. Tapping a row opens the full-screen chat page.
+  Conversation management — horizontal category selection followed by a flat
+  list of existing conversations. Tapping a row opens the full-screen chat page.
 
   The "ai" category is virtual: its single row is synthesised from the nova store
   (Nova's transcript + unread), so the existing proactive push channels keep feeding
@@ -10,22 +9,13 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 32px">
+    <view class="message-family" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/me" :title="t.conversations.title" />
 
       <view class="nx-conv-center">
-        <!-- Left type rail -->
-        <GlassSegments v-model="selectedType" :options="typeOptions" layout="vertical" class="nx-conv-rail" :label="t.conversations.typeGroupLabel">
-          <template #option="{ option, selected }">
-            <view class="nx-conv-rail-ico" :style="{ color: selected ? String(option.tint) : 'var(--v5-ink-3)' }">
-              <view v-html="option.icon" />
-              <view v-if="option.count" class="nx-conv-rail-dot" />
-            </view>
-            <text class="nx-conv-rail-label">{{ option.label }}</text>
-          </template>
-        </GlassSegments>
+        <GlassSegments v-model="selectedType" :options="typeOptions" class="nx-conv-rail" :label="t.conversations.typeGroupLabel" />
 
-        <!-- Right conversation list -->
+        <!-- Conversation list -->
         <view class="nx-conv-listcol">
           <view
             v-if="convStore.categoryAvailabilityStatus === 'loading' && TYPES.length === 0 && !convStore.error"
@@ -38,14 +28,16 @@
           <template v-else>
           <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.realtimeFallback" class="nx-conv-refresh-warning" role="status" aria-live="polite">
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.realtimeFallback }}</text>
-            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations"  @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry family-control" @click="retryConversations"  @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
+              <LiquidGlass :radius="24" />
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
           <view v-if="remoteApiEnabled && selectedType !== 'ai' && convStore.advisorError" class="nx-conv-refresh-warning" role="alert">
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.image.advisorUnavailable }}</text>
-            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" :aria-label="t.conversations.retry"
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry family-control" :aria-label="t.conversations.retry"
               @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()">
+              <LiquidGlass :radius="24" />
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
@@ -53,7 +45,7 @@
                first durable timeline entry; this surface never invents an opening. -->
           <view
             v-if="canStartConversation"
-            class="nx-conv-contact active:opacity-80"
+            class="nx-conv-contact family-control active:opacity-80"
             :class="{ 'nx-conv-contact--advisor': selectedType === 'advisor' }"
             role="button"
             tabindex="0"
@@ -62,6 +54,7 @@
 
             @keydown.enter.prevent="onStartConversation()" @keydown.space.prevent="onStartConversation()"
           >
+              <LiquidGlass :radius="24" />
             <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="selectedType === 'advisor' ? ADVISOR_ICON : SUPPORT_ICON" /></view>
             <text class="nx-conv-contact-t">{{ contactLabel }}</text>
           </view>
@@ -71,19 +64,15 @@
             class="nx-conv-refresh-warning"
           >
             <text class="nx-conv-refresh-warning__text">{{ t.conversations.staleSnapshot }}</text>
-            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry" @click="retryConversations">
+            <view role="button" tabindex="0" class="nx-conv-refresh-warning__retry family-control" @click="retryConversations">
+              <LiquidGlass :radius="24" />
               <text>{{ t.conversations.retry }}</text>
             </view>
           </view>
-          <EmptyState
-            v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length === 0"
-            kind="recoverable-error"
-            :title="t.conversations.loadError"
-            :desc="t.conversations.loadErrorDesc"
-            :cta-label="t.conversations.retry"
-            compact
-            @cta="retryConversations"
-          />
+          <view v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length === 0" class="nx-conv-retry-state">
+            <EmptyState kind="recoverable-error" :title="t.conversations.loadError" :desc="t.conversations.loadErrorDesc" compact />
+            <view class="family-control" role="button" tabindex="0" :aria-label="t.conversations.retry" @click="retryConversations"><LiquidGlass :radius="24" /><text>{{ t.conversations.retry }}</text></view>
+          </view>
           <EmptyState
             v-else-if="convStore.categoryAvailabilityStatus === 'ready' && TYPES.length === 0"
             kind="empty-list"
@@ -122,9 +111,10 @@
             </view>
           </view>
           <view v-if="!r.isAi && convStore.dismissalAvailable" class="nx-conv-rowactions">
-            <view role="button" tabindex="0" class="nx-conv-remove"
+            <view role="button" tabindex="0" class="nx-conv-remove family-control"
               :aria-label="t.conversations.removeFromList + ' · ' + r.name" :aria-disabled="convStore.dismissingIds[r.id] === true"
               @click="removeRow(r)"  @keydown.enter.prevent="removeRow(r)" @keydown.space.prevent="removeRow(r)">
+              <LiquidGlass :radius="24" />
               <text>{{ convStore.dismissingIds[r.id] ? t.conversations.removing : t.conversations.removeFromList }}</text>
             </view>
           </view>
@@ -143,6 +133,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -404,8 +395,8 @@ function avaStyle(tint: string): CSSProperties {
     display: "grid",
     placeItems: "center",
     flexShrink: 0,
-    color: tint,
-    background: `color-mix(in srgb, ${tint} 14%, transparent)`,
+    color: "var(--v5-ink-2)",
+    background: "var(--v5-surface-2)",
   };
 }
 
@@ -415,18 +406,18 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
 
 <style scoped>
 .nx-conv-rowactions { display: flex; justify-content: flex-end; padding: 0 16px 4px; }
-.nx-conv-remove { min-height: 44px; display: flex; align-items: center; color: var(--v5-ink-3); font-size: 12px; padding: 0 8px; }
+.nx-conv-remove { min-height: 44px; display: flex; align-items: center; color: var(--v5-ink-3); font-size: 12px; padding: 0 16px; }
 .nx-conv-remove[aria-disabled="true"] { opacity: .5; }
 .nx-conv-remove-hint, .nx-conv-remove-error { display: block; padding: 12px 16px; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; }
 .nx-conv-remove-error { color: var(--v5-danger, #c44); }
 .nx-conv-center {
   display: flex;
-  gap: 0;
-  /* No top padding — the sub-page header already supplies the 24px header→content gap. */
-  padding: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px;
 }
-.nx-conv-rail { width: 84px; flex-shrink: 0; align-self: flex-start; margin-right: 8px; }
-.nx-conv-rail :deep(.nx-conv-rail-item) { flex-direction: column; min-height: 72px; padding: 10px 4px; }
+.nx-conv-rail { width: 100%; flex-shrink: 0; box-sizing: border-box; }
+.nx-conv-rail :deep(.nx-conv-rail-item) { min-height: 44px; }
 .nx-conv-rail-ico {
   position: relative;
   width: 30px;
@@ -462,10 +453,11 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
   justify-content: center;
   gap: 8px;
   min-height: 48px;
-  margin: 10px 16px 4px;
+  margin: 4px 0 12px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--contact-tint) 12%, transparent);
-  color: var(--contact-tint);
+  background: transparent;
+  color: var(--v5-ink-2);
+  width: 100%;
 }
 .nx-conv-contact--advisor {
   --contact-tint: var(--v5-brand);
@@ -492,7 +484,7 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 8px 16px;
+  margin: 8px 0;
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--v5-warning-soft);
@@ -506,7 +498,7 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
 }
 .nx-conv-refresh-warning__retry {
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 16px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -529,7 +521,7 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
   align-items: center;
   gap: 12px;
   min-height: 64px;
-  padding: 12px 16px;
+  padding: 20px 0;
   border-bottom: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent);
 }
 .nx-conv-ava {
@@ -547,7 +539,7 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
 }
 .nx-conv-rowname {
   font-family: var(--font-v5);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.008em;
   color: var(--v5-ink);
@@ -584,7 +576,7 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--v5-brand-2);
+  background: var(--v5-brand-soft);
   display: grid;
   place-items: center;
 }
@@ -592,7 +584,14 @@ const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, l
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-v5);
-  color: var(--v5-on-brand-2);
+  color: var(--v5-brand);
   line-height: 1;
 }
+.nx-conv-retry-state { text-align: center; padding-bottom: 16px; }
+.nx-conv-rowtop { flex-wrap: wrap; }
+.nx-conv-rowname { overflow-wrap: anywhere; white-space: normal; }
+.nx-conv-refresh-warning { flex-wrap: wrap; }
+.nx-conv-refresh-warning__text { flex-basis: 180px; }
 </style>
+
+<style src="@/styles/message-family.css"></style>

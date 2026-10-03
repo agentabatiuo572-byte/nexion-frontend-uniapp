@@ -249,6 +249,7 @@ import * as chatSecure from "@/lib/secure-command-id";
 import * as chatFormat from "@/i18n/format";
 import * as chatApiErrors from "@/api/errors";
 import { isSupportAttachmentNotReady } from "@/api/support-api";
+import * as ticketPolicy from '@/api/support-ticket-policy';
 import { useAuth } from "@/store/auth";
 import { createSessionVault } from "@/api/session-vault";
 import { binarySessionReady } from "@/lib/binary-session-ready";
@@ -275,11 +276,12 @@ function chatDeferred() {
 }
 const chatCleanups: Array<() => void> = [];
 afterEach(() => { chatCleanups.splice(0).forEach(stop => stop()); });
-function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) {
+function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }, messages = zh) {
   setActivePinia(createPinia()); vi.clearAllMocks();
   chatTransport.conversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.replyConversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.startConversation.mockReset().mockResolvedValue(humanSnapshot());
+  chatTransport.commandResult.mockReset().mockResolvedValue(null);
   chatTransport.convertConversationToTicket.mockReset().mockResolvedValue({ conversation: humanSnapshot(), ticket: { id: "TK-fixture" } });
   chatTransport.conversationCategories.mockReset().mockResolvedValue({ advisor: true, support: true, ai: false });
   const store = useConversations(); store.bindAccount("user:1");
@@ -298,7 +300,7 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
   const modules: Record<string, unknown> = {
     vue: { ...Vue, onUnmounted: (fn: () => void) => { hooks.unmount = fn; } },
     "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onUnload", "onShow", "onHide"].map(name => [name, (fn: () => void) => { hooks[name] = fn; }])),
-    "@/i18n/use-t": { useT: () => Vue.ref(zh) }, "@/i18n/format": chatFormat,
+    "@/i18n/use-t": { useT: () => Vue.ref(messages) }, "@/i18n/format": chatFormat,
     "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: false },
     "@/lib/route": navigation, "@/lib/send-limiter": chatLimiter,
@@ -309,11 +311,12 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
     "@/mock/nova-templates": {}, "@/api/runtime": { novaAiApi: {}, remoteApiEnabled: true, sessionVault },
     "@/api/errors": chatApiErrors,
     "@/api/support-api": { isSupportAttachmentNotReady },
+    '@/api/support-ticket-policy': ticketPolicy,
     "@/lib/nova-failure": chatFailure, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": chatSecure, "@/lib/nova-thinking": chatThinking, "./conversation-realtime-page": chatRealtime,
   };
   const scope = Vue.effectScope();
-  const page = scope.run(() => new Function("require", "exports", humanChatScript + ";return { onSend, onConvertToTicket, cleanup };")((name: string) => {
+  const page = scope.run(() => new Function("require", "exports", humanChatScript + ";return { onSend, onConvertToTicket, cleanup, ticketCreationBlock, ticketCreationBlockText };")((name: string) => {
     if (name.endsWith(".vue")) return {}; if (!(name in modules)) throw new Error(`Unexpected chat dependency: ${name}`); return modules[name];
   }, {}));
   hooks.onLoad(query); chatCleanups.push(() => { page.cleanup(); scope.stop(); });
@@ -329,6 +332,52 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }) 
 }
 
 describe("real chat and store account recovery", () => {
+  it.each([
+    [zh, "客服回复当前消息后，才可转为工单。可先在此会话继续沟通。"],
+    [en, "Wait for a service agent to reply before creating a ticket. You can continue this conversation."],
+    [vietnamese, "Vui lòng chờ nhân viên hỗ trợ trả lời trước khi tạo phiếu. Bạn có thể tiếp tục cuộc trò chuyện này."],
+  ])("explains the server reply prerequisite in the selected language", async (messages, notice) => {
+    const current = mountRealHumanChat({ cid: "CV-cold" }, messages); await current.show();
+    chatTransport.commandResult.mockRejectedValue(new chatApiErrors.ApiError({
+      kind: "http", status: 409, message: "SUPPORT_COMMAND_FAILED_RETRYABLE",
+    }));
+    chatTransport.convertConversationToTicket.mockRejectedValueOnce(new chatApiErrors.ApiError({
+      kind: "http", status: 409, message: "SUPPORT_REPLY_REQUIRED",
+    }));
+    await current.page.onConvertToTicket();
+    expect(current.toast.warn).toHaveBeenCalledExactlyOnceWith(notice);
+    expect(current.toast.error).not.toHaveBeenCalled();
+    expect(chatTransport.commandResult).not.toHaveBeenCalled();
+    expect(current.page.ticketCreationBlock.value).toBeNull();
+    expect(current.store.get("CV-cold")?.status).toBe("open");
+    expect(current.navigation.navTo).not.toHaveBeenCalled();
+    await current.page.onSend("Continue the conversation", vi.fn());
+    expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
+  });
+  it("does not treat an unrelated failure as a reply prerequisite", async () => {
+    const current = mountRealHumanChat(); await current.show();
+    chatTransport.convertConversationToTicket.mockRejectedValueOnce(new Error("SUPPORT_REPLY_REQUIRED"));
+    await current.page.onConvertToTicket();
+    expect(current.toast.warn).not.toHaveBeenCalled();
+    expect(current.toast.error).toHaveBeenCalledExactlyOnceWith(zh.conversations.convertTicketFailed, "");
+  });
+  it("keeps a quota-refused conversation open and clears its notice on account rebinding", async () => {
+    const current = mountRealHumanChat(); await current.show();
+    const policy: ticketPolicy.TicketCreationPolicy = { allowed: false, reasonCode: 'SUPPORT_TICKET_CREATE_ACTIVE_LIMIT',
+      retryAfterSeconds: 0, retryAt: null, existingTicketNo: 'TK-existing', cooldownSeconds: 60,
+      windowHours: 24, maxCreatedInWindow: 10, maxActiveTickets: 3, createdInWindow: 3, activeTickets: 3 };
+    chatTransport.convertConversationToTicket.mockRejectedValueOnce(new ticketPolicy.TicketCreationDenied(policy));
+    await current.page.onConvertToTicket();
+    expect(current.page.ticketCreationBlock.value).toEqual(policy);
+    expect(current.page.ticketCreationBlockText.value).toContain('3');
+    expect(current.store.get('CV-cold')?.status).toBe('open');
+    expect(current.navigation.navTo).not.toHaveBeenCalled();
+    expect(current.toast.error).not.toHaveBeenCalled();
+    await current.page.onSend('Continue this existing conversation', vi.fn());
+    expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
+    current.rebind(); await Vue.nextTick();
+    expect(current.page.ticketCreationBlock.value).toBeNull();
+  });
   it("redirects an old AI link before opening a category or sending a request", async () => {
     const current = mountRealHumanChat({ type: "ai" });
     expect(current.navigation.navReplace).toHaveBeenCalledExactlyOnceWith("/pages/support/messages");
@@ -497,6 +546,7 @@ describe("rendered human composer account boundary", () => {
     const thread = new Function("require", "exports", composerScript + ";return exports.default;")((name: string) => {
       if (name === "vue") return { ...Vue, onMounted: vi.fn() };
       if (name === "@/composables/use-dialog-a11y") return { useDialogA11y: vi.fn() };
+      if (name === "@/components/liquid-glass.vue") return { default: { render: () => null } };
       throw new Error(`Unexpected composer dependency: ${name}`);
     }, {});
     const empty: unknown[] = [], root = element("root");

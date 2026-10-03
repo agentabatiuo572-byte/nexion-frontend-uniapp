@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { parseTicketCreationPolicy, requireTicketCreationResult, ticketCreationDenials, type TicketCreationPolicy } from './support-ticket-policy';
 import { parseServerTimestamp } from "./server-time";
 import type { Conversation, ConversationCategoryAvailability, ConvMessage, SupportFaq, SupportSlaTarget, Ticket, TicketCategory, TicketMessage, TicketPriority, TicketStatus } from "@/domain/support";
 
@@ -29,6 +30,7 @@ export interface SupportApi {
   authorityRevision(): Promise<string>;
   advisor(): Promise<CurrentAdvisor>;
   tickets(): Promise<Page<Ticket>>;
+  ticketCreationPolicy(): Promise<TicketCreationPolicy>;
   ticket(id: string, beforeMessageId?: number): Promise<Ticket>;
   markTicketRead(ticket: Ticket): Promise<Ticket>;
   createTicket(input: TicketInput, key: string): Promise<Ticket>;
@@ -265,9 +267,10 @@ export function createSupportApi(client: ApiClient): SupportApi {
     authorityRevision: async () => "canonical-v1",
     advisor: async () => parseCurrentAdvisor(await client.request({ method: "GET", path: `${supportRoot}/advisor` })),
     tickets: allTickets,
+    ticketCreationPolicy: async () => parseTicketCreationPolicy(await client.request({ method: 'GET', path: await supportPath('/tickets/creation-policy') })),
     ticket: async (id, beforeMessageId) => parseTicketDetail(await client.request({ method: "GET", path: `${await supportPath(`/tickets/${pathId(id)}`)}${pathCursor(beforeMessageId)}` })),
     markTicketRead: async ticket => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/read`), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version } })),
-    createTicket: async (input, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath("/tickets"), idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim(), clientMessageId: key } })),
+    createTicket: async (input, key) => parseTicketDetail(requireTicketCreationResult(await client.request({ method: "POST", path: await supportPath("/tickets"), idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim(), clientMessageId: key }, acceptedResponses: ticketCreationDenials }))),
     replyTicket: async (ticket, body, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     closeTicket: async (ticket, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/close`), idempotencyKey: requiredKey(key), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     conversations: allConversations,
@@ -310,7 +313,7 @@ export function createSupportApi(client: ApiClient): SupportApi {
     },
     cancelAttachment: async (id, key) => { parseAttachment(await client.request({ method: "DELETE", path: `${supportRoot}/attachments/${pathId(id)}`, idempotencyKey: requiredKey(key) })); },
     convertConversationToTicket: async (conversation, category, title, key) => {
-      const v = row(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/ticket`), idempotencyKey: requiredKey(key), body: { category, title: title.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key } }));
+      const v = row(requireTicketCreationResult(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/ticket`), idempotencyKey: requiredKey(key), body: { category, title: title.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key }, acceptedResponses: ticketCreationDenials })));
       if (!v) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID"); return { conversation: parseConversationHeader(v.conversation), ticket: parseTicketDetail(v.ticket) };
     },
     commandResult: async key => {

@@ -11,10 +11,10 @@
 .message-center .message-title { font-size: 34px; font-weight: 600; line-height: 1.25; color: var(--v5-ink); }
 .message-center .message-subtitle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font-size: 13px; margin-top: 10px; }
 .message-center .message-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-brand); flex-shrink: 0; }
-.message-center .message-primary { margin-bottom: 12px; }
+.message-center .message-primary-inner { padding-bottom: 12px; }
 .message-center .message-filters { margin-bottom: 12px; }
 .message-center .message-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 4px 0 10px; }
-.message-center .message-action { font-size: 13px; padding-inline: 13px; }
+.message-center .message-action { font-size: 13px; padding-inline: 16px; }
 .message-center .notification-item { border-bottom: 1px solid color-mix(in srgb, var(--v5-border) 55%, transparent); }
 .message-center .notification-row { display: flex; align-items: flex-start; gap: 15px; padding: 24px 0; min-height: 44px; cursor: pointer; }
 .message-center .notification-icon { flex-shrink: 0; width: 28px; padding-top: 2px; color: var(--v5-ink-2); }
@@ -38,13 +38,17 @@
 .message-center .message-scroll { flex: 1; height: 0; min-height: 0; }
 .message-center .message-scroll .uni-scroll-view { overflow-anchor: none; }
 .message-center .message-nav { flex-shrink: 0; }
-.message-center .message-compact { position: absolute; top: 8px; left: 78px; right: 78px; min-height: 44px; display: flex; justify-content: center; align-items: center; font-size: 13px; font-weight: 600; color: var(--v5-ink); text-align: center; cursor: pointer; }
+.message-center .message-compact { position: absolute; top: 8px; left: 78px; right: 78px; min-height: 44px; display: flex; justify-content: center; align-items: center; font-size: 13px; font-weight: 600; color: var(--v5-ink); text-align: center; cursor: pointer; opacity: 0; transform: translateY(6px); pointer-events: none; visibility: hidden; transition: opacity 180ms ease, transform 260ms cubic-bezier(.22,1,.36,1), visibility 0s 260ms; }
+.message-center .message-compact--visible { opacity: 1; transform: translateY(0); pointer-events: auto; visibility: visible; transition-delay: 0s; }
+.message-center .message-collapse { flex-shrink: 0; overflow: hidden; opacity: 1; transform: translateY(0); transition: height 260ms cubic-bezier(.22,1,.36,1), opacity 200ms ease, transform 260ms cubic-bezier(.22,1,.36,1); }
+.message-center .message-collapse--hidden { opacity: 0; transform: translateY(-6px); pointer-events: none; }
+.message-center .message-scroll-compensation { transition: height 260ms cubic-bezier(.22,1,.36,1); }
 .message-center .message-compact:focus-visible { outline: 2px solid var(--v5-brand); }
 .message-center .nx-glass-option--selected { color: var(--v5-bg); }
 .message-center .nx-liquid-glass--selection .nx-liquid-tint { background: linear-gradient(155deg, color-mix(in srgb, var(--v5-ink) 98%, var(--v5-surface)), color-mix(in srgb, var(--v5-ink) 65%, var(--v5-surface))); }
 .message-center .nx-glass-option__label { font-size: 13px; }
-.message-center .nx-glass-segments--scroll .nx-glass-option { padding-inline: 14px; }
-@media (prefers-reduced-motion: reduce) { .message-center .message-heading, .message-center .message-primary { transition: none; } }
+.message-center .nx-glass-segments .nx-glass-option { padding-inline: 16px; }
+@media (prefers-reduced-motion: reduce) { .message-center .message-collapse, .message-center .message-compact, .message-center .message-scroll-compensation { transition: none; transform: none; } }
 
 .message-center .message-compact > text { position: relative; }
 
