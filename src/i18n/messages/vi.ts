@@ -1459,6 +1459,7 @@ identityLabel: "Chủ sở hữu Genesis",
     // câu này không được trỏ tới kênh ngoài App mà người dùng không thể tìm thấy. #90
     noteInternal: "Yêu cầu hỗ trợ là trao đổi riêng 1:1 với đội hỗ trợ. Với câu hỏi chung, trò chuyện trực tiếp nhanh hơn.",
     backToTickets: "Về danh sách yêu cầu",
+    viewTicketList: "Xem danh sách",
   },
 
 

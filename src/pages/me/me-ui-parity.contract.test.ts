@@ -7,6 +7,7 @@ import { env } from "node:process";
 // @ts-expect-error This contract runs in Node.
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parse } from '@vue/compiler-sfc';
 
 const source = readFileSync(new URL("./me.vue", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const formalMeDir = new URL("./", import.meta.url);
@@ -61,7 +62,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Owner requested removal of the unsolicited overview withdrawal warning.
   "me.vue": "4eb7f786750e279d7d7101415c5d4857dbbdcd20a4e2afcd4979b28f21c823e6",
   // Approved smooth centered message header and shared message-family interactions.
-  "notifications.vue": "020a46e2c24e785f117dd356f3c1d7738ae4e2380034e25549d7e0822089d0ad",
+  "notifications.vue": "0c754690e400fe1b137de31e968d31a0f347c5020ed6d4a22322abb7fe327344",
   "preferences.vue": "f671d2462d5c346657790bfb9f75c92cfb0a63d1039c886ed8ad02cd6789e3cc",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
   "proof.vue": "956e804b2c96dced42cc10cb0dd757e7abd5c4a6a3596c56bca63490e93f3616",
@@ -70,7 +71,7 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "rewards.vue": "2d899c2643e74a74e5ad4102a8d7c6b328d539cd5368dfe977fe1529c167a782",
   "risk-disclosure.vue": "5f1d1f52b62559b79785d91fd28fd9e4de6597cf91b9174a87191740c95ba2bf",
   "security.vue": "277a220c6aeb77b2c7316ee00dcb945a43d6e63ddb1891888958b19a7cf8e164",
-  "support-tickets.vue": "9fb0c49d1110800bb2d1b974d6f80b7c96a57ecd23809e83032bf2317de141f2",
+  "support-tickets.vue": "866c04a6eb877e0a14cb3b4744f817551d643e7d034677e95f3ea99aaaa5d098",
   "support.vue": "9a89c364bbc52d36f0218752b5bb69ffbba692fd113feaf285e7d0273180bad0",
   "trial.vue": "9ba1ff2296064a5ccf0c750018c06c722853136431dc2f8e14ffa0ef7bd20d2e",
   "wallet-address-rebind.vue": "64f22ae20b3725ff6df6c516a9f99a6714efd94834cc5b02734c146e377e9e32",
@@ -89,10 +90,10 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   // Approved unified center uses shared flat-row styles and fixed native scrolling.
-  "notifications.vue": "16df2854933d30d28696ff4756ee14196c63761fa079209d69514c2df5aafc09",
+  "notifications.vue": "e065437c45004cdd395d81d27ebc06f17e7f3e4c5da3e9e9f7092d8204e2d30a",
   "preferences.vue": "2329be1da2edb9adaa473f5ef7408aa3edd688413331fdf42c4abd406c57415f",
   "proof.vue": "c21851c57140a23d48746e19c798781a56bccc946028165e9f3f61323e6eb2bd",
-  "support-tickets.vue": "6590079b1ec008f58de0e97c2bf99502e27079f0ade785fdec24e207efa1127a",
+  "support-tickets.vue": "3f3dc61ed7dbf90e34e879979cb6f4c1ed0d2d3f1d83176b371c8ded789cca0b",
   "wallet-repurchase.vue": "49b410e94f8d119d898b3c05f01d735af70aac979d6f8d8559341b13841d1477"
 };
 
@@ -104,6 +105,13 @@ function block(text: string, tag: "style" | "template"): string {
   return normalized.match(/<template[^>]*>[\s\S]*?<\/template>/)?.[0] ?? "";
 }
 
+// New slot-bearing surfaces also pin the full compiler-parsed template; keep
+// the historical pair fingerprints stable for unrelated approved pages.
+function fullTemplate(text: string): string {
+  const template = parse(text.replace(/\r\n/g, '\n')).descriptor.template;
+  return template ? `<template>${template.content}</template>` : '';
+}
+
 function quickKeys(section: string): string[] {
   const quickSource = source.slice(source.indexOf("const quickSections"));
   const match = quickSource.match(new RegExp(`key: "${section}"[\\s\\S]*?items: \\[([\\s\\S]*?)\\n    \\],`, "m"));
@@ -112,6 +120,15 @@ function quickKeys(section: string): string[] {
 }
 
 describe("Me page 5174 normal-state UI parity", () => {
+  it('includes content after nested template slots in the visual fingerprint', () => {
+    const markup = '<template><view><template #option><text>label</text></template><text>tail</text></view></template>';
+    expect(fullTemplate(markup)).toBe(markup);
+    expect(fullTemplate(markup.replace('tail', 'changed'))).not.toBe(fullTemplate(markup));
+  });
+  it('pins the complete notification page including content after category slots', () => {
+    const notification = readFileSync(new URL('./notifications.vue', import.meta.url), 'utf8');
+    expect(createHash('sha256').update(fullTemplate(notification)).digest('hex')).toBe('be9ba0b339c494422691051390b9f15ca3df444d5f8817f08009072b6f20c7b1');
+  });
   it("includes every page-local style block in the visual fingerprint", () => {
     const shared = '<style src="@/styles/message-center.css"></style>';
     const local = '<style scoped>.message-title { text-align: center; }</style>';

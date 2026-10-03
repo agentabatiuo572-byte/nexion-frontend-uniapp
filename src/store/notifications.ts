@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -37,6 +38,24 @@ export const useNotifications = defineStore("notifications", () => {
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   const items = ref<Notification[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const unread = ref(items.value.filter((item) => !item.readAt).length);
+  const unreadByKind = ref<Record<string, number> | null>(null);
+  const unreadByCategoryExact = computed(() => !remoteApiEnabled || unread.value === 0 || unreadByKind.value !== null);
+  // Without a server summary, positive counts describe only the loaded rows and
+  // may power unread dots; they must not be presented as exact category totals.
+  const unreadByCategory = computed<Record<NotificationCategory, number>>(() => {
+    const counts = { finance: 0, device: 0, team: 0, rewards: 0, system: 0 };
+    if (unread.value === 0) return counts;
+    if (remoteApiEnabled && unreadByKind.value !== null) {
+      for (const [rawKind, count] of Object.entries(unreadByKind.value)) {
+        counts[notificationCategory({ kind: knownKind(rawKind), rawKind })] += count;
+      }
+    } else {
+      for (const item of items.value) {
+        if (item.readAt === null) counts[notificationCategory(item)] += 1;
+      }
+    }
+    return counts;
+  });
   const loading = ref(false);
   const error = ref<string | null>(null);
   const nextCursor = ref<string | null>(null);
@@ -75,6 +94,7 @@ export const useNotifications = defineStore("notifications", () => {
       historyLoaded = true;
     }
     unread.value = page.unread;
+    unreadByKind.value = page.unreadByKind ? { ...page.unreadByKind } : null;
     if (!head || !historyLoaded || !page.nextCursor || !overlaps) nextCursor.value = page.nextCursor;
   }
   async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot(), active: () => boolean = () => true) {
@@ -160,6 +180,7 @@ export const useNotifications = defineStore("notifications", () => {
     cancelGeneration += 1;
     refreshGeneration += 1;
     mutations = { pending: 0, tail: Promise.resolve() };
+    unreadByKind.value = null;
     if (remoteApiEnabled) {
       items.value = [];
       unread.value = 0;
@@ -183,7 +204,24 @@ export const useNotifications = defineStore("notifications", () => {
     const item = items.value.find(value => value.id === id);
     if (!item || item.readAt !== null) return;
     items.value = items.value.map(value => value.id === id ? { ...value, readAt: Date.now() } : value);
+    // A successful acknowledgement may be an idempotent replay after another
+    // device read this row. Never subtract from an authoritative group locally.
+    if (unreadByKind.value !== null) return;
     unread.value = Math.max(0, unread.value - 1);
+  }
+  async function reconcileConfirmedRead(id: string, request: RemoteAccountRequest) {
+    const hasSummary = unreadByKind.value !== null;
+    confirmRead(id);
+    if (!hasSummary) return;
+    try {
+      // Already inside the mutation queue; refreshRemote would wait on itself.
+      const page = await notificationApi.page();
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+      unread.value = page.unread;
+      unreadByKind.value = page.unreadByKind ? { ...page.unreadByKind } : null;
+    } catch (cause) {
+      if (remoteAccountEpoch.isCurrent(request)) error.value = cause instanceof Error ? cause.message : 'NOTIFICATION_UPDATE_FAILED';
+    }
   }
   async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
     if (remoteApiEnabled) {
@@ -199,7 +237,7 @@ export const useNotifications = defineStore("notifications", () => {
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
         error.value = null;
-        confirmRead(id);
+        await reconcileConfirmedRead(id, request);
       });
     }
     const item = items.value.find((value) => value.id === id);
@@ -222,6 +260,7 @@ export const useNotifications = defineStore("notifications", () => {
         error.value = null;
         items.value = items.value.map((item) => item.readAt ? item : { ...item, readAt: Date.now() });
         unread.value = 0;
+        unreadByKind.value = {};
         return true;
       });
       // Reconcile only after leaving the queue: refresh waits for queued writes.
@@ -282,7 +321,7 @@ export const useNotifications = defineStore("notifications", () => {
         }
         if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
         error.value = null;
-        confirmRead(id);
+        await reconcileConfirmedRead(id, request);
         return { kind: "done", route: result.route };
       } catch (cause) {
         return { kind: "uncertain", cause };
@@ -302,5 +341,5 @@ export const useNotifications = defineStore("notifications", () => {
   async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, unread, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
+  return { items, unread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
 });

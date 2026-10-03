@@ -10,8 +10,9 @@ export type MessageSection = "notifications" | "service";
 export const useMessageDrawer = defineStore("messageDrawer", () => {
   const section = ref<MessageSection>("notifications");
   const notifications = useNotifications(), conversations = useConversations(), tickets = useTickets();
-  const humanUnread = computed(() => (["advisor", "support"] as const).reduce((sum, type) =>
-    sum + conversations.byType(type).reduce((count, row) => count + row.unread, 0), 0));
+  const advisorUnread = computed(() => conversations.byType("advisor").reduce((sum, row) => sum + row.unread, 0));
+  const supportUnread = computed(() => conversations.byType("support").reduce((sum, row) => sum + row.unread, 0));
+  const humanUnread = computed(() => advisorUnread.value + supportUnread.value);
   const ticketUnread = computed(() => tickets.tickets.reduce((sum, ticket) => sum + ticket.unread, 0));
   const serviceUnread = computed(() => humanUnread.value + ticketUnread.value);
   const totalUnread = computed(() => notifications.unread + serviceUnread.value);
@@ -83,6 +84,6 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
     section.value = "notifications";
   }
 
-  return { section, show, humanUnread, ticketUnread, serviceUnread, totalUnread,
+  return { section, show, advisorUnread, supportUnread, humanUnread, ticketUnread, serviceUnread, totalUnread,
     loading, error, refresh, startRefresh, stopRefresh, bindAccount };
 });

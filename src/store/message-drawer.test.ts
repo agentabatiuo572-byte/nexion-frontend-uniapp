@@ -75,6 +75,7 @@ describe("shared message center", () => {
     const center = useMessageDrawer();
     await center.refresh(); center.show("service");
     expect(center.section).toBe("service"); expect(pages[1].route).toBe("pages/me/notifications");
+    expect(center.advisorUnread).toBe(3); expect(center.supportUnread).toBe(4);
     expect(center.humanUnread).toBe(7); expect(center.ticketUnread).toBe(2);
     expect(center.serviceUnread).toBe(9); expect(center.totalUnread).toBe(20);
     expect(runtime.notificationApi.markRead).not.toHaveBeenCalled();
@@ -82,6 +83,22 @@ describe("shared message center", () => {
     runtime.supportApi.markTicketRead.mockResolvedValue(ticket(0, 2));
     await useTickets().markRead(useTickets().tickets[0]);
     expect(center.ticketUnread).toBe(0); expect(center.totalUnread).toBe(18);
+  });
+
+  it("updates each human category from visible conversations while preserving sibling unread", async () => {
+    runtime.supportApi.conversations.mockResolvedValueOnce({ items: [human("a1", "advisor", 3), human("a2", "advisor", 2),
+      human("s1", "support", 4), human("ai", "ai", 80)], total: 4 })
+      .mockResolvedValueOnce({ items: [human("a1", "advisor", 0), human("a2", "advisor", 2),
+        human("s1", "support", 0), human("ai", "ai", 80)], total: 4 });
+    const center = useMessageDrawer();
+    await center.refresh();
+    expect(center.advisorUnread).toBe(5); expect(center.supportUnread).toBe(4);
+    expect(center.serviceUnread).toBe(9);
+    await center.refresh();
+    expect(center.advisorUnread).toBe(2); expect(center.supportUnread).toBe(0);
+    expect(center.serviceUnread).toBe(2);
+    useConversations().bindAccount("default");
+    expect(center.advisorUnread).toBe(0); expect(center.supportUnread).toBe(0);
   });
 
   it("keeps the last successful counts and exposes source failures for retry", async () => {

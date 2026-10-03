@@ -20,6 +20,8 @@ export interface CanonicalNotificationPage {
   items: CanonicalNotification[];
   nextCursor: string | null;
   unread: number;
+  /** Account-wide counts, independent of the requested page. Omitted by older servers. */
+  unreadByKind?: Record<string, number>;
 }
 
 export interface NotificationActionResult {
@@ -101,7 +103,30 @@ function parsePage(value: unknown): CanonicalNotificationPage {
   if (ids.size !== items.length) {
     return invalid("NOTIFICATION_PAGE_INCONSISTENT");
   }
-  return { items, nextCursor, unread };
+  if (!Object.prototype.hasOwnProperty.call(row, "unreadByKind")) return { items, nextCursor, unread };
+  const summary = record(row.unreadByKind);
+  if (!summary) return invalid("NOTIFICATION_UNREAD_SUMMARY_INVALID");
+  let total = 0;
+  const entries = Object.entries(summary).map(([kind, count]): [string, number] => {
+    if (!kind || kind !== kind.trim().toLowerCase() || typeof count !== "number"
+        || !Number.isSafeInteger(count) || count < 0) {
+      return invalid("NOTIFICATION_UNREAD_SUMMARY_INVALID");
+    }
+    total += count;
+    return [kind, count];
+  });
+  if (!Number.isSafeInteger(total) || total !== unread) return invalid("NOTIFICATION_UNREAD_SUMMARY_INVALID");
+  const unreadByKind = Object.fromEntries(entries);
+  const knownUnread = new Map<string, number>();
+  for (const item of items) {
+    if (item.readAt !== null) continue;
+    const count = (knownUnread.get(item.kind) ?? 0) + 1;
+    knownUnread.set(item.kind, count);
+    if (count > (Object.prototype.hasOwnProperty.call(unreadByKind, item.kind) ? unreadByKind[item.kind] : 0)) {
+      return invalid("NOTIFICATION_PAGE_INCONSISTENT");
+    }
+  }
+  return { items, nextCursor, unread, unreadByKind };
 }
 
 function parseCount(value: unknown): number {

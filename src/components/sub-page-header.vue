@@ -7,13 +7,12 @@
   backdrop-filter works). Per-page + in-content → survives back-navigation with no
   store/onShow gymnastics (uni delivers onShow only to pages, not components).
 
-  Was: scrolled away with content, LEFT title, surface tiles — diverged from the
-  prototype. API unchanged (back / title / subtitle), so all ~55 callers are fixed
-  at once with no per-page edits.
+  The plain variant keeps the title bare and gives the back control its own
+  round glass surface. An optional action replaces the message bell.
 -->
 <template>
-  <view class="spv" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
-    <LiquidGlass :radius="rowH / 2" tone="navigation" />
+  <view class="spv" :class="{ 'spv--plain': plain }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
+    <LiquidGlass v-if="!plain" :radius="rowH / 2" tone="navigation" />
     <view
       class="spv-side spv-back"
       role="button"
@@ -24,6 +23,7 @@
       @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)"
     >
       <view class="spv-glass">
+        <LiquidGlass v-if="plain" :radius="22" tone="navigation" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
     </view>
@@ -31,7 +31,11 @@
       <text v-if="displayTitle" class="spv-title">{{ displayTitle }}</text>
       <text v-if="subtitle" class="spv-sub">{{ subtitle }}</text>
     </view>
-    <view
+    <view v-if="actionLabel && action" class="spv-action" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
+      <view class="spv-action-surface"><LiquidGlass :radius="18" /></view>
+      <text>{{ actionLabel }}</text>
+    </view>
+    <view v-else-if="!plain"
       class="spv-side spv-bell relative"
       role="button"
       tabindex="0"
@@ -57,7 +61,7 @@ import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
-const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void }>();
+const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; actionLabel?: string; action?: () => void }>();
 // 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
 // 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
@@ -160,6 +164,14 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .spv-side:active .spv-glass { transform: scale(.92); }
+.spv--plain { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; border-radius: 0; padding: 0; }
+.spv--plain .spv-glass { width: 44px; height: 44px; }
+.spv--plain .spv-glass > svg { position: relative; z-index: 1; }
+.spv-action { position: relative; z-index: 1; min-height: 44px; width: 92px; max-width: 100%; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 12px; font-weight: 500; line-height: 16px; border-radius: 22px; }
+.spv-action-surface { position: absolute; inset: 4px 0; border-radius: 18px; pointer-events: none; }
+.spv-action > text { position: relative; z-index: 1; }
+.spv-action:active { opacity: .75; transform: scale(.98); }
+.spv-action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .spv-side:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; border-radius: 24px; }
 .spv-titlewrap {
   position: relative;
@@ -188,6 +200,8 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.spv--plain .spv-title { font-size: 20px; line-height: 22px; white-space: normal; overflow: visible; text-overflow: clip; }
+@media (max-width: 360px) { .spv--plain .spv-title { font-size: 15px; line-height: 20px; } }
 .spv-sub {
   max-width: 100%;
   margin-top: 2px;

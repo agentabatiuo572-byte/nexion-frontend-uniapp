@@ -1443,6 +1443,7 @@ identityLabel: "创世持有人",
     // 用户在当前产品里找不到、也验证不了它。#90
     noteInternal: "工单是与客服团队的私密 1:1 对话。一般问题请用在线会话。",
     backToTickets: "返回工单列表",
+    viewTicketList: "查看工单列表",
   },
 
 
