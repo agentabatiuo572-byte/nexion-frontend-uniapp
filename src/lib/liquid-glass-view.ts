@@ -247,20 +247,24 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   };
 }
 
-function mountChassis(root: HTMLElement) {
+export function mountChassis(root: HTMLElement) {
   const scroll = root.querySelector<HTMLElement>(".nx-content")!;
-  const logo = root.querySelector<HTMLElement>(".nx-header__l");
   let hidden = scroll.scrollTop > 8;
   function onScroll() {
     const top = Math.max(0, Math.min(scroll.scrollTop, scroll.scrollHeight - scroll.clientHeight));
     hidden = glassLogoHidden(top, hidden);
-    if (logo) {
-      logo.dataset.hidden = String(hidden); logo.setAttribute("aria-hidden", String(hidden));
+    // Query again for headers that mount after a product or route resolves.
+    for (const title of Array.from(root.querySelectorAll<HTMLElement>(".nx-header__l, .spv-titlewrap, .nx-nav-titlewrap"))) {
+      const value = String(hidden);
+      if (title.dataset.hidden !== value) title.dataset.hidden = value;
+      if (title.getAttribute("aria-hidden") !== value) title.setAttribute("aria-hidden", value);
     }
   }
   scroll.addEventListener("scroll", onScroll, { passive: true });
+  const observer = typeof MutationObserver === "undefined" ? undefined : new MutationObserver(onScroll);
+  observer?.observe(root, { childList: true, subtree: true });
   onScroll();
-  return { update: onScroll, destroy() { scroll.removeEventListener("scroll", onScroll); } };
+  return { update: onScroll, destroy() { scroll.removeEventListener("scroll", onScroll); observer?.disconnect(); } };
 }
 
 // App renderjs mounts a separate empty Vue instance: its $el is a comment.

@@ -3,6 +3,9 @@
   <view class="nx-wallet">
     <view class="nx-glass-card nx-glass-hero nx-wallet-summary">
       <view class="nx-wallet-arc" aria-hidden="true" />
+      <view class="nx-wallet-particles" aria-hidden="true">
+        <view v-for="(dot, i) in DATA_DOTS" :key="i" class="nx-wallet-particle" data-wallet-particle :style="dotStyle(dot)" />
+      </view>
       <view class="nx-wallet-heading" data-me-action="wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" >
         <view class="nx-wallet-symbol" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-5v5h5" /></svg></view>
         <text class="nx-wallet-title">{{ t.me.myWallet }}</text>
@@ -252,15 +255,16 @@ const usdtLabel = computed(() => usdt.value.toFixed(2).replace(/\B(?=(\d{3})+(?!
 
 <style scoped>
 .nx-wallet-summary { position: relative; overflow: hidden; padding: 20px; isolation: isolate; }
-.nx-wallet-heading { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--v5-ink); }
+.nx-wallet-heading { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--v5-ink); }
 .nx-wallet-symbol { display: grid; place-items: center; width: 30px; height: 30px; color: var(--v5-nex); flex-shrink: 0; }
 .nx-wallet-title { flex: 1; min-width: 0; font: 600 20px/1.3 var(--font-v5); }
-.nx-wallet-total { position: relative; display: flex; align-items: baseline; margin: 28px 0 26px; gap: 3px; color: var(--v5-ink); font-family: var(--font-v5); font-weight: 650; letter-spacing: -.035em; line-height: 1.1; }
+.nx-wallet-total { position: relative; z-index: 1; display: flex; align-items: baseline; margin: 28px 0 26px; gap: 3px; color: var(--v5-ink); font-family: var(--font-v5); font-weight: 650; letter-spacing: -.035em; line-height: 1.1; }
 .nx-wallet-currency { font-size: clamp(28px, 8vw, 38px); }
 .nx-wallet-amount { min-width: 0; overflow-wrap: anywhere; font-size: clamp(32px, 10.5vw, 52px); }
-.nx-wallet-nex { position: relative; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.nx-wallet-nex { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
 .nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; color: var(--v5-bg); background: var(--v5-nex); }
 .nx-wallet-arc { position: absolute; width: 360px; height: 300px; border-radius: 50%;  bottom: -220px; right: -190px; transform: rotate(-30deg); background: radial-gradient(ellipse at center, var(--v5-nex-soft), transparent 68%); box-shadow: 0 0 40px var(--v5-nex-soft); pointer-events: none; animation: wallet-arc-breathe 7s ease-in-out infinite alternate; }
+.nx-wallet-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .nx-wallet-details { padding: 12px 4px 0; }
 .nx-wallet-pending { color: var(--v5-success-ink); font: 400 12px/1.65 var(--font-v5); }
 .nx-wallet-valuation { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-3); }
@@ -270,5 +274,9 @@ const usdtLabel = computed(() => usdt.value.toFixed(2).replace(/\B(?=(\d{3})+(?!
 @keyframes wallet-arc-breathe { from { opacity: .55; } to { opacity: 1; } }
 @media (max-width: 350px) { .nx-wallet-slot-block { grid-template-columns: minmax(0, 1fr); } .nx-wallet-summary { padding: 18px; } }
 @media (prefers-reduced-motion: reduce) { .nx-wallet-arc { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .nx-wallet-particle { animation: none !important; transform: none; }
+  .nx-wallet-particle { opacity: .5 !important; }
+}
 .nx-wallet-heading:active, .nx-wallet-bills:active { opacity: .7; }
 </style>

@@ -38,7 +38,9 @@ const unmounts: Array<() => void> = [];
 
 async function mount(source: string, dependencies: Record<string, unknown>) {
   const { descriptor } = parse(source);
-  const script = compileScript(descriptor, { id: "invite-wallet-state", inlineTemplate: true });
+  const script = compileScript(descriptor, { id: "invite-wallet-state", inlineTemplate: true,
+    // The in-memory host has no HTML parser for Vue's static SVG cache.
+    templateOptions: { compilerOptions: { hoistStatic: false } } });
   const code = ts.transpileModule(script.content, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   }).outputText;
@@ -68,16 +70,19 @@ async function invitation(copy = en) {
   const rewards = Vue.reactive({ snapshot: snapshot() as ReferralRewardSnapshot | null,
     error: "", loading: false, refresh: vi.fn(async () => true) });
   const copyText = vi.fn(async () => true);
+  const recordShareEvent = vi.fn();
+  const notifyUnavailableShareLink = vi.fn();
+  const toast = { info: vi.fn(), success: vi.fn() };
   const root = await mount(inviteSource, {
     "@/i18n/use-t": { useT: () => Vue.ref(copy) }, "@/i18n/format": { fmt },
     "@/store/app": { useApp: () => ({ user: { referralCode: "STALE_LOCAL_CODE" } }) },
     "@/store/referral-reward": { useReferralReward: () => rewards },
     "@/api/runtime": { remoteApiEnabled: true },
-    "@/store/ui": { toast: { info: vi.fn(), success: vi.fn() } },
-    "@/lib/share": { copyText, notifyUnavailableShareLink: vi.fn(),
+    "@/store/ui": { toast },
+    "@/lib/share": { copyText, recordShareEvent, notifyUnavailableShareLink,
       buildShareLink: (code: string) => code ? `https://invite.example/?ref=${code}` : "" },
   });
-  return { root, rewards, copyText };
+  return { root, rewards, copyText, recordShareEvent, notifyUnavailableShareLink, toast };
 }
 
 beforeEach(() => { vi.useFakeTimers(); });
@@ -87,12 +92,14 @@ test.each([en, zh, vietnamese])("disabled invitation rewards keep sharing withou
   const card = await invitation(copy);
   expect(card.rewards.refresh).toHaveBeenCalledOnce();
   const status = text(find(card.root, "invite-card__reward"));
-  expect(status).toContain(copy.team.referralRewardsDisabled);
+  expect(text(find(card.root, "invite-card__header"))).toContain(copy.team.referralRewardsDisabled);
   expect(status).toContain(copy.team.sharingStillAvailable);
   expect(status).toContain("+7 NEX"); // Historical settled earnings remain facts.
   expect(status).not.toContain(copy.team.serverRewardPerSettlement);
   expect(status).not.toContain(copy.team.perFriendCooldown);
   expect(status).not.toContain("0 NEX");
+  expect(text(find(card.root, "nx-team-share-now"))).toBe(copy.team.shareInvite);
+  expect(text(find(card.root, "invite-card__header"))).not.toContain(copy.team.earnForEachFriend);
   expect(text(card.root)).not.toContain(copy.team.rewardRules);
   expect(all(card.root).some(target => target.props.role === "link")).toBe(false);
   for (const name of ["nx-team-share-poster", "nx-team-copy-code", "nx-team-copy-link", "nx-team-share-now"]) {
@@ -101,6 +108,7 @@ test.each([en, zh, vietnamese])("disabled invitation rewards keep sharing withou
   await find(card.root, "nx-team-copy-code").props.onClick();
   await find(card.root, "nx-team-copy-link").props.onClick();
   expect(card.copyText.mock.calls).toEqual([["INVITE123"], ["https://invite.example/?ref=INVITE123"]]);
+  expect(card.recordShareEvent).not.toHaveBeenCalled();
 });
 
 test("the same invitation card follows server enablement, unavailable reads and the retry action", async () => {
@@ -109,7 +117,7 @@ test("the same invitation card follows server enablement, unavailable reads and 
   let status = text(find(card.root, "invite-card__reward"));
   expect(status).toContain("12 NEX");
   expect(status).toContain(en.team.perFriendCooldown);
-  expect(status).toContain(fmt(en.team.settlementStatus, { settled: 1, pending: 1 }));
+  expect(text(find(card.root, "invite-card__header"))).toContain(fmt(en.team.settlementStatus, { settled: 1, pending: 1 }));
   card.rewards.error = "read failed"; await Vue.nextTick();
   status = text(find(card.root, "invite-card__reward"));
   expect(status).toBe(en.team.settlementUnavailable);
@@ -138,6 +146,49 @@ test("the same invitation card follows server enablement, unavailable reads and 
   card.rewards.error = ""; card.rewards.snapshot = null; card.rewards.loading = true; await Vue.nextTick();
   expect(text(find(card.root, "invite-card__reward"))).toBe(en.team.rewardLoading);
   expect(find(card.root, "nx-team-share-now").props["aria-disabled"]).toBe(true);
+});
+
+test.each([en, zh, vietnamese])("H5 share emphasis only names a reward after a successful enabled server read", async copy => {
+  const card = await invitation(copy);
+  card.rewards.snapshot = snapshot(true); await Vue.nextTick();
+  expect(text(find(card.root, "nx-team-share-now"))).toBe(fmt(copy.team.shareAndEarn, { n: "12 NEX" }));
+  expect(text(find(card.root, "invite-card__header"))).toContain(copy.team.earnForEachFriend);
+  card.rewards.loading = true; await Vue.nextTick();
+  expect(text(find(card.root, "invite-card__reward"))).toBe(copy.team.rewardLoading);
+  expect(text(find(card.root, "nx-team-share-now"))).toBe(copy.team.shareInvite);
+  expect(text(card.root)).not.toContain("12 NEX");
+  expect(text(card.root)).not.toContain("+7 NEX");
+  expect(text(card.root)).not.toContain(copy.team.perFriendCooldown);
+  card.rewards.loading = false; card.rewards.error = "unavailable"; await Vue.nextTick();
+  expect(text(find(card.root, "nx-team-share-now"))).toBe(copy.team.shareInvite);
+  expect(text(find(card.root, "invite-card__header"))).toContain(copy.team.settlementUnavailable);
+  expect(text(card.root)).not.toContain("12 NEX");
+});
+
+test("restored sharing tools retain clipboard failure feedback and all empty-code guards", async () => {
+  const card = await invitation();
+  card.copyText.mockResolvedValue(false);
+  await find(card.root, "nx-team-copy-code").props.onClick();
+  await find(card.root, "nx-team-copy-link").props.onClick();
+  await Vue.nextTick();
+  expect(card.toast.info.mock.calls).toEqual([[en.share.copyFailed], [en.share.copyFailed]]);
+  expect(card.toast.success).not.toHaveBeenCalled();
+  expect(text(find(card.root, "nx-team-copy-code"))).not.toContain(en.team.copied);
+  expect(text(find(card.root, "nx-team-copy-link"))).not.toContain(en.team.copied);
+  expect(card.recordShareEvent).not.toHaveBeenCalled();
+  card.rewards.snapshot!.referralCode = ""; await Vue.nextTick();
+  card.copyText.mockClear(); card.toast.info.mockClear();
+  for (const name of ["nx-team-share-poster", "nx-team-copy-code", "nx-team-copy-link", "nx-team-share-now"]) {
+    const tool = find(card.root, name);
+    expect(tool.props.role).toBe("button");
+    expect(tool.props.tabindex).toBe("0");
+    expect(tool.props["aria-disabled"]).toBe(true);
+    await tool.props.onClick();
+  }
+  expect(card.copyText).not.toHaveBeenCalled();
+  expect(card.toast.info).toHaveBeenCalledExactlyOnceWith(en.share.noCodeYet);
+  expect(card.notifyUnavailableShareLink).toHaveBeenCalledTimes(3);
+  expect(card.recordShareEvent).not.toHaveBeenCalled();
 });
 
 async function wallet(copy = en, initialBalance = 11) {
@@ -204,6 +255,31 @@ test.each([en, zh, vietnamese].flatMap(copy => [false, true].map(withoutIntl => 
     }
   },
 );
+
+test("wallet keeps the original lower-right arc and adds only five decorative dots", async () => {
+  const { root } = await wallet();
+  const summary = find(root, "nx-wallet-summary");
+  expect(all(summary).filter(target => hasClass(target, "nx-wallet-arc"))).toHaveLength(1);
+  expect(find(summary, "nx-wallet-arc").props["aria-hidden"]).toBe("true");
+  expect(find(summary, "nx-wallet-grid")).toBeUndefined();
+  expect(find(summary, "nx-wallet-aurora")).toBeUndefined();
+  const particles = find(summary, "nx-wallet-particles");
+  expect(particles.props["aria-hidden"]).toBe("true");
+  const dots = all(particles).filter(target => hasClass(target, "nx-wallet-particle"));
+  expect(dots).toHaveLength(5);
+  for (const dot of dots) {
+    expect(dot.props.style).toEqual(expect.objectContaining({ width: "3px", height: "3px",
+      animation: "v5-dot-drift 8s linear infinite" }));
+    expect(dot.props).toHaveProperty("data-wallet-particle");
+    expect(dot.props).not.toHaveProperty("onClick");
+  }
+  const { descriptor } = parse(walletSource);
+  const css = compileStyle({ source: descriptor.styles[0].content, filename: "wallet-card.vue", id: "data-v-wallet", scoped: true });
+  expect(css.errors).toEqual([]);
+  expect(css.code).toMatch(/\.nx-wallet-particles\[data-v-wallet\][^{]*\{[^}]*pointer-events: none;[^}]*z-index: 0;/);
+  expect(css.code).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.nx-wallet-arc\[data-v-wallet\]\s*\{\s*animation: none;/);
+  expect(css.code).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.nx-wallet-particle\[data-v-wallet\]\s*\{\s*animation: none !important;\s*transform: none;\s*\}\s*\.nx-wallet-particle\[data-v-wallet\]\s*\{\s*opacity: .5 !important;/);
+});
 
 test("wallet valuation names USDT for both values and preserves the remote unavailable state", async () => {
   const { root, app, market, navTo, navReset } = await wallet();

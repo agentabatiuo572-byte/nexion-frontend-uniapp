@@ -298,7 +298,7 @@
   --v5-bg: #000000;             /* pure black page floor */
   --v5-bg-color-mask: rgba(0, 0, 0, 0.62);  /* 纯黑底上遮罩需更重才压得住 */
   --v5-surface: #141414;        /* card surface — +8% lift */
-  --v5-content-surface: #11151D; /* flat content, matched to the team design reference */
+  --v5-content-surface: var(--v5-surface); /* flat content shares the neutral card surface */
   --v5-surface-2: #1F1F1F;      /* nested chip / pill bg — +12% */
   --v5-surface-3: #2A2A2A;      /* recessed input / inset — +16% */
   --v5-border: rgba(255,255,255,0.06);          /* micro-bright card edge */
