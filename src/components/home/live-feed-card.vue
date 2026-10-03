@@ -113,10 +113,9 @@
 import { navTo } from "@/lib/route";
 import { computed, nextTick, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
-import { buildCanonicalHomeFeed } from "./home-live-feed";
+import { buildCanonicalHomeFeed, formatHomeFeedTime } from "./home-live-feed";
 
 interface FeedRow {
   k: number | string;
@@ -148,7 +147,7 @@ const displayActivityRows = computed<FeedRow[]>(() => {
     who: "You",
     msg: `${row.model} @ ${row.client}`,
     val: `+${row.rewardUsdt.toFixed(5)}`,
-    ts: new Date(row.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false }),
+    ts: formatHomeFeedTime(row.completedAt),
   }));
 });
 const displayEarningsItems = computed<EarningsItem[]>(() => {

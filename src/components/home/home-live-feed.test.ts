@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AppHomeEarningsLedgerRow } from "@/api/app-home-api";
 import componentSource from "./live-feed-card.vue?raw";
-import { buildCanonicalHomeFeed } from "./home-live-feed";
+import { buildCanonicalHomeFeed, formatHomeFeedTime } from "./home-live-feed";
 
 const ledger: AppHomeEarningsLedgerRow[] = [
   {
@@ -23,6 +23,23 @@ const ledger: AppHomeEarningsLedgerRow[] = [
 ];
 
 describe("home canonical live feed", () => {
+  it("keeps local HH:mm when native time formatting ignores locale options", () => {
+    const nativeTime = vi.spyOn(Date.prototype, "toLocaleTimeString")
+      .mockReturnValue("16:34:40 GMT+0900 (JST)");
+    try {
+      expect(formatHomeFeedTime(new Date(2026, 9, 3, 16, 34, 40).toISOString())).toBe("16:34");
+      expect(formatHomeFeedTime(new Date(2026, 9, 3, 0, 7, 40).toISOString())).toBe("00:07");
+    } finally {
+      nativeTime.mockRestore();
+    }
+  });
+
+  it("uses a placeholder for missing or invalid completion times", () => {
+    for (const completedAt of [undefined, null, "", "not-a-date"]) {
+      expect(formatHomeFeedTime(completedAt)).toBe("—");
+    }
+  });
+
   it("projects the same settled receipt facts into activity and earnings tabs", () => {
     expect(buildCanonicalHomeFeed(ledger)).toEqual({
       activityRows: [

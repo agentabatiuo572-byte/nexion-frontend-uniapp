@@ -37,9 +37,9 @@
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
+import { formatHomeFeedTime } from "./home-live-feed";
 
 const t = useT();
 const app = useApp();
@@ -60,7 +60,7 @@ const remoteRows = computed(() => (app.homeTruth?.earningsLedger ?? [])
     who: entry.client,
     model: entry.model,
     amt: `${entry.synthetic ? "" : "+"}$${entry.rewardUsdt.toFixed(5)}`,
-    t: new Date(entry.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false }),
+    t: formatHomeFeedTime(entry.completedAt),
   })));
 const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 const ledgerStatusText = computed(() => {
