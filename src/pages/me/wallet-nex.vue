@@ -34,7 +34,7 @@
                 <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ valuationKnown ? fmtUSD(usdValue) : "—" }}</text>
                 <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="heroChangeStyle" role="status" aria-live="polite">{{ t.wallet.loadingTransactions }}</text>
                 <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="heroChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
+                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable && Number.isFinite(change24h) ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 
@@ -131,10 +131,10 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="activityLabelStyle">{{ a.label }}</text>
-              <text class="block" :style="activityTimeStyle">{{ new Date(a.ts).toLocaleString(dateLocale()) }}</text>
+              <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
-              <text class="block tabular-nums" :style="activityNexStyle">{{ a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} NEX</text>
+              <text class="block tabular-nums" :style="activityNexStyle">{{ Number.isFinite(a.nex) && a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} NEX</text>
               <text class="block" :style="activityUsdStyle">≈ {{ marketValueKnown ? fmtUSD(a.nex * nexPrice) : "—" }}</text>
             </view>
           </view>
@@ -156,7 +156,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useApp } from "@/store/app";
 import { useMarket } from "@/store/market";
@@ -258,10 +258,16 @@ const activity = computed(() => {
 });
 
 function fmtNum(n: number, dp = 2): string {
-  return n.toLocaleString("en-US", { maximumFractionDigits: dp, minimumFractionDigits: dp });
+  if (!Number.isFinite(n)) return "—";
+  // Android's Number locale fallback ignores fraction options; group only the integer.
+  const [integer, fraction] = n.toFixed(dp).split(".");
+  return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction === undefined ? "" : `.${fraction}`);
 }
 function fmtUSD(n: number): string {
-  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+  return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
+}
+function fmtActivityTime(timestamp: number): string {
+  return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp) : "—";
 }
 
 function goMarket() {
@@ -291,15 +297,15 @@ const quickCells = computed(() => [
 
 const breakdownRows = computed(() => [
   { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} NEX` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
   { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} NEX`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
-const pnlSummary = computed(() => valuationKnown.value
+const pnlSummary = computed(() => valuationKnown.value && Number.isFinite(pnl.value) && Number.isFinite(pnlPct.value)
   ? `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`
   : "—");
 const pnlCells = computed(() => [
-  { label: t.value.nexWallet.pnl.costBasis, value: marketValueKnown.value && market.costBasis > 0 ? `$${market.costBasis.toFixed(3)}` : "—" },
+  { label: t.value.nexWallet.pnl.costBasis, value: marketValueKnown.value && Number.isFinite(market.costBasis) && market.costBasis > 0 ? `$${fmtNum(market.costBasis, 3)}` : "—" },
   { label: t.value.nexWallet.pnl.totalSpent, value: valuationKnown.value ? fmtUSD(totalSpent.value) : "—" },
   { label: t.value.nexWallet.pnl.currentValue, value: valuationKnown.value ? fmtUSD(usdValue.value) : "—" },
 ]);

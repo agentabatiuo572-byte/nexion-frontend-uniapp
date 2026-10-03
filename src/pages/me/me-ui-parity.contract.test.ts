@@ -80,7 +80,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-cards.vue": "4ba7080a2d1b7c9ce4d56c4ea90b5fed3614c689aaeccaf3811d166f08391692",
   "wallet-exchange-how.vue": "53a85b180c00d4a33e73d101a628e8f786924b2e23c48f045147b9f15cb8b9b0",
   "wallet-exchange.vue": "f6e7c49b78de3c05e25da2648b73673ec654ab69330d416dda6042ef63fe8eb6",
-  "wallet-nex.vue": "9a45bc613e2aaead9671fd5f33dd35655909afba01623a72cd1417daa6f38d98",
+  // Reviewed #413: native number/date formatting and finite display boundaries.
+  "wallet-nex.vue": "e79b540f1eacd429f044fba4bfd7fb2d15732cac2fc7cda274406416d035ee86",
   "wallet-repurchase-how.vue": "238439b99d5b73f9cf7c6ad7b8479cb86f39ef92f93d216938b071c28372e4f0",
   "wallet-repurchase.vue": "19b1c868b06086a2384a8f3bba7f013dc026f2c1bf97a5ff886f3fed3a40adca",
   "wallet-topup.vue": "010252b7630c35defdf57a3f262d0e389c011d2b9d79ad2f5fb788e794d87768",
