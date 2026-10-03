@@ -7,12 +7,16 @@
         <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
         <view class="message-button message-icon-button" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="24" /><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 3 6 0 1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></view>
       </view>
-      <view v-if="!headerState.title" class="message-compact"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
-      <view v-show="headerState.title" class="message-heading"><view class="message-subtitle" role="status"><view class="message-unread-label"><view v-if="center.totalUnread" class="message-status-dot" /><text>{{ unreadLabel }}</text></view></view></view>
-      <view v-show="headerState.primary" class="message-primary-wrap" @focusin="headerFocused = true" @focusout="headerFocused = false"><GlassSegments v-model="section" :options="sectionOptions" :label="t.notifs.drawerTitle" class="message-primary" /></view>
+      <view class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
+      <view class="message-collapse" :class="{ 'message-collapse--hidden': !headerState.title }" :style="collapseStyle('title')" :aria-hidden="!headerState.title">
+        <view class="message-heading"><view class="message-subtitle" role="status"><view class="message-unread-label"><view v-if="center.totalUnread" class="message-status-dot" /><text>{{ unreadLabel }}</text></view></view></view>
+      </view>
+      <view class="message-collapse message-primary-wrap" :class="{ 'message-collapse--hidden': !headerState.primary }" :style="collapseStyle('primary')" :aria-hidden="!headerState.primary" :inert="!headerState.primary ? true : undefined" @focusin="headerFocused = true" @focusout="headerFocused = false">
+        <view class="message-primary-inner"><GlassSegments v-model="section" :options="accessibleSectionOptions" :label="t.notifs.drawerTitle" class="message-primary" /></view>
+      </view>
       <GlassSegments v-if="section === 'service'" v-model="serviceFilter" :options="serviceFilters" layout="scroll" semantics="radio" :label="t.notifs.serviceFilterLabel" class="message-filters" />
       <GlassSegments v-else :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" class="message-filters" />
-      <scroll-view :key="section" scroll-y class="message-scroll" :show-scrollbar="false" @scroll="onMessageScroll">
+      <scroll-view :key="section" scroll-y class="message-scroll" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
       <ServiceMessageList v-if="section === 'service'" :filter="serviceFilter" hide-filters />
       <view v-else class="notification-feed">
         <view class="message-actions">
@@ -33,7 +37,7 @@
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loading ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
         <view v-if="remoteApiEnabled && notifs.items.length" class="message-original"><text>{{ t.notifs.originalTextNote }}</text></view>
       </view>
-      <view :style="{ height: ((!headerState.title ? 44 : 0) + (!headerState.primary ? 64 : 0)) + 'px' }" aria-hidden="true" />
+      <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />
       </scroll-view>
     </view>
     </template>
@@ -41,8 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { onShow, onHide, onLoad } from "@dcloudio/uni-app";
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { onShow, onHide, onLoad, onResize } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
@@ -210,12 +214,41 @@ const filterOptions = computed(() => visibleFilterIds.value.map(value => ({ valu
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
 const headerState = ref(createMessageHeaderState());
 const headerFocused = ref(false);
+const headerInstance = getCurrentInstance();
+const headerHeights = ref<{ title: number; primary: number } | null>(null);
+const accessibleSectionOptions = computed(() => sectionOptions.value.map(option => ({ ...option, disabled: !headerState.value.primary })));
+const headerCompensation = computed(() => headerHeights.value
+  ? (headerState.value.title ? 0 : headerHeights.value.title) + (headerState.value.primary ? 0 : headerHeights.value.primary) : 0);
+function collapseStyle(part: 'title' | 'primary') {
+  return headerHeights.value ? { height: (headerState.value[part] ? headerHeights.value[part] : 0) + 'px' } : undefined;
+}
+// Measure the always-mounted inner content, even while its outer wrapper is
+// clipped. The same heights drive the header and list-end compensation.
+async function measureHeader() {
+  await nextTick();
+  if (disposed || typeof uni === 'undefined' || typeof uni.createSelectorQuery !== 'function' || !headerInstance?.proxy) return;
+  uni.createSelectorQuery().in(headerInstance.proxy)
+    .select('.message-heading').boundingClientRect()
+    .select('.message-primary-inner').boundingClientRect()
+    .exec((boxes: Array<{ height?: number } | null>) => {
+      const title = boxes[0]?.height, primary = boxes[1]?.height;
+      if (!disposed && typeof title === 'number' && title > 0 && typeof primary === 'number' && primary > 0) headerHeights.value = { title, primary };
+    });
+}
+onMounted(measureHeader);
+onResize(measureHeader);
+watch([unreadLabel, sectionOptions], measureHeader);
+let lastScrollInputAt = -Infinity;
+function onScrollInput() { lastScrollInputAt = Date.now(); }
 const serviceFilter = ref<"all" | "advisor" | "support" | "ticket">("all");
 const serviceFilters = computed(() => [
   { value: "all", label: t.value.notifs.filterAll }, { value: "advisor", label: t.value.conversations.typeAdvisor },
   { value: "support", label: t.value.conversations.typeSupport }, { value: "ticket", label: t.value.notifs.ticketFilter },
 ]);
-function onMessageScroll(event: { detail: { scrollTop: number } }) { headerState.value = advanceMessageHeader(headerState.value, event.detail.scrollTop, headerFocused.value); }
+function onMessageScroll(event: { detail: { scrollTop: number } }) {
+  const now = Date.now();
+  headerState.value = advanceMessageHeader(headerState.value, event.detail.scrollTop, headerFocused.value, now, now - lastScrollInputAt < 160);
+}
 function resetHeader() { headerState.value = createMessageHeaderState(); }
 watch(section, resetHeader);
 </script>

@@ -197,9 +197,10 @@ test("an empty human conversation lane gives the user an authoritative start pat
 });
 
 test("ticket list and detail render refreshed server metadata through the active locale", async () => {
-  const [row, page, en, zh, vi] = await Promise.all([
+  const [row, page, message, en, zh, vi] = await Promise.all([
     read("src/components/me/ticket-row.vue"),
     read("src/pages/me/support-tickets.vue"),
+    read("src/components/me/ticket-message.vue"),
     read("src/i18n/messages/en.ts"),
     read("src/i18n/messages/zh.ts"),
     read("src/i18n/messages/vi.ts"),
@@ -211,9 +212,12 @@ test("ticket list and detail render refreshed server metadata through the active
   assert.match(page, /await ticketsStore\.refresh\(\)/);
   assert.match(page, /t\.value\.tickets\.status\[s\]/);
   assert.match(page, /t\.value\.tickets\.category\[c\]/);
-  assert.match(page, /t\.value\.tickets\.detail\.agentFallback/);
+  assert.match(page, /<TicketMessageRecord\b[^>]*:message="m"/);
+  assert.match(message, /t\.value\.tickets\.detail\.agentFallback/);
+  assert.match(message, /t\.value\.tickets\.detail\.youLabel/);
+  assert.match(message, /props\.message\.agentName\?\.trim\(\)/);
   assert.match(page, /t\.value\.tickets\.timeJustNow/);
-  for (const source of [row, page]) {
+  for (const source of [row, page, message]) {
     assert.doesNotMatch(source, /CATEGORY_LABEL|STATUS_LABEL/);
     assert.doesNotMatch(source, /return "just now"|`\$\{Math\.floor\([^`]+\}\)(?:m|h|d) ago`/);
   }

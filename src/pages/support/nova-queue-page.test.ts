@@ -17,6 +17,7 @@ import { ApiError } from "@/api/errors";
 import * as apiErrors from "@/api/errors";
 import * as realtimePage from "./conversation-realtime-page";
 import { createSupportApi } from "@/api/support-api";
+import * as ticketPolicy from '@/api/support-ticket-policy';
 import { useAuth } from "@/store/auth";
 import { createSessionVault } from "@/api/session-vault";
 import { binarySessionReady } from "@/lib/binary-session-ready";
@@ -102,6 +103,7 @@ function mount(query: Record<string, string> = { type: "ai" }, conversation?: {
       supportApi: { attachmentPolicy: vi.fn(async () => ({ available: false })) } },
     "@/api/errors": apiErrors,
     "@/api/support-api": { isSupportAttachmentNotReady: () => false },
+    '@/api/support-ticket-policy': ticketPolicy,
     "@/lib/nova-failure": failure,
     "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": secureId,

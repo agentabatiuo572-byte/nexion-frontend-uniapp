@@ -22,7 +22,7 @@ function mountPage() {
   const output = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const modules: Record<string, unknown> = {
     vue: { ...vue, inject: (_key: unknown, fallback: unknown) => fallback, onMounted: vi.fn(), onUnmounted: vi.fn(), watch: vi.fn() },
-    "@dcloudio/uni-app": { onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn() },
+    "@dcloudio/uni-app": { onResize: vi.fn(), onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn() },
     "@/lib/remote-account-epoch": { remoteAccountScope: createRemoteAccountEpoch("fixture") },
     "@/lib/notification-category": { notificationCategory },
     "@/lib/message-header-scroll": { advanceMessageHeader, createMessageHeaderState },

@@ -7,35 +7,42 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 32px">
-      <SubPageHeader back="/pages/me/support" />
+    <view class="message-family ticket-page" style="padding-bottom: 32px">
+      <SubPageHeader back="/pages/me/support" :title="mode.kind === 'create' ? t.tickets.create.title : mode.kind === 'detail' ? t.tickets.detailTitle : t.tickets.pageTitle" />
       <text v-if="!supportSessionReady || ticketsStore.loading || (mode.kind === 'detail' && !detailTicket)" class="block px-4" role="status" aria-live="polite">{{ t.conversations.connecting }}</text>
       <view v-if="mode.kind !== 'list'" class="px-4" style="padding-bottom: 8px">
-        <view class="flex items-center active:opacity-50" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="setMode({ kind: 'list' })">
+        <view class="family-control" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="setMode({ kind: 'list' })">
+            <LiquidGlass :radius="24" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          <text style="margin-left: 4px">{{ t.tickets.backToTickets }}</text>
+          <text>{{ t.tickets.backToTickets }}</text>
         </view>
       </view>
 
       <!-- LIST MODE -->
       <view v-if="mode.kind === 'list'" class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <view class="grid grid-cols-3" style="gap: 8px">
-          <StatBox tint="var(--v5-warning)" :label="t.tickets.statsOpen" :value="stats.open" :icon="alertIcon" @select="selectTab('open')" />
-          <StatBox tint="var(--v5-brand-2)" :label="t.tickets.statsAwaiting" :value="stats.awaiting" :icon="clockIcon" @select="selectTab('open')" />
-          <StatBox tint="var(--v5-brand)" :label="t.tickets.statsResolved" :value="stats.resolved" :icon="checkIcon" @select="selectTab('resolved')" />
+        <view class="ticket-overview">
+        <view class="ticket-stats">
+          <StatBox tint="var(--v5-warning)" :label="t.tickets.statsOpen" :value="stats.open" :icon="alertIcon" />
+          <StatBox tint="var(--v5-brand-2)" :label="t.tickets.statsAwaiting" :value="stats.awaiting" :icon="clockIcon" />
+          <StatBox tint="var(--v5-brand)" :label="t.tickets.statsResolved" :value="stats.resolved" :icon="checkIcon" />
         </view>
 
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="newBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.newTicketCta" @click="setMode({ kind: 'create' })">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-          <text style="margin-left: 8px">{{ t.tickets.newTicketCta }}</text>
+        <view class="family-control family-control--primary ticket-new" :style="newBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.newTicketCta" @click="setMode({ kind: 'create' })">
+            <LiquidGlass :radius="24" tone="selection" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+          <text>{{ t.tickets.newTicketCta }}</text>
+        </view>
         </view>
 
         <text class="block" :style="slaNoticeStyle">{{ t.tickets.slaStatisticsUnavailable }}</text>
 
-        <GlassSegments :label="t.tickets.pageTitle" :model-value="tab" :options="tabOptions" @select="selectTab"  />
+        <GlassSegments layout="scroll" :label="t.tickets.pageTitle" :model-value="tab" :options="tabOptions" @select="selectTab" />
         <text v-if="filterFeedback" class="block text-center" :style="filterFeedbackStyle">{{ filterFeedback }}</text>
 
-        <EmptyState v-if="ticketsStore.error" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="reloadTickets" />
+        <view v-if="ticketsStore.error" class="ticket-error">
+          <EmptyState kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" />
+          <view class="family-control" role="button" tabindex="0" :aria-label="t.empty.errorCta" @click="reloadTickets"><LiquidGlass :radius="24" /><text>{{ t.empty.errorCta }}</text></view>
+        </view>
         <EmptyState v-else-if="supportSessionReady && !ticketsStore.loading && filtered.length === 0" :kind="tab === 'all' ? 'empty-list' : 'no-filter-results'" :title="tab === 'all' ? t.empty.listTitle : t.empty.filterTitle" :desc="tab === 'all' ? t.empty.listDesc : t.empty.filterDesc" />
         <view v-else style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
           <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="openTicket(tk.id)" />
@@ -49,13 +56,22 @@
 
       <!-- CREATE MODE -->
       <view v-else-if="mode.kind === 'create'" class="px-4" style="display: flex; flex-direction: column; gap: 16px">
+        <view class="ticket-creation-notice" role="status" aria-live="polite">
+          <text>{{ creationNotice }}</text>
+          <text v-if="creationPolicy && !creationPolicy.allowed && creationPolicy.retryAfterSeconds > 0" class="block">{{ fmt(t.tickets.policyRetryAfter, { n: Math.max(1, Math.ceil(creationPolicy.retryAfterSeconds / 60)) }) }}</text>
+          <view class="ticket-creation-notice-actions">
+            <view v-if="creationPolicy?.existingTicketNo" class="family-control" role="button" tabindex="0" @click="openTicket(creationPolicy.existingTicketNo)"><LiquidGlass :radius="24" /><text>{{ t.tickets.policyViewTicket }}</text></view>
+            <view v-if="remoteApiEnabled && !creationPolicyLoading && (creationPolicyError || creationPolicy?.allowed === false)" class="family-control" role="button" tabindex="0" @click="loadCreationPolicy"><LiquidGlass :radius="24" /><text>{{ t.ui.retry }}</text></view>
+          </view>
+        </view>
         <view>
           <text class="block" :style="formLabelStyle">{{ t.tickets.create.catLabel }}</text>
           <!-- 分类是互斥单选(选一个,其余取消)。原先每个 chip 都是 role="button":
                读屏念「按钮」、没有组名,也读不出当前选中哪一个(默认「提现」无任何状态)。
                改 radiogroup/radio + aria-checked,roving tabindex + 方向键(与提现网络选择器同形)。 -->
           <view class="flex" style="flex-wrap: wrap; gap: 6px" role="radiogroup" :aria-label="t.tickets.create.catLabel">
-            <view v-for="c in categoriesForNew" :key="c" class="nx-ticket-cat-radio" :style="catChipStyle(newCat === c)" role="radio" :tabindex="newCat === c ? 0 : -1" :aria-checked="newCat === c ? 'true' : 'false'" :aria-label="catLabel(c)" @click="selectCategory(c)"    @keydown.left.prevent="moveCategory(-1)" @keydown.right.prevent="moveCategory(1)" @keydown.up.prevent="moveCategory(-1)" @keydown.down.prevent="moveCategory(1)">
+            <view v-for="c in categoriesForNew" :key="c" class="nx-ticket-cat-radio family-control" :style="catChipStyle(newCat === c)" role="radio" :tabindex="newCat === c ? 0 : -1" :aria-checked="newCat === c ? 'true' : 'false'" :aria-label="catLabel(c)" @click="selectCategory(c)"    @keydown.left.prevent="moveCategory(-1)" @keydown.right.prevent="moveCategory(1)" @keydown.up.prevent="moveCategory(-1)" @keydown.down.prevent="moveCategory(1)">
+              <LiquidGlass :radius="22" :tone="newCat === c ? 'selection' : 'control'" />
               <text>{{ catLabel(c) }}</text>
             </view>
           </view>
@@ -70,8 +86,8 @@
               <text class="block" :style="suggestionQuestionStyle">{{ faq.question }}</text>
               <text class="block" :style="suggestionAnswerStyle">{{ faq.answer }}</text>
             </view>
-            <view v-if="canLoadMoreTicketSuggestions" :style="ticketSuggestionLoadMoreStyle" role="button" tabindex="0" :aria-disabled="ticketSuggestionLoading ? 'true' : 'false'" @click="loadMoreTicketSuggestions"  @keydown.enter.prevent="loadMoreTicketSuggestions" @keydown.space.prevent="loadMoreTicketSuggestions">
-              <text>{{ ticketSuggestionLoading ? t.help.loadingMore : t.help.loadMore }}</text>
+            <view v-if="canLoadMoreTicketSuggestions" class="family-control" :style="ticketSuggestionLoadMoreStyle" role="button" tabindex="0" :aria-disabled="ticketSuggestionLoading ? 'true' : 'false'" @click="loadMoreTicketSuggestions"  @keydown.enter.prevent="loadMoreTicketSuggestions" @keydown.space.prevent="loadMoreTicketSuggestions">
+              <LiquidGlass :radius="22" /><text>{{ ticketSuggestionLoading ? t.help.loadingMore : t.help.loadMore }}</text>
             </view>
           </view>
         </view>
@@ -90,14 +106,16 @@
           <text id="ticket-desc-hint" class="block" :style="fieldHintStyle">{{ t.tickets.create.descHint }}</text>
           <text v-if="descInvalid" id="ticket-desc-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.tickets.create.descRequired }}</text>
         </view>
-        <view class="grid grid-cols-2" style="gap: 8px">
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.cancel" @click="setMode({ kind: 'list' })">
+        <view class="ticket-create-actions">
+          <view class="family-control family-control--primary ticket-submit" :style="{ ...submitBtnStyle, opacity: creationDisabled ? 0.55 : 1 }" role="button" :tabindex="creationDisabled ? -1 : 0" :aria-disabled="creationDisabled" :aria-busy="createSubmitting" :aria-label="t.tickets.create.submit" @click="submitCreate">
+            <LiquidGlass :radius="24" tone="selection" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
+            <text style="margin-left: 6px">{{ createSubmitting ? t.tickets.policySubmitting : t.tickets.create.submit }}</text>
+          </view>
+          <view class="family-control ticket-cancel" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.cancel" @click="setMode({ kind: 'list' })">
+            <LiquidGlass :radius="24" />
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.cancel }}</text>
-          </view>
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="{ ...submitBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.create.submit" @click="submitCreate">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
-            <text style="margin-left: 6px">{{ t.tickets.create.submit }}</text>
           </view>
         </view>
       </view>
@@ -111,6 +129,7 @@
             <text :style="catTextStyle">{{ catLabel(detailTicket.category) }}</text>
           </view>
           <text class="block" :style="detailSubjectStyle">{{ detailTicket.subject }}</text>
+          <text class="ticket-detail-id">{{ detailTicket.id }}</text>
           <view class="flex items-center justify-between" :style="detailTimesStyle">
             <text>{{ createdLabel }}</text>
             <text>{{ updatedLabel }}</text>
@@ -122,30 +141,29 @@
           </view>
         </view>
 
-        <text class="block" :style="messagesLabelStyle">{{ t.tickets.detail.messagesLabel }}</text>
+        <view class="ticket-timeline-heading">
+          <text>{{ t.tickets.detail.messagesLabel }}</text>
+          <text class="ticket-timeline-order">{{ t.tickets.detail.chronological }}</text>
+        </view>
         <text v-if="detailTicket.historyTruncated" class="block" role="status" aria-live="polite" :style="historyTruncatedStyle">{{ t.tickets.historyTruncated }}</text>
-        <view v-if="detailTicket.historyNextCursor" class="active:opacity-70" :style="historyLoadEarlierStyle" role="button" tabindex="0" :aria-label="t.tickets.loadEarlier" @click="loadEarlierTicket"  @keydown.enter.prevent="loadEarlierTicket" @keydown.space.prevent="loadEarlierTicket">
+        <view v-if="detailTicket.historyNextCursor" class="family-control" :style="historyLoadEarlierStyle" role="button" tabindex="0" :aria-label="t.tickets.loadEarlier" @click="loadEarlierTicket"  @keydown.enter.prevent="loadEarlierTicket" @keydown.space.prevent="loadEarlierTicket">
+            <LiquidGlass :radius="24" />
           <text>{{ t.tickets.loadEarlier }}</text>
         </view>
-        <view style="display: flex; flex-direction: column; gap: 8px">
-          <view v-for="m in detailTicket.messages" :key="m.id" :style="msgBubbleStyle(m.author === 'user')">
-            <view class="flex items-center" :style="msgHeadStyle">
-              <text :style="msgAuthorStyle(m.author === 'user')">{{ messageAuthor(m) }}</text>
-              <text :style="dotSepStyle" style="margin: 0 4px">·</text>
-              <text :style="msgTimeStyle">{{ relWhen(m.ts) }}</text>
-            </view>
-            <text class="block" :style="msgBodyStyle">{{ m.body }}</text>
-          </view>
+        <view class="ticket-timeline">
+          <TicketMessageRecord v-for="(m, index) in detailTicket.messages" :key="`${app.accountKey}:${detailTicket.id}:${m.id}`" :message="m" :scope="`${app.accountKey}:${detailTicket.id}`" :show-date="index === 0 || messageDay(m.ts) !== messageDay(detailTicket.messages[index - 1].ts)" />
         </view>
 
         <view v-if="canReply(detailTicket)" :style="replyCardStyle">
           <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" :aria-label="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
           <view class="grid grid-cols-2" style="gap: 8px; margin-top: 8px">
-            <view v-if="canClose(detailTicket)" class="flex items-center justify-center active:scale-[0.98]" :style="{ ...closeBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
+            <view v-if="canClose(detailTicket)" class="family-control" :style="{ ...closeBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
+            <LiquidGlass :radius="24" />
               <text>{{ t.tickets.detail.closeBtn }}</text>
             </view>
-            <view class="flex items-center justify-center active:scale-[0.98]" :style="sendReplyStyle(supportSessionReady && !ticketsStore.mutating && !!reply.trim())" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating || !reply.trim()" :aria-label="t.tickets.detail.sendBtn" @click="sendReply">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="reply.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
+            <view class="family-control family-control--primary" :style="sendReplyStyle(supportSessionReady && !ticketsStore.mutating && !!reply.trim())" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating || !reply.trim()" :aria-label="t.tickets.detail.sendBtn" @click="sendReply">
+            <LiquidGlass :radius="24" tone="selection" />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
               <text style="margin-left: 6px">{{ t.tickets.detail.sendBtn }}</text>
             </view>
           </view>
@@ -163,6 +181,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StatBox from "@/components/me/ticket-stat-box.vue";
 import TicketRow from "@/components/me/ticket-row.vue";
+import TicketMessageRecord from "@/components/me/ticket-message.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
@@ -172,9 +191,10 @@ import { useAuth } from "@/store/auth";
 import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { supportApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { TicketCreationDenied, type TicketCreationPolicy } from '@/api/support-ticket-policy';
 import { useLocaleStore } from "@/store/locale";
 import { navReplace } from "@/lib/route";
-import { STATUS_COLOR, type Ticket, type TicketCategory, type TicketMessage, type TicketStatus, type SupportSlaTarget, type SupportFaq } from "@/domain/support";
+import { STATUS_COLOR, type Ticket, type TicketCategory, type TicketStatus, type SupportSlaTarget, type SupportFaq } from "@/domain/support";
 
 type Mode = { kind: "list" } | { kind: "create" } | { kind: "detail"; id: string };
 type Tab = "all" | "open" | "resolved" | "closed";
@@ -226,6 +246,64 @@ const DESC_MAX = 2000;
 const submitAttempted = ref(false);
 const subjectInvalid = computed(() => submitAttempted.value && !subject.value.trim());
 const descInvalid = computed(() => submitAttempted.value && !desc.value.trim());
+const creationPolicy = ref<TicketCreationPolicy | null>(null);
+const creationPolicyLoading = ref(false);
+const creationPolicyError = ref(false);
+const createSubmitting = ref(false);
+let creationPolicyGeneration = 0;
+let createRequest = 0;
+let creationRetryTimer: ReturnType<typeof setTimeout> | null = null;
+const creationDisabled = computed(() => !supportSessionReady.value || ticketsStore.mutating || createSubmitting.value
+  || (remoteApiEnabled && (creationPolicyLoading.value || creationPolicyError.value || creationPolicy.value?.allowed !== true)));
+const creationNotice = computed(() => {
+  if (!remoteApiEnabled) return t.value.tickets.policyHint;
+  if (creationPolicyError.value) return t.value.tickets.policyUnavailable;
+  if (creationPolicyLoading.value || !creationPolicy.value) return t.value.tickets.policyChecking;
+  const policy = creationPolicy.value;
+  switch (policy.reasonCode) {
+    case 'SUPPORT_TICKET_CREATE_ACTIVE_LIMIT': return fmt(t.value.tickets.policyActiveLimit, { n: policy.activeTickets });
+    case 'SUPPORT_TICKET_CREATE_DAILY_LIMIT': return fmt(t.value.tickets.policyDailyLimit, { hours: policy.windowHours });
+    case 'SUPPORT_TICKET_CREATE_COOLDOWN': return t.value.tickets.policyCooldown;
+    case 'SUPPORT_TICKET_CREATE_DUPLICATE': return t.value.tickets.policyDuplicate;
+    default: return t.value.tickets.policyHint;
+  }
+});
+function clearCreationRetry() {
+  if (creationRetryTimer !== null) clearTimeout(creationRetryTimer);
+  creationRetryTimer = null;
+}
+function acceptCreationPolicy(policy: TicketCreationPolicy) {
+  clearCreationRetry();
+  creationPolicy.value = policy;
+  creationPolicyError.value = false;
+  if (!policy.allowed && policy.retryAfterSeconds > 0 && mode.value.kind === 'create') {
+    creationRetryTimer = setTimeout(() => { creationRetryTimer = null; void loadCreationPolicy(); }, Math.min(policy.retryAfterSeconds * 1000 + 250, 2_147_000_000));
+  }
+}
+async function loadCreationPolicy() {
+  if (!remoteApiEnabled || !ticketsPageVisible || !supportSessionReady.value || mode.value.kind !== 'create') return;
+  clearCreationRetry();
+  const generation = ++creationPolicyGeneration, epoch = ticketsPageEpoch, scope = captureAccountScope();
+  const current = () => generation === creationPolicyGeneration && ticketsPageVisible && supportSessionReady.value
+    && epoch === ticketsPageEpoch && isCurrentAccountScope(scope) && mode.value.kind === 'create';
+  creationPolicyLoading.value = true;
+  creationPolicyError.value = false;
+  try { const policy = await supportApi.ticketCreationPolicy(); if (current()) acceptCreationPolicy(policy); }
+  catch { if (current()) { creationPolicy.value = null; creationPolicyError.value = true; } }
+  finally { if (current()) creationPolicyLoading.value = false; }
+}
+function resetCreationPolicy() {
+  creationPolicyGeneration++;
+  clearCreationRetry();
+  creationPolicy.value = null;
+  creationPolicyLoading.value = false;
+  creationPolicyError.value = false;
+}
+watch(() => app.accountBindingEpoch, () => { resetCreationPolicy(); createRequest++; createSubmitting.value = false; }, { flush: 'sync' });
+watch(() => mode.value.kind, kind => { resetCreationPolicy(); if (kind === 'create') void loadCreationPolicy(); });
+watch([subject, desc, newCat], () => {
+  if (creationPolicy.value?.reasonCode === 'SUPPORT_TICKET_CREATE_DUPLICATE') { resetCreationPolicy(); void loadCreationPolicy(); }
+});
 // An account switch must drop the previous account's draft, but it must not
 // discard the intent the address carries: a reload of ?mode=create has to keep
 // showing the create form rather than silently falling back to the list.
@@ -260,8 +338,7 @@ const historyTruncatedStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
 const historyLoadEarlierStyle: CSSProperties = {
-  color: "var(--v5-brand)", fontSize: "13px", lineHeight: "20px", textAlign: "center",
-  padding: "8px", border: "1px solid var(--v5-border)", borderRadius: "8px",
+  fontSize: "13px", lineHeight: "20px", textAlign: "center", padding: "8px 16px",
 };
 
 onLoad((query) => {
@@ -274,7 +351,7 @@ onLoad((query) => {
 });
 
 onShow(() => { ticketsPageVisible = true; ticketShowRevision.value++; });
-function hideTicketPage() { ticketsPageVisible = false; ticketsPageEpoch++; ticketSuggestionGeneration++; ticketSuggestionLoading.value = false; }
+function hideTicketPage() { ticketsPageVisible = false; ticketsPageEpoch++; ticketSuggestionGeneration++; ticketSuggestionLoading.value = false; resetCreationPolicy(); }
 onHide(hideTicketPage);
 onUnload(hideTicketPage);
 onUnmounted(hideTicketPage);
@@ -294,7 +371,7 @@ async function activateTicketPage() {
   // toast on a ?mode=create refresh.
   const listIsVisible = mode.value.kind === "list";
   try {
-    const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets(), loadTicketSuggestions()]);
+    const [tickets] = await Promise.allSettled([ticketsStore.refresh(), loadSlaTargets(), loadTicketSuggestions(), loadCreationPolicy()]);
     if (!current()) return;
     if (tickets.status === "rejected" && listIsVisible) throw tickets.reason;
     if (mode.value.kind === "detail") await openTicket(mode.value.id);
@@ -423,7 +500,7 @@ const checkIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const stats = computed(() => ({
   open: ticketsStore.tickets.filter((x) => x.status === "open" || x.status === "in_progress").length,
   awaiting: ticketsStore.tickets.filter((x) => x.status === "pending_user").length,
-  resolved: ticketsStore.tickets.filter((x) => x.status === "resolved" || x.status === "closed").length,
+  resolved: ticketsStore.tickets.filter((x) => x.status === "resolved").length,
 }));
 
 const filtered = computed(() => {
@@ -508,9 +585,8 @@ function relWhen(ts: number): string {
   return fmt(t.value.tickets.timeDaysAgo, { n: Math.floor(ms / 86_400_000) });
 }
 
-function messageAuthor(message: TicketMessage): string {
-  if (message.author === "user") return t.value.tickets.detail.youLabel;
-  return message.agentName?.trim() || t.value.tickets.detail.agentFallback;
+function messageDay(ts: number): string {
+  return new Date(ts).toDateString();
 }
 
 function detailVal(e: Event): string {
@@ -527,7 +603,7 @@ function onReply(e: Event) {
 }
 
 async function submitCreate() {
-  if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
+  if (!ticketsPageVisible || creationDisabled.value) return;
   submitAttempted.value = true;
   if (!subject.value.trim() || !desc.value.trim()) {
     toast.info(t.value.tickets.create.missingFields, "");
@@ -536,6 +612,8 @@ async function submitCreate() {
   const scope = captureAccountScope(), epoch = ticketsPageEpoch, requestedMode = mode.value;
   const current = () => ticketsPageVisible && supportSessionReady.value && epoch === ticketsPageEpoch
     && isCurrentAccountScope(scope) && requestedMode === mode.value;
+  const request = ++createRequest;
+  createSubmitting.value = true;
   try {
     const id = await ticketsStore.createTicket({ category: newCat.value, subject: subject.value, body: desc.value });
     if (!current()) return;
@@ -544,7 +622,11 @@ async function submitCreate() {
     desc.value = "";
     submitAttempted.value = false;
     mode.value = { kind: "detail", id };
-  } catch { if (current()) toast.error(t.value.security.opFailed); }
+  } catch (cause) {
+    if (!current()) return;
+    if (cause instanceof TicketCreationDenied) acceptCreationPolicy(cause.policy);
+    else toast.error(t.value.security.opFailed);
+  } finally { if (request === createRequest) createSubmitting.value = false; }
 }
 async function sendReply() {
   if (!ticketsPageVisible || !supportSessionReady.value || ticketsStore.mutating) return;
@@ -575,8 +657,8 @@ async function closeTicket() {
   } catch { if (active()) toast.error(t.value.security.opFailed); }
 }
 
-const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };
-const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "15px" };
+const backRowStyle: CSSProperties = { minHeight: "44px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const newBtnStyle: CSSProperties = { minHeight: "48px", fontWeight: 600, fontSize: "13px" };
 const slaNoticeStyle: CSSProperties = { padding: "0 6px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const slaTargetStyle: CSSProperties = { marginTop: "10px", padding: "10px 12px", borderRadius: "12px", background: "var(--v5-surface)" };
 const slaTargetLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
@@ -587,28 +669,12 @@ const suggestionRowStyle: CSSProperties = { padding: "10px 0", borderBottom: "1p
 const suggestionQuestionStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const suggestionAnswerStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.625, color: "var(--v5-ink-3)" };
 const ticketSuggestionLoadMoreStyle: CSSProperties = { minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--v5-brand)", fontSize: "13px", fontWeight: 600 };
-// Segmented control — filled container, no border (single visual difference).
-// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)" };
-function tabStyle(active: boolean): CSSProperties {
-  return {
-    height: "44px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "12px",
-    fontSize: "12px",
-    fontWeight: 600,
-    background: active ? "var(--v5-brand)" : "transparent",
-    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
-  };
-}
 // Empty state — dashed outline hint, no fill (V5 empty-state idiom).
 const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
 const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const formLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "8px" };
+const formLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "8px" };
 // 必填/长度提示与字段错误:两者都在输入框下方,由 aria-describedby / aria-errormessage 关联。
 const fieldHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: "16px", marginTop: "6px" };
 const fieldErrorStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-danger)", lineHeight: "16px", marginTop: "4px" };
@@ -621,8 +687,7 @@ function catChipStyle(active: boolean): CSSProperties {
     borderRadius: "999px",
     fontSize: "12px",
     fontWeight: 600,
-    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
-    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
+    color: active ? "var(--v5-bg)" : "var(--v5-ink-2)",
   };
 }
 // Inputs — 零 border。新建表单容器(模板 v-else-if create 那层)没有底色 → 输入框直接
@@ -648,35 +713,17 @@ const textareaStyle: CSSProperties = {
   color: "var(--v5-ink)",
   lineHeight: 1.625,
 };
-const cancelBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontWeight: 600, fontSize: "15px" };
-const submitBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "15px" };
+const cancelBtnStyle: CSSProperties = { minHeight: "48px", fontWeight: 500, fontSize: "15px" };
+const submitBtnStyle: CSSProperties = { minHeight: "48px", fontWeight: 600, fontSize: "15px" };
 // Ticket header — sits on the page floor, hairline closes the block.
 const detailMetaStyle: CSSProperties = { padding: "4px 2px 14px", borderBottom: "1px solid var(--v5-border)" };
 function statusTextStyle(s: TicketStatus): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
+  return { fontFamily: "var(--font-v5)", fontSize: "12px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
 }
 const dotSepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "12px" };
-const catTextStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
-const detailSubjectStyle: CSSProperties = { marginTop: "6px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
-const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
-const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
-// Chat bubbles keep their fill (bubble semantics) — borders dropped,
-// the fill alone is the single visual difference.
-function msgBubbleStyle(isUser: boolean): CSSProperties {
-  return {
-    borderRadius: "16px",
-    padding: "14px",
-    background: isUser ? "color-mix(in srgb, var(--v5-brand) 9%, transparent)" : "var(--v5-surface)",
-    marginLeft: isUser ? "24px" : "0",
-    marginRight: isUser ? "0" : "24px",
-  };
-}
-const msgHeadStyle: CSSProperties = { marginBottom: "4px" };
-function msgAuthorStyle(isUser: boolean): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", fontWeight: 600, color: isUser ? "var(--v5-brand)" : "var(--v5-brand-2)" };
-}
-const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
-const msgBodyStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
+const catTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-3)" };
+const detailSubjectStyle: CSSProperties = { marginTop: "10px", overflowWrap: "anywhere", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
+const detailTimesStyle: CSSProperties = { marginTop: "8px", flexWrap: "wrap", gap: "6px", fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Reply zone — 外壳卡已删,textarea 自成一体。壳只剩 padding 无底色 → textarea 直接贴
 // 页面底;原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1(同新建表单输入框)。
 const replyCardStyle: CSSProperties = { padding: "4px 2px 0" };
@@ -686,28 +733,35 @@ const replyTextareaStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
   padding: "8px 12px",
-  fontSize: "13px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   lineHeight: 1.625,
 };
-const closeBtnStyle: CSSProperties = { height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)", fontWeight: 600, fontSize: "13px" };
+const closeBtnStyle: CSSProperties = { minHeight: "48px", fontWeight: 500, fontSize: "13px" };
 function sendReplyStyle(active: boolean): CSSProperties {
-  return {
-    height: "40px",
-    borderRadius: "8px",
-    background: active ? "var(--v5-brand)" : "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
-    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-    fontWeight: 600,
-    fontSize: "13px",
-  };
+  return { minHeight: "48px", opacity: active ? 1 : 0.45, fontWeight: 600, fontSize: "13px" };
 }
 
 import GlassSegments from "@/components/glass-segments.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 const tabOptions = computed(() => tabs.map(value => ({ value, label: tabLabel(value) })));
 </script>
 
+<style src="@/styles/message-family.css"></style>
 <style scoped>
 /* placeholder-class="ph" target — was referenced but never defined (audit P2). */
+.ticket-overview { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ticket-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; min-width: 180px; gap: 4px; }
+.ticket-new { margin-left: auto; max-width: 100%; }
+.ticket-create-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ticket-error { text-align: center; padding-bottom: 16px; }
+.ticket-creation-notice { color: var(--v5-ink-3); font-size: 13px; line-height: 1.6; padding: 4px 0 12px; border-bottom: 1px solid var(--v5-border); }
+.ticket-creation-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ticket-creation-notice-actions:empty { display: none; }
+.ticket-detail-id { display: block; margin-top: 8px; overflow-wrap: anywhere; color: var(--v5-ink-3); font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; }
+.ticket-timeline-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 2px 8px; color: var(--v5-ink); font-size: 20px; font-weight: 600; }
+.ticket-timeline-order { font-size: 12px; font-weight: 400; color: var(--v5-ink-3); }
+.ticket-timeline { padding-top: 4px; }
 .ph {
   color: var(--v5-ink-4);
 }

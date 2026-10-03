@@ -15,7 +15,7 @@
   the H5 same-page hash-query staleness (P-044/P-049). Bare text in <text> (P-026).
 -->
 <template>
-  <view class="cp-root">
+  <view class="cp-root message-family">
     <template v-if="!hiddenAiRoute">
     <!-- Simulated device status bar (preview shell only) — bare page draws its own. -->
     <DeviceStatusBar />
@@ -39,11 +39,11 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
-      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)">
+      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)"><LiquidGlass :radius="22" />
         <text>{{ t.conversations.restartSession }}</text>
       </view>
-      <view v-if="!isAi && convStore.advisorError" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><text>{{ t.conversations.image.retryPolicy }}</text></view>
-      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket"  @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)">
+      <view v-if="!isAi && convStore.advisorError" class="cp-ticket active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><LiquidGlass :radius="22" /><text>{{ t.conversations.image.retryPolicy }}</text></view>
+      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket"  @keydown.enter.prevent="onKeyboardActivate($event, onConvertToTicket)" @keydown.space.prevent="onKeyboardActivate($event, onConvertToTicket)"><LiquidGlass :radius="22" />
         <text>{{ t.conversations.convertTicket }}</text>
       </view>
     </view>
@@ -53,24 +53,29 @@
     </view>
     <view v-if="isAi && remoteApiEnabled" class="cp-ai-history">
       <text v-if="handoffRecommended" class="cp-ai-history-t">{{ handoffCopy.recommend }}</text>
-      <view class="cp-ai-history-action active:opacity-70" role="button" tabindex="0" :aria-disabled="handoffBusy ? 'true' : 'false'" :aria-busy="handoffBusy ? 'true' : 'false'" @click="!handoffBusy && onHumanHandoff()"><text>{{ handoffCopy.action }}</text></view>
+      <view class="cp-ai-history-action active:opacity-70 family-control" role="button" tabindex="0" :aria-disabled="handoffBusy ? 'true' : 'false'" :aria-busy="handoffBusy ? 'true' : 'false'" @click="!handoffBusy && onHumanHandoff()"><LiquidGlass :radius="22" /><text>{{ handoffCopy.action }}</text></view>
     </view>
     <view v-if="isAi && remoteApiEnabled && nova.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.nova.historyTruncated }}</text>
     </view>
-    <view v-if="isAi && remoteApiEnabled && nova.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
-      :aria-label="t.nova.loadEarlier" @click="loadEarlierNovaHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)">
+    <view v-if="isAi && remoteApiEnabled && nova.historyNextCursor" class="cp-ai-history cp-ai-history-action family-control" role="button" tabindex="0"
+      :aria-label="t.nova.loadEarlier" @click="loadEarlierNovaHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierNovaHistory)"><LiquidGlass :radius="22" />
       <text class="cp-ai-history-t">{{ t.nova.loadEarlier }}</text>
     </view>
     <view v-if="!isAi && conv?.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
       <text class="cp-ai-history-t">{{ t.conversations.historyTruncated }}</text>
     </view>
-    <view v-if="!isAi && conv?.historyNextCursor" class="cp-ai-history cp-ai-history-action" role="button" tabindex="0"
-      :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
+    <view v-if="!isAi && conv?.historyNextCursor" class="cp-ai-history cp-ai-history-action family-control" role="button" tabindex="0"
+      :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)"><LiquidGlass :radius="22" />
       <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
     </view>
     <view v-if="!isAi && convStore.advisor?.assignmentState === 'UNBOUND' && conv?.messages.some(message => message.sender === 'user')" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
 
+    <view v-if="ticketCreationBlock" class="cp-ticket-limit" role="status" aria-live="polite">
+      <text>{{ ticketCreationBlockText }}</text>
+      <text v-if="ticketCreationBlock.retryAfterSeconds > 0">{{ fmt(t.tickets.policyRetryAfter, { n: Math.max(1, Math.ceil(ticketCreationBlock.retryAfterSeconds / 60)) }) }}</text>
+      <view v-if="ticketCreationBlock.existingTicketNo" class="family-control" role="button" tabindex="0" @click="navTo('/pages/me/support-tickets?ticket=' + encodeURIComponent(ticketCreationBlock.existingTicketNo))"><LiquidGlass :radius="24" /><text>{{ t.tickets.policyViewTicket }}</text></view>
+    </view>
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
       @typing="!isAi && convStore.setTyping($event)"
@@ -166,6 +171,7 @@ import type { ConversationType } from "@/domain/support";
 
 import { ApiError, isSettledRejection, asApiError } from "@/api/errors";
 import { isSupportAttachmentNotReady, type SupportAttachmentPolicy } from "@/api/support-api";
+import { TicketCreationDenied, isTicketReplyRequired, type TicketCreationPolicy } from '@/api/support-ticket-policy';
 import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -191,6 +197,17 @@ type FailedHumanSend = { text: string; attachmentId?: string; kind: "unknown" | 
 const imageDraft = ref<ImageDraft | null>(null);
 const failedHumanSend = ref<FailedHumanSend | null>(null);
 const humanSendBusy = ref(false);
+const ticketCreationBlock = ref<TicketCreationPolicy | null>(null);
+const ticketCreationBlockText = computed(() => {
+  const policy = ticketCreationBlock.value;
+  if (!policy) return '';
+  switch (policy.reasonCode) {
+    case 'SUPPORT_TICKET_CREATE_ACTIVE_LIMIT': return fmt(t.value.tickets.policyActiveLimit, { n: policy.activeTickets });
+    case 'SUPPORT_TICKET_CREATE_DAILY_LIMIT': return fmt(t.value.tickets.policyDailyLimit, { hours: policy.windowHours });
+    case 'SUPPORT_TICKET_CREATE_DUPLICATE': return t.value.tickets.policyDuplicate;
+    default: return t.value.tickets.policyCooldown;
+  }
+});
 const draftText = ref("");
 const attachmentPolicy = ref<SupportAttachmentPolicy | null>(null);
 const attachmentPolicyError = ref(false);
@@ -209,6 +226,7 @@ watch(() => [app.accountBindingEpoch, convStore.scopeInvalidated], () => {
   humanComposerResetting = true;
   try {
     clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
+    ticketCreationBlock.value = null;
   } finally { humanComposerResetting = false; }
   if (novaPageVisible && !isAi.value && remoteApiEnabled && supportSessionReady.value) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
 }, { flush: "sync" });
@@ -391,6 +409,7 @@ let categoryGate: {
 } | null = null;
 const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
+watch([cid, startType], () => { ticketCreationBlock.value = null; });
 const humanComposerKey = computed(() => cid.value ? `conversation:${cid.value}` : startType.value ? `start:${startType.value}` : "");
 let recoveredNavigation = "";
 function restoreRecoveredComposer(saved: HumanComposer | null | undefined, key: string) {
@@ -1383,12 +1402,19 @@ async function onConvertToTicket() {
   if (humanConvertRequest?.binding === binding && humanConvertRequest.id === current.id) return;
   const request = { binding, id: current.id };
   humanConvertRequest = request;
+  ticketCreationBlock.value = null;
   const isCurrent = () => binding === app.accountBindingEpoch && novaPageVisible && cid.value === current.id;
   try {
     const ticketId = await convStore.convertToTicket(current.id, "technical", `Conversation ${current.id}`);
     if (!isCurrent()) return;
     navTo(`/pages/me/support-tickets?ticket=${encodeURIComponent(ticketId)}`);
-  } catch { if (isCurrent()) toast.error(t.value.conversations.convertTicketFailed, ""); }
+    } catch (cause) {
+      if (!isCurrent()) return;
+      if (cause instanceof TicketCreationDenied) ticketCreationBlock.value = cause.policy;
+      else if (isTicketReplyRequired(cause))
+        toast.warn(t.value.conversations.convertTicketReplyRequired);
+      else toast.error(t.value.conversations.convertTicketFailed, "");
+    }
   finally { if (humanConvertRequest === request) humanConvertRequest = null; }
 }
 
@@ -1448,6 +1474,8 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
 <style scoped>
+.cp-ticket-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 16px; padding: 12px 0; color: var(--v5-ink-3); font-size: 13px; line-height: 1.6; border-bottom: 1px solid var(--v5-border); }
+.cp-ticket-limit > text { flex-basis: 100%; }
 .cp-root {
   position: fixed;
   inset: 0;
@@ -1459,9 +1487,10 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px 16px;
   /* top padding is bound inline to the device status-bar height (see cp-head :style) */
-  border-bottom: 1px solid var(--v5-border);
+  border-bottom: 1px solid color-mix(in srgb, var(--v5-border) 55%, transparent);
 }
 .cp-ai-safety {
   padding: 8px 16px;
@@ -1489,7 +1518,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   /* 《07》tap≥44:原 36×36。负 margin 由 -6 调到 -10,图标视觉位置不动、只有热区变大 */
   width: 44px;
   height: 44px;
-  margin-left: -10px;
+  margin-left: 0;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1504,22 +1533,25 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 }
 .cp-meta {
   flex: 1;
-  min-width: 0;
+  min-width: 100px;
 }
 .cp-ticket {
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
-  color: var(--v5-brand);
+  color: var(--v5-ink-2);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  margin-left: auto;
+  max-width: 100%;
 }
 .cp-name {
   display: block;
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 20px;
+  overflow-wrap: anywhere;
   letter-spacing: -0.008em;
   color: var(--v5-ink);
 }
@@ -1551,4 +1583,10 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 }
 .cp-back { position: relative; overflow: visible; }
 .cp-back > svg { position: relative; z-index: 1; }
+.cp-root .cp-ai-history-action { background: transparent; border: none; margin: 6px 16px; }
+.cp-root .cp-ai-history-action .cp-ai-history-t { position: relative; }
+.cp-role-t { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .cp-dot { animation: none; } }
 </style>
+
+<style src="@/styles/message-family.css"></style>

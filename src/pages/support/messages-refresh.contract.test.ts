@@ -55,6 +55,7 @@ describe("conversation-center refresh failure contract", () => {
   it("gives a failed prior AI selection the same retry state as a human category", () => {
     expect(source).not.toContain("selectedType !== 'ai' && (convStore.error || convStore.categoryAvailabilityStatus === 'failed')");
     expect(source).toContain("convStore.error || convStore.categoryAvailabilityStatus === 'failed'");
-    expect(source).toContain('@cta="retryConversations"');
+    expect(source).toContain('@click="retryConversations"');
+    expect(source).toContain('class="family-control" role="button" tabindex="0" :aria-label="t.conversations.retry"');
   });
 });
