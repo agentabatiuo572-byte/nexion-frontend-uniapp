@@ -122,14 +122,12 @@ import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { collectDeviceSignals } from "@/lib/device-signals";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
-import { phoneCalibrationErrorDetail } from "@/lib/phone-calibration-error";
 
 const t = useT();
 const app = useApp();
 const auth = useAuth();
 const detected = ref(false);
 const loadFailed = ref(false);
-const failureCode = ref("");
 const deferFailed = ref(false);
 const deferred = ref(false);
 const loading = ref(false);
@@ -137,8 +135,7 @@ const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
 const failureDetail = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION"
   ? t.value.onboarding.phoneCalibrationPendingBody
-  : phoneCalibrationErrorDetail(failureCode.value, t.value.onboarding, deferFailed.value)
-    ?? (deferFailed.value ? t.value.onboarding.activationDeferFailed : t.value.onboarding.calibrationRetry));
+  : deferFailed.value ? t.value.onboarding.activationDeferFailed : t.value.onboarding.calibrationRetry);
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
 const phone = comparison("phone");
 const s1 = comparison("s1");
@@ -176,7 +173,6 @@ function loadCalibration(recalibrate = false) {
   if (!nativePhoneAvailable) return;
   const scope = scopePair();
   loadFailed.value = false;
-  failureCode.value = "";
   deferFailed.value = false;
   deferred.value = false;
   loading.value = true;
@@ -199,11 +195,10 @@ function loadCalibration(recalibrate = false) {
     }
     calibration.value = result;
     scheduleReveal();
-  }).catch((cause) => {
+  }).catch(() => {
     if (!mounted || !isCurrentEstimatorScope(scope.estimator,
       createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation))) return;
     calibration.value = null;
-    failureCode.value = cause instanceof Error ? cause.message : "";
     detected.value = false;
     loadFailed.value = true;
   }).finally(() => {
@@ -248,7 +243,6 @@ watch(() => String(app.accountKey || ""), (next) => {
   calibrationFlow.reset();
   detected.value = false;
   loadFailed.value = false;
-  failureCode.value = "";
   deferFailed.value = false;
   deferred.value = false;
   calibration.value = null;
@@ -321,10 +315,9 @@ async function deferPhoneActivation() {
 
     uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
     navReset({ url: "/pages/index/index", fail: () => {} });
-  } catch (cause) {
+  } catch {
     if (isCurrent(scope)) {
       calibration.value = null;
-      failureCode.value = cause instanceof Error ? cause.message : "";
       deferFailed.value = true;
       loadFailed.value = true;
       uni.showToast({ title: t.value.onboarding.activationDeferFailed, icon: "none" });

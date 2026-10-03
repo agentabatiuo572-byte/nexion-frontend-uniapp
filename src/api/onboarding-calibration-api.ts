@@ -1,6 +1,5 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { nativePhoneRequest } from "@/lib/native-phone-proof";
 
 export type OnboardingCalibrationEnvironment = "PRODUCTION";
 export type PhoneActivationStatus = "CALIBRATED" | "ACTIVE" | "DEFERRED";
@@ -226,7 +225,7 @@ function key(value: string): string {
 export function createOnboardingCalibrationApi(client: ApiClient, environment: OnboardingCalibrationEnvironment = "PRODUCTION"): OnboardingCalibrationApi {
   return {
     async phoneLogin(deviceId) {
-      const response = record(await nativePhoneRequest(client, text(deviceId), {
+      const response = record(await client.request({
         method: "POST", path: "/api/onboarding/phone-installation/login", body: { deviceId: text(deviceId) },
       }));
       if (!["BOUND", "NEEDS_CALIBRATION", "REPLACEMENT_REQUIRED", "PHONE_REPLACEMENT_DISABLED",
@@ -238,7 +237,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await nativePhoneRequest(client, normalizedDeviceId, {
+      const response = await client.request({
         method: "POST", path: "/api/onboarding/calibrate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision, signals: rawSignals },
       });
@@ -256,7 +255,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await nativePhoneRequest(client, normalizedDeviceId, {
+      const response = await client.request({
         method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });
@@ -267,7 +266,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
       }
-      const response = await nativePhoneRequest(client, normalizedDeviceId, {
+      const response = await client.request({
         method: "POST", path: "/api/onboarding/calibrate/defer", idempotencyKey: key(idempotencyKey),
         body: { deviceId: normalizedDeviceId, expectedRevision },
       });

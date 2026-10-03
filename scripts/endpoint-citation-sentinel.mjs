@@ -193,9 +193,7 @@ const LEDGER = {
   "/api/onboarding/calibrate": "TBD-NAME: BACKEND OnboardingCalibrationController 已实现;手机/设备校准请求与结果由服务端统一返回,前端 PRD 路径待同步",
   "/api/onboarding/calibrate/activate": "PRD §4.7.3 / App 落地规格 §393;服务端原子激活 canonical 手机设备",
   "/api/onboarding/calibrate/defer": "PRD §4.7.3 / App 落地规格 §393;服务端持久化 DEFERRED",
-  "/api/onboarding/phone-installation/login": "PRD §4.7.3;已验证原生安装登录与手机执行权切换",
-  "/api/onboarding/phone-installation/challenge": "PRD §4.7.3;账号与会话绑定的一次性原生证明挑战",
-  "/api/onboarding/phone-installation/verify": "PRD §4.7.3;Android 硬件密钥证明与短期原生执行资格",
+  "/api/onboarding/phone-installation/login": "PRD §6.11;当前账号与安装标识的手机绑定核验及执行权切换",
   "GET /api/users/me": "PRD §12.2",
 
   // ── social / network / misc ───────────────────────────────────────────
