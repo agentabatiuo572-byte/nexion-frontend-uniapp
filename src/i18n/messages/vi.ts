@@ -5806,7 +5806,7 @@ openSeaErrorPool: {
     welcomeGiftSub: "Ghi có ngay khi bạn kích hoạt điện thoại — không cần mua phần cứng.",
     perks: {
       gift: "Quà đăng ký ${usd} USDT + {nex} NEX",
-      day1: "Điện thoại kiếm tiền từ ngày đầu — không cần cài đặt",
+      day1: "Cài ứng dụng Android, rồi hoàn tất hiệu chỉnh và kích hoạt để bật tính toán trên điện thoại",
       always: "Hoạt động 24/7 khắp các tác vụ AI toàn cầu",
       sponsor: "Được người bảo trợ dìu dắt & vào nhóm chat đội",
     },
