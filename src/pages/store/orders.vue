@@ -86,7 +86,7 @@ import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
+import { formatTrialDate } from "@/lib/trial-date";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
 import { useGenesis } from "@/store/genesis";
@@ -295,7 +295,9 @@ function badge(status: OrderStatus): Badge {
 }
 
 function dateText(ts: number): string {
-  return new Date(ts).toLocaleDateString(dateLocale());
+  return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
+    ? formatTrialDate(ts)
+    : "—";
 }
 
 function goStore() {

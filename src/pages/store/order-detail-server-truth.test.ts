@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanonicalOrder, CanonicalOrderList } from "@/api/order-api";
 import { advanceRuntimeRevision } from "@/api/order-api";
 import { nexGridBrandText } from "@/lib/brand-copy";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
@@ -80,6 +81,7 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
     if (id === "@/i18n/use-t") return { useT: () => copyRef };
     if (id === "@/i18n/format") return { dateLocale: () => "en-US" };
     if (id === "@/lib/brand-copy") return { nexGridBrandText };
+    if (id === "@/lib/trial-date") return { formatTrialDateTime };
     if (id === "@/store/free-trial") return { trialReservesSlotNow: () => false };
     if (id === "@/store/ui" || id === "@/api/errors" || id === "@/lib/account-scope") return {};
     if (id === "@/composables/use-page-header") return { useSetPageHeader: () => {} };
