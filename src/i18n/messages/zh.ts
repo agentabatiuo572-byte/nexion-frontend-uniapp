@@ -5802,7 +5802,7 @@ openSeaErrorPool: {
     welcomeGiftSub: "激活手机即到账 — 无需购买硬件。",
     perks: {
       gift: "${usd} USDT + {nex} NEX 注册礼包",
-      day1: "手机从第一天开始赚钱 — 无需配置",
+      day1: "安装 Android App，完成校准与激活后可启用手机算力",
       always: "24/7 处理全球 AI 任务",
       sponsor: "邀请人指导 + 团队群权限",
     },

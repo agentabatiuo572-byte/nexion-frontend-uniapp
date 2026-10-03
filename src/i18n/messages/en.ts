@@ -5958,7 +5958,7 @@ openSeaErrorPool: {
     welcomeGiftSub: "Credited the moment you activate your phone — no hardware purchase needed.",
     perks: {
       gift: "${usd} USDT + {nex} NEX signup gift",
-      day1: "Phone earns from day one — no setup",
+      day1: "Install the Android app, then complete calibration and activation to enable phone compute",
       always: "Active 24/7 across global AI workloads",
       sponsor: "Sponsor mentorship & team chat access",
     },
