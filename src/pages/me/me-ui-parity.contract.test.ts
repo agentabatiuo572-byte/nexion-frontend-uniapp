@@ -58,8 +58,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "goals.vue": "43658431af1e6739fa4a269c4758f7a432b9e74dd33fa031f8fec5cb408e0a60",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
-  // Reviewed UI regression repair: bind the existing narrow-screen quick grid.
-  "me.vue": "11d4a58ee3ea0e50c41eb3762c0f2093909867bf2d012d2eeff1670cd269d5c0",
+  // Owner requested removal of the unsolicited overview withdrawal warning.
+  "me.vue": "4eb7f786750e279d7d7101415c5d4857dbbdcd20a4e2afcd4979b28f21c823e6",
   "notifications.vue": "eb2b07878505154a39e4ec058c802dcd8d991f1d51e8b34fd7ae6630c49c812e",
   "preferences.vue": "5c7a712cb60a21c7e24cbbe85783ea66503f1298724d035f4c8520251fcea632",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
@@ -122,11 +122,10 @@ describe("Me page 5174 normal-state UI parity", () => {
     expect(quickKeys("help")).toEqual(["messages", "support", "faq", "tickets", "trust", "learning", "risk", "developer"]);
   });
 
-  it("preserves the 5174 top-to-bottom component order", () => {
+  it("preserves the overview order without an unsolicited withdrawal warning", () => {
     const markers = [
       "<ProfileRow />",
       "<WalletCard />",
-      "<WithdrawalLockedWarning",
       "<TrialEntry v-if=\"trialIsHero\" />",
       "v-for=\"section in quickSections\"",
       "<TrialEntry v-if=\"trialIsActive\" />",
@@ -136,6 +135,7 @@ describe("Me page 5174 normal-state UI parity", () => {
     const indexes = markers.map((marker) => source.indexOf(marker));
     expect(indexes.every((index) => index >= 0)).toBe(true);
     expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+    expect(source).not.toContain("WithdrawalLockedWarning");
   });
 
   it("isolates authenticated module refreshes with all-settled semantics", () => {
@@ -149,7 +149,7 @@ describe("Me page 5174 normal-state UI parity", () => {
     expect(source).toContain('import { useMessageDrawer } from "@/store/message-drawer"');
     expect(source).toContain("const messageUnread = computed(() => messageCenter.totalUnread)");
     expect(source).toContain('key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications"');
-    expect(source).toContain('messageUnread.value > 99 ? "99+"');
+    expect(source).toContain('badge: formatUnreadBadge(messageUnread.value) || undefined');
   });
 
   it("matches the checked-out 5174 Me-page visual baseline when it is available", () => {

@@ -41,6 +41,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import NovaAvatar from "./nova-avatar.vue";
 import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 
 // dimmed:chassis 在页面滚动期间置真 —— 浮标横在内容上,滚动时先让路(淡出 +
 // 不吃点击),停下由 chassis 复位再淡回。不传 = 旧行为(undefined 即 falsy)。
@@ -66,7 +67,7 @@ const humanUnread = computed(() =>
 const totalUnread = computed(() => humanUnread.value);
 const visible = computed(() => !NOVA_SUPPORT_VISIBLE || remoteApiEnabled || totalUnread.value > 0);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
-const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
+const unreadLabel = computed(() => formatUnreadBadge(totalUnread.value));
 
 // Human support uses the same full-page center as the bell, opening Service.
 function open() {

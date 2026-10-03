@@ -1,6 +1,6 @@
 <!--
   Me — ported from Nexion-prototype/app/(main)/me/page.tsx (13 sections).
-  Top→bottom: ProfileRow → WalletCard → WithdrawalLockedWarning (if balance < $20)
+  Top→bottom: ProfileRow → WalletCard
   → TrialEntry (hero, if eligible) → OKX-style quick sections (network / devices
   / account / preferences / help) → TrialEntry (active row, if
   trial running) → OrdersCard (if any orders) → Sign out → version footer.
@@ -28,8 +28,6 @@
       <ProfileRow />
 
       <WalletCard />
-
-      <WithdrawalLockedWarning v-if="showWithdrawalLocked" :balance="usdtBalance" />
 
       <!-- Hero slot — zero-cost trial activation right after wallet.
            BUG 173: 三态占位 —— 首次读取期间渲染固定高度骨架,已确认后才一次性
@@ -105,7 +103,6 @@ import CardStagger from "@/components/card-stagger.vue";
 import SectionHeader from "@/components/me/section-header.vue";
 import ProfileRow from "@/components/me/profile-row.vue";
 import WalletCard from "@/components/me/wallet-card.vue";
-import WithdrawalLockedWarning from "@/components/me/withdrawal-locked-warning.vue";
 import TrialEntry from "@/components/me/trial-entry.vue";
 import OrdersCard from "@/components/me/orders-card.vue";
 import ThemePickerSheet from "@/components/me/theme-picker-sheet.vue";
@@ -113,6 +110,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt, openSlotsTemplate } from "@/i18n/format";
 import { navReset, navTo } from "@/lib/route";
 import { nexGridBrandText } from "@/lib/brand-copy";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
@@ -140,8 +138,6 @@ import type { SecurityState } from "@/api/contracts";
 import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
-
-const MIN_WITHDRAWAL_USD = 20;
 
 const t = useT();
 const app = useApp();
@@ -230,8 +226,6 @@ interface QuickSection {
   items: QuickItem[];
 }
 
-const usdtBalance = computed(() => app.user.usdtBalance);
-const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
 const profileName = computed(() => nexGridBrandText(profile.displayName));
 const orderCount = computed(() => orders.orders.length);
 const localeUpper = computed(() => locale.code.toUpperCase());
@@ -325,7 +319,7 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "help",
     title: t.value.me.secHelp,
     items: [
-      { key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications", icon: "messages", badge: messageUnread.value > 0 ? (messageUnread.value > 99 ? "99+" : String(messageUnread.value)) : undefined, tone: "purple" },
+      { key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications", icon: "messages", badge: formatUnreadBadge(messageUnread.value) || undefined, tone: "purple" },
       // This opens the support hub; availability is not inferred from a local badge.
       { key: "support", label: t.value.me.supportHubRow, href: "/me/support", icon: "chat", meta: t.value.me.supportHubMeta, tone: "success" },
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },

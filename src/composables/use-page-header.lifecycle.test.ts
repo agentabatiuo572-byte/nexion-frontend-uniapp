@@ -5,6 +5,7 @@ import { compileScript, parse } from "@vue/compiler-sfc";
 import ts from "typescript";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import chassisSource from "@/components/app-chassis.vue?raw";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import { useSetPageHeader } from "./use-page-header";
@@ -67,6 +68,7 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol("pending") },
     "@/store/popup-arbiter": { usePopupArbiter: () => ({ release: idle }), runPriorityRound: idle },
     "@/lib/route": { navBack: back, navTo: idle },
+    "@/lib/unread-badge": { formatUnreadBadge },
     "@/lib/static-review-routes": { isStaticReviewRoute: () => false },
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/lib/scroll-memory": { saveScrollPos: idle, getScrollPos: idle, dropScrollPos: idle },

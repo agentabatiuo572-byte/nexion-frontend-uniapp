@@ -8,6 +8,7 @@ import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import { localizedIdleClose } from "@/lib/support-idle-message";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { installSupportStorage } from "@/test/storage-setup";
 
 installSupportStorage();
@@ -58,6 +59,7 @@ function mount(type: "advisor" | "support", state: "empty" | "ended" | "active" 
     vue: Vue, "@dcloudio/uni-app": { onShow: vi.fn(), onHide: vi.fn() },
     "@/i18n/use-t": { useT: () => currentLocale }, "@/i18n/format": { fmt: (value: string) => value },
     "@/lib/support-idle-message": { localizedIdleClose },
+    "@/lib/unread-badge": { formatUnreadBadge },
     "@/lib/nova-visibility": { NOVA_SUPPORT_VISIBLE: false },
     "@/lib/route": { navTo }, "@/store/conversations": { useConversations: () => providedStore ?? store },
     "@/store/nova": { useNova: () => ({ messages: [], unread: 0 }) }, "@/store/app": { useApp: () => account },

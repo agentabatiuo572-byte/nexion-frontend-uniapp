@@ -5,6 +5,7 @@ import source from "./service-message-list.vue?raw";
 import { zh } from "@/i18n/messages/zh";
 import { fmt } from "@/i18n/format";
 import { localizedIdleClose } from "@/lib/support-idle-message";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 function mount() {
   const conversations = vue.reactive({
     loading: false, error: null, categoryLoading: false, categoryAvailabilityStatus: "ready", realtimeFallback: false,
@@ -20,6 +21,7 @@ function mount() {
     "@/store/tickets": { useTickets: () => tickets }, "@/store/message-drawer": { useMessageDrawer: () => ({ refresh }) },
     "@/store/app": { useApp: () => ({ accountBindingEpoch: 0 }) }, "@/i18n/use-t": { useT: () => vue.ref(zh) },
     "@/i18n/format": { fmt }, "@/lib/route": { navTo }, "@/lib/support-idle-message": { localizedIdleClose },
+    "@/lib/unread-badge": { formatUnreadBadge },
   };
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
   const js = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
