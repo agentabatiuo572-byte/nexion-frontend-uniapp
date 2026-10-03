@@ -11,7 +11,7 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view :id="chassisHostId" class="nx-chassis" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
+  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
     <view class="nx-top-chrome" :style="{ height: statusBarHeight + 'px' }" />
 
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
@@ -35,14 +35,12 @@
       </view>
     </view>
 
-    <!-- Page nav header — sub-pages that registered via useSetPageHeader. Sticky
-         chassis row (NOT inside page content) so it pins on scroll + frosts the
-         content behind it, mirroring the prototype Header nav row. Tab pages never
-         set pageHeader, so this never shows for them (brand row stays untouched). -->
+    <!-- Registered sub-page header: round glass controls stay available while
+         the bare title hides as content scrolls into the reserved header gap. -->
     <view v-if="!isTabRoute && navHeader" class="nx-navheader" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
-      <LiquidGlass :radius="navHeaderH / 2" tone="navigation" backdrop=".nx-page-enter" />
       <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
         <view class="nx-nav-glass">
+          <LiquidGlass :radius="18" tone="navigation" backdrop=".nx-page-enter" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
       </view>
@@ -52,6 +50,7 @@
       </view>
 	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
         <view class="nx-nav-glass">
+          <LiquidGlass :radius="18" tone="navigation" backdrop=".nx-page-enter" />
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-nav-belldot" />
         </view>
@@ -188,6 +187,9 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, onAcceptanceObservationModalOpened } from "@/services/behavior-analytics";
 
+// Uni forwards query parameters such as product `id` through the page root.
+// Bind fallthrough attrs explicitly so they cannot replace the view adapter's ID.
+defineOptions({ inheritAttrs: false });
 const props = defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
 }>();
@@ -620,7 +622,6 @@ const pendingBarVisible = computed(() => !!pendingCheckout.barSession && showBus
 const pendingBarTop = computed(() => contentTop.value + 8);
 const pendingBarInset = computed(() => (pendingBarVisible.value ? PENDING_BAR_INSET : 0));
 provide(PENDING_BAR_INSET_KEY, pendingBarInset);
-const topChromeHeight = computed(() => contentTop.value);
 
 // lucide-style outline paths (Home / Zap / ShoppingBag / Users / User)
 const tabs = computed(() => [
@@ -721,9 +722,7 @@ export default chassisView;
   padding: 0 16px;
   gap: 12px;
 }
-/* Page nav header (sub-pages) — its OWN chrome surface so the brand row
-   (.nx-header) stays byte-identical for the 5 tab pages. Mirrors the prototype
-   Header nav row: 44/56 tall, back + centered title + bell, frosted. */
+/* Sub-page row has no shared surface; each control owns its round glass. */
 .nx-navheader {
   position: absolute;
   left: 12px;
@@ -756,6 +755,7 @@ export default chassisView;
   place-items: center;
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
+.nx-nav-glass > svg { position: relative; z-index: 1; }
 .nx-nav-titlewrap {
   position: relative;
   z-index: 1;
@@ -765,7 +765,10 @@ export default chassisView;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  transition: transform 200ms cubic-bezier(.23,1,.32,1), opacity 200ms, visibility 0s;
 }
+.nx-nav-titlewrap[data-hidden="true"] { transform: translateY(-18px); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, 200ms; }
+@media (prefers-reduced-motion: reduce) { .nx-nav-titlewrap { transition: none; } .nx-nav-titlewrap[data-hidden="true"] { transform: none; } }
 .nx-nav-title {
   max-width: 100%;
   font-family: var(--font-v5);

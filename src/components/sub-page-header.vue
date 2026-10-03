@@ -1,18 +1,13 @@
 <!--
-  SubPageHeader — STICKY in-content top chrome for sub-pages. Prototype-faithful
-  nav row: glass back tile (left) + CENTERED title/subtitle + glass bell tile
-  (right). position:sticky so it pins to the top of the chassis scroll container on
-  scroll and frosts the content scrolling beneath it (the chassis content is a plain
-  overflow:auto view per P-041, so a sticky child shares its paint surface and
-  backdrop-filter works). Per-page + in-content → survives back-navigation with no
-  store/onShow gymnastics (uni delivers onShow only to pages, not components).
+  SubPageHeader — sticky controls with independent round glass surfaces and a
+  bare title. The chassis view layer hides the title when content scrolls under
+  it and restores it at the top. The row keeps its height and content spacing.
 
   The plain variant keeps the title bare and gives the back control its own
   round glass surface. An optional action replaces the message bell.
 -->
 <template>
   <view class="spv" :class="{ 'spv--plain': plain }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
-    <LiquidGlass v-if="!plain" :radius="rowH / 2" tone="navigation" />
     <view
       class="spv-side spv-back"
       role="button"
@@ -23,7 +18,7 @@
       @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)"
     >
       <view class="spv-glass">
-        <LiquidGlass v-if="plain" :radius="22" tone="navigation" />
+        <LiquidGlass :radius="plain ? 22 : 18" tone="navigation" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
     </view>
@@ -45,6 +40,7 @@
       @keydown.enter.prevent="onKeyboardActivate($event, goBell)" @keydown.space.prevent="onKeyboardActivate($event, goBell)"
     >
       <view class="spv-glass">
+        <LiquidGlass :radius="18" tone="navigation" />
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
         <view v-if="unread > 0" class="spv-belldot" />
       </view>
@@ -164,9 +160,9 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .spv-side:active .spv-glass { transform: scale(.92); }
+.spv-glass > svg { position: relative; z-index: 1; }
 .spv--plain { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; border-radius: 0; padding: 0; }
 .spv--plain .spv-glass { width: 44px; height: 44px; }
-.spv--plain .spv-glass > svg { position: relative; z-index: 1; }
 .spv-action { position: relative; z-index: 1; min-height: 44px; width: 92px; max-width: 100%; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 12px; font-weight: 500; line-height: 16px; border-radius: 22px; }
 .spv-action-surface { position: absolute; inset: 4px 0; border-radius: 18px; pointer-events: none; }
 .spv-action > text { position: relative; z-index: 1; }
@@ -182,7 +178,10 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   flex-direction: column;
   align-items: center;
   text-align: center;
+  transition: transform 200ms cubic-bezier(.23,1,.32,1), opacity 200ms, visibility 0s;
 }
+.spv-titlewrap[data-hidden="true"] { transform: translateY(-18px); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, 200ms; }
+@media (prefers-reduced-motion: reduce) { .spv-titlewrap { transition: none; } .spv-titlewrap[data-hidden="true"] { transform: none; } }
 /* 《02》14 档里没有「顶栏标题」专档(有 tab.label 给底部 Tab,顶栏没有)。
    17px 是 iOS 导航栏惯例值,但不在合法集。两个候选:
    · heading.h3 20/28 —— 标题语义对,但顶栏高度固定,要验放不放得下

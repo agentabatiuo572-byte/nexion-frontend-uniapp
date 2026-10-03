@@ -10,7 +10,7 @@
   Java receipt-detail endpoint; prototype mode keeps its local receipt lookup.
 -->
 <template>
-  <view class="mx-4 pt-3" style="border-top: 1px solid var(--v5-border)">
+  <view class="nx-earn-task-center nx-glass-card mx-4 p-4">
     <view class="flex items-center justify-between mb-2.5 px-0">
       <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.taskCenter }}</text>
       <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">

@@ -89,6 +89,10 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
   } }).outputText;
   const exports = { default: {} as Component };
   new Function("require", "exports", "chromeView", code)((id: string) => {
+    if (id === "@/components/liquid-glass.vue") return { default: Vue.defineComponent({
+      props: { radius: { type: Number, required: true } },
+      setup: props => () => Vue.h("glass", { "data-radius": props.radius }),
+    }) };
     if (id.endsWith(".vue")) return { default: blank };
     if (!(id in dependencies)) throw new Error(`Unexpected chassis dependency: ${id}`);
     return dependencies[id];
@@ -111,7 +115,9 @@ async function navigation() {
         useSetPageHeader(() => ({
           title: key.startsWith("bundle") ? translations.value.headerTitles.storeBundle : title[key], backHref: "/store",
         }));
-        return () => Vue.h(Chassis, { active: "store" }, { default: () => Vue.h("draft", draft.value) });
+        return () => Vue.h(Chassis, { active: "store", id: key === "pro" ? "stellarbox-s1" : undefined,
+          class: "route-shell", style: { color: "rgb(1, 2, 3)" }, "data-route-attr": key },
+          { default: () => Vue.h("draft", draft.value) });
       },
     }));
   }
@@ -131,7 +137,18 @@ async function navigation() {
   const go = async (key: string) => { current.value = key; await Vue.nextTick(); };
   const controls = () => all(root).filter(item => item.props.role === "button");
   const expectHeader = (value: string) => {
-    expect(all(root).filter(item => item.props.class === "nx-navheader")).toHaveLength(1);
+    const headers = all(root).filter(item => item.props.class === "nx-navheader");
+    expect(headers).toHaveLength(1);
+    expect(headers[0].children.filter(item => item.tag === "glass")).toHaveLength(0);
+    const surfaces = all(headers[0]).filter(item => item.props.class === "nx-nav-glass");
+    expect(surfaces).toHaveLength(2);
+    for (const surface of surfaces) {
+      const glass = surface.children.filter(item => item.tag === "glass");
+      expect(glass).toHaveLength(1);
+      expect(glass[0].props["data-radius"]).toBe(18);
+    }
+    const titleWrap = all(headers[0]).find(item => item.props.class === "nx-nav-titlewrap")!;
+    expect(all(titleWrap).filter(item => item.tag === "glass")).toHaveLength(0);
     expect(controls().filter(item => item.props["aria-label"] === translations.value.privacy.back)).toHaveLength(1);
     expect(controls().filter(item => item.props["aria-label"] === translations.value.notifs.drawerTitle)).toHaveLength(1);
     expect(all(root).filter(item => item.props.class === "nx-nav-title").map(text)).toEqual([value]);
@@ -151,6 +168,18 @@ it("cold Uni show renders the actual chassis controls; repeated keyboard activat
   p.controls().find(item => item.props["aria-label"] === en.notifs.drawerTitle)!.props.onClick();
   expect(p.messages).toHaveBeenCalledOnce();
   p.translations.value = vietnamese; await Vue.nextTick(); p.expectHeader(vietnamese.headerTitles.storeBundle);
+});
+
+it("keeps the view adapter's host ID when a product ID falls through the route root", async () => {
+  const p = await navigation(); await p.go("pro"); p.uni("pro", "onShow"); await Vue.nextTick();
+  p.expectHeader("Pro");
+  const host = all(p.root).find(item => String(item.props.class).split(" ").includes("nx-chassis"))!;
+  expect(host.props.id).toMatch(/^nx-chassis-host-\d+$/);
+  expect(host.props.id).not.toBe("stellarbox-s1");
+  expect(host.props["chrome-config"].hostId).toBe(host.props.id);
+  expect(host.props.class).toContain("route-shell");
+  expect(host.props.style).toEqual(expect.objectContaining({ color: "rgb(1, 2, 3)" }));
+  expect(host.props["data-route-attr"]).toBe("pro");
 });
 
 it.each(["pro", "quota", "rack"])("cached Bundle returns from %s through real KeepAlive activation with its draft and controls", async key => {

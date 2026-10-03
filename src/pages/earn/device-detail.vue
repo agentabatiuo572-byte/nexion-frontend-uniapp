@@ -3,12 +3,13 @@
     <view class="nx-device-detail pb-8" style="color: var(--v5-ink)">
       <SubPageHeader :back="backHref" :title="deviceTitle" :subtitle="deviceSubtitle" />
 
-      <DeviceCardPC
-        v-if="device && !fleetFailed"
-        :device="device"
-        :expanded="expanded"
-        @toggle="expanded = !expanded"
-      />
+      <view v-if="device && !fleetFailed" class="nx-device-detail__surface nx-glass-card mx-4">
+        <DeviceCardPC
+          :device="device"
+          :expanded="expanded"
+          @toggle="expanded = !expanded"
+        />
+      </view>
 
       <!-- A valid deep link starts from an empty remote account snapshot. Keep
            it visibly loading until this account's fleet authority settles. -->
