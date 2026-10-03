@@ -140,15 +140,15 @@ test("the same invitation card follows server enablement, unavailable reads and 
   expect(find(card.root, "nx-team-share-now").props["aria-disabled"]).toBe(true);
 });
 
-test("wallet valuation names USDT for both values and preserves the remote unavailable state", async () => {
+async function wallet(copy = en, initialBalance = 11) {
   const market = Vue.reactive({ isMockMode: false, remoteReady: true, nexPriceUSDT: 0.124,
     change24hAvailable: false, change24hPct: 0 });
   const navTo = vi.fn();
   const navReset = vi.fn();
-  const app = Vue.reactive({ user: { usdtBalance: 11, nexBalance: 124,
+  const app = Vue.reactive({ user: { usdtBalance: initialBalance, nexBalance: 124,
     earningBuckets: { pendingReviewUsdt: 0, bonusLockedUsdt: 0 } }, activeSlotCount: 0, slotCap: 0 });
   const root = await mount(walletSource, {
-    "@/i18n/use-t": { useT: () => Vue.ref(en) }, "@/i18n/format": { fmt, openSlotsTemplate },
+    "@/i18n/use-t": { useT: () => Vue.ref(copy) }, "@/i18n/format": { fmt, openSlotsTemplate },
     "@/store/app": { useApp: () => app },
     "@/store/earning-release": { earningsReleaseSnapshot: Vue.ref(null) },
     "@/store/bills": { useBills: () => ({ summaryStatus: "ready", summary: { monthBillCount: 0 } }) },
@@ -157,6 +157,56 @@ test("wallet valuation names USDT for both values and preserves the remote unava
     "@/store/slot-action-sheet": { useSlotActionSheet: () => ({}) },
     "@/lib/route": { navTo, navReset },
   });
+  return { root, app, market, navTo, navReset };
+}
+
+const balanceDisplays = [
+  [92.18022, "92.18"],
+  [0, "0.00"],
+  [11, "11.00"],
+  [0.045005, "0.05"],
+  [0.000001, "0.00"],
+  [999.995001, "1,000.00"],
+  [1234567.123456, "1,234,567.12"],
+  [1.005, "1.00"],
+  [2.675, "2.67"],
+] as const;
+
+async function checkWalletBalance(copy: typeof en) {
+  const card = await wallet(copy, 92.18022);
+  for (const [balance, expected] of balanceDisplays) {
+    card.app.user.usdtBalance = balance; await Vue.nextTick();
+    expect(text(find(card.root, "nx-wallet-amount"))).toBe(expected);
+    expect(find(card.root, "nx-wallet-total").props["aria-label"]).toBe(`${copy.me.usdtBalance}: $${expected}`);
+    expect(card.app.user.usdtBalance).toBe(balance); // Display rounding must not change the source balance.
+  }
+  card.app.user = { usdtBalance: 0, nexBalance: 0,
+    earningBuckets: { pendingReviewUsdt: 0, bonusLockedUsdt: 0 } };
+  await Vue.nextTick();
+  expect(text(find(card.root, "nx-wallet-amount"))).toBe("0.00");
+  expect(find(card.root, "nx-wallet-total").props["aria-label"]).toBe(`${copy.me.usdtBalance}: $0.00`);
+}
+
+test.each([en, zh, vietnamese])("wallet balance uses detail-page rounding, two decimals and comma grouping", async copy => {
+  await checkWalletBalance(copy);
+});
+
+test.each([en, zh, vietnamese].flatMap(copy => [false, true].map(withoutIntl => ({ copy, withoutIntl }))))(
+  "wallet balance survives ignored native locale options (Intl absent: $withoutIntl)", async ({ copy, withoutIntl }) => {
+    const nativeNumber = vi.spyOn(Number.prototype, "toLocaleString").mockImplementation(function (this: number) {
+      return String(this.valueOf());
+    });
+    if (withoutIntl) vi.stubGlobal("Intl", undefined);
+    try {
+      await checkWalletBalance(copy);
+    } finally {
+      nativeNumber.mockRestore(); vi.unstubAllGlobals();
+    }
+  },
+);
+
+test("wallet valuation names USDT for both values and preserves the remote unavailable state", async () => {
+  const { root, app, market, navTo, navReset } = await wallet();
   expect(text(find(root, "nx-wallet-valuation"))).toContain("≈ 15.38 USDT · 1 NEX = 0.124 USDT");
   market.remoteReady = false; await Vue.nextTick();
   expect(text(find(root, "nx-wallet-valuation"))).toContain("≈ — USDT · 1 NEX = — USDT");
