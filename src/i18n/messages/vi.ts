@@ -398,6 +398,7 @@ sandboxCodeHint: "Mã trải nghiệm: {code}. Không gửi SMS.",
     errorRemoteOtpInvalid: "Mã xác minh không đúng hoặc đã hết hạn. Vui lòng yêu cầu mã mới.",
     errorSignInStateChanged: "Trạng thái đăng nhập của tài khoản đã thay đổi. Vui lòng đăng nhập lại.",
     serverSessionReloadNotice: "Sau khi làm mới trang, phiên máy chủ sẽ được khôi phục an toàn. Bạn chỉ cần đăng nhập lại khi phiên đã hết hạn.",
+    nativeSessionReloadNotice: "Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.",
   },
   register: {
     title: "Tạo tài khoản",

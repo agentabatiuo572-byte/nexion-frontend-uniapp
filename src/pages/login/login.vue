@@ -26,7 +26,7 @@
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
       <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
-        <text class="lg-recovery-notice__t">{{ t.login.serverSessionReloadNotice }}</text>
+        <text class="lg-recovery-notice__t">{{ h5RefreshCookieEnabled ? t.login.serverSessionReloadNotice : t.login.nativeSessionReloadNotice }}</text>
       </view>
       <view v-if="browserUnsupportedNotice" class="lg-recovery-notice" role="status" data-qa="secure-browser-unsupported-notice">
         <text class="lg-recovery-notice__t">{{ t.session.secureBrowserUnsupported }}</text>
@@ -154,7 +154,7 @@ import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
-import { apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, authApi, h5RefreshCookieEnabled, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";

@@ -387,6 +387,7 @@ sandboxCodeHint: "体验验证码：{code}，不会发送短信。",
     errorRemoteOtpInvalid: "验证码不正确或已失效，请重新获取。",
     errorSignInStateChanged: "账号登录状态已更新，请重新登录。",
     serverSessionReloadNotice: "页面刷新后会安全恢复服务端会话；只有会话已失效时才需要重新登录。",
+    nativeSessionReloadNotice: "请重新登录以继续使用 App。",
   },
   register: {
     title: "创建账号",
