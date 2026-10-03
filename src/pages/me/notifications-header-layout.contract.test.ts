@@ -42,13 +42,38 @@ async function renderHeader(translations: typeof zh | typeof en | typeof vi, tot
   const render = new Function("Vue", code)(Vue) as Vue.RenderFunction;
   const app = Vue.createSSRApp({
     components: { LiquidGlass: { render: () => null } },
-    setup: () => ({ t: translations, center: { totalUnread }, headerState: { title: expanded }, unreadLabel: unreadLabel(translations, totalUnread), navBack: () => {}, navTo: () => {} }),
+    setup: () => ({ t: translations, center: { totalUnread }, section: 'notifications', hasRead: true, confirmClearRead: () => {}, headerState: { title: expanded }, unreadLabel: unreadLabel(translations, totalUnread), navBack: () => {}, navTo: () => {} }),
     render,
   });
   return renderToString(app);
 }
 
 describe("message page header content contract", () => {
+  it("fits both short category rails to their content while keeping long rails scrollable", () => {
+    const filters = all.filter(node => hasClass(node, "message-filters"));
+    expect(filters).toHaveLength(2);
+    expect(filters.map(node => node.tag)).toEqual(["GlassSegments", "GlassSegments"]);
+    expect(filters.map(node => node.props.find(prop => prop.type === 7 && prop.name === "model")))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ exp: expect.objectContaining({ content: "serviceFilter" }) }),
+        expect.objectContaining({ exp: expect.objectContaining({ content: "filter" }) }),
+      ]));
+    for (const filter of filters) {
+      expect(attribute(filter, "layout")).toMatchObject({ value: { content: "scroll" } });
+      expect(elements(filter.children).filter(node => hasClass(node, "message-category-dot"))).toHaveLength(1);
+    }
+    const styles = descriptor.styles.map(style => style.content).join("\n");
+    const rail = styles.match(/\.message-center \.message-filters\s*\{([^}]+)\}/)?.[1];
+    expect(rail).toBeDefined();
+    expect(rail).toMatch(/align-self:\s*flex-start\s*;/);
+    expect(rail).toMatch(/width:\s*fit-content\s*;/);
+    expect(rail).toMatch(/max-width:\s*100%\s*;/);
+    expect(rail).toMatch(/box-sizing:\s*border-box\s*;/);
+    const dot = styles.match(/\.message-category-dot\s*\{([^}]+)\}/)?.[1];
+    expect(dot).toMatch(/align-self:\s*center\s*;/);
+    expect(dot).toMatch(/flex-shrink:\s*0\s*;/);
+  });
+
   it("places one accessible page heading between the existing navigation actions", () => {
     const children = nav.children.filter((node): node is ElementNode => node.type === 1);
     expect(children).toHaveLength(3);
@@ -95,5 +120,20 @@ describe("message page header content contract", () => {
     expect(attribute(compact, "tabindex")).toBeUndefined();
     expect(compact.props.some(prop => prop.type === 7 && prop.name === "on")).toBe(false);
     expect(source).not.toContain("revealSections");
+  });
+
+  it("keeps clear-read beside the count with no glass and no hidden keyboard target", async () => {
+    const clear = all.find(node => hasClass(node, 'message-clear-read'))!;
+    expect(elements(heading.children)).toContain(clear);
+    expect(clear.loc.source).not.toContain('LiquidGlass');
+    expect(clear.loc.source).toContain('@click="confirmClearRead"');
+    expect(clear.loc.source).toContain('headerState.title ? 0 : -1');
+    const wrapper = all.find(node => node.children.includes(heading))!;
+    expect(wrapper.loc.source).toContain(':inert="!headerState.title ? true : undefined"');
+    expect(wrapper.loc.source).toContain('@focusin="headerFocused = true"');
+    const collapsed = await renderHeader(zh, 298, false);
+    expect(collapsed).toMatch(/class="message-button message-clear-read"[^>]*tabindex="-1"/);
+    const status = elements(heading.children).find(node => attribute(node, 'role')?.type === 6 && (attribute(node, 'role') as { value?: { content: string } }).value?.content === 'status')!;
+    expect(elements(status.children)).not.toContain(clear);
   });
 });

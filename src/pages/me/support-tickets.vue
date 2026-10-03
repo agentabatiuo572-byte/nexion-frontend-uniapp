@@ -8,9 +8,9 @@
 <template>
   <AppChassis active="me">
     <view class="message-family ticket-page" style="padding-bottom: 32px">
-      <SubPageHeader back="/pages/me/support" :title="mode.kind === 'create' ? t.tickets.create.title : mode.kind === 'detail' ? t.tickets.detailTitle : t.tickets.pageTitle" />
+      <SubPageHeader back="/pages/me/support" :title="mode.kind === 'create' ? t.tickets.create.title : mode.kind === 'detail' ? t.tickets.detailTitle : t.tickets.pageTitle" :plain="mode.kind === 'detail'" :action-label="mode.kind === 'detail' ? t.tickets.viewTicketList : undefined" :action="mode.kind === 'detail' ? showTicketList : undefined" />
       <text v-if="!supportSessionReady || ticketsStore.loading || (mode.kind === 'detail' && !detailTicket)" class="block px-4" role="status" aria-live="polite">{{ t.conversations.connecting }}</text>
-      <view v-if="mode.kind !== 'list'" class="px-4" style="padding-bottom: 8px">
+      <view v-if="mode.kind === 'create'" class="px-4" style="padding-bottom: 8px">
         <view class="family-control" :style="backRowStyle" role="button" tabindex="0" :aria-label="t.tickets.backToTickets" @click="setMode({ kind: 'list' })">
             <LiquidGlass :radius="24" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -154,9 +154,9 @@
           <TicketMessageRecord v-for="(m, index) in detailTicket.messages" :key="`${app.accountKey}:${detailTicket.id}:${m.id}`" :message="m" :scope="`${app.accountKey}:${detailTicket.id}`" :show-date="index === 0 || messageDay(m.ts) !== messageDay(detailTicket.messages[index - 1].ts)" />
         </view>
 
-        <view v-if="canReply(detailTicket)" :style="replyCardStyle">
+        <view v-if="canReply(detailTicket)" class="ticket-reply" :style="replyCardStyle">
           <textarea :value="reply" :placeholder="t.tickets.detail.replyPlaceholder" :aria-label="t.tickets.detail.replyPlaceholder" placeholder-class="ph" :style="replyTextareaStyle" @input="onReply" />
-          <view class="grid grid-cols-2" style="gap: 8px; margin-top: 8px">
+          <view class="grid grid-cols-2 ticket-reply-actions">
             <view v-if="canClose(detailTicket)" class="family-control" :style="{ ...closeBtnStyle, opacity: !supportSessionReady || ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="!supportSessionReady || ticketsStore.mutating" :aria-label="t.tickets.detail.closeBtn" @click="closeTicket">
             <LiquidGlass :radius="24" />
               <text>{{ t.tickets.detail.closeBtn }}</text>
@@ -231,6 +231,7 @@ function setMode(next: Mode) {
   // a rejected navigation still reports instead of failing silently.
   void navReplace(modeQueryHref(next));
 }
+function showTicketList() { setMode({ kind: 'list' }); }
 
 // 新工单不再提供已下线的身份核验类目;历史工单仍可渲染(标签中性化)。
 const categoriesForNew: TicketCategory[] = ["withdrawal", "deposit", "hardware", "account", "earnings", "genesis", "technical", "other"];
@@ -754,6 +755,7 @@ const tabOptions = computed(() => tabs.map(value => ({ value, label: tabLabel(va
 .ticket-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; min-width: 180px; gap: 4px; }
 .ticket-new { margin-left: auto; max-width: 100%; }
 .ticket-create-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ticket-reply-actions { gap: 12px; margin-top: 16px; }
 .ticket-error { text-align: center; padding-bottom: 16px; }
 .ticket-creation-notice { color: var(--v5-ink-3); font-size: 13px; line-height: 1.6; padding: 4px 0 12px; border-bottom: 1px solid var(--v5-border); }
 .ticket-creation-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

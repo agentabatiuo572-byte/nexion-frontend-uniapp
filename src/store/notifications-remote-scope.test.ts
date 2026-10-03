@@ -446,3 +446,210 @@ describe("global notification totals and head refresh", () => {
     expect(remote.notificationApi.page).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("account-wide unread categories", () => {
+  const row = (id: number, kind = "wallet", readAt: number | null = null) => ({ id, kind, priority: "normal" as const,
+    title: String(id), body: "", ctaLabel: "", ctaHref: "", createdAt: id, readAt });
+  const empty = { finance: 0, device: 0, team: 0, rewards: 0, system: 0 };
+
+  it("includes unseen kinds beyond the first 100 rows and keeps the server total exact", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({
+      items: Array.from({ length: 100 }, (_, index) => row(index + 1)),
+      unread: 111, unreadByKind: { wallet: 100, device: 7, team: 2, reward: 1, future_event: 1 }, nextCursor: "older",
+    });
+    const store = useNotifications();
+    await store.refreshRemote();
+    expect(store.items).toHaveLength(100);
+    expect(store.unread).toBe(111);
+    expect(store.unreadByCategory).toEqual({ finance: 100, device: 7, team: 2, rewards: 1, system: 1 });
+    expect(store.unreadByCategoryExact).toBe(true);
+  });
+
+  it("keeps a category unread for another raw kind and decrements each confirmed read only once", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1), row(2, "commission")],
+      unread: 3, unreadByKind: { wallet: 1, commission: 2 }, nextCursor: "older" })
+      .mockResolvedValueOnce({ items: [row(1, 'wallet', 1), row(2, 'commission')], unread: 2, unreadByKind: { commission: 2 }, nextCursor: 'older' })
+      .mockResolvedValueOnce({ items: [row(1, 'wallet', 1), row(2, 'commission')], unread: 2, unreadByKind: { commission: 2 }, nextCursor: 'older' })
+      .mockResolvedValueOnce({ items: [row(1, 'wallet', 1), row(2, 'commission', 2)], unread: 1, unreadByKind: { commission: 1 }, nextCursor: 'older' });
+    remote.notificationApi.recordAction.mockResolvedValue({ route: "/pages/me/wallet" });
+    const store = useNotifications();
+    await store.refreshRemote();
+    await Promise.all([store.markRead("1"), store.markRead("1")]);
+    expect(store.unreadByCategory.finance).toBe(2);
+    expect(store.unread).toBe(2);
+    await store.recordCta("1");
+    expect(store.unreadByCategory.finance).toBe(2);
+    await store.recordCta("2");
+    expect(store.unreadByCategory.finance).toBe(1);
+    expect(store.unread).toBe(1);
+  });
+
+  it("retains the last good summary when refresh or read acknowledgements fail", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 2,
+      unreadByKind: { wallet: 1, device: 1 }, nextCursor: "older" }).mockRejectedValue(new Error("offline"));
+    remote.notificationApi.markRead.mockRejectedValue(new Error("read failed"));
+    const store = useNotifications();
+    await store.refreshRemote();
+    await store.markRead("1");
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, device: 1 });
+    await store.refreshRemote();
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, device: 1 });
+    expect(store.unread).toBe(2);
+    expect(store.unreadByCategoryExact).toBe(true);
+  });
+
+  it("zeros every category after confirmed mark-all even when its refresh fails", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 2,
+      unreadByKind: { wallet: 1, device: 1 }, nextCursor: "older" }).mockRejectedValue(new Error("offline"));
+    const store = useNotifications();
+    await store.refreshRemote();
+    await store.markAllRead();
+    expect(store.unread).toBe(0);
+    expect(store.unreadByCategory).toEqual(empty);
+    expect(store.unreadByCategoryExact).toBe(true);
+  });
+
+  it("leaves unread groups untouched when clear-read reconciliation fails", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1), row(2, "device", 2)], unread: 2,
+      unreadByKind: { wallet: 1, team: 1 }, nextCursor: "older" }).mockRejectedValue(new Error("offline"));
+    const store = useNotifications();
+    await store.refreshRemote();
+    await store.clearRead();
+    expect(store.unread).toBe(2);
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, team: 1 });
+  });
+
+  it.each(["markAllRead", "clearRead"] as const)("preserves groups when %s itself fails", async action => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 2,
+      unreadByKind: { wallet: 1, team: 1 }, nextCursor: "older" });
+    remote.notificationApi[action].mockRejectedValue(new Error("write failed"));
+    const store = useNotifications();
+    await store.refreshRemote();
+    expect(await store[action]()).toBe(false);
+    expect(store.unread).toBe(2);
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, team: 1 });
+    expect(store.items[0].readAt).toBeNull();
+  });
+
+  it("does not consume a category when a confirmed CTA's read acknowledgement fails", async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 2,
+      unreadByKind: { wallet: 1, team: 1 }, nextCursor: "older" });
+    remote.notificationApi.recordAction.mockResolvedValue({ route: "/pages/me/wallet" });
+    remote.notificationApi.markRead.mockRejectedValue(new Error("read failed"));
+    const store = useNotifications();
+    await store.refreshRemote();
+    expect(await store.recordCta("1")).toBe("/pages/me/wallet");
+    expect(store.unread).toBe(2);
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, team: 1 });
+  });
+
+  it("takes fresh summary values from a tail page and a later head instead of retaining vanished groups", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(3)], unread: 3, unreadByKind: { wallet: 1, device: 2 }, nextCursor: "3" })
+      .mockResolvedValueOnce({ items: [row(2, "device")], unread: 2, unreadByKind: { wallet: 1, device: 1 }, nextCursor: null })
+      .mockResolvedValue({ items: [row(4, "team"), row(3, "wallet", 1)], unread: 1, unreadByKind: { team: 1 }, nextCursor: "3" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote();
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, device: 1 });
+    await store.refreshRemote();
+    expect(store.unreadByCategory).toEqual({ ...empty, team: 1 });
+    expect(store.unread).toBe(1);
+    await store.markRead("2");
+    expect(store.unreadByCategory).toEqual({ ...empty, team: 1 });
+    expect(store.unread).toBe(1);
+  });
+
+  it("falls back only to known loaded unread kinds when a new response omits its summary", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(1)], unread: 5, unreadByKind: { wallet: 1, device: 4 }, nextCursor: "older" })
+      .mockResolvedValueOnce({ items: [row(1), row(2, "unknown_event")], unread: 5, nextCursor: "older" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.refreshRemote();
+    expect(store.unread).toBe(5);
+    expect(store.unreadByCategory).toEqual({ ...empty, finance: 1, system: 1 });
+    expect(store.unreadByCategoryExact).toBe(false);
+    await store.markRead("1");
+    expect(store.unreadByCategory).toEqual({ ...empty, system: 1 });
+    expect(store.unread).toBe(4);
+  });
+
+  it("clears every dot when the authoritative total is zero even with stale retained history", async () => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(2)], unread: 2, nextCursor: "2" })
+      .mockResolvedValueOnce({ items: [row(1, "device")], unread: 2, nextCursor: null })
+      .mockResolvedValueOnce({ items: [row(2, "wallet", 2)], unread: 0, nextCursor: "2" });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote(); await store.refreshRemote();
+    expect(store.unread).toBe(0);
+    expect(store.unreadByCategory).toEqual(empty);
+    expect(store.unreadByCategoryExact).toBe(true);
+  });
+
+  it("resets groups on account switch and ignores the old account's late summary and read", async () => {
+    let resolveOld!: (value: CanonicalNotificationPage) => void;
+    let resolveRead!: () => void;
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(1)], unread: 2, unreadByKind: { wallet: 1, device: 1 }, nextCursor: "older" })
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockResolvedValueOnce({ items: [row(9, "team")], unread: 1, unreadByKind: { team: 1 }, nextCursor: null });
+    remote.notificationApi.markRead.mockReturnValueOnce(new Promise<void>(resolve => { resolveRead = resolve; }));
+    const store = useNotifications();
+    await store.refreshRemote();
+    const oldRefresh = store.refreshRemote();
+    const oldRead = store.markRead("1");
+    await Promise.resolve();
+    store.bindAccount("account-b");
+    expect(store.unreadByCategory).toEqual(empty);
+    await Promise.resolve();
+    resolveRead(); await oldRead;
+    resolveOld({ items: [row(1)], unread: 50, unreadByKind: { wallet: 50 }, nextCursor: "older" });
+    await oldRefresh;
+    expect(store.unreadByCategory).toEqual({ ...empty, team: 1 });
+    expect(store.unread).toBe(1);
+    expect(store.items.map(item => item.id)).toEqual(["9"]);
+  });
+
+  it.each(['markRead', 'recordCta', 'recordSwipeConversion'] as const)('%s cannot consume another unread of the same kind when old history was read elsewhere', async action => {
+    remote.notificationApi.page
+      .mockResolvedValueOnce({ items: [row(3)], unread: 2, unreadByKind: { wallet: 2 }, nextCursor: '3' })
+      .mockResolvedValueOnce({ items: [row(2)], unread: 2, unreadByKind: { wallet: 2 }, nextCursor: null })
+      .mockResolvedValue({ items: [row(3)], unread: 1, unreadByKind: { wallet: 1 }, nextCursor: '3' });
+    remote.notificationApi.recordAction.mockResolvedValue({ route: '/pages/me/wallet' });
+    const store = useNotifications();
+    await store.refreshRemote(); await store.loadMoreRemote(); await store.refreshRemote();
+    expect(store.items.find(item => item.id === '2')?.readAt).toBeNull();
+    await store[action]('2');
+    expect(store.items.find(item => item.id === '3')?.readAt).toBeNull();
+    expect(store.unread).toBe(1);
+    expect(store.unreadByCategory.finance).toBe(1);
+    expect(store.unreadByCategoryExact).toBe(true);
+  });
+
+  it('preserves the last summary when confirmation succeeds but its reconciliation fails', async () => {
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 2, unreadByKind: { wallet: 2 }, nextCursor: '1' })
+      .mockRejectedValueOnce(new Error('summary offline'));
+    const store = useNotifications();
+    await store.refreshRemote(); await store.markRead('1');
+    expect(store.items[0].readAt).not.toBeNull();
+    expect(store.unread).toBe(2);
+    expect(store.unreadByCategory.finance).toBe(2);
+    expect(store.error).toBe('summary offline');
+  });
+
+  it('ignores a late post-read summary after switching accounts', async () => {
+    let complete!: (page: CanonicalNotificationPage) => void;
+    remote.notificationApi.page.mockResolvedValueOnce({ items: [row(1)], unread: 1, unreadByKind: { wallet: 1 }, nextCursor: null })
+      .mockImplementationOnce(() => new Promise<CanonicalNotificationPage>(resolve => { complete = resolve; }))
+      .mockResolvedValue({ items: [row(9, 'team')], unread: 1, unreadByKind: { team: 1 }, nextCursor: null });
+    const store = useNotifications();
+    await store.refreshRemote();
+    const reading = store.markRead('1');
+    await vi.waitFor(() => expect(complete).toBeTypeOf('function'));
+    store.bindAccount('account-b');
+    await vi.waitFor(() => expect(store.unreadByCategory.team).toBe(1));
+    complete({ items: [], unread: 0, unreadByKind: {}, nextCursor: null });
+    await reading;
+    expect(store.unread).toBe(1);
+    expect(store.unreadByCategory).toEqual({ ...empty, team: 1 });
+  });
+});

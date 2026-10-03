@@ -1503,6 +1503,7 @@ identityLabel: "Genesis holder",
     // line must not point at an off-App channel the user cannot reach. #90
     noteInternal: "Tickets are private 1:1 with our support team. For general questions, live chat is faster.",
     backToTickets: "Back to tickets",
+    viewTicketList: "View tickets",
   },
 
 

@@ -102,7 +102,12 @@ describe("message unread badge display", () => {
       }
       const sections = computedValue<CountOption[]>(notifications, "sectionOptions", { t, notifs: { unread: count }, center: { serviceUnread: count } });
       const types = computedValue<CountOption[]>(conversations, "typeOptions", { TYPES: Vue.ref([{ key: "advisor" }, { key: "support" }, { key: "ai" }]), typeLabel: (key: string) => key, typeUnread: () => count });
-      for (const option of [...sections, ...types]) {
+      for (const option of sections) {
+        expect(option.count).toBe(count);
+        const html = await renderBadge(markup.segment, { option });
+        expect(html.match(/<text[^>]*>([^<]*)<\/text>/)?.[1]).toBe(String(count));
+      }
+      for (const option of types) {
         expect(option.count).toBe(label || undefined);
         const html = await renderBadge(markup.segment, { option });
         if (!label) expect(html).toBe("");
@@ -112,4 +117,17 @@ describe("message unread badge display", () => {
       expect(meEntry.badge).toBe(label || undefined);
     });
   }
+  it('does not announce partial legacy category counts as account-wide numbers', () => {
+    for (const exact of [false, true]) {
+      const options = computedValue<Array<{ value: string; count?: number; hasUnread: boolean }>>(notifications, 'filterOptions', {
+        visibleFilterIds: Vue.ref(['all', 'finance', 'device']), filterLabel: (value: string) => value,
+        notifs: { unread: 111, unreadByCategory: { finance: 100, device: 0 }, unreadByCategoryExact: exact },
+      });
+      expect(options[0].count).toBe(111);
+      expect(options[1].hasUnread).toBe(true);
+      expect(options[2].hasUnread).toBe(false);
+      expect(options[1].count).toBe(exact ? 100 : undefined);
+      expect(options[2].count).toBe(exact ? 0 : undefined);
+    }
+  });
 });
