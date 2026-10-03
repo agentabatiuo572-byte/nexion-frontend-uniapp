@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import source from "./notifications.vue?raw";
 import { zh } from "@/i18n/messages/zh";
 import { fmt } from "@/i18n/format";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 
 // Execute the actual page worker; evaluate the actual template bindings below.
@@ -29,6 +30,7 @@ function mountPage() {
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol() },
     "@/i18n/use-t": { useT: () => vue.ref(zh) },
     "@/i18n/format": { fmt },
+    "@/lib/unread-badge": { formatUnreadBadge },
     "@/store/notifications": { useNotifications: () => notifs },
     "@/store/message-drawer": { useMessageDrawer: () => vue.reactive({ section: "notifications", totalUnread: 1, serviceUnread: 0, refresh: () => notifs.refreshRemote() }) },
     "@/lib/route": { navTo: vi.fn() },

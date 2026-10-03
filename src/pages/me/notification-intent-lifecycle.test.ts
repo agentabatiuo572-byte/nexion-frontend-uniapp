@@ -7,6 +7,7 @@ import pageSource from "./notifications.vue?raw";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { zh } from "@/i18n/messages/zh";
 import { fmt } from "@/i18n/format";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { createPinia, setActivePinia } from "pinia";
 import { useUI } from "@/store/ui";
 
@@ -46,6 +47,7 @@ function mount(remote = true, realQueue = false, navigationQuery = "") {
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol() },
     "@/i18n/use-t": { useT: () => vue.ref(zh) }, "@/i18n/format": { fmt },
+    "@/lib/unread-badge": { formatUnreadBadge },
     "@/store/notifications": { useNotifications: () => notifs },
     "@/store/message-drawer": { useMessageDrawer: () => drawer },
     "@/lib/route": { navTo, takeNavigationQuery: () => navigationQuery }, "@/api/runtime": { remoteApiEnabled: remote },

@@ -50,6 +50,7 @@ import { useMessageDrawer, type MessageSection } from "@/store/message-drawer";
 import { notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -87,8 +88,8 @@ onLoad(query => {
   if (initial === "notifications" || initial === "service") section.value = initial;
 });
 const sectionOptions = computed(() => [
-  { value: "notifications", label: t.value.notifs.notificationsTab, count: notifs.unread > 99 ? "99+" : notifs.unread },
-  { value: "service", label: t.value.notifs.serviceTab, count: center.serviceUnread > 99 ? "99+" : center.serviceUnread },
+  { value: "notifications", label: t.value.notifs.notificationsTab, count: formatUnreadBadge(notifs.unread) || undefined },
+  { value: "service", label: t.value.notifs.serviceTab, count: formatUnreadBadge(center.serviceUnread) || undefined },
 ]);
 const unreadLabel = computed(() => center.error ? t.value.notifs.unreadUnavailable : center.totalUnread > 0 ? fmt(t.value.notifs.unreadCount, { n: center.totalUnread }) : center.loading ? t.value.help.loadingMore : t.value.notifs.allCaughtUp);
 type Filter = "all" | NotificationCategory;

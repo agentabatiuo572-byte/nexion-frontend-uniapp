@@ -26,7 +26,7 @@
         </view>
         <view class="service-content">
           <view class="service-rowtop"><text class="service-title">{{ row.title }}</text><text class="service-time">{{ timeAgo(row.ts) }}</text></view>
-          <view class="service-rowbottom"><text class="service-preview">{{ row.preview }}</text><view v-if="row.unread" class="service-unread"><text>{{ row.unread > 99 ? '99+' : row.unread }}</text></view></view>
+          <view class="service-rowbottom"><text class="service-preview">{{ row.preview }}</text><view v-if="row.unread > 0" class="service-unread"><text>{{ formatUnreadBadge(row.unread) }}</text></view></view>
         </view>
         <svg class="service-chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
       </view>
@@ -50,6 +50,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { localizedIdleClose } from "@/lib/support-idle-message";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 
 const props = withDefaults(defineProps<{ filter?: "all" | "advisor" | "support" | "ticket"; hideFilters?: boolean }>(), { filter: "all", hideFilters: false });
 const emit = defineEmits<{ (event: "navigate"): void }>();

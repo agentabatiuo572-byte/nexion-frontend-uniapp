@@ -166,6 +166,7 @@ import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
+import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useRefresh } from "@/store/refresh";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
@@ -590,7 +591,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 }
 
 const unread = computed(() => messageDrawer.totalUnread);
-const unreadLabel = computed(() => (unread.value > 99 ? "99+" : String(unread.value)));
+const unreadLabel = computed(() => formatUnreadBadge(unread.value));
 
 // ── layout insets ──
 const statusBarHeight = computed(() => {
