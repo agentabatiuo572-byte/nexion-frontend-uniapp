@@ -13,7 +13,7 @@
     <view>
       <text class="cn-step">{{ stepText }}</text>
       <text class="cn-title">{{ nativePhoneAvailable ? titleText : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-      <text v-if="!nativePhoneAvailable || phase !== 'result'" class="cn-sub">{{ nativePhoneAvailable ? subText : t.myDevices.phoneActivationAppOnlyBody }}</text>
+      <text v-if="!nativePhoneAvailable || (phase !== 'result' && phase !== 'error')" class="cn-sub">{{ nativePhoneAvailable ? subText : t.myDevices.phoneActivationAppOnlyBody }}</text>
     </view>
 
     <view v-if="nativePhoneAvailable">
@@ -126,16 +126,14 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
-import { phoneCalibrationErrorDetail } from "@/lib/phone-calibration-error";
 
 const t = useT();
 const auth = useAuth();
 
-// Recalibrate mode (?mode=recalibrate) = new-device re-measure; otherwise the
-// first-time onboarding calibration. Set in onLoad.
+// Only explicit remeasurement or a server-confirmed replacement is recalibration.
 const isRecal = ref(false);
 const isLogin = ref(false);
-let loginCheckNeeded = false;
+const loginCheckNeeded = ref(false);
 const resumeDeferred = ref(false);
 
 type Phase = "intro" | "calibrating" | "result" | "error";
@@ -187,23 +185,24 @@ watch(authenticatedAccountKey, (next, previous) => {
 
 // Copy swaps: recalibrate vs first-time onboarding.
 const stepText = computed(() => (isRecal.value ? t.value.onboarding.recalStep : t.value.onboarding.step3of3));
-const titleText = computed(() => phase.value === "error" && failedAction.value === "defer"
-  ? t.value.onboarding.activationDeferFailedTitle
-  : phase.value === "error" && failedAction.value === "activate" ? t.value.onboarding.activationFailedTitle
+const titleText = computed(() => phase.value === "error" ? failureTitle.value
+  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckTitle
   : isRecal.value ? t.value.onboarding.recalTitle : t.value.onboarding.calibrationTitle);
-const subText = computed(() => (isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle));
+const subText = computed(() => loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckBody
+  : isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle);
 const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalActivate : t.value.onboarding.activatePhone));
 const failureDetail = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
   ? t.value.onboarding.phoneCalibrationPendingBody
   : failureCode.value === "PHONE_REPLACEMENT_DISABLED" ? t.value.onboarding.phoneReplacementDisabled
   : failureCode.value === "PHONE_REPLACEMENT_COOLDOWN" ? t.value.onboarding.phoneReplacementCooldown
   : failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED" ? t.value.onboarding.phoneCalibrationRulesChanged
-  : phoneCalibrationErrorDetail(failureCode.value, t.value.onboarding, failedAction.value === "defer")
-  ?? (failedAction.value === "defer" ? t.value.onboarding.activationDeferFailed
+  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableBody
+  : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailed
   : failedAction.value === "calibration" ? t.value.onboarding.calibrationRetry
-  : t.value.onboarding.activationBindRetry));
+  : t.value.onboarding.activationBindRetry);
 const failureTitle = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
   ? t.value.onboarding.phoneCalibrationPendingTitle
+  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableTitle
   : failedAction.value === "calibration"
   ? t.value.onboarding.calibrationFailedTitle
   : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailedTitle
@@ -234,7 +233,7 @@ async function startCalibration() {
   activationIntent = null;
   const requestScope = { ...currentScope(), generation: ++requestGeneration };
   try {
-    if (loginCheckNeeded) {
+    if (loginCheckNeeded.value) {
       const status = await onboardingCalibrationApi.phoneLogin(getDeviceId());
       if (!scopeIsCurrent(requestScope)) return;
       if (status === "BOUND") {
@@ -242,7 +241,8 @@ async function startCalibration() {
         return;
       }
       if (status !== "NEEDS_CALIBRATION" && status !== "REPLACEMENT_REQUIRED") throw new Error(status);
-      loginCheckNeeded = false;
+      isRecal.value = status === "REPLACEMENT_REQUIRED";
+      loginCheckNeeded.value = false;
       phase.value = "intro";
       return;
     }
@@ -441,9 +441,9 @@ function leaveConnect() {
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   isLogin.value = o.mode === "login";
-  isRecal.value = isLogin.value || o.mode === "recalibrate";
+  isRecal.value = o.mode === "recalibrate";
   resumeDeferred.value = o.mode === "resume";
-  loginCheckNeeded = isLogin.value;
+  loginCheckNeeded.value = isLogin.value;
   phase.value = "intro";
 });
 onMounted(() => {

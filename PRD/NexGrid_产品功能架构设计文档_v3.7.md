@@ -780,9 +780,9 @@ CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home
 
 | Endpoint | Method | Payload | 用途 |
 |---|---|---|---|
-| `/api/onboarding/phone-installation/challenge` | POST | `{deviceId}` | 生成账号、会话与安装绑定的一次性挑战 |
-| `/api/onboarding/phone-installation/verify` | POST | `{deviceId,certificates,signature}` | 验证 Android 硬件密钥与应用身份，发放短期原生资格 |
-| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 原生登录检查执行安装及换机资格；异机先停止旧手机任务 |
+| `/api/onboarding/phone-installation/challenge` | POST | 历史 `{deviceId}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不生成挑战 |
+| `/api/onboarding/phone-installation/verify` | POST | 历史 `{deviceId,certificates,signature}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不验证或发放资格 |
+| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 普通认证请求检查当前账号的执行安装及换机资格；异机先停止旧手机任务 |
 | `/api/onboarding/calibrate` | POST | `{deviceId,signals,expectedRevision}` + `Idempotency-Key` | 服务端按观测值确定性派生并保存 score/tier/yield baseline |
 | `/api/onboarding/calibrate/result?deviceId=` | GET | — | 回读该账号、设备与环境下的服务端校准事实 |
 | `/api/onboarding/calibrate/activate` | POST | `{deviceId,expectedRevision}` + `Idempotency-Key` | 原子绑定 canonical 手机设备并发布 `ACTIVE` |
@@ -1465,11 +1465,13 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 H5 首次注册完成后进入下载引导；旧校准入口直接跳转下载页，不采集、登记或激活手机算力，不发放手机登记奖励。普通注册礼按其独立规则执行。H5 登录显示网页版无法运行手机任务的提示。
 
-APP 登录完成当前条款确认后，以原生证明调用手机登录核验。无绑定时引导校准；当前安装已绑定时保留绑定。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
+APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手机登录核验。服务端返回 BOUND 时直接进入首页，不重新校准；明确返回 NEEDS_CALIBRATION 或 REPLACEMENT_REQUIRED 时才引导相应流程，未知或失败显示可重试错误，不称已校准或已换机。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
 
-账号只允许当前执行安装领取或提交手机任务。原绑定手机重新登录可恢复执行权，但只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不具有原生执行证明；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
+账号只允许当前执行安装领取或提交手机任务。PHONE/MOBILE 任务领取与完成以普通业务头 X-Phone-Installation-Id 与当前账号绑定匹配；心跳使用既有请求体 calibrationDeviceId 与绑定匹配，不重复添加安装头。非手机任务不受此头约束，正式 App 当前无任务领取/完成 API 入口，本次不新增。原绑定手机重新登录可恢复执行权，但只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不采集或上报原生手机运行状态；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
 
-原生证明挑战绑定账号、会话与安装，一次性且两分钟过期；通过 Android 硬件密钥证书、应用包名、签名及设备启动状态验证后发放十五分钟资格。任务领取、心跳和完成均校验资格与当前绑定；失败闭合，不回退浏览器身份。当前实现覆盖 Android，iOS 未接入证明时不能开启手机任务，需按真机交接清单验收后再发布。
+2026-10-03 起采用最小业务校验：不再使用 AndroidKeyStore、挑战/签名/证书、包签名校验或证明资格有效期，不新增安全开关或资格 TTL。安装标识仅用于账号与当前手机绑定的业务匹配，不证明硬件真实性。保留 Android 原生采集与 H5/iOS 不执行手机任务的边界、服务端硬件规则匹配、canonical 结果、幂等/revision、换机资格、任务状态与收益结算校验；手机心跳超时继续沿用现有运行规则。需按真机交接清单验收后再发布。
+
+历史方案（superseded，2026-10-03）：原生证明挑战绑定账号、会话与安装，一次性且两分钟过期；通过 Android 硬件密钥证书、应用包名、签名及设备启动状态验证后发放十五分钟资格。此方案仅留作历史背景，不再作为当前执行或验收要求。
 
 ---
 

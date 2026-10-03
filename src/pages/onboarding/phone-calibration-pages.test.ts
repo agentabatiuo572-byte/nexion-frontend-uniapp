@@ -9,7 +9,6 @@ import * as flow from "@/lib/phone-calibration-flow";
 import * as estimatorScope from "@/lib/estimator-scope";
 import * as calibrationScope from "@/lib/onboarding-calibration-scope";
 import * as format from "@/i18n/format";
-import * as phoneCalibrationError from "@/lib/phone-calibration-error";
 
 const raw = { memGB: null, cores: null, model: "", brand: "", gpu: "", pxDensity: null,
   pingMs: null, batteryLevel: null, charging: null, networkReachable: null };
@@ -46,12 +45,11 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
     "@/lib/account-scope": { captureAccountScope: () => ({ epoch }), isCurrentAccountScope: (scope: any) => scope.epoch === epoch },
     "@/lib/estimator-scope": estimatorScope, "@/lib/onboarding-calibration-scope": calibrationScope,
     "@/lib/phone-calibration-flow": flow,
-    "@/lib/phone-calibration-error": phoneCalibrationError,
     "@/lib/defer-phone-activation": { confirmDeferredPhoneActivation },
   };
   vi.stubGlobal("uni", { showToast: vi.fn() });
   const source = readFileSync(new URL(`./${name}.vue`, import.meta.url), "utf8").split('<script setup lang="ts">')[1].split("</script>")[0];
-  const fields = name === "connect" ? "phase, canonical, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, deferPhoneActivation";
+  const fields = name === "connect" ? "phase, canonical, titleText, isRecal, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, deferPhoneActivation";
   const code = ts.transpileModule(`${source}\nexport const page = { ${fields} };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -64,14 +62,50 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
 }
 
 describe("real onboarding page workers", () => {
+  it("returns the bound installation to Home without calibration or replacement", async () => {
+    const api = { phoneLogin: vi.fn().mockResolvedValue("BOUND"), result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
+    const { page, navReset } = mount("connect", api, { mode: "login" });
+    expect(page.titleText.value).toBe(zh.onboarding.phoneBindingCheckTitle);
+    await settle();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: "/pages/index/index" }));
+    expect(page.isRecal.value).toBe(false);
+    expect(api.result).not.toHaveBeenCalled();
+    expect(api.calibrate).not.toHaveBeenCalled();
+    expect(api.activate).not.toHaveBeenCalled();
+  });
+  it("keeps failed or unknown binding reads as errors without claiming recalibration", async () => {
+    for (const status of [new ApiError({ kind: "network", message: "offline" }), "UNKNOWN"]) {
+      const api = { phoneLogin: status instanceof Error ? vi.fn().mockRejectedValue(status) : vi.fn().mockResolvedValue(status),
+        result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
+      const { page, navReset } = mount("connect", api, { mode: "login" }); await settle();
+      expect(page.phase.value).toBe("error");
+      expect(page.titleText.value).toBe(zh.onboarding.phoneBindingReadUnavailableTitle);
+      expect(page.failureDetail.value).toBe(zh.onboarding.phoneBindingReadUnavailableBody);
+      expect(page.isRecal.value).toBe(false);
+      expect(navReset).not.toHaveBeenCalled();
+      expect(api.calibrate).not.toHaveBeenCalled();
+      expect(api.activate).not.toHaveBeenCalled();
+    }
+  });
+  it("uses the first-calibration title only after the server requests calibration", async () => {
+    const api = { phoneLogin: vi.fn().mockResolvedValue("NEEDS_CALIBRATION"), result: vi.fn(), calibrate: vi.fn() };
+    const { page } = mount("connect", api, { mode: "login" }); await settle();
+    expect(page.phase.value).toBe("intro");
+    expect(page.titleText.value).toBe(zh.onboarding.calibrationTitle);
+    expect(page.isRecal.value).toBe(false);
+    expect(api.calibrate).not.toHaveBeenCalled();
+  });
   it("checks the server on native login before allowing a denied replacement to calibrate", async () => {
     const api = { phoneLogin: vi.fn().mockResolvedValueOnce("PHONE_REPLACEMENT_DISABLED").mockResolvedValue("REPLACEMENT_REQUIRED"),
       result: vi.fn().mockResolvedValue(record), calibrate: vi.fn().mockResolvedValue(record), activate: vi.fn() };
     const { page } = mount("connect",api,{mode:"login"}); await settle();
     expect(page.phase.value).toBe("error"); expect(api.result).not.toHaveBeenCalled();
+    expect(page.titleText.value).toBe(zh.onboarding.phoneBindingReadUnavailableTitle);
+    expect(page.isRecal.value).toBe(false);
     await page.activate(); expect(api.activate).not.toHaveBeenCalled();
     page.retryCalibration(); await settle();
     expect(page.phase.value).toBe("intro"); expect(api.calibrate).not.toHaveBeenCalled();
+    expect(page.isRecal.value).toBe(true);
     page.phase.value="calibrating"; await settle(); expect(api.calibrate).toHaveBeenCalledOnce();
   });
   it("retains unknown hardware and recalibrates on explicit retry without allowing activation", async () => {
@@ -214,12 +248,12 @@ describe("real onboarding page workers", () => {
     const api = { result: vi.fn().mockResolvedValue(pending), calibrate: vi.fn() };
     const { page, confirmDeferredPhoneActivation, navReset } = mount("estimator", api); await settle();
     confirmDeferredPhoneActivation.mockRejectedValueOnce(new ApiError({
-      kind: "http", status: 403, message: "PHONE_NATIVE_SESSION_REQUIRED",
+      kind: "network", message: "lost response",
     })).mockResolvedValue({ ...record, revision: 5, activationStatus: "DEFERRED" });
 
     await page.deferPhoneActivation();
     expect(page.deferFailed.value).toBe(true);
-    expect(page.failureDetail.value).toContain("服务器尚无法保存");
+    expect(page.failureDetail.value).toBe(zh.onboarding.activationDeferFailed);
     expect(page.calibration.value).toBeNull();
     expect(navReset).not.toHaveBeenCalled();
 
@@ -229,18 +263,19 @@ describe("real onboarding page workers", () => {
     expect(api.calibrate).not.toHaveBeenCalled();
     expect(navReset).toHaveBeenCalledWith(expect.objectContaining({ url: "/pages/index/index" }));
   });
-  it("shows the package trust error and keeps defer failures explicit without activating", async () => {
+  it("keeps unavailable calibration and defer failures explicit without activating", async () => {
     const api = { result: vi.fn().mockRejectedValue(missing()), calibrate: vi.fn().mockRejectedValue(
-      new ApiError({ kind: "http", status: 503, message: "PHONE_NATIVE_PROOF_NOT_CONFIGURED" })), activate: vi.fn() };
+      new ApiError({ kind: "http", status: 503, message: "CALIBRATION_UNAVAILABLE" })), activate: vi.fn() };
     const { page, confirmDeferredPhoneActivation, navReset } = mount("connect", api); await settle();
     expect(page.phase.value).toBe("error");
-    expect(page.failureDetail.value).toContain("服务器尚未信任");
+    expect(page.titleText.value).toBe(zh.onboarding.calibrationFailedTitle);
+    expect(page.failureDetail.value).toBe(zh.onboarding.calibrationRetry);
     confirmDeferredPhoneActivation.mockRejectedValue(new ApiError({
-      kind: "http", status: 403, message: "PHONE_NATIVE_SESSION_REQUIRED",
+      kind: "network", message: "lost response",
     }));
     await page.deferPhoneActivation();
     expect(page.failureTitle.value).toBe("暂不激活未保存");
-    expect(page.failureDetail.value).toContain("服务器尚无法保存");
+    expect(page.failureDetail.value).toBe(zh.onboarding.activationDeferFailed);
     expect(navReset).not.toHaveBeenCalled();
     expect(api.activate).not.toHaveBeenCalled();
   });

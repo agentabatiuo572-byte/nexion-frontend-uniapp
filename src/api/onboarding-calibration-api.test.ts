@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseOnboardingCalibration, createOnboardingCalibrationApi, type CalibrationRequestSignals, type CalibrationSignals } from "./onboarding-calibration-api";
 import { advanceRuntimeRevision } from "./order-api";
+import { ApiError } from "./errors";
 
 const valid = {
   userId: 9,
@@ -25,6 +26,26 @@ const valid = {
 
 describe("onboarding calibration API", () => {
   afterEach(() => advanceRuntimeRevision(null));
+
+  it("checks the current installation with one ordinary authenticated request", async () => {
+    const request = vi.fn().mockResolvedValue({ status: "BOUND" });
+    const api = createOnboardingCalibrationApi({ request } as never);
+    expect(await api.phoneLogin(" device-a ")).toBe("BOUND");
+    expect(request).toHaveBeenCalledExactlyOnceWith({
+      method: "POST", path: "/api/onboarding/phone-installation/login", body: { deviceId: "device-a" },
+    });
+    request.mockClear().mockResolvedValue({ status: "UNKNOWN" });
+    await expect(api.phoneLogin("device-a")).rejects.toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates a business rejection without an extra device handshake or retry", async () => {
+    const denial = new ApiError({ kind: "business", message: "PHONE_REPLACEMENT_DISABLED" });
+    const request = vi.fn().mockRejectedValue(denial);
+    const api = createOnboardingCalibrationApi({ request } as never);
+    await expect(api.activate("device-a", 2, "phone-active-001")).rejects.toBe(denial);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
 
   it("accepts only a server-canonical capability projection", () => {
     expect(parseOnboardingCalibration(valid, "PRODUCTION")).toMatchObject({ source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", tier: 3, tops: 28.3 });
