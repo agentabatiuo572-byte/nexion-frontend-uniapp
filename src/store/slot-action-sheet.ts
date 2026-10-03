@@ -2,6 +2,7 @@ import { navTo } from "@/lib/route";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useApp } from "./app";
+import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 /**
  * Slot-action sheet — opened from /earn (empty slot tile / add-device CTA).
@@ -28,7 +29,9 @@ export const useSlotActionSheet = defineStore("slotActionSheet", () => {
    * 仓库有未激活设备 → 弹选择弹层;没有 → 直接进商城,不弹只剩一个购买按钮的空壳层。
    */
   function openForSlot() {
-    const hasInactive = useApp().visibleDevices.some((d) => d.activatedAt === null);
+    const hasInactive = useApp().visibleDevices.some(
+      (d) => isActivatableInventoryDevice(d) || requiresActivationConfirmation(d),
+    );
     if (hasInactive) {
       open.value = true;
     } else {

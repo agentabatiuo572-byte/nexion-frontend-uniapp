@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import source from "./app.ts?raw";
 import cardContent from "../components/earn/device-card-pc.vue?raw";
+import slotSheetContent from "../components/slot-action-sheet.vue?raw";
+import slotStoreSource from "./slot-action-sheet.ts?raw";
 import ts from "typescript";
-import { isActiveSlotDevice, requiresActivationConfirmation } from "../lib/device-slot-policy";
+import { isActiveSlotDevice, isActivatableInventoryDevice, requiresActivationConfirmation } from "../lib/device-slot-policy";
 
 const ast = ts.createSourceFile("app.ts", source, ts.ScriptTarget.Latest, true);
 let body = "";
@@ -142,7 +144,7 @@ function findPhoneRecovery(node: ts.Node) {
 findPhoneRecovery(inventoryAst);
 const offerPhoneRecovery = new Function("app", "session", "requiresActivationConfirmation", `return (${phoneOfferBody})();`);
 describe("phone reconciliation remains reachable", () => {
-  it.each([[], [{kind:"phone",activatedAt:null,activationUnconfirmed:true}],
+  it.each([[], [{kind:"phone",activatedAt:null,activationUnconfirmed:false}], [{kind:"phone",activatedAt:null,activationUnconfirmed:true}],
     [{kind:"phone",activatedAt:123},{kind:"phone",activatedAt:null,activationUnconfirmed:true}]].map(visibleDevices => ({visibleDevices})))("offers recovery for missing or unconfirmed phone facts", ({visibleDevices}) => {
     expect(offerPhoneRecovery({visibleDevices,accountKey:"u"}, {isCurrentDeviceCalibrated:()=>true}, requiresActivationConfirmation)).toBe(true);
   });
@@ -156,5 +158,74 @@ describe("phone reconciliation remains reachable", () => {
     routes.length = 0;
     new Function("navTo", "nativePhoneAvailable", `${phoneNavigationBody}; goPhoneActivation();`)((route:string)=>routes.push(route), false);
     expect(routes).toEqual([]);
+  });
+});
+
+// Execute the consumer callbacks and routing branch rather than copy their inventory rules.
+function inventorySelection(content: string, name: string, visibleDevices: unknown[]): { id: string }[] {
+  const script = content.split('<script setup lang="ts">')[1].split("</script>")[0];
+  const ast = ts.createSourceFile("inventory.ts", script, ts.ScriptTarget.Latest, true);
+  let callback = "";
+  function visit(node: ts.Node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === name
+      && node.initializer && ts.isCallExpression(node.initializer)) callback = node.initializer.arguments[0].getText(ast);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  if (!callback) throw new Error(`${name} missing`);
+  return new Function("app", "isActivatableInventoryDevice", "requiresActivationConfirmation", `return (${callback})();`)(
+    { visibleDevices }, isActivatableInventoryDevice, requiresActivationConfirmation,
+  );
+}
+
+const slotStoreAst = ts.createSourceFile("slot-action-sheet.ts", slotStoreSource, ts.ScriptTarget.Latest, true);
+let openForSlotBody = "";
+function findSlotBranch(node: ts.Node) {
+  if (ts.isFunctionDeclaration(node) && node.name?.text === "openForSlot") openForSlotBody = node.getText(slotStoreAst);
+  ts.forEachChild(node, findSlotBranch);
+}
+findSlotBranch(slotStoreAst);
+if (!openForSlotBody) throw new Error("openForSlot missing");
+function openInventory(visibleDevices: unknown[]) {
+  const open = { value: false };
+  const routes: string[] = [];
+  new Function("useApp", "open", "navTo", "isActivatableInventoryDevice", "requiresActivationConfirmation", `${openForSlotBody}; openForSlot();`)(
+    () => ({ visibleDevices }), open, (route: string) => routes.push(route), isActivatableInventoryDevice, requiresActivationConfirmation,
+  );
+  return { open: open.value, routes };
+}
+
+describe("purchased inventory excludes historical phones", () => {
+  const oldPhone = project({ ...fixture, id: 1144, kind: "phone", status: "DEACTIVATED", activatedAt: null }, 1000, 20);
+  const currentPhone = project({ ...fixture, id: 1151, kind: "phone" }, 1000, 20);
+
+  it("does not advertise an old phone as inventory or hide the current active phone", () => {
+    const devices = [oldPhone, currentPhone];
+    for (const content of [inventoryContent, slotSheetContent]) {
+      expect(inventorySelection(content, "inactiveDevices", devices)).toEqual([]);
+    }
+    expect(inventorySelection(inventoryContent, "activeDevices", devices).map((device) => device.id)).toEqual(["1151"]);
+    expect(devices.filter(isActiveSlotDevice)).toEqual([currentPhone]);
+    expect(openInventory([oldPhone])).toEqual({ open: false, routes: ["/pages/store/store"] });
+    expect(openInventory(devices)).toEqual({ open: false, routes: ["/pages/store/store"] });
+  });
+
+  it("keeps real hardware and Cloud Share inventory in both lists and opens their chooser", () => {
+    const hardware = project({ ...fixture, id: 1201, kind: "stellarbox-s1", status: "DEACTIVATED" }, 1000, 20);
+    const cloud = project({ ...fixture, id: 1202, kind: "cloud-share", status: "INVENTORY", activatedAt: null }, 1000, 20);
+    const devices = [oldPhone, currentPhone, hardware, cloud];
+    for (const content of [inventoryContent, slotSheetContent]) {
+      expect(inventorySelection(content, "inactiveDevices", devices).map((device) => device.id)).toEqual(["1201", "1202"]);
+    }
+    expect(openInventory(devices)).toEqual({ open: true, routes: [] });
+  });
+
+  it.each(["phone", "stellarbox-s1"])("keeps unconfirmed %s visible without an inventory activation promise", (kind) => {
+    const unconfirmed = project({ ...fixture, id: 1203, kind, activatedAt: null }, 1000, 20);
+    for (const content of [inventoryContent, slotSheetContent]) {
+      expect(inventorySelection(content, "inactiveDevices", [unconfirmed])).toEqual([]);
+      expect(inventorySelection(content, "unconfirmedDevices", [unconfirmed]).map((device) => device.id)).toEqual(["1203"]);
+    }
+    expect(openInventory([unconfirmed])).toEqual({ open: true, routes: [] });
   });
 });
