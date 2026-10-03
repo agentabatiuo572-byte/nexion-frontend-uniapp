@@ -242,7 +242,7 @@ const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
 const activatedLabel = computed(() => fmt(t.value.myDevices.activatedLabel, { n: activeCount.value }));
 const emptySlotsLabel = computed(() => fmt(openSlotsTemplate(t.value.myDevices.emptySlots, emptySlots.value), { n: emptySlots.value }));
-const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
+const deviceOrdersMeta = computed(() => fmt(orderCount.value === 1 ? t.value.me.deviceOrdersMetaOne : t.value.me.deviceOrdersMeta, { n: orderCount.value }));
 const rankValue = computed(() => remoteApiEnabled && !vrank.remoteReady ? "—" : `V${vrank.myRank}`);
 const themeModeLabel = computed(() =>
   theme.mode === "system"
