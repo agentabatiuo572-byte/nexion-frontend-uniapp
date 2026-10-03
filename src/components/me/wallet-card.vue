@@ -246,7 +246,8 @@ const addDeviceBtnStyle: CSSProperties = {
 };
 
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
-const usdtLabel = computed(() => usdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+// Native locale formatters can ignore fraction options; match the wallet detail's display rounding.
+const usdtLabel = computed(() => usdt.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 </script>
 
 <style scoped>
