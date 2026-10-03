@@ -403,6 +403,7 @@ sandboxCodeHint: "Demo code: {code}. No SMS will be sent.",
     errorRemoteOtpInvalid: "The verification code is incorrect or expired. Request a new code.",
     errorSignInStateChanged: "The account sign-in state changed. Please sign in again.",
     serverSessionReloadNotice: "After a page refresh, the server session is restored securely. You only need to sign in again if that session has expired.",
+    nativeSessionReloadNotice: "Please sign in again to continue using the app.",
   },
   register: {
     title: "Create account",
