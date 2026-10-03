@@ -15,7 +15,9 @@ export function todayCompletedTasks(tasks: readonly CompletedTask[], serverNow: 
     .sort((left, right) => right.completedAt - left.completedAt);
 }
 
-export function shanghaiClockTime(timestamp: number): string {
-  if (!Number.isFinite(timestamp) || timestamp < 0) return "—";
-  return new Date(timestamp + SHANGHAI_OFFSET_MS).toISOString().slice(11, 16);
+// Receipt clocks use the device's local time; Shanghai only determines the business day.
+export function localClockTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  if (timestamp < 0 || Number.isNaN(date.getTime())) return "—";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }

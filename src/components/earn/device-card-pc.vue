@@ -270,7 +270,7 @@
         >
           <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
           <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">+${{ task.reward.toFixed(3) }}</text>
-          <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ shanghaiClockTime(task.completedAt) }}</text>
+          <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
       </view>
       <text v-else class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
@@ -393,7 +393,7 @@ import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
-import { shanghaiClockTime, todayCompletedTasks } from "@/lib/today-completed-tasks";
+import { localClockTime, todayCompletedTasks } from "@/lib/today-completed-tasks";
 
 const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
