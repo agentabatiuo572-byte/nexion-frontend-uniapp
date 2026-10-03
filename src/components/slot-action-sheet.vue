@@ -88,7 +88,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
+import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
@@ -107,9 +107,7 @@ watch(
   },
 );
 
-const inactiveDevices = computed(() => app.visibleDevices.filter(
-  (d) => d.activatedAt === null && !requiresActivationConfirmation(d),
-));
+const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const activeCount = computed(() => app.activeSlotCount);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));

@@ -20,3 +20,8 @@ export function isActiveSlotDevice(device: SlotDevice): boolean {
 export function requiresActivationConfirmation(device: Pick<SlotDevice, "activationUnconfirmed">): boolean {
   return device.activationUnconfirmed === true;
 }
+
+/** Phones activate through current-installation calibration, never as purchased inventory. */
+export function isActivatableInventoryDevice(device: SlotDevice): boolean {
+  return device.kind !== "phone" && device.activatedAt === null && !requiresActivationConfirmation(device);
+}

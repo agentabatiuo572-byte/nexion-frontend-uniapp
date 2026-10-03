@@ -241,7 +241,7 @@ import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-comma
 import { isProductAvailable } from "@/store/product-availability";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
-import { occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
+import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
@@ -280,9 +280,7 @@ function deferredCommandBusy(device: Device): boolean {
 const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
 const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const inactiveDevices = computed(() => app.visibleDevices.filter(
-  (d) => d.activatedAt === null && !requiresActivationConfirmation(d),
-));
+const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0
   && inactiveDevices.value.length === 0
