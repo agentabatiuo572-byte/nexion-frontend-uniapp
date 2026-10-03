@@ -190,7 +190,7 @@ import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
 import { useApp } from "@/store/app";
@@ -438,7 +438,9 @@ function eventText(stage: OrderStatus): string {
 }
 
 function dt(ts: number): string {
-  return new Date(ts).toLocaleString(dateLocale());
+  return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
+    ? formatTrialDateTime(ts)
+    : "—";
 }
 
 async function handleCancel() {
