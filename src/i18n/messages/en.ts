@@ -3797,6 +3797,7 @@ earningsMilestone: "Earnings milestone ${threshold}",
     statusFailed: "Failed",
     empty: "No entries match this filter.",
     monthLabel: "{month} · {n} entries",
+    monthLabelOne: "{month} · {n} entry",
     runningBalance: "Running balance",
     footer:
       "Bills and wallet balances are reconciled in real time.",

@@ -3670,6 +3670,7 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
     statusFailed: "Thất bại",
     empty: "Không có mục nào khớp bộ lọc này.",
     monthLabel: "{month} · {n} mục",
+    monthLabelOne: "{month} · {n} mục",
     runningBalance: "Số dư",
     footer:
       "Sao kê và số dư ví được đối soát theo thời gian thực.",
