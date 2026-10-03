@@ -8,6 +8,7 @@ import source from "./daily.vue?raw";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { dailyCheckInSuccessCopy } from "./daily-success-copy";
 import { fmt } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import { en } from "@/i18n/messages/en";
 import { createPointsApi } from "@/api/points-api";
 import { advanceRuntimeRevision, captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
@@ -153,6 +154,7 @@ async function mountedDaily() {
     "@/api/runtime": remote, "@/store/app": { useApp: () => app }, "@/store/nex-faucet": { useNexFaucet: () => faucet },
     "@/store/bills": { useBills: () => bills }, "@/store/auth": { useAuth: () => auth }, "@/store/lucky-spin": { useLuckySpin: () => ({}) },
     "@/store/ui": { toast }, "@/i18n/use-t": { useT: () => ref(en) }, "@/i18n/format": { fmt, dateLocale: () => "en-US" },
+    "@/lib/trial-date": { formatTrialDateTime },
     "@/lib/binary-session-ready": { binarySessionReady }, "@/lib/binary-read-coalescer": { createScopedReadCoalescer },
     "@/api/order-api": { captureRuntimeRevision, subscribeRuntimeRevision }, "@/lib/route": { navTo: vi.fn() },
     "@/lib/wallet-bill-display": { resolveWalletBillMemo }, "@/api/geo-policy-error": { geoPolicyUserMessage: () => null },

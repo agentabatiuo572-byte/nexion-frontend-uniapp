@@ -11,6 +11,7 @@ import { binarySessionReady } from "@/lib/binary-session-ready";
 import { createScopedReadCoalescer } from "@/lib/binary-read-coalescer";
 import { en } from "@/i18n/messages/en";
 import { fmt } from "@/i18n/format";
+import { formatTrialDateTime } from "@/lib/trial-date";
 import * as rewards from "./daily-reward-view";
 import { dailyCheckInSuccessCopy } from "./daily-success-copy";
 
@@ -96,6 +97,7 @@ async function page() {
     vue: Vue, "@dcloudio/uni-app": { onShow: (callback: () => void) => shows.push(callback) },
     "@/lib/route": { navTo: vi.fn() }, "@/i18n/use-t": { useT: () => Vue.ref(en) },
     "@/i18n/format": { fmt, dateLocale: () => "en-US" }, "@/store/nex-faucet": { useNexFaucet: () => faucet },
+    "@/lib/trial-date": { formatTrialDateTime },
     "@/store/app": { useApp: () => app }, "@/store/auth": { useAuth: () => auth },
     "@/store/bills": { useBills: () => bills }, "@/store/lucky-spin": { useLuckySpin: () => ({}) },
     "@/store/ui": { toast }, "@/api/runtime": remote,
