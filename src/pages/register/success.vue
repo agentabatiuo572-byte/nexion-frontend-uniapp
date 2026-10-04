@@ -5,7 +5,7 @@
   onboarding。bare 全屏页(无 chassis)→ 自带 GlobalUi 宿主(PORT-PITFALLS P-062)。
   H5 官网地址 = platform config share.appDownload.officialUrl(运营可配);空值
   显示不可用占位,不制造死链接。App 编译不渲染下载提醒。返回键视同
-  「继续」进 onboarding(禁回注册流)。
+  「继续」:H5 进首页,App 进 onboarding(禁回注册流)。
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
@@ -17,8 +17,14 @@
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5" /></svg>
             </view>
           </view>
+          <!-- #ifdef H5 -->
+          <text class="rs-title" role="heading" aria-level="1" tabindex="-1">{{ downloadOnly ? t.register.doneOfficialDownloadLink : t.register.doneTitle }}</text>
+          <text class="rs-sub">{{ downloadOnly ? t.myDevices.phoneActivationAppOnlyBody : subLine }}</text>
+          <!-- #endif -->
+          <!-- #ifndef H5 -->
           <text class="rs-title" role="heading" aria-level="1" tabindex="-1">{{ t.register.doneTitle }}</text>
           <text class="rs-sub">{{ subLine }}</text>
+          <!-- #endif -->
 
           <!-- 礼包确认(giftRoute 两态;无礼包注册则整块省略) -->
           <view v-if="giftState !== 'none'" class="rs-gift">
@@ -81,6 +87,9 @@
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
         </view>
+        <view v-if="!officialDownloadUrl" class="rs-retry active-press" role="button" :tabindex="cfg.loading ? -1 : 0" :aria-disabled="cfg.loading" @click="retryDownloadConfig">
+          <text>{{ t.ui.retry }}</text>
+        </view>
       </view>
       <!-- #endif -->
 
@@ -106,7 +115,7 @@
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
-import { onBackPress } from "@dcloudio/uni-app";
+import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
@@ -125,9 +134,22 @@ type GiftState = "posted" | "pending" | "none";
 const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
-const remoteReceipt = ref<RegistrationReceipt | null>(consumeRemoteRegistrationReceipt(auth.accountId));
+// #ifdef H5
+const downloadOnly = ref(false);
+// #endif
+const remoteReceipt = ref<RegistrationReceipt | null>(null);
+onLoad((options) => {
+  // #ifdef H5
+  downloadOnly.value = options?.download === "1";
+  if (downloadOnly.value) return;
+  // #endif
+  remoteReceipt.value = consumeRemoteRegistrationReceipt(auth.accountId);
+});
 const sessionGateTick = ref(0);
 const successVisible = computed(() => {
+  // #ifdef H5
+  if (downloadOnly.value) return true;
+  // #endif
   sessionGateTick.value;
   const session = sessionVault.read();
   return canRenderRegistrationSuccess({
@@ -148,6 +170,9 @@ const registration = computed(() => {
   return resolved.ok && resolved.account?.status === "active" ? resolved.account.registration : null;
 });
 const giftState = computed<GiftState>(() => {
+  // #ifdef H5
+  if (downloadOnly.value) return "none";
+  // #endif
   if (remoteApiEnabled) {
     const status = remoteReceipt.value?.giftStatus;
     if (!remoteReceipt.value || status === "UNAVAILABLE"
@@ -220,10 +245,18 @@ function openOfficialDownload() {
   if (popup) popup.opener = null;
   else window.location.assign(url);
 }
+function retryDownloadConfig() {
+  if (!cfg.loading) void cfg.load();
+}
 // #endif
 
 function continueWeb() {
+  // #ifdef H5
+  navReset({ url: "/pages/index/index", fail: () => {} });
+  // #endif
+  // #ifndef H5
   navReset({ url: "/pages/onboarding/estimator", fail: () => {} });
+  // #endif
 }
 // 禁回注册流:返回键视同「继续」(App 端;H5 hash 回退由浏览器承担)。
 onBackPress(() => {
@@ -260,6 +293,8 @@ onBackPress(() => {
 .rs-why__ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rs-why__t { flex: 1; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
 .rs-h5-download { position: absolute; right: 24px; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); left: 24px; }
+.rs-retry { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); font-size: 12px; }
+.rs-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rs-h5-download__hint { display: block; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
 .rs-h5-download__action { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 9999px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .rs-h5-download__action--disabled { color: var(--v5-ink-3); background: var(--v5-surface); }

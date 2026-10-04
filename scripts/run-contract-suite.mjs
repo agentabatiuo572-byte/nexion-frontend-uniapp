@@ -22,6 +22,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCRIPTS = path.join(root, "scripts");
 
 const REGISTRY = {
+  "app-h5-sync.test.mjs": { how: "elsewhere", by: "npm run test:app-h5-sync" },
   // ── chain:本执行器跑(原孤儿,z1 接入)──
   "native-svg-icons.test.mjs": { how: "chain" },
   "hard-block-auth-contract.test.mjs": { how: "chain" },
@@ -71,6 +72,7 @@ const REGISTRY = {
   "market-board-visual-contract.test.mjs": { how: "chain" },
   "onboarding-estimator-fail-closed.contract.test.mjs": { how: "chain" },
   "phone-activation-defer-contract.test.mjs": { how: "chain" },
+  "h5-phone-readonly.test.mjs": { how: "chain" },
   "p1-audit-regression.contract.test.mjs": { how: "chain" },
   "learning-empty-state-contract.test.mjs": { how: "chain" },
   "shared-keyboard-activation-contract.test.mjs": { how: "chain" },

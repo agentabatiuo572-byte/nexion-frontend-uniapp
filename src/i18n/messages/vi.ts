@@ -1898,6 +1898,8 @@ catalog: {
     phoneActivationCta: "Hiệu chuẩn và liên kết điện thoại này",
     phoneActivationAppOnlyTitle: "Kích hoạt tác vụ điện thoại trong ứng dụng Android",
     phoneActivationAppOnlyBody: "Trình duyệt không thể đọc pin hoặc gửi nhịp tim tác vụ của điện thoại. Hãy đăng nhập ứng dụng Android để hiệu chuẩn và kích hoạt.",
+    phoneActivationNativeUnavailableTitle: "Hiệu chuẩn điện thoại hiện chưa khả dụng",
+    phoneActivationNativeUnavailableBody: "Thiết bị này hiện chưa thể hiệu chuẩn hoặc kích hoạt tài nguyên tính toán của điện thoại. Bạn vẫn có thể xem trạng thái các điện thoại đã liên kết.",
 
 onlineLabel: "{n} đang online",
 },

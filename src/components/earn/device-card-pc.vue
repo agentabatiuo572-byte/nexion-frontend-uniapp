@@ -86,8 +86,8 @@
     <!-- Detail body (expanded; accordion) -->
     <view v-if="expanded" class="nx-device-card__details">
       <view v-if="!phoneLocalReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
-        <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationTitle : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-        <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ nativePhoneAvailable ? t.myDevices.phoneActivationBody : t.myDevices.phoneActivationAppOnlyBody }}</text>
+        <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ phoneActivationGuidance.title }}</text>
+        <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
         <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
       </view>
       <!-- device identity: gpu · location + lifecycle chip -->
@@ -376,6 +376,7 @@ import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, 
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
@@ -401,6 +402,7 @@ const app = useApp();
 const session = useSession();
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 const t = useT();
+const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
 
@@ -481,8 +483,7 @@ const idleGated = computed(
 );
 
 const statusLabel = computed(() => {
-  if (!phoneLocalReady.value) return nativePhoneAvailable
-    ? t.value.myDevices.phoneActivationTitle : t.value.myDevices.phoneActivationAppOnlyTitle;
+  if (!phoneLocalReady.value) return phoneActivationGuidance.value.title;
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (task.value?.status === "PAUSED") return t.value.earn.phoneTaskPaused;

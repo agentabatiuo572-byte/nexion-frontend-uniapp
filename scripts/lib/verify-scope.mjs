@@ -104,12 +104,12 @@ export function changedSet({ base } = {}) {
   } else {
     reason = `SCOPE_BASE=${baseRef}`;
   }
-  const committed = git(["diff", "--name-only", "--diff-filter=ACMRTD", `${baseRef}...HEAD`]);
+  const committed = git(["diff", "--name-only", "-z", "--diff-filter=ACMRTD", `${baseRef}...HEAD`]);
   if (committed === null) return null;
   const status = workingStatus();
   if (status === null) return null;
   const files = new Set();
-  committed.split(/\r?\n/).filter(Boolean).forEach((f) => files.add(norm(f)));
+  committed.split("\0").filter(Boolean).forEach((f) => files.add(norm(f)));
   status.forEach((s) => files.add(s.path));
   return { base: baseRef, baseReason: reason, mainline: ml, files: [...files].sort() };
 }
@@ -314,7 +314,7 @@ export function lint({ manifest = loadManifest(), verifySh = fs.readFileSync(pat
   const idsInManifest = new Set(Object.keys(manifest.gates || {}));
   for (const id of idsInSh) if (!idsInManifest.has(id)) problems.push(`verify.sh 调了 scope_hit ${id},manifest.gates 没有它(会按「未声明照跑」处理,但接线意图丢了)`);
   for (const id of idsInManifest) if (!idsInSh.has(id)) problems.push(`manifest.gates.${id} 在 verify.sh 里没有 scope_hit 调用点(声明了却没接线 = 空转)`);
-  const allFiles = git(["ls-files"])?.split(/\r?\n/).filter(Boolean) || [];
+  const allFiles = git(["ls-files", "-z"])?.split("\0").filter(Boolean) || [];
   const checkGlobs = (owner, globs) => {
     for (const g of globs || []) {
       if (g.includes("*") ? !allFiles.some((f) => path.matchesGlob(f, g)) : !fs.existsSync(path.join(ROOT, g))) {

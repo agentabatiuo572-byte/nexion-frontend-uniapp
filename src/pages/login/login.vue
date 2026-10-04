@@ -28,9 +28,11 @@
       <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
         <text class="lg-recovery-notice__t">{{ h5RefreshCookieEnabled ? t.login.serverSessionReloadNotice : t.login.nativeSessionReloadNotice }}</text>
       </view>
+      <!-- #ifdef H5 -->
       <view v-if="browserUnsupportedNotice" class="lg-recovery-notice" role="status" data-qa="secure-browser-unsupported-notice">
         <text class="lg-recovery-notice__t">{{ t.session.secureBrowserUnsupported }}</text>
       </view>
+      <!-- #endif -->
       <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
       <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
       <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
@@ -225,7 +227,9 @@ const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
 const remoteTwoFactorChallenge = ref<string | null>(null);
 const serverSessionReloadNotice = ref(false);
+// #ifdef H5
 const browserUnsupportedNotice = ref(false);
+// #endif
 const passwordFocused = ref(false);
 const confirmPasswordFocused = ref(false);
 
@@ -238,7 +242,9 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.return) returnParam.value = o.return;
   serverSessionReloadNotice.value = o.notice === "server-session-reload";
+  // #ifdef H5
   browserUnsupportedNotice.value = o.notice === "secure-browser-unsupported";
+  // #endif
   // [FEAT-SHARE4] 与注册页同一 client 预检:非法码不入绑定链(服务端权威校验另行)。
   const normRef = normalizeRefCode(o.ref);
   if (normRef) refOnLogin.value = normRef;
@@ -604,7 +610,9 @@ function goSendCode() {
 }
 function remoteLoginError(error: unknown): string {
   const code = error instanceof ApiError ? error.message : "";
+  // #ifdef H5
   if (code === "COOKIE_LOCK_UNAVAILABLE") return t.value.session.secureBrowserUnsupported;
+  // #endif
   const geoMessage = geoText(code);
   if (geoMessage) return geoMessage;
   switch (resolveRemoteLoginErrorKind(code)) {

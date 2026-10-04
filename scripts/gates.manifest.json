@@ -301,6 +301,11 @@
     }
   },
   "steps": {
+    "test:app-h5-sync": {
+      "kind": "test",
+      "always": true,
+      "inputs": ["src/**", "scripts/**", "checks/**", "PRD/**", "docs/**", ".githooks/**", "package*.json", "*.config.ts", "tsconfig.json", "shims-uni.d.ts", "index.html", ".gitattributes", ".gitignore", ".env.development", ".env.production", ".env.example"]
+    },
     "type-check:cached": {
       "kind": "static",
       "always": true,

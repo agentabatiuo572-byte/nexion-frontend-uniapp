@@ -188,6 +188,19 @@ for (const step of STEPS) {
 if (pool) { try { pool.development.stop(); } catch { /* 起服子进程可能已退出 */ } try { pool.production.stop(); } catch { /* 同上 */ } }
 
 // ── 汇总 + 产物 ──────────────────────────────────────────────────────────────
+// The sibling checkout can change without this repository's fingerprint moving.
+// Recheck parity before publishing a full green receipt, using the same strong gate.
+const syncResult = results.find((result) => result.step === "test:app-h5-sync");
+if (mode === "full" && syncResult?.status === "PASS") {
+  const parity = await runCommand(process.execPath, [path.join(ROOT, "scripts", "app-h5-sync.mjs"), "check"], {}, path.join(LOG_DIR, "app-h5-sync-final.log"));
+  syncResult.ms += parity.ms;
+  syncResult.finalParity = parity.code === 0 ? "PASS" : "FAIL";
+  if (parity.code !== 0) {
+    syncResult.status = "FAIL";
+    syncResult.code = parity.code;
+    syncResult.reason = `Final APP/H5 parity failed: ${parity.out.trim().split(/\r?\n/).at(-1)}`;
+  }
+}
 const fpEnd = treeFingerprint();
 const commitEnd = captureCommitCandidate(ROOT);
 // 已知红(Tier 1-C):FAIL 步命中 scripts/known-red.json 未到期条目 → KNOWN-RED,不进 verdict;到期 → 仍 FAIL 并写明;清单本身坏了 → 追加一条 FAIL(门的门)。

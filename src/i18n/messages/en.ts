@@ -1957,6 +1957,8 @@ catalog: {
     phoneActivationCta: "Calibrate and bind this phone",
     phoneActivationAppOnlyTitle: "Activate phone compute in the Android App",
     phoneActivationAppOnlyBody: "A browser cannot read this phone's battery or send its task heartbeat. Sign in to the Android App to calibrate and activate it.",
+    phoneActivationNativeUnavailableTitle: "Phone calibration unavailable",
+    phoneActivationNativeUnavailableBody: "This device cannot calibrate or activate phone compute right now. You can still view the status of phones already bound to your account.",
     // Trade-in promo banner — surfaces when user has an eligible device for
     // an upgrade. Config-gated by DEFAULT_TRADEIN_CONFIG.promo (kill switch,
     // cooldown, max-per-session, routes).

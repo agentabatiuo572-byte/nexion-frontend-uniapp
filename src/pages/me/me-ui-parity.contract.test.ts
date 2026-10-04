@@ -5,16 +5,17 @@ import { createHash } from "node:crypto";
 // @ts-expect-error This contract runs in Node.
 import { env } from "node:process";
 // @ts-expect-error This contract runs in Node.
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from '@vue/compiler-sfc';
+import { resolvePrototypeVisualReference } from "./prototype-visual-reference";
 
 const source = readFileSync(new URL("./me.vue", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const formalMeDir = new URL("./", import.meta.url);
-const prototypeMeDir = env.NEXGRID_PROTOTYPE_ROOT
-  ? pathToFileURL(`${env.NEXGRID_PROTOTYPE_ROOT}/src/pages/me/`)
-  : new URL("../../../../NX1.0-Prototype/src/pages/me/", import.meta.url);
-if (env.NEXGRID_PROTOTYPE_ROOT && !existsSync(prototypeMeDir)) throw new Error("Configured prototype checkout is missing");
+const prototypeReference = resolvePrototypeVisualReference({
+  repositoryRoot: fileURLToPath(new URL("../../../", import.meta.url)),
+  configuredRoot: env.NEXGRID_PROTOTYPE_ROOT,
+});
 const EXPECTED_TEMPLATE_DIFFERENCES = [
   "achievements.vue",
   "devices.vue",
@@ -55,7 +56,7 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 // Reviewed 710e9ee visual refresh with formal server and accessibility boundaries.
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "e7cfef2560a4a60747043f2a4d76b875a0faad0383b5cbcf1fb15deeab98e60f",
-  "devices.vue": "7f3bf67d7f5c066943c992e8345d1fa25c2d2ff82c21473ff41712dd58d4fbba",
+  "devices.vue": "227aa03a6c8ba621deb6d5e69fa1672cd80e918fc18cf37deeac446818adb125",
   "goals.vue": "43658431af1e6739fa4a269c4758f7a432b9e74dd33fa031f8fec5cb408e0a60",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
@@ -238,11 +239,11 @@ describe("Me page 5174 normal-state UI parity", () => {
   });
 
   it("matches the checked-out 5174 Me-page visual baseline when it is available", () => {
-    if (!existsSync(prototypeMeDir)) return;
+    if (!prototypeReference) return;
     // User-requested HDPay payout is a new server-only page, covered by bank-withdrawal-runtime.mjs.
     expect(existsSync(new URL("wallet-withdraw-bank.vue", formalMeDir))).toBe(true);
     const files = readdirSync(formalMeDir).filter((name: string) => name.endsWith(".vue") && !["wallet-withdraw-bank.vue", "wallet-withdraw-method.vue"].includes(name)).sort();
-    const prototypeFiles = readdirSync(prototypeMeDir).filter((name: string) => name.endsWith(".vue")).sort();
+    const prototypeFiles = prototypeReference.files("src/pages/me").map((name) => name.slice("src/pages/me/".length)).filter((name) => name.endsWith(".vue")).sort();
     expect(files).toEqual(prototypeFiles);
     expect(files).toHaveLength(32);
 
@@ -250,7 +251,7 @@ describe("Me page 5174 normal-state UI parity", () => {
     const templatePairHashes: Record<string, string> = {};
     for (const name of files) {
       const formal = readFileSync(new URL(name, formalMeDir), "utf8");
-      const prototype = readFileSync(new URL(name, prototypeMeDir), "utf8");
+      const prototype = prototypeReference.read(`src/pages/me/${name}`);
       const formalStyle = block(formal, "style"), prototypeStyle = block(prototype, "style");
       if (EXPECTED_STYLE_PAIR_SHA256[name]) {
         expect(createHash("sha256").update(formalStyle).update("\0").update(prototypeStyle).digest("hex"), name).toBe(EXPECTED_STYLE_PAIR_SHA256[name]);

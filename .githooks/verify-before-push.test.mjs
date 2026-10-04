@@ -36,6 +36,13 @@ test("从没跑过 full(无 last-run.json)→ 拦", () => {
   const r = push(toMain(shaA));
   assert.equal(r.code, 1); assert.match(r.err, /从没跑过 npm run verify/);
 });
+test("实际发布分支 refs/heads/test（网页为 H5）没有 full 记录必须拒绝", () => {
+  assert.ok(["test", "H5"].includes(MAINLINE), `活跃发布门不能漂回历史 main: ${MAINLINE}`);
+  const ref = MAINLINE === "H5" ? "refs/heads/H5" : "refs/heads/test";
+  const result = push(`${ref} ${shaA} ${ref} ${ZERO}\n`);
+  assert.equal(result.code, 1);
+  assert.match(result.err, /从没跑过 npm run verify/);
+});
 test("推别的分支(pkg/*)不拦,哪怕从没跑过 full", () => {
   assert.equal(push(`refs/heads/pkg/x ${shaA} refs/heads/pkg/x ${ZERO}\n`).code, 0);
 });

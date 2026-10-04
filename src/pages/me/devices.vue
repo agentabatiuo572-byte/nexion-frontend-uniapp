@@ -68,8 +68,8 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block" :style="phoneActivationTitleStyle">{{ nativePhoneAvailable ? t.myDevices.phoneActivationTitle : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-              <text class="block" :style="phoneActivationBodyStyle">{{ nativePhoneAvailable ? t.myDevices.phoneActivationBody : t.myDevices.phoneActivationAppOnlyBody }}</text>
+              <text class="block" :style="phoneActivationTitleStyle">{{ phoneActivationGuidance.title }}</text>
+              <text class="block" :style="phoneActivationBodyStyle">{{ phoneActivationGuidance.body }}</text>
               <text class="block" :style="phoneActivationRewardStyle">{{ t.myDevices.phoneActivationRewardGate }}</text>
             </view>
           </view>
@@ -113,6 +113,7 @@
               :key="d.id"
               :device="d"
               :active="true"
+              :show-action="canControlDevice(d)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
@@ -138,6 +139,7 @@
               :key="d.id"
               :device="d"
               :active="false"
+              :show-action="canControlDevice(d)"
               :disabled="slotsFull && occupiesDeviceSlot(d.kind)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
@@ -167,6 +169,7 @@
               :key="d.id"
               :device="d"
               :active="false"
+              :show-action="canControlDevice(d)"
               disabled
               :disabled-label="t.myDevices.inventoryActivationUnconfirmed"
               :activate-label="t.myDevices.inventoryRowActivate"
@@ -225,6 +228,8 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
+import { canControlDevice } from "@/lib/device-control-platform";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { PRODUCTS } from "@/mock/products";
@@ -247,6 +252,7 @@ const t = useT();
 const app = useApp();
 const session = useSession();
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
+const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
@@ -371,6 +377,7 @@ function tradeinStrip(d: Device): {
 }
 
 function handleTradein(d: Device) {
+  if (!canControlDevice(d)) return;
   // 激活中且任务运行:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格
   // DEV02A 异常2)。库存机的出厂任务不在跑,不阻断——判定单源 isDeviceTaskBlocked。
   if (isDeviceTaskBlocked(d)) {
@@ -381,6 +388,7 @@ function handleTradein(d: Device) {
 }
 
 async function handleActivate(d: Device) {
+  if (!canControlDevice(d)) return;
   if (requiresActivationConfirmation(d)) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;
@@ -407,6 +415,7 @@ async function handleActivate(d: Device) {
 }
 
 async function handleDeactivate(d: Device) {
+  if (!canControlDevice(d)) return;
   if (remoteApiEnabled && deferredCommandBusy(d)) return;
   if (remoteApiEnabled && d.pendingDeactivate) {
     toast.info(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
@@ -432,7 +441,7 @@ async function handleDeactivate(d: Device) {
 
 function onSheetWait() {
   const d = sheetDevice.value;
-  if (!d) return;
+  if (!d || !canControlDevice(d)) return;
   if (remoteApiEnabled) {
     void runRemoteDeferredCommand(d);
     return;
@@ -448,6 +457,7 @@ function goPhoneActivation() {
 }
 
 async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
+  if (!canControlDevice(d)) return false;
   if (!Number.isSafeInteger(d.rowVersion) || Number(d.rowVersion) < 0) {
     toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
     return false;
@@ -517,7 +527,7 @@ async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
 
 async function onSheetForce() {
   const d = sheetDevice.value;
-  if (!d) return;
+  if (!d || !canControlDevice(d)) return;
   if (remoteApiEnabled) await runRemoteDeviceCommand(d, "deactivate");
   else if (app.deactivateDevice(d.id)) {
     toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
@@ -542,6 +552,7 @@ async function handleCancelTrial() {
 }
 
 async function runRemoteDeviceCommand(d: Device, operation: "activate" | "deactivate"): Promise<boolean> {
+  if (!canControlDevice(d)) return false;
   if (!Number.isSafeInteger(d.rowVersion) || Number(d.rowVersion) < 0) {
     toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
     return false;

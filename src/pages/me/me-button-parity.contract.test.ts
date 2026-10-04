@@ -4,15 +4,18 @@ import { existsSync, readFileSync } from "node:fs";
 // @ts-expect-error This contract runs in Node.
 import { env } from "node:process";
 // @ts-expect-error This contract runs in Node.
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { resolvePrototypeVisualReference } from "./prototype-visual-reference";
 
 const formalRoot = new URL("../../", import.meta.url);
-const prototypeRoot = env.NEXGRID_PROTOTYPE_ROOT
-  ? pathToFileURL(`${env.NEXGRID_PROTOTYPE_ROOT}/src/`)
-  : new URL("../../../../NX1.0-Prototype/src/", import.meta.url);
+const prototypeReference = resolvePrototypeVisualReference({
+  repositoryRoot: fileURLToPath(new URL("../../../", import.meta.url)),
+  configuredRoot: env.NEXGRID_PROTOTYPE_ROOT,
+});
+if (!prototypeReference) throw new Error("Me-button parity requires the approved prototype Git checkout; configure NEXGRID_PROTOTYPE_ROOT");
 const formalMe = readFileSync(new URL("pages/me/me.vue", formalRoot), "utf8").replace(/\r\n/g, "\n");
-const prototypeMe = readFileSync(new URL("pages/me/me.vue", prototypeRoot), "utf8").replace(/\r\n/g, "\n");
+const prototypeMe = prototypeReference.read("src/pages/me/me.vue");
 const pages = JSON.parse(readFileSync(new URL("pages.json", formalRoot), "utf8")) as { pages: Array<{ path: string }> };
 
 function quickRoutes(source: string): Array<[string, string]> {
@@ -109,7 +112,7 @@ describe("Me button click-through parity", () => {
       if (page.path === bankRoute || page.path === "pages/me/wallet-withdraw-method") continue;
       const name = `${page.path.slice("pages/me/".length)}.vue`;
       expect(existsSync(new URL(`pages/me/${name}`, formalRoot)), `5173 ${name}`).toBe(true);
-      expect(existsSync(new URL(`pages/me/${name}`, prototypeRoot)), `5174 ${name}`).toBe(true);
+      expect(prototypeReference.files("src/pages/me").includes(`src/pages/me/${name}`), `5174 ${name}`).toBe(true);
     }
   });
 });

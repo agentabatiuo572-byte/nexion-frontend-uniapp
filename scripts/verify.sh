@@ -2491,7 +2491,7 @@ no_oldbrand_check() {
   #    于是「一行里既有合法的后端仓路径、又有真的品牌泄漏」会被整行放走 ——
   #    例:const heroTitle = "Nexion";  // 契约来源:nexion-backend/...  ← 旧判据放行。
   #    改法:先把白名单形态从行里**删掉**,再看这一行还剩不剩旧词;剩了才算命中。
-  hits=$("$NODE_BIN" -e '
+  if ! hits=$("$NODE_BIN" -e '
 const fs=require("fs"),path=require("path");
 const tok=process.argv[1];
 // 🔴 线上契约标识符不算品牌残留(2026-08-13):`NEXION_USDT_WALLET` 是服务端下发的
@@ -2503,6 +2503,28 @@ const tok=process.argv[1];
 // Keep this exact (whole product name) rather than allowing the bare Nexion token;
 // a normal brand string must still fail the rebrand gate.
 const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-(?:edge-country|refresh-mode)|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID|${tok}_ADMIN_MFA_ENCRYPTION_KEY|${tok}_admin_token|${tok}-LEGAL-TERMS-CMS-v1|${tok}-local-dev|process\\.env\\.NX_(?:FULL|MARKET)_DATABASE\\s*\\|\\|\\s*"${tok}"`,"gi");
+// Exact repository addresses and this discovery call are engineering identity.
+// Strip only the permitted occurrence; display copy on the same line stays red.
+const ENGINEERING_URLS = /https:\/\/github\.com\/agentabatiuo572-byte\/nexion-frontend-(?:uniapp|prototype)\.git(?=["\x27\x60\s]|$)/gi;
+const ENGINEERING_DISCOVERY = /\bdiscover\(root,\s*"Nexion-H5"\)/g;
+const residual = (line) => line.replace(ENGINEERING_URLS, "").replace(ENGINEERING_DISCOVERY, "").replace(WHITELIST, "");
+const hasOldBrand = (line) => new RegExp(tok,"i").test(residual(line));
+const engineering = [
+  "https://github.com/agentabatiuo572-byte/nexion-frontend-uniapp.git",
+  "https://github.com/agentabatiuo572-byte/nexion-frontend-prototype.git",
+  "discover(root, \"Nexion-H5\")",
+];
+for (const identity of engineering) {
+  if (hasOldBrand(identity)) throw new Error(`brand selftest rejected engineering identity: ${identity}`);
+  if (!hasOldBrand(`${identity}; const label = "${tok}";`)) throw new Error("brand selftest accepted same-line display copy");
+}
+for (const display of [
+  `const label = "${tok}";`, "const label = \"Nexion-H5\";",
+  "discover(otherRoot, \"Nexion-H5\")",
+  "https://github.com/wrong-owner/nexion-frontend-uniapp.git",
+  "https://github.com/agentabatiuo572-byte/nexion-frontend-other.git",
+  "https://github.com/agentabatiuo572-byte/nexion-frontend-uniapp.git-extra",
+]) if (!hasOldBrand(display)) throw new Error(`brand selftest accepted a non-identity token: ${display}`);
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
@@ -2510,14 +2532,15 @@ const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch
     else if(/\.(vue|ts|js|mjs|json|html|css|md)$/.test(e.name)){
       let txt=""; try{txt=fs.readFileSync(p,"utf8")}catch{continue}
       txt.split(/\r?\n/).forEach((ln,i)=>{
-        const residual=ln.replace(WHITELIST,"");
-        if(new RegExp(tok,"i").test(residual)) hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim().slice(0,120));
+        if(hasOldBrand(ln)) hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim().slice(0,120));
       });
     }}};
 ["src","scripts"].forEach(walk);
-try{ const h=fs.readFileSync("index.html","utf8"); h.split(/\r?\n/).forEach((ln,i)=>{ const r=ln.replace(WHITELIST,""); if(new RegExp(tok,"i").test(r)) hits.push("index.html:"+(i+1)+":"+ln.trim().slice(0,120)); }); }catch{}
+try{ const h=fs.readFileSync("index.html","utf8"); h.split(/\r?\n/).forEach((ln,i)=>{ if(hasOldBrand(ln)) hits.push("index.html:"+(i+1)+":"+ln.trim().slice(0,120)); }); }catch{}
 console.log(hits.slice(0,8).join("\n"));
-' "$tok" 2>/dev/null)
+' "$tok" 2>&1); then
+    bad "brand matcher selftest failed"; echo "$hits" | sed 's/^/        /'; return 1
+  fi
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }
