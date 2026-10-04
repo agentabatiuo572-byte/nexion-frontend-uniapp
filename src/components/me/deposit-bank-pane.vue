@@ -79,7 +79,7 @@
     <!-- ── 付款单(awaiting_payment)── -->
     <template v-else-if="paneView === 'order' && intent">
       <view class="nx-step-in" style="margin-top: 14px">
-        <view><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
+        <view v-if="!hostedRejected"><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
         <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
         <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
 
@@ -88,10 +88,13 @@
             <view class="grid place-items-center" :style="hostedIconStyle">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" /><path d="M3 10h18" /><path d="M7 15h.01" /></svg>
             </view>
-            <text class="block text-center" style="margin-top: 10px; font-size: 13px; color: var(--v5-ink-2); line-height: 1.55">{{ hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
+            <text class="block text-center" style="margin-top: 10px; font-size: 13px; color: var(--v5-ink-2); line-height: 1.55">{{ hostedRejected ? t.bankPane.hostedRejectedNote : hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
           </view>
           <view v-if="hostedCanOpen" class="nx-bank-hosted-continue-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="openHostedOrder(intent)">
             <text>{{ t.bankPane.hostedContinueCta }}</text>
+          </view>
+          <view v-if="hostedRejected" class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
+            <text :style="ghostTextStyle">{{ t.help.contactSupport }}</text>
           </view>
         </template>
 
@@ -456,6 +459,9 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     } catch (cause) {
+      if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
+        approvedBusinessFailureCopy = t.value.bankPane.hostedRejectedNote;
+      }
       // Another payment can consume the last daily capacity after our preflight.
       // The server remains the final authority; translate this settled 422 into
       // the same explicit today-limit guidance instead of a generic retry error.
@@ -532,6 +538,8 @@ const countdownText = computed(() => {
   const left = Math.max(0, Math.floor((it.expireAt - nowTick.value) / 1000));
   return `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
 });
+const hostedRejected = computed(() => intent.value?.paymentMode === "hosted"
+  && intent.value.providerStatus === "rejected");
 const hostedCanOpen = computed(() => intent.value?.paymentMode === "hosted"
   && intent.value.providerStatus === "created"
   && Boolean(intent.value.paymentUrl));

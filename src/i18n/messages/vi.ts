@@ -6393,6 +6393,7 @@ openSeaErrorPool: {
     railPaused: "Kênh ngân hàng đang tạm bảo trì. Vui lòng thử lại sau.",
     hostedSecureNote: "Thông tin tài khoản ngân hàng và mã QR do nhà cung cấp thanh toán hiển thị trên trang thanh toán bảo mật. Hãy kiểm tra số tiền trước khi thanh toán.",
     hostedPendingNote: "Nhà cung cấp thanh toán đang xác nhận đơn này. Đơn đã được lưu; hãy làm mới sau hoặc liên hệ hỗ trợ nếu vẫn chưa thể thanh toán.",
+    hostedRejectedNote: "Chưa tạo được lệnh thanh toán ngân hàng nên hiện chưa thể thanh toán. Đơn đã được lưu; hãy liên hệ hỗ trợ để kiểm tra.",
     hostedContinueCta: "Đến trang thanh toán ngân hàng",
     hostedOpenFailed: "Không thể mở trang thanh toán ngân hàng. Đơn hàng đã được lưu; hãy nhấn tiếp tục thanh toán để thử lại.",
   },

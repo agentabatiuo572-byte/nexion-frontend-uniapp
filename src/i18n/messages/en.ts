@@ -6547,6 +6547,7 @@ openSeaErrorPool: {
     railPaused: "The bank channel is temporarily under maintenance. Please try again later.",
     hostedSecureNote: "Bank details and the QR code are provided on the payment provider's secure page. Check the amount there before paying.",
     hostedPendingNote: "The payment provider is confirming this order. Your order is saved; refresh later or contact support if it remains unavailable.",
+    hostedRejectedNote: "The bank payment order could not be created, so payment is currently unavailable. Your order is saved; contact support to check it.",
     hostedContinueCta: "Go to bank payment page",
     hostedOpenFailed: "The bank payment page could not be opened. Your order is saved; tap continue payment to try again.",
   },

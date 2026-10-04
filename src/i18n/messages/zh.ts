@@ -6386,6 +6386,7 @@ openSeaErrorPool: {
     railPaused: "银行通道暂时维护中，请稍后再试。",
     hostedSecureNote: "银行账户与二维码由支付服务商在安全付款页提供。请在付款页核对金额后完成转账。",
     hostedPendingNote: "支付服务商正在确认该订单。订单已保留，请稍后刷新；若长时间不可用，请联系客服。",
+    hostedRejectedNote: "银行付款单创建未成功，当前无法付款。该订单已保留，请联系客服处理。",
     hostedContinueCta: "前往银行付款页",
     hostedOpenFailed: "暂时无法打开银行付款页。订单已保留，请稍后点击继续付款。",
   },
