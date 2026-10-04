@@ -9,13 +9,13 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FxRateLine />
-    <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
-      <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError }}</text>
+    <FxRateLine v-if="paymentSessionReady" :key="app.accountBindingEpoch" />
+    <view v-if="createError || readError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
+      <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError || readError }}</text>
     </view>
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
-    <template v-if="paneView === 'form'">
+    <template v-if="paneView === 'form' && paymentSessionReady">
       <!-- 收款账户池无可用账户 → 通道维护空状态([FEAT-PAY02] ⑤;segment 侧同步置灰) -->
       <view v-if="!bankRailAvailable" class="flex flex-col items-center" style="padding: 36px 0 28px">
         <view class="grid place-items-center" :style="pausedIconStyle">
@@ -268,11 +268,13 @@ import { toast, confirm } from "@/store/ui";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
@@ -282,6 +284,17 @@ const t = useT();
 const fx = useFx();
 const dep = useDeposits();
 const app = useApp();
+const auth = useAuth();
+const paymentSessionReady = computed(() => {
+  void app.accountBindingEpoch;
+  return accountSessionReady({
+    remote: remoteApiEnabled,
+    authenticated: auth.isAuthenticated,
+    accountId: auth.accountId,
+    appAccountKey: app.accountKey,
+    sessionUserId: sessionVault.read()?.user.userId ?? null,
+  });
+});
 
 // ── 视图派生(单选真源 = store intents;本地只记「正在看哪张单」+ UI 等待旗)──
 const viewIntentId = ref<string | null>(null);
@@ -289,6 +302,7 @@ const paidPressed = ref(false);
 const autoResumePending = ref(true);
 const openingHosted = ref(false);
 const pageActive = ref(false);
+const readError = ref("");
 
 const intent = computed<DepositIntent | null>(
   () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
@@ -307,20 +321,42 @@ const paneView = computed<PaneView>(() => {
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
   pageActive.value = true;
-  if (remoteApiEnabled) {
+});
+watch(
+  () => [pageActive.value, paymentSessionReady.value, app.accountBindingEpoch] as const,
+  ([active, ready]) => {
+    if (!remoteApiEnabled) return;
+    if (!active || !ready) {
+      readError.value = "";
+      dep.stopRemoteVietQrPolling();
+      return;
+    }
+    const accountKey = app.accountKey;
+    const bindingEpoch = app.accountBindingEpoch;
+    readError.value = "";
     // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
     //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
     //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
     //   充值页的报错横幅会**静默变哑** —— 改缝必须连消费方一起改,这就是那一半。
     void dep.refreshRemoteVietQrDeposits().then(() => {
+      if (!pageActive.value || !paymentSessionReady.value
+          || app.accountKey !== accountKey || app.accountBindingEpoch !== bindingEpoch) return;
       if (dep.serverStatus === "error" && dep.serverError) {
         console.warn("[deposit] refresh failed:", dep.serverError);
-        createError.value = t.value.topupChrome.depositOpFailedNote;
+        readError.value = t.value.topupChrome.depositOpFailedNote;
       }
     });
     dep.startRemoteVietQrPolling();
-  }
-});
+  },
+  { immediate: true, flush: "post" },
+);
+watch(
+  () => dep.serverStatus,
+  (status) => {
+    if (pageActive.value && paymentSessionReady.value && status === "ready") readError.value = "";
+  },
+  { flush: "post" },
+);
 watch(
   () => dep.intents.map((item) => `${item.intentId}:${item.status}`).join("|"),
   () => {
@@ -357,7 +393,7 @@ const maxDeposit = computed(() => remoteApiEnabled ? fx.maxDepositUsdt : BANK_MA
 const dailyCapacityKnown = computed(() => !remoteApiEnabled || fx.dailyCapacityKnown);
 const todayRemainingDeposit = computed(() => remoteApiEnabled ? fx.todayRemainingDepositUsdt : BANK_MAX_DEPOSIT_USDT);
 const bankRailAvailable = computed(() => remoteApiEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
-const fxUsable = computed(() => fx.fxAvailable && fx.configReady && bankRailAvailable.value);
+const fxUsable = computed(() => paymentSessionReady.value && fx.fxAvailable && fx.configReady && bankRailAvailable.value);
 const dailyCapacityExhausted = computed(() =>
   fxUsable.value && dailyCapacityKnown.value && todayRemainingDeposit.value < minDeposit.value,
 );

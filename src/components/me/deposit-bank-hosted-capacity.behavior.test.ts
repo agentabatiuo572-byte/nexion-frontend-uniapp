@@ -13,9 +13,13 @@ import { computeQuoteRate, fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { en } from "@/i18n/messages/en";
 import { fmt } from "@/i18n/format";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
+import { createSessionVault } from "@/api/session-vault";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 const runtime = vi.hoisted(() => ({ config: vi.fn(), fxQuote: vi.fn() }));
-vi.mock("@/api/runtime", () => ({ remoteApiEnabled: true, paymentApi: runtime }));
+const sessionVault = createSessionVault();
+vi.mock("@/api/runtime", () => ({ remoteApiEnabled: true, paymentApi: runtime,
+  sessionVault: { read: () => sessionVault.read() } }));
 const quoteRate = computeQuoteRate(26000, 1.5);
 
 function config(known: boolean | undefined = false, remaining = 0) {
@@ -48,7 +52,7 @@ function pane(fx: ReturnType<typeof useFx>) {
   `, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const dep = { currentAccountKey: () => "user:7", createRemoteBankIntent: vi.fn(async () => ({ intentId: "owned-intent" })) };
   const toast = { error: vi.fn() };
-  const args = { ref: Vue.ref, computed: Vue.computed, fx, remoteApiEnabled: true, MIN_DEPOSIT_USDT: 10,
+  const args = { ref: Vue.ref, computed: Vue.computed, fx, paymentSessionReady: Vue.ref(true), remoteApiEnabled: true, MIN_DEPOSIT_USDT: 10,
     BANK_MAX_DEPOSIT_USDT: 5000, dep, toast, t: Vue.ref(en), fmt, fmtVnd, vndForUsdt,
     runRecoverableFundsOperation, ApiError, autoResumePending: Vue.ref(false), viewIntentId: Vue.ref(null),
     paidPressed: Vue.ref(false), pageActive: Vue.ref(false), openHostedOrder: vi.fn() };
@@ -62,7 +66,7 @@ const render = new Function("Vue", compile(template, { mode: "function", prefixI
 async function show(view: ReturnType<typeof pane>, fx: ReturnType<typeof useFx>) {
   const styles = Object.fromEntries([...source.matchAll(/\b(?:const|function)\s+(\w+Style)\b/g)].map((match) => [match[1], {}]));
   const app = Vue.createSSRApp({ render, setup: () => ({ ...styles, ...view.bindings, fx,
-    paneView: "form", intent: null, t: en, fmt }) });
+    paneView: "form", intent: null, readError: "", paymentSessionReady: true, app: { accountBindingEpoch: 1 }, t: en, fmt }) });
   app.component("FxRateLine", { render: () => Vue.h("aside") });
   return renderToString(app);
 }
@@ -70,6 +74,9 @@ async function show(view: ReturnType<typeof pane>, fx: ReturnType<typeof useFx>)
 beforeEach(() => {
   setActivePinia(createPinia()); vi.useFakeTimers();
   runtime.config.mockReset(); runtime.fxQuote.mockReset();
+  sessionVault.save({ accessToken: "test-access", refreshToken: "test-refresh", tokenType: "Bearer",
+    user: { userId: 7, countryCode: "+86", phone: "13800000007", nickname: "Test", onboardingComplete: true } });
+  remoteAccountScope.bind("user:7");
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
