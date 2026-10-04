@@ -93,6 +93,19 @@
           <view v-if="hostedCanOpen" class="nx-bank-hosted-continue-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="openHostedOrder(intent)">
             <text>{{ t.bankPane.hostedContinueCta }}</text>
           </view>
+          <view
+            v-if="hostedRejected"
+            :class="['nx-bank-regen-cta w-full grid place-items-center', creating || !fxUsable ? '' : 'active:opacity-90']"
+            :style="paidBtnStyle"
+            role="button" tabindex="0"
+            :aria-disabled="creating || !fxUsable"
+            @click="regen"
+          >
+            <view class="inline-flex items-center" style="gap: 8px">
+              <view v-if="creating" :style="miniSpinnerStyle" />
+              <text>{{ creating ? t.bankPane.creating : t.bankPane.regenCta }}</text>
+            </view>
+          </view>
           <view v-if="hostedRejected" class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
             <text :style="ghostTextStyle">{{ t.help.contactSupport }}</text>
           </view>
@@ -457,10 +470,18 @@ function createOrder(presetUsdt?: number) {
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
 async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
+  const expectedAppAccountKey = app.accountKey;
+  const expectedBindingEpoch = app.accountBindingEpoch;
+  const stillCurrent = () => pageActive.value && app.accountKey === expectedAppAccountKey
+    && app.accountBindingEpoch === expectedBindingEpoch && dep.currentAccountKey() === expectedAccountKey;
   if (remoteApiEnabled) {
     // 收款账户的日额度会在另一笔入账后变化；提交前必须重读服务端快照，
     // 不能拿进入页面时缓存的 5000 上限继续创建一张服务端必拒绝的付款单。
     await fx.load();
+    if (!stillCurrent()) {
+      creating.value = false;
+      return;
+    }
     if (!fx.fxAvailable || !fx.configReady) {
       createError.value = t.value.topupChrome.depositOpFailedNote;
       toast.error(createError.value);
@@ -485,6 +506,10 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       creating.value = false;
       return;
     }
+  }
+  if (!stillCurrent()) {
+    creating.value = false;
+    return;
   }
   let approvedBusinessFailureCopy = "";
   await runRecoverableFundsOperation(async () => {
@@ -514,12 +539,14 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     }
     }, {
       success: (it) => {
+        if (!stillCurrent()) return;
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
         if (pageActive.value && it.paymentMode === "hosted") openHostedOrder(it);
       },
       failure: (reason) => {
+        if (!stillCurrent()) return;
         const userFacingReason = approvedBusinessFailureCopy || reason;
         createError.value = userFacingReason;
         toast.error(userFacingReason);
@@ -529,7 +556,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
     }, t.value.topupChrome.depositOpFailedNote);
 }
-/** 过期态「重新生成」= 新单新锁价(沿用原单金额,当前牌价重新锁定)。 */
+/** 拒绝/过期态显式重试保留原金额；命令键与最终结果仍由 store 决定。 */
 function regen() {
   const it = intent.value;
   if (!it) return;
