@@ -43,7 +43,7 @@ function install(response = config()) {
 
 function pane(fx: ReturnType<typeof useFx>) {
   const start = source.indexOf('const amount = ref("25")');
-  const end = source.indexOf('/** 过期态', start);
+  const end = source.indexOf('function regen()', start);
   expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
   const code = ts.transpileModule(source.slice(start, end) + `
     return { amount, minLabel, maxLabel, limitLine, dailyCapacityKnown, todayRemainingLabel, todayRemainingLine, feeNote, amountError,
@@ -55,7 +55,8 @@ function pane(fx: ReturnType<typeof useFx>) {
   const args = { ref: Vue.ref, computed: Vue.computed, fx, paymentSessionReady: Vue.ref(true), remoteApiEnabled: true, MIN_DEPOSIT_USDT: 10,
     BANK_MAX_DEPOSIT_USDT: 5000, dep, toast, t: Vue.ref(en), fmt, fmtVnd, vndForUsdt,
     runRecoverableFundsOperation, ApiError, autoResumePending: Vue.ref(false), viewIntentId: Vue.ref(null),
-    paidPressed: Vue.ref(false), pageActive: Vue.ref(false), openHostedOrder: vi.fn() };
+    paidPressed: Vue.ref(false), pageActive: Vue.ref(true), openHostedOrder: vi.fn(),
+    app: Vue.reactive({ accountKey: "user:7", accountBindingEpoch: 1 }) };
   const bindings = new Function(...Object.keys(args), code)(...Object.values(args));
   return { bindings, dep, toast };
 }
