@@ -465,7 +465,7 @@ function createOrder(presetUsdt?: number) {
   if (creating.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
-  createError.value = "";
+  if (presetUsdt === undefined) createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
@@ -540,6 +540,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     }, {
       success: (it) => {
         if (!stillCurrent()) return;
+        createError.value = "";
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;

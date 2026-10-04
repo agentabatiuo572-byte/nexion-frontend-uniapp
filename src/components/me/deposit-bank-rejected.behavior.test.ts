@@ -67,6 +67,10 @@ function action(target: HostNode, name: string): HostNode | undefined {
   return String(target.props.class ?? "").split(/\s+/).includes(name)
     ? target : target.children.map(child => action(child, name)).find(Boolean);
 }
+function errorBanner(target: HostNode): HostNode | undefined {
+  return (target.props.style as { background?: unknown } | undefined)?.background === "var(--v5-danger-soft)"
+    ? target : target.children.map(errorBanner).find(Boolean);
+}
 const click = (target: HostNode) => (target.props.onClick as () => void)();
 
 // Execute the unchanged production store methods with its real request/parser,
@@ -255,6 +259,125 @@ test("the rejected-order template retries its original amount and blocks duplica
   expect(view.open).toHaveBeenCalledExactlyOnceWith("https://api.hdpayadmin.com/pay?id=new");
 });
 
+test.each([zh, en, vietnamese])("a rejected CREATE banner and both CTAs stay in place throughout an explicit retry", async (messages) => {
+  const view = pane("rejected", messages), mounted = view.mount(), storage = memoryStorage();
+  const rejected = creationFlow(view.dep, [422], storage);
+  view.dep.createRemoteBankIntent.mockImplementation(rejected.create);
+  click(mounted.retry()!);
+  await vi.advanceTimersByTimeAsync(600);
+  await Vue.nextTick();
+  expect(rejected.requests).toHaveBeenCalledOnce();
+  expect(view.state.createError.value).toBe(messages.bankPane.hostedRejectedNote);
+  const banner = errorBanner(mounted.root)!, retry = mounted.retry()!;
+  const support = action(mounted.root, "nx-bank-support-link")!;
+  expect(banner).toBeDefined();
+  const anchors = [banner, retry, support].map(target => ({
+    target, parent: target.parent, index: target.parent!.children.indexOf(target),
+    style: { ...(target.props.style as Record<string, unknown>) },
+  }));
+  const expectStable = () => {
+    expect(errorBanner(mounted.root)).toBe(banner);
+    expect(mounted.retry()).toBe(retry);
+    expect(action(mounted.root, "nx-bank-support-link")).toBe(support);
+    for (const anchor of anchors) {
+      expect(anchor.target.parent).toBe(anchor.parent);
+      expect(anchor.parent!.children.indexOf(anchor.target)).toBe(anchor.index);
+      expect(anchor.target.props.style).toEqual(anchor.style);
+    }
+    expect(view.state.createError.value).toBe(messages.bankPane.hostedRejectedNote);
+    expect(retry.props["aria-disabled"]).toBe(true);
+    expect(view.state.creating.value).toBe(true);
+    expect(view.state.intent.value?.intentId).toBe("VQR-existing");
+    expect(view.navTo).not.toHaveBeenCalled();
+  };
+  let resolve!: () => void;
+  const response = new Promise<void>(done => { resolve = done; });
+  const pending = creationFlow(view.dep, [200], storage, "user:7", response);
+  view.dep.createRemoteBankIntent.mockImplementation(pending.create);
+  click(retry);
+  await Vue.nextTick();
+  expectStable();
+  click(mounted.retry()!);
+  await vi.advanceTimersByTimeAsync(600);
+  await Vue.nextTick();
+  expectStable();
+  expect(pending.requests).toHaveBeenCalledOnce();
+  expect(pending.requests.mock.calls[0][0].body).toEqual({ usdtAmount: 5000 });
+  click(mounted.retry()!);
+  await vi.advanceTimersByTimeAsync(1200);
+  await Vue.nextTick();
+  expectStable();
+  expect(pending.requests).toHaveBeenCalledOnce();
+  resolve();
+  await vi.advanceTimersByTimeAsync(0);
+  await Vue.nextTick();
+  expect(view.state.createError.value).toBe("");
+  expect(errorBanner(mounted.root)).toBeUndefined();
+  expect(view.state.creating.value).toBe(false);
+  expect(view.state.intent.value?.intentId).toBe("VQR-new");
+  expect(view.dep.intents.find(item => item.intentId === "VQR-existing")).toMatchObject({ usdtAmount: 5000, providerStatus: "rejected" });
+  expect(view.open).toHaveBeenCalledExactlyOnceWith("https://api.hdpayadmin.com/pay?id=new");
+  expect(view.navTo).not.toHaveBeenCalled();
+});
+
+test.each([422, 503])("a settled HTTP %s retry updates the retained banner with current human guidance", async (status) => {
+  const view = pane(), mounted = view.mount();
+  view.state.createError.value = zh.bankPane.hostedOpenFailed;
+  await Vue.nextTick();
+  const flow = creationFlow(view.dep, [status]);
+  view.dep.createRemoteBankIntent.mockImplementation(flow.create);
+  click(mounted.retry()!);
+  expect(view.state.createError.value).toBe(zh.bankPane.hostedOpenFailed);
+  await vi.advanceTimersByTimeAsync(600);
+  await Vue.nextTick();
+  const expected = status === 422 ? zh.bankPane.hostedRejectedNote : zh.topupChrome.depositOpFailedNote;
+  expect(view.state.createError.value).toBe(expected);
+  expect(errorBanner(mounted.root)).toBeDefined();
+  expect(view.toast.error).toHaveBeenCalledExactlyOnceWith(expected);
+  expect(view.state.creating.value).toBe(false);
+  expect(mounted.retry()?.props["aria-disabled"]).toBe(false);
+  expect(view.state.intent.value?.intentId).toBe("VQR-existing");
+  expect(flow.requests).toHaveBeenCalledOnce();
+  expect(view.open).not.toHaveBeenCalled();
+  expect(view.navTo).not.toHaveBeenCalled();
+});
+
+test.each(["cancelled", "return_pending"] as const)("a real %s form submits without a preset and immediately clears its previous CREATE banner", async (status) => {
+  const view = pane(), mounted = view.mount();
+  const flow = creationFlow(view.dep, [422, 503]);
+  view.dep.createRemoteBankIntent.mockImplementation(flow.create);
+  click(mounted.retry()!);
+  await vi.advanceTimersByTimeAsync(600);
+  await Vue.nextTick();
+  expect(view.state.createError.value).toBe(zh.bankPane.hostedRejectedNote);
+  expect(flow.requests).toHaveBeenCalledOnce();
+  expect(flow.requests.mock.calls[0][0].body).toEqual({ usdtAmount: 5000 });
+  view.dep.intents[0].status = status;
+  await Vue.nextTick();
+  expect(view.state.intent.value).toMatchObject({ intentId: "VQR-existing", status });
+  expect(view.state.paneView.value).toBe("form");
+  expect(mounted.retry()).toBeUndefined();
+  expect(errorBanner(mounted.root)).toBeDefined();
+  const submit = action(mounted.root, "nx-bank-create-cta")!;
+  expect(submit.props["aria-disabled"]).toBe(false);
+  click(submit);
+  expect(view.state.createError.value).toBe("");
+  expect(view.state.creating.value).toBe(true);
+  await Vue.nextTick();
+  expect(errorBanner(mounted.root)).toBeUndefined();
+  expect(submit.props["aria-disabled"]).toBe(true);
+  click(submit);
+  await vi.advanceTimersByTimeAsync(600);
+  await Vue.nextTick();
+  expect(flow.requests).toHaveBeenCalledTimes(2);
+  expect(flow.requests.mock.calls[1][0].body).toEqual({ usdtAmount: 25 });
+  expect(view.state.intent.value).toMatchObject({ intentId: "VQR-existing", status });
+  expect(view.state.createError.value).toBe(zh.topupChrome.depositOpFailedNote);
+  expect(view.state.creating.value).toBe(false);
+  expect(view.open).not.toHaveBeenCalled();
+  expect(view.navTo).not.toHaveBeenCalled();
+});
+
 test("an unavailable quote disables the rejected-order retry without a POST", async () => {
   const view = pane(), mounted = view.mount();
   view.fx.fxAvailable = false;
@@ -267,8 +390,12 @@ test("an unavailable quote disables the rejected-order retry without a POST", as
   expect(view.state.intent.value?.intentId).toBe("VQR-existing");
 });
 
-test.each(["leave", "account", "epoch"] as const)("a retry awaiting FX stops silently after %s changes", async (change) => {
+const fxChanges = (["leave", "account", "epoch"] as const).flatMap(change =>
+  [false, true].map(hasPreviousError => [change, hasPreviousError] as const));
+test.each(fxChanges)("a retry awaiting FX stops silently after %s changes (previous error: %s)", async (change, hasPreviousError) => {
   const view = pane(), mounted = view.mount();
+  const previousError = hasPreviousError ? zh.bankPane.hostedRejectedNote : "";
+  view.state.createError.value = previousError;
   let resolve!: () => void;
   const quote = new Promise<void>(done => { resolve = done; });
   view.fx.load.mockImplementation(() => quote);
@@ -284,15 +411,19 @@ test.each(["leave", "account", "epoch"] as const)("a retry awaiting FX stops sil
   await vi.advanceTimersByTimeAsync(0);
   expect(view.state.creating.value).toBe(false);
   expect(view.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+  expect(view.state.createError.value).toBe(previousError);
   expect(view.toast.error).not.toHaveBeenCalled();
   expect(view.open).not.toHaveBeenCalled();
   expect(view.state.intent.value?.intentId).toBe("VQR-existing");
 });
 
 const lateOutcomes = (["leave", "account", "epoch"] as const).flatMap(change =>
-  ([200, 422, 503] as const).map(status => [change, status] as const));
-test.each(lateOutcomes)("a late POST result after %s stays silent for HTTP %s while the store settles its key", async (change, status) => {
+  ([200, 422, 503] as const).flatMap(status =>
+    [false, true].map(hasPreviousError => [change, status, hasPreviousError] as const)));
+test.each(lateOutcomes)("a late POST result after %s stays silent for HTTP %s while the store settles its key (previous error: %s)", async (change, status, hasPreviousError) => {
   const view = pane(), mounted = view.mount(), storage = memoryStorage();
+  const previousError = hasPreviousError ? zh.bankPane.hostedRejectedNote : "";
+  view.state.createError.value = previousError;
   let resolve!: () => void;
   const response = new Promise<void>(done => { resolve = done; });
   const flow = creationFlow(view.dep, [status], storage, "user:7", response);
@@ -310,7 +441,7 @@ test.each(lateOutcomes)("a late POST result after %s stays silent for HTTP %s wh
   await vi.advanceTimersByTimeAsync(0);
   await Vue.nextTick();
   expect(view.state.creating.value).toBe(false);
-  expect(view.state.createError.value).toBe("");
+  expect(view.state.createError.value).toBe(previousError);
   expect(view.toast.error).not.toHaveBeenCalled();
   expect(view.open).not.toHaveBeenCalled();
   expect(view.navTo).not.toHaveBeenCalled();
@@ -358,6 +489,7 @@ test("a persisted legacy 502 key retires on trusted 422 and only the next explic
   expect(persisted.getOrCreate({ accountKey: "user:7", action: "CREATE", fingerprint: "5000.000000" })).toBe(nextKey);
   expect(flow.requests.mock.calls[1][0].body).toEqual({ usdtAmount: 5000 });
   expect(restored.state.intent.value?.intentId).toBe("VQR-new");
+  expect(restored.state.createError.value).toBe("");
   expect(restored.dep.intents.find(item => item.intentId === "VQR-existing")).toMatchObject({ providerStatus: "rejected" });
   expect(restored.open).toHaveBeenCalledExactlyOnceWith("https://api.hdpayadmin.com/pay?id=new");
 });

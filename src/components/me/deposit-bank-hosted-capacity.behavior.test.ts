@@ -96,6 +96,25 @@ test("unknown capacity survives real API and FX store, renders no fake limit, an
   expect(view.bindings.creating.value).toBe(false);
 });
 
+test("a form retry still clears its previous CREATE error immediately and settles with its entered amount", async () => {
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  install(); const fx = useFx(); await fx.load(); const view = pane(fx);
+  view.dep.createRemoteBankIntent.mockRejectedValueOnce(new ApiError({ kind: "http", status: 422, message: "HDPAY_ORDER_CREATE_REJECTED" }));
+  view.bindings.createOrder();
+  await vi.advanceTimersByTimeAsync(600);
+  expect(view.bindings.createError.value).toBe(en.bankPane.hostedRejectedNote);
+  expect(view.bindings.creating.value).toBe(false);
+  view.bindings.createOrder();
+  expect(view.bindings.createError.value).toBe("");
+  expect(view.bindings.creating.value).toBe(true);
+  expect(await show(view, fx)).not.toContain(en.bankPane.hostedRejectedNote);
+  await vi.advanceTimersByTimeAsync(600);
+  expect(view.dep.createRemoteBankIntent).toHaveBeenCalledTimes(2);
+  expect(view.dep.createRemoteBankIntent).toHaveBeenLastCalledWith(25, "user:7");
+  expect(view.bindings.createError.value).toBe("");
+  expect(view.bindings.creating.value).toBe(false);
+});
+
 test.each([true, undefined])("known or legacy zero capacity remains exhausted: %s", async (known) => {
   const response = config(true); if (known === undefined) delete (response.vietQr as { dailyCapacityKnown?: boolean }).dailyCapacityKnown;
   install(response); const fx = useFx(); await fx.load(); const view = pane(fx);
