@@ -96,7 +96,8 @@ import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo } from "@/lib/route";
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { dateLocale, fmt } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
+import { formatTrialDate } from "@/lib/trial-date";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -167,7 +168,7 @@ const interestText = computed(() =>
   props.term !== null ? (amount.value * apyRate.value * (props.term / 365)).toFixed(2) : "0.00",
 );
 const unlockDateText = computed(() =>
-  props.term !== null ? new Date(Date.now() + props.term * ONE_DAY_MS).toLocaleDateString(dateLocale()) : "",
+  props.term !== null ? formatTrialDate(Date.now() + props.term * ONE_DAY_MS) : "",
 );
 const totalText = computed(() =>
   props.term !== null ? (amount.value * (1 + apyRate.value * (props.term / 365))).toFixed(2) : "0.00",
