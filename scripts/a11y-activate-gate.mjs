@@ -19,6 +19,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
+import { projectGlassSegmentsIds } from "./lib/glass-segments-id-projection.mjs";
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
@@ -26,6 +27,8 @@ const LIB = join(SRC, "lib", "a11y-activate.ts");
 const APP = join(SRC, "App.vue");
 const BEHAVIOR = join(ROOT, "scripts", "a11y-activate-behavior.test.mjs");
 const REDTEST = join(ROOT, "scripts", "a11y-activate-gate.redtest.mjs");
+const SEGMENTS = join(SRC, "components", "glass-segments.vue");
+const segmentsSource = existsSync(SEGMENTS) ? readFileSync(SEGMENTS, "utf8") : "";
 
 /**
  * 真·原生自带键盘行为的标签(浏览器直接给,不需要 role/tabindex)。
@@ -296,7 +299,10 @@ for (const file of files) {
   }
 
   // E:悬空 + 重复。重复 id 让 describedby 指向哪一个成了运气,注释里的"两分支互斥"不是机器判据。
+  // Shared controls generate IDs from caller options. Only project proven imported,
+  // bound literals and the actual shared render contract; unknowns leave E red.
   const ids = [...tpl.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  ids.push(...projectGlassSegmentsIds(src, segmentsSource).ids);
   for (const dup of [...new Set(ids.filter((x, i) => ids.indexOf(x) !== i))]) {
     findings.E.push(`${rel} id="${dup}" 在同一文件出现 ${ids.filter((x) => x === dup).length} 次 —— 指向哪个由渲染顺序决定`);
   }
@@ -304,7 +310,7 @@ for (const file of files) {
     const refs = m[2].includes("'") ? [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]) : m[2].trim().split(/\s+/);
     for (const id of refs.filter((v) => v && v !== "undefined" && v !== "null")) {
       described++;
-      if (!new RegExp(`\\sid="${esc(id)}"`).test(tpl)) findings.E.push(`${rel} aria-${m[1]} 指向的 id="${id}" 在本文件不存在`);
+      if (!ids.includes(id)) findings.E.push(`${rel} aria-${m[1]} 指向的 id="${id}" 在本文件不存在`);
     }
   }
 }

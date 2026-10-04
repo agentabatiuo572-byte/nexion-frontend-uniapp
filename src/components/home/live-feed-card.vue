@@ -8,53 +8,14 @@
   <view data-home-section="live-feed" data-feed-mode="CANONICAL">
     <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
-      <!-- 轨道贴页面底:原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1。
-           配套把选中 pill 从「白底+投影」换成 brand-soft 底(见 tabStyle),
-           否则轨道和选中 pill 都是白的,等于修掉隐形又弄丢选中态。 -->
-      <view class="flex gap-0.5" style="padding: 4px; background: var(--v5-surface-2); border-radius: 28px" role="tablist" :aria-label="`${t.home.liveFeedTabActivity} / ${t.home.liveFeedTabEarnings}`">
-        <!-- 《08》§2 反馈恒定:选中态原先是空 class,按下去零反馈。
-             切到自己虽然不改变什么,但用户仍需要「点到了」的确认。 -->
-        <view
-          id="home-live-feed-tab-activity"
-          class="active:opacity-70 transition-opacity"
-          :style="tabStyle('activity')"
-          role="tab"
-          :aria-selected="tab === 'activity'"
-          aria-controls="home-live-feed-panel-activity"
-          :tabindex="tab === 'activity' ? 0 : -1"
-          @click="tab = 'activity'"
-
-
-
-
-
-
-
-          @keydown.enter.stop.prevent="tab = 'activity'" @keydown.space.stop.prevent="tab = 'activity'" @keydown.left.stop.prevent="activateAdjacentTab('activity', -1)" @keydown.up.stop.prevent="activateAdjacentTab('activity', -1)" @keydown.right.stop.prevent="activateAdjacentTab('activity', 1)" @keydown.down.stop.prevent="activateAdjacentTab('activity', 1)" @keydown.home.stop.prevent="activateTabFromKeyboard('activity')" @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
-        >
-          <text :style="{ color: tab === 'activity' ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontWeight: tab === 'activity' ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ t.home.liveFeedTabActivity }}</text>
-        </view>
-        <view
-          id="home-live-feed-tab-earnings"
-          class="active:opacity-70 transition-opacity"
-          :style="tabStyle('earnings')"
-          role="tab"
-          :aria-selected="tab === 'earnings'"
-          aria-controls="home-live-feed-panel-earnings"
-          :tabindex="tab === 'earnings' ? 0 : -1"
-          @click="tab = 'earnings'"
-
-
-
-
-
-
-
-          @keydown.enter.stop.prevent="tab = 'earnings'" @keydown.space.stop.prevent="tab = 'earnings'" @keydown.left.stop.prevent="activateAdjacentTab('earnings', -1)" @keydown.up.stop.prevent="activateAdjacentTab('earnings', -1)" @keydown.right.stop.prevent="activateAdjacentTab('earnings', 1)" @keydown.down.stop.prevent="activateAdjacentTab('earnings', 1)" @keydown.home.stop.prevent="activateTabFromKeyboard('activity')" @keydown.end.stop.prevent="activateTabFromKeyboard('earnings')"
-        >
-          <text :style="{ color: tab === 'earnings' ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontWeight: tab === 'earnings' ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ t.home.liveFeedTabEarnings }}</text>
-        </view>
-      </view>
+      <GlassSegments
+        v-model="tab"
+        class="nx-home-feed-tabs"
+        :options="feedTabOptions"
+        :label="`${t.home.liveFeedTabActivity} / ${t.home.liveFeedTabEarnings}`"
+        @keydown.up.stop.prevent="activateAdjacentTab(tab, -1)"
+        @keydown.down.stop.prevent="activateAdjacentTab(tab, 1)"
+      />
       <view v-if="tab === 'earnings'" class="inline-flex items-center gap-1 font-mono-tabular active:opacity-70 transition-opacity" style="min-height: 44px; font-size: 12px; color: var(--v5-ink-3)" role="link" tabindex="0" @click.stop="goEarnings" @keydown.enter.stop.prevent="goEarnings">
         <text style="color: var(--v5-ink-3)">{{ t.home.liveFeedSeeAll }}</text>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -112,6 +73,7 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, nextTick, ref, type CSSProperties } from "vue";
+import GlassSegments from "@/components/glass-segments.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
@@ -139,6 +101,10 @@ const tab = ref<"activity" | "earnings">("activity");
 const canonicalFeed = computed(() => buildCanonicalHomeFeed(app.homeTruth?.earningsLedger ?? []));
 
 const tabOrder = ["activity", "earnings"] as const;
+const feedTabOptions = computed(() => [
+  { value: "activity", label: t.value.home.liveFeedTabActivity, id: "home-live-feed-tab-activity", ariaControls: "home-live-feed-panel-activity" },
+  { value: "earnings", label: t.value.home.liveFeedTabEarnings, id: "home-live-feed-tab-earnings", ariaControls: "home-live-feed-panel-earnings" },
+]);
 
 const displayActivityRows = computed<FeedRow[]>(() => {
   return canonicalFeed.value.activityRows.map((row) => ({
@@ -164,24 +130,6 @@ const remoteFeedStatusText = computed(() => {
   return tab.value === "activity" ? t.value.home.liveFeedEmpty : t.value.home.ledgerEmpty;
 });
 
-function tabStyle(id: "activity" | "earnings"): CSSProperties {
-  const on = tab.value === id;
-  return {
-    // 《07》tap≥44:原 3px 纵向 padding 实测盒高仅 28px。用 min-height 撑热区,
-    // 视觉高度靠 flex 居中维持紧凑观感(《03》§2 圆角上阶梯 6→12)。
-    minHeight: "44px",
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "0 12px",
-    borderRadius: "12px",
-    // 选中态改用 brand-soft 底 + brand 文字 —— 与本仓库同类分段/排序控件一致
-    // (genesis/marketplace 的 sortPillStyle、home/device-slot 的在线态)。
-    // 原「白底 + 投影」在轨道提到 L1(白)之后会与轨道撞色,只剩一层淡投影可辨;
-    // 且靠 box-shadow 表达选中本就违反《03》「不用 box-shadow 做层级」。
-    background: on ? "var(--v5-brand-soft)" : "transparent",
-    boxShadow: "none",
-  };
-}
 // 身份徽章列宽按语言取值(包 G P2#2 选项 a):en「Peer」/zh「同伴」进 38px,
 // vi「Thành viên」实测 ~62px,固定 38px 溢出 5px+;列宽仍是常量 → 跨行对齐不破。
 const localeStore = useLocaleStore();
@@ -220,3 +168,8 @@ function goEarnings() {
 
 
 </script>
+
+<style scoped>
+.nx-home-feed-tabs { flex: 0 0 auto; width: 180px; min-width: 0; }
+.nx-home-feed-tabs :deep(.nx-glass-option__label) { white-space: nowrap; }
+</style>

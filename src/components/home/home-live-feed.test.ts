@@ -95,8 +95,12 @@ describe("home canonical live feed", () => {
   it("keeps the formal dual-tab component canonical and isolates prototype mock data", () => {
     expect(componentSource).toContain('data-feed-mode="CANONICAL"');
     expect(componentSource).toContain("app.homeTruth?.earningsLedger ?? []");
-    expect(componentSource).toContain('aria-controls="home-live-feed-panel-activity"');
-    expect(componentSource).toContain('aria-controls="home-live-feed-panel-earnings"');
+    expect(componentSource).toContain('ariaControls: "home-live-feed-panel-activity"');
+    expect(componentSource).toContain('ariaControls: "home-live-feed-panel-earnings"');
+    expect(componentSource).toContain('<GlassSegments');
+    expect(componentSource).toContain('v-model="tab"');
+    expect(componentSource).toContain(':options="feedTabOptions"');
+    expect(componentSource).not.toContain("function tabStyle(");
     expect(componentSource).not.toContain("remoteApiEnabled");
     expect(componentSource).not.toContain("FEED_POOL");
     expect(componentSource).not.toContain("setInterval");
