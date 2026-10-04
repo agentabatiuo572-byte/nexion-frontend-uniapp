@@ -1,5 +1,7 @@
 // @ts-expect-error Node-only SFC harness.
 import { readFileSync } from "node:fs";
+// @ts-expect-error Node-only platform compiler.
+import { createRequire } from "node:module";
 import ts from "typescript";
 import * as vue from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +11,17 @@ import * as flow from "@/lib/phone-calibration-flow";
 import * as estimatorScope from "@/lib/estimator-scope";
 import * as calibrationScope from "@/lib/onboarding-calibration-scope";
 import * as format from "@/i18n/format";
+
+const require = createRequire(import.meta.url);
+const { initPreContext, preHtml, preJs } = require("@dcloudio/uni-cli-shared");
+function compileGuidance(h5: boolean) {
+  initPreContext(h5 ? "h5" : "app-plus");
+  const source = preJs(readFileSync(new URL("../../lib/phone-activation-guidance.ts", import.meta.url), "utf8"), "phone-activation-guidance.ts");
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const exports: Record<string, unknown> = {};
+  new Function("exports", code)(exports);
+  return exports;
+}
 
 const raw = { memGB: null, cores: null, model: "", brand: "", gpu: "", pxDensity: null,
   pingMs: null, batteryLevel: null, charging: null, networkReachable: null };
@@ -21,7 +34,7 @@ const cleanups: Array<() => void> = [];
 afterEach(() => { cleanups.splice(0).forEach(fn => fn()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function settle() { for (let n = 0; n < 15; n++) await vue.nextTick(); }
 
-function mount(name: "connect" | "estimator", api: any, query: Record<string, string> = {}, nativePhone = true) {
+function mount(name: "connect" | "estimator", api: any, query: Record<string, string> = {}, nativePhone = true, h5 = !nativePhone) {
   const hooks: Record<string, (...args: any[]) => void> = {};
   const auth = vue.reactive({ accountId: "user:42", email: "", isAuthenticated: true,
     completeOnboarding: vi.fn(() => true), requireOnboarding: vi.fn(), signOut: vi.fn() });
@@ -40,6 +53,7 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
     "@/lib/secure-command-id": { requireCryptoUuid: () => "fixed-unique-command" },
     "@/lib/device-id": { getDeviceId: () => "phone-1" },
     "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => nativePhone },
+    "@/lib/phone-activation-guidance": compileGuidance(h5),
     "@/lib/device-signals": { collectDeviceSignals: () => raw },
     "@/api/runtime": { onboardingCalibrationApi: api, remoteApiEnabled: true },
     "@/lib/account-scope": { captureAccountScope: () => ({ epoch }), isCurrentAccountScope: (scope: any) => scope.epoch === epoch },
@@ -48,9 +62,11 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
     "@/lib/defer-phone-activation": { confirmDeferredPhoneActivation },
   };
   vi.stubGlobal("uni", { showToast: vi.fn() });
-  const source = readFileSync(new URL(`./${name}.vue`, import.meta.url), "utf8").split('<script setup lang="ts">')[1].split("</script>")[0];
-  const fields = name === "connect" ? "phase, canonical, titleText, isRecal, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, deferPhoneActivation";
-  const code = ts.transpileModule(`${source}\nexport const page = { ${fields} };`, {
+  initPreContext(h5 ? "h5" : "app-plus");
+  const compiled = preJs(preHtml(readFileSync(new URL(`./${name}.vue`, import.meta.url), "utf8"), `${name}.vue`), `${name}.vue`);
+  const source = compiled.split('<script setup lang="ts">')[1].split("</script>")[0];
+  const fields = name === "connect" ? "phase, canonical, titleText, isRecal, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, leaveEstimator, deferPhoneActivation";
+  const code = ts.transpileModule(`${source}\nexport const page = { ${fields}, phoneActivationGuidance };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const exports: any = {};
@@ -62,6 +78,66 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
 }
 
 describe("real onboarding page workers", () => {
+  it.each([
+    ["connect", {}], ["connect", { mode: "login" }],
+    ["connect", { mode: "recalibrate" }], ["connect", { mode: "resume" }],
+    ["estimator", {}],
+  ] as const)("a browser sends %s %j to the download guide without changing phone or registration state", async (name, query) => {
+    const api = { phoneLogin: vi.fn(), result: vi.fn(), calibrate: vi.fn(), activate: vi.fn(), defer: vi.fn() };
+    const { page, auth, app, navReset, confirmDeferredPhoneActivation, back } = mount(name, api, query, false);
+    await settle();
+    expect(page.phoneActivationGuidance.value).toEqual({ title: zh.myDevices.phoneActivationAppOnlyTitle, body: zh.myDevices.phoneActivationAppOnlyBody });
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: "/pages/register/success?download=1" }));
+    navReset.mockClear();
+    const leave = name === "connect" ? page.leaveConnect : page.leaveEstimator;
+    leave();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: "/pages/index/index" }));
+    navReset.mockClear();
+    back();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: "/pages/index/index" }));
+    for (const method of Object.values(api)) expect(method).not.toHaveBeenCalled();
+    expect(confirmDeferredPhoneActivation).not.toHaveBeenCalled();
+    expect(auth.completeOnboarding).not.toHaveBeenCalled();
+    expect(app.refreshRemoteFleet).not.toHaveBeenCalled();
+    expect(app.resumeMining).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{}, "/pages/onboarding/estimator"],
+    [{ mode: "login" }, "/pages/index/index"],
+    [{ mode: "recalibrate" }, "/pages/me/devices"],
+    [{ mode: "resume" }, "/pages/onboarding/estimator"],
+  ])("retains the native connect exit for %j", async (query, expected) => {
+    const api = { phoneLogin: vi.fn().mockResolvedValue("NEEDS_CALIBRATION"), result: vi.fn().mockResolvedValue(record), calibrate: vi.fn() };
+    const { page, navReset } = mount("connect", api, query as Record<string, string>, true);
+    await settle();
+    page.leaveConnect();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: expected }));
+  });
+
+  it("retains the native estimator return to its introduction", async () => {
+    const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn() };
+    const { page, navReset } = mount("estimator", api, {}, true);
+    await settle();
+    page.leaveEstimator();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: "/pages/onboarding/intro" }));
+  });
+
+  it.each([
+    ["connect", {}, "/pages/onboarding/estimator"],
+    ["connect", { mode: "recalibrate" }, "/pages/me/devices"],
+    ["estimator", {}, "/pages/onboarding/intro"],
+  ] as const)("retains the %s APP exit without an Android runtime", async (name, query, expected) => {
+    const api = { phoneLogin: vi.fn(), result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
+    const { page, navReset } = mount(name, api, query, false, false);
+    await settle();
+    expect(page.phoneActivationGuidance.value).toEqual({ title: zh.myDevices.phoneActivationNativeUnavailableTitle, body: zh.myDevices.phoneActivationNativeUnavailableBody });
+    expect(navReset).not.toHaveBeenCalled();
+    (name === "connect" ? page.leaveConnect : page.leaveEstimator)();
+    expect(navReset).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url: expected }));
+    for (const method of Object.values(api)) expect(method).not.toHaveBeenCalled();
+  });
+
   it("returns the bound installation to Home without calibration or replacement", async () => {
     const api = { phoneLogin: vi.fn().mockResolvedValue("BOUND"), result: vi.fn(), calibrate: vi.fn(), activate: vi.fn() };
     const { page, navReset } = mount("connect", api, { mode: "login" });

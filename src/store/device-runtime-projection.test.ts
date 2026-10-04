@@ -98,10 +98,10 @@ function findLabel(node: ts.Node) {
   ts.forEachChild(node, findLabel);
 }
 findLabel(cardAst);
-const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "nativePhoneAvailable", `return (${labelBody})();`);
+const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "phoneActivationGuidance", `return (${labelBody})();`);
 const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online", phoneTaskPaused: "paused" }, myDevices: { inventoryPendingDeactivateChip: "pending", phoneActivationTitle: "activate phone", phoneActivationAppOnlyTitle: "use Android App" } } };
 const withoutTask = (props: unknown, reconnecting: unknown, idleGated: unknown, deviceOnline: unknown, t: unknown) =>
-  labelFactory(props, reconnecting, idleGated, deviceOnline, { value: null }, t, { value: true }, true);
+  labelFactory(props, reconnecting, idleGated, deviceOnline, { value: null }, t, { value: true }, { value: { title: "activate phone" } });
 describe("actual device card runtime label", () => {
   it("does not expose mock heartbeat controls in the remote phone card", () => {
     expect(cardContent).toContain("v-if=\"device.kind === 'phone' && !remoteApiEnabled\"");
@@ -120,12 +120,13 @@ describe("actual device card runtime label", () => {
   });
   it("shows a server-paused phone task as paused even when the last runtime flag was ONLINE", () => {
     expect(labelFactory({ device: {kind:"phone", capacitySource:"server", runtimeStatus:"ONLINE"} },
-      {value:false}, {value:false}, {value:false}, {value:{status:"PAUSED"}}, texts, {value:true}, true)).toBe("paused");
+      {value:false}, {value:false}, {value:false}, {value:{status:"PAUSED"}}, texts, {value:true}, {value:{title:"activate phone"}})).toBe("paused");
   });
   it("does not claim a different phone is running locally", () => {
     const phone = { device: { kind: "phone", capacitySource: "server", runtimeStatus: "ONLINE" } };
-    expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, true)).toBe("activate phone");
-    expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, false)).toBe("use Android App");
+    for (const title of ["activate phone", "use Android App", "native unavailable"]) {
+      expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title}})).toBe(title);
+    }
   });
 });
 

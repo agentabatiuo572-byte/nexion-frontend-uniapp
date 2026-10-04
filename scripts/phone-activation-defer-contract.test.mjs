@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { initPreContext, preHtml, preJs } = require("@dcloudio/uni-cli-shared");
+function compiledPage(source, platform) {
+  initPreContext(platform);
+  return preJs(preHtml(source, "page.vue"), "page.vue");
+}
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -42,8 +50,10 @@ test("estimator activate-later confirms the server state and exits onboarding wi
   assert.match(estimator, /markPhoneActivationDeferred/);
   assert.match(estimator, /auth\.completeOnboarding\(\)/);
   assert.match(handler, /navReset\(\{ url: "\/pages\/index\/index"/);
-  assert.doesNotMatch(estimator, /pages\/register\/success/,
-    "a login/onboarding recovery page must never masquerade as a newly completed registration");
+  assert.doesNotMatch(compiledPage(estimator, "app-plus"), /pages\/register\/success/,
+    "native login/onboarding recovery must never reopen a web registration or download page");
+  assert.match(compiledPage(estimator, "h5"), /pages\/register\/success\?download=1/,
+    "the browser offers the download-only guide, without claiming a new registration");
   assert.match(estimator, /activationDeferFailed/,
     "a failed defer write must be explained as a failed save, not as an activation failure");
   assert.match(estimator, /function retryCalibration\(\) \{\s*if \(deferBusy\.value\) return;/,
@@ -51,6 +61,28 @@ test("estimator activate-later confirms the server state and exits onboarding wi
   const leaveHandler = estimator.slice(estimator.indexOf("function leaveEstimator"), estimator.indexOf("async function deferPhoneActivation"));
   assert.doesNotMatch(leaveHandler, /confirmDeferredPhoneActivation|onboardingCalibrationApi\.defer/,
     "back is navigation, never an implicit server-side defer decision");
+});
+
+test("native APP compilation excludes web download mode, copy and route behavior", () => {
+  const success = compiledPage(read("src/pages/register/success.vue"), "app-plus");
+  const script = success.split('<script setup lang="ts">')[1].split("</script>")[0];
+  const template = success.split("<template>")[1].split("</template>")[0];
+  assert.doesNotMatch(script, /downloadOnly|officialDownloadUrl|retryDownloadConfig|window\.open/);
+  assert.doesNotMatch(template, /rs-h5-download|rs-retry|doneOfficialDownload|phoneActivationAppOnlyBody|doneWhyApp/);
+  assert.match(script, /function continueWeb\(\)\s*\{\s*navReset\(\{ url: "\/pages\/onboarding\/estimator"/);
+  for (const name of ["connect", "estimator"]) {
+    assert.doesNotMatch(compiledPage(read(`src/pages/onboarding/${name}.vue`), "app-plus"), /register\/success\?download=1/);
+  }
+  for (const path of ["src/pages/onboarding/connect.vue", "src/pages/onboarding/estimator.vue", "src/pages/me/devices.vue", "src/components/earn/device-card-pc.vue"]) {
+    const native = compiledPage(read(path), "app-plus");
+    assert.match(native, /resolvePhoneActivationGuidance/, `${path} must share the platform-specific guidance`);
+    assert.doesNotMatch(native, /phoneActivationAppOnly(?:Title|Body)/, `${path} must not show browser or download instructions inside an APP`);
+  }
+  const nativeLogin = compiledPage(read("src/pages/login/login.vue"), "app-plus");
+  assert.doesNotMatch(nativeLogin, /browserUnsupportedNotice|secureBrowserUnsupported|secure-browser-unsupported-notice/);
+  const browserLogin = compiledPage(read("src/pages/login/login.vue"), "h5");
+  assert.match(browserLogin, /browserUnsupportedNotice/);
+  assert.match(browserLogin, /secure-browser-unsupported-notice/);
 });
 
 test("deferred activation is a persisted non-active state, not a forced recalibration loop", () => {

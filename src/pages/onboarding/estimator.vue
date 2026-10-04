@@ -12,8 +12,8 @@
 
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
-      <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : t.myDevices.phoneActivationAppOnlyBody }}</text>
+      <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : phoneActivationGuidance.title }}</text>
+      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : phoneActivationGuidance.body }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
@@ -103,12 +103,13 @@
 
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
-import { onBackPress } from "@dcloudio/uni-app";
+import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { getDeviceId } from "@/lib/device-id";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { useApp } from "@/store/app";
@@ -156,6 +157,7 @@ let deferIntent: { revision: number; idempotencyKey: string } | null = null;
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectDeviceSignals, key: () => `onboarding:${requireCryptoUuid()}` });
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
+const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
   return {
@@ -249,6 +251,11 @@ watch(() => String(app.accountKey || ""), (next) => {
   loadCalibration();
 });
 
+onLoad(() => {
+  // #ifdef H5
+  navReset({ url: "/pages/register/success?download=1", fail: () => {} });
+  // #endif
+});
 onMounted(() => {
   mounted = true;
   loadCalibration();
@@ -280,7 +287,12 @@ function completeOnboardingLocally(): boolean {
 function leaveEstimator() {
   if (!mounted || deferBusy.value) return;
   generation += 1;
+  // #ifdef H5
+  navReset({ url: "/pages/index/index", fail: () => {} });
+  // #endif
+  // #ifndef H5
   navReset({ url: "/pages/onboarding/intro", fail: () => {} });
+  // #endif
 }
 
 async function deferPhoneActivation() {

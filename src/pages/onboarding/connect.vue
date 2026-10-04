@@ -12,8 +12,8 @@
 
     <view>
       <text class="cn-step">{{ stepText }}</text>
-      <text class="cn-title">{{ nativePhoneAvailable ? titleText : t.myDevices.phoneActivationAppOnlyTitle }}</text>
-      <text v-if="!nativePhoneAvailable || (phase !== 'result' && phase !== 'error')" class="cn-sub">{{ nativePhoneAvailable ? subText : t.myDevices.phoneActivationAppOnlyBody }}</text>
+      <text class="cn-title">{{ nativePhoneAvailable ? titleText : phoneActivationGuidance.title }}</text>
+      <text v-if="!nativePhoneAvailable || (phase !== 'result' && phase !== 'error')" class="cn-sub">{{ nativePhoneAvailable ? subText : phoneActivationGuidance.body }}</text>
     </view>
 
     <view v-if="nativePhoneAvailable">
@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { navReset } from "@/lib/route";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { onLoad, onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -223,6 +224,7 @@ const whyPoints = computed(() => [
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectDeviceSignals, key: () => `onboarding:${requireCryptoUuid()}` });
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
+const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string } | null = null;
 const activationBusy = ref(false);
 
@@ -435,10 +437,19 @@ async function deferPhoneActivation() {
 function leaveConnect() {
   if (activationBusy.value || phase.value === "calibrating") return;
   requestGeneration += 1;
+  // #ifdef H5
+  navReset({ url: "/pages/index/index", fail: () => {} });
+  // #endif
+  // #ifndef H5
   navReset({ url: isLogin.value ? "/pages/index/index" : isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
+  // #endif
 }
 
 onLoad((options) => {
+  // #ifdef H5
+  navReset({ url: "/pages/register/success?download=1", fail: () => {} });
+  return;
+  // #endif
   const o = (options || {}) as Record<string, string>;
   isLogin.value = o.mode === "login";
   isRecal.value = o.mode === "recalibrate";

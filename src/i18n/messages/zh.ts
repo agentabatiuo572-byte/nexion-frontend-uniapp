@@ -1896,6 +1896,8 @@ catalog: {
     phoneActivationCta: "校准并绑定当前手机",
     phoneActivationAppOnlyTitle: "请在 Android App 中激活手机算力",
     phoneActivationAppOnlyBody: "浏览器无法读取本机电量并发送手机任务心跳。请在 Android App 中登录并完成校准激活。",
+    phoneActivationNativeUnavailableTitle: "手机校准暂不可用",
+    phoneActivationNativeUnavailableBody: "当前设备暂无法校准或激活手机算力。可继续查看已绑定手机的状态。",
     // 置换促销 banner — 当用户拥有可置换设备时显示,受 DEFAULT_TRADEIN_CONFIG.promo
     // 后台 kill switch / cooldown / 单会话最大次数 / 路由白名单控制
 

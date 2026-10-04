@@ -35,7 +35,7 @@
         <text :style="tradeinCtaStyle">{{ tradeinCtaLabel }}</text>
       </view>
     </view>
-    <view class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !actionDisabled }" :style="actionStyle" role="button" :tabindex="actionDisabled ? -1 : 0" :aria-disabled="actionDisabled ? 'true' : 'false'" @click="onAction"  @keydown.enter.prevent="onAction" @keydown.space.prevent="onAction">
+    <view v-if="showAction" class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !actionDisabled }" :style="actionStyle" role="button" :tabindex="actionDisabled ? -1 : 0" :aria-disabled="actionDisabled ? 'true' : 'false'" @click="onAction"  @keydown.enter.prevent="onAction" @keydown.space.prevent="onAction">
       <svg v-if="active" width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15" /><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" /><path d="M12 2v4" /><line x1="2" x2="22" y1="2" y2="22" /></svg>
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
       <text :style="actionLabelStyle">{{ actionLabel }}</text>
@@ -55,6 +55,7 @@ const props = withDefaults(
   defineProps<{
     device: Device;
     active: boolean;
+    showAction?: boolean;
     disabled?: boolean;
     actionDisabled?: boolean;
     /** Replaces the disabled action label when the server needs reconciliation. */
@@ -68,7 +69,7 @@ const props = withDefaults(
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
   }>(),
-  { disabled: false, actionDisabled: false },
+  { disabled: false, actionDisabled: false, showAction: true },
 );
 
 const emit = defineEmits<{ (e: "toggle"): void; (e: "tradein"): void; (e: "ladder"): void }>();
@@ -84,7 +85,7 @@ const actionLabel = computed(() =>
 );
 
 function onAction() {
-  if (actionDisabled.value) return;
+  if (!props.showAction || actionDisabled.value) return;
   emit("toggle");
 }
 
