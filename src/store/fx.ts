@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { computeQuoteRate, isFxQuoteUsable } from "./fx-core";
-import { paymentApi, remoteApiEnabled } from "@/api/runtime";
+import { paymentApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 // 汇率牌价 store(PAY-规格 [FEAT-PAY03])。FxQuoteConfig 单源 = 后台 [D6],
 // client 只读;VND 仅出现在银行转账流程,全站其余场景维持 USDT 单币展示。
@@ -30,7 +31,14 @@ export const useFx = defineStore("fx", () => {
   const feeVnd = ref(0);
   const feeUsdt = ref(0);
   let inFlightLoad: Promise<void> | null = null;
+  let loadScope: RemoteAccountRequest | null = null;
+  let loadSessionUserId: number | null = null;
   let devFailureInjected = false;
+
+  function ownsLoad(scope: RemoteAccountRequest, sessionUserId: number | null): boolean {
+    return !remoteApiEnabled || (remoteAccountScope.isCurrent(scope)
+      && (sessionVault.read()?.user.userId ?? null) === sessionUserId);
+  }
 
   function resetRemoteState(): void {
     baseRateVndPerUsdt.value = 0;
@@ -59,13 +67,21 @@ export const useFx = defineStore("fx", () => {
 
   /** 拉取牌价配置(并发去重)。MOCK 种子;PROD = GET /api/config/fx([D6] 单源)。 */
   function load(): Promise<void> {
-    if (inFlightLoad) return inFlightLoad;
+    if (inFlightLoad && loadScope && ownsLoad(loadScope, loadSessionUserId)) return inFlightLoad;
+    if (remoteApiEnabled && loadScope && !ownsLoad(loadScope, loadSessionUserId)) {
+      resetRemoteState();
+      syncFailed.value = false;
+    }
+    const scope = remoteAccountScope.snapshot();
+    const sessionUserId = remoteApiEnabled ? sessionVault.read()?.user.userId ?? null : null;
+    loadScope = scope;
+    loadSessionUserId = sessionUserId;
     loading.value = true;
     inFlightLoad = (async () => {
       try {
         if (remoteApiEnabled) {
           const [config, quote] = await Promise.all([paymentApi.config(), paymentApi.fxQuote()]);
-          if (devFailureInjected) return;
+          if (devFailureInjected || !ownsLoad(scope, sessionUserId)) return;
           syncFailed.value = false;
           baseRateVndPerUsdt.value = quote.baseRateVndPerUsdt;
           buySpreadPct.value = quote.buySpreadPct;
@@ -100,6 +116,7 @@ export const useFx = defineStore("fx", () => {
           }
         }
       } catch {
+        if (!ownsLoad(scope, sessionUserId)) return;
         // Remote and explicit App sandbox payment facts are server-owned.  A
         // failed config/quote must also evict any prior snapshot so a stale
         // quote or local-looking numeric default cannot keep the rail usable.
@@ -107,8 +124,10 @@ export const useFx = defineStore("fx", () => {
         syncFailed.value = true;
         configReady.value = false;
       } finally {
-        loading.value = false;
-        inFlightLoad = null;
+        if (loadScope === scope) {
+          loading.value = false;
+          inFlightLoad = null;
+        }
       }
     })();
     return inFlightLoad;

@@ -15,6 +15,7 @@ import { computeQuoteRate, fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { findResumablePaymentIntent } from "@/lib/hosted-payment";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
+import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
 
 const descriptor = parse(source).descriptor;
 const setupSource = descriptor.scriptSetup!.content;
@@ -72,10 +73,14 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
     "@/components/me/fx-rate-line.vue": {}, "@/i18n/use-t": { useT: () => Vue.ref(translations) },
     "@/i18n/format": { fmt }, "@/lib/route": { navTo, navBack: vi.fn() },
     "@/store/ui": { toast, confirm: vi.fn() }, "@/store/deposits": { useDeposits: () => dep },
-    "@/store/fx": { useFx: () => fx }, "@/store/app": { useApp: () => ({}) },
+    "@/store/fx": { useFx: () => fx },
+    "@/store/app": { useApp: () => ({ accountKey: "user:7", accountBindingEpoch: 1 }) },
+    "@/store/auth": { useAuth: () => ({ isAuthenticated: true, accountId: "user:7" }) },
+    "@/lib/binary-session-ready": { binarySessionReady: accountSessionReady },
     "@/store/fx-core": { fmtVnd, vndForUsdt }, "@/store/server-time": { mockServerNow: () => now },
     "@/store/deposits-core": { BANK_MAX_DEPOSIT_USDT: 5000, MIN_DEPOSIT_USDT: 10 },
-    "@/api/runtime": { remoteApiEnabled: true }, "@/api/errors": { ApiError },
+    "@/api/runtime": { remoteApiEnabled: true, sessionVault: { read: () => ({ user: { userId: 7 } }) } },
+    "@/api/errors": { ApiError },
     "@/lib/recoverable-funds-operation": { runRecoverableFundsOperation },
     "@/lib/vietqr-remote-safety": { buildVietQrTransferSteps },
     "@/lib/hosted-payment": { findResumablePaymentIntent, openHostedPaymentPage: open },
