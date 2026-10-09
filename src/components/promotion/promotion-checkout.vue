@@ -35,6 +35,7 @@
         <template v-if="order">
           <text class="promotion-copy">{{ p.orderNo }} · {{ order.orderNo }}</text>
           <text class="promotion-title">{{ order.paymentStatus==='PAID' ? p.paid : order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
+          <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ payWindow===false?t.orders.statusExpired:p.unknown }}</text>
           <PromotionAction v-if="order.paymentStatus==='PENDING'&&!unknown" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="!canPay" @click="pay"><text>{{ p.pay }}</text></PromotionAction>
           <PromotionAction class="promotion-action" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction>
           <view class="promotion-link" role="button" tabindex="0" @click="viewOrder"><text>{{ p.viewOrder }}</text></view>
@@ -64,7 +65,7 @@ import { computed,ref,shallowRef,onMounted,onBeforeUnmount } from 'vue';
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
-import { promotionApi } from '@/api/runtime';
+import { promotionApi,deviceE3Api } from '@/api/runtime';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
 import type { LocalizedText,RewardDisclosure } from '@/api/promotion-contracts';
@@ -97,18 +98,30 @@ const voucherId=ref(session.record.voucherId??null);const selectedVoucherName=co
 const items=computed(()=>order.value?.items??quote.value?.items??props.items);const rewards=computed(()=>order.value?.rewards??quote.value?.expectedRewards??[]);
 function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&['zh','en','vi'].every(l=>typeof x[l as keyof LocalizedText]==='string'&&x[l as keyof LocalizedText].trim()))?d:null;}
 const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is RewardDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
-let receivedAt:number|null=null,promotionReceivedAt:number|null=null;const quoteFresh=ref(false);let timer:ReturnType<typeof setInterval>|undefined;
-function updateClock(){const now=readTrustedMonotonicNowMs();quoteFresh.value=!!quote.value&&receivedAt!==null&&now!==null&&projectServerNow(Date.parse(quote.value.serverTime),receivedAt,now)<Date.parse(quote.value.expiresAt);}
+let receivedAt:number|null=null,promotionReceivedAt:number|null=null,orderClock:{serverNow:number;at:number}|null=null,clockGeneration=0;const quoteFresh=ref(false),payWindow=ref<boolean|null>(null);let timer:ReturnType<typeof setInterval>|undefined;
+function updateClock(){
+  const now=readTrustedMonotonicNowMs();quoteFresh.value=!!quote.value&&receivedAt!==null&&now!==null&&projectServerNow(Date.parse(quote.value.serverTime),receivedAt,now)<Date.parse(quote.value.expiresAt);
+  const sample=receivedAt!==null&&quote.value?{serverNow:Date.parse(quote.value.serverTime),at:receivedAt}:promotionReceivedAt!==null&&promotion.value?{serverNow:Date.parse(promotion.value.serverTime),at:promotionReceivedAt}:orderClock;
+  const deadline=Date.parse(order.value?.payBy??'');
+  payWindow.value=order.value?.paymentStatus==='PENDING'&&now!==null&&sample&&Number.isFinite(deadline)?projectServerNow(sample.serverNow,sample.at,now)<deadline:null;
+}
+async function loadOrderClock(){
+  updateClock();if(!current()||order.value?.paymentStatus!=='PENDING'||payWindow.value!==null)return;
+  const generation=++clockGeneration,sampledAt=readTrustedMonotonicNowMs();if(sampledAt===null)return;
+  // Persisted quotes have no live monotonic anchor; an empty fleet still carries validated server time.
+  const fleet=await deviceE3Api.fleet();if(!current()||generation!==clockGeneration)return;
+  orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
+}
 const canCreate=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
-async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';try{await action();}catch(cause){if(current()){const message=asApiError(cause).message;error.value=message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}}finally{if(current()){busy.value=false;revision.value++;}}}
+async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';try{await action();}catch(cause){if(current()){const message=asApiError(cause).message;error.value=message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}}finally{if(current()){busy.value=false;revision.value++;updateClock();}}}
 async function loadQuote(){if(openedOriginal||session.record.pending||session.record.order||!auth.isAuthenticated)return;await run(async()=>{session.invalidateQuote();revision.value++;const sampledAt=readTrustedMonotonicNowMs();const result=await promotionApi.quote(props.items,props.activityId||null,voucherId.value);if(!current())return;session.setQuote(result,voucherId.value);receivedAt=sampledAt;revision.value++;updateClock();});}
 async function chooseVoucher(){if(openedOriginal||busy.value||session.record.pending||order.value||items.value.length!==1)return;await voucher.refreshRemote();if(!current())return;const options=voucher.claimedUnused;uni.showActionSheet({itemList:[p.value.noVoucher,...options.map(v=>v.name)],success:result=>{if(!current())return;voucherId.value=result.tapIndex===0?null:options[result.tapIndex-1]?.id??null;void loadQuote();}});}
 async function createOrder(){if(!canCreate.value)return;await run(()=>session.create());}
-async function pay(){if(!canPay.value)return;await run(()=>session.pay());}
-async function recover(){await run(()=>session.recover());}
+async function pay(){updateClock();if(!canPay.value)return;await run(()=>session.pay());}
+async function recover(){await run(async()=>{await session.recover();if(!current())return;revision.value++;await loadOrderClock();});}
 async function startNewPurchase(){if(!canStartNew.value||props.orderNo||openedOriginal)return;session.startNewPurchase();voucherId.value=null;revision.value++;await loadQuote();}
 async function cancelOrder(){if(!canCancel.value)return;const ok=await confirm({title:p.value.cancelTitle,message:p.value.cancelBody,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,danger:true});if(ok&&current())await run(()=>session.cancel());}
 function viewOrder(){if(order.value)void navTo('/pages/store/order-detail?id='+encodeURIComponent(order.value.orderNo));}
@@ -117,8 +130,7 @@ let leaveResolver:((allowed:boolean)=>void)|null=null;let asked='';let disposeGu
 function finishLeave(allowed:boolean){leaveOpen.value=false;leaveResolver?.(allowed);leaveResolver=null;}
 function requestLeave():Promise<boolean>{
   updateClock();
-  const now=readTrustedMonotonicNowMs(),sample=receivedAt!==null&&quote.value?{time:quote.value.serverTime,at:receivedAt}:promotionReceivedAt!==null&&promotion.value?{time:promotion.value.serverTime,at:promotionReceivedAt}:null;
-  const reserved=!!order.value&&order.value.paymentStatus==='PENDING'&&now!==null&&!!sample&&projectServerNow(Date.parse(sample.time),sample.at,now)<Date.parse(order.value.payBy??'');
+  const reserved=payWindow.value===true;
   const fingerprint=order.value?.orderNo??quote.value?.quoteId??'';
   if(!current()||busy.value||unknown.value||!rewards.value.length||!fingerprint||asked===fingerprint||(order.value?!reserved:!quoteFresh.value||quote.value?.eligibility!=='ELIGIBLE'))return Promise.resolve(true);
   asked=fingerprint;leaveOpen.value=true;return new Promise(resolve=>{leaveResolver=resolve;});
@@ -138,7 +150,7 @@ onMounted(async()=>{
   // Catalog and current campaign visibility cannot block an original order or
   // command receipt. Historical rewards always come from that receipt.
   if(auth.isAuthenticated)void refreshProductCatalog(true).catch(()=>{});
-  if(props.activityId){const sampledAt=readTrustedMonotonicNowMs();void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{if(current()){promotion.value=value;promotionReceivedAt=sampledAt;}}).catch(()=>{});}
+  if(props.activityId){const sampledAt=readTrustedMonotonicNowMs();void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{if(current()){promotion.value=value;promotionReceivedAt=sampledAt;updateClock();}}).catch(()=>{});}
   try {
     if(auth.isAuthenticated){
       if(props.orderNo&&!session.record.order&&!session.record.pending){
