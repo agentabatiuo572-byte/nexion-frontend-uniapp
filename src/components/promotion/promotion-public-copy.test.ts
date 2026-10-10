@@ -56,9 +56,9 @@ it.each([{ locale: 'zh', copy: zh }, { locale: 'en', copy: en }, { locale: 'vi',
 );
 
 it.each([
-  { locale: 'zh', copy: zh, empty: '暂无数据', latency: '平均延迟 暂不可用', progress: '完成任务后，请查看奖励领取状态。' },
-  { locale: 'en', copy: en, empty: 'Data unavailable', latency: 'Average latency unavailable', progress: 'After completing the quest, check the reward claim status.' },
-  { locale: 'vi', copy: vi, empty: 'Dữ liệu chưa khả dụng', latency: 'Độ trễ trung bình chưa khả dụng', progress: 'Sau khi hoàn thành nhiệm vụ, hãy kiểm tra trạng thái nhận thưởng.' },
+  { locale: 'zh', copy: zh, empty: '-', latency: '-', progress: '完成任务后，请查看奖励领取状态。' },
+  { locale: 'en', copy: en, empty: '-', latency: '-', progress: 'After completing the quest, check the reward claim status.' },
+  { locale: 'vi', copy: vi, empty: '-', latency: '-', progress: 'Sau khi hoàn thành nhiệm vụ, hãy kiểm tra trạng thái nhận thưởng.' },
 ])('$locale reports missing measurements without a number and asks to check quest eligibility', ({ copy, empty, latency, progress }) => {
   expect(copy.home.networkStatUnverified).toBe(empty);
   expect(copy.globe.latencyTelemetryMissing).toBe(latency);
@@ -87,7 +87,7 @@ it.each([
   {locale:'zh',copy:zh,text:'当前算力暂不可用。'},
   {locale:'en',copy:en,text:'Current hashpower is unavailable.'},
   {locale:'vi',copy:vi,text:'Công suất hiện tại tạm thời chưa có.'},
-])('$locale shared unavailable hashpower copy fits all three callers without claiming estimated specifications',({copy,text})=>{
+])('$locale shared unavailable hashpower copy remains in all three explanation callers',({copy,text})=>{
   expect(deviceSource.match(/t(?:\.value)?\.earn\.hashCapabilityUnknown/g)).toHaveLength(3);
   expect(copy.earn.hashCapabilityUnknown).toBe(text);
 });
