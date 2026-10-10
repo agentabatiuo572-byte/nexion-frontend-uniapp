@@ -11,7 +11,7 @@ import { promotionZH } from '@/i18n/messages/promotion';
 
 const serverTime='2026-10-08T00:00:00Z';
 const ast=ts.createSourceFile('checkout.ts',source.split('<script setup lang="ts">')[1].split('</script>')[0],ts.ScriptTarget.Latest,true);
-const names=['requestLeave','finishLeave','updateClock'];
+const names=['requestLeave','finishLeave','updateClock','startNewPurchase'];
 const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&node.name&&names.includes(node.name.text));
 expect(functions).toHaveLength(names.length);
 const code=ts.transpileModule(functions.map(node=>node.getText(ast)).join('\n'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
@@ -21,8 +21,10 @@ function harness({status='PENDING',payBy='2026-10-08T00:00:10Z',clock=true,quote
     order:ref(built?{orderNo:'ORD-1',paymentStatus:status,payBy}:null),
     quote:ref({quoteId:'Q1',serverTime,expiresAt:'2026-10-08T00:00:05Z',eligibility}),quoteFresh:ref(false),payWindow:ref<boolean|null>(null),
     promotion:ref({serverTime}),leaveOpen:ref(false),projectServerNow,readTrustedMonotonicNowMs:()=>now,
-    initialReceivedAt:quoteClock?100:null,initialPromotionReceivedAt:clock?100:null};
-  const guard=new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;let asked='',leaveResolver=null,receivedAt=initialReceivedAt,promotionReceivedAt=initialPromotionReceivedAt,orderClock=null;${code};return {requestLeave,finishLeave};`)(deps) as {requestLeave():Promise<boolean>;finishLeave(allowed:boolean):void};
+    initialReceivedAt:quoteClock?100:null,initialPromotionReceivedAt:clock?100:null,
+    canStartNew:ref(true),props:{orderNo:null},openedOriginal:false,session:{startNewPurchase:vi.fn()},
+    voucherId:ref<string|null>('voucher'),revision:ref(0),loadQuote:vi.fn(async()=>{})};
+  const guard=new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;let asked='',leaveResolver=null,receivedAt=initialReceivedAt,promotionReceivedAt=initialPromotionReceivedAt,orderClock=null;${code};return {requestLeave,finishLeave,startNewPurchase};`)(deps) as {requestLeave():Promise<boolean>;finishLeave(allowed:boolean):void;startNewPurchase():Promise<void>};
   return {...guard,...deps,setNow:(value:number|null)=>{now=value;}};
 }
 it.each([
@@ -40,6 +42,20 @@ it.each([true,false])('valid reservation uses the original stay/exit decision: %
 it('an eligible fresh quote opens the compact reminder, but an elapsed quote does not',async()=>{
   const guard=harness({built:false,quoteClock:true});const answer=guard.requestLeave();expect(guard.leaveOpen.value).toBe(true);guard.finishLeave(false);expect(await answer).toBe(false);
   const expired=harness({built:false,quoteClock:true});expired.setNow(5100);expect(await expired.requestLeave()).toBe(true);expect(expired.leaveOpen.value).toBe(false);
+});
+it.each(['new quote','original order'])('does not repeat a reminder in the same purchase after %s',async transition=>{
+  const guard=harness({built:false,quoteClock:true});const first=guard.requestLeave();guard.finishLeave(false);expect(await first).toBe(false);
+  if(transition==='new quote')guard.quote.value.quoteId='Q2';
+  else guard.order.value={orderNo:'ORD-1',paymentStatus:'PENDING',payBy:'2026-10-08T00:00:10Z'};
+  const again=guard.requestLeave();expect(guard.leaveOpen.value).toBe(false);expect(await again).toBe(true);
+});
+it('allows one new reminder only after explicitly starting a new purchase',async()=>{
+  const guard=harness({built:false,quoteClock:true});const first=guard.requestLeave();guard.finishLeave(false);expect(await first).toBe(false);
+  guard.canStartNew.value=false;await guard.startNewPurchase();expect(guard.session.startNewPurchase).not.toHaveBeenCalled();
+  expect(await guard.requestLeave()).toBe(true);
+  guard.canStartNew.value=true;await guard.startNewPurchase();expect(guard.session.startNewPurchase).toHaveBeenCalledOnce();
+  guard.quote.value.quoteId='Q2';const next=guard.requestLeave();expect(guard.leaveOpen.value).toBe(true);guard.finishLeave(false);expect(await next).toBe(false);
+  expect(await guard.requestLeave()).toBe(true);
 });
 it('projects server time again when leaving an order that was open across its deadline',async()=>{
   const guard=harness();guard.setNow(10100);expect(await guard.requestLeave()).toBe(true);expect(guard.leaveOpen.value).toBe(false);

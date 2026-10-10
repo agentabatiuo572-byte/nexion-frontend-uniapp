@@ -122,7 +122,7 @@ async function chooseVoucher(){if(openedOriginal||busy.value||session.record.pen
 async function createOrder(){if(!canCreate.value)return;await run(()=>session.create());}
 async function pay(){updateClock();if(!canPay.value)return;await run(()=>session.pay());}
 async function recover(){await run(async()=>{await session.recover();if(!current())return;revision.value++;await loadOrderClock();});}
-async function startNewPurchase(){if(!canStartNew.value||props.orderNo||openedOriginal)return;session.startNewPurchase();voucherId.value=null;revision.value++;await loadQuote();}
+async function startNewPurchase(){if(!canStartNew.value||props.orderNo||openedOriginal)return;session.startNewPurchase();asked='';voucherId.value=null;revision.value++;await loadQuote();}
 async function cancelOrder(){if(!canCancel.value)return;const ok=await confirm({title:p.value.cancelTitle,message:p.value.cancelBody,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,danger:true});if(ok&&current())await run(()=>session.cancel());}
 function viewOrder(){if(order.value)void navTo('/pages/store/order-detail?id='+encodeURIComponent(order.value.orderNo));}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent('/pages/store/checkout?activityId='+props.activityId+'&items='+encodeURIComponent(JSON.stringify(props.items))));}
@@ -132,7 +132,7 @@ function requestLeave():Promise<boolean>{
   updateClock();
   const reserved=payWindow.value===true;
   const fingerprint=order.value?.orderNo??quote.value?.quoteId??'';
-  if(!current()||busy.value||unknown.value||!rewards.value.length||!fingerprint||asked===fingerprint||(order.value?!reserved:!quoteFresh.value||quote.value?.eligibility!=='ELIGIBLE'))return Promise.resolve(true);
+  if(!current()||busy.value||unknown.value||!rewards.value.length||!fingerprint||asked||(order.value?!reserved:!quoteFresh.value||quote.value?.eligibility!=='ELIGIBLE'))return Promise.resolve(true);
   asked=fingerprint;leaveOpen.value=true;return new Promise(resolve=>{leaveResolver=resolve;});
 }
 useDialogA11y(leaveOpen,'.promotion-leave',()=>finishLeave(false));
