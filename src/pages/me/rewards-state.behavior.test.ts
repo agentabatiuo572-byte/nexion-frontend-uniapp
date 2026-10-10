@@ -111,6 +111,37 @@ async function mount(localeCode: Locale, rows: Bill[] = [], page: keyof typeof c
   app.mount(root); cleanups.push(() => app.unmount()); shown.forEach(callback => callback()); await Vue.nextTick();
   return { root, locale, pager, summary: bills.summary, bills, voucher, account, navTo, text: () => textOf(root) };
 }
+const tokenPath = decodeURIComponent(new URL("../../styles/tokens.css", import.meta.url).pathname).replace(/^\/([a-z]:\/)/i, "$1");
+const tokenSource = (() => {
+  const source = ts.sys.readFile(tokenPath);
+  if (source === undefined) throw new Error(`Reward contrast tokens not readable: ${tokenPath}`);
+  return source;
+})();
+// Resolve current hex/rgba tokens and srgb tints; unsupported syntax fails the gate.
+function failureContrast(style: Vue.CSSProperties, theme: "light" | "dark") {
+  const light = tokenSource.match(/:root\s*\{([^}]+)\}/)![1];
+  const dark = tokenSource.match(/:root:not\(\[data-theme="light"\]\)\s*\{([^}]+)\}/)![1];
+  const colors = Object.fromEntries([...`${light}${theme === "dark" ? dark : ""}`.matchAll(/(--[\w-]+):\s*(#[\da-f]{6}|rgba\([^)]*\))\s*;/gi)]
+    .map(match => [match[1], match[2]]));
+  const rgb = (value: string) => {
+    const token = value.match(/^var\((--[\w-]+)\)$/), color = token ? colors[token[1]] : value;
+    expect(color).toBeDefined();
+    if (/^#[\da-f]{6}$/i.test(color)) return [...[1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255), 1];
+    const channels = color.match(/^rgba\(\s*([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\s*\)$/);
+    expect(channels).not.toBeNull();
+    return channels!.slice(1).map((channel, index) => Number(channel) / (index < 3 ? 255 : 1));
+  };
+  const mix = String(style.background).match(/^color-mix\(in srgb, (var\(--[\w-]+\)|#[\da-f]{6}) (\d+(?:\.\d+)?)%, transparent\)$/i);
+  const tint = rgb(mix ? mix[1] : String(style.background)), page = rgb("var(--v5-bg)");
+  const alpha = tint[3] * (mix ? Number(mix[2]) / 100 : 1);
+  const background = tint.slice(0, 3).map((channel, index) => channel * alpha + page[index] * (1 - alpha));
+  const luminance = (channels: number[]) => channels
+    .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const [bright, dim] = [luminance(rgb(String(style.color)).slice(0, 3)), luminance(background)].sort((a, b) => b - a);
+  return (bright + 0.05) / (dim + 0.05);
+}
+
 beforeEach(() => {
   vi.stubGlobal("uni", { getStorageSync: () => "", setStorageSync: vi.fn(), getSystemInfoSync: () => ({ language: "en" }) });
   setActivePinia(createPinia());
@@ -118,6 +149,25 @@ beforeEach(() => {
 afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("mounted reward state presentation", () => {
+  it.each(["light", "dark"] as const)("keeps danger text readable on existing %s notice and status backgrounds", theme => {
+    const backgrounds = ["var(--v5-bg)", "var(--v5-surface)", "var(--v5-surface-2)", "var(--v5-surface-3)", "var(--v5-danger-soft)",
+      ...[6, 8, 10, 15].map(alpha => `color-mix(in srgb, var(--v5-danger) ${alpha}%, transparent)`)];
+    for (const background of backgrounds) {
+      expect(failureContrast({ color: "var(--v5-danger)", background }, theme), background).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(failureContrast({ color: "var(--v5-on-brand)", background: "var(--v5-danger)" }, theme)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  const contrastCases = locales.flatMap(locale => (["light", "dark"] as const).map(theme => ({ locale, theme })));
+  it.each(contrastCases)("keeps the rendered failure notice readable in $locale/$theme", async ({ locale, theme }) => {
+    const screen = await mount(locale, [], "summary", undefined, true);
+    const message = nodes(screen.root).find(entry => entry.tag === "text" && textOf(entry) === dicts[locale].walletV3.submitReasonServiceUnavailable)!;
+    expect(message).toBeDefined();
+    const style = message.parent!.props.style as Vue.CSSProperties;
+    expect(failureContrast(style, theme)).toBeGreaterThanOrEqual(4.5);
+    if (theme === "light") expect(failureContrast({ color: "#B9554A", background: "color-mix(in srgb, #B9554A 10%, transparent)" }, theme)).toBeLessThan(4.5);
+  });
+
   it.each(locales)("keeps the old activity reward URL on the same category body and back route in %s", async locale => {
     const screen = await mount(locale, [], "legacy"), header = nodes(screen.root).find(entry => entry.tag === "header");
     expect(header?.text).toBe(dicts[locale].promotion.rewardCategory);
