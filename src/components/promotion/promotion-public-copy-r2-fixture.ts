@@ -2,7 +2,7 @@
 export const reviewedCopyR2 = [
   {"key":"home.networkStatUnverified","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.value.home.networkStatUnverified"}]},
   {"key":"globe.latencyTelemetryMissing","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.value.globe.latencyTelemetryMissing"}]},
-  {"key":"intro.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/onboarding/intro.vue","expression":"t.value.intro.verifiedScope"}]},
+  {"key":"intro.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/onboarding/intro.vue","expression":"t.value.intro.verifiedScope"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"login.serverSessionReloadNotice","placeholders":[],"consumers":[{"file":"src/pages/login/login.vue","expression":"t.login.serverSessionReloadNotice"}]},
   {"key":"earn.phoneTaskPausedHint","placeholders":[],"consumers":[{"file":"src/components/earn/device-card-pc.vue","expression":"t.earn.phoneTaskPausedHint"}]},
   {"key":"earn.phonePausedNoNetworkHint","placeholders":[],"consumers":[{"file":"src/components/earn/device-card-pc.vue","expression":"t.value.earn.phonePausedNoNetworkHint"}]},
@@ -13,7 +13,7 @@ export const reviewedCopyR2 = [
   {"key":"goals.loading","placeholders":[],"consumers":[{"file":"src/pages/me/goals.vue","expression":"t.goals.loading"}]},
   {"key":"tx.detailUnavailableBody","placeholders":[],"consumers":[{"file":"src/pages/tx/hash.vue","expression":"w.detailUnavailableBody"}]},
   {"key":"tradein.remoteQuoteCreditLabel","placeholders":[],"consumers":[{"file":"src/components/tradein-sheets.vue","expression":"t.value.tradein.remoteQuoteCreditLabel"},{"file":"src/pages/me/devices.vue","expression":"t.value.tradein.remoteQuoteCreditLabel"}]},
-  {"key":"tradein.remoteQuoteBandLabel","placeholders":["pct"],"consumers":[{"file":"src/components/tradein-sheets.vue","expression":"t.value.tradein.remoteQuoteBandLabel"}]},
+  {"key":"tradein.remoteQuoteBandLabel","placeholders":["pct"],"consumers":[{"file":"src/components/tradein-sheets.vue","expression":"t.value.tradein.remoteQuoteBandLabel"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"tickets.historyTruncated","placeholders":[],"consumers":[{"file":"src/pages/me/support-tickets.vue","expression":"t.tickets.historyTruncated"}]},
   {"key":"trial.claimUnknownInline","placeholders":[],"consumers":[{"file":"src/components/trial-claim-sheet.vue","expression":"t.value.trial.claimUnknownInline"}]},
   {"key":"trial.eligReasonUnknown","placeholders":[],"consumers":[{"file":"src/components/trial-claim-sheet.vue","expression":"w.eligReasonUnknown"}]},
@@ -23,8 +23,8 @@ export const reviewedCopyR2 = [
   {"key":"team.serverRewardPerSettlement","placeholders":[],"consumers":[{"file":"src/components/team/invite-earn-card.vue","expression":"t.team.serverRewardPerSettlement"},{"file":"src/components/team/share-channel-sheet.vue","expression":"t.value.team.serverRewardPerSettlement"}]},
   {"key":"wallet.pendingSheetBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet.vue","expression":"t.value.wallet.pendingSheetBody"}]},
   {"key":"wallet.lockedSheetBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet.vue","expression":"t.value.wallet.lockedSheetBody"}]},
-  {"key":"wallet.releaseAttestationInfo","placeholders":["hours"],"consumers":[{"file":"src/pages/me/wallet.vue","expression":"t.value.wallet.releaseAttestationInfo"}]},
-  {"key":"wallet.trackExpectedAt","placeholders":["time"],"consumers":[{"file":"src/pages/me/wallet-withdraw-tracking.vue","expression":"t.value.wallet.trackExpectedAt"}]},
+  {"key":"wallet.releaseAttestationInfo","placeholders":["hours"],"consumers":[{"file":"src/pages/me/wallet.vue","expression":"t.value.wallet.releaseAttestationInfo"}]}, // i18n-raw-ok: non-rendered test expression string
+  {"key":"wallet.trackExpectedAt","placeholders":["time"],"consumers":[{"file":"src/pages/me/wallet-withdraw-tracking.vue","expression":"t.value.wallet.trackExpectedAt"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"onboarding.policyLine3","placeholders":[],"consumers":[{"file":"src/pages/onboarding/connect.vue","expression":"t.value.onboarding.policyLine3"}]},
   {"key":"session.kickedTaskNote","placeholders":[],"consumers":[{"file":"src/pages/session/kicked.vue","expression":"t.session.kickedTaskNote"}]},
   {"key":"profile.serverMutationFailed","placeholders":[],"consumers":[{"file":"src/pages/me/profile.vue","expression":"t.value.profile.serverMutationFailed"}]},
@@ -40,7 +40,7 @@ export const reviewedCopyR2 = [
   {"key":"globe.regionProjectionEmptyDesc","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.value.globe.regionProjectionEmptyDesc"}]},
   {"key":"globe.regionProjectionErrorDesc","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.regionProjectionErrorDesc"},{"file":"src/pages/globe/globe.vue","expression":"t.value.globe.regionProjectionErrorDesc"}]},
   {"key":"globe.latencyTelemetryMissingHint","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.latencyTelemetryMissingHint"}]},
-  {"key":"globe.projectionUpdatedAt","placeholders":["at"],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.projectionUpdatedAt"}]},
+  {"key":"globe.projectionUpdatedAt","placeholders":["at"],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.projectionUpdatedAt"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"trust.verifiedAggregateNote","placeholders":["at"],"consumers":[{"file":"src/pages/trust/trust.vue","expression":"tr.value.verifiedAggregateNote"}]},
   {"key":"genesis.purchaseRunConflict","placeholders":[],"consumers":[{"file":"src/components/genesis/purchase-sheet.vue","expression":"t.value.genesis.purchaseRunConflict"}]},
   {"key":"genesis.purchaseRunConflictSub","placeholders":[],"consumers":[{"file":"src/components/genesis/purchase-sheet.vue","expression":"t.value.genesis.purchaseRunConflictSub"}]},
@@ -49,19 +49,19 @@ export const reviewedCopyR2 = [
   {"key":"walletV3.withdrawAbandonAlreadyCommitted","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-withdraw.vue","expression":"t.value.walletV3.withdrawAbandonAlreadyCommitted"}]},
   {"key":"rank.loadError","placeholders":[],"consumers":[{"file":"src/pages/team/rank.vue","expression":"t.rank.loadError"}]},
   {"key":"directReferral.netHint","placeholders":[],"consumers":[{"file":"src/pages/team/unilevel.vue","expression":"t.directReferral.netHint"}]},
-  {"key":"binary.blockedDetail","placeholders":["side","vol"],"consumers":[{"file":"src/pages/team/binary.vue","expression":"t.value.binary.blockedDetail"}]},
+  {"key":"binary.blockedDetail","placeholders":["side","vol"],"consumers":[{"file":"src/pages/team/binary.vue","expression":"t.value.binary.blockedDetail"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"binary.blockedAction","placeholders":[],"consumers":[{"file":"src/pages/team/binary.vue","expression":"t.value.binary.blockedAction"}]},
   {"key":"binary.memberDetailsUnavailable","placeholders":[],"consumers":[{"file":"src/pages/team/binary.vue","expression":"t.binary.memberDetailsUnavailable"}]},
   {"key":"repurchase.claimMessage","placeholders":["amount","order"],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.claimMessage"}]},
   {"key":"repurchase.earlyMessage","placeholders":["amount","order","penalty"],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.earlyMessage"}]},
-  {"key":"tree.serverVolumeSubtitle","placeholders":["n","volume"],"consumers":[{"file":"src/pages/team/tree.vue","expression":"t.value.tree.serverVolumeSubtitle"}]},
+  {"key":"tree.serverVolumeSubtitle","placeholders":["n","volume"],"consumers":[{"file":"src/pages/team/tree.vue","expression":"t.value.tree.serverVolumeSubtitle"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"agent.serverApplication","placeholders":[],"consumers":[{"file":"src/pages/team/agent.vue","expression":"t.agent.serverApplication"}]},
   {"key":"daily.powerUps.footer","placeholders":[],"consumers":[{"file":"src/components/daily/streak-power-ups.vue","expression":"w.footer"}]},
-  {"key":"ref.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.value.ref.verifiedScope"}]},
+  {"key":"ref.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.value.ref.verifiedScope"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"ref.unavailableScope","placeholders":[],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.value.ref.unavailableScope"}]},
   {"key":"missions.eventsUnavailableBody","placeholders":[],"consumers":[{"file":"src/pages/missions/missions.vue","expression":"t.missions.eventsUnavailableBody"}]},
   {"key":"weeklyQuest.progressVerified","placeholders":[],"consumers":[{"file":"src/components/home/weekly-quest-hero.vue","expression":"w.value.progressVerified"}]},
-  {"key":"share.posterRewardEffectiveAt","placeholders":["date"],"consumers":[{"file":"src/components/team/share-poster-sheet.vue","expression":"t.value.share.posterRewardEffectiveAt"}]},
+  {"key":"share.posterRewardEffectiveAt","placeholders":["date"],"consumers":[{"file":"src/components/team/share-poster-sheet.vue","expression":"t.value.share.posterRewardEffectiveAt"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"share.eventFailed","placeholders":[],"consumers":[{"file":"src/lib/share.ts","expression":"t.value.share.eventFailed"}]},
   {"key":"home.networkStatUnverifiedHint","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.home.networkStatUnverifiedHint"}]},
   {"key":"repurchase.unavailableBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.unavailableBody"}]},
