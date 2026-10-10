@@ -62,13 +62,14 @@ const fixture = (status: Bill["status"], type: Bill["type"] = "refer"): Bill => 
   id: "WL-840781", type, amount: 99.5, symbol: "NEX", status,
   ts: Date.parse("2026-10-05T11:48:21Z"), memo: "", memoKey: "refer", ref: "F2-NETWORK-NEX-376",
 });
-async function mount(localeCode: Locale, rows: Bill[] = [], page: keyof typeof codes = "list", category?: string) {
+async function mount(localeCode: Locale, rows: Bill[] = [], page: keyof typeof codes = "list", category?: string, initialReadFailed = false) {
   const locale = useLocaleStore(); locale.setLocale(localeCode);
   const pager = Vue.reactive({ rows, status: "ready", hasMore: false, loadingMore: false, error: "",
     refresh: vi.fn(async () => {}), loadMore: vi.fn(async () => {}) });
   const bills = Vue.reactive({ getLedger: () => pager, bills: [], summary: { rewardsNex: 251.5, rewardsUsdt: 147.72 } as { rewardsNex: number; rewardsUsdt: number } | null,
     summaryStatus: "ready", refreshSummary: vi.fn(async () => {}) });
   const voucher = Vue.reactive({ claimedUnused: [] as unknown[], expiredVouchers: [] as unknown[], remoteStatus: "ready", refreshRemote: vi.fn() });
+  if (initialReadFailed) { bills.summary = null; bills.summaryStatus = "error"; voucher.remoteStatus = "error"; }
   const account = Vue.reactive({ accountKey: "user:7", accountBindingEpoch: 1 });
   const shown: Array<() => void> = [], navTo = vi.fn();
   const modules: Record<string, unknown> = {
@@ -134,10 +135,44 @@ describe("mounted reward state presentation", () => {
     screen.bills.summaryStatus = "loading"; screen.bills.summary = null; await Vue.nextTick();
     expect(totals()).toEqual(["2", "$147.72", "251.5"]);
     screen.account.accountBindingEpoch++; screen.account.accountKey = "user:8"; await Vue.nextTick();
-    expect(totals()).toEqual(["--", "--", "--"]);
+    expect(totals()).toEqual(["-", "-", "-"]);
     screen.voucher.remoteStatus = "ready"; screen.bills.summary = { rewardsUsdt: 5, rewardsNex: 6 };
     screen.bills.summaryStatus = "ready"; await Vue.nextTick();
     expect(totals()).toEqual(["0", "$5.00", "6"]);
+  });
+
+  it.each(locales)("keeps uncached failed reads unknown until retry restores values, including fixture zeros in %s", async locale => {
+    const screen = await mount(locale, [], "summary", undefined, true), t = dicts[locale];
+    const totals = () => nodes(screen.root).filter(entry => entry.props.class === "font-mono-tabular").map(textOf);
+    expect(totals()).toEqual(["-", "-", "-"]);
+    expect(screen.text()).toContain(t.walletV3.submitReasonServiceUnavailable);
+    expect(screen.text()).not.toContain(t.rewards.emptyHint);
+    const retry = nodes(screen.root).find(entry => entry.props.role === "button" && textOf(entry) === t.store.catalogRetry)!;
+    expect(retry).toBeDefined();
+    let finishRead!: () => void;
+    const read = new Promise<void>(resolve => { finishRead = resolve; });
+    screen.voucher.refreshRemote.mockImplementation(() => { screen.voucher.remoteStatus = "loading"; return read; });
+    screen.bills.refreshSummary.mockImplementation(async () => { screen.bills.summaryStatus = "loading"; await read; });
+    const pending = (retry.props.onClick as () => Promise<void>)(); await Vue.nextTick();
+    expect(screen.voucher.refreshRemote).toHaveBeenCalledTimes(2);
+    expect(screen.bills.refreshSummary).toHaveBeenCalledTimes(2);
+    expect(totals()).toEqual(["-", "-", "-"]);
+    expect(screen.text()).not.toContain(t.rewards.emptyHint);
+    screen.voucher.claimedUnused = [{ id: "recovered-1" }, { id: "recovered-2" }]; screen.voucher.remoteStatus = "ready";
+    screen.bills.summary = { rewardsUsdt: 12.5, rewardsNex: 340 }; screen.bills.summaryStatus = "ready";
+    finishRead(); await pending; await Vue.nextTick();
+    expect(totals()).toEqual(["2", "$12.50", "340"]);
+    expect(screen.text()).not.toContain(t.walletV3.submitReasonServiceUnavailable);
+    expect(screen.text()).not.toContain(t.store.catalogRetry);
+    screen.voucher.remoteStatus = "error"; screen.voucher.claimedUnused = [];
+    screen.bills.summaryStatus = "error"; screen.bills.summary = null; await Vue.nextTick();
+    expect(totals()).toEqual(["2", "$12.50", "340"]);
+    expect(screen.text()).toContain(t.walletV3.submitReasonServiceUnavailable);
+    screen.voucher.remoteStatus = "ready"; screen.bills.summary = { rewardsUsdt: 0, rewardsNex: 0 };
+    screen.bills.summaryStatus = "ready"; await Vue.nextTick();
+    expect(totals()).toEqual(["0", "$0.00", "0"]);
+    expect(screen.text()).toContain(t.rewards.emptyHint);
+    expect(screen.text()).not.toContain(t.walletV3.submitReasonServiceUnavailable);
   });
 
   it.each(locales)("adds the activity category without mixing gifts into currency totals in %s", async locale => {
