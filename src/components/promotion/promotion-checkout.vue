@@ -132,8 +132,10 @@ function requestLeave():Promise<boolean>{
   updateClock();
   const reserved=payWindow.value===true;
   const fingerprint=order.value?.orderNo??quote.value?.quoteId??'';
-  if(!current()||busy.value||unknown.value||!rewards.value.length||!fingerprint||asked||(order.value?!reserved:!quoteFresh.value||quote.value?.eligibility!=='ELIGIBLE'))return Promise.resolve(true);
-  asked=fingerprint;leaveOpen.value=true;return new Promise(resolve=>{leaveResolver=resolve;});
+  if(!current()||busy.value||unknown.value||!rewards.value.length||!fingerprint||asked||session.record.leavePromptShown||(order.value?!reserved:!quoteFresh.value||quote.value?.eligibility!=='ELIGIBLE'))return Promise.resolve(true);
+  asked=fingerprint;
+  try{session.rememberLeavePrompt();}catch{return Promise.resolve(true);}
+  leaveOpen.value=true;return new Promise(resolve=>{leaveResolver=resolve;});
 }
 useDialogA11y(leaveOpen,'.promotion-leave',()=>finishLeave(false));
 // H5 browser history uses the router guard; no artificial history entry or popstate trap.
