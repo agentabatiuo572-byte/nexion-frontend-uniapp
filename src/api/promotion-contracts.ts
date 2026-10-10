@@ -1,5 +1,5 @@
 // Generated from the reviewed OpenAPI. Run scripts/generate-promotion-contracts.mjs; no business calculations.
-// Source SHA256: b8a3349bf63ba3288c59bec34ec81deac4390fd3b16e15128f62b4fc100d7fa5
+// Source SHA256: f2a6d69da06bcc7dda7d8383cff2fbfe9620802cc640f4fae3f7fd8be9ed7516
 export type Id = string;
 export type Revision = number;
 export type Template = "SKU_GIFT" | "FIRST_PURCHASE" | "DIRECT_REFERRAL" | "MULTI_PRODUCT" | "REPURCHASE";

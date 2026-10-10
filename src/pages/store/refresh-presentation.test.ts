@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import ordersPage from "./orders.vue?raw";
 import card from "@/components/store/product-card.vue?raw";
+import { en } from "@/i18n/messages/en";
+import { zh } from "@/i18n/messages/zh";
+import { vi as vietnamese } from "@/i18n/messages/vi";
 
 function actual(script: string, names: string[], args: Record<string, unknown>) {
   const source = ts.createSourceFile("actual.ts", script.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)![1], ts.ScriptTarget.Latest, true);
@@ -14,6 +17,23 @@ function actual(script: string, names: string[], args: Record<string, unknown>) 
 }
 
 describe("actual page presentation remains separate from authority", () => {
+  it("offers an initial eligibility check in all three languages and reserves retry for an actual error", () => {
+    for (const messages of [en, zh, vietnamese]) {
+      const eligibility = ref({ status: "idle" });
+      const { buyLabel } = actual(card, ["buyLabel"], {
+        computed, t: ref(messages), remoteApiEnabled: true, eligibility,
+        promotionSignIn: ref(false), promotionUnavailable: ref(false), catalogUnavailable: ref(false),
+        stockUnavailable: ref(false), gate: ref({ soldOut: false, blocked: true }),
+      });
+      expect(buyLabel.value).toBe(messages.store.purchaseEligibilityCheck);
+      expect(buyLabel.value).not.toBe(messages.store.purchaseEligibilityRetry);
+      eligibility.value.status = "loading";
+      expect(buyLabel.value).toBe(messages.store.purchaseEligibilityLoading);
+      eligibility.value.status = "error";
+      expect(buyLabel.value).toBe(messages.store.purchaseEligibilityRetry);
+    }
+  });
+
   it("shows order read errors without importing Genesis opening status", () => {
     const genesis = reactive({ remoteEligibilityError: "GENESIS_SERIES_UNAVAILABLE" });
     const commerceOrdersUnavailable = ref(true), genesisOrdersUnavailable = ref(true);
@@ -40,10 +60,14 @@ describe("actual page presentation remains separate from authority", () => {
     for (const status of ["loading", "error"]) { state.status = status; expect(buyUnavailable.value).toBe(true); onBuy(); }
     expect(goCheckout).not.toHaveBeenCalled();
     state.status = "ready";
-    for (const status of ["idle", "loading"]) { eligibility.value.status = status; expect(buyUnavailable.value).toBe(true); onBuy(); }
+    eligibility.value.status = "idle"; expect(buyUnavailable.value).toBe(false); onBuy();
+    expect(retryEligibility).toHaveBeenCalledOnce();
+    expect(goCheckout).not.toHaveBeenCalled();
+    eligibility.value.status = "loading"; expect(buyUnavailable.value).toBe(true); onBuy();
+    expect(retryEligibility).toHaveBeenCalledOnce();
     eligibility.value.status = "error"; expect(buyUnavailable.value).toBe(false); onBuy();
     expect(goCheckout).not.toHaveBeenCalled();
-    expect(retryEligibility).toHaveBeenCalledOnce();
+    expect(retryEligibility).toHaveBeenCalledTimes(2);
     eligibility.value = { status: "ready", eligible: false }; onBuy();
     expect(goCheckout).not.toHaveBeenCalled();
     expect(goDetail).toHaveBeenCalledOnce();
