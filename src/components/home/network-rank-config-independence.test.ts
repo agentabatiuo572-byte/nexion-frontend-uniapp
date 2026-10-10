@@ -44,8 +44,7 @@ describe('actual homepage remote ranking is independent of H9 estimates', () => 
   it('keeps a successful real rank when public configuration fails', () => {
     const { metrics, configRefresh } = scenario({ failed: true, rankOk: true });
     expect(metrics[2].v).toBe('#7');
-    // #59:配置读失败且没有服务端可核验聚合时,两格不拿配置派生量充事实 ——
-    // 如实说「无实测口径」,而不是伪装成「更新中」再回落到配置值。
+    // Missing measurements remain placeholders and retain the existing retry.
     expect(metrics[0].v).toBe('-');
     expect(metrics[1].v).toBe('-');
     metrics[0].tap(); expect(configRefresh).toHaveBeenCalledOnce();

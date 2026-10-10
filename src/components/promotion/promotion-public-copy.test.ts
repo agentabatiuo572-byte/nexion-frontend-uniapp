@@ -56,8 +56,8 @@ const internal=/服务端|数据库|接口|投影|本地(?:数据|模拟|不会)
 const readCopy = (copy: unknown, key: string): string => key.split('.').reduce<unknown>(
   (node, segment) => (node as Record<string, unknown>)[segment], copy) as string;
 it.each([{ locale: 'zh', copy: zh }, { locale: 'en', copy: en }, { locale: 'vi', copy: vi }])(
-  '$locale all 67 approved public keys keep their real consumers and format every placeholder without engineering prose', ({ copy }) => {
-    expect(reviewedCopyR2).toHaveLength(67);
+  '$locale all 61 approved public keys keep their real consumers and format every placeholder without engineering prose', ({ copy }) => {
+    expect(reviewedCopyR2).toHaveLength(61);
     for (const item of reviewedCopyR2) {
       const value = readCopy(copy, item.key);
       expect(value, item.key).toBeTruthy();
@@ -74,23 +74,28 @@ it.each([{ locale: 'zh', copy: zh }, { locale: 'en', copy: en }, { locale: 'vi',
     }
     for (const key of ['remoteSource', 'remoteError']) expect(copy.help).not.toHaveProperty(key);
     for (const key of ['releasePhasePending', 'releaseSchedulePending', 'releaseConfigUnavailable', 'releasePending']) expect(copy.store).not.toHaveProperty(key);
+    for (const key of ['networkStatUnverified', 'networkStatUnverifiedHint', 'networkVerifiedScope']) expect(copy.home).not.toHaveProperty(key);
+    expect(copy.intro).not.toHaveProperty('verifiedScope');
+    expect(copy.goals).not.toHaveProperty('recReasonServer');
+    expect(copy.trust).not.toHaveProperty('verifiedAggregateNote');
+    expect(copy.ref).not.toHaveProperty('verifiedScope');
   },
 );
 
 it.each([
-  { locale: 'zh', copy: zh, empty: '-', latency: '-', progress: '完成任务后，请查看奖励领取状态。' },
-  { locale: 'en', copy: en, empty: '-', latency: '-', progress: 'After completing the quest, check the reward claim status.' },
-  { locale: 'vi', copy: vi, empty: '-', latency: '-', progress: 'Sau khi hoàn thành nhiệm vụ, hãy kiểm tra trạng thái nhận thưởng.' },
-])('$locale reports missing measurements without a number and asks to check quest eligibility', ({ copy, empty, latency, progress }) => {
-  expect(copy.home.networkStatUnverified).toBe(empty);
+  { locale: 'zh', copy: zh, latency: '-', progress: '请继续完成任务。' },
+  { locale: 'en', copy: en, latency: '-', progress: 'Please continue with the task.' },
+  { locale: 'vi', copy: vi, latency: '-', progress: 'Hãy tiếp tục hoàn thành nhiệm vụ.' },
+])('$locale reports missing measurements without a number and asks to continue the task', ({ copy, latency, progress }) => {
+  expect(networkSource).toContain('v: "-"');
   expect(copy.globe.latencyTelemetryMissing).toBe(latency);
   expect(copy.weeklyQuest.progressVerified).toBe(progress);
 });
 
 it.each([
-  { locale: 'zh', copy: zh, expected: ['本金', '利息', '预计', '到账'], penalty: ['本金', '罚金', '放弃利息及抽奖券', '预计退回'], unknown: '无法确认', release: ['暂不可提现', '是否释放', '释放金额'], privacy: ['审核', '依法', '财务与安全', '不会被立即删除'], abandon: ['未建单', '已建单不会撤销或重复扣款'], quote: ['估算', '提交时', '汇率及手续费'] },
-  { locale: 'en', copy: en, expected: ['principal', 'interest', 'estimated', 'credited'], penalty: ['principal penalty', 'Interest and lottery tickets are forfeited', 'Estimated return'], unknown: 'not confirmed', release: ['not withdrawable', 'Release eligibility and amounts'], privacy: ['reviewed', 'Financial and security', 'required by law', 'not erased immediately'], abandon: ['Only an attempt without an order', 'not cancelled or charged again'], quote: ['Estimate', 'at submission', 'exchange rate and fee'] },
-  { locale: 'vi', copy: vi, expected: ['gốc', 'lãi', 'dự kiến', 'ghi có'], penalty: ['phạt', 'tiền gốc', 'mất lãi và vé quay thưởng', 'Dự kiến hoàn'], unknown: 'Chưa thể xác nhận', release: ['chưa thể rút', 'Việc giải phóng', 'số tiền được giải phóng'], privacy: ['xem xét', 'tài chính và bảo mật', 'theo pháp luật', 'không bị xóa ngay'], abandon: ['Chỉ đóng lần thử chưa có lệnh', 'không bị hủy hoặc trừ tiền lần nữa'], quote: ['ước tính', 'tại thời điểm gửi', 'tỷ giá và phí'] },
+  { locale: 'zh', copy: zh, expected: ['本金', '利息', '预计', '结算结果为准'], penalty: ['本金', '罚金', '放弃利息及抽奖券', '预计退回', '结算结果为准'], unknown: '无法确认', release: ['暂不可提现', '是否释放', '释放金额'], privacy: ['审核', '依法', '财务与安全', '不会被立即删除'], abandon: ['确认未创建订单后', '已创建的订单不会撤销或重复扣款'], quote: ['估算', '提交时', '汇率及手续费'] },
+  { locale: 'en', copy: en, expected: ['principal', 'interest', 'estimated', 'confirmed at settlement'], penalty: ['principal penalty', 'Interest and lottery tickets are forfeited', 'Estimated return', 'confirmed at settlement'], unknown: 'not confirmed', release: ['not withdrawable', 'Release eligibility and amounts'], privacy: ['reviewed', 'Financial and security', 'required by law', 'not erased immediately'], abandon: ['only after confirming that no order was created', 'not be cancelled or charged again'], quote: ['Estimate', 'at submission', 'exchange rate and fee'] },
+  { locale: 'vi', copy: vi, expected: ['gốc', 'lãi', 'dự kiến', 'xác nhận khi quyết toán'], penalty: ['phạt', 'tiền gốc', 'mất lãi và vé quay thưởng', 'Dự kiến hoàn', 'xác nhận khi quyết toán'], unknown: 'Chưa thể xác nhận', release: ['chưa thể rút', 'Điều kiện', 'số tiền được giải phóng', 'kết quả xác nhận cuối cùng'], privacy: ['xét duyệt', 'tài chính và bảo mật', 'theo pháp luật', 'không bị xóa ngay'], abandon: ['sau khi xác nhận chưa tạo lệnh', 'không bị hủy hoặc trừ tiền lần nữa'], quote: ['ước tính', 'tại thời điểm gửi', 'tỷ giá và phí'] },
 ])('$locale keeps money estimates, penalties, unknown results, release conditions and deletion limits', ({ copy, expected, penalty, unknown, release, privacy, abandon, quote }) => {
   const claim = fmt(copy.repurchase.claimMessage, { order: 'ORDER-42', amount: '123.45' });
   for (const text of ['ORDER-42', '123.45 USDT', ...expected]) expect(claim).toContain(text);
@@ -106,17 +111,18 @@ it.each([
   expect(copy.onboarding.policyLine3).toContain('120');
 });
 it.each([
-  {locale:'zh',copy:zh,text:'当前算力暂不可用。'},
-  {locale:'en',copy:en,text:'Current hashpower is unavailable.'},
-  {locale:'vi',copy:vi,text:'Công suất hiện tại tạm thời chưa có.'},
-])('$locale shared unavailable hashpower copy remains in all three explanation callers',({copy,text})=>{
-  expect(deviceSource.match(/t(?:\.value)?\.earn\.hashCapabilityUnknown/g)).toHaveLength(3);
+  {locale:'zh',copy:zh,text:'上方设备规格为估算值，已校准算力暂不可用；任务状态单独展示。'},
+  {locale:'en',copy:en,text:'The device specifications above are estimates; calibrated compute capacity is unavailable. Task status is shown separately.'},
+  {locale:'vi',copy:vi,text:'Thông số thiết bị ở trên chỉ là ước tính; công suất đã hiệu chuẩn chưa có. Trạng thái tác vụ được hiển thị riêng.'},
+])('$locale unavailable hashpower keeps two explanations and a dash in compact metric slots',({copy,text})=>{
+  expect(deviceSource.match(/t(?:\.value)?\.earn\.hashCapabilityUnknown/g)).toHaveLength(2);
+  expect(deviceSource).toContain("baselineTops == null ? '-' :");
+  expect(deviceSource).toContain('? deviceGpuLabel(t.value, props.device) : "-"');
   expect(copy.earn.hashCapabilityUnknown).toBe(text);
 });
 const consumers:{key:string;sources:string[]}[]=[
   {key:'home.networkVerifiedMembers',sources:[networkSource]},
   {key:'home.networkVerifiedDevices',sources:[networkSource]},
-  {key:'home.networkVerifiedScope',sources:[networkSource]},
   {key:'earn.summaryUnavailableBody',sources:[earnSource]},
   {key:'earn.hashCapabilityUnknown',sources:[deviceSource]},
   {key:'events.loadErrorBody',sources:[eventsSource]},

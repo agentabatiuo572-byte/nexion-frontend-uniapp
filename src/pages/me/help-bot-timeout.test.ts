@@ -51,7 +51,7 @@ function harness(chat: (request?: { turnId: string }) => Promise<unknown>): Harn
       capture: () => ({ language: "zh", conversationId: "CV-TEST" }),
       add: (message) => { transcript.push(message); },
     };
-    const w = { value: { botTimeout: "超时", botTimeoutHint: "可以重试", remoteFailed: "暂时无法回复，请重试。" } };
+    const w = { value: { botTimeout: "超时", botTimeoutHint: "可以重试", remoteFailed: "暂时无法回复，请重试" } };
     const syncBotAccountScope = () => undefined;
     const bumpScroll = () => undefined;
     const fmt = (template, params) => template.replace(/\\{(\\w+)\\}/g, (_, key) => params[key] ?? "{" + key + "}");
@@ -113,13 +113,15 @@ describe("NexGridBot remote reply deadline", () => {
 
     expect(h.thinking.value).toBe(false);
     expect(h.botFailure.value).toBe("error");
-    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "暂时无法回复，请重试。", meta: undefined });
+    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "暂时无法回复，请重试" });
+    expect(JSON.stringify(h.transcript)).not.toContain("NOVA_INTERNAL_SENTINEL");
+    expect(JSON.stringify(h.transcript)).not.toContain("NOVA_AI_UNAVAILABLE");
   });
 
   it("shows a reply without internal source metadata", async () => {
     const h = harness(async () => ({ reply: "可以查看最新订单。", source: "INTERNAL_SOURCE_SENTINEL", language: "zh" }));
     await h.sendToBot();
-    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "可以查看最新订单。", meta: undefined });
+    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "可以查看最新订单。" });
     expect(h.pendingBotRequest.value).toBeNull();
   });
 
@@ -129,7 +131,7 @@ describe("NexGridBot remote reply deadline", () => {
     const h = harness(chat);
     await h.sendToBot();
     expect(h.pendingBotRequest.value?.payload.turnId).toBe("turn-id");
-    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "暂时无法回复，请重试。", meta: undefined });
+    expect(h.transcript.at(-1)).toEqual({ from: "bot", text: "暂时无法回复，请重试" });
     h.retryBot();
     await Promise.resolve();
     await Promise.resolve();

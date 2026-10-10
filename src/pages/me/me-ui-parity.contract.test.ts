@@ -57,12 +57,12 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "e7cfef2560a4a60747043f2a4d76b875a0faad0383b5cbcf1fb15deeab98e60f",
   "devices.vue": "227aa03a6c8ba621deb6d5e69fa1672cd80e918fc18cf37deeac446818adb125",
-  // Reviewed #223: wait for the goal editor snapshot and require a matching recommendation target.
-  "goals.vue": "d1b25b9400d00972fce6b36636c2874be231a7b9e5be1b0c9702091ef72ab74d",
+  // Keep #223 authority gates; hide the removed internal recommendation footnote.
+  "goals.vue": "2043fa722af0c8ae7aba51ed92455bcb255beb2be2ca2d8d81df4dbeb24b8f7f",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
   // Owner requested removal of the unsolicited overview withdrawal warning.
-  "me.vue": "4eb7f786750e279d7d7101415c5d4857dbbdcd20a4e2afcd4979b28f21c823e6",
+  "me.vue": "3b4a7faf7ed879ac741e08a839d7c27b372c3a5cc9b553bbde785f873945237d",
   // Approved smooth centered message header and shared message-family interactions.
   "notifications.vue": "0c754690e400fe1b137de31e968d31a0f347c5020ed6d4a22322abb7fe327344",
   "preferences.vue": "f671d2462d5c346657790bfb9f75c92cfb0a63d1039c886ed8ad02cd6789e3cc",
@@ -74,12 +74,13 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "rewards.vue": "720da0cce42564baaa4451ee4002b6e92f83be5e1ab0317963e22490927e59ef",
   "risk-disclosure.vue": "5f1d1f52b62559b79785d91fd28fd9e4de6597cf91b9174a87191740c95ba2bf",
   // Reviewed ME41: busy save/cancel remain visible and reject keyboard/pointer re-entry.
-  "security.vue": "19d724dcc21783439730c5709bd9651afc99ed50e995c5437dab0a8cbe83c247",
+  "security.vue": "97dd537c7c35262b3946475b4f897fd499de49437050c08e66c937f291b8a4ed",
   // Reviewed #439: BASIC retains the existing hint; enhanced policy owns retry timing and existing-ticket/retry actions.
   // Reviewed #470: cursor-spacing=72 on the detail reply textarea only.
   "support-tickets.vue": "4504cb6168c6e939402a4be14b5f39caeaaa8ab9deda42433c7b91eacf12fce8",
   "support.vue": "9a89c364bbc52d36f0218752b5bb69ffbba692fd113feaf285e7d0273180bad0",
-  "trial.vue": "9ba1ff2296064a5ccf0c750018c06c722853136431dc2f8e14ffa0ef7bd20d2e",
+  // Reviewed removal of the retired card-migration notice; trial amounts, deadlines and actions remain covered.
+  "trial.vue": "53967cefbe18331bee801de39a048cd5969dda1e216bb829bd54155230f3e838",
   "wallet-address-rebind.vue": "64f22ae20b3725ff6df6c516a9f99a6714efd94834cc5b02734c146e377e9e32",
   // Reviewed #465: refund references wrap on their own read-only line; other bill rows retain their layout.
   // Promotion receipt deep links retain the existing refund row and bill layout.
@@ -95,7 +96,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-repurchase.vue": "19b1c868b06086a2384a8f3bba7f013dc026f2c1bf97a5ff886f3fed3a40adca",
   "wallet-topup.vue": "010252b7630c35defdf57a3f262d0e389c011d2b9d79ad2f5fb788e794d87768",
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
-  "wallet-withdraw.vue": "e3f41cf165b08b6a7813a6f1b180d3da96e5d786f1daa138e95fb4ba334ed10d",
+  // Original pending requests expose retry even when the new-transfer form is incomplete.
+  "wallet-withdraw.vue": "9de96547e0723614444c9116690dbc5d4bf6ee906e2d1457940702249175dc40",
   // Reviewed e0a491a: missing earnings use '-' with a separate reason and authority retry.
   "wallet.vue": "bd3aab8e397c2be70bc04959a75c139f30fb2fd60aedc6fbe2d2d9850caee2c9"
 };

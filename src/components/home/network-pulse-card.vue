@@ -6,17 +6,9 @@
   <view data-home-section="network-pulse">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.networkPulseTitle }}</text>
-      <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan-ink)">{{ t.home.networkPublished }}</text>
     </view>
 
     <view class="nx-glass-card" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); overflow: hidden">
-      <view class="nx-glass-inset px-3.5 py-2.5 flex justify-between items-center font-mono-tabular" style="border-bottom: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3)">
-        <view class="inline-flex items-center gap-1.5">
-          <PulseDot color="var(--v5-tech-cyan)" />
-          <text>{{ cfg.config.verifiedStats && !cfg.syncFailed ? fmt(t.home.networkVerifiedScope, { at: cfg.config.verifiedStats.capturedAt.slice(0, 16).replace('T', ' ') }) : t.home.networkStatUnverifiedHint }}</text>
-        </view>
-        <!-- 条头右侧刻意留空:实时支付流数字已删(FEAT-HOME02 定案,与「今日支付」同一笔钱两种表达)。 -->
-      </view>
 
       <view class="grid grid-cols-3">
         <view
@@ -83,7 +75,6 @@ import { computeRank } from "@/lib/network-rank";
 import { publicStatsHealth, compactNumber as compact } from "@/lib/platform-stats";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
-import PulseDot from "./pulse-dot.vue";
 import HomeSparkline from "./home-sparkline.vue";
 
 const t = useT();
@@ -197,11 +188,11 @@ function activate(action?: () => void) {
   action?.();
 }
 
-// Missing measurements keep the header explanation; failed reads offer the existing retry.
+/** No published measurement: never substitute a configured estimate. */
 function unverifiedCell(label: string): Cell {
   return {
     k: label,
-    v: t.value.home.networkStatUnverified,
+    v: "-",
     vSize: "12.5px",
     tone: "var(--v5-ink-3)",
     sub: cfg.syncFailed ? t.value.home.networkStatRetry : "",

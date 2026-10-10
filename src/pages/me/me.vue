@@ -75,7 +75,7 @@
       </view>
       <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
         <text class="flex-1" style="font-size: 12px; color: var(--v5-danger)">{{ t.orders.refreshFailed }}</text>
-        <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.orders.retry" @click="refreshRemoteOrders"  @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
+        <view class="shrink-0 inline-flex items-center justify-center active:scale-[0.98] transition-transform" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.orders.retry" @click="refreshRemoteOrders"  @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
           <text>{{ t.orders.retry }}</text>
         </view>
       </view>

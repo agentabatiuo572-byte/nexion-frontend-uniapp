@@ -1,15 +1,12 @@
 // Approved formal consumers. Keep this list scoped so developer API documentation remains untouched.
 export const reviewedCopyR2 = [
-  {"key":"home.networkStatUnverified","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.value.home.networkStatUnverified"}]},
   {"key":"globe.latencyTelemetryMissing","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.value.globe.latencyTelemetryMissing"}]},
-  {"key":"intro.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/onboarding/intro.vue","expression":"t.value.intro.verifiedScope"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"login.serverSessionReloadNotice","placeholders":[],"consumers":[{"file":"src/pages/login/login.vue","expression":"t.login.serverSessionReloadNotice"}]},
   {"key":"earn.phoneTaskPausedHint","placeholders":[],"consumers":[{"file":"src/components/earn/device-card-pc.vue","expression":"t.earn.phoneTaskPausedHint"}]},
   {"key":"earn.phonePausedNoNetworkHint","placeholders":[],"consumers":[{"file":"src/components/earn/device-card-pc.vue","expression":"t.value.earn.phonePausedNoNetworkHint"}]},
   {"key":"genesisHolder.pre.serverPointsUnavailable","placeholders":[],"consumers":[{"file":"src/pages/genesis/holder.vue","expression":"t.genesisHolder.pre.serverPointsUnavailable"}]},
   {"key":"genesisHolder.post.noEmissions","placeholders":[],"consumers":[{"file":"src/pages/genesis/holder.vue","expression":"t.genesisHolder.post.noEmissions"}]},
   {"key":"preferences.hapticsHint","placeholders":[],"consumers":[{"file":"src/pages/me/preferences.vue","expression":"w.hapticsHint"}]},
-  {"key":"goals.recReasonServer","placeholders":[],"consumers":[{"file":"src/pages/me/goals.vue","expression":"t.value.goals.recReasonServer"}]},
   {"key":"goals.loading","placeholders":[],"consumers":[{"file":"src/pages/me/goals.vue","expression":"t.goals.loading"}]},
   {"key":"tx.detailUnavailableBody","placeholders":[],"consumers":[{"file":"src/pages/tx/hash.vue","expression":"w.detailUnavailableBody"}]},
   {"key":"tradein.remoteQuoteCreditLabel","placeholders":[],"consumers":[{"file":"src/components/tradein-sheets.vue","expression":"t.value.tradein.remoteQuoteCreditLabel"},{"file":"src/pages/me/devices.vue","expression":"t.value.tradein.remoteQuoteCreditLabel"}]},
@@ -41,7 +38,6 @@ export const reviewedCopyR2 = [
   {"key":"globe.regionProjectionErrorDesc","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.regionProjectionErrorDesc"},{"file":"src/pages/globe/globe.vue","expression":"t.value.globe.regionProjectionErrorDesc"}]},
   {"key":"globe.latencyTelemetryMissingHint","placeholders":[],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.latencyTelemetryMissingHint"}]},
   {"key":"globe.projectionUpdatedAt","placeholders":["at"],"consumers":[{"file":"src/pages/globe/globe.vue","expression":"t.globe.projectionUpdatedAt"}]}, // i18n-raw-ok: non-rendered test expression string
-  {"key":"trust.verifiedAggregateNote","placeholders":["at"],"consumers":[{"file":"src/pages/trust/trust.vue","expression":"tr.value.verifiedAggregateNote"}]},
   {"key":"genesis.purchaseRunConflict","placeholders":[],"consumers":[{"file":"src/components/genesis/purchase-sheet.vue","expression":"t.value.genesis.purchaseRunConflict"}]},
   {"key":"genesis.purchaseRunConflictSub","placeholders":[],"consumers":[{"file":"src/components/genesis/purchase-sheet.vue","expression":"t.value.genesis.purchaseRunConflictSub"}]},
   {"key":"walletV3.withdrawAmbiguousExitBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-withdraw.vue","expression":"t.walletV3.withdrawAmbiguousExitBody"}]},
@@ -57,13 +53,11 @@ export const reviewedCopyR2 = [
   {"key":"tree.serverVolumeSubtitle","placeholders":["n","volume"],"consumers":[{"file":"src/pages/team/tree.vue","expression":"t.value.tree.serverVolumeSubtitle"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"agent.serverApplication","placeholders":[],"consumers":[{"file":"src/pages/team/agent.vue","expression":"t.agent.serverApplication"}]},
   {"key":"daily.powerUps.footer","placeholders":[],"consumers":[{"file":"src/components/daily/streak-power-ups.vue","expression":"w.footer"}]},
-  {"key":"ref.verifiedScope","placeholders":["at"],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.value.ref.verifiedScope"}]}, // i18n-raw-ok: non-rendered test expression string
-  {"key":"ref.unavailableScope","placeholders":[],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.value.ref.unavailableScope"}]},
+  {"key":"ref.unavailableScope","placeholders":[],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.ref.unavailableScope"}]},
   {"key":"missions.eventsUnavailableBody","placeholders":[],"consumers":[{"file":"src/pages/missions/missions.vue","expression":"t.missions.eventsUnavailableBody"}]},
   {"key":"weeklyQuest.progressVerified","placeholders":[],"consumers":[{"file":"src/components/home/weekly-quest-hero.vue","expression":"w.value.progressVerified"}]},
   {"key":"share.posterRewardEffectiveAt","placeholders":["date"],"consumers":[{"file":"src/components/team/share-poster-sheet.vue","expression":"t.value.share.posterRewardEffectiveAt"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"share.eventFailed","placeholders":[],"consumers":[{"file":"src/lib/share.ts","expression":"t.value.share.eventFailed"}]},
-  {"key":"home.networkStatUnverifiedHint","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.home.networkStatUnverifiedHint"}]},
   {"key":"repurchase.unavailableBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.unavailableBody"}]},
   {"key":"repurchase.loading","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.loading"},{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.loading"}]},
   {"key":"learning.submitUnconfirmed","placeholders":[],"consumers":[{"file":"src/pages/learn/course.vue","expression":"t.value.learning[error.value]"}]},
