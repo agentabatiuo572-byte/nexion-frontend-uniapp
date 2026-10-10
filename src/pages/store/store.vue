@@ -311,7 +311,7 @@ const unlockedProducts = computed(() =>
 );
 const lockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
-    if (!mounted.value) return true;
+    if (!mounted.value) return false;
     return !isProductAvailable(p, phase.value);
   }),
 );

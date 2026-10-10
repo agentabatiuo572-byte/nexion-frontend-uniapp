@@ -12,7 +12,7 @@
 -->
 <template>
   <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
-  <view class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :class="promotion ? 'promotion-catalog-card' : 'nx-glass-card'" :style="promotion ? promotionCardStyle : cardStyle" @click="goDetail">
+  <view ref="cardRef" class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :class="promotion ? 'promotion-catalog-card' : 'nx-glass-card'" :style="promotion ? promotionCardStyle : cardStyle" @click="goDetail">
     <view v-if="featured&&!promotion" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
@@ -129,6 +129,7 @@ import { nexGridBrandText } from "@/lib/brand-copy";
 import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
+import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { productCatalogState } from "@/store/product-catalog";
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
@@ -146,9 +147,8 @@ const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
 const promotionUnavailable=computed(()=>!!props.activityId&&(!props.promotionReady||!canPreviewPromotion(props.promotion??null)||!props.promotion?.productNos.includes(props.product.id)));
 const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
-const stockUnavailable = computed(() => !isShare.value
-  && props.product.inventoryMode === "FINITE"
-  && (props.product.stock ?? 0) <= 0);
+const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
+  && props.product.stock === 0);
 const failedImageUrl = ref("");
 watch(() => props.product.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
 // Product videos stay detail-only: listing cards use the catalog image
@@ -178,7 +178,8 @@ const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value 
 // Remote mode never evaluates the local V-rank/team snapshot. The server
 // eligibility response is the only source that can unlock this card.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(() => props.product);
-const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id);
+const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
 const gate = computed(() => stockUnavailable.value
   ? {
       gated: true,
@@ -208,11 +209,12 @@ const gateDetailsOpen = ref(false);
 let lastGateToggleAt = 0;
 const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
 const buyUnavailable = computed(() => promotionUnavailable.value || stockUnavailable.value || catalogUnavailable.value
-  || (!promotionSignIn.value&&remoteApiEnabled && (gate.value.soldOut || eligibility.value.status === "loading" || eligibility.value.status === "idle")));
+  || (!promotionSignIn.value&&remoteApiEnabled && (gate.value.soldOut || eligibility.value.status === "loading")));
 const gateLabel = computed(() => {
   if (stockUnavailable.value) return t.value.store.temporarilyOutOfStock;
   if (!remoteApiEnabled) return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.gateLockedEyebrow;
-  if (eligibility.value.status === "loading" || eligibility.value.status === "idle") return t.value.store.purchaseEligibilityLoading;
+  if (eligibility.value.status === "loading") return t.value.store.purchaseEligibilityLoading;
+  if (eligibility.value.status === "idle") return t.value.store.purchaseEligibilityProductPolicy;
   if (eligibility.value.status === "error") return t.value.store.purchaseEligibilityRetry;
   return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.purchaseEligibilityIneligible;
 });
@@ -238,7 +240,9 @@ const buyLabel = computed(() =>
     ? productCatalogState.status === "loading" ? t.value.store.catalogLoadingTitle : t.value.store.catalogErrorTitle
     : stockUnavailable.value
     ? t.value.store.temporarilyOutOfStock
-    : remoteApiEnabled && (eligibility.value.status === "loading" || eligibility.value.status === "idle")
+    : remoteApiEnabled && eligibility.value.status === "idle"
+    ? t.value.store.purchaseEligibilityCheck
+    : remoteApiEnabled && eligibility.value.status === "loading"
     ? t.value.store.purchaseEligibilityLoading
     : remoteApiEnabled && eligibility.value.status === "error"
       ? t.value.store.purchaseEligibilityRetry
@@ -252,7 +256,7 @@ function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}
   if (remoteApiEnabled) {
-    if (eligibility.value.status === "error") void retryEligibility();
+    if (eligibility.value.status === "idle" || eligibility.value.status === "error") void retryEligibility();
     else if (eligibility.value.status === "ready" && eligibility.value.eligible) goCheckout();
     else if (eligibility.value.status === "ready") goDetail();
     return;
