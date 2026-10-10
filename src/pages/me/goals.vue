@@ -356,19 +356,21 @@ async function onSave() {
     restoreEditorFromGoal(goalsStore.goals[goalsStore.goals.length - 1]);
     void goalsStore.refreshRecommendation(target.value, goalsStore.goals[goalsStore.goals.length - 1]?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
     ui.pushToast({ kind: "success", title: fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }) });
-  } catch (error) {
+  } catch {
     if (!isCurrentSave()) return;
-    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
+    ui.pushToast({ kind: "warn", title: t.value.goals.serverUnavailable });
   } finally {
     if (isCurrentSave()) savePending.value = false;
   }
 }
 
 async function remove(id: string) {
+  const expectedAccountEpoch = goalsStore.accountEpoch;
   try {
     await goalsStore.remove(id);
-  } catch (error) {
-    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
+  } catch {
+    if (expectedAccountEpoch !== goalsStore.accountEpoch) return;
+    ui.pushToast({ kind: "warn", title: t.value.goals.serverUnavailable });
   }
 }
 

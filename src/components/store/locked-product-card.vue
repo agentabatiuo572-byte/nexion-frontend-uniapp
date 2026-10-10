@@ -98,22 +98,6 @@ const queue = computed(() =>
     : null,
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
-const serverReleaseReason = computed(() => {
-  const state = props.product.releaseState;
-  if (!state || props.product.available !== false) return "";
-  const phase = props.product.releasePhaseId
-    ? fmt(t.value.store.releasePhaseRef, { phase: props.product.releasePhaseId })
-    : "";
-  if (state === "H1_RHYTHM_UNAVAILABLE") return t.value.store.releaseRhythmUnavailable;
-  if (state === "E1_PHASE_CONFIG_UNAVAILABLE" || state === "E1_UNLOCK_PHASE_INVALID"
-      || state === "E1_GENERATION_PHASE_MISMATCH") return t.value.store.releaseConfigUnavailable;
-  if (state === "E1_GENERATION_ELIGIBILITY_REQUIRED") return t.value.store.releaseEligibilityPending;
-  if (state === "E1_GENERATION_RELEASE_MONTH_NOT_REACHED") return t.value.store.releaseSchedulePending;
-  if (state === "E1_PHASE_NOT_REACHED" || state === "E1_GENERATION_PHASE_NOT_REACHED") {
-    return phase ? fmt(t.value.store.releasePhasePending, { phase }) : t.value.store.releasePending;
-  }
-  return t.value.store.releasePending;
-});
 const stageText = computed(() =>
   props.product.available === false && props.product.releasePhaseId
     ? fmt(t.value.store.releasePhaseRef, { phase: props.product.releasePhaseId })

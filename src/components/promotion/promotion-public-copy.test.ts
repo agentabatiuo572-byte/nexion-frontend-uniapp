@@ -4,6 +4,10 @@ import { compile } from '@vue/compiler-dom';
 import { parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
+// @ts-expect-error Node test runner reads reviewed source consumers; the App tsconfig omits Node globals.
+import { readFileSync } from 'node:fs';
+import { reviewedCopyR2 } from './promotion-public-copy-r2-fixture';
+import { fmt } from '@/i18n/format';
 import { zh } from '@/i18n/messages/zh';
 import { en } from '@/i18n/messages/en';
 import { vi } from '@/i18n/messages/vi';
@@ -27,6 +31,58 @@ import inviteSource from './referral-progress.vue?raw';
 import rewardDetailSource from '@/pages/events/promotion-reward-detail.vue?raw';
 
 const internal=/服务端|数据库|接口|投影|本地(?:数据|模拟|不会)|不会(?:猜测|用本地)|沿现有|server(?:[- ]side)?|database|backend|\bAPI\b|\bmock\b|\bfixture\b|\bfallback\b|existing (?:invite|product)|máy chủ|cơ sở dữ liệu|dữ liệu cục bộ|hiện có/i;
+const readCopy = (copy: unknown, key: string): string => key.split('.').reduce<unknown>(
+  (node, segment) => (node as Record<string, unknown>)[segment], copy) as string;
+it.each([{ locale: 'zh', copy: zh }, { locale: 'en', copy: en }, { locale: 'vi', copy: vi }])(
+  '$locale all 67 approved public keys keep their real consumers and format every placeholder without engineering prose', ({ copy }) => {
+    expect(reviewedCopyR2).toHaveLength(67);
+    for (const item of reviewedCopyR2) {
+      const value = readCopy(copy, item.key);
+      expect(value, item.key).toBeTruthy();
+      expect(value, item.key).not.toMatch(internal);
+      expect([...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort(), item.key).toEqual(item.placeholders);
+      const values = Object.fromEntries(item.placeholders.map(name => [name, `TEST_${name}`]));
+      const rendered = fmt(value, values);
+      expect(rendered, item.key).not.toMatch(/\{\w+\}/);
+      for (const name of item.placeholders) expect(rendered, item.key).toContain(`TEST_${name}`);
+      for (const consumer of item.consumers) {
+        const actual = readFileSync(new URL(`../../../${consumer.file}`, import.meta.url), 'utf8');
+        expect(actual, `${item.key}: ${consumer.file}`).toContain(consumer.expression);
+      }
+    }
+    for (const key of ['remoteSource', 'remoteError']) expect(copy.help).not.toHaveProperty(key);
+    for (const key of ['releasePhasePending', 'releaseSchedulePending', 'releaseConfigUnavailable', 'releasePending']) expect(copy.store).not.toHaveProperty(key);
+  },
+);
+
+it.each([
+  { locale: 'zh', copy: zh, empty: '暂无数据', latency: '平均延迟 暂不可用', progress: '完成任务后，请查看奖励领取状态。' },
+  { locale: 'en', copy: en, empty: 'Data unavailable', latency: 'Average latency unavailable', progress: 'After completing the quest, check the reward claim status.' },
+  { locale: 'vi', copy: vi, empty: 'Dữ liệu chưa khả dụng', latency: 'Độ trễ trung bình chưa khả dụng', progress: 'Sau khi hoàn thành nhiệm vụ, hãy kiểm tra trạng thái nhận thưởng.' },
+])('$locale reports missing measurements without a number and asks to check quest eligibility', ({ copy, empty, latency, progress }) => {
+  expect(copy.home.networkStatUnverified).toBe(empty);
+  expect(copy.globe.latencyTelemetryMissing).toBe(latency);
+  expect(copy.weeklyQuest.progressVerified).toBe(progress);
+});
+
+it.each([
+  { locale: 'zh', copy: zh, expected: ['本金', '利息', '预计', '到账'], penalty: ['本金', '罚金', '放弃利息及抽奖券', '预计退回'], unknown: '无法确认', release: ['暂不可提现', '是否释放', '释放金额'], privacy: ['审核', '依法', '财务与安全', '不会被立即删除'], abandon: ['未建单', '已建单不会撤销或重复扣款'], quote: ['估算', '提交时', '汇率及手续费'] },
+  { locale: 'en', copy: en, expected: ['principal', 'interest', 'estimated', 'credited'], penalty: ['principal penalty', 'Interest and lottery tickets are forfeited', 'Estimated return'], unknown: 'not confirmed', release: ['not withdrawable', 'Release eligibility and amounts'], privacy: ['reviewed', 'Financial and security', 'required by law', 'not erased immediately'], abandon: ['Only an attempt without an order', 'not cancelled or charged again'], quote: ['Estimate', 'at submission', 'exchange rate and fee'] },
+  { locale: 'vi', copy: vi, expected: ['gốc', 'lãi', 'dự kiến', 'ghi có'], penalty: ['phạt', 'tiền gốc', 'mất lãi và vé quay thưởng', 'Dự kiến hoàn'], unknown: 'Chưa thể xác nhận', release: ['chưa thể rút', 'Việc giải phóng', 'số tiền được giải phóng'], privacy: ['xem xét', 'tài chính và bảo mật', 'theo pháp luật', 'không bị xóa ngay'], abandon: ['Chỉ đóng lần thử chưa có lệnh', 'không bị hủy hoặc trừ tiền lần nữa'], quote: ['ước tính', 'tại thời điểm gửi', 'tỷ giá và phí'] },
+])('$locale keeps money estimates, penalties, unknown results, release conditions and deletion limits', ({ copy, expected, penalty, unknown, release, privacy, abandon, quote }) => {
+  const claim = fmt(copy.repurchase.claimMessage, { order: 'ORDER-42', amount: '123.45' });
+  for (const text of ['ORDER-42', '123.45 USDT', ...expected]) expect(claim).toContain(text);
+  const early = fmt(copy.repurchase.earlyMessage, { order: 'ORDER-42', amount: '89.50', penalty: 15 });
+  for (const text of ['ORDER-42', '15%', '89.50 USDT', ...penalty]) expect(early).toContain(text);
+  expect(copy.repurchase.unavailableBody).toContain(unknown);
+  for (const text of release) expect(copy.wallet.pendingSheetBody).toContain(text);
+  for (const text of privacy) expect(copy.security.deleteAccountHint).toContain(text);
+  for (const text of abandon) expect(copy.walletV3.withdrawAbandonAttemptBody).toContain(text);
+  for (const text of quote) expect(copy.exchange.quoteEstimate).toContain(text);
+  expect(fmt(copy.wallet.releaseAttestationInfo, { hours: 48 })).toContain('48');
+  expect(copy.earn.phoneTaskPausedHint).toContain('20%');
+  expect(copy.onboarding.policyLine3).toContain('120');
+});
 it.each([
   {locale:'zh',copy:zh,text:'当前算力暂不可用。'},
   {locale:'en',copy:en,text:'Current hashpower is unavailable.'},
