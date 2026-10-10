@@ -8,6 +8,8 @@ import ts from 'typescript';
 import source from './promotion-checkout.vue?raw';
 import { projectServerNow } from '@/lib/server-deadline-clock';
 import { promotionZH } from '@/i18n/messages/promotion';
+import { PromotionCheckoutSession,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
+import type { Quote } from '@/api/promotion-contracts';
 
 const serverTime='2026-10-08T00:00:00Z';
 const ast=ts.createSourceFile('checkout.ts',source.split('<script setup lang="ts">')[1].split('</script>')[0],ts.ScriptTarget.Latest,true);
@@ -15,14 +17,16 @@ const names=['requestLeave','finishLeave','updateClock','startNewPurchase'];
 const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&node.name&&names.includes(node.name.text));
 expect(functions).toHaveLength(names.length);
 const code=ts.transpileModule(functions.map(node=>node.getText(ast)).join('\n'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
-function harness({status='PENDING',payBy='2026-10-08T00:00:10Z',clock=true,quoteClock=false,eligibility='ELIGIBLE',built=true,rewards=true,busy=false,unknown=false,current=true}:Record<string,unknown>={}){
+function harness({status='PENDING',payBy='2026-10-08T00:00:10Z',clock=true,quoteClock=false,eligibility='ELIGIBLE',built=true,rewards=true,busy=false,unknown=false,current=true,checkoutSession}:Record<string,unknown>={}){
   let now:number|null=clock?100:null;
+  const record={leavePromptShown:false};
+  const session=(checkoutSession as PromotionCheckoutSession|undefined)??{record,rememberLeavePrompt:vi.fn(()=>{record.leavePromptShown=true;}),startNewPurchase:vi.fn(()=>{record.leavePromptShown=false;})};
   const deps={current:()=>current,busy:ref(busy),unknown:ref(unknown),rewards:ref(rewards?[{}]:[]),
     order:ref(built?{orderNo:'ORD-1',paymentStatus:status,payBy}:null),
     quote:ref({quoteId:'Q1',serverTime,expiresAt:'2026-10-08T00:00:05Z',eligibility}),quoteFresh:ref(false),payWindow:ref<boolean|null>(null),
     promotion:ref({serverTime}),leaveOpen:ref(false),projectServerNow,readTrustedMonotonicNowMs:()=>now,
     initialReceivedAt:quoteClock?100:null,initialPromotionReceivedAt:clock?100:null,
-    canStartNew:ref(true),props:{orderNo:null},openedOriginal:false,session:{startNewPurchase:vi.fn()},
+    canStartNew:ref(true),props:{orderNo:null},openedOriginal:false,session,
     voucherId:ref<string|null>('voucher'),revision:ref(0),loadQuote:vi.fn(async()=>{})};
   const guard=new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;let asked='',leaveResolver=null,receivedAt=initialReceivedAt,promotionReceivedAt=initialPromotionReceivedAt,orderClock=null;${code};return {requestLeave,finishLeave,startNewPurchase};`)(deps) as {requestLeave():Promise<boolean>;finishLeave(allowed:boolean):void;startNewPurchase():Promise<void>};
   return {...guard,...deps,setNow:(value:number|null)=>{now=value;}};
@@ -60,6 +64,28 @@ it('allows one new reminder only after explicitly starting a new purchase',async
 it('projects server time again when leaving an order that was open across its deadline',async()=>{
   const guard=harness();guard.setNow(10100);expect(await guard.requestLeave()).toBe(true);expect(guard.leaveOpen.value).toBe(false);
 });
+it('the real leave action persists before display and a recreated page restores its once-only decision',async()=>{
+  let saved:PromotionCheckoutRecord={quote:null,order:null,pending:null};
+  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),findOrder:vi.fn()},save:vi.fn(record=>{saved=JSON.parse(JSON.stringify(record));}),key:()=>'',current:()=>true};
+  const guard=harness({built:false,quoteClock:true,checkoutSession:new PromotionCheckoutSession(ports,saved)});
+  const first=guard.requestLeave();expect(saved.leavePromptShown).toBe(true);expect(ports.save).toHaveBeenCalledOnce();expect(guard.leaveOpen.value).toBe(true);
+  guard.finishLeave(true);expect(await first).toBe(true);
+  const restored=harness({built:false,quoteClock:true,checkoutSession:new PromotionCheckoutSession(ports,saved)});
+  restored.quote.value.quoteId='Q2';expect(await restored.requestLeave()).toBe(true);expect(restored.leaveOpen.value).toBe(false);
+  restored.order.value={orderNo:'ORD-1',paymentStatus:'PENDING',payBy:'2026-10-08T00:00:10Z'};
+  expect(await restored.requestLeave()).toBe(true);expect(ports.save).toHaveBeenCalledOnce();
+  for(const command of Object.values(ports.api))expect(command).not.toHaveBeenCalled();
+});
+it('a failed reminder save permits navigation while preserving the existing financial storage guard',async()=>{
+  const quote={quoteId:'Q1',eligibility:'ELIGIBLE',items:[{productNo:'sku-a',quantity:1}]} as Quote;
+  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),findOrder:vi.fn()},save:vi.fn(()=>{throw new Error('storage unavailable');}),key:()=>'',current:()=>true};
+  const session=new PromotionCheckoutSession(ports,{quote,order:null,pending:null});
+  const guard=harness({built:false,quoteClock:true,checkoutSession:session});
+  expect(await guard.requestLeave()).toBe(true);expect(guard.leaveOpen.value).toBe(false);expect(session.record.leavePromptShown).toBeUndefined();
+  expect(await guard.requestLeave()).toBe(true);expect(ports.save).toHaveBeenCalledOnce();
+  await expect(session.create()).rejects.toThrow('storage unavailable');
+  for(const command of Object.values(ports.api))expect(command).not.toHaveBeenCalled();
+});
 
 const purchaseVariables=['rewards','disclosures','completeTerms','canCreate','canPay'];
 const purchaseFunctions=['disclosure','run','createOrder','pay','updateClock','loadOrderClock','recover','requestLeave','finishLeave'];
@@ -88,7 +114,7 @@ function purchaseHarness({rewardRows=[] as unknown[],built=false,busy=false,unkn
     promotion:ref({serverTime,state:promotionState,endsAt:serverTime}),projectServerNow,readTrustedMonotonicNowMs:()=>now,
     leaveOpen:ref(false),
     initialReceivedAt:quoteClock?100:null,initialPromotionReceivedAt:promotionClock?100:null,
-    revision:ref(0),session:{canExecute,create,pay,recover,confirmed,retryOriginal},deviceE3Api:{fleet},
+    revision:ref(0),session:{canExecute,create,pay,recover,confirmed,retryOriginal,record:{},rememberLeavePrompt:vi.fn()},deviceE3Api:{fleet},
     asApiError:(cause:unknown)=>({message:String(cause)}),p:ref({errorNote:'Error'})};
   const gates=new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;let receivedAt=initialReceivedAt,promotionReceivedAt=initialPromotionReceivedAt,orderClock=null,clockGeneration=0,asked='',leaveResolver=null;${purchaseCode};return {completeTerms,canCreate,canPay,createOrder,pay,updateClock,loadOrderClock,recover,requestLeave,finishLeave};`)(deps) as {
     completeTerms:{value:boolean};canCreate:{value:boolean};canPay:{value:boolean};
