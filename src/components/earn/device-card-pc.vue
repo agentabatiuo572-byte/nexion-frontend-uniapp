@@ -424,7 +424,7 @@ const displayName = computed(() => deviceName(t.value, props.device));
 const phoneLocalReady = computed(() => !remoteApiEnabled || props.device.kind !== "phone"
   || (nativePhoneAvailable && session.isCurrentDeviceCalibrated(app.accountKey) && !app.remotePhoneBindingInvalid));
 const displayGpu = computed(() => phoneLocalReady.value
-  ? deviceGpuLabel(t.value, props.device) : t.value.earn.hashCapabilityUnknown);
+  ? deviceGpuLabel(t.value, props.device) : "-");
 const displayLocation = computed(() => deviceLocation(t.value, props.device));
 function goPhoneBinding() { if (nativePhoneAvailable) navTo("/pages/onboarding/connect?mode=recalibrate"); }
 

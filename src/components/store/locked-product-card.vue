@@ -71,8 +71,8 @@ const app = useApp();
 const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
-const gpuText = computed(() => specText(t.value, props.product.gpu));
-const vramText = computed(() => specText(t.value, props.product.vram));
+const gpuText = computed(() => specText(t.value, props.product.gpu, "-"));
+const vramText = computed(() => specText(t.value, props.product.vram, "-"));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },
@@ -98,16 +98,6 @@ const queue = computed(() =>
     : null,
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
-const stageText = computed(() =>
-  props.product.available === false && props.product.releasePhaseId
-    ? fmt(t.value.store.releasePhaseRef, { phase: props.product.releasePhaseId })
-    : progress.value
-    ? fmt(t.value.store.lockedStageCompact, {
-        current: progress.value.current,
-        total: progress.value.total,
-      })
-    : t.value.store.comingSoonHeading,
-);
 
 const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
 

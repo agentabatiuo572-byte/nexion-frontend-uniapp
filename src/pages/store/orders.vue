@@ -34,7 +34,7 @@
         <view
           v-for="(o, i) in orderList"
           :key="o.id"
-          class="block active:opacity-90"
+          class="block active:scale-[0.98] transition-transform"
           :style="orderRowStyle(i === orderList.length - 1)"
           role="button"
           tabindex="0"

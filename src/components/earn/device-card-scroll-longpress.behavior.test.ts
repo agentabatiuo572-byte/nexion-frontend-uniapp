@@ -116,7 +116,11 @@ for (const copy of [en, zh, vietnamese]) {
     for (const [native, calibrated] of [[true, false], [false, true]]) {
       const blocked = await mount(copy, phone, true, native, calibrated);
       expect(all(blocked.root).some(entry => text(entry) === copy.earn.hashCapability)).toBe(false);
-      expect(text(blocked.root)).toContain(copy.earn.hashCapabilityUnknown);
+      const guidance = phoneGuidance.resolvePhoneActivationGuidance(native, copy.myDevices);
+      expect(text(blocked.root)).toContain(guidance.title);
+      expect(text(blocked.root)).toContain(guidance.body);
+      expect(text(blocked.root)).not.toContain(copy.earn.hashCapabilityUnknown);
+      expect(all(blocked.root).some(entry => text(entry) === `${copy.myDevices.phoneActivationCta} →`)).toBe(native);
     }
   });
 }

@@ -99,17 +99,17 @@ describe("earning-goal read recovery", () => {
     const hero = (current: string) => fmt(copy.goals.heroSubtitle, { current });
     try {
       let html = await showActual();
-      expect(html).toContain(hero("-")); expect(html).not.toContain(hero("$0.00")); expect(html).not.toContain("$-");
+      expect(html).toContain(copy.goals.serverUnavailable); expect(html).not.toContain(hero("0.00")); expect(html).not.toContain("$-");
       goalsStore.status = "ready"; await (page.refreshRemoteGoals as () => Promise<void>)();
-      html = await showActual(); expect(html).toContain(hero("$0.00"));
+      html = await showActual(); expect(html).toContain(hero("0.00")); expect(html).not.toContain("$$");
       goalsStore.lifetimeEarningsUsdt = 12.25;
-      html = await showActual(); expect(html).toContain(hero("$12.25"));
+      html = await showActual(); expect(html).toContain(hero("12.25"));
       goalsStore.status = "error";
-      html = await showActual(); expect(html).toContain(hero("-")); expect(html).not.toContain(hero("$12.25"));
+      html = await showActual(); expect(html).toContain(copy.goals.serverUnavailable); expect(html).not.toContain(hero("12.25"));
       goalsStore.accountEpoch += 1; goalsStore.status = "ready";
-      html = await showActual(); expect(html).toContain(hero("-")); expect(html).not.toContain(hero("$12.25"));
+      html = await showActual(); expect(html).toContain(copy.goals.loading); expect(html).not.toContain(hero("12.25"));
       goalsStore.lifetimeEarningsUsdt = 7; await (page.refreshRemoteGoals as () => Promise<void>)();
-      html = await showActual(); expect(html).toContain(hero("$7.00"));
+      html = await showActual(); expect(html).toContain(hero("7.00"));
     } finally { scope.stop(); }
   });
 
