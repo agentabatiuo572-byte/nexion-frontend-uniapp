@@ -22,9 +22,9 @@ describe("binary blocked guidance page contract", () => {
   });
 
   it("keeps all visible invite guidance conditional and non-guaranteeing", () => {
-    expect(zh).toContain('是否恢复结算以服务端后续资格判定为准');
-    expect(en).toContain('server will determine whether settlement becomes eligible');
-    expect(vi).toContain('máy chủ sẽ xác định liệu kết toán có đủ điều kiện hay không');
+    expect(zh).toContain('可查看邀请选项；是否恢复结算以之后的资格确认结果为准。');
+    expect(en).toContain('You can review invite options. Settlement resumes only when eligibility is confirmed.');
+    expect(vi).toContain('Có thể xem các tùy chọn mời. Quyết toán chỉ tiếp tục khi điều kiện được xác nhận.');
     expect(zh).not.toContain('本月奖励即可恢复');
     expect(en).not.toContain("lift this month's payout");
     expect(vi).not.toContain('nâng khoản thưởng tháng này');

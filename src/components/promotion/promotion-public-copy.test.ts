@@ -30,6 +30,28 @@ import teamSource from '@/pages/team/team.vue?raw';
 import inviteSource from './referral-progress.vue?raw';
 import rewardDetailSource from '@/pages/events/promotion-reward-detail.vue?raw';
 
+it('anxiety copy gate excludes only test files and retains every production copy source', () => {
+  const gate = readFileSync(new URL('../../../scripts/anxiety-copy-gate.mjs', import.meta.url), 'utf8');
+  const expression = gate.match(/for \(const file of (\[[^\n]+\](?:\.filter\([^\n]+\))?)\) \{/)?.[1];
+  expect(expression).toBeTruthy();
+  const select = new Function('i18nFiles', 'srcFiles', `return ${expression};`) as (i18n: string[], sources: string[]) => string[];
+  const i18nFiles = ['src/i18n/messages/zh.ts', 'src/i18n/messages/en.ts', 'src/i18n/messages/vi.ts'];
+  const srcFiles = [
+    'src/components/promotion/promotion-public-copy.test.ts',
+    'src/pages/me/me-ui-parity.contract.test.ts',
+    'src/pages/example.ts',
+    'src/components/example.vue',
+    'src/pages/testimonials.vue',
+    'src/lib/example.test.ts.backup.ts',
+  ];
+  const expected = [...i18nFiles, ...srcFiles.slice(2)];
+  expect(select(i18nFiles, srcFiles)).toEqual(expected);
+  const changed = expression!.replace('.filter(file => !file.endsWith(".test.ts"))', '');
+  expect(changed).not.toBe(expression);
+  const selectWithoutExclusion = new Function('i18nFiles', 'srcFiles', `return ${changed};`) as typeof select;
+  expect(selectWithoutExclusion(i18nFiles, srcFiles)).not.toEqual(expected);
+});
+
 const internal=/服务端|数据库|接口|投影|本地(?:数据|模拟|不会)|不会(?:猜测|用本地)|沿现有|server(?:[- ]side)?|database|backend|\bAPI\b|\bmock\b|\bfixture\b|\bfallback\b|existing (?:invite|product)|máy chủ|cơ sở dữ liệu|dữ liệu cục bộ|hiện có/i;
 const readCopy = (copy: unknown, key: string): string => key.split('.').reduce<unknown>(
   (node, segment) => (node as Record<string, unknown>)[segment], copy) as string;

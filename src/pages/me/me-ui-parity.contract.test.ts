@@ -87,7 +87,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-cards-new.vue": "6af630a5acf97669826202e3842042a8b28af8813f0657da0a6085336f7a3fc2",
   "wallet-cards.vue": "4ba7080a2d1b7c9ce4d56c4ea90b5fed3614c689aaeccaf3811d166f08391692",
   "wallet-exchange-how.vue": "53a85b180c00d4a33e73d101a628e8f786924b2e23c48f045147b9f15cb8b9b0",
-  "wallet-exchange.vue": "f6e7c49b78de3c05e25da2648b73673ec654ab69330d416dda6042ef63fe8eb6",
+  // Reviewed e0a491a: missing numeric values use '-' while authority labels remain separate.
+  "wallet-exchange.vue": "6e2bab7772260232f50feeb076713b3896b807840187e1f228dc818ed73dd3c6",
   // Reviewed #413: native number/date formatting and finite display boundaries.
   "wallet-nex.vue": "e79b540f1eacd429f044fba4bfd7fb2d15732cac2fc7cda274406416d035ee86",
   "wallet-repurchase-how.vue": "238439b99d5b73f9cf7c6ad7b8479cb86f39ef92f93d216938b071c28372e4f0",
@@ -95,8 +96,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-topup.vue": "010252b7630c35defdf57a3f262d0e389c011d2b9d79ad2f5fb788e794d87768",
   "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
   "wallet-withdraw.vue": "e3f41cf165b08b6a7813a6f1b180d3da96e5d786f1daa138e95fb4ba334ed10d",
-  // Reviewed held-authority failure and retry UI against the fixed 710e9ee reference.
-  "wallet.vue": "02bbdb6e646a7d44131faea4d6f341f87b0528115500749c9174009fc1c01733"
+  // Reviewed e0a491a: missing earnings use '-' with a separate reason and authority retry.
+  "wallet.vue": "bd3aab8e397c2be70bc04959a75c139f30fb2fd60aedc6fbe2d2d9850caee2c9"
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   // Approved unified center uses shared flat-row styles and fixed native scrolling.
