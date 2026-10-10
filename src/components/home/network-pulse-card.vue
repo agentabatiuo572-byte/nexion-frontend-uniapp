@@ -197,28 +197,24 @@ function activate(action?: () => void) {
   action?.();
 }
 
-/** 配置失败的占位格(规格异常2:骨架→「数据更新中」+ 重试;禁回退写死数字)。 */
-/**
- * 「没有可核验来源」态:数值位不给数字,说明为什么没有。
- * 与 placeholderCell(读取失败/更新中)区分开 —— 这里不是暂时读不到,而是**平台没有
- * 对外可核验的实测口径**,所以既不显示配置派生量,也不提供重试。
- */
+// Missing measurements keep the header explanation; failed reads offer the existing retry.
 function unverifiedCell(label: string): Cell {
   return {
     k: label,
     v: t.value.home.networkStatUnverified,
     vSize: "12.5px",
     tone: "var(--v5-ink-3)",
-    sub: t.value.home.networkStatUnverifiedHint,
+    sub: cfg.syncFailed ? t.value.home.networkStatRetry : "",
     subTone: "var(--v5-ink-4)",
     data: null,
     color: "var(--v5-ink-4)",
+    tap: cfg.syncFailed ? () => { void cfg.load(); } : undefined,
   };
 }
 function placeholderCell(label: string, retry?: () => void, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
-    v: t.value.home.networkStatUpdating,
+    v: "-",
     vSize: "12.5px",
     tone: "var(--v5-ink-3)",
     sub: t.value.home.networkStatRetry,

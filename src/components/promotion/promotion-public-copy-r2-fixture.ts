@@ -63,7 +63,7 @@ export const reviewedCopyR2 = [
   {"key":"weeklyQuest.progressVerified","placeholders":[],"consumers":[{"file":"src/components/home/weekly-quest-hero.vue","expression":"w.value.progressVerified"}]},
   {"key":"share.posterRewardEffectiveAt","placeholders":["date"],"consumers":[{"file":"src/components/team/share-poster-sheet.vue","expression":"t.value.share.posterRewardEffectiveAt"}]},
   {"key":"share.eventFailed","placeholders":[],"consumers":[{"file":"src/lib/share.ts","expression":"t.value.share.eventFailed"}]},
-  {"key":"home.networkStatUnverifiedHint","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.home.networkStatUnverifiedHint"},{"file":"src/components/home/network-pulse-card.vue","expression":"t.value.home.networkStatUnverifiedHint"}]},
+  {"key":"home.networkStatUnverifiedHint","placeholders":[],"consumers":[{"file":"src/components/home/network-pulse-card.vue","expression":"t.home.networkStatUnverifiedHint"}]},
   {"key":"repurchase.unavailableBody","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.unavailableBody"}]},
   {"key":"repurchase.loading","placeholders":[],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.loading"},{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.loading"}]},
   {"key":"learning.submitUnconfirmed","placeholders":[],"consumers":[{"file":"src/pages/learn/course.vue","expression":"t.value.learning[error.value]"}]},

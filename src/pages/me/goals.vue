@@ -203,7 +203,7 @@ const recommendation = computed(() => {
 });
 
 const heroSubLine = computed(() =>
-  fmt(t.value.goals.heroSubtitle, { current: lifeTimeEarnings.value.toFixed(2) }),
+  fmt(t.value.goals.heroSubtitle, { current: editorHasSnapshot.value ? `$${lifeTimeEarnings.value.toFixed(2)}` : "-" }),
 );
 const recPathLine = computed(() =>
   fmt(t.value.goals.recPath, {
