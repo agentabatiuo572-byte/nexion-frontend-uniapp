@@ -85,6 +85,7 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
   const navTo = vi.fn();
   const forbiddenNetwork = vi.fn(() => { throw new Error("No business transport in component fixture"); });
   const onLoads: Array<(options: Record<string, string>) => Promise<void>> = [];
+  const onUnloads: Array<() => void> = [];
   const cta = Vue.ref<Record<string, unknown> | null>(null);
   const empty = { render: () => null };
   const chassis = { setup: (_props: unknown, { slots }: { slots: Record<string, () => Vue.VNode[]> }) => () => Vue.h("chassis-fixture", slots.default?.()) };
@@ -106,7 +107,8 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
     "@/lib/promotion-entry": promotionEntry,
     "@/lib/promotion-display": { localized: (value: unknown) => value ?? "" },
     "@/composables/use-promotion-context": { usePromotionContext: () => ({ activity: Vue.ref(null), status: Vue.ref("ready"), available: Vue.ref(false), refresh: async () => true }) },
-    "@dcloudio/uni-app": { onLoad: (callback: (options: Record<string, string>) => Promise<void>) => onLoads.push(callback), onShow: () => {}, onHide: () => {} },
+    "@dcloudio/uni-app": { onLoad: (callback: (options: Record<string, string>) => Promise<void>) => onLoads.push(callback), onShow: () => {}, onHide: () => {},
+      onUnload: (callback: () => void) => onUnloads.push(callback) },
     "@/mock/products": { getProduct: () => undefined },
     "@/composables/use-product-phase": { useProductPhase: () => Vue.ref({}) },
     "@/store/product-availability": { isProductAvailable },
@@ -138,7 +140,16 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
   const cardApp = renderer.createApp(component(cardCode), { product: current,promotion,activityId:promotion?.activityId,promotionReady:true });
   cardApp.mount(cardRoot); unmounts.push(() => cardApp.unmount());
   const detailApp = renderer.createApp(component(detailCode));
-  detailApp.mount(detailRoot); unmounts.push(() => detailApp.unmount());
+  detailApp.mount(detailRoot); unmounts.push(() => {
+    try {
+      expect(onUnloads).toHaveLength(1);
+      onUnloads.forEach(unload => unload());
+      expect(cta.value).toBeNull();
+    } finally {
+      detailApp.unmount();
+    }
+    expect(cta.value).toBeNull();
+  });
   await onLoads[0]({ id: current.id });
   await Vue.nextTick();
   return {
