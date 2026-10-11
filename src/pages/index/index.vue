@@ -148,7 +148,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { remoteApiEnabled, promotionApi, sessionVault } from "@/api/runtime";
 import type { PublicPromotion } from "@/api/promotion-contracts";
-import { createPromotionReadFence } from "@/lib/promotion-entry";
+import { createPromotionReadFence,isPromotionActive } from "@/lib/promotion-entry";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { navTo } from "@/lib/route";
@@ -193,7 +193,7 @@ async function refreshHomePromotions() {
   try {
     const page = await promotionApi.list({ limit:20, placement:'home.purchase-promotion' }, !!sessionVault.read());
     if (!promotionHomeVisible || !promotionReadFence.current(request) || identity !== `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`) return;
-    homePromotions.value = page.items;
+    homePromotions.value = page.items.filter(isPromotionActive);
     homePromotionStatus.value = 'ready';
   } catch {
     if (promotionHomeVisible && promotionReadFence.current(request) && identity === `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`) homePromotionStatus.value = 'error';

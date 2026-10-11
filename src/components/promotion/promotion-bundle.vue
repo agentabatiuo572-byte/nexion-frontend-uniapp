@@ -1,12 +1,13 @@
 <template>
   <view class="promotion promotion-main" data-testid="promotion-bundle">
     <view>
-      <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : t.promotion.bundle }}</text>
-      <text class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
+      <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+      <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <view v-if="scopeId&&contextStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshContext"><text>{{ t.promotion.retry }}</text></view></view>
-      <text v-if="scopeId&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity?.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+      <text v-if="scopeId&&activity&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
     </view>
+    <template v-if="!scopeId||activity">
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.selected }}</text>
       <text v-if="!selection.length" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
@@ -55,9 +56,10 @@
     <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="refreshQuote"><LiquidGlass :radius="999" tone="control" /><text>{{ t.promotion.quote }}</text></view>
     <text v-if="selection.length<2" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
     <view class="promotion-action primary" role="button" :tabindex="canContinue?0:-1" :aria-disabled="!canContinue" @click="continueCheckout"><LiquidGlass :radius="999" tone="control" /><text>{{ t.promotion.continue }}</text></view>
-    <view v-if="scopeId" class="promotion-link" role="button" tabindex="0" @click="clearScope"><text>{{ t.promotion.ordinary }}</text></view>
     <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))"><text>{{ t.promotion.buyMore }}</text></view>
     <PromotionTerms :open="termsOpen" :title="localized(activity?.title,locale.code)" :terms="ruleTerms" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
+    </template>
+    <view v-if="scopeId" class="promotion-link" role="button" tabindex="0" @click="clearScope"><text>{{ activity?t.promotion.ordinary:t.promotion.allProducts }}</text></view>
   </view>
 </template>
 <script setup lang="ts">
@@ -117,7 +119,7 @@ const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&
 const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
 function invalidate(){fence.invalidate();quote.value=null;quoteStatus.value='idle';}
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
-watch([scopeId,()=>activity.value?.version],invalidate);
+watch([scopeId,()=>activity.value?.version,()=>locale.code],()=>{invalidate();termsOpen.value=false;},{flush:'sync'});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch],()=>{invalidate();termsOpen.value=false;restore();});
 function add(productNo:string){if(selection.value.length>=8||totalUnits.value>=100||!suggestions.value.some(product=>product.id===productNo))return;selection.value=[...selection.value,{productNo,quantity:1}];}
 function remove(productNo:string){selection.value=selection.value.filter(item=>item.productNo!==productNo);}

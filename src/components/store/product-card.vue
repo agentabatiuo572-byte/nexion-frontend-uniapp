@@ -12,8 +12,8 @@
 -->
 <template>
   <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
-  <view ref="cardRef" class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :class="promotion ? 'promotion-catalog-card' : 'nx-glass-card'" :style="promotion ? promotionCardStyle : cardStyle" @click="goDetail">
-    <view v-if="featured&&!promotion" aria-hidden :style="featuredGlowStyle" />
+  <view ref="cardRef" class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :class="marketingPromotion ? 'promotion-catalog-card' : 'nx-glass-card'" :style="marketingPromotion ? promotionCardStyle : cardStyle" @click="goDetail">
+    <view v-if="featured&&!marketingPromotion" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
     <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
@@ -44,7 +44,7 @@
 
       <!-- ROI 4-line hero -->
       <!-- 去线(主人 2026-08-17 全站令):mt-6 = 原 mt-3 + pt-3 的总间距 -->
-      <view v-if="!promotion" class="mt-6">
+      <view v-if="!marketingPromotion" class="mt-6">
         <!-- Eyebrow -->
         <view class="font-mono-tabular inline-flex items-center gap-1.5" :style="earnEyebrowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -90,7 +90,7 @@
           <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
-      <PromotionProduct v-if="promotion" :activity="promotion" :product-no="product.id" />
+      <PromotionProduct v-if="marketingPromotion" :activity="marketingPromotion" :product-no="product.id" />
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -103,8 +103,8 @@
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :class="{'promotion-buy':!!promotion}" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy"  @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
-        <LiquidGlass v-if="promotion" :radius="999" tone="control" />
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :class="{'promotion-buy':!!marketingPromotion}" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy"  @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
+        <LiquidGlass v-if="marketingPromotion" :radius="999" tone="control" />
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -134,7 +134,7 @@ import { productCatalogState } from "@/store/product-catalog";
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
-import { canPreviewPromotion,promotionCheckoutHref,promotionDetailHref } from '@/lib/promotion-entry';
+import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref } from '@/lib/promotion-entry';
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean }>(), {
   featured: false,
@@ -145,6 +145,7 @@ const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled
 
 const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
+const marketingPromotion=computed(()=>isPromotionActive(props.promotion)?props.promotion:null);
 const promotionUnavailable=computed(()=>!!props.activityId&&(!props.promotionReady||!canPreviewPromotion(props.promotion??null)||!props.promotion?.productNos.includes(props.product.id)));
 const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
