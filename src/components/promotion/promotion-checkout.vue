@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import PromotionAction from '@/components/promotion/promotion-action.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
-import { computed,ref,shallowRef,onMounted,onBeforeUnmount } from 'vue';
+import { computed,ref,shallowRef,watch,onMounted,onBeforeUnmount } from 'vue';
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
@@ -85,14 +85,15 @@ const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string
 function getProduct(id:string){void productCatalogState.status;return readProduct(id);}
 const t=useT(),p=computed(()=>t.value.promotion),locale=useLocaleStore(),app=useApp(),auth=useAuth(),voucher=useVoucher();
 function selectedItemName(item:{productNo:string;productName?:string}){return ('productName' in item?item.productName:getProduct(item.productNo)?.name)??p.value.unknown;}
-const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
+const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,visible=true,readGeneration=0,refreshOnIdle=false;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
+const readCurrent=(generation:number)=>current()&&visible&&generation===readGeneration;
 const TABLE='nexgrid-promotion-checkout-v1';
 let storageReadable=true;let records:Record<string,PromotionCheckoutRecord>={};
 try{records=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};}catch{storageReadable=false;}
 // A changed route cannot bypass an unresolved command from this same account.
 const {intent,record:stored,openedOriginal}=selectPromotionCheckoutRecord(records,props);
 const session=new PromotionCheckoutSession({api:promotionApi,current,key:key=>acquireAccountCommandKey('nexgrid-promotion-commands-v1',account,key,'promotion'),save:record=>{if(!storageReadable)throw new Error('STORAGE_UNAVAILABLE');const rows=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};if(!writeAccountRow(TABLE,account,{...rows,[intent]:record}))throw new Error('STORAGE_UNAVAILABLE');}},stored);
-const revision=ref(0),quote=computed(()=>{revision.value;return session.record.quote;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
+const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||freshQuoteReady.value?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
 const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),termsOpen=ref(false),leaveOpen=ref(false);
 const voucherId=ref(session.record.voucherId??null);const selectedVoucherName=computed(()=>voucher.catalog.find(v=>v.id===voucherId.value)?.name??p.value.noVoucher);
 const items=computed(()=>order.value?.items??quote.value?.items??props.items);const rewards=computed(()=>order.value?.rewards??quote.value?.expectedRewards??[]);
@@ -117,7 +118,23 @@ const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&sess
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';try{await action();}catch(cause){if(current()){const message=asApiError(cause).message;error.value=message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}}finally{if(current()){busy.value=false;revision.value++;updateClock();}}}
-async function loadQuote(){if(openedOriginal||session.record.pending||session.record.order||!auth.isAuthenticated)return;await run(async()=>{session.invalidateQuote();revision.value++;const sampledAt=readTrustedMonotonicNowMs();const result=await promotionApi.quote(props.items,props.activityId||null,voucherId.value);if(!current())return;session.setQuote(result,voucherId.value);receivedAt=sampledAt;revision.value++;updateClock();});}
+async function loadQuote(){
+  if(busy.value||!visible||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
+  const generation=++readGeneration;
+  freshQuoteReady.value=false;promotion.value=null;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;
+  await run(async()=>{
+    session.invalidateQuote();revision.value++;
+    const sampledAt=readTrustedMonotonicNowMs();
+    if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
+      if(readCurrent(generation)&&value.state==='ACTIVE'){promotion.value=value;promotionReceivedAt=sampledAt;updateClock();}
+    }).catch(()=>{});
+    try{
+      const result=await promotionApi.quote(props.items,props.activityId||null,voucherId.value);
+      if(!readCurrent(generation))return;
+      session.setQuote(result,voucherId.value);freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();
+    }catch(cause){if(readCurrent(generation))throw cause;}
+  });
+}
 async function chooseVoucher(){if(openedOriginal||busy.value||session.record.pending||order.value||items.value.length!==1)return;await voucher.refreshRemote();if(!current())return;const options=voucher.claimedUnused;uni.showActionSheet({itemList:[p.value.noVoucher,...options.map(v=>v.name)],success:result=>{if(!current())return;voucherId.value=result.tapIndex===0?null:options[result.tapIndex-1]?.id??null;void loadQuote();}});}
 async function createOrder(){if(!canCreate.value)return;await run(()=>session.create());}
 async function pay(){updateClock();if(!canPay.value)return;await run(()=>session.pay());}
@@ -144,15 +161,28 @@ onBeforeRouteLeave(()=>requestCheckoutLeave());
 // #endif
 let nativeBackApproved=false;
 function back():boolean{if(nativeBackApproved){nativeBackApproved=false;return false;}void requestLeave().then(ok=>{if(ok&&current()){nativeBackApproved=true;navBack('/store');}});return true;}
-function hide(){disposeGuard?.();disposeGuard=null;finishLeave(true);}
-function show(){if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(requestLeave);if(session.record.pending||session.record.order)void recover();}
+function hide(){
+  visible=false;readGeneration++;refreshOnIdle=false;termsOpen.value=false;promotion.value=null;promotionReceivedAt=null;
+  if(current()&&!session.record.pending&&!session.record.order){
+    freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;
+    try{if(session.record.quote)session.invalidateQuote();}catch{error.value=p.value.errorNote;}
+    revision.value++;
+  }
+  disposeGuard?.();disposeGuard=null;finishLeave(true);
+}
+function show(){
+  visible=true;if(!current())return;
+  if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(requestLeave);
+  if(busy.value){refreshOnIdle=true;return;}
+  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo)void loadQuote();
+}
+watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible&&current())show();}});
 defineExpose({back,hide,show});
 onMounted(async()=>{
   disposeGuard=registerCheckoutLeaveGuard(requestLeave);timer=setInterval(updateClock,1000);
   // Catalog and current campaign visibility cannot block an original order or
   // command receipt. Historical rewards always come from that receipt.
   if(auth.isAuthenticated)void refreshProductCatalog(true).catch(()=>{});
-  if(props.activityId){const sampledAt=readTrustedMonotonicNowMs();void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{if(current()){promotion.value=value;promotionReceivedAt=sampledAt;updateClock();}}).catch(()=>{});}
   try {
     if(auth.isAuthenticated){
       if(props.orderNo&&!session.record.order&&!session.record.pending){
@@ -164,6 +194,6 @@ onMounted(async()=>{
     }
   }catch{if(current())error.value=p.value.error;}finally{if(current())loading.value=false;}
 });
-onBeforeUnmount(()=>{alive=false;disposeGuard?.();if(timer)clearInterval(timer);finishLeave(true);});
+onBeforeUnmount(()=>{hide();alive=false;if(timer)clearInterval(timer);});
 </script>
 <style src="./promotion.css"></style>

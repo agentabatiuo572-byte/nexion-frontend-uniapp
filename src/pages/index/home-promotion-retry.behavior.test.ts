@@ -4,7 +4,7 @@ import { compile } from '@vue/compiler-dom';
 import ts from 'typescript';
 import { afterEach, expect, it, vi } from 'vitest';
 import source from './index.vue?raw';
-import { createPromotionReadFence } from '@/lib/promotion-entry';
+import { createPromotionReadFence,isPromotionActive } from '@/lib/promotion-entry';
 import { deriveHomeTaskCards } from '@/lib/home-task-carousel';
 import { promotionZH, promotionEN, promotionVI } from '@/i18n/messages/promotion';
 import type { PublicPromotion, PublicPromotionPage } from '@/api/promotion-contracts';
@@ -21,7 +21,7 @@ type View = {
   homePromotionStatus: Vue.Ref<'idle' | 'loading' | 'ready' | 'error'>;
   refreshHomePromotions(): Promise<void>;
 };
-const page = (ids: string[]): PublicPromotionPage => ({ items: ids.map(activityId => ({ activityId } as PublicPromotion)), nextCursor: null, hasMore: false });
+const page = (ids: string[]): PublicPromotionPage => ({ items: ids.map(activityId => ({ activityId,state:'ACTIVE' } as PublicPromotion)), nextCursor: null, hasMore: false });
 function deferred() {
   let resolve!: (value: PublicPromotionPage) => void, reject!: (error: Error) => void;
   const promise = new Promise<PublicPromotionPage>((yes, no) => { resolve = yes; reject = no; });
@@ -41,7 +41,7 @@ function mount(copy = promotionZH) {
   const list = vi.fn<(...args: unknown[]) => Promise<PublicPromotionPage>>().mockResolvedValue(page([]));
   const shown: Array<() => void> = [], hidden: Array<() => void> = [];
   const dependencies = { ref: Vue.ref, watch: Vue.watch, app, locale, remoteApiEnabled: true,
-    promotionApi: { list }, sessionVault: { read: () => ({ user: { userId: app.accountKey } }) }, createPromotionReadFence,
+    promotionApi: { list }, sessionVault: { read: () => ({ user: { userId: app.accountKey } }) }, createPromotionReadFence,isPromotionActive,
     onShow: (callback: () => void) => shown.push(callback), onHide: (callback: () => void) => hidden.push(callback) };
   const scope = Vue.effectScope();
   const view = scope.run(() => new Function('deps', `const {${Object.keys(dependencies).join(',')}}=deps;${requestCode};return {homePromotions,homePromotionStatus,refreshHomePromotions};`)(dependencies)) as View;
@@ -112,4 +112,14 @@ it('hidden reads are discarded and returning starts a fresh read even while the 
   screen.list.mockResolvedValueOnce(page(['returned-activity'])); screen.show(); await flush();
   stale.resolve(page(['hidden-activity'])); await oldRead;
   expect(screen.list).toHaveBeenCalledTimes(2); expect(screen.view.homePromotionStatus.value).toBe('ready'); expect(screen.cards.value).toEqual(['promotion:returned-activity']);
+});
+
+it('a mixed server list cannot put inactive activity IDs into the home carousel or retain them during refresh',async()=>{
+  const screen=mount();
+  screen.list.mockResolvedValueOnce({...page([]),items:[{activityId:'live',state:'ACTIVE',eligibility:'INELIGIBLE'},{activityId:'closed',state:'PAUSED'}] as PublicPromotion[]});
+  await screen.view.refreshHomePromotions();
+  expect(screen.cards.value).toEqual(['promotion:live']);
+  const reread=deferred();screen.list.mockReturnValueOnce(reread.promise);
+  const read=screen.view.refreshHomePromotions();expect(screen.cards.value).toEqual([]);
+  reread.reject(new Error('unavailable'));await read;expect(screen.cards.value).toEqual([]);
 });
