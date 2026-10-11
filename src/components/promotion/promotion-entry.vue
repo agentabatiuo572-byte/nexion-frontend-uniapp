@@ -104,7 +104,7 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();});
 .entry-artwork { position:absolute; inset:0 auto 0 0; width:45%; background:url('/static/promotion/purchase-gift-reference.png') left center / auto 100% no-repeat; mask-image:linear-gradient(to right,black 80%,transparent); }
 .entry-label { position:absolute; top:10px; left:10px; padding:3px 7px; border-radius:12px; border:1px solid var(--v5-brand); background:color-mix(in srgb,var(--v5-brand) 28%,var(--v5-bg)); color:var(--v5-ink); font-size:12px; }
 .entry-advert .entry-title { font-size:20px; line-height:1.25; margin:0 0 8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.entry-advert .promotion-copy { font-size:12px; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.entry-advert .promotion-copy { color:var(--v5-ink-2); font-size:12px; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .entry-title { display:block; font-size:20px; line-height:1.4; font-weight:600; margin:7px 0; overflow-wrap:anywhere; }
 .entry-eyebrow { font-size:12px; color:var(--v5-brand); }
 .entry-copy { min-width:0; }
