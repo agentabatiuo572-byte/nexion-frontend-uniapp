@@ -37,14 +37,15 @@ function screen(stored?:PromotionCheckoutRecord){
   const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1,remoteFleetHasSnapshot:true,user:{usdtBalance:150}});
   const mounted:Array<()=>Promise<void>>=[],unmounted:Array<()=>void>=[],guardDisposal=vi.fn(),guardRegistration=vi.fn(()=>guardDisposal);
   const key=vi.fn(()=> 'original-key'),fleet=vi.fn().mockResolvedValue({serverNow:Date.parse(serverTime)});
+  const getProduct=vi.fn().mockReturnValue({name:'Selected device'}),catalog=Vue.reactive({status:'ready'}),presentation=Vue.ref<{products:{id:string;name:string}[]}|null>({products:[{id:'sku',name:'Selected device'}]});
   vi.stubGlobal('setInterval',vi.fn(()=>0));vi.stubGlobal('clearInterval',vi.fn());
   const modules:Record<string,unknown>={
     vue:{...Vue,onMounted:(fn:()=>Promise<void>)=>mounted.push(fn),onBeforeUnmount:(fn:()=>void)=>unmounted.push(fn)},
     'vue-router':{onBeforeRouteLeave:vi.fn()},
     '@/api/runtime':{promotionApi:api,deviceE3Api:{fleet}},'@/api/errors':{asApiError},
     '@/i18n/use-t':{useT:()=>Vue.ref(zh)},'@/store/locale':{useLocaleStore:()=>({code:'zh'})},'@/store/app':{useApp:()=>app},'@/store/auth':{useAuth:()=>({isAuthenticated:true})},
-    '@/store/voucher':{useVoucher:()=>({catalog:[],claimedUnused:[],refreshRemote:vi.fn()})},'@/mock/products':{getProduct:()=>({name:'Selected device'})},
-    '@/store/product-catalog':{productCatalogState:Vue.reactive({status:'ready'}),refreshProductCatalog:vi.fn().mockResolvedValue(true)},
+    '@/store/voucher':{useVoucher:()=>({catalog:[],claimedUnused:[],refreshRemote:vi.fn()})},'@/mock/products':{getProduct},
+    '@/store/product-catalog':{productCatalogState:catalog,productCatalogPresentation:presentation,refreshProductCatalog:vi.fn().mockResolvedValue(true)},
     '@/lib/route':{navTo:vi.fn(),navBack:vi.fn()},'@/store/ui':{confirm:vi.fn().mockResolvedValue(false)},
     '@/lib/promotion-checkout-session':{PromotionCheckoutSession,selectPromotionCheckoutRecord},
     '@/store/account-scoped-storage':{readAccountRow:()=>rows,writeAccountRow:save,acquireAccountCommandKey:key},
@@ -62,7 +63,7 @@ function screen(stored?:PromotionCheckoutRecord){
   cleanup.push(()=>{unmounted.forEach(fn=>fn());scope.stop();});
   const passthrough={setup:(_props:unknown,{slots}:Vue.SetupContext)=>()=>Vue.h('view',slots.default?.())};
   const html=()=>renderToString(Vue.createSSRApp({components:{PromotionAction:passthrough,PromotionTerms:empty,RewardRows:empty,LiquidGlass:empty},render:()=>render(Vue.proxyRefs({...Vue.toRefs(props),...view}),[])}));
-  return{view,exposed,api,save,key,app,fleet,props,html,start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
+  return{view,exposed,api,save,key,app,fleet,props,getProduct,catalog,presentation,html,start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
 }
 
 it('fresh hide invalidates and persists the unlocked quote, closes terms, then show obtains a new quote',async()=>{
@@ -82,6 +83,16 @@ it('a closed campaign quote failure after returning never restores previous gift
   expect(page.view.quote.value).toBeNull();expect(page.view.rewards.value).toEqual([]);expect(page.view.promotion.value).toBeNull();
   expect(page.view.error.value).toBe(zh.promotion.disabledNote);expect(page.view.canCreate.value).toBe(false);
   const html=await page.html();expect(html).not.toContain(zh.promotion.expected);expect(html).not.toContain('旧活动标题');expect(html).not.toContain(zh.promotion.rulesLink);expect(html).toContain(zh.promotion.quote);
+});
+it.each([true,false])('a failed catalog read keeps only a confirmed selected name when its presentation contains the SKU=%s',async known=>{
+  const page=screen();await page.start();expect(await page.html()).toContain('Selected device');page.exposed.hide();
+  page.getProduct.mockReturnValue(undefined);page.catalog.status='error';
+  if(!known)page.presentation.value={products:[]};
+  page.api.get.mockResolvedValueOnce(activity('PAUSED'));page.api.quote.mockRejectedValueOnce(new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'}));
+  page.exposed.show();await flush();
+  const html=await page.html();expect(html).toContain(known?'Selected device':zh.promotion.unknown);expect(html).toContain(zh.promotion.quantity+' · 1');
+  expect(html).not.toContain(zh.promotion.expected);expect(html).not.toContain('旧活动标题');expect(html).not.toContain('promotion-price');expect(html).not.toContain(zh.promotion.confirmOrder);
+  expect(page.view.canCreate.value).toBe(false);await page.view.createOrder();expect(page.api.create).not.toHaveBeenCalled();
 });
 it('quote and campaign reads started before hiding cannot restore marketing when they finish late',async()=>{
   const page=screen(),q=deferred<Quote>(),campaign=deferred<PublicPromotion>();
@@ -107,6 +118,7 @@ it('a fresh quote invalidation storage failure exposes an error and cannot re-di
 it('a confirmed original order remains intact on hide and show reads the same receipt without a new quote',async()=>{
   const original={quote:quote(),order:receipt(),pending:null};
   const page=screen(original);await page.start();const before=structuredClone(page.view.session.record);
+  const html=await page.html();expect(html).toContain('Original device');expect(html).not.toContain('Selected device');
   page.exposed.hide();expect(page.view.session.record).toEqual(before);expect(page.view.rewards.value).toHaveLength(1);
   page.exposed.show();await flush();expect(page.api.findOrder).toHaveBeenLastCalledWith('o1');expect(page.view.session.confirmed).toBe(true);expect(page.view.canPay.value).toBe(true);
   expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.get).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();
