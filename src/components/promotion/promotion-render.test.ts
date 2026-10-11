@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import * as Vue from 'vue';
 import { renderToString } from '@vue/server-renderer';
 import { compileScript, parse } from '@vue/compiler-sfc';
@@ -9,6 +10,7 @@ import orderRewardsSource from './order-rewards.vue?raw';
 import rewardDetailSource from '@/pages/events/promotion-reward-detail.vue?raw';
 import checkoutSource from './promotion-checkout.vue?raw';
 import termsSource from './promotion-terms.vue?raw';
+import entrySource from './promotion-entry.vue?raw';
 import { promotionZH } from '@/i18n/messages/promotion';
 import { localized, rewardAmount, rewardStateKey } from '@/lib/promotion-display';
 
@@ -27,6 +29,25 @@ const dependencies:Record<string,unknown>={
 const componentExports={default:{} as Vue.Component};
 new Function('require','exports',code)((id:string)=>{if(!(id in dependencies))throw new Error('Unexpected import '+id);return dependencies[id];},componentExports);
 const reward={obligationId:'reward-1',reward:{rewardRuleId:'r1',type:'USDT',amount:'3.000000',beneficiaryRole:'BUYER'},state:'ISSUED',refundHold:false};
+
+it('home advert copy keeps AA contrast against captured light background samples',()=>{
+  const styles=parse(entrySource).descriptor.styles.find(style=>style.scoped)!.content;
+  const rule=styles.match(/\.entry-advert\s+\.promotion-copy\s*\{([^}]*)\}/)![1];
+  const token=rule.match(/color:\s*var\((--[\w-]+)\)/)?.[1];
+  expect(token).toBeDefined();
+  const light=readFileSync(new URL('../../styles/tokens.css',import.meta.url),'utf8').match(/:root\s*\{([^}]*)\}/)![1];
+  const color=light.match(new RegExp(`${token}:\\s*(#[\\da-f]{6})`,'i'))?.[1];
+  expect(color).toBeDefined();
+  const luminance=(hex:string)=>hex.slice(1).match(/../g)!.map(channel=>{
+    const value=parseInt(channel,16)/255;
+    return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4;
+  }).reduce((sum,value,index)=>sum+value*[0.2126,0.7152,0.0722][index],0);
+  // Captured en/light320 home advert background samples.
+  for(const background of ['#D8DCE9','#C5CFE9','#BDC9E9']){
+    const foreground=luminance(color!),backdrop=luminance(background);
+    expect((Math.max(foreground,backdrop)+0.05)/(Math.min(foreground,backdrop)+0.05)).toBeGreaterThanOrEqual(4.5);
+  }
+});
 
 it('the compiled Vue Boolean prop defaults to a usable reward details link',async()=>{
   const html=await renderToString(Vue.createSSRApp(componentExports.default,{rewards:[reward]}));
