@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import * as Vue from 'vue';
 import { renderToString } from '@vue/server-renderer';
 import { compileScript, parse } from '@vue/compiler-sfc';
@@ -35,7 +34,10 @@ it('home advert copy keeps AA contrast against captured light background samples
   const rule=styles.match(/\.entry-advert\s+\.promotion-copy\s*\{([^}]*)\}/)![1];
   const token=rule.match(/color:\s*var\((--[\w-]+)\)/)?.[1];
   expect(token).toBeDefined();
-  const light=readFileSync(new URL('../../styles/tokens.css',import.meta.url),'utf8').match(/:root\s*\{([^}]*)\}/)![1];
+  const tokenPath=decodeURIComponent(new URL('../../styles/tokens.css',import.meta.url).pathname).replace(/^\/([a-z]:\/)/i,'$1');
+  const tokenSource=ts.sys.readFile(tokenPath);
+  if(tokenSource===undefined)throw new Error(`Promotion contrast tokens not readable: ${tokenPath}`);
+  const light=tokenSource.match(/:root\s*\{([^}]*)\}/)![1];
   const color=light.match(new RegExp(`${token}:\\s*(#[\\da-f]{6})`,'i'))?.[1];
   expect(color).toBeDefined();
   const luminance=(hex:string)=>hex.slice(1).match(/../g)!.map(channel=>{

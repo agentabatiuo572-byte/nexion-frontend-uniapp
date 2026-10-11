@@ -463,7 +463,7 @@ onLoad(() => {
 
 .home-promotion-status { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .home-task-carousel__swiper + .home-promotion-status { margin-top:12px; }
-.home-promotion-retry { display:flex; align-items:center; justify-content:center; flex:none; min-width:44px; min-height:44px; padding:10px 14px; border-radius:999px; text-align:center; font-size:14px; }
+.home-promotion-retry { flex:none; min-width:44px; min-height:44px; padding:10px 14px; }
 
 .home-task-carousel__status {
   position: absolute;
