@@ -502,5 +502,8 @@ const gateMetaStyle: CSSProperties = {
 import { getProductMedia } from "@/lib/product-media";
 </script>
 <style scoped>
+.promotion-buy { --v5-liquid-tint:transparent; }
+.promotion-buy :deep(.nx-liquid-glass[data-glass-strategy="solid"]),
+.promotion-buy :deep(.nx-liquid-glass[data-glass-strategy="solid"] .nx-liquid-optics) { background:inherit; }
 .promotion-buy > text,.promotion-buy > svg { position:relative;z-index:1; }
 </style>

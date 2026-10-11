@@ -72,7 +72,7 @@ import type { LocalizedText,RewardDisclosure } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { useVoucher } from '@/store/voucher';
 import { asApiError } from '@/api/errors';
-import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,productCatalogState } from '@/store/product-catalog';
+import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
 import { navTo,navBack } from '@/lib/route';import { confirm } from '@/store/ui';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
 import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
@@ -84,7 +84,7 @@ import RewardRows from './reward-rows.vue';import PromotionTerms from './promoti
 const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string}>();
 function getProduct(id:string){void productCatalogState.status;return readProduct(id);}
 const t=useT(),p=computed(()=>t.value.promotion),locale=useLocaleStore(),app=useApp(),auth=useAuth(),voucher=useVoucher();
-function selectedItemName(item:{productNo:string;productName?:string}){return ('productName' in item?item.productName:getProduct(item.productNo)?.name)??p.value.unknown;}
+function selectedItemName(item:{productNo:string;productName?:string}){return item.productName??getProduct(item.productNo)?.name??productCatalogPresentation.value?.products.find(product=>product.id===item.productNo)?.name??p.value.unknown;}
 const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,visible=true,readGeneration=0,refreshOnIdle=false;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
 const readCurrent=(generation:number)=>current()&&visible&&generation===readGeneration;
 const TABLE='nexgrid-promotion-checkout-v1';
