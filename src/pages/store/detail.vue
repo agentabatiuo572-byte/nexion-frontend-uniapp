@@ -267,8 +267,8 @@
 
 <script setup lang="ts">
 import { navTo, takeNavigationQuery } from "@/lib/route";
-import { ref, computed, watch, onUnmounted, nextTick, type CSSProperties } from "vue";
-import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
+import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
+import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SectionHeader from "@/components/store/section-header.vue";
 import ProductRender from "@/components/store/product-render.vue";
@@ -682,14 +682,12 @@ function toggleFaq(i: number) {
 // Chassis-level sticky bottom Buy CTA (replaces the old page-level fixed-position
 // bar, which positioned against the viewport — wrong inside the bezel). useStickyCTA
 // → the chassis-mounted <StickyCtaBar> renders it correctly (absolute). Re-syncs as
-// product/qty resolve; cleared on hide/unmount so it never bleeds to the next page.
+// product/qty resolve; cached deactivation and Uni unload also clear this page's CTA.
 const sticky = useStickyCTA();
 const stickyOwner = Symbol("store-detail");
 const stickyPageVisible = ref(true);
 sticky.activate(stickyOwner);
-watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty],
-  () => {
+function publishStickyCTA() {
     if (!stickyPageVisible.value || (remoteApiEnabled && catalogStatus.value !== "ready")) {
       sticky.hide(stickyOwner);
       return;
@@ -763,27 +761,31 @@ watch(
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
-  },
+}
+watch(
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty],
+  publishStickyCTA,
   { immediate: true },
 );
-onShow(() => {
+function showDetailStickyCTA() {
+  detailPageVisible = true;
   sticky.activate(stickyOwner);
   stickyPageVisible.value = true;
-});
-onHide(() => {
+  publishStickyCTA();
+}
+function hideDetailStickyCTA() {
   detailPageVisible = false;
   detailObservationEpoch += 1;
   invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);
-});
-onUnmounted(() => {
-  detailPageVisible = false;
-  detailObservationEpoch += 1;
-  invalidateDetailFacts();
-  stickyPageVisible.value = false;
-  sticky.hide(stickyOwner);
-});
+}
+onShow(showDetailStickyCTA);
+onActivated(showDetailStickyCTA);
+onHide(hideDetailStickyCTA);
+onUnload(hideDetailStickyCTA);
+onDeactivated(hideDetailStickyCTA);
+onUnmounted(hideDetailStickyCTA);
 
 // ─── styles ───
 const catalogRetryStyle: CSSProperties = {
