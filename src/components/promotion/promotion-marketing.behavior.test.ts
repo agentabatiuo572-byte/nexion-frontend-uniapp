@@ -12,6 +12,10 @@ import storeSource from '@/pages/store/store.vue?raw';
 import detailSource from '@/pages/store/detail.vue?raw';
 import type { PublicPromotion,PublicPromotionPage } from '@/api/promotion-contracts';
 import { promotionZH,promotionEN,promotionVI } from '@/i18n/messages/promotion';
+import { zh } from '@/i18n/messages/zh';
+import { en } from '@/i18n/messages/en';
+import { vi as vietnamese } from '@/i18n/messages/vi';
+import { fmt } from '@/i18n/format';
 import * as entry from '@/lib/promotion-entry';
 import * as display from '@/lib/promotion-display';
 
@@ -41,6 +45,7 @@ function platform(){
     '@dcloudio/uni-app':{onShow:(fn:()=>void)=>shown.push(fn),onHide:(fn:()=>void)=>hidden.push(fn)},
     '@/store/app':{useApp:()=>app},'@/store/locale':{useLocaleStore:()=>locale},
     '@/lib/promotion-entry':entry,'@/lib/promotion-display':display,
+    '@/i18n/format':{fmt},
   };
   const scope=Vue.effectScope();cleanups.push(()=>{hidden.forEach(fn=>fn());scope.stop();});
   return{app,locale,modules,scope,start:()=>mounted.forEach(fn=>fn()),show:()=>shown.forEach(fn=>fn()),hide:()=>hidden.forEach(fn=>fn())};
@@ -164,6 +169,25 @@ it('the production bundle clears quote rewards and open terms synchronously when
   view.quote.value={expectedRewards:[{rewardRuleId:'old-reward'}]};view.quoteStatus.value='ready';view.termsOpen.value=true;
   current.value=null;
   expect(view.quote.value).toBeNull();expect(view.quoteStatus.value).toBe('idle');expect(view.termsOpen.value).toBe(false);
+});
+it.each([zh,en,vietnamese])('bundle catalog recovery hides internal IDs and names the add action',async copy=>{
+  const screen=platform(),products=Vue.ref({products:[] as Array<{id:string;name:string;productType:string}>}),status=Vue.reactive({status:'error'}),internalId='private-product-id';
+  Object.assign(screen.modules,{
+    '@/api/runtime':{promotionApi:{quote:vi.fn()},sessionVault:{read:()=>({user:{userId:7}})}},
+    '@/i18n/use-t':{useT:()=>Vue.ref(copy)},
+    '@/store/product-catalog':{productCatalogState:status,productCatalogPresentation:products,refreshProductCatalog:vi.fn()},
+    '@/composables/use-product-phase':{useProductPhase:()=>Vue.ref('P1')},'@/store/product-availability':{isProductAvailable:()=>true},
+    '@/composables/use-promotion-context':{usePromotionContext:()=>({activity:Vue.ref(activity({productNos:[internalId,'second']})),status:Vue.ref('ready'),available:Vue.ref(true),refresh:vi.fn()})},
+    '@/store/account-scoped-storage':{readAccountRow:()=>null,writeAccountRow:vi.fn()},'@/lib/product-image':{catalogProductImageUrl:()=>null},'@/lib/route':{navTo:vi.fn()},
+  });
+  const component=evaluate(script(bundleSource),screen.modules).default;
+  const view=screen.scope.run(()=>component.setup({activityId:'a1',initialItems:[{productNo:internalId,quantity:1}]},{expose(){}}))!;
+  const rendered=renderer(bundleSource,view),failed=await rendered.html();
+  expect(failed).not.toContain(internalId);expect(failed).toContain(copy.uiChrome.unavailable);
+  products.value.products=[{id:internalId,name:'First device',productType:'DEVICE'},{id:'second',name:'Second $& device',productType:'DEVICE'}];status.status='ready';
+  expect(await rendered.html()).toContain('First device');
+  const add=find(rendered.node(),'bundle-add')!;expect(add.props!['aria-label']).toBe(fmt(copy.uiChrome.addItem,{name:'Second $& device'}));
+  add.props!.onClick();expect(view.selection.value).toEqual([{productNo:internalId,quantity:1},{productNo:'second',quantity:1}]);
 });
 it.each(['PAUSED','ENDED'] as const)('direct product promotion props suppress reward content for %s',async state=>{
   const screen=platform();Object.assign(screen.modules,{'@/i18n/use-t':{useT:()=>Vue.ref({promotion:promotionZH})},'@/mock/products':{getProduct:()=>({name:'Actual device'})}});

@@ -33,7 +33,7 @@
       <view v-for="product in suggestions" :key="product.id" class="promotion-row">
         <image v-if="imageFor(product.id)" class="promotion-image" :src="imageFor(product.id)" mode="aspectFill" :alt="product.name" />
         <view class="promotion-grow"><text class="bundle-name">{{ product.name }}</text><view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(product.id,scopeId))"><text>{{ t.promotion.detail }}</text></view></view>
-        <view class="bundle-add" role="button" :aria-label="t.promotion.selected+' · '+product.name" :tabindex="selection.length>=8||totalUnits>=100?-1:0" :aria-disabled="selection.length>=8||totalUnits>=100" @click="add(product.id)">+</view>
+        <view class="bundle-add" role="button" :aria-label="fmt(t.uiChrome.addItem,{name:product.name})" :tabindex="selection.length>=8||totalUnits>=100?-1:0" :aria-disabled="selection.length>=8||totalUnits>=100" @click="add(product.id)">+</view>
       </view>
     </view>
     <view class="promotion-flat">
@@ -78,6 +78,7 @@ import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { catalogProductImageUrl } from '@/lib/product-image';
 import { localized,displayDeadline,rewardAmount } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
+import { fmt } from '@/i18n/format';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
 import LiquidGlass from '@/components/liquid-glass.vue';
 import RewardRows from './reward-rows.vue';
@@ -99,7 +100,7 @@ restore(props.initialItems);
 const catalogStatus=computed(()=>productCatalogState.status);
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
-const nameFor=(id:string)=>productFor(id)?.name??id;
+const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;
 const imageFor=(id:string)=>catalogProductImageUrl(productFor(id)?.imageUrl,'')??'';
 const ruleTerms=computed(()=>activity.value?[
   localized(activity.value.terms,locale.code),
