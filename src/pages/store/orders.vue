@@ -95,6 +95,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
@@ -217,6 +218,7 @@ onHide(() => {
 onUnmounted(() => {
   ordersPageActive = false;
   refreshEpoch += 1;
+  unsubscribeRuntimeRevision();
 });
 watch(() => app.accountBindingEpoch, () => {
   remoteOrdersResolved.value = false;
@@ -226,6 +228,14 @@ watch(() => app.accountBindingEpoch, () => {
 // read starts here instead, so the page never settles on an account-state error.
 watch(remoteSessionReady, (ready, wasReady) => {
   if (ready && !wasReady && ordersPageActive) void refreshOrders();
+});
+
+// A later catalog response clears the shared orders without rebinding the account.
+const unsubscribeRuntimeRevision = subscribeRuntimeRevision(() => {
+  if (!remoteApiEnabled) return;
+  refreshEpoch += 1;
+  remoteOrdersResolved.value = false;
+  if (ordersPageActive) void refreshOrders();
 });
 
 const ordersBackHref = ref("/store");
@@ -304,7 +314,7 @@ function goStore() {
   navTo("/store");
 }
 function goOrder(order: OrderListItem) {
-  navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${order.id}`);
+  navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}`);
 }
 
 const remoteErrorStyle: CSSProperties = {
