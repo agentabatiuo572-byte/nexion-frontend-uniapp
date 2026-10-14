@@ -12,10 +12,10 @@
 
   TickerNumber (source) → plain reactive values (interval re-render ramps them;
   uni has no tween component). Long-press uses touchstart/touchend (uni has no
-  pointer events). onPressStart/End also clear on touchcancel.
+  pointer events). Movement, touchcancel and unmount cancel the pending hold.
 -->
 <template>
-  <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet).
          🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
          庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
@@ -75,7 +75,7 @@
         <view class="earn-device-amount">
           <!-- Compact rows use neutral realized earnings; detailed pending/warning states retain their semantics. -->
           <text class="earn-device-amount-label">{{ t.earn.todayEarnings }}</text>
-          <text class="earn-device-value tabular-nums">{{ phoneLocalReady ? `$${device.todayEarnings.toFixed(2)}` : '—' }}</text>
+          <text class="earn-device-value tabular-nums">{{ phoneLocalReady ? `$${formatAmount(device.todayEarnings)}` : '—' }}</text>
         </view>
         <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }"><path d="m6 9 6 6 6-6" /></svg>
@@ -130,10 +130,11 @@
       <view class="flex items-center justify-between gap-2">
         <text :style="sectionLabelStyle">{{ t.earn.hashCapability }}</text>
         <view class="flex items-center gap-1.5">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ baselineTops == null ? t.earn.hashCapabilityUnknown : `${baselineTops} ${t.onboarding.phoneComputeUnit}` }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ baselineTops == null ? '-' : `${baselineTops} ${t.onboarding.phoneComputeUnit}` }}</text>
           <text v-if="capTier != null" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashTier, { n: capTier }) }}</text>
         </view>
       </view>
+      <text v-if="baselineTops == null" class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
     </view>
 
     <!-- Mock phone: live hashpower (effective vs calibrated capability ceiling) -->
@@ -239,7 +240,7 @@
       <view v-if="task.status !== 'PAUSED'" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
         <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
-        <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} +${{ task.reward.toFixed(3) }}</text>
+        <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} +${{ formatAmount(task.reward) }}</text>
       </view>
     </view>
 
@@ -247,7 +248,7 @@
          this list only mirrors settled task previews returned for this device. -->
     <view v-if="phoneLocalReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
-        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }} ({{ deviceTodayCompleted.length }})</text>
+        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ deviceTodayCompleted.length }})</template></text>
         <view
           class="active:opacity-60"
           style="min-height: 44px; padding-left: 16px; display: flex; align-items: center"
@@ -260,7 +261,12 @@
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAllAccountReceipts }}</text>
         </view>
       </view>
-      <view v-if="deviceTodayCompleted.length" class="space-y-1.5">
+      <view v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" role="status" aria-live="polite">
+        <text class="block" style="font-size: 12px; color: var(--v5-danger)">{{ t.wallet.assignmentsUnavailableTitle }}</text>
+        <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.wallet.assignmentsUnavailableBody }}</text>
+      </view>
+      <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
+      <view v-else-if="deviceTodayCompleted.length" class="space-y-1.5">
         <view
           v-for="task in deviceTodayCompleted"
           :key="task.receiptNo ?? task.id"
@@ -269,7 +275,7 @@
           style="min-height: 28px; font-size: 12px"
         >
           <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
-          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">+${{ task.reward.toFixed(3) }}</text>
+          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">+${{ formatAmount(task.reward) }}</text>
           <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
       </view>
@@ -359,10 +365,10 @@
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
              与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.014em">${{ formatAmount(device.todayEarnings) }}</text>
         <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 600">
           <text style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-success) 75%, transparent)">+</text>
-          <text>{{ device.todayEarningsNEX.toFixed(1) }} NEX</text>
+          <text>{{ formatAmount(device.todayEarningsNEX) }} NEX</text>
         </view>
       </view>
     </view>
@@ -371,6 +377,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
@@ -418,7 +425,7 @@ const displayName = computed(() => deviceName(t.value, props.device));
 const phoneLocalReady = computed(() => !remoteApiEnabled || props.device.kind !== "phone"
   || (nativePhoneAvailable && session.isCurrentDeviceCalibrated(app.accountKey) && !app.remotePhoneBindingInvalid));
 const displayGpu = computed(() => phoneLocalReady.value
-  ? deviceGpuLabel(t.value, props.device) : t.value.earn.hashCapabilityUnknown);
+  ? deviceGpuLabel(t.value, props.device) : "-");
 const displayLocation = computed(() => deviceLocation(t.value, props.device));
 function goPhoneBinding() { if (nativePhoneAvailable) navTo("/pages/onboarding/connect?mode=recalibrate"); }
 
@@ -434,6 +441,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  onPressEnd();
   if (typeof document !== "undefined") document.removeEventListener("keydown", onDocumentMenuKeydown, true);
 });
 
@@ -462,6 +470,8 @@ const deviceTodayCompleted = computed(() => todayCompletedTasks(
   props.device.recentTasks,
   liveTaskNow.value,
 ));
+const taskHistoryReady = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
+  || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
 const taskLockRemainingMinutes = computed(() => {
   const lockUntil = props.device.taskLockUntil ?? 0;
   return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
@@ -802,6 +812,7 @@ function onPressStart() {
   if (longPress) clearTimeout(longPress);
   pressFiredMenu.value = false;
   longPress = setTimeout(() => {
+    longPress = null;
     openMenu();
     pressFiredMenu.value = true;
   }, 480);

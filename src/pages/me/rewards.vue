@@ -38,7 +38,7 @@
       >
         <view class="flex-1 min-w-0">
           <text class="block truncate" :style="catTitleStyle">{{ c.label }}</text>
-          <view class="flex items-baseline" style="white-space: nowrap; margin-top: 10px; gap: 6px">
+          <view v-if="c.big" class="flex items-baseline" style="white-space: nowrap; margin-top: 10px; gap: 6px">
             <text class="font-mono-tabular" :style="bigNumStyle">{{ c.big }}</text>
             <text :style="unitStyle">{{ c.unit }}</text>
           </view>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -69,9 +70,7 @@ import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
 import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
-
-// L2 category param — mirrored by pages/me/rewards-list.vue (invalid → voucher).
-type RewardsCat = "voucher" | "usdt" | "nex";
+import type { RewardsCat } from "./course-reward-link";
 
 const t = useT();
 const voucher = useVoucher();
@@ -103,7 +102,7 @@ const voucherReady = computed(() => !remoteApiEnabled || voucher.remoteStatus ==
 const remoteAvailableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
 const remoteExpiredCount = computed<number | null>(() => voucherReady.value ? voucher.expiredVouchers.length : null);
 // Voucher re-reads happen on every return from a detail page. Keep the last
-// successful counts so the cards never flash "--" for values already known.
+// successful counts so the cards never flash "-" for values already known.
 const lastAvailableCount = ref<number | null>(null);
 const lastExpiredCount = ref<number | null>(null);
 watch(remoteAvailableCount, (value) => { if (value !== null) lastAvailableCount.value = value; }, { immediate: true });
@@ -127,7 +126,7 @@ const remoteNexTotal = computed<number | null>(() => summaryReady.value ? bills.
 // must not blank out totals the user already saw. The store drops its snapshot
 // to null only on a failed read, so keep the last successful figures while a
 // re-read is in flight, and surface the failure through summaryFailed instead of
-// replacing known values with "--".
+// replacing known values with "-".
 const lastUsdtTotal = ref<number | null>(null);
 const lastNexTotal = ref<number | null>(null);
 watch(remoteUsdtTotal, (value) => { if (value !== null) lastUsdtTotal.value = value; }, { immediate: true });
@@ -155,7 +154,7 @@ const cats = computed<CatCard[]>(() => [
   {
     key: "voucher",
     label: t.value.rewards.catVouchers,
-    big: availableCount.value === null ? "--" : String(availableCount.value),
+    big: availableCount.value === null ? "-" : String(availableCount.value),
     unit: t.value.rewards.unitVouchers,
     // Expired stock replaces the purpose line — the more actionable fact.
     desc: expiredCount.value !== null && expiredCount.value > 0 ? fmt(t.value.rewards.expiredCount, { n: expiredCount.value }) : t.value.rewards.catVouchersDesc,
@@ -163,22 +162,39 @@ const cats = computed<CatCard[]>(() => [
   {
     key: "usdt",
     label: t.value.rewards.catUsdt,
-    big: displayUsdtTotal.value === null ? "--" : `$${displayUsdtTotal.value.toFixed(2)}`,
+    big: displayUsdtTotal.value === null ? "-" : `$${formatAmount(displayUsdtTotal.value)}`,
     unit: "USDT",
     desc: t.value.rewards.catUsdtDesc,
   },
   {
     key: "nex",
     label: t.value.rewards.catNex,
-    big: displayNexTotal.value === null ? "--" : displayNexTotal.value.toLocaleString(),
+    big: displayNexTotal.value === null ? "-" : formatAmount(displayNexTotal.value),
     unit: "NEX",
     desc: t.value.rewards.catNexDesc,
+  },
+  {
+    key: "promotion",
+    label: t.value.promotion.rewardCategory,
+    big: "",
+    unit: "",
+    desc: t.value.promotion.rewardCategoryDesc,
   },
 ]);
 
 function openCat(cat: RewardsCat) {
   navTo(`/me/rewards/list?cat=${cat}`);
 }
+
+// Preserve known figures only within one account binding. A new binding must
+// wait for its own voucher/summary reads instead of showing the former account.
+watch(() => [app.accountKey, app.accountBindingEpoch], () => {
+  rewardViewRequest++;
+  lastAvailableCount.value = null;
+  lastExpiredCount.value = null;
+  lastUsdtTotal.value = null;
+  lastNexTotal.value = null;
+}, { flush: "sync" });
 
 // ── styles ── (stat-card identity — filled surface, no border, big value as
 // the visual hero; round ink circle = the rest-state affordance, OKX idiom)

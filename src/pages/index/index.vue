@@ -26,7 +26,7 @@
       </view>
 
       <view
-        v-if="visibleTaskCards.length"
+        v-if="visibleTaskCards.length || homePromotionStatus === 'loading' || homePromotionStatus === 'error'"
         id="home-task-carousel"
         class="home-task-carousel"
         role="region"
@@ -39,6 +39,7 @@
         @keydown.right.prevent="onTaskCarouselKeydown(1)"
       >
         <swiper
+          v-if="visibleTaskCards.length"
           :key="taskCardSignature"
           class="home-task-carousel__swiper"
           :style="{ height: `${taskCarouselHeight}px` }"
@@ -71,10 +72,16 @@
                 @update:expanded="onNewcomerExpandedChange"
                 @content-resize="onNewcomerContentResize(index)"
               />
-              <ConversionBanner v-else :active="taskSlide === index" />
+              <ConversionBanner v-else-if="card === 'weekly'" :active="taskSlide === index" />
+              <PromotionEntry v-else mode="home" :active="taskSlide === index" :activities="homePromotions.filter(activity => card === 'promotion:'+activity.activityId)" />
             </view>
           </swiper-item>
         </swiper>
+
+        <view v-if="homePromotionStatus === 'loading' || homePromotionStatus === 'error'" class="promotion-flat home-promotion-status" :role="homePromotionStatus === 'error' ? 'alert' : 'status'" :aria-busy="homePromotionStatus === 'loading'">
+          <text class="promotion-copy">{{ t.promotion.activityBadge }} · {{ homePromotionStatus === 'loading' ? t.promotion.loading : t.promotion.error }}</text>
+          <PromotionAction class="home-promotion-retry" role="button" :tabindex="homePromotionStatus === 'loading' ? -1 : 0" :aria-disabled="homePromotionStatus === 'loading'" @click="refreshHomePromotions"><text>{{ t.promotion.retry }}</text></PromotionAction>
+        </view>
 
         <text class="home-task-carousel__status" aria-live="polite" aria-atomic="true">
           {{ taskCarouselAnnouncement }}
@@ -108,7 +115,7 @@
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
@@ -117,6 +124,8 @@ import GreetingHeader from "@/components/home/greeting-header.vue";
 import TechMoneyCard from "@/components/home/tech-money-card.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import ConversionBanner from "@/components/home/conversion-banner.vue";
+import PromotionEntry from "@/components/promotion/promotion-entry.vue";
+import PromotionAction from "@/components/promotion/promotion-action.vue";
 import DayOneQuestCard from "@/components/home/day-one-quest-card.vue";
 import LiveFeedCard from "@/components/home/live-feed-card.vue";
 import FeaturedLearningCard from "@/components/home/featured-learning-card.vue";
@@ -137,7 +146,9 @@ import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { useWeeklyQuest } from "@/store/weekly-quest";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, promotionApi, sessionVault } from "@/api/runtime";
+import type { PublicPromotion } from "@/api/promotion-contracts";
+import { createPromotionReadFence,isPromotionActive } from "@/lib/promotion-entry";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { navTo } from "@/lib/route";
@@ -165,6 +176,35 @@ const locale = useLocaleStore();
 const platformConfig = useConfig();
 const weeklyQuestStore = useWeeklyQuest();
 const instance = getCurrentInstance();
+const homePromotions = ref<PublicPromotion[]>([]);
+const homePromotionStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
+const promotionReadFence = createPromotionReadFence();
+let promotionHomeVisible = true;
+let promotionLoadingIdentity = '';
+async function refreshHomePromotions() {
+  if (!promotionHomeVisible) return;
+  const identity = `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
+  if (homePromotionStatus.value === 'loading' && promotionLoadingIdentity === identity) return;
+  const request = promotionReadFence.next();
+  promotionLoadingIdentity = identity;
+  homePromotions.value = [];
+  homePromotionStatus.value = remoteApiEnabled ? 'loading' : 'ready';
+  if (!remoteApiEnabled) return;
+  try {
+    const page = await promotionApi.list({ limit:20, placement:'home.purchase-promotion' }, !!sessionVault.read());
+    if (!promotionHomeVisible || !promotionReadFence.current(request) || identity !== `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`) return;
+    homePromotions.value = page.items.filter(isPromotionActive);
+    homePromotionStatus.value = 'ready';
+  } catch {
+    if (promotionHomeVisible && promotionReadFence.current(request) && identity === `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`) homePromotionStatus.value = 'error';
+  }
+}
+onShow(() => { promotionHomeVisible = true; void refreshHomePromotions(); });
+onHide(() => { promotionHomeVisible = false; promotionReadFence.invalidate(); homePromotions.value = []; homePromotionStatus.value = 'idle'; });
+watch([() => app.accountKey, () => app.accountBindingEpoch, () => locale.code], () => {
+  promotionReadFence.invalidate(); homePromotions.value = []; homePromotionStatus.value = 'idle';
+  if (promotionHomeVisible) void refreshHomePromotions();
+});
 
 // PC 端更新任务配置后，用户回到首页即可读取最新投影，无需杀掉 App 重开。
 onShow(() => {
@@ -187,7 +227,7 @@ const visibleTaskCards = computed<TaskCardId[]>(() =>
   deriveHomeTaskCards(platformConfig.syncFailed, {
     homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
     homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
-  }),
+  }, homePromotions.value.map(activity => activity.activityId)),
 );
 
 const taskCardSignature = computed(() => visibleTaskCards.value.join("-"));
@@ -202,7 +242,7 @@ const shouldAutoplay = computed(
 );
 
 function taskCardTitle(card: TaskCardId) {
-  return card === "newcomer" ? t.value.home.dayOneFirstDayReward : t.value.home.weeklyQuestEyebrow;
+  return card === "newcomer" ? t.value.home.dayOneFirstDayReward : card === "weekly" ? t.value.home.weeklyQuestEyebrow : t.value.promotion.promo;
 }
 
 function announceTaskSlide(index = taskSlide.value) {
@@ -377,6 +417,8 @@ onMounted(() => {
 onUnmounted(() => {
   uni.offWindowResize(onTaskWindowResize);
   newcomerContentResizer.invalidate();
+  promotionReadFence.invalidate();
+  promotionHomeVisible = false;
 });
 
 onLoad(() => {
@@ -418,6 +460,10 @@ onLoad(() => {
   box-sizing: border-box;
   width: 100%;
 }
+
+.home-promotion-status { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.home-task-carousel__swiper + .home-promotion-status { margin-top:12px; }
+.home-promotion-retry { flex:none; min-width:44px; min-height:44px; padding:10px 14px; }
 
 .home-task-carousel__status {
   position: absolute;

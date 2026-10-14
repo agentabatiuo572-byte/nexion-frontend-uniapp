@@ -20,7 +20,7 @@
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.displayName[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.displayName }}</text> {{ t.ref.invitedYou }}</text>
-          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
+          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} NEX</text>
         </view>
         <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
@@ -158,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { navReset, navTo } from "@/lib/route";
@@ -174,7 +175,7 @@ import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
-import type { OAuthProvider } from "@/api/auth-api";
+import type { OAuthProvider, RegistrationRequest } from "@/api/auth-api";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin } from "@/auth/registration-auto-login";
@@ -222,8 +223,8 @@ const giftNex = computed(() => remoteApiEnabled
   ? remotePreview.value?.gift.nexAmount ?? 0
   : localGift.value.nexAmount);
 const giftLabel = computed(() => [
-  giftUsdt.value > 0 ? `${giftUsdt.value} USDT` : "",
-  giftNex.value > 0 ? `${giftNex.value} NEX` : "",
+  giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)} USDT` : "",
+  giftNex.value > 0 ? `${formatAmount(giftNex.value)} NEX` : "",
 ].filter(Boolean).join(" + "));
 
 type Step = 1 | 2 | 3;
@@ -233,6 +234,7 @@ interface RemoteRegistrationAttemptContext {
   phone: string;
   challengeNo: string;
 }
+let pendingRegistrationRecovery: RegistrationRequest | null = null;
 const step = ref<Step>(1);
 // 包 zm T4:初始国家码随 App 语言(仅初始默认;用户手选后以 pickCountry 为准)。
 const country = ref(dialCodeForLocale(useLocaleStore().code));
@@ -416,6 +418,7 @@ const reviewNoticeBody = computed(() => {
 
 function invalidateOtpFlow() {
   otpFlowVersion += 1;
+  pendingRegistrationRecovery = null;
   verifying.value = false;
 }
 
@@ -734,8 +737,7 @@ async function finish() {
       phone: fullPhone.value,
       challengeNo,
     };
-    completing.value = true;
-    const registration = await registerAndLogin(authApi, {
+    const registrationRequest = pendingRegistrationRecovery ?? {
       countryCode: country.value,
       phone: phoneClean.value,
       challengeNo,
@@ -743,7 +745,10 @@ async function finish() {
       password: password.value,
       sponsorCode: currentSponsorCode(),
       language: useLocaleStore().code,
-    }, () => isCurrentRemoteRegistrationAttempt(registrationAttempt));
+    };
+    completing.value = true;
+    const registration = await registerAndLogin(authApi, registrationRequest,
+      () => isCurrentRemoteRegistrationAttempt(registrationAttempt), pendingRegistrationRecovery !== null);
     if (registration.kind === "stale" || !isCurrentRemoteRegistrationAttempt(registrationAttempt)) return;
     if (registration.kind === "registration_error") {
       completing.value = false;
@@ -753,10 +758,14 @@ async function finish() {
       return;
     }
     if (registration.kind === "login_error") {
+      // Keep the submitted identity/password until this flow is cancelled;
+      // its next explicit attempt must resolve the result before another POST.
+      pendingRegistrationRecovery = registrationRequest;
       completing.value = false;
       error.value = t.value.register.registrationOutcomeUnknown;
       return;
     }
+    pendingRegistrationRecovery = registrationRequest;
     const completed = completeSignIn({
       identity: `user:${registration.user.userId}`,
       onboardingComplete: registration.user.onboardingComplete,
@@ -772,6 +781,7 @@ async function finish() {
       clearRemoteRegistrationReceipt();
       return;
     }
+    pendingRegistrationRecovery = null;
     stageRemoteRegistrationReceipt(registration.registrationReceipt ?? null, `user:${registration.user.userId}`);
     toast.success(t.value.register.registrationSignedIn);
     launchRegistrationSuccess();
@@ -864,7 +874,7 @@ async function finish() {
         if (!usdtBill || !nexBill) throw new Error("gift_bill_unavailable");
         if (posted && giftPosted) {
           toast.success(
-            `+$${gift.usdt} + ${gift.nex} NEX`,
+            `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} NEX`,
             sponsorPreview.value
               ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: sponsorPreview.value.displayName })
               : t.value.register.giftCreditedToastSub,

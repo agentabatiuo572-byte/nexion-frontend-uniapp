@@ -35,7 +35,7 @@
           <!-- Presets -->
           <view class="grid grid-cols-4" style="margin-top: 16px; gap: 8px">
             <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" role="button" tabindex="0" @click="amount = p"  @keydown.enter.prevent="amount = p" @keydown.space.prevent="amount = p">
-              <text>${{ p.toLocaleString() }}</text>
+              <text>${{ formatAmount(p) }}</text>
             </view>
           </view>
           <!-- Balance / Max -->
@@ -92,9 +92,10 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo } from "@/lib/route";
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, computed, watch, onBeforeUnmount, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
@@ -138,6 +139,8 @@ const apyRate = computed(() => selectedPool.value?.apy ?? 0);
 const penaltyRate = computed(() => selectedPool.value?.penalty ?? 0);
 const minAmount = computed(() => selectedPool.value?.minAmountUsdt ?? 0);
 
+let sheetOpenGeneration = 0;
+
 function intentLease(tierKey: string, amountUsdt: number): RemoteIntentLease {
   return remoteGate.acquire(app.accountKey, "open", { tierKey, amountUsdt });
 }
@@ -146,9 +149,12 @@ function intentLease(tierKey: string, amountUsdt: number): RemoteIntentLease {
 watch(
   () => [props.open, props.term] as const,
   ([o, term]) => {
+    sheetOpenGeneration += 1;
     if (o && term !== null) amount.value = minAmount.value;
   },
+  { flush: "sync" },
 );
+onBeforeUnmount(() => { sheetOpenGeneration += 1; });
 
 const titleText = computed(() => (props.term !== null ? fmt(t.value.stakingV3.sheet.title, { n: props.term }) : ""));
 const subtitleText = computed(() =>
@@ -162,19 +168,19 @@ const subtitleText = computed(() =>
 const interestLabel = computed(() =>
   props.term !== null ? fmt(t.value.stakingV3.sheet.interest, { n: props.term }) : "",
 );
-const balanceText = computed(() => (staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt).toFixed(2));
-const principalText = computed(() => formatCommandAmount(amount.value));
+const balanceText = computed(() => formatAmount(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt));
+const principalText = computed(() => formatAmount(amount.value));
 const interestText = computed(() =>
-  props.term !== null ? (amount.value * apyRate.value * (props.term / 365)).toFixed(2) : "0.00",
+  props.term !== null ? formatAmount(amount.value * apyRate.value * (props.term / 365)) : "0.00",
 );
 const unlockDateText = computed(() =>
   props.term !== null ? formatTrialDate(Date.now() + props.term * ONE_DAY_MS) : "",
 );
 const totalText = computed(() =>
-  props.term !== null ? (amount.value * (1 + apyRate.value * (props.term / 365))).toFixed(2) : "0.00",
+  props.term !== null ? formatAmount(amount.value * (1 + apyRate.value * (props.term / 365))) : "0.00",
 );
 const ctaText = computed(() =>
-  props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: formatCommandAmount(amount.value), n: props.term }) : "",
+  props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: formatAmount(amount.value), n: props.term }) : "",
 );
 const lockedNoticeText = computed(() =>
   props.term !== null
@@ -190,16 +196,18 @@ function setMax() {
   amount.value = normalizeCommandAmount(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
 }
 function emitClose() {
+  // Invalidate before the parent applies v-model, including close/reopen in one tick.
+  sheetOpenGeneration += 1;
   emit("update:open", false);
 }
 
 async function submit() {
-  if (!canOpen.value || remotePending.value) return;
+  if (!props.open || !canOpen.value || remotePending.value) return;
   const term = props.term;
   if (term === null) return;
   const min = minAmount.value;
   if (amount.value < min) {
-    toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min, n: term }));
+    toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min: formatAmount(min), n: term }));
     return;
   }
   if (!staking.isMockMode) {
@@ -215,17 +223,20 @@ async function submit() {
     const submittedAmount = normalizeCommandAmount(amount.value);
     const expectedAccountKey = app.accountKey;
     const expectedBindingEpoch = app.accountBindingEpoch;
+    const expectedSheetGeneration = sheetOpenGeneration;
+    const isCurrentSheet = () => props.open && props.term === term
+      && expectedSheetGeneration === sheetOpenGeneration;
     let lease: RemoteIntentLease | null = null;
     try {
       lease = intentLease(pool.tierKey, submittedAmount);
       await risk.checkGate("staking", lease.key);
-      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) {
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) {
         remoteGate.complete(lease, false);
         return;
       }
       await staking.openRemote(pool.tierKey, submittedAmount, lease.key);
       remoteGate.complete(lease, true);
-      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) return;
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) return;
       toast.success(t.value.stakingV3.toast.stakeSuccess);
       emitClose();
     } catch (cause) {
@@ -233,6 +244,7 @@ async function submit() {
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) return;
       // Unknown timeout/result: read the authority before allowing a retry with the same key.
       await staking.syncRemote();
+      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) return;
       if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
         navTo("/pages/me/risk-disclosure?return=/pages/staking/staking");
         return;
@@ -264,7 +276,7 @@ async function submit() {
   if (paid === "insufficient") {
     toast.error(
       t.value.stakingV3.toast.insufficient,
-      fmt(t.value.stakingV3.toast.insufficientSubtitle, { amount: app.user.usdtBalance.toFixed(2) }),
+      fmt(t.value.stakingV3.toast.insufficientSubtitle, { amount: formatAmount(app.user.usdtBalance) }),
     );
     return;
   }
@@ -300,7 +312,7 @@ async function submit() {
   }
   toast.success(
     t.value.stakingV3.toast.stakeSuccess,
-    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: formatStakingPercentage(apyRate.value), n: term }),
+    fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: formatAmount(amount.value), apy: formatStakingPercentage(apyRate.value), n: term }),
   );
   emitClose();
 }

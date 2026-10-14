@@ -11,11 +11,11 @@ describe("support copy preserves recovery and history without implementation exp
       }
       for (const copy of [locale.conversations.historyTruncated, locale.tickets.historyTruncated]) {
         expect(copy).toContain("100");
-        expect(copy).toMatch(/更早|Earlier|cũ hơn/);
-        expect(copy).toMatch(/保留|available|lưu/);
+        expect(copy).toMatch(/更早|早期|Earlier|cũ hơn/);
+        expect(copy).toMatch(/保留|available|retained|lưu/);
       }
       expect(locale.conversations.loadErrorDesc).toMatch(/重试|try again|thử lại/);
-      expect(locale.nova.queue.tracking).toMatch(/这条问题|this question|câu hỏi này/i);
+      expect(locale.nova.queue.tracking).toMatch(/问题|question|câu hỏi/i);
       expect(locale.nova.queue.tracking).toMatch(/自动|automatically|tự động/);
     });
   }

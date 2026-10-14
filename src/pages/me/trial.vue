@@ -32,12 +32,6 @@
             :grace-ends-at="freeTrial.graceEndsAt"
           />
 
-          <!-- Legacy card-era trial migrated → rules-changed notice (异常6) -->
-          <view v-if="freeTrial.legacyCardMigrated" class="flex items-start" :style="legacyNoteStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 1px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ t.trial.legacyMigratedNote }}</text>
-          </view>
-
           <!-- Grace: stopped note — device dimmed above; here the plain words -->
           <view v-if="status === 'grace'" :style="stoppedRowStyle">
             <view class="flex items-center" style="gap: 6px">
@@ -51,7 +45,7 @@
           <view :style="creditWrapStyle">
             <view class="flex items-center justify-between">
               <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.trial.offsetAccruedLabel }}</text>
-              <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ trialOffset.offsetUSD.toFixed(2) }}</text>
+              <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ formatAmount(trialOffset.offsetUSD) }}</text>
             </view>
             <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
             <view
@@ -60,16 +54,17 @@
               :style="trialProductUnavailable ? buyBtnDisabledStyle : buyBtnStyle"
               role="button"
               :tabindex="trialProductUnavailable ? -1 : 0"
-              :aria-label="buyCtaText"
+              :aria-label="trialBuyCtaText"
               :aria-disabled="trialProductUnavailable ? 'true' : 'false'"
+              :aria-busy="trialCatalogLoading ? 'true' : 'false'"
               @click="goCheckout"
 
               @keydown.enter.prevent="goCheckout" @keydown.space.prevent="goCheckout"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="margin-left: 6px">{{ trialProductUnavailable ? t.store.temporarilyOutOfStock : buyCtaText }}</text>
+              <text style="margin-left: 6px">{{ trialBuyCtaText }}</text>
             </view>
-            <text v-if="trialProductUnavailable" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
+            <text v-if="trialProductUnavailable && productCatalogState.status === 'ready'" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
           </view>
 
           <!-- Rules entry -->
@@ -89,7 +84,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
           </view>
           <text class="block" :style="idleTitleStyle">{{ t.trial.idleTitleNew }}</text>
-          <text class="block" :style="idleBodyStyle">{{ idleBody }}</text>
+          <text v-if="idleBody" class="block" :style="idleBodyStyle">{{ idleBody }}</text>
           <view
             class="inline-flex items-center justify-center"
             :class="canStartNow ? 'active:scale-[0.98]' : ''"
@@ -114,11 +109,11 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
           </view>
           <text class="block" :style="idleTitleStyle">{{ t.trial.endedTitle }}</text>
-          <text class="block" :style="idleBodyStyle">{{ endedDesc }}</text>
-          <view class="inline-flex items-center justify-center" :class="trialProductUnavailable ? '' : 'active:scale-[0.98]'" :style="trialProductUnavailable ? idleCtaDisabledStyle : idleCtaStyle" role="button" :tabindex="trialProductUnavailable ? -1 : 0" :aria-label="t.trial.buyCtaPlain" :aria-disabled="trialProductUnavailable ? 'true' : 'false'" @click="goCheckout"  @keydown.enter.prevent="goCheckout" @keydown.space.prevent="goCheckout">
-            <text>{{ trialProductUnavailable ? t.store.temporarilyOutOfStock : t.trial.buyCtaPlain }}</text>
+          <text class="block" :style="idleBodyStyle">{{ t.trial.endedDesc }}</text>
+          <view class="inline-flex items-center justify-center" :class="trialProductUnavailable ? '' : 'active:scale-[0.98]'" :style="trialProductUnavailable ? idleCtaDisabledStyle : idleCtaStyle" role="button" :tabindex="trialProductUnavailable ? -1 : 0" :aria-label="trialBuyCtaText" :aria-disabled="trialProductUnavailable ? 'true' : 'false'" :aria-busy="trialCatalogLoading ? 'true' : 'false'" @click="goCheckout"  @keydown.enter.prevent="goCheckout" @keydown.space.prevent="goCheckout">
+            <text>{{ trialBuyCtaText }}</text>
           </view>
-          <text v-if="trialProductUnavailable" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
+          <text v-if="trialProductUnavailable && productCatalogState.status === 'ready'" class="block" :style="reasonNoteStyle">{{ t.store.trialProductUnavailable }}</text>
         </view>
 
         <!-- ═══ converted — owned terminal ═══ -->
@@ -132,6 +127,9 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
             <text>{{ t.trial.convertedDevicesCta }}</text>
           </view>
+        </view>
+        <view v-if="(isActiveCycle || status === 'ended') && productCatalogState.status === 'error'" class="inline-flex items-center justify-center active:opacity-70" :style="goEarnStyle" role="button" tabindex="0" @click="retryCatalog" @keydown.enter.prevent="retryCatalog" @keydown.space.prevent="retryCatalog">
+          <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
     </view>
@@ -161,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -201,6 +200,7 @@ onUnmounted(() => {
 const isActiveCycle = computed(() => status.value === "active" || status.value === "grace");
 const trialProductId = computed(() => resolveTrialCheckoutProductId(cfg.value.trialProductId));
 const trialProduct = computed(() => (trialProductId.value ? getProduct(trialProductId.value) : undefined));
+const trialCatalogLoading = computed(() => productCatalogState.status !== "ready" && productCatalogState.status !== "error");
 const trialProductUnavailable = computed(() => {
   if (productCatalogState.status !== "ready") return true;
   const product = trialProduct.value;
@@ -215,8 +215,10 @@ const remainingMsValue = computed(() => remainingMs(now.value));
 const trialOffset = computed(() => computeTrialOffset(cfg.value, shadowUSD.value));
 
 const w = computed(() => t.value.trial);
-const idleBody = computed(() => fmt(w.value.idleBody, { n: String(cfg.value.trialDays) }));
-const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: trialOffset.value.remainderUSD.toFixed(2) }));
+const idleBody = computed(() => freeTrial.authorityStatus === "mock" || freeTrial.authorityServerState !== null
+  ? fmt(w.value.idleBody, { n: String(cfg.value.trialDays) })
+  : "");
+const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: formatAmount(trialOffset.value.remainderUSD) }));
 const offsetUsableUntilText = computed(() =>
   fmt(w.value.offsetUsableUntil, {
     time: freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt) : w.value.countdownDateEmpty,
@@ -224,14 +226,16 @@ const offsetUsableUntilText = computed(() =>
 );
 const buyCtaText = computed(() =>
   status.value === "grace"
-    ? fmt(w.value.graceBuyCta, { amount: trialOffset.value.offsetUSD.toFixed(2) })
-    : fmt(w.value.buyCtaOffset, { amount: trialOffset.value.offsetUSD.toFixed(2) }),
+    ? fmt(w.value.graceBuyCta, { amount: formatAmount(trialOffset.value.offsetUSD) })
+    : fmt(w.value.buyCtaOffset, { amount: formatAmount(trialOffset.value.offsetUSD) }),
 );
-const endedDesc = computed(() => {
-  const at = freeTrial.finishedAt ?? freeTrial.graceEndsAt;
-  return fmt(w.value.endedDesc, { time: at !== null ? formatTrialDateTime(at) : w.value.countdownDateEmpty });
+const trialBuyCtaText = computed(() => {
+  if (productCatalogState.status !== "ready") {
+    return productCatalogState.status === "error" ? t.value.store.catalogErrorTitle : t.value.store.catalogLoadingTitle;
+  }
+  if (trialProductUnavailable.value) return t.value.store.temporarilyOutOfStock;
+  return status.value === "ended" ? w.value.buyCtaPlain : buyCtaText.value;
 });
-
 // none-state eligibility (异常2 — concrete reason, never a generic error).
 const canStartNow = computed(() => {
   void now.value; // re-evaluate each tick (eligibility isn't reactive on config alone)
@@ -242,9 +246,7 @@ const ineligibleReasonText = computed(() => {
   // PROD: this reason is served by GET /api/trial/eligibility, so a region
   // refusal arrives here as the reason code. Translate it first; `null` means an
   // ordinary reason, which the named branches below still handle unchanged.
-  // 这里是**禁用 CTA 下方的常驻说明**,不是 toast —— 页面上没有任何重试控件。
-  // 所以 unavailable 那条自带的「请重试」在这个位置是死胡同,换成本页既有的
-  // 「晚点再来看看」口径(eligReasonClosed 同款),其余三条照常用。
+  // 本页没有重试控件；读取失败只说明暂不可用，不推断活动关闭。
   const geo = geoPolicyUserMessage(r, t.value.geoPolicy);
   if (geo) return geoPolicyErrorKind(r) === "unavailable" ? w.value.eligReasonClosed : geo;
   if (r === "converted") return w.value.eligReasonConverted;
@@ -260,10 +262,10 @@ const ineligibleReasonText = computed(() => {
 // remainder → balance / expiry).
 const rulesOpen = ref(false);
 const rulesLines = computed(() => [
-  fmt(w.value.rulesBefore, { cap: String(cfg.value.trialOffsetCapUSD) }),
+  fmt(w.value.rulesBefore, { cap: formatAmount(cfg.value.trialOffsetCapUSD) }),
   w.value.rulesNoCash,
   w.value.rulesAfter,
-  fmt(w.value.rulesExpiry, { days: String(cfg.value.graceDays) }),
+  w.value.rulesExpiry,
 ]);
 
 function claim() {
@@ -280,6 +282,10 @@ function goCheckout() {
   if (!productId) return; // applyAuthoritative already rejects unknown policy ids
   navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
+function retryCatalog() {
+  if (productCatalogState.status !== "error") return;
+  void refreshProductCatalog(true);
+}
 function goEarn() {
   navTo("/pages/earn/earn");
 }
@@ -288,7 +294,6 @@ function goDevices() {
 }
 
 // ── styles — hairline-separated blocks on the page floor ──
-const legacyNoteStyle: CSSProperties = { padding: "10px 2px 0" };
 const stoppedRowStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const creditWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const remainderNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625, textWrap: "pretty" };

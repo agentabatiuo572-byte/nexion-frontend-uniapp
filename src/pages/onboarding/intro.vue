@@ -110,11 +110,10 @@
           </view>
           <view v-if="visiblePaid !== null" class="stat-sep" />
           <view v-if="visiblePaid !== null" class="stat-item">
-            <text class="stat-num stat-num--brand">{{ visiblePaid === null ? t.intro.publicStatsUnavailable : `$${fmtNum(visiblePaid)}` }}</text>
+            <text class="stat-num stat-num--brand">{{ visiblePaid === null ? t.intro.publicStatsUnavailable : `$${formatAmount(visiblePaid)}` }}</text>
             <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
           </view>
         </view>
-        <text v-if="verifiedScope" class="stat-label">{{ verifiedScope }}</text>
       </view>
 
       <view class="intro-cta anim-cta">
@@ -171,12 +170,12 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { navReset, navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -211,14 +210,10 @@ const fleetNow = () => {
 const paidNow = () => {
   if (!remoteApiEnabled) return paidCumulativeNow();
   const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
-  return v ? Math.round(v.completedPayoutUsdt.value) : null;
+  return v ? v.completedPayoutUsdt.value : null;
 };
 const paid = ref(paidNow());
 const visiblePaid = computed(() => remoteApiEnabled ? paidNow() : paid.value);
-const verifiedScope = computed(() => {
-  const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
-  return v ? fmt(t.value.intro.verifiedScope, { at: v.capturedAt.slice(0, 16).replace("T", " ") }) : "";
-});
 // Intro is public and often shown before a user session exists. Its public
 // device count comes from the verified server aggregate.
 const devices = ref(fleetNow());

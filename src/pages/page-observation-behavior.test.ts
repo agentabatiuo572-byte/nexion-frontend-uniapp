@@ -26,6 +26,15 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
   const ast = ts.createSourceFile(page.file + ".ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const fn = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === page.fn);
   if (!fn) throw new Error(`actual observer missing: ${page.file} ${page.fn}`);
+  const refreshHelper = page.fn === "refreshMarketplaceFacts"
+    ? ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "retryMarketplaceFacts") : undefined;
+  if (page.fn === "refreshMarketplaceFacts" && !refreshHelper) throw new Error("actual marketplace refresh helper missing");
+  const hideHelper = page.file === "store/detail.vue"
+    ? ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "hideDetailStickyCTA") : undefined;
+  if (page.file === "store/detail.vue" && !hideHelper) throw new Error("actual detail hide helper missing");
+  const refreshState = refreshHelper ? ast.statements.filter(node => ts.isVariableStatement(node)
+    && node.declarationList.declarations.some(declaration => ["refreshInFlight", "refreshRequested"].includes(declaration.name.getText(ast))))
+    .map(node => node.getText(ast)).join("\n") : "";
   const lifecycle = (name: string) => ast.statements.filter(node => ts.isExpressionStatement(node)
     && ts.isCallExpression(node.expression) && node.expression.expression.getText(ast) === name)
     .map(node => (node as ts.ExpressionStatement).expression as ts.CallExpression)
@@ -42,6 +51,7 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     catalogStatus: { value: "ready" },
     product: { value: { id: "stellarbox-s1", productType: "HARDWARE", price: 100, dailyEarn: 1 } },
     genesis: { remotePublicReadState: "ready", syncRemote: vi.fn().mockResolvedValue(true) },
+    cfg: { refresh: vi.fn(async () => {}) },
     nextTick: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     captureAccountScope: () => ({ ...currentScope }),
     isCurrentAccountScope: (scope: typeof currentScope) => scope.accountKey === currentScope.accountKey && scope.epoch === currentScope.epoch,
@@ -53,6 +63,7 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     h3ObservationApi: createH3ObservationApi({ request } as unknown as ApiClient),
     invalidateDetailFacts: () => {}, stickyPageVisible: { value: true }, sticky: { hide: () => {} }, stickyOwner: "fixture",
     releaseActiveRefresh: () => {},
+    stopMarketplaceRevision: vi.fn(),
     listingPageScope: { visible: false, epoch: 0 },
     // store.vue clears the goal-recommendation arrival context on hide/unmount.
     focusProductId: { value: "" }, focusProductName: { value: "" },
@@ -62,14 +73,18 @@ function harness(page: Page, options: { remote?: boolean; recorded?: boolean } =
     let ${page.visible} = true, ${page.epoch} = 0;
     let storeViewReportedScope = "";
     let storeViewAttempt = null;
+    ${refreshState}
+    ${refreshHelper?.getText(ast) ?? ""}
+    ${hideHelper?.getText(ast) ?? ""}
     ${fn.getText(ast)}
     return {
       run: ${page.fn}, hide: () => [${lifecycle("onHide").join(",")}].forEach(fn => fn()),
+      unload: () => [${lifecycle("onUnload").join(",")}].forEach(fn => fn()),
       unmount: () => [${lifecycle("onUnmounted").join(",")}].forEach(fn => fn()),
       show: () => { ${page.visible} = true; }
     };
   `, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  const actual = new Function("deps", js)(deps) as { run(): Promise<void>; hide(): void; unmount(): void; show(): void };
+  const actual = new Function("deps", js)(deps) as { run(): Promise<void>; hide(): void; unload(): void; unmount(): void; show(): void };
   return { deps, request, actual, setSession: (value: typeof session) => { session = value; },
     rebind: () => { currentScope = { ...currentScope, epoch: currentScope.epoch + 1 }; },
     advance: (ms: number) => { now += ms; },
@@ -159,8 +174,8 @@ describe("actual App page observers through the real API adapters and reporter",
       const mismatch = harness(page); mismatch.setSession({ accessToken: "fixture", user: { userId: 8 } }); await mismatch.run(); expect(mismatch.request).not.toHaveBeenCalled();
       const mock = harness(page, { remote: false }); await mock.run(); expect(mock.request).not.toHaveBeenCalled();
     });
-    it(`${page.file}: hide, unmount and same-account rebind before render cancel observations`, async () => {
-      for (const cancel of ["hide", "unmount", "rebind"] as const) {
+    it(`${page.file}: hide, unmount, same-account rebind and registered unload before render cancel observations`, async () => {
+      for (const cancel of page.file === "store/detail.vue" ? ["hide", "unload", "unmount", "rebind"] as const : ["hide", "unmount", "rebind"] as const) {
         const h = harness(page);
         h.deps.nextTick.mockImplementation(async () => { if (cancel === "rebind") h.rebind(); else h.actual[cancel](); });
         await h.run(); expect(h.request).not.toHaveBeenCalled();

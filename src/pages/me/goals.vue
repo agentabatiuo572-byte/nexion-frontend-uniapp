@@ -25,7 +25,7 @@
       </view>
 
       <!-- Setter — de-carded: labels + L1-filled input sit on the page floor -->
-      <view class="mx-4" :style="setterWrapStyle">
+      <view v-if="editorHasSnapshot" class="mx-4" :style="setterWrapStyle">
         <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
         <view class="flex items-center" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
@@ -41,14 +41,14 @@
             :aria-disabled="editorBlocked"
             :tabindex="target === p || (pi === 0 && !PRESET_TARGETS.includes(target)) ? 0 : -1"
             :aria-checked="target === p ? 'true' : 'false'"
-            :aria-label="fmt(t.goals.targetPresetOption, { amount: String(p) })"
+            :aria-label="fmt(t.goals.targetPresetOption, { amount: formatAmount(p) })"
             @click="selectTarget(p)"
 
 
 
             @keydown.enter.prevent="selectTarget(p)" @keydown.space.prevent="selectTarget(p)" @keydown.left.prevent="moveTarget(pi, -1)" @keydown.right.prevent="moveTarget(pi, 1)"
           >
-            <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${p / 1000}K` : p }}</text>
+            <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${formatAmount(p / 1000)}K` : formatAmount(p) }}</text>
           </view>
         </view>
 
@@ -74,23 +74,26 @@
           </view>
         </view>
       </view>
+      <view v-else class="mx-4" :style="emptyStateStyle" role="status">
+        <text>{{ goalsStore.status === 'error' ? t.goals.serverUnavailable : t.goals.loading }}</text>
+      </view>
 
       <!-- Recommendation -->
-      <view v-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="nx-glass-card mx-4" :style="recCardStyle">
+      <view v-if="editorHasSnapshot && target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="nx-glass-card mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ t.goals.loading }}</text>
       </view>
-      <view v-else-if="target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
+      <view v-else-if="editorHasSnapshot && target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
         <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
           <text :style="recCtaLabelStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
-      <view v-else-if="target > 0 && (!remoteApiEnabled || (goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true))" class="mx-4" :style="recCardStyle">
+      <view v-else-if="target > 0 && (!remoteApiEnabled || (!editorBlocked && goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true && goalsStore.recommendation.targetUsdt === target))" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
-        <text class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
+        <text v-if="recommendation.reason" class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
         <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <text :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -120,15 +123,15 @@
         <view :style="goalGroupStyle">
           <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
             <view class="flex items-center justify-between">
-              <text class="font-mono-tabular" :style="goalTargetStyle">${{ g.targetUSDT.toLocaleString() }}</text>
-              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: g.targetUSDT.toLocaleString() })" @click="remove(g.id)"  @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
+              <text class="font-mono-tabular" :style="goalTargetStyle">${{ formatAmount(g.targetUSDT) }}</text>
+              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: formatAmount(g.targetUSDT) })" @click="remove(g.id)"  @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
               </view>
             </view>
             <text class="block" :style="goalDeadlineStyle">{{ deadlineLine(g.deadlineMs) }}</text>
             <GoalProgressBar :pct="goalPct(g.targetUSDT)" />
             <view class="flex items-center justify-between font-mono-tabular" style="margin-top: 4px">
-              <text :style="goalFootMutedStyle">${{ lifeTimeEarnings.toFixed(0) }} / ${{ g.targetUSDT.toLocaleString() }}</text>
+              <text :style="goalFootMutedStyle">${{ formatAmount(lifeTimeEarnings) }} / ${{ formatAmount(g.targetUSDT) }}</text>
               <text :style="goalFootPctStyle">{{ goalPct(g.targetUSDT).toFixed(0) }}%</text>
             </view>
             <view v-if="g.achieved" class="inline-flex items-center" :style="achievedBadgeStyle">
@@ -143,9 +146,10 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
-import { computed, nextTick, onMounted, ref, watch, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
@@ -171,8 +175,10 @@ const goals = computed(() => goalsStore.goals);
 const target = ref(1000);
 const days = ref(90);
 const savePending = ref(false);
-const restoredGoal = ref<{ targetUSDT: number; days: number } | null>(null);
-const editorBlocked = computed(() => savePending.value || (remoteApiEnabled && goalsStore.status !== "ready"));
+const restoredGoal = ref<{ id: string; targetUSDT: number; days: number } | null>(null);
+const editorReadPending = ref(remoteApiEnabled && goalsStore.status !== "ready");
+const editorHasSnapshot = computed(() => !remoteApiEnabled || (!editorReadPending.value && goalsStore.status === "ready"));
+const editorBlocked = computed(() => savePending.value || !editorHasSnapshot.value);
 const saveBlocked = computed(() => editorBlocked.value || (remoteApiEnabled && restoredGoal.value !== null
     && target.value === restoredGoal.value.targetUSDT && days.value === restoredGoal.value.days));
 type GoalSaveIntent = { targetUSDT: number; days: number; deadlineMs: number; idempotencyKey: string };
@@ -180,12 +186,14 @@ const retryableSaveIntents = new Map<string, GoalSaveIntent>();
 let saveEpoch = 0;
 let editorReadEpoch = 0;
 let restoringEditor = false;
+let deleteFeedbackVisible = true;
+let deleteFeedbackGeneration = 0;
 
 const recommendation = computed(() => {
   if (remoteApiEnabled && goalsStore.recommendation?.purchaseRequired) {
     return {
       tier: nexGridBrandText(goalsStore.recommendation.productName ?? ""),
-      reason: fmt(t.value.goals.recReasonServer, { daily: formatGoalDailyRate(goalsStore.recommendation.dailyEarn ?? 0) }),
+      reason: "",
     };
   }
   if (remoteApiEnabled) return { tier: "", reason: "" };
@@ -195,12 +203,15 @@ const recommendation = computed(() => {
   return { tier: "UVELRack P1", reason: t.value.goals.recRack };
 });
 
-const heroSubLine = computed(() =>
-  fmt(t.value.goals.heroSubtitle, { current: lifeTimeEarnings.value.toFixed(2) }),
-);
+const heroSubLine = computed(() => {
+  if (remoteApiEnabled && !editorHasSnapshot.value) {
+    return goalsStore.status === "error" ? t.value.goals.serverUnavailable : t.value.goals.loading;
+  }
+  return fmt(t.value.goals.heroSubtitle, { current: formatAmount(lifeTimeEarnings.value) });
+});
 const recPathLine = computed(() =>
   fmt(t.value.goals.recPath, {
-    target: target.value.toLocaleString(),
+    target: formatAmount(goalsStore.recommendation?.targetUsdt ?? target.value),
     days: goalsStore.recommendation?.days ?? days.value,
     tier: recommendation.value.tier,
     perDay: formatGoalDailyRate(goalsStore.recommendation?.requiredDaily ?? target.value / days.value),
@@ -208,8 +219,7 @@ const recPathLine = computed(() =>
 );
 
 function formatGoalDailyRate(value: number): string {
-  if (value > 0 && value < 0.01) return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
-  return value.toFixed(2);
+  return formatAmount(value);
 }
 
 function detailVal(e: Event): string {
@@ -249,6 +259,7 @@ function moveDays(index: number, delta: number): void { movePreset(".nx-goal-dea
 
 watch(() => goalsStore.accountEpoch, () => {
   editorReadEpoch += 1;
+  editorReadPending.value = remoteApiEnabled;
   restoringEditor = true;
   target.value = 1000;
   days.value = 90;
@@ -264,21 +275,32 @@ function restoreEditorFromGoal(goal: Goal | undefined): void {
   target.value = goal?.targetUSDT ?? 1000;
   // The selected term is fixed at creation; remaining days are shown only in the goal row.
   days.value = goal ? Math.max(1, Math.round((goal.deadlineMs - goal.createdAt) / ONE_DAY_MS)) : 90;
-  restoredGoal.value = goal ? { targetUSDT: target.value, days: days.value } : null;
+  restoredGoal.value = goal ? { id: goal.id, targetUSDT: target.value, days: days.value } : null;
   restoringEditor = false;
 }
+
+function latestActiveGoal(): Goal | undefined {
+  return goalsStore.goals.filter((goal) => !goal.achieved)
+    .sort((left, right) => right.createdAt - left.createdAt)[0];
+}
+
+if (remoteApiEnabled && goalsStore.status === "ready") restoreEditorFromGoal(latestActiveGoal());
 
 async function refreshRemoteGoals(force = false): Promise<void> {
   if (!remoteApiEnabled) return;
   const expectedReadEpoch = ++editorReadEpoch;
   const expectedAccountEpoch = goalsStore.accountEpoch;
+  editorReadPending.value = true;
   const list = force ? goalsStore.refresh() : goalsStore.ensure();
   await list;
-  if (expectedReadEpoch !== editorReadEpoch || expectedAccountEpoch !== goalsStore.accountEpoch
-      || goalsStore.status !== "ready" || savePending.value) return;
-  const latestActive = goalsStore.goals.filter((goal) => !goal.achieved)
-    .sort((left, right) => right.createdAt - left.createdAt)[0];
+  if (expectedReadEpoch !== editorReadEpoch || expectedAccountEpoch !== goalsStore.accountEpoch) return;
+  if (goalsStore.status !== "ready" || savePending.value) {
+    editorReadPending.value = false;
+    return;
+  }
+  const latestActive = latestActiveGoal();
   restoreEditorFromGoal(latestActive);
+  editorReadPending.value = false;
   await goalsStore.refreshRecommendation(target.value, latestActive?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
 }
 
@@ -291,8 +313,16 @@ onMounted(() => {
 });
 
 onShow(() => {
+  deleteFeedbackVisible = true;
   void refreshRemoteGoals();
 });
+
+function invalidateDeleteFeedback(): void {
+  deleteFeedbackVisible = false;
+  deleteFeedbackGeneration += 1;
+}
+onHide(invalidateDeleteFeedback);
+onUnmounted(invalidateDeleteFeedback);
 
 watch([target, days], () => {
   if (!restoringEditor && remoteApiEnabled && goalsStore.status === "ready" && target.value >= 100 && days.value > 0) {
@@ -326,7 +356,8 @@ async function onSave() {
     ?? {
         targetUSDT: target.value,
         days: days.value,
-        deadlineMs: Date.now() + days.value * ONE_DAY_MS,
+        // Use the server's DATETIME second precision from the first POST; retries retain this deadline.
+        deadlineMs: Math.floor(Date.now() / 1000) * 1000 + days.value * ONE_DAY_MS,
         // IDEMPOTENCY-FRESH-OK:首次创建后立即写入 retryableSaveIntents；失败重试按同一 intentKey 复用，成功才删除。
         idempotencyKey: `goal-save-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`,
       };
@@ -338,20 +369,40 @@ async function onSave() {
     retryableSaveIntents.delete(intentKey);
     restoreEditorFromGoal(goalsStore.goals[goalsStore.goals.length - 1]);
     void goalsStore.refreshRecommendation(target.value, goalsStore.goals[goalsStore.goals.length - 1]?.deadlineMs ?? Date.now() + days.value * ONE_DAY_MS);
-    ui.pushToast({ kind: "success", title: fmt(t.value.goals.savedToast, { amount: target.value.toLocaleString("en-US"), days: days.value }) });
-  } catch (error) {
+    ui.pushToast({ kind: "success", title: fmt(t.value.goals.savedToast, { amount: formatAmount(target.value), days: days.value }) });
+  } catch {
     if (!isCurrentSave()) return;
-    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
+    ui.pushToast({ kind: "warn", title: t.value.goals.serverUnavailable });
   } finally {
     if (isCurrentSave()) savePending.value = false;
   }
 }
 
 async function remove(id: string) {
+  if (!deleteFeedbackVisible) return;
+  const removedGoal = goalsStore.goals.find((goal) => goal.id === id);
+  const expectedAccountKey = app.accountKey;
+  const expectedBindingEpoch = app.accountBindingEpoch;
+  const expectedAccountEpoch = goalsStore.accountEpoch;
+  const expectedGeneration = deleteFeedbackGeneration;
+  const isCurrentDelete = () => deleteFeedbackVisible && expectedGeneration === deleteFeedbackGeneration
+    && expectedAccountKey === app.accountKey && expectedBindingEpoch === app.accountBindingEpoch
+    && expectedAccountEpoch === goalsStore.accountEpoch;
   try {
     await goalsStore.remove(id);
-  } catch (error) {
-    ui.pushToast({ kind: "warn", title: error instanceof Error ? error.message : t.value.goals.serverUnavailable });
+    if (!isCurrentDelete() || goalsStore.goals.some((goal) => goal.id === id)) return;
+    if (restoredGoal.value?.id === id) restoredGoal.value = null;
+    // A confirmed deletion ends only the exact recovered save, not other unknown POST outcomes.
+    if (removedGoal) {
+      for (const [intentKey, intent] of retryableSaveIntents) {
+        if (intent.targetUSDT === removedGoal.targetUSDT && intent.deadlineMs === removedGoal.deadlineMs) {
+          retryableSaveIntents.delete(intentKey);
+        }
+      }
+    }
+  } catch {
+    if (!isCurrentDelete()) return;
+    ui.pushToast({ kind: "warn", title: t.value.goals.serverUnavailable });
   }
 }
 
@@ -360,6 +411,8 @@ async function remove(id: string) {
 // (BUG 71). The name travels along so a recommendation that is no longer
 // purchasable can still be named in the change explanation.
 function goStore() {
+  if (remoteApiEnabled && (editorBlocked.value || goalsStore.recommendationStatus !== "ready"
+      || goalsStore.recommendation?.purchaseRequired !== true || goalsStore.recommendation.targetUsdt !== target.value)) return;
   const productNo = goalsStore.recommendation?.productNo;
   const name = recommendation.value.tier;
   const query = productNo
