@@ -10,6 +10,7 @@
 
 - 工作分支：`codex/cs-app-delivery-20261014`。客服候选提交：`81ab8d64058ded5098e58a31b43593d7afbab72d`；整合来源：`origin/test`的`bb0ed7949db3825e0ce1bfd638ef47fb6b1b5b67`。最终提交以该分支Git历史为准，本页不把候选写成已合入远端test。
 - 候选新增差异：真实`npm run type-check`通过，8个定向Vitest文件145/145通过（含时区稳定测试）。整合最新test后，真实type-check、17个客服连接Vitest文件326/326及权限契约17/17通过；独立`npm run build:h5:prod`通过（33.45s），生产产物边界检查272文件通过，属于生产构建证明，不是full通过。
+- 独审三个P2修补后：发送前读取失败使用三语中性提示并保留草稿/原恢复记录；待分配标题复用既有本地化判据；越语接收、停用、忙碌称谓统一。受影响3个Vitest文件120/120通过，最终提示变更后的14个用例及真实type-check再次通过；单次生产构建通过（22.79s），272文件边界检查通过。非客服的`orderCancelledMsg`三语恢复整合基线，未纳入本轮交付。
 - **Full BLOCKED：H5同步不一致。** `D:/WORKS/PLAN/Nexion-H5`是现行active镜像，来源pin仍为ce497623及其它任务的源工作树；只读同步检查返回APP_H5_SYNC_FAILED。未改镜像、未新建或复制H5。2026-10-10的full只证明旧候选，不能代签当前树；feature代码交接不等于已经合入test。
 
 ## 明确待测

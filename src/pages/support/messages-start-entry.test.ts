@@ -351,7 +351,7 @@ describe("human chat assignment belongs to the current conversation", () => {
     ]) {
       current.store.advisor = advisor as any;
       current.store.advisorError = true; current.store.advisorLoading = true;
-      expect(current.page.headerName.value).toBe("待分配");
+      expect(current.page.headerName.value).toBe(zh.conversations.unassignedAgent);
       expect(current.page.headerRole.value).toBe(zh.conversations.sessionEnded);
       expect(current.page.isClosedSession.value).toBe(true);
       expect(current.page.showUnassignedReceived.value).toBe(false);

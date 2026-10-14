@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { computed, reactive, ref } from "vue";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import source from "./chat.vue?raw";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
@@ -28,10 +28,78 @@ it.each([zh, en, vietnamese])("keeps the existing thread's real owner while acco
   expect(h.state.headerName.value).toBe("Original S"); expect(h.state.showUnassignedReceived.value).toBe(false);
   h.conv.value = { ...h.conv.value, agentName: "Refreshed S" };
   expect(h.state.headerName.value).toBe("Refreshed S"); expect(h.cid.value).toBe("CV-old-support");
-  h.conv.value = { ...h.conv.value, agentName: "Unassigned" };
-  expect(h.state.headerName.value).toBe(messages.conversations.unassignedAgent);
-  expect(h.state.showUnassignedReceived.value).toBe(true);
+  for (const agentName of ["", " Unassigned ", "备勤池", "待分配"]) {
+    h.conv.value = { ...h.conv.value, agentName };
+    expect(h.state.headerName.value).toBe(messages.conversations.unassignedAgent);
+    expect(h.state.showUnassignedReceived.value).toBe(true);
+  }
   h.cid.value = ""; h.conv.value = undefined; h.startType.value = "advisor";
   expect(h.state.advisorApplies.value).toBe(true);
   expect(h.state.headerName.value).toBe(messages.conversations.image.unassigned);
+});
+
+it.each([[zh, "专属客服"], [en, "dedicated support"], [vietnamese, "hỗ trợ riêng"]] as const)(
+  "uses dedicated support wording in received, disabled and busy states", (messages, label) => {
+    for (const key of ["unassignedReceived", "disabledAdvisor", "busyAdvisor"] as const) {
+      expect(messages.conversations.image[key].toLowerCase()).toContain(label);
+    }
+  });
+
+const preflightCode = ts.transpileModule(ast.statements.filter(node => ts.isFunctionDeclaration(node)
+  && ["onSend", "activateHumanPage"].includes(node.name?.text ?? "")).map(node => node.getText(ast)).join("\n"),
+  { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+
+function preflightHarness(messages = zh) {
+  const failedSend = { text: "Original message", kind: "unknown", settled: false, attachmentId: "ATT-original" };
+  let rejectRead!: (cause: Error) => void;
+  const pendingRead = new Promise<boolean>((_, reject) => { rejectRead = reject; });
+  const app = reactive({ accountBindingEpoch: 1 });
+  const convStore = reactive({ scopeInvalidated: 1, composer: vi.fn(() => ({ failedSend })),
+    hasPendingHumanCreate: vi.fn(() => pendingRead), refreshAdvisor: vi.fn(), saveComposer: vi.fn() });
+  const toast = { error: vi.fn() }, restore = vi.fn(), sendHumanMessage = vi.fn();
+  const cid = ref(""), startType = ref("advisor"), humanSendBusy = ref(false);
+  const page = new Function("deps", `const { isAi, supportSessionReady, humanSendBusy, cid, startType, remoteApiEnabled,
+    app, convStore, imageDraft, t, toast, sendHumanMessage, stopHumanThreadPolling, humanRealtime,
+    loadAttachmentPolicy, restoreCompletedHumanCreate, restoreRecoveredComposer, humanComposerKey, revealTick } = deps;
+    let novaPageVisible = true, humanOpenRequest = null;
+    ${preflightCode}; return { onSend, activateHumanPage, hide: () => { novaPageVisible = false; } };`)(
+    { isAi: ref(false), supportSessionReady: ref(true), humanSendBusy, cid, startType, remoteApiEnabled: true,
+      app, convStore, imageDraft: ref(null), t: ref(messages), toast, sendHumanMessage,
+      stopHumanThreadPolling: vi.fn(), humanRealtime: { show: vi.fn(() => 1) },
+      loadAttachmentPolicy: vi.fn(), restoreCompletedHumanCreate: vi.fn(), restoreRecoveredComposer: vi.fn(),
+      humanComposerKey: ref("start:advisor"), revealTick: ref(0) });
+  return { page, app, convStore, toast, restore, sendHumanMessage, humanSendBusy, failedSend, cid,
+    reject: () => rejectRead(new Error("SUPPORT_PENDING_PERSIST_FAILED")) };
+}
+
+it.each([zh, en, vietnamese])("reports a blocked send without asserting delivery and restores the draft without changing unknown recovery", async messages => {
+  const h = preflightHarness(messages);
+  const sending = h.page.onSend("New draft", h.restore); h.reject(); await sending;
+  expect(h.toast.error).toHaveBeenCalledWith(messages.conversations.image.sendBlocked, "");
+  expect(h.toast.error).not.toHaveBeenCalledWith(messages.conversations.image.sendFailed, "");
+  expect(h.restore).toHaveBeenCalledOnce(); expect(h.sendHumanMessage).not.toHaveBeenCalled();
+  expect(h.convStore.saveComposer).not.toHaveBeenCalled(); expect(h.convStore.composer().failedSend).toBe(h.failedSend);
+  expect(h.humanSendBusy.value).toBe(false);
+});
+
+it.each([zh, en, vietnamese])("reports recovery read failure while preserving the original unknown command", async messages => {
+  const h = preflightHarness(messages);
+  const showing = h.page.activateHumanPage(); h.reject(); await showing;
+  expect(h.toast.error).toHaveBeenCalledWith(messages.conversations.image.sendBlocked, "");
+  expect(h.convStore.hasPendingHumanCreate).toHaveBeenCalledWith("advisor", "Original message", "ATT-original");
+  expect(h.convStore.saveComposer).not.toHaveBeenCalled(); expect(h.convStore.composer().failedSend).toBe(h.failedSend);
+});
+
+it.each(["send", "activate"])("silently discards stale %s preflight failures", async entry => {
+  for (const stale of ["account", "scope", "hidden", "conversation"]) {
+    const h = preflightHarness();
+    const pending = entry === "send" ? h.page.onSend("Old draft", h.restore) : h.page.activateHumanPage();
+    if (stale === "account") h.app.accountBindingEpoch += 1;
+    if (stale === "scope") h.convStore.scopeInvalidated += 1;
+    if (stale === "hidden") h.page.hide();
+    if (stale === "conversation") h.cid.value = "CV-other";
+    h.reject(); await pending;
+    expect(h.toast.error).not.toHaveBeenCalled(); expect(h.restore).not.toHaveBeenCalled();
+    expect(h.sendHumanMessage).not.toHaveBeenCalled(); expect(h.convStore.saveComposer).not.toHaveBeenCalled();
+  }
 });
