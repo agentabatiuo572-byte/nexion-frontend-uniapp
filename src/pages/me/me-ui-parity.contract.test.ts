@@ -54,44 +54,55 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
 // production-only delta is reviewed; this is not a file-level exemption.
 // Reviewed 710e9ee visual refresh with formal server and accessibility boundaries.
 // Reviewed 710e9ee visual refresh with formal server and accessibility boundaries.
+// Approved amount displays now share decimal half-up rounding; authority and layout mutations remain pinned.
 const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "e7cfef2560a4a60747043f2a4d76b875a0faad0383b5cbcf1fb15deeab98e60f",
   "devices.vue": "227aa03a6c8ba621deb6d5e69fa1672cd80e918fc18cf37deeac446818adb125",
-  "goals.vue": "43658431af1e6739fa4a269c4758f7a432b9e74dd33fa031f8fec5cb408e0a60",
+  // Keep #223 authority gates; hide the removed internal recommendation footnote.
+  "goals.vue": "2ecbc0a56d928f5e7cdabe370fd01ff02ae81845839310ecf761475bc79e40c8",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
   // Owner requested removal of the unsolicited overview withdrawal warning.
-  "me.vue": "4eb7f786750e279d7d7101415c5d4857dbbdcd20a4e2afcd4979b28f21c823e6",
+  // #528: only the version footer now binds the current resource fingerprint.
+  "me.vue": "9dca52a5c50c0d6c2af12cab111af911178b6b8ddac0fbdc0ef910c4bb1f815c",
   // Approved smooth centered message header and shared message-family interactions.
   "notifications.vue": "0c754690e400fe1b137de31e968d31a0f347c5020ed6d4a22322abb7fe327344",
   "preferences.vue": "f671d2462d5c346657790bfb9f75c92cfb0a63d1039c886ed8ad02cd6789e3cc",
   "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
   "proof.vue": "956e804b2c96dced42cc10cb0dd757e7abd5c4a6a3596c56bca63490e93f3616",
-  "receipts.vue": "ee45b67eef9b7054af4c16b095d1adc9c5c1c48e979469f37dbc41f0f03c613f",
-  "rewards-list.vue": "75c2e5fa485fda8e0bf6dbc742b3333f7b70cf3e2788dc5923edf50038bc1218",
-  "rewards.vue": "2d899c2643e74a74e5ad4102a8d7c6b328d539cd5368dfe977fe1529c167a782",
+  "receipts.vue": "aaf76128cf09b5a8648eb547e453964efb1be7cf30063e17bb941366166ff891",
+  // Approved promotion category reuses the existing reward hub and list.
+  "rewards-list.vue": "450f0917d2ba2af0b8215ad9ea8e0f126357a6858ead54038f226700278a1da9",
+  "rewards.vue": "720da0cce42564baaa4451ee4002b6e92f83be5e1ab0317963e22490927e59ef",
   "risk-disclosure.vue": "5f1d1f52b62559b79785d91fd28fd9e4de6597cf91b9174a87191740c95ba2bf",
-  "security.vue": "277a220c6aeb77b2c7316ee00dcb945a43d6e63ddb1891888958b19a7cf8e164",
+  // Reviewed ME41: busy save/cancel remain visible and reject keyboard/pointer re-entry.
+  "security.vue": "97dd537c7c35262b3946475b4f897fd499de49437050c08e66c937f291b8a4ed",
   // Reviewed #439: BASIC retains the existing hint; enhanced policy owns retry timing and existing-ticket/retry actions.
   // Reviewed #470: cursor-spacing=72 on the detail reply textarea only.
   "support-tickets.vue": "4504cb6168c6e939402a4be14b5f39caeaaa8ab9deda42433c7b91eacf12fce8",
   "support.vue": "9a89c364bbc52d36f0218752b5bb69ffbba692fd113feaf285e7d0273180bad0",
-  "trial.vue": "9ba1ff2296064a5ccf0c750018c06c722853136431dc2f8e14ffa0ef7bd20d2e",
+  // Reviewed removal of the retired card-migration notice; trial amounts, deadlines and actions remain covered.
+  // Reviewed #535: active/grace catalog CTA/ARIA and ready-only unavailability hint.
+  "trial.vue": "aaced274aa73d3d8b5345ea1e76d9854eb987519cca0fc8bd185aa4ff3858e36",
   "wallet-address-rebind.vue": "64f22ae20b3725ff6df6c516a9f99a6714efd94834cc5b02734c146e377e9e32",
   // Reviewed #465: refund references wrap on their own read-only line; other bill rows retain their layout.
-  "wallet-bills.vue": "c5e47e15570a7722235aeea6b1e32172ea19a3adcd3af605b4e27ea7392d2aab",
+  // Promotion receipt deep links retain the existing refund row and bill layout.
+  "wallet-bills.vue": "c3f827ee5d16ffc31e373c1e79567ae8e8a8affbacc1f34646399d015dd16ba7",
   "wallet-cards-new.vue": "6af630a5acf97669826202e3842042a8b28af8813f0657da0a6085336f7a3fc2",
   "wallet-cards.vue": "4ba7080a2d1b7c9ce4d56c4ea90b5fed3614c689aaeccaf3811d166f08391692",
   "wallet-exchange-how.vue": "53a85b180c00d4a33e73d101a628e8f786924b2e23c48f045147b9f15cb8b9b0",
-  "wallet-exchange.vue": "f6e7c49b78de3c05e25da2648b73673ec654ab69330d416dda6042ef63fe8eb6",
+  // Reviewed e0a491a authority labels with fixed two-decimal amount displays.
+  "wallet-exchange.vue": "c0254329c6ca1986c73fc1c1a8f31fe1e63b34a223343366069e60ddca6d585f",
   // Reviewed #413: native number/date formatting and finite display boundaries.
   "wallet-nex.vue": "e79b540f1eacd429f044fba4bfd7fb2d15732cac2fc7cda274406416d035ee86",
   "wallet-repurchase-how.vue": "238439b99d5b73f9cf7c6ad7b8479cb86f39ef92f93d216938b071c28372e4f0",
-  "wallet-repurchase.vue": "19b1c868b06086a2384a8f3bba7f013dc026f2c1bf97a5ff886f3fed3a40adca",
+  "wallet-repurchase.vue": "224a4968f2b1542ad6847be8a98da9109a07cceb58fc04e8cd913b6b3e4bd956",
   "wallet-topup.vue": "010252b7630c35defdf57a3f262d0e389c011d2b9d79ad2f5fb788e794d87768",
-  "wallet-withdraw-tracking.vue": "7e295fb4b5e5bc50dcbfbbe136c6ede7bcab07ae9bb6193b666bf397acb60e9a",
-  "wallet-withdraw.vue": "e3f41cf165b08b6a7813a6f1b180d3da96e5d786f1daa138e95fb4ba334ed10d",
-  "wallet.vue": "95b9805fdebe39db2a8920a235436fca6b8d21e65101df5cb866a244122a6bd5"
+  "wallet-withdraw-tracking.vue": "8df13af397e2fcb7b6de4164285dd222d6d8f851c8c153af03f300d2883de2f5",
+  // Original pending requests expose retry even when the new-transfer form is incomplete.
+  "wallet-withdraw.vue": "267bd0456c6e186e9ca41069afd6901107cf764cc00bc84338b73ca5873bafb0",
+  // Reviewed e0a491a earnings reasons/retry with fixed two-decimal amount displays.
+  "wallet.vue": "eb813b7dfcb664f836091f06472188a2bd101f73c05aa6b607debf35051da849"
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   // Approved unified center uses shared flat-row styles and fixed native scrolling.
@@ -110,7 +121,7 @@ function block(text: string, tag: "style" | "template"): string {
   return normalized.match(/<template[^>]*>[\s\S]*?<\/template>/)?.[0] ?? "";
 }
 
-// New slot-bearing surfaces also pin the full compiler-parsed template; keep
+// Reviewed surfaces with nested templates also pin the full compiler-parsed template; keep
 // the historical pair fingerprints stable for unrelated approved pages.
 function fullTemplate(text: string): string {
   const template = parse(text.replace(/\r\n/g, '\n')).descriptor.template;
@@ -125,6 +136,24 @@ function quickKeys(section: string): string[] {
 }
 
 describe("Me page 5174 normal-state UI parity", () => {
+  it("pins the approved goal authority gates and detects guard or normal-layout mutations", () => {
+    if (!prototypeReference) throw new Error("Goal authority fingerprint requires the approved prototype reference");
+    const goals = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
+    const prototype = prototypeReference.read("src/pages/me/goals.vue");
+    const digest = (value: string) => createHash("sha256").update(block(value, "template")).update("\0").update(block(prototype, "template")).digest("hex");
+    expect(goals).toContain('v-if="editorHasSnapshot" class="mx-4" :style="setterWrapStyle"');
+    expect(goals).toContain("goalsStore.recommendation.targetUsdt === target");
+    const expected = EXPECTED_TEMPLATE_PAIR_SHA256["goals.vue"];
+    expect(digest(goals)).toBe(expected);
+    for (const changed of [
+      goals.replace('v-if="editorHasSnapshot"', 'v-if="true"'),
+      goals.replace(" && goalsStore.recommendation.targetUsdt === target", ""),
+      goals.replace('class="mx-4" :style="setterWrapStyle"', 'class="mx-8" :style="setterWrapStyle"'),
+    ]) {
+      expect(changed).not.toBe(goals);
+      expect(digest(changed)).not.toBe(expected);
+    }
+  });
   it('includes content after nested template slots in the visual fingerprint', () => {
     const markup = '<template><view><template #option><text>label</text></template><text>tail</text></view></template>';
     expect(fullTemplate(markup)).toBe(markup);
@@ -133,6 +162,10 @@ describe("Me page 5174 normal-state UI parity", () => {
   it('pins the complete notification page including content after category slots', () => {
     const notification = readFileSync(new URL('./notifications.vue', import.meta.url), 'utf8');
     expect(createHash('sha256').update(fullTemplate(notification)).digest('hex')).toBe('be9ba0b339c494422691051390b9f15ca3df444d5f8817f08009072b6f20c7b1');
+  });
+  it('pins the complete trial page including ended catalog ARIA and independent retry', () => {
+    const trial = readFileSync(new URL('./trial.vue', import.meta.url), 'utf8');
+    expect(createHash('sha256').update(fullTemplate(trial)).digest('hex')).toBe('b11c5c08a5e1f64a630700a7120a8a48fec6c9f9cb95ad6bfef8eb1f40ab1fac');
   });
   it("includes every page-local style block in the visual fingerprint", () => {
     const shared = '<style src="@/styles/message-center.css"></style>';

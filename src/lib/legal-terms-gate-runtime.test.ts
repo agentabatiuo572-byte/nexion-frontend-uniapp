@@ -10,13 +10,20 @@ const state = vi.hoisted(() => ({
   sessionRevision: 1,
   refreshContinuation: false,
   locale: "en",
+  loading: false,
   current: vi.fn<() => Promise<LegalTermsCurrent>>(),
+  acknowledge: vi.fn<() => Promise<LegalTermsCurrent>>(),
+  retryProfileLocale: vi.fn<() => void>(),
 }));
 
 vi.mock("@/api/runtime", () => ({
   remoteApiEnabled: true,
   sessionVault: { read: () => state.session, revision: () => state.sessionRevision, isRefreshContinuation: () => state.refreshContinuation },
-  legalTermsApi: { current: () => state.current() },
+  legalTermsApi: { current: () => state.current(), acknowledge: () => state.acknowledge() },
+}));
+
+vi.mock("./locale-profile-sync-runtime", () => ({
+  retryCurrentProfileLocale: () => state.retryProfileLocale(),
 }));
 
 vi.mock("@/store/locale", () => ({
@@ -113,11 +120,14 @@ describe("legal terms runtime gate", () => {
     state.sessionRevision = 1;
     state.refreshContinuation = false;
     state.locale = "en";
+    state.loading = false;
     state.current.mockReset();
+    state.acknowledge.mockReset();
+    state.retryProfileLocale.mockReset();
     vi.stubGlobal("uni", {
       reLaunch: vi.fn(),
-      showLoading: vi.fn(),
-      hideLoading: vi.fn(),
+      showLoading: vi.fn(() => { state.loading = true; }),
+      hideLoading: vi.fn(() => { state.loading = false; }),
       showModal: vi.fn(),
     });
   });
@@ -136,6 +146,170 @@ describe("legal terms runtime gate", () => {
     expect(uni.showModal).not.toHaveBeenCalled();
     expect(uni.reLaunch).toHaveBeenCalledTimes(acknowledged ? 0 : 1);
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(!acknowledged);
+  });
+
+  it.each([true, false])("recovers a real HTML 429 on an ordinary Earn read; next version acknowledged=%s", async (acknowledged) => {
+    vi.useFakeTimers();
+    state.locale = "zh";
+    const runtime = await loadRuntime();
+    const { createApiClient } = await import("@/api/api-client");
+    const { createSessionVault } = await import("@/api/session-vault");
+    const { createLegalTermsApi } = await import("@/api/legal-terms-api");
+    const vault = createSessionVault();
+    vault.save({ accessToken: "token-a", refreshToken: "refresh-a", tokenType: "Bearer",
+      user: { userId: 7, countryCode: "+86", phone: "13800000007", nickname: "Fixture", onboardingComplete: true } });
+    const acknowledgedV6 = { ...snapshot(true), requestedLocale: "zh", resolvedLocale: "zh", version: "v6",
+      sections: [{ key: "fixture", title: "Fixture", body: "Fixture only", sortOrder: 0 }] };
+    const next = { ...acknowledgedV6, acknowledged, version: acknowledged ? "v6" : "v7",
+      acknowledgedAt: acknowledged ? acknowledgedV6.acknowledgedAt : null };
+    const request = vi.fn().mockResolvedValueOnce({ status: 200, data: { code: 0, message: "success", data: acknowledgedV6 }, headers: {} })
+      .mockResolvedValueOnce({ status: 429, data: "<html><title>429 Too Many Requests</title></html>", headers: { "content-type": "text/html" } })
+      .mockResolvedValueOnce({ status: 200, data: { code: 0, message: "success", data: next }, headers: {} });
+    const api = createLegalTermsApi(createApiClient({ baseUrl: "https://fixture.invalid", vault, transport: { request } }));
+    state.current.mockImplementation(() => api.current("zh", "GLOBAL", true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    const read = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(runtime.enforcePendingLegalTermsGate("/pages/earn/earn")).toBe(true);
+    expect(uni.showLoading).toHaveBeenLastCalledWith({ title: "", mask: true });
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(uni.showModal).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await read;
+    expect(request).toHaveBeenCalledTimes(3);
+    for (const [sent] of request.mock.calls) {
+      expect(sent).toMatchObject({ method: "GET", headers: { Authorization: "Bearer token-a" } });
+      expect(sent.url).toContain("/api/legal/terms/current?locale=zh&jurisdiction=GLOBAL");
+    }
+    expect(state.acknowledge).not.toHaveBeenCalled();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(!acknowledged);
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(uni.reLaunch).toHaveBeenCalledTimes(acknowledged ? 0 : 1);
+  });
+
+  it("bounds repeated 429 reads and keeps the existing explicit retry without inventing acknowledgement", async () => {
+    vi.useFakeTimers();
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValue(new ApiError({ kind: "http", status: 429, message: "HTTP_429" }));
+    const read = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await read;
+    expect(state.current).toHaveBeenCalledTimes(3);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.showModal).toHaveBeenCalledOnce();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(state.current).toHaveBeenCalledTimes(3);
+    state.current.mockResolvedValueOnce(snapshot(true));
+    vi.mocked(uni.showModal).mock.calls[0][0]!.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    expect(state.current).toHaveBeenCalledTimes(4);
+    expect(state.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it.each(["account", "relogin", "locale"])("does not let a 429 backoff cross a new %s fence or release its gate", async (change) => {
+    vi.useFakeTimers();
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    let resolveNew!: (value: LegalTermsCurrent) => void;
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "http", status: 429, message: "HTTP_429" }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveNew = resolve; }));
+    const old = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    if (change === "locale") state.locale = "zh";
+    else {
+      state.session = { accessToken: "token-new", user: { userId: change === "account" ? 8 : 7 } };
+      state.sessionRevision++;
+    }
+    const current = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    vi.mocked(uni.hideLoading).mockClear();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await old;
+    expect(state.current).toHaveBeenCalledTimes(3);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.hideLoading).not.toHaveBeenCalled();
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    resolveNew({ ...snapshot(false), requestedLocale: state.locale, resolvedLocale: state.locale, version: "v7" });
+    await current;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(uni.reLaunch).toHaveBeenCalledOnce();
+    expect(state.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it.each(["logout-login", "terms-unacknowledged", "terms-acknowledged"])("cancels the obsolete 429 timer and mask immediately for %s", async (destination) => {
+    vi.useFakeTimers();
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    const { legalTermsApi } = await import("@/api/runtime");
+    const { navReset } = await import("@/lib/route");
+    state.current.mockResolvedValueOnce({ ...snapshot(true), version: "v6" });
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "http", status: 429, message: "HTTP_429" }));
+    const old = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    expect(state.loading).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+    const termsReturn = "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme";
+    if (destination === "logout-login") {
+      state.session = null;
+      state.sessionRevision++;
+      void navReset("/pages/login/login");
+      await runtime.scheduleLegalTermsGate("/pages/login/login");
+    } else {
+      void navReset(termsReturn);
+      await runtime.scheduleLegalTermsGate(termsReturn);
+      const acknowledged = destination === "terms-acknowledged";
+      state.current.mockResolvedValueOnce({ ...snapshot(acknowledged), version: acknowledged ? "v6" : "v7" });
+      const pageSnapshot = await legalTermsApi.current("en", "GLOBAL", true);
+      if (pageSnapshot.acknowledged) runtime.recordLegalTermsAcknowledged(pageSnapshot);
+    }
+    expect(state.loading).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    await old;
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(destination === "terms-unacknowledged");
+    const requests = destination === "logout-login" ? 2 : 3;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(state.current).toHaveBeenCalledTimes(requests);
+    expect(state.acknowledge).not.toHaveBeenCalled();
+    expect(uni.showModal).not.toHaveBeenCalled();
+    expect(vi.mocked(uni.reLaunch).mock.calls.map(([options]) => options.url))
+      .toEqual([destination === "logout-login" ? "/pages/login/login" : termsReturn]);
+  });
+
+  it.each(["auth-required", "login", "terms"])("releases an obsolete 429 without a new global read through the %s guard", async (destination) => {
+    vi.useFakeTimers();
+    const runtime = await loadRuntime();
+    const { ApiError } = await import("@/api/errors");
+    state.current.mockResolvedValueOnce(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/me");
+    state.current.mockRejectedValueOnce(new ApiError({ kind: "http", status: 429, message: "HTTP_429" }));
+    const old = runtime.scheduleLegalTermsGate("/pages/earn/earn");
+    await settleGate();
+    if (destination === "auth-required") {
+      state.session = null;
+      expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    } else {
+      expect(runtime.enforcePendingLegalTermsGate(destination === "terms" ? "/pages/onboarding/terms" : "/pages/login/login")).toBe(false);
+      expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    }
+    expect(state.loading).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    await old;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(state.current).toHaveBeenCalledTimes(2);
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(uni.showModal).not.toHaveBeenCalled();
   });
 
   it("shows the retry prompt after a second transient failure", async () => {
@@ -212,6 +386,7 @@ describe("legal terms runtime gate", () => {
     prompt.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
     await settleGate();
     expect(state.current).toHaveBeenCalledTimes(3);
+    expect(state.retryProfileLocale).not.toHaveBeenCalled();
     expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
     expect(uni.reLaunch).not.toHaveBeenCalled();
   });
@@ -331,6 +506,67 @@ describe("legal terms runtime gate", () => {
     expect(uni.reLaunch).toHaveBeenLastCalledWith(expect.objectContaining({
       url: "/pages/onboarding/terms?return=%2Fpages%2Fme%2Fme",
     }));
+  });
+
+  it.each(["PROFILE_LANGUAGE_LOAD_FAILED", "PROFILE_LANGUAGE_SYNC_FAILED"])("recovers %s through the same-session native Retry before reading Terms", async (message) => {
+    const runtime = await loadRuntime();
+    const { trackProfileLocaleHydration, pendingProfileLocaleHydration } = await import("./locale-profile-hydration");
+    const scope = { accountId: "user:7", revision: 1 };
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    const failed = Promise.reject(new Error(message));
+    trackProfileLocaleHydration(scope, failed);
+    await expect(failed).rejects.toThrow(message);
+    state.current.mockResolvedValue(snapshot(true));
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    expect(state.current).not.toHaveBeenCalled();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(pendingProfileLocaleHydration(scope)).toBe(failed);
+    const prompt = vi.mocked(uni.showModal).mock.calls[0][0]!;
+    state.retryProfileLocale.mockImplementation(() => trackProfileLocaleHydration(scope, Promise.resolve()));
+    prompt.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(state.retryProfileLocale).toHaveBeenCalledOnce();
+    expect(state.current).toHaveBeenCalledOnce();
+    expect(state.acknowledge).not.toHaveBeenCalled();
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+    expect(pendingProfileLocaleHydration(scope)).toBeNull();
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+  });
+
+  it.each(["language-failed", "terms-failed", "acknowledgement-required"])("keeps business gated after locale Retry when %s", async (outcome) => {
+    const runtime = await loadRuntime();
+    const { trackProfileLocaleHydration } = await import("./locale-profile-hydration");
+    const scope = { accountId: "user:7", revision: 1 };
+    const resumed = vi.fn(async () => {});
+    runtime.recordLegalTermsAcknowledged(snapshot(true));
+    runtime.afterLegalTermsAcknowledged(resumed);
+    const failed = Promise.reject(new Error("PROFILE_LANGUAGE_LOAD_FAILED"));
+    trackProfileLocaleHydration(scope, failed);
+    await expect(failed).rejects.toThrow("PROFILE_LANGUAGE_LOAD_FAILED");
+    await runtime.scheduleLegalTermsGate("/pages/me/rewards");
+    state.retryProfileLocale.mockImplementation(() => trackProfileLocaleHydration(scope,
+      outcome === "language-failed" ? Promise.reject(new Error("PROFILE_LANGUAGE_LOAD_FAILED")) : Promise.resolve()));
+    if (outcome === "terms-failed") state.current.mockRejectedValue(new Error("LEGAL_TERMS_RESPONSE_INVALID"));
+    else state.current.mockResolvedValue(snapshot(false));
+    vi.mocked(uni.showModal).mock.calls[0][0]!.success?.({ confirm: true, cancel: false, errMsg: "showModal:ok" });
+    await settleGate();
+    expect(state.retryProfileLocale).toHaveBeenCalledOnce();
+    expect(state.current).toHaveBeenCalledTimes(outcome === "language-failed" ? 0 : 1);
+    expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+    expect(resumed).not.toHaveBeenCalled();
+    expect(state.acknowledge).not.toHaveBeenCalled();
+    expect(uni.reLaunch).toHaveBeenCalledTimes(outcome === "acknowledgement-required" ? 1 : 0);
+    if (outcome === "acknowledgement-required") {
+      runtime.recordLegalTermsAcknowledged(snapshot(false));
+      await settleGate();
+      expect(runtime.hasPendingLegalTermsRequirement()).toBe(true);
+      expect(resumed).not.toHaveBeenCalled();
+      runtime.recordLegalTermsAcknowledged(snapshot(true));
+      await settleGate();
+      expect(runtime.hasPendingLegalTermsRequirement()).toBe(false);
+      expect(resumed).toHaveBeenCalledOnce();
+      expect(state.acknowledge).not.toHaveBeenCalled();
+    }
   });
 
   it("waits for account language before presenting Terms and never shows the earlier default", async () => {

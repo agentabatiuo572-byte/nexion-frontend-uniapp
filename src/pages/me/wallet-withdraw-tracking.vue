@@ -44,7 +44,7 @@
                floor glow + dot-grid are deleted, not re-tuned). -->
           <view :style="heroStyle">
             <text class="block" :style="amountLabelStyle">{{ t.wallet.trackAmountLabel }}</text>
-            <text class="block" :style="amountStyle">${{ wd.amount.toFixed(2) }}</text>
+            <text class="block" :style="amountStyle">${{ formatAmount(wd.amount) }}</text>
             <text class="block" :style="viaStyle">{{ viaLine }}</text>
             <text class="block" :style="addrStyle">{{ wd.address }}</text>
           </view>
@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
@@ -290,7 +291,7 @@ const failedTitle = computed(() => {
 // 🔴 拦截/异常态一律要有客服出口。原判据只看 riskRoute,而 frozen 也可能由后台对一张
 // pass 路由的在途单事后冻结(types.ts 明写「K3 route freeze 或 D2 处置」)——
 // 那种单文案叫用户联系客服,页面上却没有客服入口。
-const routeHeld = computed(() => !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
+const routeHeld = computed(() => !isTerminalDone.value && !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
 // 钱都到账了还转,用户会以为卡住了。
@@ -403,7 +404,7 @@ const againReasonText = computed(() => {
   return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
 });
 // SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
-const isFrozenHold = computed(() => wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen");
+const isFrozenHold = computed(() => !isTerminalDone.value && (wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen"));
 // 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
 const heldReasonLines = computed(() => {
   if (!routeHeld.value) return [] as string[];
@@ -432,7 +433,7 @@ const reasonLines = computed(() => [...new Set([
 ])]);
 // FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
 const viaLine = computed(() =>
-  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.actualFeeUsd.toFixed(2) }) : "",
+  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: formatAmount(wd.value.fee.actualFeeUsd) }) : "",
 );
 const etaTitle = computed(() =>
   wd.value?.status === "confirmed"

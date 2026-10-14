@@ -1,3 +1,4 @@
+import { formatAmount } from "@/lib/amount-display";
 // Execute the production SFC setup: header/product computeds, retry and CTA guards
 // stay real. Only page notifications and remote/decorative dependencies are adapted.
 import { compile } from "@vue/compiler-dom";
@@ -13,6 +14,8 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import type { Product } from "@/mock/products";
 import { purchaseEligibilityPolicyHasNoRestriction, purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import * as promotionEntry from "@/lib/promotion-entry";
+import { localized } from "@/lib/promotion-display";
 
 const { descriptor } = parse(source, { filename: "detail.vue" });
 const script = compileScript(descriptor, { id: "detail-loading-header" });
@@ -25,8 +28,8 @@ const renderCode = compile(descriptor.template!.content, {
 const render = new Function("Vue", ts.transpileModule(renderCode, { compilerOptions: {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None,
 } }).outputText)(Vue);
-const scopes: Vue.EffectScope[] = [];
-afterEach(() => { for (const scope of scopes.splice(0)) scope.stop(); });
+const teardowns: Array<() => void> = [];
+afterEach(() => { for (const teardown of teardowns.splice(0)) teardown(); });
 const cloud: Product = { id: "cloud-share", name: "Cloud Share", tier: "Share", tagline: "Cloud share",
   productType: "SHARE", inventoryMode: "UNLIMITED", price: 19.9, dailyEarn: 0,
   dailyEarnNEX: 3, shareYieldMin: 8, shareYieldMax: 12, sold: 1, features: [], available: true };
@@ -39,6 +42,8 @@ function page(copy = en, fallback = "") {
   const presentation = Vue.shallowRef({ products: [cloud] });
   const translations = Vue.ref(copy);
   const loads: Array<(options: Record<string, string>) => Promise<void>> = [];
+  const unloads: Array<() => void> = [];
+  const unmounts: Array<() => void> = [];
   const reads: Array<(ok: boolean, products?: Product[]) => void> = [];
   const refresh = vi.fn(() => {
     catalog.status = "loading";
@@ -55,9 +60,13 @@ function page(copy = en, fallback = "") {
   let header!: Vue.ComputedRef<{ title: string; backHref: string }>;
   const getProduct = vi.fn(() => { throw new Error("Remote detail must not borrow a mock product"); });
   const dependencies: Record<string, unknown> = {
-    vue: { ...Vue, onUnmounted() {} },
-    "@dcloudio/uni-app": { onLoad: (callback: typeof loads[number]) => loads.push(callback), onShow() {}, onHide() {} },
+    "@/lib/amount-display": { formatAmount },
+    vue: { ...Vue, onUnmounted: (callback: () => void) => unmounts.push(callback) },
+    "@dcloudio/uni-app": { onLoad: (callback: typeof loads[number]) => loads.push(callback), onShow() {}, onHide() {},
+      onUnload: (callback: () => void) => unloads.push(callback) },
     "@/lib/route": { navTo: vi.fn(), takeNavigationQuery: () => fallback },
+    "@/composables/use-promotion-context": { usePromotionContext: () => ({ activity: Vue.ref(null), status: Vue.ref("idle"), available: Vue.ref(false), refresh: vi.fn() }) },
+    "@/lib/promotion-entry": promotionEntry, "@/lib/promotion-display": { localized },
     "@/i18n/use-t": { useT: () => translations }, "@/store/locale": { useLocaleStore: () => ({ code: "en" }) },
     "@/i18n/format": { fmt }, "@/lib/brand-copy": { nexGridBrandText: (value: string) => value },
     "@/mock/products": { getProduct }, "@/composables/use-product-phase": { useProductPhase: () => Vue.ref("P1") },
@@ -72,7 +81,7 @@ function page(copy = en, fallback = "") {
     "@/store/product-catalog": { productCatalogState: catalog, productCatalogPresentation: presentation, refreshProductCatalog: refresh },
     "@/store/app": { useApp: () => Vue.reactive({ accountKey: "user:3778", accountBindingEpoch: 1, remoteFleetHasSnapshot: false }) },
     "@/store/server-product-phase": { refreshServerProductPhase: async () => true },
-    "@/api/runtime": { remoteApiEnabled: true }, "@/store/ui": { toast: { error: vi.fn() } },
+    "@/api/runtime": { remoteApiEnabled: true, sessionVault: { read: () => ({ user: { userId: 3778 } }) } }, "@/store/ui": { toast: { error: vi.fn() } },
     "@/lib/account-scope": { captureAccountScope: () => ({}), isCurrentAccountScope: () => true },
     "@/lib/authenticated-page-observation": {}, "@/composables/use-purchase-gate": {},
     "@/store/purchase-eligibility": { useRemotePurchaseEligibility: () => ({ eligibility, retry: vi.fn() }) },
@@ -86,7 +95,19 @@ function page(copy = en, fallback = "") {
     if (!(id in dependencies)) throw new Error(`Unexpected detail import ${id}`);
     return dependencies[id];
   }, exports);
-  const scope = Vue.effectScope(); scopes.push(scope);
+  const scope = Vue.effectScope();
+  teardowns.push(() => {
+    try {
+      expect(unloads).toHaveLength(1);
+      unloads.forEach(unload => unload());
+      expect(cta.value).toBeNull();
+      expect(unmounts).toHaveLength(1);
+      unmounts.forEach(unmount => unmount());
+      expect(cta.value).toBeNull();
+    } finally {
+      scope.stop();
+    }
+  });
   const view = scope.run(() => exports.default.setup({}, { expose() {} }))!;
   async function body() {
     // The separately compiled template uses public setup bindings; do not carry
@@ -94,7 +115,7 @@ function page(copy = en, fallback = "") {
     const app = Vue.createSSRApp({ render, setup: () => Vue.proxyRefs({ ...view }) });
     const blank = { setup: () => () => null };
     app.component("AppChassis", { setup: (_: unknown, { slots }: any) => () => Vue.h("main", slots.default?.()) });
-    for (const name of ["SectionHeader", "ProductRender", "LiveSocialProof", "SpecTable", "LockedProductCard"]) app.component(name, blank);
+    for (const name of ["SectionHeader", "ProductRender", "LiveSocialProof", "SpecTable", "LockedProductCard", "PromotionProduct"]) app.component(name, blank);
     return renderToString(app);
   }
   return { catalog, presentation, translations, loads, reads, refresh, eligibility, cta, header, view, body, getProduct };
@@ -132,6 +153,8 @@ describe("BUG 400 detail header distinguishes pending/failed reads from a missin
     p.catalog.status = "error"; await Vue.nextTick();
     expect(p.header.value.title).toBe(copy.store.catalogErrorTitle); expect(p.cta.value).toBeNull();
     expect(p.getProduct).not.toHaveBeenCalled();
+    p.catalog.status = "ready"; await Vue.nextTick();
+    expect(p.cta.value?.href).toBe("/pages/store/checkout?product=cloud-share");
   });
 
   it.each(copies)("%s reports not-found only after a successful directory lacks the target", async (_language, copy) => {

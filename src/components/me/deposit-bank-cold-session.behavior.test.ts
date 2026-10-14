@@ -1,3 +1,4 @@
+import { formatAmount } from "@/lib/amount-display";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { compile } from "@vue/compiler-dom";
@@ -48,7 +49,7 @@ function component(source: string, modules: Record<string, unknown>, components 
       if (!(name in modules)) throw new Error(`Unexpected payment dependency: ${name}`);
       return modules[name];
     }, {}) as Record<string, unknown>;
-    return { ...state, fmt, fmtVnd };
+    return { fmt, fmtVnd, formatAmount, ...state };
   } }, state: () => state };
 }
 
@@ -142,6 +143,7 @@ function harness(options: { warm?: boolean; quoteFailure?: boolean; existing?: b
     }) });
   const fx = useFx(), open = vi.fn(), navTo = vi.fn();
   const modules: Record<string, unknown> = {
+    "@/lib/amount-display": { formatAmount },
     vue: Vue, "@/store/fx": { useFx: () => fx }, "@/store/app": { useApp: () => app },
     "@/store/auth": { useAuth: () => auth }, "@/store/deposits": { useDeposits: () => dep },
     "@/api/runtime": { remoteApiEnabled: true, sessionVault: vault }, "@/api/errors": { ApiError },
@@ -244,6 +246,23 @@ test("a late read failure cannot write a banner after the pane was unmounted", a
   expect(h.dep.createRemoteBankIntent).not.toHaveBeenCalled();
 });
 
+test("a coalesced initial read still reports failure when its caller returns before the shared read", async () => {
+  const h = harness({ warm: true });
+  h.dep.refreshRemoteVietQrDeposits.mockImplementationOnce(async () => {
+    h.dep.remoteReceiptInitialStatus = "loading";
+    h.dep.serverStatus = "loading";
+  });
+  await Vue.nextTick(); await Promise.resolve(); await Vue.nextTick();
+  expect((h.state().readError as Vue.Ref<string>).value).toBe("");
+  h.dep.remoteReceiptInitialStatus = "error";
+  h.dep.serverStatus = "error";
+  h.dep.serverError = "INTENTS_READ_FAILED";
+  await Vue.nextTick();
+  expect((h.state().readError as Vue.Ref<string>).value).toBe(zh.topupChrome.depositOpFailedNote);
+  expect(h.text()).toContain(zh.topupChrome.depositOpFailedNote);
+  expect(h.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+});
+
 test("the first read failure clears after a later successful read without a remount or another FX load", async () => {
   const h = harness({ warm: true, firstIntentFailure: true });
   await vi.waitFor(() => expect(h.dep.serverStatus).toBe("error")); await Vue.nextTick();
@@ -265,7 +284,7 @@ test.each(["HDPAY_ORDER_CREATE_REJECTED", "CREATE_TEMPORARILY_UNAVAILABLE"])(
     h.dep.createRemoteBankIntent.mockRejectedValue(new ApiError({ kind: "business", status: 422, message }));
     const complete = h.state().completeCreateOrder as (amount: number, account: string) => Promise<void>;
     await complete(25, "user:7"); await Vue.nextTick();
-    const expected = message === "HDPAY_ORDER_CREATE_REJECTED" ? zh.bankPane.hostedRejectedNote : zh.topupChrome.depositOpFailedNote;
+    const expected = message === "HDPAY_ORDER_CREATE_REJECTED" ? zh.bankPane.hostedRejectedNote : zh.bankPane.createFailedNote;
     expect((h.state().createError as Vue.Ref<string>).value).toBe(expected);
     await h.dep.refreshRemoteVietQrDeposits(); await Vue.nextTick();
     expect((h.state().readError as Vue.Ref<string>).value).toBe("");
@@ -285,7 +304,7 @@ test("an old binding's late read callback cannot add a banner over the current a
   const complete = h.state().completeCreateOrder as (amount: number, account: string) => Promise<void>;
   await complete(9, "user:8");
   const currentCreateError = (h.state().createError as Vue.Ref<string>).value;
-  expect(currentCreateError).toBe(fmt(zh.bankPane.minimumLimitExceeded, { min: "$10" }));
+  expect(currentCreateError).toBe(fmt(zh.bankPane.minimumLimitExceeded, { min: "$10.00" }));
   h.dep.serverStatus = "error"; h.dep.serverError = "OLD_READ_FAILED"; release();
   await Promise.resolve(); await Vue.nextTick();
   expect((h.state().readError as Vue.Ref<string>).value).toBe("");
@@ -300,7 +319,7 @@ test("an invalidated session removes only the stale read banner and keeps the ac
   await complete(9, "user:7");
   expect((h.state().readError as Vue.Ref<string>).value).toBe(zh.topupChrome.depositOpFailedNote);
   const createError = (h.state().createError as Vue.Ref<string>).value;
-  expect(createError).toBe(fmt(zh.bankPane.minimumLimitExceeded, { min: "$10" }));
+  expect(createError).toBe(fmt(zh.bankPane.minimumLimitExceeded, { min: "$10.00" }));
   const readCount = h.transport.mock.calls.length;
   h.auth.isAuthenticated = false; await Vue.nextTick();
   expect((h.state().readError as Vue.Ref<string>).value).toBe("");
@@ -335,7 +354,7 @@ test.each([zh, en, vietnamese])("a fresh canonical list offers an explicit exist
   (h.state().createError as Vue.Ref<string>).value = messages.bankPane.hostedRejectedNote;
   (choice.props.onClick as () => void)(); await Vue.nextTick();
   expect((h.state().viewIntentId as Vue.Ref<string>).value).toBe(existing20.intentId);
-  expect(h.text()).toContain(fmtVnd(existing20.vndAmount)); expect(h.text()).toContain(messages.bankPane.hostedContinueCta);
+  expect(h.text()).toContain("527800.00₫"); expect(h.text()).toContain(messages.bankPane.hostedContinueCta);
   expect(h.text()).not.toContain(messages.bankPane.expiredTitle); expect(existingControl(h)).toBeUndefined();
   expect((h.state().createError as Vue.Ref<string>).value).toBe(""); expect(h.dep.intents).toEqual(before);
   expect(h.dep.records).toEqual([]); expect(h.dep.remoteReceipts).toEqual([]);

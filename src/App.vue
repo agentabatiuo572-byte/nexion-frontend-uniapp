@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
@@ -35,6 +36,7 @@ import {
   routeFromH5Location,
 } from "@/lib/static-review-routes";
 import { isPublicAuthRoute } from "@/lib/auth-route-visibility";
+import { currentPublicPromotionRoute } from '@/lib/promotion-public-route';
 import { resolveBootstrapAccountKey } from "@/lib/bootstrap-account-key";
 import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
@@ -58,6 +60,7 @@ import {
   setRemoteUnauthorizedHandler,
 } from "@/api/runtime";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { installFieldNaming } from "@/lib/a11y-field-label";
@@ -333,11 +336,11 @@ async function pollTrial() {
     const left = remainingMs(nowMs);
     if (!urgencyFired.active24h && left > 0 && left <= URGENCY_24H_MS) {
       urgencyFired.active24h = true;
-      toast.warn(fmt(t.trial.urgency24h, { amount: useTrialConfig().config.discountCapUSD }));
+      toast.warn(fmt(t.trial.urgency24h, { amount: formatAmount(useTrialConfig().config.discountCapUSD) }));
     }
   } else if (st.status === "grace" && st.graceEndsAt !== null) {
     const left = remainingMs(nowMs);
-    const credit = liveShadowUSD(nowMs).toFixed(2);
+    const credit = formatAmount(liveShadowUSD(nowMs));
     if (!urgencyFired.grace1h && left > 0 && left <= URGENCY_1H_MS) {
       urgencyFired.grace1h = true;
       urgencyFired.grace24h = true; // don't double-push inside the last hour
@@ -467,7 +470,7 @@ function isAuthWhitelisted(route: string): boolean {
   // 🔴 两个判据必须同形:normalizeRoute 吃得下 `pages/x` 与冷启动时的 `#/pages/x?q=1`。
   //    原来后半段直接 startsWith,喂 hash 形态时白名单判不中 —— 守卫会在 intro 页
   //    自己把自己踢回 intro(死循环),所以下面 checkAuthGuard 敢回退到 hash 的前提就是这里。
-  return isPublicAuthRoute(route);
+  return isPublicAuthRoute(route) || (!useAuth().isAuthenticated && currentPublicPromotionRoute(route));
 }
 
 /**
@@ -598,8 +601,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     const route = readCurrentRoute();
     // Public privacy remains readable during cookie restoration, including
     // its query return target. Login/onboarding entries keep their usual reset.
-    const preserveCurrentRoute = !!route && (!isAuthWhitelisted(route)
-      || route === "pages/onboarding/privacy");
+    const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
       returnTo: preserveCurrentRoute ? `/${route}` : "/pages/index/index",
@@ -1081,7 +1083,7 @@ function checkQuestRoute() {
   if (!drafts.length) return;
   if (postMoneyBillsOnce(drafts) !== "ok") return;
   if (!useQuest().markComplete(id).firstTime) return; // 消费失败:重试命中同 ref 不会再发
-  toast.success(fmt(t.quest.routeToast, { n: task.nexReward }));
+  toast.success(fmt(t.quest.routeToast, { n: formatAmount(task.nexReward) }));
 }
 
 function startQuestWatch() {

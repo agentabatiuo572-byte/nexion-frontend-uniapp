@@ -125,9 +125,11 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo } from "@/lib/route";
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, getCurrentInstance, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -142,7 +144,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
 import { useApp } from "@/store/app";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm, type StakingPosition } from "@/store/staking";
-import { confirm as uiConfirm, toast } from "@/store/ui";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { canOpenStakingPool, resolvePositionPenalty, resolveStakingPool } from "@/lib/staking-canonical";
 import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 
@@ -176,8 +178,39 @@ const sheetOpen = ref(false);
 const sheetTerm = ref<StakingTerm | null>(null);
 const pendingRemoteMutations = ref(new Set<string>());
 const remoteMutationGate = createRemoteIntentGate("G1");
+const ui = useUI();
+const confirmationOwner = `staking-page-${getCurrentInstance()?.uid}`;
+let pageVisible = true;
+let pageGeneration = 0;
 
-async function runRemoteMutation(kind: "claim" | "early", positionNo: string) {
+function mutationScope() {
+  return { accountKey: app.accountKey, bindingEpoch: app.accountBindingEpoch, generation: pageGeneration };
+}
+
+function isCurrentMutationBinding(scope: ReturnType<typeof mutationScope>) {
+  return scope.accountKey === app.accountKey && scope.bindingEpoch === app.accountBindingEpoch;
+}
+
+function isCurrentMutationPage(scope: ReturnType<typeof mutationScope>) {
+  return pageVisible && scope.generation === pageGeneration && isCurrentMutationBinding(scope);
+}
+
+function invalidateConfirmations() {
+  pageGeneration += 1;
+  ui.clearConfirmsBy(confirmationOwner);
+}
+
+function hidePage() {
+  pageVisible = false;
+  invalidateConfirmations();
+}
+
+watch(() => [app.accountKey, app.accountBindingEpoch], invalidateConfirmations, { flush: "sync" });
+onShow(() => { pageVisible = true; });
+onHide(hidePage);
+
+async function runRemoteMutation(kind: "claim" | "early", positionNo: string, scope = mutationScope()) {
+  if (!isCurrentMutationPage(scope)) return false;
   let lease;
   try {
     lease = remoteMutationGate.acquire(app.accountKey, kind, { positionNo });
@@ -195,7 +228,7 @@ async function runRemoteMutation(kind: "claim" | "early", positionNo: string) {
   } catch {
     remoteMutationGate.complete(lease, false);
     // The request may have reached the service even when its response is unknown.
-    await staking.syncRemote();
+    if (isCurrentMutationBinding(scope)) await staking.syncRemote();
     return false;
   } finally {
     const next = new Set(pendingRemoteMutations.value);
@@ -227,6 +260,7 @@ onMounted(() => {
   }, 4000);
 });
 onUnmounted(() => {
+  hidePage();
   if (timer) clearInterval(timer);
 });
 
@@ -252,9 +286,9 @@ const avgAPY = computed(() => {
   return w / totalLocked.value;
 });
 
-const totalLockedText = computed(() => totalLocked.value.toFixed(2));
-const todayAccruedText = computed(() => todayAccrued.value.toFixed(2));
-const totalAccruedText = computed(() => totalAccrued.value.toFixed(2));
+const totalLockedText = computed(() => formatAmount(totalLocked.value));
+const todayAccruedText = computed(() => formatAmount(todayAccrued.value));
+const totalAccruedText = computed(() => formatAmount(totalAccrued.value));
 const avgApyText = computed(() => (totalLocked.value > 0 ? `${formatStakingPercentage(avgAPY.value)}%` : "—"));
 
 function openSheet(term: StakingTerm) {
@@ -305,13 +339,15 @@ function reportStakingFailure(reason: unknown, fallbackTitle: string) {
 }
 
 async function handleEarlyWithdraw(p: StakingPosition) {
+  const scope = mutationScope();
+  if (!isCurrentMutationPage(scope)) return;
   const penaltyRate = resolvePositionPenalty(p, staking.isMockMode, STAKING_PENALTY[p.termDays]);
   if (penaltyRate === null) {
     reportStakingFailure(null, t.value.staking.remoteUnavailableClosed);
     return;
   }
-  const penalty = (p.amountUSDT * penaltyRate).toFixed(2);
-  const refund = (p.amountUSDT * (1 - penaltyRate)).toFixed(2);
+  const penalty = formatAmount(p.amountUSDT * penaltyRate);
+  const refund = formatAmount(p.amountUSDT * (1 - penaltyRate));
   const ok = await uiConfirm({
     title: t.value.stakingV3.toast.earlyConfirmTitle,
     message: fmt(t.value.stakingV3.toast.earlyConfirmMessage, {
@@ -321,10 +357,13 @@ async function handleEarlyWithdraw(p: StakingPosition) {
     }),
     danger: true,
     confirmLabel: t.value.stakingV3.toast.earlyConfirmCta,
+    owner: confirmationOwner,
   });
-  if (!ok) return;
+  if (!ok || !isCurrentMutationPage(scope)) return;
   if (!staking.isMockMode) {
-    if (await runRemoteMutation("early", p.id)) {
+    const settled = await runRemoteMutation("early", p.id, scope);
+    if (!isCurrentMutationPage(scope)) return;
+    if (settled) {
       toast.warn(t.value.stakingV3.toast.earlyDoneTitle);
     } else {
       reportStakingFailure(null, t.value.stakingV3.toast.staleTitle);
@@ -355,8 +394,8 @@ async function handleEarlyWithdraw(p: StakingPosition) {
     toast.warn(
       t.value.stakingV3.toast.earlyDoneTitle,
       fmt(t.value.stakingV3.toast.earlyDoneSubtitle, {
-        refund: r.refund.toFixed(2),
-        penalty: r.penalty.toFixed(2),
+        refund: formatAmount(r.refund),
+        penalty: formatAmount(r.penalty),
       }),
     );
   } else if (r.conflict) {
@@ -371,8 +410,12 @@ async function handleEarlyWithdraw(p: StakingPosition) {
 }
 
 async function handleClaim(p: StakingPosition) {
+  const scope = mutationScope();
+  if (!isCurrentMutationPage(scope)) return;
   if (!staking.isMockMode) {
-    if (await runRemoteMutation("claim", p.id)) {
+    const settled = await runRemoteMutation("claim", p.id, scope);
+    if (!isCurrentMutationPage(scope)) return;
+    if (settled) {
       toast.success(t.value.stakingV3.toast.claimedTitle);
     } else {
       reportStakingFailure(null, t.value.stakingV3.toast.staleTitle);
@@ -400,8 +443,8 @@ async function handleClaim(p: StakingPosition) {
     toast.success(
       t.value.stakingV3.toast.claimedTitle,
       fmt(t.value.stakingV3.toast.claimedSubtitle, {
-        total: (r.principal + r.interest).toFixed(2),
-        interest: r.interest.toFixed(2),
+        total: formatAmount(r.principal + r.interest),
+        interest: formatAmount(r.interest),
       }),
     );
   } else if (r.conflict) {

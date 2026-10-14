@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { formatAmount } from "@/lib/amount-display";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
 // @ts-expect-error The isolated legacy-JS realm is used only by the Node test runner.
@@ -10,6 +11,7 @@ import ts from "typescript";
 import { fmt } from "@/i18n/format";
 import { zh } from "@/i18n/messages/zh";
 import { useUI } from "@/store/ui";
+import { nexGridBrandText } from "@/lib/brand-copy";
 
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
 
@@ -34,13 +36,15 @@ function legacyNativePage() {
       async refreshRecommendation(target, deadline) {
         this.recommendations.push({ target, deadline });
       },
+      async remove() { throw new Error("GOAL_DELETE_INTERNAL_SENTINEL"); },
     };
     this.ui = { toasts: [], pushToast(toast) { this.toasts.push(toast); } };
     this.exports = this.module.exports;
   `, context);
   context.require = (id: string) => {
-    if (id === "vue") return { ...Vue, onMounted: () => {} };
-    if (id === "@dcloudio/uni-app") return { onShow: () => {} };
+    if (id === "@/lib/amount-display") return { formatAmount };
+    if (id === "vue") return { ...Vue, onMounted: () => {}, onUnmounted: () => {} };
+    if (id === "@dcloudio/uni-app") return { onShow: () => {}, onHide: () => {} };
     if (id === "@/store/goals") return { useGoals: () => context.goalsStore };
     if (id === "@/store/ui") return { useUI: () => context.ui };
     if (id === "@/store/app") return { useApp: () => ({ accountKey: "user:3778", accountBindingEpoch: 1 }) };
@@ -64,6 +68,21 @@ function legacyNativePage() {
 }
 
 describe("native goal save without Array.at", () => {
+  it("does not describe unread earnings as zero while loading or after a failed read", () => {
+    for (const status of ["idle", "loading", "error", "ready"]) {
+      const { context, page, scope } = legacyNativePage();
+      try {
+        context.goalsStore.status = status;
+        const subtitle = page.heroSubLine.value;
+        if (status === "ready") expect(subtitle).toContain("$0.00");
+        else {
+          expect(subtitle).not.toContain("$0.00");
+          expect(subtitle).toBe(status === "error" ? zh.goals.serverUnavailable : zh.goals.loading);
+        }
+      } finally { scope.stop(); }
+    }
+  });
+
   it("confirms one saved goal, restores its term and shows success in the actual page script", async () => {
     const { context, page, scope } = legacyNativePage();
     try {
@@ -75,8 +94,8 @@ describe("native goal save without Array.at", () => {
       await page.onSave();
       expect(context.goalsStore.saves).toHaveLength(1);
       expect(context.goalsStore.goals).toHaveLength(1);
-      expect(context.ui.toasts).toEqual([{ kind: "success", title: "目标已保存 · 30 天达成 $500" }]);
-      expect(page.restoredGoal.value).toEqual({ targetUSDT: 500, days: 30 });
+      expect(context.ui.toasts).toEqual([{ kind: "success", title: "目标已保存：$500.00 / 30 天" }]);
+      expect(page.restoredGoal.value).toEqual({ id: "saved-goal", targetUSDT: 500, days: 30 });
       expect(page.savePending.value).toBe(false);
       expect(page.saveBlocked.value).toBe(true);
       expect(context.goalsStore.recommendations).toEqual([{
@@ -95,13 +114,78 @@ describe("native goal save without Array.at", () => {
       context.goalsStore.failNextSave = true;
       await page.onSave();
       expect(context.goalsStore.goals).toHaveLength(0);
-      expect(context.ui.toasts).toEqual([{ kind: "warn", title: "GOAL_SAVE_FAILED" }]);
+      expect(context.ui.toasts).toEqual([{ kind: "warn", title: zh.goals.serverUnavailable }]);
+      expect(JSON.stringify(context.ui.toasts)).not.toContain("GOAL_SAVE_FAILED");
       expect(page.savePending.value).toBe(false);
       await page.onSave();
       expect(context.goalsStore.saves).toHaveLength(2);
       expect(context.goalsStore.saves[1]).toEqual(context.goalsStore.saves[0]);
       expect(context.goalsStore.goals).toHaveLength(1);
-      expect(context.ui.toasts[1]).toEqual({ kind: "success", title: "目标已保存 · 30 天达成 $500" });
+      expect(context.ui.toasts[1]).toEqual({ kind: "success", title: "目标已保存：$500.00 / 30 天" });
+    } finally { scope.stop(); }
+  });
+
+  it("maps a deletion failure to product copy without exposing the diagnostic", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      await page.remove("goal-id");
+      expect(context.ui.toasts).toEqual([{ kind: "warn", title: zh.goals.serverUnavailable }]);
+    } finally { scope.stop(); }
+  });
+
+  it("deletes the requested goal normally without adding an error toast", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      const removed: string[] = [];
+      context.goalsStore.remove = async (id: string) => { removed.push(id); };
+      await page.remove("goal-id");
+      expect(removed).toEqual(["goal-id"]);
+      expect(context.ui.toasts).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps a late deletion rejection out of the next account", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      let reject!: (error: Error) => void;
+      context.goalsStore.remove = () => new Promise((_resolve, fail) => { reject = fail; });
+      const deleting = page.remove("old-account-goal");
+      context.goalsStore.accountEpoch += 1;
+      reject(new Error("OLD_DELETE_ACCOUNT_INTERNAL_SENTINEL"));
+      await deleting;
+      expect(context.ui.toasts).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("does not turn a successful old-account deletion into a failure after switching accounts", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      let resolve!: () => void;
+      const removed: string[] = [];
+      context.goalsStore.remove = (id: string) => {
+        removed.push(id);
+        return new Promise<void>(done => { resolve = done; });
+      };
+      const deleting = page.remove("old-account-goal");
+      context.goalsStore.accountEpoch += 1;
+      resolve();
+      await deleting;
+      expect(removed).toEqual(["old-account-goal"]);
+      expect(context.ui.toasts).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps a late save rejection out of the next account", async () => {
+    const { context, page, scope } = legacyNativePage();
+    try {
+      let reject!: (error: Error) => void;
+      context.goalsStore.setGoal = () => new Promise((_resolve, fail) => { reject = fail; });
+      page.selectTarget(500);
+      const saving = page.onSave();
+      context.goalsStore.accountEpoch += 1;
+      reject(new Error("OLD_ACCOUNT_INTERNAL_SENTINEL"));
+      await saving;
+      expect(context.ui.toasts).toEqual([]);
     } finally { scope.stop(); }
   });
 });
@@ -145,12 +229,12 @@ describe("earning-goal save account fence", () => {
  * 判据是**行为**而非文本:用真实 fmt 渲染一遍,断言天数前没有 $、金额前有 $。
  */
 describe("goal save toast placeholder contract", () => {
-  it("keeps days unitless and groups default and custom amounts", () => {
-    expect(source).toMatch(/savedToast, \{ amount: target\.value\.toLocaleString\("en-US"\), days: days\.value \}/);
-    expect(fmt(zh.goals.savedToast, { amount: (1000).toLocaleString("en-US"), days: 90 }))
-      .toBe("目标已保存 · 90 天达成 $1,000");
-    expect(fmt(zh.goals.savedToast, { amount: (1234.56).toLocaleString("en-US"), days: 180 }))
-      .toBe("目标已保存 · 180 天达成 $1,234.56");
+  it("keeps days unitless and displays default and custom amounts with two decimals", () => {
+    expect(source).toMatch(/savedToast, \{ amount: formatAmount\(target\.value\), days: days\.value \}/);
+    expect(fmt(zh.goals.savedToast, { amount: formatAmount(1000), days: 90 }))
+      .toBe("目标已保存：$1000.00 / 90 天");
+    expect(fmt(zh.goals.savedToast, { amount: formatAmount(1234.56), days: 180 }))
+      .toBe("目标已保存：$1234.56 / 180 天");
   });
 
   it("shows both saved terms through the page-bound toast store after an async save", async () => {
@@ -178,18 +262,181 @@ describe("goal save toast placeholder contract", () => {
     const implementation = ts.transpileModule(source.slice(start, end), {
       compilerOptions: { target: ts.ScriptTarget.ES2022 },
     }).outputText;
-    const makeSave = new Function("saveBlocked", "target", "days", "goalsStore", "savePending", "ui", "t", "fmt", "restoreEditorFromGoal", "ONE_DAY_MS",
+    const makeSave = new Function("formatAmount", "saveBlocked", "target", "days", "goalsStore", "savePending", "ui", "t", "fmt", "restoreEditorFromGoal", "ONE_DAY_MS",
       `let saveEpoch = 0; const retryableSaveIntents = new Map(); ${implementation}; return onSave;`);
-    const save = makeSave({ value: false }, target, days, goalsStore, savePending, pageUi,
+    const save = makeSave(formatAmount, { value: false }, target, days, goalsStore, savePending, pageUi,
       { value: { goals: zh.goals } }, fmt, () => {}, 86_400_000) as () => Promise<void>;
 
     await save();
-    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存 · 90 天达成 $500");
+    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存：$500.00 / 90 天");
     days.value = 30;
     await save();
-    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存 · 30 天达成 $500");
+    expect(pageUi.toasts.at(-1)?.title).toBe("目标已保存：$500.00 / 30 天");
     expect(useUI(otherPinia).toasts).toEqual([]);
     expect(goals).toHaveLength(2);
     expect(savePending.value).toBe(false);
+  });
+});
+
+const remote=vi.hoisted(()=>({remoteApiEnabled:true,goalsApi:{list:vi.fn(),create:vi.fn(),recommendation:vi.fn(),setStatus:vi.fn(),remove:vi.fn()}}));
+vi.mock('@/api/runtime',()=>remote);
+vi.mock('@/store/account-scoped-storage',()=>({readAccountRow:()=>null,writeAccountRow:()=>{throw new Error('PERSISTENCE_NOT_ALLOWED');}}));
+const { useGoals }=await import('@/store/goals');
+const { descriptor }=parse(source,{filename:'goals.vue'});
+const script=compileScript(descriptor,{id:'goal-delete-finite'});
+const code=ts.transpileModule(script.content,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;
+const mounted: Array<()=>void>=[];
+function deferred<T>(){let resolve!:(v:T)=>void;let reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};}
+async function flush(){for(let i=0;i<6;i++)await Promise.resolve();await Vue.nextTick();}
+function snapshot(id=9){return{serverCanonical:true,source:'nx_earning_goal',lifetimeEarningsUsdt:0,goals:[{id,targetUsdt:100,deadlineAt:1_900_000_000_000,createdAt:1_800_000_000_000,achieved:false,progressPct:0}]};}
+async function setup(){
+  const store=useGoals();store.bindAccount('A');await flush();
+  const account=Vue.reactive({accountKey:'A',accountBindingEpoch:1,earnings:{total:0}});
+  const ui=useUI();const shows: Array<() => void>=[];const hides: Array<() => void>=[];
+  const require=(id:string)=>{
+    if (id === "@/lib/amount-display") return { formatAmount };
+    if(id==='vue')return Vue;
+    if(id==='@dcloudio/uni-app')return{onShow:(fn:() => void)=>shows.push(fn),onHide:(fn:() => void)=>hides.push(fn)};
+    if(id==='@/store/goals')return{useGoals:()=>store};
+    if(id==='@/store/app')return{useApp:()=>account};
+    if(id==='@/store/ui')return{useUI:()=>ui};
+    if(id==='@/i18n/use-t')return{useT:()=>Vue.ref({goals:zh.goals})};
+    if(id==='@/i18n/format')return{fmt};
+    if(id==='@/api/runtime')return{remoteApiEnabled:true};
+    if(id==='@/lib/brand-copy')return{nexGridBrandText};
+    if(id==='@/lib/route')return{navReset:vi.fn()};
+    if(id.endsWith('.vue'))return{__esModule:true,default:{}};
+    throw new Error('UNEXPECTED_IMPORT '+id);
+  };
+  const module={exports:{} as any};new Function('require','module','exports',code)(require,module,module.exports);
+  let page:any;
+  const renderer=Vue.createRenderer<any,any>({insert:(child,parent)=>{child.parent=parent;},remove:()=>{},createElement:()=>({}),createText:()=>({}),createComment:()=>({}),setText:()=>{},setElementText:()=>{},parentNode:n=>n.parent??null,nextSibling:()=>null,patchProp:()=>{}});
+  const component=module.exports.default;
+  const app=renderer.createApp({...component,setup:(p:any,c:any)=>{page=component.setup(p,c);return page;},render:()=>null});
+  app.mount({});let active=true;const stop=()=>{if(active){active=false;app.unmount();}};mounted.push(stop);await flush();
+  const rebind=(key:string)=>{account.accountKey=key;account.accountBindingEpoch++;store.bindAccount(key);};
+  return{store,page,account,ui,stop,rebind,hide:()=>hides.forEach(fn=>fn()),show:()=>shows.forEach(fn=>fn())};
+}
+describe('actual goal page/store deletion feedback scope',()=>{
+  beforeEach(()=>{setActivePinia(createPinia());Object.values(remote.goalsApi).forEach(m=>m.mockReset());remote.goalsApi.list.mockResolvedValue(snapshot());remote.goalsApi.recommendation.mockResolvedValue({purchaseRequired:false});vi.stubGlobal('fetch',()=>{throw new Error('NETWORK_NOT_ALLOWED');});vi.useFakeTimers();});
+  afterEach(()=>{mounted.splice(0).forEach(stop=>stop());vi.useRealTimers();vi.unstubAllGlobals();});
+  it.each(['account','same-account-rebind','unmount','hide-and-show'])('suppresses late failure after %s',async boundary=>{
+    const s=await setup();const response=deferred<void>();remote.goalsApi.remove.mockReturnValue(response.promise);
+    const pending=s.page.remove('9');expect(remote.goalsApi.remove).toHaveBeenCalledExactlyOnceWith(9);
+    if(boundary==='account')s.rebind('B');
+    if(boundary==='same-account-rebind')s.rebind('A');
+    if(boundary==='unmount')s.stop();
+    if(boundary==='hide-and-show'){s.hide();s.show();}
+    await flush();response.reject(new Error('OLD_ACCOUNT_DELETE_FAILED'));await pending;
+    console.log(JSON.stringify({boundary,account:s.account.accountKey,bindingEpoch:s.account.accountBindingEpoch,storeEpoch:s.store.accountEpoch,toasts:s.ui.toasts.map(t=>({kind:t.kind,title:t.title})),currentGoals:s.store.goals.map(g=>g.id)}));
+    expect(s.ui.toasts).toHaveLength(0);
+  });
+  it('does not dispatch while hidden and permits a current delete after show',async()=>{
+    const s=await setup();s.hide();await s.page.remove('9');expect(remote.goalsApi.remove).not.toHaveBeenCalled();
+    s.show();await flush();remote.goalsApi.remove.mockResolvedValue(undefined);await s.page.remove('9');
+    expect(remote.goalsApi.remove).toHaveBeenCalledExactlyOnceWith(9);expect(s.store.goals).toEqual([]);expect(s.ui.toasts).toHaveLength(0);
+  });
+  it('current successful removal deletes the intended local row',async()=>{
+    const s=await setup();remote.goalsApi.remove.mockResolvedValue(undefined);await s.page.remove('9');
+    expect(s.store.goals).toEqual([]);expect(s.ui.toasts).toHaveLength(0);expect(remote.goalsApi.remove).toHaveBeenCalledExactlyOnceWith(9);
+  });
+  it('current failure remains visible and retains the confirmed row',async()=>{
+    const s=await setup();remote.goalsApi.remove.mockRejectedValue(new Error('CURRENT_DELETE_FAILED'));await s.page.remove('9');
+    expect(s.ui.toasts).toHaveLength(1);expect(s.ui.toasts[0].title).toBe(zh.goals.serverUnavailable);expect(s.store.goals[0]?.id).toBe('9');
+  });
+  it('keeps the saved draft fenced until its deletion succeeds, then creates one new goal',async()=>{
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[]});
+    remote.goalsApi.create.mockImplementation(async input=>({id:41+remote.goalsApi.create.mock.calls.length,...input,
+      createdAt:Date.now(),achieved:false,progressPct:0,lifetimeEarningsUsdt:0}));
+    const s=await setup();s.page.selectTarget(1234.56);s.page.selectDays(30);await s.page.onSave();
+    const first={...remote.goalsApi.create.mock.calls[0][0]};const id=s.store.goals[0]!.id;
+    expect(s.page.saveBlocked.value).toBe(true);await s.page.onSave();expect(remote.goalsApi.create).toHaveBeenCalledTimes(1);
+    const response=deferred<void>();remote.goalsApi.remove.mockReturnValueOnce(response.promise);
+    const removing=s.page.remove(id);expect(s.page.saveBlocked.value).toBe(true);
+    expect(s.store.goals.map(g=>g.id)).toEqual([id]);await s.page.onSave();expect(remote.goalsApi.create).toHaveBeenCalledTimes(1);
+    response.resolve();await removing;
+    expect(s.store.goals).toEqual([]);expect(s.page.target.value).toBe(1234.56);expect(s.page.days.value).toBe(30);
+    expect(s.page.saveBlocked.value).toBe(false);
+    vi.advanceTimersByTime(1000);await s.page.onSave();await s.page.onSave();
+    expect(remote.goalsApi.create).toHaveBeenCalledTimes(2);const second=remote.goalsApi.create.mock.calls[1][0];
+    expect(second.idempotencyKey).not.toBe(first.idempotencyKey);expect(second.deadlineAt).toBe(first.deadlineAt+1000);
+    expect(s.store.goals).toHaveLength(1);expect(s.store.goals[0]!.id).not.toBe(id);expect(s.page.saveBlocked.value).toBe(true);
+  });
+  it('retains the saved-goal fence after deletion failure',async()=>{
+    const s=await setup();const draft={target:s.page.target.value,days:s.page.days.value};
+    remote.goalsApi.remove.mockRejectedValueOnce(new Error('DELETE_RESULT_UNKNOWN'));await s.page.remove('9');
+    expect(s.store.goals.map(g=>g.id)).toEqual(['9']);expect(s.page.saveBlocked.value).toBe(true);
+    expect({target:s.page.target.value,days:s.page.days.value}).toEqual(draft);
+    await s.page.onSave();expect(remote.goalsApi.create).not.toHaveBeenCalled();
+  });
+  it.each([0,500,2000])('only retires the unknown save intent for the confirmed deleted row and uses a new key after %d ms',async elapsed=>{
+    vi.setSystemTime(1_791_841_508_166);
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[]});
+    remote.goalsApi.create.mockRejectedValueOnce(new Error('POST_RESULT_UNKNOWN')).mockRejectedValueOnce(new Error('OTHER_POST_RESULT_UNKNOWN'))
+      .mockImplementation(async input=>({id:44+remote.goalsApi.create.mock.calls.length,...input,
+        createdAt:Date.now(),achieved:false,progressPct:0,lifetimeEarningsUsdt:0}));
+    const s=await setup();s.page.selectTarget(1234.56);s.page.selectDays(30);await s.page.onSave();
+    const unknown={...remote.goalsApi.create.mock.calls[0][0]};
+    const canonicalDeadline=Math.floor(unknown.deadlineAt/1000)*1000;
+    s.page.selectTarget(1500);await s.page.onSave();const otherUnknown={...remote.goalsApi.create.mock.calls[1][0]};
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[{id:43,...unknown,deadlineAt:canonicalDeadline,createdAt:canonicalDeadline-30*86_400_000,
+      achieved:false,progressPct:0,lifetimeEarningsUsdt:0}]});
+    await s.page.refreshRemoteGoals(true);expect(s.page.saveBlocked.value).toBe(true);
+    remote.goalsApi.remove.mockRejectedValueOnce(new Error('DELETE_RESULT_UNKNOWN'));await s.page.remove('43');
+    expect(s.page.saveBlocked.value).toBe(true);await s.page.onSave();expect(remote.goalsApi.create).toHaveBeenCalledTimes(2);
+    remote.goalsApi.remove.mockResolvedValueOnce(undefined);await s.page.remove('43');
+    expect(s.page.target.value).toBe(1234.56);expect(s.page.days.value).toBe(30);expect(s.page.saveBlocked.value).toBe(false);
+    vi.advanceTimersByTime(elapsed);await s.page.onSave();
+    const recreated=remote.goalsApi.create.mock.calls[2][0];
+    expect(recreated.idempotencyKey).not.toBe(unknown.idempotencyKey);expect(recreated.deadlineAt).toBe(canonicalDeadline+Math.floor(elapsed/1000)*1000);
+    expect(unknown.deadlineAt).toBe(canonicalDeadline);
+    expect(s.store.goals.map(g=>g.id)).not.toContain('43');expect(s.store.goals).toHaveLength(1);
+    s.page.selectTarget(1500);await s.page.onSave();expect(remote.goalsApi.create.mock.calls[3][0]).toEqual(otherUnknown);
+  });
+  it('retries an unknown POST with the original deadline and idempotency key',async()=>{
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[]});
+    remote.goalsApi.create.mockRejectedValueOnce(new Error('POST_RESULT_UNKNOWN')).mockImplementation(async input=>({id:48,...input,
+      createdAt:Date.now()-1000,achieved:false,progressPct:0,lifetimeEarningsUsdt:0}));
+    const s=await setup();s.page.selectTarget(500);s.page.selectDays(30);await s.page.onSave();
+    const first={...remote.goalsApi.create.mock.calls[0][0]};vi.advanceTimersByTime(1000);await s.page.onSave();
+    expect(remote.goalsApi.create.mock.calls[1][0]).toEqual(first);expect(s.store.goals).toHaveLength(1);expect(s.page.saveBlocked.value).toBe(true);
+  });
+  it('preserves an unknown save with the same terms but a different original deadline',async()=>{
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[]});
+    remote.goalsApi.create.mockRejectedValueOnce(new Error('POST_RESULT_UNKNOWN')).mockImplementation(async input=>({id:49,...input,
+      createdAt:Date.now()-1000,achieved:false,progressPct:0,lifetimeEarningsUsdt:0}));
+    const s=await setup();s.page.selectTarget(500);s.page.selectDays(30);await s.page.onSave();
+    const unknown={...remote.goalsApi.create.mock.calls[0][0]};
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[{id:50,targetUsdt:500,deadlineAt:unknown.deadlineAt-10_000,
+      createdAt:Date.now()-10_000,achieved:false,progressPct:0,lifetimeEarningsUsdt:0}]});
+    await s.page.refreshRemoteGoals(true);remote.goalsApi.remove.mockResolvedValueOnce(undefined);await s.page.remove('50');
+    expect(s.page.saveBlocked.value).toBe(false);vi.advanceTimersByTime(1000);await s.page.onSave();
+    expect(remote.goalsApi.create.mock.calls[1][0]).toEqual(unknown);expect(s.store.goals.map(g=>g.id)).toEqual(['49']);
+  });
+  it('does not unlock the confirmed goal when another goal is removed or overwrite an edited draft',async()=>{
+    const createdAt=Date.now();const older={id:51,targetUsdt:250,deadlineAt:createdAt+30*86_400_000-1000,createdAt:createdAt-1000,
+      achieved:false,progressPct:0,lifetimeEarningsUsdt:0};const current={...older,id:52,targetUsdt:500,createdAt,deadlineAt:createdAt+30*86_400_000};
+    remote.goalsApi.list.mockResolvedValue({...snapshot(),goals:[older,current]});remote.goalsApi.remove.mockResolvedValue(undefined);
+    const s=await setup();await s.page.remove('51');expect(s.store.goals.map(g=>g.id)).toEqual(['52']);
+    expect(s.page.saveBlocked.value).toBe(true);await s.page.onSave();expect(remote.goalsApi.create).not.toHaveBeenCalled();
+    s.page.selectTarget(1500);s.page.selectDays(90);await s.page.remove('52');
+    expect(s.store.goals).toEqual([]);expect(s.page.target.value).toBe(1500);expect(s.page.days.value).toBe(90);expect(s.page.saveBlocked.value).toBe(false);
+  });
+  it.each(['account','same-account-rebind','unmount','hide-and-show'])('does not release a newer editor from late deletion success after %s',async boundary=>{
+    const s=await setup();const response=deferred<void>();remote.goalsApi.remove.mockReturnValueOnce(response.promise);
+    const pending=s.page.remove('9');
+    if(boundary==='account')s.rebind('B');
+    if(boundary==='same-account-rebind')s.rebind('A');
+    if(boundary==='unmount')s.stop();
+    if(boundary==='hide-and-show'){s.hide();s.show();}
+    await flush();const draft={target:s.page.target.value,days:s.page.days.value};const restored={...s.page.restoredGoal.value};
+    response.resolve();await pending;
+    expect({target:s.page.target.value,days:s.page.days.value}).toEqual(draft);expect(s.page.restoredGoal.value).toEqual(restored);
+    expect(s.page.saveBlocked.value).toBe(true);expect(s.ui.toasts).toHaveLength(0);
+  });
+  it('late success after account switch cannot remove the new account row',async()=>{
+    const s=await setup();const response=deferred<void>();remote.goalsApi.remove.mockReturnValue(response.promise);const pending=s.page.remove('9');
+    s.rebind('B');await flush();expect(s.store.goals[0]?.id).toBe('9');response.resolve();await pending;
+    expect(s.store.goals[0]?.id).toBe('9');expect(s.ui.toasts).toHaveLength(0);
   });
 });

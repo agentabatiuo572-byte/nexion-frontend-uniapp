@@ -22,7 +22,16 @@
            (useSetPageHeader below) so they pin on scroll + frost content,
            mirroring the prototype's SetPageHeader. -->
 
-      <view v-if="catalogStatus === 'loading'" class="text-center" style="padding: 40px 16px">
+      <view v-if="publicOnly" class="promotion promotion-main" data-testid="promotion-public-detail">
+        <text class="promotion-title">{{ activity?localized(activity.title,locale.code):promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+        <text v-if="promotionStatus==='loading'||promotionStatus==='idle'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
+        <view v-else-if="promotionStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+        <text v-else-if="activity&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+        <PromotionProduct v-if="activity" :activity="activity" :product-no="id" expanded public-only />
+        <view v-if="activity" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionDetailHref(id,activityId)))"><text>{{ t.promotion.signIn }}</text></view>
+        <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text></view>
+      </view>
+      <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: 40px 16px">
         <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
@@ -117,6 +126,24 @@
           </view>
         </view>
 
+        <view v-if="activityId" class="mx-4 mt-3 promotion promotion-flat" data-testid="detail-promotion">
+          <text class="promotion-title">{{ activity?t.promotion.gift:promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+          <text v-if="promotionStatus==='loading'||promotionStatus==='idle'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
+          <view v-else-if="promotionStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+          <text v-else-if="activity&&(!promotionAvailable||!activity.productNos.includes(product.id))" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+          <PromotionProduct v-if="activity" :activity="activity" :product-no="product.id" expanded />
+          <view v-if="activity" class="promotion-summary" style="align-items:center;margin-top:16px">
+            <text>{{ t.promotion.quantity }}</text>
+            <view class="promotion-quantity-stepper">
+              <view role="button" :tabindex="qty<=1?-1:0" :aria-disabled="qty<=1" :aria-label="t.uiChrome.decreaseQty" @click="dec">−</view>
+              <text aria-live="polite">{{ qty }}</text>
+              <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="qty>=100?-1:0" :aria-disabled="qty>=100" @click="inc">+</view>
+            </view>
+          </view>
+          <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="navTo(promotionBundleHref(activityId,[{productNo:product.id,quantity:qty}]))"><text>{{ t.promotion.bundle }}</text></view>
+          <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(id))"><text>{{ t.promotion.ordinary }}</text></view>
+        </view>
+
         <!-- === Cloud Share E1 annual reference and NEX allocation === -->
         <view v-if="isShare" class="mx-4 mt-3 nx-glass-card" style="padding: 16px 18px">
           <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
@@ -146,7 +173,7 @@
         </view>
 
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
-        <template v-if="!isShare">
+        <template v-if="!isShare&&!activityId">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detEstReturns" :count="t.store.detEstReturnsMeta" /></view>
           <view class="mx-4 nx-glass-card" :style="roiCardStyle">
             <!-- qty stepper -->
@@ -239,12 +266,17 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { navTo, takeNavigationQuery } from "@/lib/route";
-import { ref, computed, watch, onUnmounted, nextTick, type CSSProperties } from "vue";
-import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
+import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
+import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SectionHeader from "@/components/store/section-header.vue";
 import ProductRender from "@/components/store/product-render.vue";
+import PromotionProduct from '@/components/promotion/promotion-product.vue';
+import { usePromotionContext } from '@/composables/use-promotion-context';
+import { promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionStoreHref } from '@/lib/promotion-entry';
+import { localized } from '@/lib/promotion-display';
 import LiveSocialProof from "@/components/store/live-social-proof.vue";
 import SpecTable from "@/components/store/spec-table.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
@@ -284,6 +316,9 @@ const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = 
 
 const app = useApp();
 const id = ref("");
+const activityId=ref('');
+const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !sessionVault.read();});
+const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId);
 const catalogRetrying = ref(false);
 let detailPageVisible = false;
 let detailObservationEpoch = 0;
@@ -294,6 +329,7 @@ function invalidateDetailFacts(): void {
 }
 
 async function refreshDetailFacts(): Promise<void> {
+  if(publicOnly.value)return;
   const readEpoch = ++detailFactsEpoch;
   const accountScope = captureAccountScope();
   // A forced catalog result advances the commerce runtime on both success and
@@ -311,8 +347,9 @@ async function refreshDetailFacts(): Promise<void> {
 
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
-  const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail")).get("id");
-  id.value = (o.id || fallback || "").trim();
+  const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail"));
+  id.value = (o.id || fallback.get('id') || "").trim();
+  activityId.value=(o.activityId||fallback.get('activityId')||'').trim();
   await refreshDetailFacts();
 });
 
@@ -339,7 +376,7 @@ async function retryCatalog() {
 const catalogStatus = computed(() => productCatalogState.status);
 // PRODUCTS is a plain compatibility array: its server replacement cannot
 // invalidate a computed that first ran while the cold-start catalog was empty.
-const product = computed<Product | undefined>(() => !id.value || (remoteApiEnabled && catalogStatus.value !== "ready") ? undefined
+const product = computed<Product | undefined>(() => publicOnly.value || !id.value || (remoteApiEnabled && catalogStatus.value !== "ready") ? undefined
   : remoteApiEnabled
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === id.value)
     : getProduct(id.value));
@@ -385,9 +422,8 @@ watch([catalogStatus, () => product.value?.id], () => {
 });
 
 const isShare = computed(() => product.value?.productType === "SHARE");
-const stockUnavailable = computed(() => !isShare.value
-  && product.value?.inventoryMode === "FINITE"
-  && (product.value.stock ?? 0) <= 0);
+const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE"
+  && product.value.stock === 0);
 // Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
@@ -441,10 +477,11 @@ const purchaseGate = computed(() => remoteApiEnabled
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
 // SetPageHeader). Getter form: title resolves once the product loads (onLoad).
 useSetPageHeader(() => ({
-  title: catalogStatus.value === "loading" ? t.value.store.catalogLoadingTitle
+  title: publicOnly.value ? (activity.value ? localized(activity.value.title,locale.code) : t.value.promotion.events)
+    : catalogStatus.value === "loading" ? t.value.store.catalogLoadingTitle
     : catalogStatus.value === "error" ? t.value.store.catalogErrorTitle
       : product.value?.name ?? t.value.store.coProductNotFound,
-  backHref: "/store",
+  backHref: activityId.value ? '/pages/store/store?activityId='+encodeURIComponent(activityId.value) : "/store",
 }));
 
 // ── derived ROI math (mirrors page.tsx + _client.tsx) ──
@@ -562,26 +599,26 @@ const stockLow = computed(
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
 const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
-  ? `${phoneDailyEarnValue.value.toFixed(2)}`
+  ? formatAmount(phoneDailyEarnValue.value)
   : t.value.store.specValueUnavailable));
 // Same server figure the vs-phone strip shows. It used to be baked into the copy
 // as "$0.06", which contradicted the strip whenever the server said otherwise —
 // or said nothing at all (strip degraded, this line still claimed $0.06).
 const vsPhoneSubText = computed(() => fmt(t.value.store.detVsPhone, { n: phoneDailyEarnText.value }));
-const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
+const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
 const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
   ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
   : t.value.store.shareAnnualUnavailable);
-const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
-const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));
-const annualYieldText = computed(() => annualYield.value.toFixed(0));
+const dailyYieldText = computed(() => formatAmount(dailyYield.value));
+const monthlyYieldText = computed(() => formatAmount(monthlyYield.value));
+const annualYieldText = computed(() => formatAmount(annualYield.value));
 const monthlyPctText = computed(() =>
   totalPrice.value > 0 ? ((monthlyYield.value / totalPrice.value) * 100).toFixed(1) : "0",
 );
 const annualPctText = computed(() =>
   totalPrice.value > 0 ? ((annualYield.value / totalPrice.value) * 100).toFixed(0) : "0",
 );
-const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
+const priceText = computed(() => formatAmount((product.value?.price ?? 0)));
 
 function eligibilityPolicyTitle(policy: PurchaseEligibilityPolicy): string {
   return policy.policy === "F4B"
@@ -614,10 +651,11 @@ function eligibilityNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
 }
 function eligibilityConditionText(condition: PurchaseEligibilityCondition): string {
+  const numberLabel = condition.kind === "teamVolumeUsd" ? formatAmount : eligibilityNumber;
   const values = {
-    current: eligibilityNumber(condition.current),
-    required: eligibilityNumber(condition.required),
-    gap: eligibilityNumber(condition.gap),
+    current: numberLabel(condition.current),
+    required: numberLabel(condition.required),
+    gap: numberLabel(condition.gap),
   };
   const copy = condition.kind === "rank"
     ? fmt(t.value.store.purchaseEligibilityRank, values)
@@ -638,7 +676,7 @@ function dec() {
   if (qty.value > 1) qty.value -= 1;
 }
 function inc() {
-  if (qty.value < 6) qty.value += 1;
+  if (qty.value < (activityId.value?100:6)) qty.value += 1;
 }
 function toggleFaq(i: number) {
   openFaq.value = openFaq.value === i ? -1 : i;
@@ -646,14 +684,12 @@ function toggleFaq(i: number) {
 // Chassis-level sticky bottom Buy CTA (replaces the old page-level fixed-position
 // bar, which positioned against the viewport — wrong inside the bezel). useStickyCTA
 // → the chassis-mounted <StickyCtaBar> renders it correctly (absolute). Re-syncs as
-// product/qty resolve; cleared on hide/unmount so it never bleeds to the next page.
+// product/qty resolve; cached deactivation and Uni unload also clear this page's CTA.
 const sticky = useStickyCTA();
 const stickyOwner = Symbol("store-detail");
 const stickyPageVisible = ref(true);
 sticky.activate(stickyOwner);
-watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage],
-  () => {
+function publishStickyCTA() {
     if (!stickyPageVisible.value || (remoteApiEnabled && catalogStatus.value !== "ready")) {
       sticky.hide(stickyOwner);
       return;
@@ -672,6 +708,17 @@ watch(
         showTabBar: false,
       }, stickyOwner);
       return;
+    }
+    if(activityId.value){
+      const allowed=promotionAvailable.value&&activity.value?.productNos.includes(product.value.id);
+      if(!allowed){
+        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:t.value.promotion.disabledNote,buttonLabel:t.value.promotion.unavailable,disabled:true,showTabBar:false},stickyOwner);
+        return;
+      }
+      if(activity.value?.eligibility==='SIGN_IN_REQUIRED'){
+        sticky.show({href:'/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value)),amount:`${priceText.value}`,buttonLabel:t.value.promotion.signIn,showTabBar:false},stickyOwner);
+        return;
+      }
     }
     if (remoteApiEnabled && eligibility.value.status !== "ready") {
       sticky.hide(stickyOwner);
@@ -710,33 +757,37 @@ watch(
       return;
     }
     sticky.show({
-      href: `/pages/store/checkout?product=${product.value.id}`,
+      href: activityId.value ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value) : `/pages/store/checkout?product=${product.value.id}`,
       amount: `${priceText.value}`,
       amountSubtext: isShare.value ? undefined : `${t.value.store.detDaily}: ${dailyEarnText.value}`,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
-  },
+}
+watch(
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty],
+  publishStickyCTA,
   { immediate: true },
 );
-onShow(() => {
+function showDetailStickyCTA() {
+  detailPageVisible = true;
   sticky.activate(stickyOwner);
   stickyPageVisible.value = true;
-});
-onHide(() => {
+  publishStickyCTA();
+}
+function hideDetailStickyCTA() {
   detailPageVisible = false;
   detailObservationEpoch += 1;
   invalidateDetailFacts();
   stickyPageVisible.value = false;
   sticky.hide(stickyOwner);
-});
-onUnmounted(() => {
-  detailPageVisible = false;
-  detailObservationEpoch += 1;
-  invalidateDetailFacts();
-  stickyPageVisible.value = false;
-  sticky.hide(stickyOwner);
-});
+}
+onShow(showDetailStickyCTA);
+onActivated(showDetailStickyCTA);
+onHide(hideDetailStickyCTA);
+onUnload(hideDetailStickyCTA);
+onDeactivated(hideDetailStickyCTA);
+onUnmounted(hideDetailStickyCTA);
 
 // ─── styles ───
 const catalogRetryStyle: CSSProperties = {
@@ -931,3 +982,10 @@ const faqQStyle: CSSProperties = {
 
 
 </script>
+<style src="@/components/promotion/promotion.css"></style>
+<style scoped>
+.promotion-quantity-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;overflow:hidden; }
+.promotion-quantity-stepper view { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--v5-surface-2); }
+.promotion-quantity-stepper text { min-width:36px;text-align:center;font-variant-numeric:tabular-nums; }
+.promotion-quantity-stepper [aria-disabled=true] { opacity:.4; }
+</style>

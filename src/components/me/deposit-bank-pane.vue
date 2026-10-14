@@ -212,7 +212,7 @@
         </view>
         <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.successTitle }}</text></view>
         <view>
-          <text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-brand); white-space: nowrap">+{{ creditedUsdt.toFixed(2) }} USDT</text>
+          <text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-brand); white-space: nowrap">+{{ formatAmount(creditedUsdt) }} USDT</text>
         </view>
         <view><text class="block text-center" :style="stateBodyStyle">{{ fmt(t.bankPane.successLine, { rate: rateText }) }}</text></view>
       </view>
@@ -261,7 +261,7 @@
         @keydown.enter.prevent="selectExistingPayment(choice)"
         @keydown.space.prevent="selectExistingPayment(choice)"
       >
-        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ choice.usdtAmount.toFixed(2) }} USDT</text>
+        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) }} USDT</text>
       </view>
     </template>
 
@@ -298,6 +298,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import { useT } from "@/i18n/use-t";
@@ -309,7 +310,7 @@ import { useFx } from "@/store/fx";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady as accountSessionReady } from "@/lib/binary-session-ready";
-import { fmtVnd, vndForUsdt } from "@/store/fx-core";
+import { vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
@@ -426,6 +427,7 @@ watch(
     } else {
       pendingPaymentRead = null;
       successfulPaymentRead.value = null;
+      if (status === "error" && initialStatus === "error") readError.value = t.value.topupChrome.depositOpFailedNote;
     }
   },
   { flush: "post" },
@@ -481,8 +483,9 @@ const inRange = computed(() =>
 );
 
 function usdtLabel(value: number): string {
-  return `$${value.toLocaleString("en-US", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
+  return `$${formatAmount(value)}`;
 }
+function fmtVnd(value: number): string { return `${formatAmount(value)}₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 const limitLine = computed(() => fx.configReady
@@ -494,7 +497,7 @@ const todayRemainingLine = computed(() =>
 const feeNote = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd <= 0) return t.value.bankPane.feeNote;
-  const usdt = fx.feeUsdt.toFixed(2);
+  const usdt = formatAmount(fx.feeUsdt);
   return fx.feeVnd > 0
     ? fmt(t.value.bankPane.feeConfiguredVnd, { usdt, vnd: fmtVnd(fx.feeVnd) })
     : fmt(t.value.bankPane.feeConfigured, { usdt });
@@ -605,6 +608,29 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     } catch (cause) {
+      // Only translate the exact known 503 envelope; never render raw server
+      // text or use this presentation choice to classify/retire a command key.
+      if (cause instanceof ApiError && cause.kind === "http" && cause.status === 503 && cause.code === 503) {
+        switch (cause.message) {
+          case "USER_ONBOARDING_STATE_UNAVAILABLE":
+            approvedBusinessFailureCopy = t.value.bankPane.createOnboardingUnavailable;
+            break;
+          case "LEGAL_TERMS_UNAVAILABLE":
+            approvedBusinessFailureCopy = t.value.bankPane.createTermsUnavailable;
+            break;
+          case "FX_QUOTE_UNAVAILABLE":
+            approvedBusinessFailureCopy = t.value.bankPane.createFxUnavailable;
+            break;
+          case "VIETQR_BANK_RAIL_UNAVAILABLE":
+          case "VIETQR_CHANNEL_UNAVAILABLE":
+            approvedBusinessFailureCopy = t.value.bankPane.createBankUnavailable;
+            break;
+          case "HDPAY_CONFIGURATION_INCOMPLETE":
+          case "PAYMENT_CONFIG_UNAVAILABLE":
+            approvedBusinessFailureCopy = t.value.bankPane.createServiceUnavailable;
+            break;
+        }
+      }
       if (cause instanceof ApiError && cause.kind === "http" && cause.status === 428 && cause.code === 428) {
         if (cause.message === "USER_ONBOARDING_REQUIRED") {
           approvedBusinessFailureCopy = t.value.bankPane.onboardingRequired;
@@ -652,7 +678,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       settled: () => { creating.value = false; },
       // lib 新契约:fallback = 用户面人话(原始 cause 由 lib 进日志)。审计 R3 抓获:此处
       // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
-    }, t.value.topupChrome.depositOpFailedNote);
+    }, t.value.bankPane.createFailedNote);
 }
 /** 拒绝/过期态显式重试保留原金额；命令键与最终结果仍由 store 决定。 */
 function regen() {
@@ -750,7 +776,7 @@ const creditedUsdt = computed(() => {
 const rateText = computed(() => (intent.value ? intent.value.fxRate.toLocaleString("en-US") : "—"));
 const creditLineText = computed(() =>
   intent.value
-    ? fmt(t.value.bankPane.creditLine, { usdt: intent.value.usdtAmount.toFixed(2), rate: rateText.value })
+    ? fmt(t.value.bankPane.creditLine, { usdt: formatAmount(intent.value.usdtAmount), rate: rateText.value })
     : "",
 );
 // 过期文案的锁价分钟数:配置未返回用「—」占位,不显示 0(同 fx-rate-line 口径)

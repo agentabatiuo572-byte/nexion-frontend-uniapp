@@ -21,9 +21,10 @@
 -->
 <template>
   <AppChassis active="store">
+    <PromotionCheckout v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" />
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
-    <view style="color: var(--v5-ink); padding-top: 24px">
+    <view v-else style="color: var(--v5-ink); padding-top: 24px">
       <!-- Back + title now live in the sticky chassis nav header
            (useSetPageHeader below) so they pin on scroll, mirroring the
            prototype's <SetPageHeader>. -->
@@ -168,8 +169,8 @@
             <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
           </view>
-          <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="onConfirmPay">
-            <text @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
+          <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="requestConfirmPay">
+            <text @click.stop="requestConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
           </view>
           <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @click.stop="goSelectPayment">
             <text @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
@@ -256,8 +257,12 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
-import { onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
+import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
+import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
+import { takeNavigationQuery } from '@/lib/route';
 import AppChassis from "@/components/app-chassis.vue";
 import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
@@ -326,6 +331,9 @@ interface PaymentMethod {
 
 const t = useT();
 const app = useApp();
+const promotionRoute=ref<{activityId:string;items:PromotionItem[];orderNo?:string}|null>(null);
+const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
+onBackPress(()=>promotionRoute.value ? (promotionCheckout.value?.back()??false) : false);
 const auth = useAuth();
 const orders = useOrders();
 const voucher = useVoucher();
@@ -399,7 +407,7 @@ const walletBalanceHint = computed(() => {
     return checkoutWalletRefreshing.value || app.remoteFleetStatus === "idle" || app.remoteFleetStatus === "loading"
       ? t.value.help.loadingMore : t.value.wallet.fundsUnavailableTitle;
   }
-  return `${t.value.wallet.usdtBalance} · $${app.user.usdtBalance.toFixed(2)}`;
+  return `${t.value.wallet.usdtBalance} · $${formatAmount(app.user.usdtBalance)}`;
 });
 
 function checkoutRouteIdentity() {
@@ -483,7 +491,17 @@ function purchaseEligibilityFailureCopy(): string {
 }
 
 onLoad(async (options) => {
-  const o = (options || {}) as Record<string, string>;
+  const pendingQuery=new URLSearchParams(takeNavigationQuery('/pages/store/checkout').replace(/^\?/,''));
+  const navigationQuery:Record<string,string>={};pendingQuery.forEach((value,key)=>{navigationQuery[key]=value;});
+  const o = { ...navigationQuery, ...(options || {}) } as Record<string, string>;
+  if (o.activityId || o.promotion==='1') {
+    try {
+      const items:PromotionItem[]=o.items ? JSON.parse(o.items) : o.product ? [{productNo:o.product,quantity:Number(o.quantity??1)}] : [];
+      if(!o.orderNo)validatePromotionItems(items);
+      promotionRoute.value={activityId:o.activityId??'',items,orderNo:o.orderNo};
+    } catch { toast.warn(t.value.promotion.errorNote);void navTo('/store'); }
+    return;
+  }
   trialCheckoutSource = o.source === "trial";
   // accept ?product= (canonical) or ?id= via the one canonical product resolver.
   if (o.product) productId.value = resolveTrialCheckoutProductId(o.product) ?? o.product;
@@ -642,8 +660,8 @@ const trialView = computed(() => trialQuoteAt(nowTick.value));
 const trialConversionMode = computed(() => trialView.value.applied);
 const promoDiscount = computed(() => trialView.value.promo);
 const trialOffsetView = computed(() => trialView.value);
-const promoDiscountText = computed(() => promoDiscount.value.toFixed(2));
-const trialOffsetText = computed(() => trialOffsetView.value.offsetUSD.toFixed(2));
+const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
+const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offsetUSD));
 const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, { pct: (trialCfg.value.discountRate * 100).toFixed(0) }));
 
 // ─── Voucher redemption ──────────────────────────────────────────────────
@@ -671,7 +689,7 @@ const voucherMatch = computed(() => {
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
 const hasVoucher = computed(() => voucherDiscount.value > 0);
-const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString());
+const voucherDiscountText = computed(() => formatAmount(voucherDiscount.value));
 
 // ─── FEAT-DEV02 旧机抵扣 ─────────────────────────────────────────────────
 // retire 流(设备页下架)或本页 choice 弹层确认后,tradein.appliedTradein 携带
@@ -711,8 +729,8 @@ function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit:
 }
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
 const hasTradein = computed(() => tradeinCredit.value > 0);
-// toFixed(2) 与其余六个抵扣展示面统一(strip/弹层/横幅均两位小数)。
-const tradeinCreditText = computed(() => tradeinCredit.value.toFixed(2));
+// 抵扣展示面统一使用两位小数和相同的十进制舍入。
+const tradeinCreditText = computed(() => formatAmount(tradeinCredit.value));
 const tradeinChipText = computed(() => {
   const ti = appliedTradeinView.value;
   if (!ti) return "";
@@ -890,7 +908,7 @@ function fireTradeinIntercept() {
 // back to the store grid before the product resolves.
 useSetPageHeader(() => ({
   title: t.value.headerTitles.storeCheckout,
-  backHref: product.value ? `/pages/store/detail?id=${product.value.id}` : "/store",
+  backHref: promotionRoute.value ? '/pages/store/store'+(promotionRoute.value.activityId?'?activityId='+encodeURIComponent(promotionRoute.value.activityId):'') : product.value ? `/pages/store/detail?id=${product.value.id}` : "/store",
 }));
 
 const step = ref<Step>("select-payment");
@@ -976,16 +994,16 @@ const capped = computed(() => targetOccupiesPhysicalSlot.value && (
 ));
 
 // ── derived text ──
-const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
+const priceText = computed(() => formatAmount((product.value?.price ?? 0)));
 // Header "Total" = device price after voucher (still excludes card fee, matching
 // the pre-voucher convention). Card fee is computed on the discounted subtotal.
-const netPriceText = computed(() => netPrice.value.toLocaleString());
+const netPriceText = computed(() => formatAmount(netPrice.value));
 // 算法也单源:整数域(cent × bps)与入金同一套。浮点直乘再 toFixed 会在半分边界
 // 被 IEEE754 压低一分(实测 14 个金额少收 1 分),同一笔费率两种算法两个答案。
 const cardFee = computed(() => (remoteApiEnabled && appliedTradeinView.value?.canonicalQuote
   ? 0 : isCard.value ? cardFeeUsd(netPrice.value) : 0));
-const cardFeeText = computed(() => cardFee.value.toLocaleString());
-const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
+const cardFeeText = computed(() => formatAmount(cardFee.value));
+const confirmTotalText = computed(() => formatAmount((netPrice.value + cardFee.value)));
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 const activatingSubText = computed(() => {
@@ -1074,13 +1092,49 @@ let quotedTradeIn: { deviceId: string } | null = null;
 /** 上一次结算尝试里核销了却没放回的券 id(storage 抖动);下一次尝试开头先补放回。 */
 let pendingVoucherRelease: string | null = null;
 
+let purchaseConfirmationOpen = false;
+async function requestConfirmPay() {
+  if (purchaseConfirmationOpen || confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
+  const scope = captureCheckoutRoute();
+  const amount = netPrice.value + cardFee.value;
+  if (!Number.isFinite(amount) || amount < 0) return;
+  purchaseConfirmationOpen = true;
+  dialogsOpen += 1;
+  try {
+    const accepted = await confirm({
+      title: t.value.store.coConfirmPurchase,
+      message: fmt(t.value.store.coConfirmPurchaseMessage, { amount: formatAmount(amount) }),
+      confirmLabel: t.value.store.coConfirmPayment,
+      cancelLabel: t.value.store.coCancel,
+      owner: dialogOwner,
+    });
+    if (!accepted || !isCurrentCheckoutRoute(scope) || step.value !== "confirm") return;
+    if (amount !== netPrice.value + cardFee.value) {
+      toast.warn(t.value.store.coTotalQuoteChanged);
+      step.value = "select-payment";
+      return;
+    }
+    await onConfirmPay();
+  } finally {
+    purchaseConfirmationOpen = false;
+    dialogsOpen = Math.max(0, dialogsOpen - 1);
+  }
+}
+
 async function onConfirmPay() {
   if (confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
   confirming = true;
   const recoveryScope = captureCheckoutRoute();
+  const confirmedAmount = netPrice.value + cardFee.value;
   if (remoteApiEnabled) {
     const recovering = await resumeServerOrder(recoveryScope);
     if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+  }
+  if (confirmedAmount !== netPrice.value + cardFee.value) {
+    confirming = false;
+    toast.warn(t.value.store.coTotalQuoteChanged);
+    step.value = "select-payment";
+    return;
   }
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
@@ -1090,11 +1144,12 @@ async function onConfirmPay() {
     // Trial conversion is already a backend transaction (trial lock + wallet
     // debit + order creation). It must run before the ordinary order path so
     // the checkout cannot create a second, permanently pending order.
-    if (trialQuote.applied) {
+    const recoveringTrial = freeTrial.hasPendingConversion();
+    if (trialQuote.applied || recoveringTrial) {
       const confirmationScope = captureCheckoutRoute();
       const p = product.value;
       const payQuote = trialQuoteAt(mockServerNow());
-      if (!p || !payQuote.applied) {
+      if (!p || (!recoveringTrial && !payQuote.applied)) {
         confirming = false;
         toast.warn(t.value.store.coTrialQuoteChanged);
         step.value = "select-payment";
@@ -1110,8 +1165,16 @@ async function onConfirmPay() {
       if (!isCurrentCheckoutRoute(confirmationScope)) { confirming = false; return; }
       confirming = false;
       if (!conversion.ok || !conversion.orderNo) {
-        toast.warn(t.value.store.coTrialQuoteChanged);
-        step.value = "select-payment";
+        if (conversion.reason === "insufficient-funds") {
+          await offerWalletTopup(quotedTotal, confirmationScope);
+        } else if (conversion.reason === "unknown" || (conversion.ok && !conversion.orderNo)) {
+          toast.warn(t.value.store.coRecoverOriginalOrder);
+        } else if (conversion.reason === "storage-unavailable") {
+          toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        } else {
+          toast.warn(conversion.reason === "quote-changed" ? t.value.store.coTrialQuoteChanged : t.value.tradein.errPurchaseFailed);
+          step.value = "select-payment";
+        }
         return;
       }
       orderId.value = conversion.orderNo;
@@ -1207,7 +1270,7 @@ async function openChainSession(): Promise<boolean> {
       title: t.value.store.pendingCollisionTitle,
       message: fmt(t.value.store.pendingCollisionBody, {
         name: getProduct(existing.productId)?.name ?? existing.productId,
-        amount: existing.amountUsdt.toLocaleString(),
+        amount: formatAmount(existing.amountUsdt),
         left: formatCountdown(pending.secondsLeft(existing)),
       }),
       confirmLabel: t.value.store.pendingCollisionDrop,
@@ -1361,7 +1424,7 @@ async function offerWalletTopup(requiredUsdt: number, routeScope = captureChecko
   dialogsOpen += 1;
   const accepted = await confirm({
     title: t.value.errors.insufficientBalanceTitle,
-    message: fmt(t.value.errors.insufficientBalanceMsg, { amt: requiredUsdt.toLocaleString() }),
+    message: fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(requiredUsdt) }),
     confirmLabel: t.value.me.topup,
     cancelLabel: t.value.store.coCancel,
     icon: "warn",
@@ -1441,6 +1504,7 @@ async function submitRemoteOrder(): Promise<void> {
               || persisted.paymentStatus.toUpperCase() !== "PAID"
               || persisted.orderStatus.toUpperCase() !== "COMPLETED"
               || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
+              || typeof persisted.amountUsdt !== "number"
               || Math.abs(persisted.amountUsdt - submitted.walletDebitUsdt) > 0.000001
               || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
             throw new Error("E3_TRADEIN_READBACK_MISMATCH");
@@ -1516,6 +1580,7 @@ async function submitRemoteOrder(): Promise<void> {
           || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
           || created.paymentStatus.toUpperCase() !== "PENDING"
           || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"))
+        || typeof persisted.amountUsdt !== "number"
         || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
         || Math.abs(persisted.discountUsdt - created.discountUsdt) > 0.000001) {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
@@ -1603,6 +1668,7 @@ function reassertTradeinContext() {
 }
 
 onShow(() => {
+  if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
   if (checkoutRouteInitialized && !activeCheckoutLoad) void resumeServerOrder();
   reassertTradeinContext();
@@ -1623,8 +1689,10 @@ onShow(() => {
   restoreReceiptRecovery();
 });
 onHide(() => {
+  if(promotionRoute.value){promotionCheckout.value?.hide();return;}
   pageVisible = false;
   invalidateCheckoutRoute();
+  if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。
   if (activeSession.value && pending.viewingId === activeSession.value.id) pending.setViewing(null);
 });
@@ -1800,7 +1868,7 @@ watch(step, async (s) => {
       // (审计 R2 P0 族:此前只验「过期」不验「还在不在」,同一张票被两处各结算一次、取消后仍能扣)。
       // 余额预检排在消费发票之前:钱不够就别先把付款指令销掉(consume 不可逆)。
       if (app.user.usdtBalance < chargeTotal) {
-        toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+        toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(chargeTotal) }));
         step.value = "select-payment";
         return;
       }
@@ -1947,14 +2015,14 @@ watch(step, async (s) => {
         }
         // 只报**真的到账**的那几项 —— 报了没到账的钱等于二次欺骗。
         const earnParts: string[] = [];
-        if (usdtCredited) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
-        if (nexCredited) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
+        if (usdtCredited) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: formatAmount(trialRemainderUSD) }));
+        if (nexCredited) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: formatAmount(shadowNEXNow) }));
         if (earnParts.length) toast.success(fmt(t.value.store.coTrialEarnToast, { parts: earnParts.join(" · ") }));
       }
       // 券已在扣款前核销(先占后花,见上);到这里订单已落盘,核销就是终态。
       // 账单 memo 走 i18n(用户账单页直接渲染,禁硬编码英文)。
       const memoParts: string[] = [];
-      if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
+      if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: formatAmount(discount) }));
       // 设备名经 device-copy 解析(存档只认 kind,显示随语言切换);试用促销/抵扣两行为 FEAT-TRIAL02 转化单分项。
       if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: deviceName(t.value, ti.device), amount: tradeInCredit }));
       if (promo > 0) memoParts.push(fmt(t.value.store.coBillTrialDiscountPart, { amount: promo.toFixed(2) }));

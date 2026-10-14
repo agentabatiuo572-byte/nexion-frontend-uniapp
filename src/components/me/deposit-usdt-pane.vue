@@ -42,7 +42,7 @@
         >
           <text :style="chipLabelStyle(nw.id)">{{ nw.label }}</text>
           <text v-if="nw.id === 'usdt-trc20'" :style="chipTagStyle">{{ t.topupChrome.netRecommended }}</text>
-          <text v-else :style="chipSubStyle" style="white-space: nowrap">{{ fmt(t.topupChrome.netFee, { fee: fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id] }) }}</text>
+          <text v-else :style="chipSubStyle" style="white-space: nowrap">{{ fmt(t.topupChrome.netFee, { fee: formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
         </view>
       </view>
 
@@ -68,8 +68,8 @@
         </view>
         <!-- 费用/最低额/确认数 — deposits-core 常量单源派生 -->
         <view class="flex items-center justify-between" style="margin-top: 12px; gap: 8px">
-          <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text :style="metaValStyle">${{ minDeposit }}</text></text></view>
-          <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ feeUsdt }} USDT</text></text></view>
+          <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text :style="metaValStyle">${{ formatAmount(minDeposit) }}</text></text></view>
+          <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ formatAmount(feeUsdt) }} USDT</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ confirmations }}</text></text></view>
         </view>
       </view>
@@ -82,8 +82,8 @@
         <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; max-width: 260px">{{ t.topupChrome.allNetworksPaused }}</text></view>
       </view>
 
-      <!-- ── 常驻警示:专属地址恒定 + 错网络不可找回(规格 ⑦ 语义)── -->
-      <view class="flex" :style="warnlineStyle">
+      <!-- ── 可用专属地址警示:地址恒定 + 错网络不可找回(规格 ⑦ 语义)── -->
+      <view v-if="activeNet && address" class="flex" :style="warnlineStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.topupChrome.depositAddrNote }}</text></view>
       </view>
@@ -104,14 +104,22 @@
       <view style="margin-top: 20px">
         <view><text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.topupChrome.recentDeposits }}</text></view>
 
-        <view v-if="sortedRecords.length === 0" class="flex flex-col items-center" style="padding: 26px 0 18px">
+        <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+        <view v-else-if="bankHistoryStatus === 'error'" style="margin-top: 8px">
+          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
+          <view class="nx-dep-history-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBankHistory">
+            <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text>
+          </view>
+        </view>
+
+        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready'" class="flex flex-col items-center" style="padding: 26px 0 18px">
           <view class="grid place-items-center" :style="stateIconBoxStyle">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
           </view>
           <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.noDepositsYet }}</text></view>
         </view>
 
-        <view v-else style="margin-top: 4px">
+        <view v-else-if="sortedRecords.length > 0" style="margin-top: 4px">
           <view
             v-for="r in sortedRecords"
             :key="r.depositId"
@@ -145,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
@@ -169,13 +178,16 @@ const t = useT();
 const dep = useDeposits();
 const app = useApp();
 const auth = useAuth();
-const remoteSessionReady = computed(() => binarySessionReady({
-  remote: fundsServerEnabled,
-  authenticated: auth.isAuthenticated,
-  accountId: auth.accountId,
-  appAccountKey: app.accountKey,
-  sessionUserId: sessionVault.read()?.user.userId ?? null,
-}));
+const remoteSessionReady = computed(() => {
+  void app.accountBindingEpoch;
+  return binarySessionReady({
+    remote: fundsServerEnabled,
+    authenticated: auth.isAuthenticated,
+    accountId: auth.accountId,
+    appAccountKey: app.accountKey,
+    sessionUserId: sessionVault.read()?.user.userId ?? null,
+  });
+});
 
 // ── 网络 chip(标签为链名专有名词,非文案)──
 const NETWORKS: { id: ChainDepositChannel; label: string }[] = fundsServerEnabled ? [
@@ -212,11 +224,16 @@ const copied = ref(false);
 const minDeposit = ref(MIN_DEPOSIT_USDT);
 const feeUsdt = ref(0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
+function refreshBankHistory(): void {
+  if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
+      && dep.remoteReceiptInitialStatus !== "loading") void dep.refreshRemoteVietQrDeposits();
+}
 function load(background = false) {
   if (fundsServerEnabled && !remoteSessionReady.value) return;
   if (!background) phase.value = "loading";
   if (loadTimer) clearTimeout(loadTimer);
   if (fundsServerEnabled) {
+    if (!background) refreshBankHistory();
     const generation = ++loadGeneration;
     const account = app.accountKey;
     const bindingEpoch = app.accountBindingEpoch;
@@ -348,9 +365,20 @@ function goSupport() {
   navTo("/pages/me/support-tickets?mode=create&cat=deposit");
 }
 
-// ── 最近入金(纯展示;状态由 store mock 引擎推进,server-canonical)──
-const sortedRecords = computed(() => [...(fundsServerEnabled ? serverRecords.value : dep.records)]
-  .sort((a, b) => b.createdAt - a.createdAt));
+// ── 最近入金(复用本人银行记录与初始读取状态;收据翻页不改变历史完整性)──
+const bankHistoryStatus = computed(() => {
+  if (!fundsServerEnabled) return "ready";
+  const status = dep.remoteReceiptInitialStatus;
+  return remoteSessionReady.value && dep.currentAccountKey() === app.accountKey ? status : "idle";
+});
+const sortedRecords = computed(() => {
+  if (!fundsServerEnabled) return [...dep.records].sort((a, b) => b.createdAt - a.createdAt);
+  if (!remoteSessionReady.value) return [];
+  const bankRecords = dep.records;
+  return [...serverRecords.value, ...(dep.currentAccountKey() === app.accountKey
+    ? bankRecords.filter(row => row.channel === "bank-vietqr") : [])]
+    .sort((a, b) => b.createdAt - a.createdAt);
+});
 /** 法币轨(VietQR / 银行卡)入账后与链上记录同列此区,标题按通道分流。
  *  全键 Record 而非三元表达式:新增通道时 TS 强制补齐,不会静默落进 USDT 文案 ——
  *  卡轨接入本列表时正是先踩了这个(旧写法「非银行轨即 USDT」会把卡入金标成 USDT 充值)。 */
@@ -370,7 +398,7 @@ function isRiskHold(r: PaneDepositRecord): boolean {
 }
 function rowAmount(r: PaneDepositRecord): string {
   const value = isRiskHold(r) || r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt;
-  return fundsServerEnabled ? value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "") : value.toFixed(2);
+  return formatAmount(value);
 }
 function netShort(c: DepositChannel): string {
   return CHANNEL_SHORT[c];

@@ -1,3 +1,4 @@
+import { formatAmount } from "@/lib/amount-display";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { computed } from "vue";
@@ -6,6 +7,7 @@ import type { TrialAuthorityState } from "@/api/trial-api";
 import hero from "@/components/trial-hero-banner.vue?raw";
 import banner from "@/components/trial-promo-banner.vue?raw";
 import ghost from "@/components/trial-ghost-slot.vue?raw";
+import trialPage from "@/pages/me/trial.vue?raw";
 import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
@@ -47,7 +49,7 @@ function actual(source: string, names: string[], deps: Record<string, unknown>) 
     statements.map(s => s.getText(ast)).join("\n") + `\nreturn {${names.join(",")}}`,
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } },
   ).outputText;
-  return new Function(...Object.keys(deps), body)(...Object.values(deps));
+  return new Function("formatAmount", ...Object.keys(deps), body)(formatAmount, ...Object.values(deps));
 }
 
 function authority(canStart = true): TrialAuthorityState {
@@ -81,8 +83,8 @@ it.each([en, zh, vietnamese])("active trial savings retain the monetary unit of 
   const { discountText } = actual(ghost, ["discount", "discountText"], {
     computed, trialCfg, computeDiscountedPrice, t: computed(() => copy), fmt,
   });
-  expect(discountText.value).toBe(fmt(copy.trial.ghostDiscount, { amount: "$50" }));
-  expect(discountText.value).toContain("$50");
+  expect(discountText.value).toBe(fmt(copy.trial.ghostDiscount, { amount: "$50.00" }));
+  expect(discountText.value).toContain("$50.00");
 });
 
 describe("earn hero quotes the creditable trial offset, not the raw accrual", () => {
@@ -117,7 +119,7 @@ describe("earn hero quotes the creditable trial offset, not the raw accrual", ()
       t: computed(() => ({ trial: { heroCreditCapNote: "最高抵 ${cap}" } })),
       fmt,
     }).creditBasisText;
-    expect(cappedBasis.value).toBe("最高抵 $50");
+    expect(cappedBasis.value).toBe("最高抵 $50.00");
 
     // Below the cap the total IS days × rate, so the rate line stays the basis.
     const under = { trialDays: 3, shadowDailyUSD: 1, trialOffsetCapUSD: 50 };
@@ -171,5 +173,28 @@ describe("trial config authority feeds the shared capped-offset helper", () => {
     cfg.applyAuthoritative(authority().config);
     expect(cfg.config.trialOffsetCapUSD).toBe(50);
     expect(computeTrialOffset(cfg.config, cfg.config.trialDays * cfg.config.shadowDailyUSD).offsetUSD).toBe(50);
+  });
+
+  it("withholds an unconfirmed duration and retains a confirmed duration during polling", async () => {
+    const freeTrial = useFreeTrial();
+    const trialCfg = useTrialConfig();
+    const { idleBody } = actual(trialPage, ["idleBody"], {
+      computed, freeTrial, cfg: computed(() => trialCfg.config), w: computed(() => zh.trial), fmt,
+    });
+    expect(idleBody.value).toBe("");
+    remote.state.mockRejectedValueOnce(new Error("unavailable"));
+    await freeTrial.refreshRemote();
+    expect(idleBody.value).toBe("");
+    remote.state.mockResolvedValueOnce({ ...authority(), config: { ...authority().config, trialDays: "7" } });
+    await freeTrial.refreshRemote();
+    const confirmed = fmt(zh.trial.idleBody, { n: "7" });
+    expect(idleBody.value).toBe(confirmed);
+    freeTrial.authorityStatus = "loading";
+    expect(idleBody.value).toBe(confirmed);
+    remote.state.mockRejectedValueOnce(new Error("unavailable"));
+    await freeTrial.refreshRemote();
+    expect(idleBody.value).toBe("");
+    freeTrial.authorityStatus = "mock";
+    expect(idleBody.value).toBe(confirmed);
   });
 });

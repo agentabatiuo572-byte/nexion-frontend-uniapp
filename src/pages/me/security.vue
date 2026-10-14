@@ -55,10 +55,10 @@
           <text v-else-if="err && pwdErrorField === PWD_FIELD_CONFIRM" id="security-pwd-error-confirm" class="block" :style="errStyle" role="alert">{{ err }}</text>
           <text v-else-if="err" class="block" :style="errStyle" role="alert">{{ err }}</text>
           <view class="flex" style="gap: 8px; margin-top: 4px">
-            <view class="flex-1 flex items-center justify-center active:opacity-70" :style="pwdCancelStyle" role="button" tabindex="0" @click="cancelPwd"  @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
+            <view class="flex-1 flex items-center justify-center" :class="securityBusy ? 'opacity-50' : 'active:opacity-70'" :style="pwdCancelStyle" role="button" :tabindex="securityBusy ? -1 : 0" :aria-disabled="securityBusy" @click="cancelPwd"  @keydown.enter.prevent="cancelPwd" @keydown.space.prevent="cancelPwd">
               <text :style="pwdCancelLabelStyle">{{ t.ui.cancel }}</text>
             </view>
-            <view class="flex-1 flex items-center justify-center active:opacity-80" :style="pwdSaveStyle" role="button" tabindex="0" @click="submitPasswordChange"  @keydown.enter.prevent="submitPasswordChange" @keydown.space.prevent="submitPasswordChange">
+            <view class="flex-1 flex items-center justify-center" :class="securityBusy ? 'opacity-50' : 'active:opacity-80'" :style="pwdSaveStyle" role="button" :tabindex="securityBusy ? -1 : 0" :aria-disabled="securityBusy" @click="submitPasswordChange"  @keydown.enter.prevent="submitPasswordChange" @keydown.space.prevent="submitPasswordChange">
               <text :style="pwdSaveLabelStyle">{{ t.ui.save }}</text>
             </view>
           </view>
@@ -114,7 +114,7 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
-        <view v-if="hasOtherSessions" class="flex items-center justify-center active:opacity-70" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll"  @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
+        <view v-if="hasOtherSessions" class="flex items-center justify-center active:scale-[0.98] transition-transform" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.revokeAll" @click="handleRevokeAll"  @keydown.enter.prevent="handleRevokeAll" @keydown.space.prevent="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
       </view>
@@ -138,7 +138,7 @@
         <view v-if="remoteApiEnabled && !deletionPending" :style="pwdFormStyle">
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </view>
-        <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
+        <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:scale-[0.98] transition-transform"
           :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
           @click="handleCancelAccountDeletion"  @keydown.enter.prevent="handleCancelAccountDeletion" @keydown.space.prevent="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
@@ -150,6 +150,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -464,6 +465,8 @@ function relativeWhen(ms: number): string {
 }
 
 function cancelPwd() {
+  // Clearing the form cannot cancel a pending command or its authoritative readback.
+  if (securityBusy.value) return;
   editingPwd.value = false;
   err.value = "";
   pwdErrorField.value = "";
@@ -752,9 +755,9 @@ async function handleDeleteAccount() {
       .reduce((s, p) => s + p.amountUSDT, 0);
     const forfeitLines = [
       t.value.security.deleteAccountForfeitLead,
-      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `${formatAmount(app.user.usdtBalance)}` }),
       ...(forfeitPrincipal > 0
-        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
+        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `${formatAmount(forfeitPrincipal)}` })]
         : []),
     ];
     const ok = await uiConfirm({

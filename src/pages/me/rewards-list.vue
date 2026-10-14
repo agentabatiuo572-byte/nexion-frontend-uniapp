@@ -1,5 +1,5 @@
 <!--
-  My Rewards L2 (分类记录页) — /me/rewards/list?cat=voucher|usdt|nex, reached
+  My Rewards L2 (分类记录页) — /me/rewards/list?cat=voucher|usdt|nex|promotion, reached
   from the L1 category summary (pages/me/rewards.vue).
 
   cat=voucher → claimed-unused voucher cards ("Use" routes per scope: single
@@ -20,8 +20,10 @@
     <view style="color: var(--v5-ink); padding-bottom: 24px">
       <SubPageHeader back="/pages/me/rewards" :title="pageTitle" />
 
+      <PromotionRewardList v-if="cat === 'promotion'" :activity-id="activityId" :order-no="orderNo" />
+
       <!-- ── Vouchers (ticket-style cards: value stub + perforation + body) ── -->
-      <template v-if="cat === 'voucher'">
+      <template v-else-if="cat === 'voucher'">
         <view v-if="voucherInitialLoading" :style="loadingStyle"><text>{{ t.home.networkStatUpdating }}</text></view>
         <template v-else>
           <view v-if="voucherReadError" class="flex items-center justify-between" :style="remoteErrorStyle">
@@ -108,7 +110,7 @@
               <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
             </view>
             <view class="text-right shrink-0" style="margin-left: 8px">
-              <text class="block tabular-nums" :style="rewardAmountStyle">{{ b.amount >= 0 ? '+' : '' }}{{ formatHowNumber(b.amount, locale.code) }} {{ b.symbol }}</text>
+              <text class="block tabular-nums" :style="rewardAmountStyle">{{ (b.amountExact === undefined ? Math.sign(b.amount) === -1 : b.amountExact.startsWith('-')) ? '' : '+' }}{{ formatAmount(b.amountExact ?? b.amount) }} {{ b.symbol }}</text>
               <text class="block" :style="rowDateStyle">{{ rewardStatusLabel(b.status) }}</text>
               <text class="block" :style="rowDateStyle">{{ shortDate(b.ts) }}</text>
             </view>
@@ -135,15 +137,16 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch, watchEffect, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import PromotionRewardList from "@/components/promotion/promotion-reward-list.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
-import { formatHowNumber } from "@/lib/rank-how-content";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
@@ -186,12 +189,19 @@ const remoteSessionReady = computed(() => binarySessionReady({
 }));
 
 const cat = ref<RewardsCat>("voucher");
+const activityId = ref("");
+const orderNo = ref("");
 onLoad((options) => {
-  cat.value = rewardsListCategory(options, takeNavigationQuery("/pages/me/rewards-list"));
+  const query = takeNavigationQuery("/pages/me/rewards-list");
+  const params = new URLSearchParams(query);
+  cat.value = rewardsListCategory(options, query);
+  activityId.value = String(options?.activityId ?? params.get("activityId") ?? "").trim();
+  orderNo.value = String(options?.orderNo ?? params.get("orderNo") ?? "").trim();
 });
 
 const pageTitle = computed(() =>
-  cat.value === "usdt" ? t.value.rewards.catUsdt : cat.value === "nex" ? t.value.rewards.catNex : t.value.rewards.catVouchers,
+  cat.value === "promotion" ? t.value.promotion.rewardCategory
+    : cat.value === "usdt" ? t.value.rewards.catUsdt : cat.value === "nex" ? t.value.rewards.catNex : t.value.rewards.catVouchers,
 );
 
 // ── vouchers ──
@@ -227,11 +237,12 @@ const appendError = computed(() => fundsServerEnabled && activePager.value.statu
 const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
 
 async function refreshRecords() {
-  if (!fundsServerEnabled || cat.value === "voucher") return;
+  if (!fundsServerEnabled || (cat.value !== "usdt" && cat.value !== "nex")) return;
   if (!remoteSessionReady.value) return;
   try { await activePager.value.refresh(); } catch { /* the pager retains rows and exposes the error */ }
 }
 async function loadMoreRecords() {
+  if (cat.value !== "usdt" && cat.value !== "nex") return;
   if (fundsServerEnabled) {
     try { await activePager.value.loadMore(); } catch { /* keep loaded rows visible for retry */ }
     return;
@@ -250,7 +261,7 @@ watch(remoteSessionReady, (ready, wasReady) => {
   if (cat.value === "voucher") retryVouchers();
 });
 useManualScrollLoadMore(scrollAnchor, {
-  enabled: () => fundsServerEnabled && cat.value !== "voucher" && !activePager.value.error,
+  enabled: () => fundsServerEnabled && (cat.value === "usdt" || cat.value === "nex") && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,
   loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
   loadMore: loadMoreRecords,
@@ -260,7 +271,7 @@ useManualScrollLoadMore(scrollAnchor, {
 // receipts.vue: watchEffect re-checks on every dependency change.
 const { elRef: loadMoreSentinel, inView: loadMoreInView } = useScrollGrowProgress({ threshold: 0 });
 watchEffect(() => {
-  if (!fundsServerEnabled && cat.value !== "voucher" && loadMoreInView.value && hasMore.value) {
+  if (!fundsServerEnabled && (cat.value === "usdt" || cat.value === "nex") && loadMoreInView.value && hasMore.value) {
     visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);
   }
 });
@@ -279,7 +290,7 @@ function shortDate(ms: number): string {
 // Ticket stub — the denomination alone, big ("$50" / "8%"); the word ("立减"/
 // "折扣"/"OFF") drops to the small label line below it.
 function stubValue(v: VoucherDef): string {
-  return v.type === "fixed" ? `$${v.amountUSD ?? 0}` : `${v.percent ?? 0}%`;
+  return v.type === "fixed" ? `$${formatAmount(v.amountUSD ?? 0)}` : `${v.percent ?? 0}%`;
 }
 function stubLabel(v: VoucherDef): string {
   return v.type === "fixed" ? t.value.rewards.stubFixed : t.value.rewards.stubPercent;

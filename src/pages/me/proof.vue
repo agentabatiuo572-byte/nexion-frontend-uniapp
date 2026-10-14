@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onUnload } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
@@ -195,7 +196,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
-import { buildShareLink } from "@/lib/share";
+import { buildShareLink, copyText as copyToClipboard } from "@/lib/share";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank } from "@/store/v-rank";
@@ -268,7 +269,7 @@ async function refreshRemoteProof() {
   }
 }
 
-watch(() => String(app.accountKey), () => {
+watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
   if (!remoteApiEnabled || !remoteMounted) return;
   remoteRequest += 1;
   remoteSnapshot.value = null;
@@ -291,7 +292,7 @@ onShow(() => {
 });
 
 const earningsTotal = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.earningsTotalUsdt ?? null : app.earnings.total);
-const earningsTotalText = computed(() => earningsTotal.value === null ? "—" : earningsTotal.value.toFixed(2));
+const earningsTotalText = computed(() => earningsTotal.value === null ? "—" : formatAmount(earningsTotal.value));
 const onlineDevices = computed(
   () => remoteApiEnabled ? remoteSnapshot.value?.onlineDevices ?? null
     : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
@@ -308,8 +309,7 @@ const streakFacts = computed(() => proofStreakFacts(
 const streak = computed<number | null>(() => streakFacts.value.current);
 const longestStreak = computed<number | null>(() => streakFacts.value.longest);
 const longestOrCurrent = computed<number | null>(() => streakFacts.value.display);
-// A streak card is a public artifact: an unavailable server fact must read as
-// unavailable rather than rendering the unit alone ("d" with no number).
+// Missing streaks use the same placeholder on screen and in the shared poster.
 const streakHeroValue = computed(() => longestOrCurrent.value === null
   ? t.value.proof.valueUnavailable
   : String(longestOrCurrent.value));
@@ -389,9 +389,10 @@ async function downloadPng() {
     exportingPoster.value = false;
   }
 }
-function copyText(data: string, title: string, desc = "") {
-  uni.setClipboardData({ data, showToast: false, fail: () => {} });
-  toast.success(title, desc);
+async function copyText(data: string, title: string, desc = "") {
+  const copied = await copyToClipboard(data).catch(() => false);
+  if (copied) toast.success(title, desc);
+  else toast.info(t.value.share.copyFailed);
 }
 
 // ── QR payload is the exact referral URL shown beside it. ──

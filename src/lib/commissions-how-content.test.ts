@@ -32,7 +32,7 @@ describe("published direct and independent reward explanations", () => {
     facts.document.blocks.find(b => b.id === "network")!.body = "{directPurchaseRules} {directDeviceRules}";
     expect(buildCommissionsHowContent(facts, locale).incomplete).toBe(true);
   });
-  it.each([["en", "12.3456%", "6,789"], ["zh", "12.3456%", "6,789"], ["vi", "12,3456%", "6.789"]])("renders configured direct splits and preserves public limits in %s", (locale, rate, cap) => {
+  it.each([["en", "12.3456%", "6789.00"], ["zh", "12.3456%", "6789.00"], ["vi", "12,3456%", "6789.00"]])("renders configured direct splits and preserves public limits in %s", (locale, rate, cap) => {
     const view = buildCommissionsHowContent(snapshot(), locale);
     expect(view.incomplete).toBe(false);
     expect(view.section("network").body).toContain(rate); expect(view.section("network").body).toContain("60%");
@@ -50,10 +50,10 @@ describe("published direct and independent reward explanations", () => {
   });
   it("handles disabled, unconfigured and absent-price rules without numeric income promises", () => {
     const facts = snapshot(); facts.directPolicy.configured = false;
-    let view = buildCommissionsHowContent(facts, "en"); expect(view.section("network").body).toContain("Not configured");
+    let view = buildCommissionsHowContent(facts, "en"); expect(view.section("network").body).toContain("Temporarily unavailable");
     facts.directPolicy.configured = true; facts.directPolicy.purchase.enabled = false; facts.directPolicy.nexUsdtPrice = null;
     view = buildCommissionsHowContent(facts, "en"); expect(view.section("network").body).toContain("paused");
-    expect(view.section("network").body).toContain("NEX price unavailable"); expect(view.amounts.network).toBe("Not configured");
+    expect(view.section("network").body).toContain("NEX price unavailable"); expect(view.amounts.network).toBe("Temporarily unavailable");
   });
   it("does not call configuration examples actual earnings or replace missing tokens", () => {
     let view = buildCommissionsHowContent(snapshot(), "en");
@@ -70,7 +70,7 @@ describe("published direct and independent reward explanations", () => {
       const {buildCommissionsHowContent:build} = await import(${JSON.stringify(moduleUrl)});
       const view=build(${JSON.stringify(snapshot())},"vi");
       assert.equal(view.incomplete,false); assert.ok(view.section("network").body.includes("12,3456%"));
-      assert.ok(view.section("binary").body.includes("6.789 USDT"));
+      assert.ok(view.section("binary").body.includes("6789.00 USDT"));
       assert.ok(!view.section("binary").body.includes("876,123456"));`;
     const process = (globalThis as unknown as { process: { execPath: string } }).process;
     const result = spawnSync(process.execPath, ["--experimental-strip-types", "--import", loader, "--input-type=module", "--eval", code], { encoding: "utf8" });
