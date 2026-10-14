@@ -573,7 +573,10 @@ async function activateHumanPage() {
   let originalPending = false;
   if (type && savedCreate && !savedCreate.settled && remoteApiEnabled) {
     try { originalPending = await convStore.hasPendingHumanCreate(type, savedCreate.text, savedCreate.attachmentId); }
-    catch { return; }
+    catch {
+      if (current()) toast.error(t.value.conversations.image.sendBlocked, "");
+      return;
+    }
     if (!current()) return;
   }
   if (type && !id && remoteApiEnabled && !originalPending) {
@@ -750,9 +753,7 @@ const headerName = computed(() => {
 
 function displayAgentName(name: string): string {
   const normalized = name.trim();
-  return normalized && normalized.toLowerCase() !== "unassigned"
-    ? normalized
-    : t.value.conversations.unassignedAgent;
+  return isWaitingForAgent(normalized) ? t.value.conversations.unassignedAgent : normalized;
 }
 const agentTyping = computed(() =>
   isAi.value ? nova.typing : (cid.value ? convStore.typingIds[cid.value] === true : false),
@@ -1271,7 +1272,7 @@ async function onSend(text: string, restore?: () => void) {
     try { originalPending = await convStore.hasPendingHumanCreate(type, text, imageDraft.value?.state === "ready" ? imageDraft.value.attachmentId : undefined); }
     catch {
       if (binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated || !novaPageVisible || startType.value !== type || cid.value) return;
-      restore?.(); return;
+      restore?.(); toast.error(t.value.conversations.image.sendBlocked, ""); return;
     }
     if (binding !== app.accountBindingEpoch || scope !== convStore.scopeInvalidated || !novaPageVisible || startType.value !== type || cid.value) return;
     if (!originalPending && convStore.categoryAvailabilityStatus !== "ready") {
