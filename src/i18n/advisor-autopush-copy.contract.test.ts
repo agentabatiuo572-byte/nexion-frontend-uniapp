@@ -10,10 +10,10 @@ describe("advisor empty-state delivery claims", () => {
     expect(vi.conversations.listEmptyAdvisor).not.toContain("sẽ chủ động liên hệ");
 
     expect(en.conversations.listEmptyAdvisor).toContain("send a question");
-    expect(en.conversations.listEmptyAdvisor).toContain("not been assigned an advisor");
+    expect(en.conversations.listEmptyAdvisor).toContain("before being assigned dedicated support");
     expect(zh.conversations.listEmptyAdvisor).toContain("发送咨询");
-    expect(zh.conversations.listEmptyAdvisor).toContain("未分配专属顾问也可以发送咨询");
+    expect(zh.conversations.listEmptyAdvisor).toContain("未分配专属客服也可以发送咨询");
     expect(vi.conversations.listEmptyAdvisor).toContain("gửi câu hỏi");
-    expect(vi.conversations.listEmptyAdvisor).toContain("chưa được chỉ định cố vấn");
+    expect(vi.conversations.listEmptyAdvisor).toContain("chưa được chỉ định hỗ trợ riêng");
   });
 });
