@@ -98,14 +98,17 @@ export async function ensureServer({ root, environment = "development", reuseUrl
     { cwd: root, env: { ...process.env }, shell: false, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] },
   );
   if (process.platform !== "win32") ownedProcessGroups.add(child);
-  let out = "";
+  // Pipe events can arrive in different orders. Keep each stream's tail so a
+  // burst on stderr cannot erase the final stdout diagnostics (or vice versa).
+  let stdoutTail = "", stderrTail = "";
+  const outputTail = () => `${stdoutTail}\n${stderrTail}`;
   let stopping = false;
-  child.stdout.on("data", (c) => { out = (out + c).slice(-12_000); });
-  child.stderr.on("data", (c) => { out = (out + c).slice(-12_000); });
+  child.stdout.on("data", (c) => { stdoutTail = (stdoutTail + c).slice(-6_000); });
+  child.stderr.on("data", (c) => { stderrTail = (stderrTail + c).slice(-6_000); });
   child.once("close", (code, signal) => {
-    if (!stopping) log(`owned ${environment} server exited ${baseUrl} pid=${child.pid} code=${code} signal=${signal || "none"}\n${out}`);
+    if (!stopping) log(`owned ${environment} server exited ${baseUrl} pid=${child.pid} code=${code} signal=${signal || "none"}\n${outputTail()}`);
   });
-  await waitForServer(`${baseUrl}/?nx_device=off`, child, () => out, timeoutMs);
+  await waitForServer(`${baseUrl}/?nx_device=off`, child, outputTail, timeoutMs);
   const id = await identify(baseUrl, { root, environment });
   if (!id.ok) { stopTree(child); throw new Error(`自起的 server 身份核对失败:${id.why}`); }
   log(`起 ${environment} server ${baseUrl}(本树隔离) pid=${child.pid}`);
