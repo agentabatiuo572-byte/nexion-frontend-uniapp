@@ -279,7 +279,7 @@ export function createRepurchaseApi(client: ApiClient, mode: ApiEnvironment = "p
       if (!Number.isFinite(amountUsdt) || amountUsdt <= 0) return invalid();
       const row = record(await client.request({
         method: "GET", authenticated: true,
-        path: `/api/repurchase/orders/open-status?amountUsdt=${encodeURIComponent(amountUsdt.toFixed(6))}`,
+        path: `/api/repurchase/orders/open-status?amountUsdt=${encodeURIComponent(String(amountUsdt))}`,
         idempotencyKey: requireKey(idempotencyKey),
       }));
       if (!row || row.repurchaseCommandProtocol !== 1 || mode !== "prod"
