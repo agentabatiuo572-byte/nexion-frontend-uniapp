@@ -53,11 +53,12 @@ describe("store detail eligibility never claims a met result without facts", () 
     expect(new Set(values).size).toBe(3);
   });
 
-  it("uses only a confirmed activated phone for personal comparison", () => {
-    expect(detail).toContain("app.remoteFleetHasSnapshot ? activePhoneDailyRate(app.visibleDevices) : 0");
-    expect(detail).toContain("storeYieldMultiplier(product.value.dailyEarn, phoneDailyEarnValue.value)");
-    expect(detail).toContain('v-if="!isShare && phoneDailyEarnValue > 0"');
-    expect(detail).not.toContain("earnConfig.phoneTiers.value?.tiers");
+  it("keeps product return estimates without phone comparisons in H5 Lite", () => {
+    expect(detail).not.toContain("detYourPhone");
+    expect(detail).not.toContain("detVsPhone");
+    expect(detail).not.toContain("speedup");
+    expect(detail).toContain("{{ dailyYieldText }}");
+    expect(detail).toContain("{{ monthlyYieldText }}");
   });
 
   it("shows server policy facts without exposing raw backend codes", () => {

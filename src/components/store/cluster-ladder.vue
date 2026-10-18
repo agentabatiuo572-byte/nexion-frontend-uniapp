@@ -1,7 +1,7 @@
 <!--
   ClusterLadder — daily USD yield ladder (ported from store/page.tsx
-  ClusterLadderV5). Phone → Box S1 → Box Pro → Rack P1, drawn bottom-up
-  (column-reverse) with the user "←you" marker on Phone. Each row: label · bar
+  ClusterLadderV5). Box S1 → Box Pro → Rack P1, drawn bottom-up
+  (column-reverse) with the user "←you" marker on owned hardware. Each row: label · bar
   (width = relative yield) · $/d. Drives the "climb the ladder" upgrade intent.
 -->
 <template>
@@ -90,7 +90,7 @@ const tiers = computed<Tier[]>(() => {
     rows.splice(props.owned.kind === "stellarbox-pro-v2" ? 4 : rows.length, 0, ownedRow);
   }
   const maximum = Math.max(0, ...rows.map((row) => row.amount));
-  return rows.map((row) => ({ ...row, width: maximum > 0 && row.amount > 0 ? Math.max(1, row.amount / maximum * 100) : 0 }));
+  return rows.filter((row) => row.id !== "phone").map((row) => ({ ...row, width: maximum > 0 && row.amount > 0 ? Math.max(1, row.amount / maximum * 100) : 0 }));
 });
 
 const frameStyle: CSSProperties = {
