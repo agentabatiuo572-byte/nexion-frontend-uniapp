@@ -206,7 +206,7 @@ function retrySearchSources() {
 const devices = computed(() => !remoteApiEnabled
   || app.remoteFleetStatus === "ready"
   || app.remoteFleetHasSnapshot
-  ? app.visibleDevices
+  ? app.visibleDevices.filter((d) => d.kind !== "phone")
   : []);
 const members = computed(() => !remoteApiEnabled || network.remoteStatus === "ready" ? network.members : []);
 const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS

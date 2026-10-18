@@ -130,7 +130,7 @@ function preserveDeviceDetailQueryInH5() {
 }
 
 const device = computed(
-  () => app.visibleDevices.find((item) => item.id === id.value && item.activatedAt !== null) ?? null,
+  () => app.visibleDevices.find((item) => item.id === id.value && item.kind !== "phone" && item.activatedAt !== null) ?? null,
 );
 const hasDeviceId = computed(() => id.value.trim().length > 0);
 const waitingForFleet = computed(() => remoteApiEnabled && hasDeviceId.value

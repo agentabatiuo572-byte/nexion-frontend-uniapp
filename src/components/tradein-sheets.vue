@@ -145,15 +145,16 @@
       <template v-else-if="state.kind === 'replace' && replaceView">
         <view class="tis-head">
           <text class="tis-title">{{ t.tradein.replaceTitle }}</text>
-          <text class="tis-subtitle">{{ replaceView.warning }}</text>
+          <text v-if="canReplaceSource" class="tis-subtitle">{{ replaceView.warning }}</text>
         </view>
 
-        <view class="tis-card tis-card-mb4">
+        <view v-if="canReplaceSource" class="tis-card tis-card-mb4">
           <text class="tis-card-cap">{{ t.tradein.replaceLowestDeviceLabel }}</text>
           <text class="tis-card-line">{{ replaceView.lowestText }}</text>
         </view>
 
         <view
+          v-if="canReplaceSource"
           class="tis-cta"
           :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
           role="button"
@@ -642,6 +643,13 @@ function onConfirmTradein() {
 
 // ───────────────────────── 3. replace (Path B) ─────────────────────────
 
+const canReplaceSource = computed(() => {
+  const s = state.value;
+  if (s.kind !== "replace" || (remoteApiEnabled && !app.remoteFleetHasSnapshot)) return false;
+  const source = app.devices.find((d) => d.id === s.oldDeviceId);
+  return !!source && source.kind !== "phone";
+});
+
 const replaceView = computed(() => {
   const s = state.value;
   if (s.kind !== "replace") return null;
@@ -783,6 +791,7 @@ async function submitCanonicalCapacityReplacement(
 function onReplace() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (!canReplaceSource.value) return;
   if (replaceView.value?.insufficient) return;
   if (remoteApiEnabled) {
     if (!s.canonicalCapacityQuote) {
@@ -1025,7 +1034,7 @@ function onForce() {
   const s = state.value;
   if (s.kind !== "block" || s.origin !== "replace" || confirming.value) return;
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId);
-  if (!lowest) {
+  if (!lowest || lowest.kind === "phone") {
     hide();
     return;
   }

@@ -85,11 +85,13 @@
 
     <!-- Detail body (expanded; accordion) -->
     <view v-if="expanded" class="nx-device-card__details">
+      <!-- #ifdef APP-PLUS -->
       <view v-if="!phoneLocalReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
         <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ phoneActivationGuidance.title }}</text>
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
         <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
       </view>
+      <!-- #endif -->
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayGpu }}<text v-if="displayLocation"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ displayLocation }}</text></text>
@@ -493,7 +495,7 @@ const idleGated = computed(
 );
 
 const statusLabel = computed(() => {
-  if (!phoneLocalReady.value) return phoneActivationGuidance.value.title;
+  if (!phoneLocalReady.value && nativePhoneAvailable) return phoneActivationGuidance.value.title;
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (task.value?.status === "PAUSED") return t.value.earn.phoneTaskPaused;
@@ -513,7 +515,7 @@ const statusLabel = computed(() => {
   return t.value.earn.online;
 });
 const statusColor = computed(() => {
-  if (!phoneLocalReady.value) return "var(--v5-warning-ink)";
+  if (!phoneLocalReady.value && nativePhoneAvailable) return "var(--v5-warning-ink)";
   if (props.device.pendingDeactivate) return "var(--v5-warning)";
   if (reconnecting.value) return "var(--v5-warning)";
   if (task.value?.status === "PAUSED") return "var(--v5-warning-ink)";

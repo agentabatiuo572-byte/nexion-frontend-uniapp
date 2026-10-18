@@ -4,7 +4,7 @@ import { renderToString } from '@vue/server-renderer';
 import { compile } from '@vue/compiler-dom';
 import { parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { expect, it, vi as mock } from 'vitest';
 import source from './tradein-sheets.vue?raw';
 import { fmt } from '@/i18n/format';
 import { formatAmount } from '@/lib/amount-display';
@@ -27,6 +27,28 @@ const code = ts.transpileModule(selected.map(node => node.getText(ast)).join('\n
 const render = new Function('Vue', compile(descriptor.template!.content, {
   mode: 'function', prefixIdentifiers: true, isCustomElement: tag => ['view', 'text'].includes(tag),
 }).code)(Vue);
+
+it.each(['phone', 'missing', 'stellarbox-s1'])('keeps inventory purchase while gating replacement of %s', async kind => {
+  const names = ['canReplaceSource', 'replaceView', 'onReplace', 'onKeepBuy'];
+  const nodes = ast.statements.filter(node => ts.isFunctionDeclaration(node) ? names.includes(node.name?.text ?? '')
+    : ts.isVariableStatement(node) && node.declarationList.declarations.some(d => names.includes(d.name.getText(ast))));
+  const compiled = ts.transpileModule(nodes.map(n => n.getText(ast)).join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const quote = { sourceDeviceId: 42, sourceDeviceName: 'Source', sufficientFunds: true };
+  const state = ref({ kind: 'replace', oldDeviceId: '42', newKind: 'stellarbox-pro', canonicalCapacityQuote: quote });
+  const deps = { computed, state, remoteApiEnabled: true, app: { remoteFleetHasSnapshot: true, devices: kind === 'missing' ? [] : [{ id: '42', kind }] },
+    confirming: ref(false), fmt, t: ref(en), kindLabel: (value: string) => value,
+    submitCanonicalCapacityReplacement: mock.fn(), submitCanonicalKeepBuy: mock.fn() };
+  const actual = new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${compiled}; return {${names.join(',')}};`)(deps);
+  const html = await renderToString(Vue.createSSRApp({ render, setup: () => Vue.proxyRefs({ ...deps, ...actual,
+    ctaHalo: {}, hide: () => {}, onKeyboardActivate: () => {} }) }));
+  expect(html.includes(actual.replaceView.value.replaceCta)).toBe(kind === 'stellarbox-s1');
+  expect(html).toContain(actual.replaceView.value.keepCta);
+  actual.onReplace();
+  expect(deps.submitCanonicalCapacityReplacement).toHaveBeenCalledTimes(kind === 'stellarbox-s1' ? 1 : 0);
+  deps.confirming.value = false;
+  actual.onKeepBuy();
+  expect(deps.submitCanonicalKeepBuy).toHaveBeenCalledWith('stellarbox-pro', quote);
+});
 
 function page(copy = en, remoteApiEnabled = true) {
   const state = ref({ kind: 'choice', tradeInSources: ['42'], newPrice: 500, oldDeviceId: '42', newKind: 'stellarbox-pro' });

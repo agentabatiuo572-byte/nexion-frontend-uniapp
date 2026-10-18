@@ -3,11 +3,14 @@ export type ApiEnvironment = "dev" | "prod";
 export interface ApiRuntimeConfig {
   environment: ApiEnvironment;
   baseUrl: string;
+  previewTarget?: string;
 }
 
 /** The Vite build mode does not identify which server a debug App targets. */
 export function apiEnvironmentBadgeLabel(config: ApiRuntimeConfig, localDevelopmentLabel: string): string {
-  const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+  const browserBase = config.baseUrl.trim().replace(/\/+$/, "");
+  const isLocalPreview = config.environment === "dev" && /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/i.test(browserBase);
+  const baseUrl = (isLocalPreview && config.previewTarget ? config.previewTarget : browserBase).trim().replace(/\/+$/, "");
   if (baseUrl === "https://18.142.169.24") return "UVEL TEST";
   if (config.environment === "dev" && /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/i.test(baseUrl)) {
     return localDevelopmentLabel;
@@ -22,6 +25,7 @@ const runtimeEnv: Record<string, unknown> = import.meta.env.PROD
   : {
     VITE_NEXGRID_API_BASE_URL: import.meta.env.VITE_NEXGRID_API_BASE_URL,
     VITE_NEXGRID_API_DEV_BASE_URL: import.meta.env.VITE_NEXGRID_API_DEV_BASE_URL,
+    VITE_NEXGRID_API_PREVIEW_TARGET: import.meta.env.VITE_NEXGRID_API_PREVIEW_TARGET,
   };
 
 function currentBrowserOrigin(): string {
@@ -45,12 +49,17 @@ export function readApiRuntimeConfig(
     && typeof env.VITE_NEXGRID_API_DEV_BASE_URL === "string"
     ? env.VITE_NEXGRID_API_DEV_BASE_URL.trim()
     : "";
+  const baseUrl = configured || developmentFallback || browserOrigin;
+  const previewTarget = import.meta.env.DEV && baseUrl === browserOrigin
+    && typeof env.VITE_NEXGRID_API_PREVIEW_TARGET === "string"
+    ? env.VITE_NEXGRID_API_PREVIEW_TARGET.trim() : "";
   return {
     environment,
     // A static H5 bundle is normally mounted behind the public API gateway.
     // Use that origin when a separate API origin is not supplied, so a valid
     // remote build never crashes during module initialization before the
     // login/error surface can render. Cross-origin deployments stay explicit.
-    baseUrl: configured || developmentFallback || browserOrigin,
+    baseUrl,
+    ...(previewTarget ? { previewTarget } : {}),
   };
 }

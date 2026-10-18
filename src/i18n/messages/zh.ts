@@ -4061,7 +4061,7 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
     memberSince: "加入于 {m}",
     totalEarned: "累计收益",
     activeDays: "活跃天数",
-    devices: "设备数",
+    devices: "在线设备",
     teamMembers: "团队成员",
     joinMyNetwork: "加入我的网络",
     shareTwitter: "分享到 Twitter",

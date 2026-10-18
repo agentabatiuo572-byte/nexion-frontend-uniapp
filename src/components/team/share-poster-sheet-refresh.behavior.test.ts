@@ -233,11 +233,19 @@ describe("mounted poster template during real authority refresh", () => {
     await s.generate(); await s.finish(); expect(s.canvas.at(-1)!.texts).toContain("+1.23"); expect(s.selected()).toBe(en.share.tplYield);
   });
 
-  it("falls back after a canonical current fleet confirms no active physical slot", async () => {
+  it("hides the yield template when the confirmed fleet only contains phones", async () => {
     const s = await mount(); await s.selectYield(); const pending = s.hold(fleetPath), request = s.app.refreshRemoteFleet();
-    pending.resolve(response(fleet(false))); await request; await s.generate(); await s.finish();
+    const phones = fleet(); phones.devices = phones.devices.filter(device => device.productCode === "phone");
+    pending.resolve(response(phones)); await request; await s.generate(); await s.finish();
     expect(s.selected()).toBe(en.share.tplBrand); expect(s.tab(en.share.tplYield)).toBeUndefined();
     expect(s.canvas.at(-1)!.texts).not.toContain(en.share.posterYieldCap);
+  });
+
+  it("keeps a Cloud Share yield poster when no physical slot is active", async () => {
+    const s = await mount(); await s.selectYield(); const pending = s.hold(fleetPath), request = s.app.refreshRemoteFleet();
+    pending.resolve(response(fleet(false))); await request; await s.generate(); await s.finish();
+    expect(s.selected()).toBe(en.share.tplYield);
+    expect(s.canvas.at(-1)!.texts).toContain(fmt(en.share.posterYieldUnit, { n: 1 }));
   });
 
   it("honors an explicit Network selection made while yield data is pending", async () => {

@@ -17,7 +17,7 @@ function setup(remoteApiEnabled = true, refreshCatalog?: ReturnType<typeof vi.fn
   const app = reactive({
     accountKey: 'user-a',
     accountBindingEpoch: 1,
-    visibleDevices: [{ id: 'device-a', name: 'Device A' }],
+    visibleDevices: [{ id: 'device-a', name: 'Device A', kind: 'stellarbox-s1' }],
     remoteFleetStatus: 'ready',
     remoteFleetHasSnapshot: false,
     remoteAssignmentStatus: 'ready',
@@ -53,6 +53,17 @@ function setup(remoteApiEnabled = true, refreshCatalog?: ReturnType<typeof vi.fn
 }
 
 describe('search remote source wiring', () => {
+  it('hides phones while retaining other devices through loading and recovery', () => {
+    const s = setup();
+    s.app.visibleDevices.push({ id: 'phone', name: 'Your phone', kind: 'phone' });
+    expect(s.devices.value.map((d: { id: string }) => d.id)).toEqual(['device-a']);
+    s.app.remoteFleetStatus = 'error';
+    expect(s.devices.value).toEqual([]);
+    s.app.remoteFleetHasSnapshot = true;
+    expect(s.devices.value.map((d: { id: string }) => d.id)).toEqual(['device-a']);
+    s.app.visibleDevices = [{ id: 'phone', name: 'Your phone', kind: 'phone' }];
+    expect(s.devices.value).toEqual([]);
+  });
   it('shows server SKU specs instead of a conflicting marketing tagline', () => {
     const sku = { id: 'p2', name: 'StellarRack P2', price: 7499, tagline: 'H100 rack', gpu: '8× RTX 4090', vram: '192GB' };
     expect(setup(true).productSearchDetail(sku)).toBe('8× RTX 4090 · 192GB');
@@ -123,7 +134,7 @@ describe('search remote source wiring', () => {
     state.app.remoteFleetStatus = 'loading';
     state.app.remoteFleetHasSnapshot = true;
 
-    expect(state.devices.value).toEqual([{ id: 'device-a', name: 'Device A' }]);
+    expect(state.devices.value).toEqual([{ id: 'device-a', name: 'Device A', kind: 'stellarbox-s1' }]);
   });
 
   it('refreshes the fleet source and keeps local mock sources available', async () => {

@@ -4,7 +4,7 @@ import uniPlugin from "@dcloudio/vite-plugin-uni";
 import { parseJson } from "@dcloudio/uni-cli-shared/dist/json/json";
 import UnoCSS from "unocss/vite";
 import { nativeSvgIcons } from "./scripts/native-svg-icons.mjs";
-import { mustBlockDevelopmentOAuthProxy } from "./src/lib/dev-preview-auth-boundary";
+import { mustBlockDevelopmentOAuthProxy, trustedPreviewProxyOrigin } from "./src/lib/dev-preview-auth-boundary";
 
 // @dcloudio/vite-plugin-uni ships as CJS. With "type":"module" in package.json
 // (required so the ESM-only unocss/vite plugin can be imported), Vite loads
@@ -94,6 +94,8 @@ export default defineConfig(({ mode }) => {
           },
           configure: (proxy) => {
             proxy.on("proxyReq", (proxyReq, req) => {
+              const origin = trustedPreviewProxyOrigin(req.headers.origin, req.headers.host, req.socket.remoteAddress, apiPreviewTarget);
+              if (origin) proxyReq.setHeader("Origin", origin);
               const authorization = req.headers.authorization;
               if (typeof authorization === "string" && authorization.trim()) {
                 proxyReq.setHeader("Authorization", authorization);
@@ -107,6 +109,8 @@ export default defineConfig(({ mode }) => {
           headers: apiPreviewHeaders,
           configure: (proxy) => {
             proxy.on("proxyReq", (proxyReq, req) => {
+              const origin = trustedPreviewProxyOrigin(req.headers.origin, req.headers.host, req.socket.remoteAddress, apiPreviewTarget);
+              if (origin) proxyReq.setHeader("Origin", origin);
               const authorization = req.headers.authorization;
               if (typeof authorization === "string" && authorization.trim()) {
                 proxyReq.setHeader("Authorization", authorization);
