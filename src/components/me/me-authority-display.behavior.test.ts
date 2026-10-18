@@ -138,10 +138,10 @@ describe("Me wallet and device authority", () => {
     const s = mount(); s.confirmFleetAndTrial(); s.app.slotCap = 3;
     s.devices.push({ kind: "phone", activatedAt: 1 }, { kind: "stellarbox-s1", activatedAt: 1 },
       ...Array.from({ length: 3 }, () => ({ kind: "cloud-share" as const, activatedAt: 1 })));
-    expect(s.read()).toMatchObject({ count: "2 / 3", active: "5 active", open: "1 slot open", promotion: true });
-    expect(s.readDevices()).toMatchObject({ walletSummary: "5 active · 1 slot open", warehouseActive: 5 });
+    expect(s.read()).toMatchObject({ count: "2 / 3", active: "4 active", open: "1 slot open", promotion: true });
+    expect(s.readDevices()).toMatchObject({ walletSummary: "4 active · 1 slot open", warehouseActive: 4 });
     s.trial.status = "grace"; s.trial.authorityServerState = "EXTENDED";
-    expect(s.read()).toMatchObject({ count: "3 / 3", active: "5 active", open: "0 slots open", promotion: false });
+    expect(s.read()).toMatchObject({ count: "3 / 3", active: "4 active", open: "0 slots open", promotion: false });
   });
 
   it.each([
@@ -165,16 +165,16 @@ describe("Me wallet and device authority", () => {
     expect(s.readDevices()).toMatchObject({ count: "1 / 0", active: "5 active", open: "0 slots open", walletSummary: null });
   });
 
-  it("matches the warehouse for active phones and pending deactivation, excludes inactive or unconfirmed activation, and updates after cancellation", () => {
+  it("matches the phone-free warehouse while preserving pending deactivation and slot occupancy", () => {
     const s = mount(); s.confirmFleetAndTrial(); s.app.slotCap = 3;
     s.devices.push({ kind: "phone", activatedAt: 1 }, { kind: "stellarbox-s1", activatedAt: 1, pendingDeactivate: true },
       { kind: "cloud-share", activatedAt: 1, pendingDeactivate: true }, { kind: "stellarbox-s1", activatedAt: null },
       { kind: "cloud-share", activatedAt: null, activationUnconfirmed: true });
-    expect(s.readDevices()).toEqual({ count: "1 / 3", active: "3 active", open: "2 slots open", walletSummary: "3 active · 2 slots open", warehouseActive: 3 });
+    expect(s.readDevices()).toEqual({ count: "1 / 3", active: "2 active", open: "2 slots open", walletSummary: "2 active · 2 slots open", warehouseActive: 2 });
     s.devices[1].pendingDeactivate = false;
-    expect(s.readDevices()).toMatchObject({ count: "2 / 3", active: "3 active", open: "1 slot open", walletSummary: "3 active · 1 slot open" });
+    expect(s.readDevices()).toMatchObject({ count: "2 / 3", active: "2 active", open: "1 slot open", walletSummary: "2 active · 1 slot open" });
     s.devices[1].activatedAt = null;
-    expect(s.readDevices()).toMatchObject({ count: "1 / 3", active: "2 active", open: "2 slots open", walletSummary: "2 active · 2 slots open", warehouseActive: 2 });
+    expect(s.readDevices()).toMatchObject({ count: "1 / 3", active: "1 active", open: "2 slots open", walletSummary: "1 active · 2 slots open", warehouseActive: 1 });
   });
 
   it("keeps hidden PC share occupancy while counting only the visible activated fleet", () => {

@@ -100,7 +100,6 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { remoteApiEnabled } from "@/api/runtime";
-import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
@@ -140,10 +139,10 @@ const rewardEffectiveAtText = computed(() => {
   return fmt(t.value.share.posterRewardEffectiveAt, { date: at.toLocaleDateString(dateLocale()) });
 });
 
-// 与 Earn 的设备位口径一致；远端设备清单未确认时不展示产出模板。
+// 与设备仓库的可见已激活设备数一致；远端设备清单未确认时不展示产出模板。
 const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready");
 const runningDevices = computed(() => fleetReady.value
-  ? app.visibleDevices.filter(isActiveSlotDevice).length : 0);
+  ? app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null).length : 0);
 const yieldTodayUsdt = computed(() => {
   if (!remoteApiEnabled) return app.earnings.today;
   if (app.homeTruthStatus !== "ready") return null;

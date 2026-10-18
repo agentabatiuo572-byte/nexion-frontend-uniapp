@@ -254,6 +254,7 @@ function invalidateRemoteProof(): void {
 async function refreshRemoteProof() {
   const request = ++remoteRequest;
   remoteError.value = false;
+  void app.refreshRemoteFleet(undefined, { coalesce: true });
   const expectedAccount = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
@@ -294,8 +295,8 @@ onShow(() => {
 const earningsTotal = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.earningsTotalUsdt ?? null : app.earnings.total);
 const earningsTotalText = computed(() => earningsTotal.value === null ? "—" : formatAmount(earningsTotal.value));
 const onlineDevices = computed(
-  () => remoteApiEnabled ? remoteSnapshot.value?.onlineDevices ?? null
-    : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
+  () => remoteApiEnabled && (!remoteSnapshot.value || app.remoteFleetStatus !== "ready") ? null
+    : app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
 const profileName = computed(() => nexGridBrandText(profile.displayName));
 const myRank = computed(() => remoteApiEnabled && !vRank.remoteReady ? null : vRank.myRank);

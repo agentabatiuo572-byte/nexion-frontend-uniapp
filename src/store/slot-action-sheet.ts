@@ -30,7 +30,7 @@ export const useSlotActionSheet = defineStore("slotActionSheet", () => {
    */
   function openForSlot() {
     const hasInactive = useApp().visibleDevices.some(
-      (d) => isActivatableInventoryDevice(d) || requiresActivationConfirmation(d),
+      (d) => d.kind !== "phone" && (isActivatableInventoryDevice(d) || requiresActivationConfirmation(d)),
     );
     if (hasInactive) {
       open.value = true;

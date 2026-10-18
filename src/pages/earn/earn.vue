@@ -228,7 +228,7 @@ function toggleDevice(id: string) {
 }
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
-const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
+const devices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
 // A background refresh remains authoritative only for fresh mutations. For
 // read-only presentation, keep the bound account's last confirmed fleet visible
 // until the next response resolves; a first read and every error stay unknown.
@@ -236,7 +236,7 @@ const fleetReady = computed(() => !remoteApiEnabled
   || app.remoteFleetStatus === "ready"
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
 const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
-  n: devices.value.filter(isActiveSlotDevice).length,
+  n: app.visibleDevices.filter(isActiveSlotDevice).length,
   max: app.slotCap,
 }) : "— / —");
 

@@ -4040,7 +4040,7 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
     memberSince: "Thành viên từ {m}",
     totalEarned: "Tổng thu nhập",
     activeDays: "Số ngày hoạt động",
-    devices: "Thiết bị",
+    devices: "Thiết bị trực tuyến",
     teamMembers: "Thành viên nhóm",
     joinMyNetwork: "Tham gia mạng lưới của tôi",
     shareTwitter: "Chia sẻ lên Twitter",

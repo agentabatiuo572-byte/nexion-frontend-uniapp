@@ -34,8 +34,9 @@ import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 const t = useT();
 const app = useApp();
 
-const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const slotDevices = computed(() => devices.value.filter(isActiveSlotDevice));
+const devices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
+// Hiding a phone card does not release its server-owned slot.
+const slotDevices = computed(() => app.visibleDevices.filter(isActiveSlotDevice));
 // Read-only fleet presentation may retain this account's last confirmed
 // snapshot while a background refresh is pending. Actions remain governed by
 // their existing authoritative checks.

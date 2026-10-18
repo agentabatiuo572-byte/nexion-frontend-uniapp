@@ -6,6 +6,20 @@ export function isLoopbackPreviewClient(remoteAddress: string | undefined): bool
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
+/** Translate only a same-origin loopback browser request to its configured HTTPS upstream. */
+export function trustedPreviewProxyOrigin(
+  origin: string | undefined,
+  host: string | undefined,
+  remoteAddress: string | undefined,
+  target: string,
+): string | undefined {
+  if (!origin || !host || !isLoopbackPreviewClient(remoteAddress)) return;
+  const localOrigin = `http://${host}`;
+  if (origin !== localOrigin || !/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(localOrigin)) return;
+  const upstream = new URL(target);
+  if (upstream.protocol === "https:") return upstream.origin;
+}
+
 function normalizedPath(rawUrl: string | undefined): string {
   const pathname = new URL(rawUrl || "/", "http://preview.invalid").pathname;
   try {

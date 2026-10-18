@@ -16,6 +16,7 @@
         <TechMoneyCard />
       </view>
       <TrialGhostSlot />
+      <!-- #ifdef APP-PLUS -->
       <view v-if="phoneNeedsBinding" class="phone-policy-notice nx-home-glass-item" role="status">
         <view class="nx-home-glass-panel" aria-hidden="true" />
         <view class="phone-policy-icon" aria-hidden="true">
@@ -24,6 +25,7 @@
         <text class="phone-policy-copy">{{ t.myDevices.phoneActivationBody }}</text>
         <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" data-home-action="phone-binding" @click="goPhoneBinding"  @keydown.enter.prevent="goPhoneBinding" @keydown.space.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }}</text></view>
       </view>
+      <!-- #endif -->
 
       <view
         v-if="visibleTaskCards.length || homePromotionStatus === 'loading' || homePromotionStatus === 'error'"

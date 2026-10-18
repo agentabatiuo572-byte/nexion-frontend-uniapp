@@ -109,7 +109,7 @@ watch(
 );
 
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
-const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
+const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && requiresActivationConfirmation(d)));
 const activeCount = computed(() => app.activeSlotCount);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + reservedSlots.value);

@@ -4170,7 +4170,7 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
     memberSince: "Member since {m}",
     totalEarned: "Total earned",
     activeDays: "Active days",
-    devices: "Devices",
+    devices: "Online devices",
     teamMembers: "Team members",
     joinMyNetwork: "Join my network",
     shareTwitter: "Share to Twitter",

@@ -98,7 +98,7 @@ function findLabel(node: ts.Node) {
   ts.forEachChild(node, findLabel);
 }
 findLabel(cardAst);
-const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "phoneActivationGuidance", `return (${labelBody})();`);
+const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "phoneActivationGuidance", "nativePhoneAvailable", `return (${labelBody})();`);
 const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online", phoneTaskPaused: "paused" }, myDevices: { inventoryPendingDeactivateChip: "pending", phoneActivationTitle: "activate phone", phoneActivationAppOnlyTitle: "use Android App" } } };
 const withoutTask = (props: unknown, reconnecting: unknown, idleGated: unknown, deviceOnline: unknown, t: unknown) =>
   labelFactory(props, reconnecting, idleGated, deviceOnline, { value: null }, t, { value: true }, { value: { title: "activate phone" } });
@@ -125,13 +125,19 @@ describe("actual device card runtime label", () => {
   it("does not claim a different phone is running locally", () => {
     const phone = { device: { kind: "phone", capacitySource: "server", runtimeStatus: "ONLINE" } };
     for (const title of ["activate phone", "use Android App", "native unavailable"]) {
-      expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title}})).toBe(title);
+      expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title}}, true)).toBe(title);
     }
+  });
+  it.each([["ONLINE", "online"], ["OFFLINE", "offline"], ["UNKNOWN", "unknown"]])("H5 reads phone %s without offering activation", (runtimeStatus, expected) => {
+    expect(labelFactory({ device: { kind: "phone", capacitySource: "server", runtimeStatus } },
+      {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title:"use Android App"}}, false)).toBe(expected);
   });
 });
 
 // Recalibration is a distinct server-authorized repair flow; ordinary inventory activation stays blocked.
 import inventoryContent from "../pages/me/devices.vue?raw";
+import homeFleetContent from "../components/home/my-fleet-section.vue?raw";
+import earnContent from "../pages/earn/earn.vue?raw";
 const inventorySource = inventoryContent.split('<script setup lang="ts">')[1].split("</script>")[0];
 const inventoryAst = ts.createSourceFile("devices.ts", inventorySource, ts.ScriptTarget.Latest, true);
 let phoneOfferBody = "";
@@ -174,8 +180,8 @@ function inventorySelection(content: string, name: string, visibleDevices: unkno
   }
   visit(ast);
   if (!callback) throw new Error(`${name} missing`);
-  return new Function("app", "isActivatableInventoryDevice", "requiresActivationConfirmation", `return (${callback})();`)(
-    { visibleDevices }, isActivatableInventoryDevice, requiresActivationConfirmation,
+  return new Function("app", "isActivatableInventoryDevice", "requiresActivationConfirmation", "isActiveSlotDevice", `return (${callback})();`)(
+    { visibleDevices }, isActivatableInventoryDevice, requiresActivationConfirmation, isActiveSlotDevice,
   );
 }
 
@@ -200,12 +206,15 @@ describe("purchased inventory excludes historical phones", () => {
   const oldPhone = project({ ...fixture, id: 1144, kind: "phone", status: "DEACTIVATED", activatedAt: null }, 1000, 20);
   const currentPhone = project({ ...fixture, id: 1151, kind: "phone" }, 1000, 20);
 
-  it("does not advertise an old phone as inventory or hide the current active phone", () => {
+  it("hides both old and active phones without changing their slot occupancy", () => {
     const devices = [oldPhone, currentPhone];
     for (const content of [inventoryContent, slotSheetContent]) {
       expect(inventorySelection(content, "inactiveDevices", devices)).toEqual([]);
     }
-    expect(inventorySelection(inventoryContent, "activeDevices", devices).map((device) => device.id)).toEqual(["1151"]);
+    expect(inventorySelection(inventoryContent, "activeDevices", devices)).toEqual([]);
+    expect(inventorySelection(homeFleetContent, "devices", devices)).toEqual([]);
+    expect(inventorySelection(earnContent, "devices", devices)).toEqual([]);
+    expect(inventorySelection(homeFleetContent, "slotDevices", devices)).toEqual([currentPhone]);
     expect(devices.filter(isActiveSlotDevice)).toEqual([currentPhone]);
     expect(openInventory([oldPhone])).toEqual({ open: false, routes: ["/pages/store/store"] });
     expect(openInventory(devices)).toEqual({ open: false, routes: ["/pages/store/store"] });
@@ -221,12 +230,25 @@ describe("purchased inventory excludes historical phones", () => {
     expect(openInventory(devices)).toEqual({ open: true, routes: [] });
   });
 
-  it.each(["phone", "stellarbox-s1"])("keeps unconfirmed %s visible without an inventory activation promise", (kind) => {
+  it.each(["phone", "stellarbox-s1"])("filters unconfirmed %s consistently across warehouse and add-device entry", (kind) => {
     const unconfirmed = project({ ...fixture, id: 1203, kind, activatedAt: null }, 1000, 20);
     for (const content of [inventoryContent, slotSheetContent]) {
       expect(inventorySelection(content, "inactiveDevices", [unconfirmed])).toEqual([]);
-      expect(inventorySelection(content, "unconfirmedDevices", [unconfirmed]).map((device) => device.id)).toEqual(["1203"]);
+      expect(inventorySelection(content, "unconfirmedDevices", [unconfirmed]).map((device) => device.id))
+        .toEqual(kind === "phone" ? [] : ["1203"]);
     }
-    expect(openInventory([unconfirmed])).toEqual({ open: true, routes: [] });
+    expect(openInventory([unconfirmed])).toEqual(kind === "phone"
+      ? { open: false, routes: ["/pages/store/store"] }
+      : { open: true, routes: [] });
+  });
+
+  it("retains every active purchased-device kind on all three surfaces", () => {
+    const kinds = ["pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2", "cloud-share"];
+    const purchased = kinds.map((kind, i) => project({ ...fixture, id: 1300 + i, kind }, 1000, 20));
+    const devices = [oldPhone, currentPhone, ...purchased];
+    for (const [content, name] of [[homeFleetContent, "devices"], [earnContent, "devices"], [inventoryContent, "activeDevices"]]) {
+      expect(inventorySelection(content, name, devices)).toEqual(purchased);
+    }
+    expect(devices).toHaveLength(9);
   });
 });

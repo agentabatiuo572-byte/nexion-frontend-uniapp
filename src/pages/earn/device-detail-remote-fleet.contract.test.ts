@@ -14,7 +14,7 @@ function deferred() {
   const promise = new Promise<boolean>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-function harness(remoteApiEnabled = true, routeId = "85", cached: Array<{ id: string; activatedAt: number | null }> = []) {
+function harness(remoteApiEnabled = true, routeId = "85", cached: Array<{ id: string; kind?: string; activatedAt: number | null }> = []) {
   const account = createRemoteAccountEpoch("A");
   const app = reactive({ accountBindingEpoch: 0, remoteFleetStatus: "ready", visibleDevices: cached,
     captureRemoteAccountRequest: account.snapshot, refreshRemoteFleet: vi.fn() });
@@ -39,6 +39,15 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
 afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); vi.unstubAllGlobals(); });
 
 describe("remote device detail recovery", () => {
+  it("keeps an old phone detail link unavailable while preserving hardware details", async () => {
+    const { page, app, pending, show } = harness(true, "85", [{ id: "85", kind: "phone", activatedAt: 1 }]);
+    show(); pending[0].resolve(true); await settle();
+    expect(page.device.value).toBeNull();
+    expect(page.showNotFound.value).toBe(true);
+    app.visibleDevices = [{ id: "85", kind: "stellarbox-s1", activatedAt: 1 }];
+    expect(page.device.value).not.toBeNull();
+    expect(page.showNotFound.value).toBe(false);
+  });
   it("rereads a ready pre-issue empty fleet before showing a gift or declaring it missing", async () => {
     const { page, app, pending, show } = harness();
     expect(page.showNotFound.value).toBe(false);

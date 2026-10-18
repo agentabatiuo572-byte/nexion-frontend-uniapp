@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { apiEnvironmentBadgeLabel } from "./runtime-config";
+import { apiEnvironmentBadgeLabel, readApiRuntimeConfig } from "./runtime-config";
 
 it("labels the configured TEST API without calling it a local development service", () => {
   const localLabel = "Development environment · local Java service";
@@ -11,4 +11,12 @@ it("labels the configured TEST API without calling it a local development servic
     .toBe("");
   expect(apiEnvironmentBadgeLabel({ environment: "prod", baseUrl: "https://api.example.com" }, localLabel))
     .toBe("");
+});
+
+it("labels a TEST proxy without changing the browser's same-origin API URL", () => {
+  const config = readApiRuntimeConfig({ VITE_NEXGRID_API_PREVIEW_TARGET: "https://18.142.169.24" }, "http://127.0.0.1:5176");
+  expect(config.baseUrl).toBe("http://127.0.0.1:5176");
+  expect(apiEnvironmentBadgeLabel(config, "Local Java")).toBe("UVEL TEST");
+  expect(apiEnvironmentBadgeLabel({ ...config, environment: "prod" }, "Local Java")).toBe("");
+  expect(apiEnvironmentBadgeLabel({ ...config, baseUrl: "https://other.example" }, "Local Java")).toBe("");
 });

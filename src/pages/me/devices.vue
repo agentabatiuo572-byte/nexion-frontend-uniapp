@@ -62,6 +62,7 @@
 
         <ComputeShareEntry context="devices" />
 
+        <!-- #ifdef APP-PLUS -->
         <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
           <view class="flex items-start" style="gap: 12px">
             <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
@@ -77,7 +78,7 @@
             <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
           </view>
         </view>
-
+        <!-- #endif -->
         <!-- Trial device — UVELBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="nx-glass-card overflow-hidden" :style="trialCardStyle">
@@ -286,9 +287,9 @@ function deferredCommandBusy(device: Device): boolean {
 // silently widening to string[] (FEAT-TRIAL02 audit trap).
 const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
 const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
-const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
+const activeDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
-const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
+const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && requiresActivationConfirmation(d)));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0
   && inactiveDevices.value.length === 0
   && unconfirmedDevices.value.length === 0);
