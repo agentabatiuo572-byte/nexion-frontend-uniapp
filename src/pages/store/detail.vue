@@ -4,7 +4,7 @@
 
   Wrapped in <AppChassis active="store">. Top→bottom:
     in-page header (back + product name) → Hero (ProductRender + ribbon +
-    LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
+    LiveSocialProof + name/tagline + trust chips) →
     ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec →
     Trust badges → FAQ accordion → sticky bottom Buy CTA.
 
@@ -114,7 +114,6 @@
                 <text class="block truncate" :style="nameStyle">{{ nexGridBrandText(product.name) }}</text>
                 <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
               </view>
-              <text v-if="!isShare && speedup > 0" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
             </view>
 
             <!-- trust chips -->
@@ -157,21 +156,6 @@
           <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--v5-ink-4)">{{ t.store.shareYieldDisclaimer }}</text>
         </view>
 
-        <!-- === Section 2: Vs phone strip === -->
-        <view v-if="!isShare && phoneDailyEarnValue > 0" class="mx-4 mt-3 nx-glass-card flex items-center" :style="vsStripStyle">
-          <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
-            <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">{{ phoneDailyEarnText }}</text>
-          </view>
-          <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
-          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-warning)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}/d</text>
-          </view>
-          <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ speedup }}×</text>
-        </view>
-
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
         <template v-if="!isShare&&!activityId">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detEstReturns" :count="t.store.detEstReturnsMeta" /></view>
@@ -196,7 +180,6 @@
               <view :style="roiCellStyle(0)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
-                <text v-if="phoneDailyEarnValue > 0" class="block" :style="roiSubStyle">{{ vsPhoneSubText }}</text>
               </view>
               <view :style="roiCellStyle(1)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
@@ -291,8 +274,6 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { localizedDatacenterValue, productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { estimatePaybackDays } from "@/lib/product-payback";
-import { getPhoneTierYields } from "@/mock/phone-tiers";
-import { activePhoneDailyRate, storeYieldMultiplier } from "@/lib/store-upgrade";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { useApp } from "@/store/app";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
@@ -487,18 +468,6 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
-// "Your phone" uses the same activated fleet rate as the Store overview.
-// Without a confirmed fleet, hide the personal comparison instead of using a
-// global tier as if it described this handset.
-const phoneDailyEarnValue = computed(() => remoteApiEnabled
-  ? app.remoteFleetHasSnapshot ? activePhoneDailyRate(app.visibleDevices) : 0
-  : getPhoneTierYields().find((row) => row.tier === 3)?.baseRateUsdt ?? 0);
-const speedup = computed(() =>
-  product.value && !isShare.value
-    && phoneDailyEarnValue.value > 0
-    ? storeYieldMultiplier(product.value.dailyEarn, phoneDailyEarnValue.value)
-    : 0,
-);
 const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);
 const monthlyYield = computed(() => dailyYield.value * 30);
 const annualYield = computed(() => dailyYield.value * 365);
@@ -597,13 +566,6 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
-const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
-  ? formatAmount(phoneDailyEarnValue.value)
-  : t.value.store.specValueUnavailable));
-// Same server figure the vs-phone strip shows. It used to be baked into the copy
-// as "$0.06", which contradicted the strip whenever the server said otherwise —
-// or said nothing at all (strip degraded, this line still claimed $0.06).
-const vsPhoneSubText = computed(() => fmt(t.value.store.detVsPhone, { n: phoneDailyEarnText.value }));
 const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
 const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
   ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
@@ -846,14 +808,6 @@ const nameStyle: CSSProperties = {
   letterSpacing: "-0.024em",
   color: "var(--v5-ink)",
 };
-const multBadgeStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "20px",
-  letterSpacing: "-0.024em",
-  color: "var(--v5-brand-2)",
-  whiteSpace: "nowrap",
-};
 function codeChip(tone: "success" | "amber"): CSSProperties {
   const palette =
     tone === "success"
@@ -870,23 +824,6 @@ function codeChip(tone: "success" | "amber"): CSSProperties {
     letterSpacing: "-0.005em",
   };
 }
-// De-carded to a filled tile (no border) — keeps the phone-vs-device commercial
-// comparison punch without the boxed weight.
-const vsStripStyle: CSSProperties = {
-  padding: "12px 14px",
-  gap: "12px",
-};
-const vsMultChipStyle: CSSProperties = {
-  padding: "4px 10px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
-  color: "var(--v5-brand)",
-  letterSpacing: "-0.014em",
-  lineHeight: 1,
-};
 const roiCardStyle: CSSProperties = {
   padding: "16px",
 };
@@ -936,9 +873,6 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
     marginTop: "4px",
   };
 }
-// textWrap pretty: the vs-phone subline now carries a server-sized figure, so it
-// can wrap in the half-width cell — keep the last line from stranding one char.
-const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", textWrap: "pretty" };
 const trustCardStyle: CSSProperties = { padding: "16px" };
 const mediaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

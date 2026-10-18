@@ -57,6 +57,20 @@ async function view(component: ReturnType<typeof compiled>, copy: typeof en, pro
   };
 }
 
+it.each([null, { kind: "phone", name: "Phone", activatedAt: 1, baseRate: 0.06, baseRateNEX: 0 }])("hides phone ladder rows even when the only owned device is a phone: %j", async (owned) => {
+  const authority = { ladder: [
+    { id: "phone", amount: { usd: 0.06, nex: 0 }, widthPct: 1 },
+    { id: "entry", amount: { usd: 1, nex: 1 }, widthPct: 100 },
+  ] };
+  const instance = await view(ladder, en, { owned, authority });
+  try {
+    const html = await instance.html();
+    expect(html).not.toContain(en.store.ladderPhone);
+    expect(html).toContain(en.store.ladderS1);
+    expect(html).toContain('aria-label="$1.00"');
+  } finally { instance.close(); }
+});
+
 for (const [locale, copy] of [["en", en], ["zh", zh], ["vi", vietnamese]] as const) {
   for (const theme of ["light", "dark"]) {
     it(`${locale}/${theme}: brands the current-owned ladder label without rewriting the device`, async () => {
@@ -69,6 +83,7 @@ for (const [locale, copy] of [["en", en], ["zh", zh], ["vi", vietnamese]] as con
         expect(html).toContain("UVELBox Pro v2");
         expect(html).not.toContain("NexGridBox");
         expect(html).toContain(copy.store.ladderYou);
+        expect(html).not.toContain(copy.store.ladderPhone);
         expect(html).toContain('aria-label="$4.00"');
         expect({ owned, authority }).toEqual(before);
       } finally { instance.close(); }
