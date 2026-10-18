@@ -16,6 +16,14 @@
         <TechMoneyCard />
       </view>
       <TrialGhostSlot />
+      <!-- #ifdef H5 -->
+      <view v-if="auth.isAuthenticated" class="phone-policy-notice nx-home-glass-item" role="status" data-testid="home-app-download-banner">
+        <view class="nx-home-glass-panel" aria-hidden="true" />
+        <svg class="phone-policy-icon" width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="4" y="2" width="16" height="28" rx="4" /><path d="M10 5h4m-4 22h4" /></svg>
+        <text class="phone-policy-copy">{{ t.phonePolicy.webNotice }}</text>
+        <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" @click="goAppDownload" @keydown.enter.prevent="goAppDownload" @keydown.space.prevent="goAppDownload"><text>{{ t.phonePolicy.download }}</text></view>
+      </view>
+      <!-- #endif -->
       <!-- #ifdef APP-PLUS -->
       <view v-if="phoneNeedsBinding" class="phone-policy-notice nx-home-glass-item" role="status">
         <view class="nx-home-glass-panel" aria-hidden="true" />
@@ -152,6 +160,9 @@ import { remoteApiEnabled, promotionApi, sessionVault } from "@/api/runtime";
 import type { PublicPromotion } from "@/api/promotion-contracts";
 import { createPromotionReadFence,isPromotionActive } from "@/lib/promotion-entry";
 import { useApp } from "@/store/app";
+// #ifdef H5
+import { useAuth } from "@/store/auth";
+// #endif
 import { useSession } from "@/store/session";
 import { navTo } from "@/lib/route";
 import { deriveHomeTaskCards, createHomeNewcomerContentResizer, HOME_TASK_CARD_COLLAPSED_HEIGHT, shouldMeasureHomeNewcomerContent, type HomeTaskCardId } from "@/lib/home-task-carousel";
@@ -166,6 +177,10 @@ interface TouchPoint {
 const TASK_CAROUSEL_INTERVAL_MS = 5000;
 const t = useT();
 const app = useApp();
+// #ifdef H5
+const auth = useAuth();
+function goAppDownload() { navTo("/pages/register/success?download=1"); }
+// #endif
 const session = useSession();
 const phoneNeedsBinding = computed(() => remoteApiEnabled && hasNativeAndroidPhoneRuntime() && app.accountKey !== "default"
   && (app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey)));

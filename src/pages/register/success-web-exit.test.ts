@@ -1,6 +1,55 @@
 import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
+import { computed } from "vue";
 import source from "./success.vue?raw";
+
+function downloads(links = { officialUrl: "https://www.google.com", iosUrl: "", androidUrl: "", apkUrl: "" }) {
+  const script = source.slice(source.indexOf("function safeDownloadUrl("), source.indexOf("function retryDownloadConfig("));
+  const code = ts.transpileModule(script + "\nreturn { officialDownloadUrl, platformDownloads, openOfficialDownload, openDownload };", {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  }).outputText;
+  const popup = { opener: {} as unknown };
+  const window = { open: vi.fn(() => popup), location: { assign: vi.fn() } };
+  const page = new Function("cfg", "t", "computed", "window", code)(
+    { config: { share: { appDownload: links } } }, { value: { register: { doneIosDownload: "iOS", doneAndroidDownload: "Android" } } },
+    computed, window,
+  );
+  return { page, window, popup };
+}
+
+describe("H5 Lite separate download destinations", () => {
+  it("uses the configured website only for the website entry, leaving missing packages unavailable", () => {
+    const { page } = downloads();
+    expect(page.officialDownloadUrl.value).toBe("https://www.google.com/");
+    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["", ""]);
+  });
+  it("follows management changes and has no hardcoded website fallback", () => {
+    expect(downloads({ officialUrl: "https://uvel.example.com/download", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("https://uvel.example.com/download");
+    expect(downloads({ officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("");
+    expect(source).not.toContain("VITE_H5_OFFICIAL_DOWNLOAD_URL");
+  });
+  it("keeps real platform URLs separate and supports the Android APK field", () => {
+    const { page } = downloads({ officialUrl: "", iosUrl: "https://download.example.com/app.ipa", androidUrl: "", apkUrl: "https://download.example.com/app.apk" });
+    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual([
+      "https://download.example.com/app.ipa", "https://download.example.com/app.apk",
+    ]);
+  });
+  it("does not create executable, HTTP or malformed package links", () => {
+    const { page } = downloads({ officialUrl: "", iosUrl: "javascript:alert(1)", androidUrl: "http://example.com/app.apk", apkUrl: "not-a-url" });
+    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["", ""]);
+  });
+  it("opens the selected URL without an opener and does nothing for unavailable packages", () => {
+    const { page, window, popup } = downloads();
+    page.openDownload("");
+    expect(window.open).not.toHaveBeenCalled();
+    page.openOfficialDownload();
+    expect(window.open).toHaveBeenCalledExactlyOnceWith("https://www.google.com/", "_blank");
+    expect(popup.opener).toBeNull();
+    window.open.mockReturnValueOnce(null as never);
+    page.openOfficialDownload();
+    expect(window.location.assign).toHaveBeenCalledExactlyOnceWith("https://www.google.com/");
+  });
+});
 
 function successExit(h5: boolean) {
   // Apply the same compile-time branches as UniApp before executing the actual

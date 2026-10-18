@@ -3,13 +3,14 @@
   规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE5]。
   仅 H5 注册链路到达(register.vue finish 的 #ifdef H5 分支);APP 壳内注册直进
   onboarding。bare 全屏页(无 chassis)→ 自带 GlobalUi 宿主(PORT-PITFALLS P-062)。
-  H5 官网地址 = platform config share.appDownload.officialUrl(运营可配);空值
+  H5 官网地址读取 share.appDownload.officialUrl，平台安装包分别读取
+  share.appDownload.iosUrl 与 androidUrl/apkUrl；空值
   显示不可用占位,不制造死链接。App 编译不渲染下载提醒。返回键视同
   「继续」:H5 进首页,App 进 onboarding(禁回注册流)。
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
-    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none', 'rs-wrap--web-setup': webSetupAvailable }">
+    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none', 'rs-wrap--web-setup': webSetupAvailable, 'rs-wrap--web-download': showH5Downloads }">
       <view class="rs-main">
         <view class="rs-content">
           <view class="rs-badge">
@@ -80,6 +81,18 @@
 
       <!-- #ifdef H5 -->
       <view class="rs-h5-download">
+        <view class="rs-platform-downloads">
+          <view v-for="item in platformDownloads" :key="item.platform" class="rs-platform-download">
+            <view v-if="item.url" class="rs-h5-download__action active-press" role="link" tabindex="0"
+              @click="openDownload(item.url)" @keydown.enter.prevent="openDownload(item.url)" @keydown.space.prevent="openDownload(item.url)">
+              <text class="rs-h5-download__action-text">{{ item.label }} ↗</text>
+            </view>
+            <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
+              <text class="rs-h5-download__pending">{{ item.label }}</text>
+            </view>
+            <text v-if="!item.url" class="rs-platform-download__pending">{{ t.register.donePackagePending }}</text>
+          </view>
+        </view>
         <text class="rs-h5-download__hint">{{ t.register.doneOfficialDownloadHint }}</text>
         <view
           v-if="officialDownloadUrl"
@@ -155,7 +168,9 @@ type GiftState = "posted" | "pending" | "none";
 const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
+let showH5Downloads = false;
 // #ifdef H5
+showH5Downloads = true;
 const downloadOnly = ref(false);
 const setupOnly = ref(false);
 // #endif
@@ -302,8 +317,8 @@ async function deferForWeb() {
     if (generation === setupGeneration) setupBusy.value = false;
   }
 }
-const officialDownloadUrl = computed(() => {
-  const raw = cfg.config.share.appDownload.officialUrl?.trim() ?? "";
+function safeDownloadUrl(value: string | undefined): string {
+  const raw = value?.trim() ?? "";
   if (!raw) return "";
   try {
     const parsed = new URL(raw);
@@ -311,10 +326,19 @@ const officialDownloadUrl = computed(() => {
   } catch {
     return "";
   }
-});
+}
+const officialDownloadUrl = computed(() => safeDownloadUrl(
+  cfg.config.share.appDownload.officialUrl,
+));
+const platformDownloads = computed(() => [
+  { platform: "ios", label: t.value.register.doneIosDownload, url: safeDownloadUrl(cfg.config.share.appDownload.iosUrl) },
+  { platform: "android", label: t.value.register.doneAndroidDownload, url: safeDownloadUrl(cfg.config.share.appDownload.androidUrl) || safeDownloadUrl(cfg.config.share.appDownload.apkUrl) },
+]);
 
 function openOfficialDownload() {
-  const url = officialDownloadUrl.value;
+  openDownload(officialDownloadUrl.value);
+}
+function openDownload(url: string) {
   if (!url) return;
   const popup = window.open(url, "_blank");
   if (popup) popup.opener = null;
@@ -375,6 +399,9 @@ onBackPress(() => {
 .rs-h5-download__action--disabled { color: var(--v5-ink-3); background: var(--v5-surface); }
 .rs-h5-download__action-text, .rs-h5-download__pending { font-size: 12px; font-weight: 500; }
 .rs-h5-download__arrow { font-size: 13px; line-height: 1; }
+.rs-platform-downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.rs-platform-download__pending { display: block; margin-top: 5px; font-size: 12px; color: var(--v5-ink-3); }
+.rs-h5-download__action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rs-footer { position: fixed; z-index: 3; right: 24px; bottom: 0; left: 24px; padding-top: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); background: linear-gradient(to bottom, transparent, var(--v5-bg) 12px); }
 .rs-cta { min-height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
 .rs-cta__t { font-size: 15px; font-weight: 500; color: var(--v5-on-brand); }
@@ -409,4 +436,7 @@ onBackPress(() => {
   .rs-wrap--gift .rs-h5-download { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); z-index: 2; margin-bottom: 12px; background: var(--v5-bg); }
   .rs-wrap--web-setup.rs-wrap--gift .rs-h5-download { position: static; }
 }
+.rs-wrap--web-download { height: auto; min-height: 100%; padding-top: 32px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
+.rs-wrap--web-download .rs-main { position: static; flex: 1; padding: 0 0 24px; }
+.rs-wrap--web-download .rs-h5-download { position: static; margin-bottom: 16px; }
 </style>
