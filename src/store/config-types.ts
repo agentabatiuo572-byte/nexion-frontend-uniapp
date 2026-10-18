@@ -200,7 +200,7 @@ export interface ShareConfig {
   // 顺序即渠道面板展示序(越南盘默认 Zalo 首位)。
   channels: ShareChannelDef[];
   // 注册成功页 H5 官网下载引导;officialUrl 为空 = 显示不可用占位。
-  // 旧平台直链字段保留兼容历史配置,成功页不再直接消费。
+  // H5 Lite 同时展示 iOS/Android 安装包入口；无有效地址时禁用。
   appDownload: {
     officialUrl: string;
     iosUrl: string;
