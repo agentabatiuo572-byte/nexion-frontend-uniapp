@@ -16,7 +16,7 @@ test("unknown, inactive and top-tier owners receive no invented upgrade comparis
   expect(storeUpgrade(products, [{ kind: "phone", name: "Phone", activatedAt: null, baseRate: 1, baseRateNEX: 1 }])).toBeNull();
   expect(storeUpgrade(products, [{ kind: "stellarrack-p2", name: "P2", activatedAt: 1, baseRate: 50, baseRateNEX: 50 }])).toBeNull();
 });
-test("detail and overview use the activated phone's $0.04 rate and the same 25× multiplier", () => {
+test("h5-lite excludes activated phones from upgrade comparisons without changing rate calculations", () => {
   const phones = [
     { kind: "phone" as const, name: "Inactive", activatedAt: null, baseRate: 0.06, baseRateNEX: 0 },
     { kind: "phone" as const, name: "Current phone", activatedAt: 1, baseRate: 0.04, baseRateNEX: 6 },
@@ -24,7 +24,13 @@ test("detail and overview use the activated phone's $0.04 rate and the same 25×
   const phoneRate = activePhoneDailyRate(phones);
   expect(phoneRate).toBe(0.04);
   expect(storeYieldMultiplier(1, phoneRate)).toBe(25);
-  expect(storeUpgrade(products, phones)?.multiplier).toBe(25);
+  expect(storeUpgrade(products, phones)).toBeNull();
+  const upgrade = storeUpgrade(products, [...phones,
+    { kind: "stellarbox-s1", name: "S1", activatedAt: 1, baseRate: 1, baseRateNEX: 2 },
+  ]);
+  expect(upgrade?.base.kind).toBe("stellarbox-s1");
+  expect(upgrade?.target.id).toBe("stellarbox-pro-v2");
+  expect(upgrade?.multiplier).toBe(5);
   expect(activePhoneDailyRate(phones.slice(0, 1))).toBe(0);
   expect(storeYieldMultiplier(1, 0)).toBe(0);
 });
