@@ -151,6 +151,8 @@ const joinedAtValid = computed(() =>
 // no higher catalog product to compare against and remains hidden.
 const show = computed(() =>
   promo.value !== null
+  && promo.value.baseKind !== "phone"
+  && promo.value.targetKind !== "phone"
   && promo.value.baseKind !== "cloud-share"
   && promo.value.targetKind !== "cloud-share"
   && authoritativeNow.value > 0
