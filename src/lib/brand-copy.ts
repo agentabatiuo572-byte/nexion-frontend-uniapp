@@ -16,6 +16,20 @@ const LEGACY_BRAND = "Nexi" + "on";
 const BRAND = "UVEL";
 
 const LEGACY_BRAND_PATTERN = new RegExp(LEGACY_BRAND, "gi");
+const SYSTEM_NICKNAME_PATTERN = new RegExp(`^(?:(?:${LEGACY_BRAND}|NexGrid) [0-9]{4}|NexGrid-[0-9A-F]{8})$`);
+
+/** Only system-generated historical nicknames; keep personal names and raw API values intact. */
+export function displayNickname(value: string): string {
+  return SYSTEM_NICKNAME_PATTERN.test(value) ? nexGridBrandText(value) : value;
+}
+
+/** Known official snapshots only; custom catalog names remain verbatim. */
+export function catalogSkuBrandText(id: string | undefined, value: string): string {
+  const official = (id === "stellarbox-s1" && value === "NexGridBox S1")
+    || (id === "stellarbox-pro" && value === "StellarBox Pro")
+    || (id === "stellarrack-p1" && value === "StellarRack P1");
+  return official ? nexGridBrandText(value) : value;
+}
 
 /** 服务端历史值 → 现品牌文案。大小写不敏感,命中即整词替换。 */
 export function nexGridBrandText(value: string): string {
