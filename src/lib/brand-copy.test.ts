@@ -71,6 +71,9 @@ describe("system nickname display", () => {
 describe("official SKU display", () => {
   it.each([
     ["stellarbox-s1", "NexGridBox S1", "UVELBox S1"],
+    ["stellarbox-pro-v2", "NexGridBox Pro v2", "UVELBox Pro v2"],
+    ["stellarbox-pro-v2", "NexGridBox Pro v2 Limited", "NexGridBox Pro v2 Limited"],
+    ["custom", "NexGridBox Pro v2", "NexGridBox Pro v2"],
     ["stellarbox-pro", "StellarBox Pro", "UVELBox Pro"],
     ["stellarrack-p1", "StellarRack P1", "UVELRack P1"],
     ["custom", "NexGridBox S1", "NexGridBox S1"],
