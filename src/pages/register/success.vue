@@ -3,8 +3,8 @@
   规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE5]。
   仅 H5 注册链路到达(register.vue finish 的 #ifdef H5 分支);APP 壳内注册直进
   onboarding。bare 全屏页(无 chassis)→ 自带 GlobalUi 宿主(PORT-PITFALLS P-062)。
-  H5 官网地址读取 share.appDownload.officialUrl，平台安装包分别读取
-  share.appDownload.iosUrl 与 androidUrl/apkUrl；空值
+  H5 官网地址读取 share.appDownload.officialUrl，所有下载入口统一前往
+  官网 /download/，platform 区分 ios/android/auto，source=button 标识按钮来源；空值
   显示不可用占位,不制造死链接。App 编译不渲染下载提醒。返回键视同
   「继续」:H5 进首页,App 进 onboarding(禁回注册流)。
 -->
@@ -84,7 +84,7 @@
         <view class="rs-platform-downloads">
           <view v-for="item in platformDownloads" :key="item.platform" class="rs-platform-download">
             <view v-if="item.url" class="rs-h5-download__action active-press" role="link" tabindex="0"
-              @click="openDownload(item.url)" @keydown.enter.prevent="openDownload(item.url)" @keydown.space.prevent="openDownload(item.url)">
+              @click="openDownload(item.url)">
               <text class="rs-h5-download__action-text">{{ item.label }} ↗</text>
             </view>
             <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
@@ -100,7 +100,6 @@
           role="link"
           tabindex="0"
           @click="openOfficialDownload"
-          @keydown.enter.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
           <text class="rs-h5-download__arrow">↗</text>
@@ -161,6 +160,7 @@ import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { getDeviceId } from "@/lib/device-id";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { calibrationBelongsTo } from "@/lib/phone-calibration-flow";
+import { appDownloadUrl } from "@/lib/app-download-url";
 // #endif
 
 type GiftState = "posted" | "pending" | "none";
@@ -317,22 +317,12 @@ async function deferForWeb() {
     if (generation === setupGeneration) setupBusy.value = false;
   }
 }
-function safeDownloadUrl(value: string | undefined): string {
-  const raw = value?.trim() ?? "";
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw);
-    return parsed.protocol === "https:" ? parsed.href : "";
-  } catch {
-    return "";
-  }
-}
-const officialDownloadUrl = computed(() => safeDownloadUrl(
+const officialDownloadUrl = computed(() => appDownloadUrl(
   cfg.config.share.appDownload.officialUrl,
 ));
 const platformDownloads = computed(() => [
-  { platform: "ios", label: t.value.register.doneIosDownload, url: safeDownloadUrl(cfg.config.share.appDownload.iosUrl) },
-  { platform: "android", label: t.value.register.doneAndroidDownload, url: safeDownloadUrl(cfg.config.share.appDownload.androidUrl) || safeDownloadUrl(cfg.config.share.appDownload.apkUrl) },
+  { platform: "ios", label: t.value.register.doneIosDownload, url: appDownloadUrl(cfg.config.share.appDownload.officialUrl, "ios") },
+  { platform: "android", label: t.value.register.doneAndroidDownload, url: appDownloadUrl(cfg.config.share.appDownload.officialUrl, "android") },
 ]);
 
 function openOfficialDownload() {
@@ -340,9 +330,7 @@ function openOfficialDownload() {
 }
 function openDownload(url: string) {
   if (!url) return;
-  const popup = window.open(url, "_blank");
-  if (popup) popup.opener = null;
-  else window.location.assign(url);
+  window.location.assign(url);
 }
 function retryDownloadConfig() {
   if (!cfg.loading) void cfg.load();
