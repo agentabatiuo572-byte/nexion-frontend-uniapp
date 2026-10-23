@@ -77,7 +77,7 @@ afterEach(() => {
   vi.useRealTimers(); vi.unstubAllGlobals();
 });
 
-const afternoon = { en: "Good afternoon", vi: "Chào buổi chiều", zh: "Good afternoon" };
+const afternoon = { en: "Good afternoon", vi: "Chào buổi chiều", zh: "下午好" };
 test.each([
   ["en", "vi"], ["en", "zh"], ["vi", "en"], ["vi", "zh"], ["zh", "en"], ["zh", "vi"],
 ] as Array<[keyof typeof afternoon, keyof typeof afternoon]>)
@@ -100,7 +100,7 @@ test("late account-language hydration updates the already mounted greeting", asy
   resolve({ language: "zh" });
   await pendingProfileLocaleHydration({ accountId: "user:3778", revision: 1 });
   await Vue.nextTick();
-  expect(header.text()).toBe("Good evening, UVEL 3778");
+  expect(header.text()).toBe("晚上好, UVEL 3778");
 });
 
 test("a freshly published dictionary updates a mounted greeting in the same locale", async () => {
