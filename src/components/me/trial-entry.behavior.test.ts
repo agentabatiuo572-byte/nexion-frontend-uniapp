@@ -64,8 +64,8 @@ afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); vi.unstubAll
 test.each([
   ["en", "active", "Trial in progress · Active"],
   ["en", "grace", "Trial ended · Production stopped"],
-  ["zh", "active", "Trial in progress · Active"],
-  ["zh", "grace", "Trial ended · Production stopped"],
+  ["zh", "active", "试用进行中 · 体验中"],
+  ["zh", "grace", "试用已结束 · 已停止产出"],
   ["vi", "active", "Đang dùng thử · Đang chạy"],
   ["vi", "grace", "Đã kết thúc dùng thử · Đã ngừng sinh lời"],
 ] as const)("renders the %s %s entry with its truthful title and detail route", async (locale, status, title) => {

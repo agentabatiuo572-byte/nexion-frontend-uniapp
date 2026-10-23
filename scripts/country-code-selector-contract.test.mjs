@@ -8,14 +8,14 @@ const phoneRules = read("src/auth/phone-number.ts");
 const login = read("src/pages/login/login.vue");
 const register = read("src/pages/register/register.vue");
 
-test("only +84 remains selectable while every other country stays visible and disabled", () => {
+test("+84 and +86 are selectable while other countries stay disabled", () => {
   assert.match(selector, /v-for="\(item, index\) in COUNTRIES"/);
   assert.match(selector, /case "CN": return t\.value\.countryCodes\.china/);
   assert.match(phoneRules, /PHONE_COUNTRIES[^=]*=\s*\[\s*\{ iso: "VN", dialCode: "\+84"[^\n]*selectable: true/);
-  assert.match(phoneRules, /\{ iso: "CN", dialCode: "\+86"[^\n]*selectable: false/);
+  assert.match(phoneRules, /\{ iso: "CN", dialCode: "\+86"[^\n]*selectable: true/);
   assert.equal((phoneRules.match(/dialCode:\s*"\+/g) ?? []).length, 16);
-  assert.equal((phoneRules.match(/selectable:\s*true/g) ?? []).length, 1);
-  assert.equal((phoneRules.match(/selectable:\s*false/g) ?? []).length, 15);
+  assert.equal((phoneRules.match(/selectable:\s*true/g) ?? []).length, 2);
+  assert.equal((phoneRules.match(/selectable:\s*false/g) ?? []).length, 14);
   assert.match(selector, /:aria-disabled="!item\.selectable"/);
   assert.match(selector, /:tabindex="item\.selectable \? 0 : -1"/);
   assert.match(selector, /cc-row--disabled/);

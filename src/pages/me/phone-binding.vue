@@ -34,14 +34,15 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { accountApi, authApi, sessionVault } from "@/api/runtime";
-import { sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
+import { dialCodeForLocale, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
+import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 import { asApiError } from "@/api/errors";
 
 const t = useT();
 const showCountries = ref(false);
-const countryCode = ref("+84");
+const countryCode = ref(dialCodeForLocale(useLocaleStore().code));
 const phone = ref("");
 const code = ref("");
 const challengeNo = ref("");
