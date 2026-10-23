@@ -3,7 +3,7 @@ import { LOCALES, getLocale } from "./index";
 
 describe("supported locale catalogue", () => {
   it("advertises only locales backed by complete dictionaries", () => {
-    expect(LOCALES.map((locale) => locale.code)).toEqual(["en", "vi", "zh"]);
+    expect(LOCALES.map((locale) => locale.code)).toEqual(["en", "vi"]);
     expect(LOCALES.every((locale) => !locale.isRTL)).toBe(true);
   });
 
