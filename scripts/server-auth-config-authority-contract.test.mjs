@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import test from "node:test";
+const { initPreContext, preJs } = createRequire(import.meta.url)("@dcloudio/uni-cli-shared");
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 // 🔴 fnBlock:按大括号配平抠出**这一个函数的块**,断言只在块内量。
@@ -40,9 +42,18 @@ test("server mode starts unauthenticated and only retains a non-secret recovery 
   assert.match(runtimeVault, /const vault = createSessionVault\(storage, \{ deferHydration: !!storage \}\);/);
   assert.match(runtimeVault, /if \(storage\) return vault;/);
   const runtime = read("src/api/runtime.ts");
-  assert.match(runtime, /\/\/ #ifdef APP-PLUS\s+if \(!h5RefreshCookieEnabled\) \{\s+nativeSessionStorage = createNativeSessionStorage\([^\n]+\);\s+\}\s+\/\/ #endif/,
-    "the native encrypted adapter must remain APP-PLUS only");
-  assert.match(runtime, /await nativeSessionStorage\.ready\(\);\s+sessionVault\.hydrate\(\);/);
+  const nativeBlock = runtime.match(/\/\/ #ifdef APP-PLUS\s+if \(!h5RefreshCookieEnabled\) \{([\s\S]*?)\}\s+\/\/ #endif/)?.[1];
+  assert.ok(nativeBlock, "native encrypted adapters must remain APP-PLUS only");
+  assert.match(nativeBlock, /nativeSessionStorage = createNativeSessionStorage\(/);
+  assert.equal((runtime.match(/= createNativeSessionStorage\(/g) || []).length, 1);
+  const prepare = fnBlock(runtime, "prepareSessionVault");
+  assert.match(prepare, /await nativeSessionStorage\.ready\(\);\s+sessionVault\.hydrate\(\);/);
+  initPreContext("h5");
+  const h5 = preJs(runtime, "src/api/runtime.ts");
+  assert.doesNotMatch(h5, /clientSurface = "APP"|= createNativeSessionStorage\(/);
+  assert.match(h5, /executionSupported: \(\) => false/);
+  assert.match(h5, /attemptStorage: typeof sessionStorage !== "undefined"/);
+  assert.match(h5, /sessionStorage\.setItem\("uvel-login-attempt", JSON\.stringify\(value\)\)/);
   assert.doesNotMatch(runtimeVault, /(?:window\.)?localStorage\.(?:setItem|getItem)|uni\.setStorageSync|storage\.set\(/,
     "cross-tab access-token continuity must remain in memory");
   assert.doesNotMatch(fnBlock(vault, "persistAndCommit"), /accessToken:\s*snapshot\.accessToken/,
@@ -80,7 +91,12 @@ test("mock password reset persists through AuthApi and reuses the phone account 
     "mock reset must not bypass the AuthApi persistence call");
   assert.match(accountId, /if \(remoteApiEnabled\) return `user:\$\{user\.userId\}`/);
   assert.match(accountId, /authAccountKeyForPhone\(`\$\{user\.countryCode\}\$\{user\.phone\}`\)/);
-  assert.equal((login.match(/accountId: authenticatedAccountId\(result\.user\)/g) || []).length, 3);
+  for (const name of ["signInWithPassword", "verifyRemoteTwoFactor", "verifyCode", "retryOriginalLogin", "recoverLoginResult"]) {
+    const flow = fnBlock(login, name);
+    assert.match(flow, /accountId: authenticatedAccountId\(result\.user\)/, name);
+    assert.match(flow, /serverProfile: result\.user/, name);
+    assert.match(flow, /serverSessionRevision: result\.vaultRevision/, name);
+  }
   assert.match(login, /identity: authenticatedAccountId\(result\.user\)/);
 });
 
